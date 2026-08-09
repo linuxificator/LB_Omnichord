@@ -1,0 +1,1064 @@
+{
+  "version": 1,
+  "factory_name": "DnB Voltage",
+  "chord_rows": [
+    {
+      "chord": "minor",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "5",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "minor7",
+      "octave": "O4",
+      "inversion": 0
+    },
+    {
+      "chord": "dominant7_flat5",
+      "octave": "O4",
+      "inversion": 0
+    }
+  ],
+  "synths": {
+    "chord": {
+      "selected": "mod_dsaw",
+      "parameters": {
+        "beep": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "sine": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "saw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "square": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0
+        },
+        "pulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "pulse_width": 0.5
+        },
+        "subpulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "pulse_width": 0.5,
+          "sub_amp": 1.0,
+          "sub_detune": -12.0
+        },
+        "tri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0
+        },
+        "dsaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1
+        },
+        "dpulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1,
+          "pulse_width": 0.5
+        },
+        "dtri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1
+        },
+        "fm": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "divisor": 2.0,
+          "depth": 1.0
+        },
+        "mod_fm": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "divisor": 2.0,
+          "depth": 1.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_saw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_dsaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 0.38,
+          "cutoff": 118.0,
+          "detune": 0.42,
+          "mod_range": 11.0,
+          "mod_phase": 0.16
+        },
+        "mod_sine": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_tri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_pulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "pulse_width": 0.5,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "tb303": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 120.0,
+          "res": 0.9,
+          "cutoff_min": 30.0,
+          "pulse_width": 0.5
+        },
+        "supersaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 130.0,
+          "res": 0.7
+        },
+        "hoover": {
+          "attack": 0.05,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 130.0,
+          "res": 0.1
+        },
+        "prophet": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 110.0,
+          "res": 0.7
+        },
+        "zawa": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "res": 0.9,
+          "pulse_width": 0.5,
+          "phase": 1.0,
+          "range": 24.0
+        },
+        "dull_bell": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "pretty_bell": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "blade": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "vibrato_rate": 6.0,
+          "vibrato_depth": 0.15
+        },
+        "piano": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "vel": 0.2,
+          "hard": 0.5,
+          "stereo_width": 0.0
+        },
+        "pluck": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "noise_amp": 0.8,
+          "pluck_decay": 30.0,
+          "coef": 0.3
+        }
+      }
+    },
+    "strum": {
+      "selected": "mod_pulse",
+      "parameters": {
+        "beep": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "sine": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "saw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "square": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0
+        },
+        "pulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "pulse_width": 0.5
+        },
+        "subpulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "pulse_width": 0.5,
+          "sub_amp": 1.0,
+          "sub_detune": -12.0
+        },
+        "tri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0
+        },
+        "dsaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1
+        },
+        "dpulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1,
+          "pulse_width": 0.5
+        },
+        "dtri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1
+        },
+        "fm": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "divisor": 2.0,
+          "depth": 1.0
+        },
+        "mod_fm": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "divisor": 2.0,
+          "depth": 1.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_saw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_dsaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_sine": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_tri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_pulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 0.24,
+          "cutoff": 124.0,
+          "pulse_width": 0.2,
+          "mod_range": 12.0,
+          "mod_phase": 0.14
+        },
+        "tb303": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 120.0,
+          "res": 0.9,
+          "cutoff_min": 30.0,
+          "pulse_width": 0.5
+        },
+        "supersaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 130.0,
+          "res": 0.7
+        },
+        "hoover": {
+          "attack": 0.05,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 130.0,
+          "res": 0.1
+        },
+        "prophet": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 110.0,
+          "res": 0.7
+        },
+        "zawa": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "res": 0.9,
+          "pulse_width": 0.5,
+          "phase": 1.0,
+          "range": 24.0
+        },
+        "dull_bell": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "pretty_bell": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "blade": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "vibrato_rate": 6.0,
+          "vibrato_depth": 0.15
+        },
+        "piano": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "vel": 0.2,
+          "hard": 0.5,
+          "stereo_width": 0.0
+        },
+        "pluck": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "noise_amp": 0.8,
+          "pluck_decay": 30.0,
+          "coef": 0.3
+        }
+      }
+    },
+    "bass": {
+      "selected": "subpulse",
+      "parameters": {
+        "beep": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "sine": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "saw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "square": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0
+        },
+        "pulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "pulse_width": 0.5
+        },
+        "subpulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 0.22,
+          "cutoff": 82.0,
+          "pulse_width": 0.24,
+          "sub_amp": 1.55,
+          "sub_detune": -12.0
+        },
+        "tri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0
+        },
+        "dsaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1
+        },
+        "dpulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1,
+          "pulse_width": 0.5
+        },
+        "dtri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1
+        },
+        "fm": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "divisor": 2.0,
+          "depth": 1.0
+        },
+        "mod_fm": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "divisor": 2.0,
+          "depth": 1.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_saw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_dsaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "detune": 0.1,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_sine": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_tri": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "mod_pulse": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "pulse_width": 0.5,
+          "mod_range": 5.0,
+          "mod_phase": 0.25
+        },
+        "tb303": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 120.0,
+          "res": 0.9,
+          "cutoff_min": 30.0,
+          "pulse_width": 0.5
+        },
+        "supersaw": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 130.0,
+          "res": 0.7
+        },
+        "hoover": {
+          "attack": 0.05,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 130.0,
+          "res": 0.1
+        },
+        "prophet": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 110.0,
+          "res": 0.7
+        },
+        "zawa": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "res": 0.9,
+          "pulse_width": 0.5,
+          "phase": 1.0,
+          "range": 24.0
+        },
+        "dull_bell": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "pretty_bell": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0
+        },
+        "blade": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "cutoff": 100.0,
+          "vibrato_rate": 6.0,
+          "vibrato_depth": 0.15
+        },
+        "piano": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "vel": 0.2,
+          "hard": 0.5,
+          "stereo_width": 0.0
+        },
+        "pluck": {
+          "attack": 0.0,
+          "decay": 0.0,
+          "sustain": 0.0,
+          "release": 1.0,
+          "noise_amp": 0.8,
+          "pluck_decay": 30.0,
+          "coef": 0.3
+        }
+      }
+    }
+  },
+  "volumes": {
+    "chord": 0.63,
+    "strum": 0.66,
+    "bass": 0.76,
+    "percussion": 0.78
+  },
+  "transport": {
+    "rhythm_running": false,
+    "bass_running": true
+  },
+  "rhythm": {
+    "selected": "drum_and_bass",
+    "settings": {
+      "pop_8": {
+        "tempo": 108.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "pop_16": {
+        "tempo": 112.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "slow_ballad": {
+        "tempo": 66.0,
+        "percussion_activity": 1,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "six_eight_ballad": {
+        "tempo": 72.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "rock": {
+        "tempo": 118.0,
+        "percussion_activity": 2,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "shuffle": {
+        "tempo": 112.0,
+        "percussion_activity": 2,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "punk": {
+        "tempo": 176.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "metal": {
+        "tempo": 150.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "country_train": {
+        "tempo": 132.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "country_waltz": {
+        "tempo": 92.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "waltz": {
+        "tempo": 96.0,
+        "percussion_activity": 1,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "polka": {
+        "tempo": 126.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "march": {
+        "tempo": 116.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "straight_blues": {
+        "tempo": 100.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "twelve_eight_blues": {
+        "tempo": 72.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "jazz_swing": {
+        "tempo": 144.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "jazz_waltz": {
+        "tempo": 138.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "jazz_shuffle": {
+        "tempo": 118.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "funk": {
+        "tempo": 102.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "jazz_funk": {
+        "tempo": 108.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "soul": {
+        "tempo": 92.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "soul_shuffle": {
+        "tempo": 94.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "gospel_6_8": {
+        "tempo": 82.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "rnb": {
+        "tempo": 78.0,
+        "percussion_activity": 1,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "disco": {
+        "tempo": 120.0,
+        "percussion_activity": 3,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "house": {
+        "tempo": 124.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "techno": {
+        "tempo": 132.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "trance": {
+        "tempo": 138.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "garage_2step": {
+        "tempo": 132.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "breakbeat": {
+        "tempo": 128.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "drum_and_bass": {
+        "tempo": 174.0,
+        "percussion_activity": 4,
+        "chord_activity": 4,
+        "bass_activity": 4
+      },
+      "dubstep": {
+        "tempo": 140.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "hip_hop": {
+        "tempo": 86.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "boom_bap": {
+        "tempo": 92.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "trap": {
+        "tempo": 140.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "bossa": {
+        "tempo": 132.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "samba": {
+        "tempo": 148.0,
+        "percussion_activity": 3,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "salsa": {
+        "tempo": 110.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "cha_cha": {
+        "tempo": 118.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "mambo": {
+        "tempo": 176.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "merengue": {
+        "tempo": 130.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "cumbia": {
+        "tempo": 92.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "bolero": {
+        "tempo": 76.0,
+        "percussion_activity": 1,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "tango": {
+        "tempo": 120.0,
+        "percussion_activity": 1,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "son_clave_3_2": {
+        "tempo": 100.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "rumba_clave_3_2": {
+        "tempo": 104.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "afro_cuban_6_8": {
+        "tempo": 110.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "reggae": {
+        "tempo": 78.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "calypso_soca": {
+        "tempo": 126.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "five_four": {
+        "tempo": 108.0,
+        "percussion_activity": 2,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "seven_eight": {
+        "tempo": 126.0,
+        "percussion_activity": 2,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "seven_four_funk": {
+        "tempo": 112.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "nine_eight": {
+        "tempo": 118.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "eleven_eight": {
+        "tempo": 116.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      }
+    }
+  },
+  "tuning": {
+    "mode": "EQ",
+    "reference_hz": 440
+  }
+}
