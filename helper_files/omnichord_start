@@ -1,0 +1,36 @@
+#!/bin/bash
+
+for i in $(seq 1 30); do
+    if systemctl --user is-active --quiet pipewire.service &&
+       systemctl --user is-active --quiet wireplumber.service; then
+        break
+    fi
+    sleep 1
+done
+
+# Wait until an HDMI sink has actually appeared.
+for i in $(seq 1 30); do
+    if wpctl status | sed -n '/Sinks:/,/Sources:/p' | grep -qi HDMI; then
+        break
+    fi
+    sleep 1
+done
+
+# Give HDMI/PipeWire a little settling time.
+sleep 3
+
+sonic-pi &
+
+for i in $(seq 1 30); do
+    if ss -lun | grep -q ':4560 '; then
+        break
+    fi
+    sleep 1
+done
+
+# A little extra time for init.rb to finish installing its live_loops
+sleep 3
+
+source "$HOME/omnichord-env/bin/activate"
+cd "$HOME/LB_Omnichord"
+python3 ./main.py --fullscreen
