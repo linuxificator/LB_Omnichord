@@ -14,7 +14,7 @@ ApplicationWindow {
     // Raspberry Pi OS desktop this lets the Wayland compositor own decoration,
     // placement and movement of the top-level window.
     visible: true
-    title: "Qt Omnichord"
+    title: "LB Omnichord"
     color: "#f4f0e6"
 
     property int rowHeight: 74
