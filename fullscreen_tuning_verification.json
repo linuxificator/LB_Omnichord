@@ -1,0 +1,34 @@
+{
+  "fullscreen": {
+    "button_fullscreen_text": "ESC",
+    "button_windowed_text": "FSC",
+    "uses_showNormal": true,
+    "uses_showFullScreen": true,
+    "explicit_decorated_window_flags": true
+  },
+  "watermarks": {
+    "opacity": 0.72,
+    "tuba_source": "user supplied tuba drawing",
+    "tuba_asset": "tuba_watermark.png",
+    "omnichord": "classic OM-84 style silhouette"
+  },
+  "tuning": {
+    "default_reference_hz": 440,
+    "range_hz": [
+      415,
+      466
+    ],
+    "formula": "12 * log2(reference / 440)",
+    "qt_side_only": true,
+    "strum_precision_decimal_places": 12,
+    "sonic_pi_note_parsing": "to_f",
+    "preset_field": "tuning.reference_hz",
+    "numeric_checks": {
+      "A440_offset": 0.0,
+      "A442_offset": 0.07851415040126504,
+      "A415_offset": -1.012706247484469,
+      "A466_offset": 0.9939171735554475
+    }
+  },
+  "ruby_syntax": "Syntax OK"
+}

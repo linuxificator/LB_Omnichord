@@ -1,0 +1,15 @@
+{
+  "strum_low_midi": 24,
+  "strum_high_midi": 107,
+  "range": "C1-B7",
+  "octaves": 7,
+  "uses": [
+    "active root pitch class",
+    "active chord type pitch classes"
+  ],
+  "ignores": [
+    "row octave",
+    "row inversion"
+  ],
+  "ruby_syntax": "Syntax OK"
+}

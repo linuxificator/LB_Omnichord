@@ -1,0 +1,14 @@
+{
+  "probable_fix": {
+    "musical_chord_AbstractButton_removed": true,
+    "direct_MultiPointTouchArea": true,
+    "physical_touch_owns_note_until_release": true
+  },
+  "debug": {
+    "flag": "--debug",
+    "file_flag": "--debug-file",
+    "default_path": "~/.omnichord/debug-*.jsonl",
+    "format": "JSON Lines"
+  },
+  "ruby_syntax": "Syntax OK"
+}

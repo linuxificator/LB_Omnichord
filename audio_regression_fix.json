@@ -1,0 +1,23 @@
+{
+  "normal_audio_paths_restored": {
+    "manual_chord": true,
+    "one_shot_chord": true,
+    "strum": true,
+    "bass": true,
+    "percussion": true
+  },
+  "removed": [
+    "global panic SynthNode list",
+    "tracking wrapper around every play/sample",
+    "startup stopping of stale SynthNode IDs"
+  ],
+  "panic_behavior": [
+    "stop rhythm transport",
+    "disable automatic chords",
+    "stop bass transport",
+    "release all sustained manual chords",
+    "release currently tracked rhythm chord",
+    "short one-shot sounds finish naturally"
+  ],
+  "ruby_syntax": "Syntax OK"
+}

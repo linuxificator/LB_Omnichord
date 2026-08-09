@@ -1,0 +1,46 @@
+{
+  "chord_rows": [
+    {
+      "chord": "major",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "minor",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "major7",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "minor7",
+      "octave": "O3",
+      "inversion": 0
+    }
+  ],
+  "synths": {
+    "chord": "prophet",
+    "strum": "pluck",
+    "bass": "fm"
+  },
+  "volumes": {
+    "chord": 0.5,
+    "strum": 0.5,
+    "bass": 0.5,
+    "percussion": 0.5
+  },
+  "transport": {
+    "rhythm_running": false,
+    "bass_running": true
+  },
+  "rhythm": {
+    "selected": "waltz"
+  },
+  "window": {
+    "start_fullscreen": false,
+    "scale_to_fit": true
+  }
+}

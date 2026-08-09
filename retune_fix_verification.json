@@ -1,0 +1,10 @@
+{
+  "held_octave_change": "retune all held voices in row",
+  "held_inversion_change": "retune all held voices in row",
+  "rhythm_octave_or_inversion_change": "retune currently tracked rhythm chord",
+  "no_current_chord": "settings do not create note-on",
+  "all_touched_buttons_blue": true,
+  "automatic_chord_gate": "rhythm_running AND effective_chord_activity > 0",
+  "startup_stale_rhythm_chord_path": "closed",
+  "ruby_syntax": "Syntax OK"
+}

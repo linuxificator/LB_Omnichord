@@ -1,0 +1,60 @@
+{
+  "watermarks": {
+    "opacity": 0.58,
+    "bass_instruments": [
+      "tuba",
+      "contrabass",
+      "sousaphone"
+    ],
+    "green_instruments": [
+      "accordion",
+      "mandolin",
+      "Suzuki-style Omnichord silhouette"
+    ]
+  },
+  "utility_row": {
+    "height": 104,
+    "tuning_modes": [
+      "HARM",
+      "EQ",
+      "JV"
+    ],
+    "default_mode": "EQ",
+    "reference_hz": {
+      "min": 415,
+      "default": 440,
+      "max": 466,
+      "step": 1
+    },
+    "tuning_audio_implemented": false,
+    "panic_button": "PNC!",
+    "escape_button": "ESC"
+  },
+  "presets": {
+    "count": 18,
+    "directory": "~/.omnichord",
+    "files": "p1.json ... p18.json plus last_preset.json",
+    "same_selected_button_reloads": true,
+    "store_button": "STR",
+    "stores_rhythm_running": true,
+    "stores_bass_running": true,
+    "stores_all_synth_parameter_memories": true,
+    "stores_per_rhythm_settings": true,
+    "stores_tuning_ui_state": true,
+    "startup_loads_last_preset": true
+  },
+  "panic": {
+    "dedicated_osc": "/panic",
+    "hard_kills_manual_chords": true,
+    "hard_kills_tracked_rhythm_chord": true,
+    "kills_recent_strum_bass_percussion_nodes": true,
+    "stops_rhythm_and_bass_transport": true
+  },
+  "validation": {
+    "python_compile": "OK",
+    "ruby_syntax": "Syntax OK",
+    "qml_brace_check": "OK",
+    "preset_backend_stub_test": "OK",
+    "startup_last_preset_test": "OK"
+  }
+}

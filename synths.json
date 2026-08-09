@@ -1,0 +1,1929 @@
+{
+  "schema_version": 2,
+  "source": {
+    "sonic_pi_version": "4.6.0",
+    "generated_document": "etc/doc/cheatsheets/synths.md",
+    "source_metadata": "app/server/ruby/lib/sonicpi/synths/synthinfo.rb",
+    "repository": "sonic-pi-net/sonic-pi"
+  },
+  "default_chord_synth": "prophet",
+  "default_strum_synth": "pluck",
+  "common_control_keys": [
+    "attack",
+    "decay",
+    "sustain",
+    "release"
+  ],
+  "synths": [
+    {
+      "key": "beep",
+      "label": "beep",
+      "source_title": "Sine Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "sine",
+      "label": "sine",
+      "source_title": "Sine Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "saw",
+      "label": "saw",
+      "source_title": "Saw Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "square",
+      "label": "square",
+      "source_title": "Square Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        }
+      ]
+    },
+    {
+      "key": "pulse",
+      "label": "pulse",
+      "source_title": "Pulse Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "pulse_width",
+          "label": "pulse width",
+          "group": "extra",
+          "default": 0.5,
+          "minimum": 0.05,
+          "maximum": 0.95,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "subpulse",
+      "label": "subpulse",
+      "source_title": "Pulse Wave with sub",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "pulse_width",
+          "label": "pulse width",
+          "group": "extra",
+          "default": 0.5,
+          "minimum": 0.05,
+          "maximum": 0.95,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sub_amp",
+          "label": "sub amp",
+          "group": "extra",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sub_detune",
+          "label": "sub detune",
+          "group": "extra",
+          "default": -12.0,
+          "minimum": -24.0,
+          "maximum": 0.0,
+          "step": 1.0,
+          "decimals": 0
+        }
+      ]
+    },
+    {
+      "key": "tri",
+      "label": "tri",
+      "source_title": "Triangle Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        }
+      ]
+    },
+    {
+      "key": "dsaw",
+      "label": "detuned saw",
+      "source_title": "Detuned Saw wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "detune",
+          "label": "detune",
+          "group": "extra",
+          "default": 0.1,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "dpulse",
+      "label": "detuned pulse",
+      "source_title": "Detuned Pulse Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "detune",
+          "label": "detune",
+          "group": "extra",
+          "default": 0.1,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "pulse_width",
+          "label": "pulse width",
+          "group": "extra",
+          "default": 0.5,
+          "minimum": 0.05,
+          "maximum": 0.95,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "dtri",
+      "label": "detuned tri",
+      "source_title": "Detuned Triangle Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "detune",
+          "label": "detune",
+          "group": "extra",
+          "default": 0.1,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "fm",
+      "label": "fm",
+      "source_title": "Basic FM synthesis",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "divisor",
+          "label": "fm divisor",
+          "group": "extra",
+          "default": 2.0,
+          "minimum": 0.25,
+          "maximum": 8.0,
+          "step": 0.05,
+          "decimals": 2
+        },
+        {
+          "key": "depth",
+          "label": "fm depth",
+          "group": "extra",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 10.0,
+          "step": 0.05,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "mod_fm",
+      "label": "mod fm",
+      "source_title": "Basic FM synthesis with frequency modulation.",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "divisor",
+          "label": "fm divisor",
+          "group": "extra",
+          "default": 2.0,
+          "minimum": 0.25,
+          "maximum": 8.0,
+          "step": 0.05,
+          "decimals": 2
+        },
+        {
+          "key": "depth",
+          "label": "fm depth",
+          "group": "extra",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 10.0,
+          "step": 0.05,
+          "decimals": 2
+        },
+        {
+          "key": "mod_range",
+          "label": "mod range",
+          "group": "extra",
+          "default": 5.0,
+          "minimum": 0.0,
+          "maximum": 24.0,
+          "step": 0.25,
+          "decimals": 2
+        },
+        {
+          "key": "mod_phase",
+          "label": "mod phase",
+          "group": "extra",
+          "default": 0.25,
+          "minimum": 0.05,
+          "maximum": 4.0,
+          "step": 0.05,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "mod_saw",
+      "label": "mod saw",
+      "source_title": "Modulated Saw Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "mod_range",
+          "label": "mod range",
+          "group": "extra",
+          "default": 5.0,
+          "minimum": 0.0,
+          "maximum": 24.0,
+          "step": 0.25,
+          "decimals": 2
+        },
+        {
+          "key": "mod_phase",
+          "label": "mod phase",
+          "group": "extra",
+          "default": 0.25,
+          "minimum": 0.05,
+          "maximum": 4.0,
+          "step": 0.05,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "mod_dsaw",
+      "label": "mod detuned saw",
+      "source_title": "Modulated Detuned Saw Waves",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "detune",
+          "label": "detune",
+          "group": "extra",
+          "default": 0.1,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "mod_range",
+          "label": "mod range",
+          "group": "extra",
+          "default": 5.0,
+          "minimum": 0.0,
+          "maximum": 24.0,
+          "step": 0.25,
+          "decimals": 2
+        },
+        {
+          "key": "mod_phase",
+          "label": "mod phase",
+          "group": "extra",
+          "default": 0.25,
+          "minimum": 0.05,
+          "maximum": 4.0,
+          "step": 0.05,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "mod_sine",
+      "label": "mod sine",
+      "source_title": "Modulated Sine Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "mod_range",
+          "label": "mod range",
+          "group": "extra",
+          "default": 5.0,
+          "minimum": 0.0,
+          "maximum": 24.0,
+          "step": 0.25,
+          "decimals": 2
+        },
+        {
+          "key": "mod_phase",
+          "label": "mod phase",
+          "group": "extra",
+          "default": 0.25,
+          "minimum": 0.05,
+          "maximum": 4.0,
+          "step": 0.05,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "mod_tri",
+      "label": "mod tri",
+      "source_title": "Modulated Triangle Wave",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "mod_range",
+          "label": "mod range",
+          "group": "extra",
+          "default": 5.0,
+          "minimum": 0.0,
+          "maximum": 24.0,
+          "step": 0.25,
+          "decimals": 2
+        },
+        {
+          "key": "mod_phase",
+          "label": "mod phase",
+          "group": "extra",
+          "default": 0.25,
+          "minimum": 0.05,
+          "maximum": 4.0,
+          "step": 0.05,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "mod_pulse",
+      "label": "mod pulse",
+      "source_title": "Modulated Pulse",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "pulse_width",
+          "label": "pulse width",
+          "group": "extra",
+          "default": 0.5,
+          "minimum": 0.05,
+          "maximum": 0.95,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "mod_range",
+          "label": "mod range",
+          "group": "extra",
+          "default": 5.0,
+          "minimum": 0.0,
+          "maximum": 24.0,
+          "step": 0.25,
+          "decimals": 2
+        },
+        {
+          "key": "mod_phase",
+          "label": "mod phase",
+          "group": "extra",
+          "default": 0.25,
+          "minimum": 0.05,
+          "maximum": 4.0,
+          "step": 0.05,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "tb303",
+      "label": "tb 303",
+      "source_title": "TB-303 Emulation",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 120.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "res",
+          "label": "resonance",
+          "group": "extra",
+          "default": 0.9,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff_min",
+          "label": "cutoff min",
+          "group": "extra",
+          "default": 30.0,
+          "minimum": 20.0,
+          "maximum": 120.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "pulse_width",
+          "label": "pulse width",
+          "group": "extra",
+          "default": 0.5,
+          "minimum": 0.05,
+          "maximum": 0.95,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "supersaw",
+      "label": "supersaw",
+      "source_title": "Supersaw",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 130.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "res",
+          "label": "resonance",
+          "group": "extra",
+          "default": 0.7,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "hoover",
+      "label": "hoover",
+      "source_title": "Hoover",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.05,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 130.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "res",
+          "label": "resonance",
+          "group": "extra",
+          "default": 0.1,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "prophet",
+      "label": "prophet",
+      "source_title": "The Prophet",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 110.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "res",
+          "label": "resonance",
+          "group": "extra",
+          "default": 0.7,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "zawa",
+      "label": "zawa",
+      "source_title": "Zawa",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "res",
+          "label": "resonance",
+          "group": "extra",
+          "default": 0.9,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "pulse_width",
+          "label": "pulse width",
+          "group": "extra",
+          "default": 0.5,
+          "minimum": 0.05,
+          "maximum": 0.95,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "phase",
+          "label": "phase",
+          "group": "extra",
+          "default": 1.0,
+          "minimum": 0.05,
+          "maximum": 4.0,
+          "step": 0.05,
+          "decimals": 2
+        },
+        {
+          "key": "range",
+          "label": "range",
+          "group": "extra",
+          "default": 24.0,
+          "minimum": 0.0,
+          "maximum": 48.0,
+          "step": 1.0,
+          "decimals": 0
+        }
+      ]
+    },
+    {
+      "key": "dull_bell",
+      "label": "dull bell",
+      "source_title": "Dull Bell",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "pretty_bell",
+      "label": "pretty bell",
+      "source_title": "Pretty Bell",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "blade",
+      "label": "blade",
+      "source_title": "Blade Runner style strings",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "cutoff",
+          "label": "cutoff",
+          "group": "extra",
+          "default": 100.0,
+          "minimum": 30.0,
+          "maximum": 130.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "vibrato_rate",
+          "label": "vibrato rate",
+          "group": "extra",
+          "default": 6.0,
+          "minimum": 0.0,
+          "maximum": 20.0,
+          "step": 0.1,
+          "decimals": 1
+        },
+        {
+          "key": "vibrato_depth",
+          "label": "vibrato depth",
+          "group": "extra",
+          "default": 0.15,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "piano",
+      "label": "piano",
+      "source_title": "SynthPiano",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "vel",
+          "label": "velocity",
+          "group": "extra",
+          "default": 0.2,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "hard",
+          "label": "hardness",
+          "group": "extra",
+          "default": 0.5,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "stereo_width",
+          "label": "stereo width",
+          "group": "extra",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    },
+    {
+      "key": "pluck",
+      "label": "pluck",
+      "source_title": "SynthPluck",
+      "controls": [
+        {
+          "key": "attack",
+          "label": "attack",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "decay",
+          "label": "decay",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 2.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "sustain",
+          "label": "sustain",
+          "group": "common",
+          "default": 0.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "release",
+          "label": "release",
+          "group": "common",
+          "default": 1.0,
+          "minimum": 0.0,
+          "maximum": 4.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "noise_amp",
+          "label": "noise amp",
+          "group": "extra",
+          "default": 0.8,
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "step": 0.01,
+          "decimals": 2
+        },
+        {
+          "key": "pluck_decay",
+          "label": "pluck decay",
+          "group": "extra",
+          "default": 30.0,
+          "minimum": 1.0,
+          "maximum": 100.0,
+          "step": 1.0,
+          "decimals": 0
+        },
+        {
+          "key": "coef",
+          "label": "coefficient",
+          "group": "extra",
+          "default": 0.3,
+          "minimum": -0.95,
+          "maximum": 0.95,
+          "step": 0.01,
+          "decimals": 2
+        }
+      ]
+    }
+  ],
+  "default_bass_synth": "fm"
+}

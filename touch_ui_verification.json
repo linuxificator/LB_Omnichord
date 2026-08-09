@@ -1,0 +1,45 @@
+{
+  "wheel_tap_selection": {
+    "rhythm": true,
+    "synth": true,
+    "chord_type": true,
+    "swipe_retained": true
+  },
+  "volume_controls": {
+    "drag_slider_removed": true,
+    "tap_step_percent": 5,
+    "hold_delay_ms": 380,
+    "repeat_step_percent": 2.5,
+    "repeat_interval_ms": 75,
+    "labels_removed": true,
+    "percentage_centered": true
+  },
+  "watermarks": {
+    "yellow": [
+      "drum",
+      "tambourine",
+      "maracas",
+      "cymbal"
+    ],
+    "gray": [
+      "tuba",
+      "contrabass",
+      "sousaphone"
+    ],
+    "blue": [
+      "harp",
+      "lyre"
+    ],
+    "green": [
+      "accordion",
+      "mandolin",
+      "Omnichord-style"
+    ]
+  },
+  "startup_rhythm_race": {
+    "chord_state_authoritative_off": true,
+    "manual_start_authoritative_off": true,
+    "transport_off_stops_tracked_rhythm_nodes": true
+  },
+  "ruby_syntax": "Syntax OK"
+}

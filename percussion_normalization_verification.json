@@ -1,0 +1,425 @@
+{
+  "summary": {
+    "rhythms_normalized": 54,
+    "percussion_events": 1908,
+    "before": {
+      "min": 0.09,
+      "median": 0.22,
+      "max": 1.0
+    },
+    "after": {
+      "min": 0.109756,
+      "median": 0.284091,
+      "max": 1.0
+    },
+    "peak_scale_range": {
+      "min": 1.0,
+      "max": 2.941176470588235
+    },
+    "examples": {
+      "pop_8": {
+        "id": "pop_8",
+        "events": 32,
+        "old_peak": 0.82,
+        "scale": 1.2195121951219512,
+        "new_peak": 1.0
+      },
+      "jazz_swing": {
+        "id": "jazz_swing",
+        "events": 35,
+        "old_peak": 0.34,
+        "scale": 2.941176470588235,
+        "new_peak": 1.0
+      },
+      "waltz": {
+        "id": "waltz",
+        "events": 23,
+        "old_peak": 1.0,
+        "scale": 1.0,
+        "new_peak": 1.0
+      }
+    },
+    "sonic_pi_receiver_changed": false,
+    "ruby_syntax": "Syntax OK"
+  },
+  "rhythms": [
+    {
+      "id": "pop_8",
+      "events": 32,
+      "old_peak": 0.82,
+      "scale": 1.2195121951219512,
+      "new_peak": 1.0
+    },
+    {
+      "id": "pop_16",
+      "events": 48,
+      "old_peak": 0.82,
+      "scale": 1.2195121951219512,
+      "new_peak": 1.0
+    },
+    {
+      "id": "slow_ballad",
+      "events": 30,
+      "old_peak": 0.72,
+      "scale": 1.3888888888888888,
+      "new_peak": 1.0
+    },
+    {
+      "id": "six_eight_ballad",
+      "events": 21,
+      "old_peak": 0.78,
+      "scale": 1.282051282051282,
+      "new_peak": 1.0
+    },
+    {
+      "id": "rock",
+      "events": 32,
+      "old_peak": 0.88,
+      "scale": 1.1363636363636365,
+      "new_peak": 1.0
+    },
+    {
+      "id": "shuffle",
+      "events": 31,
+      "old_peak": 0.82,
+      "scale": 1.2195121951219512,
+      "new_peak": 1.0
+    },
+    {
+      "id": "punk",
+      "events": 34,
+      "old_peak": 0.76,
+      "scale": 1.3157894736842106,
+      "new_peak": 1.0
+    },
+    {
+      "id": "metal",
+      "events": 40,
+      "old_peak": 0.82,
+      "scale": 1.2195121951219512,
+      "new_peak": 1.0
+    },
+    {
+      "id": "country_train",
+      "events": 36,
+      "old_peak": 0.72,
+      "scale": 1.3888888888888888,
+      "new_peak": 1.0
+    },
+    {
+      "id": "country_waltz",
+      "events": 23,
+      "old_peak": 0.76,
+      "scale": 1.3157894736842106,
+      "new_peak": 1.0
+    },
+    {
+      "id": "waltz",
+      "events": 23,
+      "old_peak": 1.0,
+      "scale": 1.0,
+      "new_peak": 1.0
+    },
+    {
+      "id": "polka",
+      "events": 21,
+      "old_peak": 0.72,
+      "scale": 1.3888888888888888,
+      "new_peak": 1.0
+    },
+    {
+      "id": "march",
+      "events": 26,
+      "old_peak": 0.74,
+      "scale": 1.3513513513513513,
+      "new_peak": 1.0
+    },
+    {
+      "id": "straight_blues",
+      "events": 30,
+      "old_peak": 0.74,
+      "scale": 1.3513513513513513,
+      "new_peak": 1.0
+    },
+    {
+      "id": "twelve_eight_blues",
+      "events": 43,
+      "old_peak": 0.76,
+      "scale": 1.3157894736842106,
+      "new_peak": 1.0
+    },
+    {
+      "id": "jazz_swing",
+      "events": 35,
+      "old_peak": 0.34,
+      "scale": 2.941176470588235,
+      "new_peak": 1.0
+    },
+    {
+      "id": "jazz_waltz",
+      "events": 23,
+      "old_peak": 0.34,
+      "scale": 2.941176470588235,
+      "new_peak": 1.0
+    },
+    {
+      "id": "jazz_shuffle",
+      "events": 31,
+      "old_peak": 0.46,
+      "scale": 2.1739130434782608,
+      "new_peak": 1.0
+    },
+    {
+      "id": "funk",
+      "events": 50,
+      "old_peak": 0.78,
+      "scale": 1.282051282051282,
+      "new_peak": 1.0
+    },
+    {
+      "id": "jazz_funk",
+      "events": 50,
+      "old_peak": 0.72,
+      "scale": 1.3888888888888888,
+      "new_peak": 1.0
+    },
+    {
+      "id": "soul",
+      "events": 32,
+      "old_peak": 0.7,
+      "scale": 1.4285714285714286,
+      "new_peak": 1.0
+    },
+    {
+      "id": "soul_shuffle",
+      "events": 31,
+      "old_peak": 0.68,
+      "scale": 1.4705882352941175,
+      "new_peak": 1.0
+    },
+    {
+      "id": "gospel_6_8",
+      "events": 21,
+      "old_peak": 0.76,
+      "scale": 1.3157894736842106,
+      "new_peak": 1.0
+    },
+    {
+      "id": "rnb",
+      "events": 32,
+      "old_peak": 0.68,
+      "scale": 1.4705882352941175,
+      "new_peak": 1.0
+    },
+    {
+      "id": "disco",
+      "events": 55,
+      "old_peak": 0.8,
+      "scale": 1.25,
+      "new_peak": 1.0
+    },
+    {
+      "id": "house",
+      "events": 39,
+      "old_peak": 0.82,
+      "scale": 1.2195121951219512,
+      "new_peak": 1.0
+    },
+    {
+      "id": "techno",
+      "events": 55,
+      "old_peak": 0.84,
+      "scale": 1.1904761904761905,
+      "new_peak": 1.0
+    },
+    {
+      "id": "trance",
+      "events": 56,
+      "old_peak": 0.82,
+      "scale": 1.2195121951219512,
+      "new_peak": 1.0
+    },
+    {
+      "id": "garage_2step",
+      "events": 28,
+      "old_peak": 0.78,
+      "scale": 1.282051282051282,
+      "new_peak": 1.0
+    },
+    {
+      "id": "breakbeat",
+      "events": 34,
+      "old_peak": 0.8,
+      "scale": 1.25,
+      "new_peak": 1.0
+    },
+    {
+      "id": "drum_and_bass",
+      "events": 48,
+      "old_peak": 0.82,
+      "scale": 1.2195121951219512,
+      "new_peak": 1.0
+    },
+    {
+      "id": "dubstep",
+      "events": 28,
+      "old_peak": 0.84,
+      "scale": 1.1904761904761905,
+      "new_peak": 1.0
+    },
+    {
+      "id": "hip_hop",
+      "events": 32,
+      "old_peak": 0.78,
+      "scale": 1.282051282051282,
+      "new_peak": 1.0
+    },
+    {
+      "id": "boom_bap",
+      "events": 32,
+      "old_peak": 0.76,
+      "scale": 1.3157894736842106,
+      "new_peak": 1.0
+    },
+    {
+      "id": "trap",
+      "events": 36,
+      "old_peak": 0.78,
+      "scale": 1.282051282051282,
+      "new_peak": 1.0
+    },
+    {
+      "id": "bossa",
+      "events": 34,
+      "old_peak": 0.72,
+      "scale": 1.3888888888888888,
+      "new_peak": 1.0
+    },
+    {
+      "id": "samba",
+      "events": 56,
+      "old_peak": 0.88,
+      "scale": 1.1363636363636365,
+      "new_peak": 1.0
+    },
+    {
+      "id": "salsa",
+      "events": 35,
+      "old_peak": 0.62,
+      "scale": 1.6129032258064517,
+      "new_peak": 1.0
+    },
+    {
+      "id": "cha_cha",
+      "events": 33,
+      "old_peak": 0.58,
+      "scale": 1.7241379310344829,
+      "new_peak": 1.0
+    },
+    {
+      "id": "mambo",
+      "events": 35,
+      "old_peak": 0.62,
+      "scale": 1.6129032258064517,
+      "new_peak": 1.0
+    },
+    {
+      "id": "merengue",
+      "events": 23,
+      "old_peak": 0.68,
+      "scale": 1.4705882352941175,
+      "new_peak": 1.0
+    },
+    {
+      "id": "cumbia",
+      "events": 34,
+      "old_peak": 0.7,
+      "scale": 1.4285714285714286,
+      "new_peak": 1.0
+    },
+    {
+      "id": "bolero",
+      "events": 32,
+      "old_peak": 0.56,
+      "scale": 1.7857142857142856,
+      "new_peak": 1.0
+    },
+    {
+      "id": "tango",
+      "events": 37,
+      "old_peak": 0.78,
+      "scale": 1.282051282051282,
+      "new_peak": 1.0
+    },
+    {
+      "id": "son_clave_3_2",
+      "events": 34,
+      "old_peak": 0.56,
+      "scale": 1.7857142857142856,
+      "new_peak": 1.0
+    },
+    {
+      "id": "rumba_clave_3_2",
+      "events": 34,
+      "old_peak": 0.54,
+      "scale": 1.8518518518518516,
+      "new_peak": 1.0
+    },
+    {
+      "id": "afro_cuban_6_8",
+      "events": 29,
+      "old_peak": 0.6,
+      "scale": 1.6666666666666667,
+      "new_peak": 1.0
+    },
+    {
+      "id": "reggae",
+      "events": 36,
+      "old_peak": 0.72,
+      "scale": 1.3888888888888888,
+      "new_peak": 1.0
+    },
+    {
+      "id": "calypso_soca",
+      "events": 34,
+      "old_peak": 0.64,
+      "scale": 1.5625,
+      "new_peak": 1.0
+    },
+    {
+      "id": "five_four",
+      "events": 38,
+      "old_peak": 0.82,
+      "scale": 1.2195121951219512,
+      "new_peak": 1.0
+    },
+    {
+      "id": "seven_eight",
+      "events": 32,
+      "old_peak": 0.8,
+      "scale": 1.25,
+      "new_peak": 1.0
+    },
+    {
+      "id": "seven_four_funk",
+      "events": 46,
+      "old_peak": 0.78,
+      "scale": 1.282051282051282,
+      "new_peak": 1.0
+    },
+    {
+      "id": "nine_eight",
+      "events": 42,
+      "old_peak": 0.76,
+      "scale": 1.3157894736842106,
+      "new_peak": 1.0
+    },
+    {
+      "id": "eleven_eight",
+      "events": 46,
+      "old_peak": 0.76,
+      "scale": 1.3157894736842106,
+      "new_peak": 1.0
+    }
+  ]
+}

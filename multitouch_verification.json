@@ -1,0 +1,14 @@
+{
+  "strum_touch_handler": "MultiPointTouchArea",
+  "strum_owned_touch_points": 1,
+  "mouse_fallback": [
+    "TapHandler acceptedDevices=Mouse",
+    "DragHandler acceptedDevices=Mouse"
+  ],
+  "diagnostic": "python touch_test.py",
+  "expected_multitouch_result": {
+    "maximum_seen": "2 or more",
+    "qt_device_type": "TouchScreen",
+    "qt_max_points": "2 or more"
+  }
+}
