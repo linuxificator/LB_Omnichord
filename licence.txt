@@ -1,0 +1,10 @@
+By using this software you agree to:
+
+* Have fun with it
+* Wish Luciel a happy birthday!
+* Do your best to make this world a better place 
+
+If you are using it or performing with it, I would like to know!
+Leave a comment at: https://hackaday.io/project/206368-lb-omnichord
+
+If you create new cool stuff based on this software, or use the tuning described in the README.md or got inspired by any of the techniques used, please refer to "Luciel's Birthday Omnichord" as the source and include this license.
