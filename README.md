@@ -2,6 +2,8 @@
 
 **Luciel's Birthday Omnichord** is a touchscreen chord instrument built around Sonic Pi, a Qt Quick/PySide6 user interface and OSC.
 
+![plot](./screenshots/lb_omnichord.png)
+
 It started from the basic Omnichord idea: one hand selects chords, the other hand plays or strums over them. I did not try to make an exact software copy of a particular Suzuki Omnichord. The useful part of the concept is the separation between chord selection and the strum surface, and from there the instrument grew into something with its own synths, bass, rhythm section, presets and tuning systems.
 
 This version was made as a birthday gift for Luciel.
