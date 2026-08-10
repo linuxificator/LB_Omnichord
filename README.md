@@ -254,9 +254,17 @@ A  = D * 3/2
 E  = A * 3/4
 B  = E * 3/2
 Eb = B * 5/8
+
+Bb = Eb * 3/2
+F = Bb * 3/4
+
+Ab = Eb * 4/3
+Db = Ab * 2/3
+F# = Db * 4/3
 ```
 
 The remaining notes are filled from the Eb anchor using powers of 3 and 2, i.e. pure fifth relationships in both directions.
+It can also be see as just the octave split in two sets of six notes with clean just-intonated 5ths (3rd harmonic) connecting the notes within the sets and the sets themselves connected by a clean just-intonated major third. (5th harmonic)
 
 The resulting C-root ratios are:
 
