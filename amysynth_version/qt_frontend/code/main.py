@@ -530,6 +530,33 @@ def load_rhythm_catalog(
     return tuple(rhythms)
 
 
+def collect_synth_parameter_overrides(
+    synths: tuple[SynthDefinition, ...],
+    values_by_synth: list[dict[str, float]],
+) -> dict[str, dict[str, float]]:
+    """Return only slider values which differ from instrument defaults."""
+    result: dict[str, dict[str, float]] = {}
+
+    for index, synth in enumerate(synths):
+        current_values = values_by_synth[index]
+        changed: dict[str, float] = {}
+
+        for control in synth.controls:
+            current = float(current_values[control.key])
+            if not math.isclose(
+                current,
+                float(control.default),
+                rel_tol=0.0,
+                abs_tol=1e-9,
+            ):
+                changed[control.key] = current
+
+        if changed:
+            result[synth.key] = changed
+
+    return result
+
+
 class InstrumentBackend(QObject):
     stateChanged = Signal()
 
@@ -1446,13 +1473,12 @@ class InstrumentBackend(QObject):
                 "selected": self._synths[
                     runtime.selected_index
                 ].key,
-                "parameters": {
-                    synth.key: copy.deepcopy(
-                        runtime.values_by_synth[index]
+                "parameters": (
+                    collect_synth_parameter_overrides(
+                        self._synths,
+                        runtime.values_by_synth,
                     )
-                    for index, synth
-                    in enumerate(self._synths)
-                },
+                ),
             }
 
         rhythm_settings = {}
@@ -1760,6 +1786,16 @@ class InstrumentBackend(QObject):
                             control.key
                         ]
                     )
+
+                    # Older presets used -1 as "use the patch/default".
+                    # With explicit instrument defaults this is equivalent
+                    # to the control being absent from the sparse preset.
+                    if (
+                        value < 0.0
+                        and control.default >= 0.0
+                    ):
+                        continue
+
                     values[control.key] = max(
                         control.minimum,
                         min(
