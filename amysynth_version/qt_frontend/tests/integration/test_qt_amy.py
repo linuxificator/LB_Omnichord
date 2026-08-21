@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MAIN = ROOT / "code" / "main.py"
+TEST_APP = Path(__file__).with_name("qt_test_app.py")
 PORT = 18765
 
 
@@ -90,20 +90,19 @@ def main() -> int:
         env = os.environ.copy()
         env["HOME"] = str(home)
         env["PYTHONUNBUFFERED"] = "1"
+        env["OMNICHORD_TEST_API_PORT"] = str(PORT)
 
         process = subprocess.Popen(
             [
                 "xvfb-run",
                 "-a",
                 sys.executable,
-                str(MAIN),
+                str(TEST_APP),
                 "--windowed",
                 "--serial-port",
                 serial_port,
                 "--serial-baud",
                 "1000000",
-                "--test-api-port",
-                str(PORT),
             ],
             cwd=ROOT,
             env=env,
