@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import copy
 import sys
 import unittest
 from pathlib import Path
@@ -12,6 +11,7 @@ CODE = FRONTEND / "code"
 sys.path.insert(0, str(CODE))
 
 import main as omnichord  # noqa: E402
+from amy_serial import AmySerialClient  # noqa: E402
 
 
 class BackendHarness:
@@ -63,16 +63,31 @@ class InstrumentDefaultTests(unittest.TestCase):
         cls.index_by_key = {synth.key: index for index, synth in enumerate(cls.synths)}
 
     @staticmethod
-    def control_default(synth: omnichord.SynthDefinition, key: str) -> float:
-        return next(control.default for control in synth.controls if control.key == key)
+    def control(synth: omnichord.SynthDefinition, key: str) -> omnichord.SynthControl:
+        return next(control for control in synth.controls if control.key == key)
 
-    def test_every_slider_has_explicit_in_range_default(self) -> None:
+    @classmethod
+    def control_default(cls, synth: omnichord.SynthDefinition, key: str) -> float:
+        return cls.control(synth, key).default
+
+    def test_every_slider_has_explicit_physical_range(self) -> None:
         self.assertEqual(len(self.synths), 123)
         for synth in self.synths:
             for control in synth.controls:
-                self.assertGreaterEqual(control.default, 0.0, (synth.key, control.key))
+                self.assertGreaterEqual(control.minimum, 0.0, (synth.key, control.key))
                 self.assertGreaterEqual(control.default, control.minimum)
                 self.assertLessEqual(control.default, control.maximum)
+
+        # Sustain is a 0..1 level.  Zero must be the left edge, never the
+        # midpoint of a legacy -1..1 "native sentinel" range.
+        for synth in self.synths:
+            sustain = next(
+                (control for control in synth.controls if control.key == "sustain"),
+                None,
+            )
+            if sustain is not None:
+                self.assertEqual(sustain.minimum, 0.0)
+                self.assertEqual(sustain.maximum, 1.0)
 
         self.assertEqual(
             self.control_default(self.by_key["juno_068"], "attack_ms"),
@@ -97,7 +112,7 @@ class InstrumentDefaultTests(unittest.TestCase):
         for offset, key in enumerate(changed_keys, start=1):
             index = self.index_by_key[key]
             synth = self.synths[index]
-            control = next(control for control in synth.controls if control.key == "attack_ms")
+            control = self.control(synth, "attack_ms")
             values[index]["attack_ms"] = min(
                 control.maximum,
                 control.default + 10.0 * offset,
@@ -163,6 +178,50 @@ class InstrumentDefaultTests(unittest.TestCase):
             values["release_ms"],
             self.control_default(piano, "release_ms"),
         )
+
+    def test_repeater_sustain_command_does_not_touch_filter(self) -> None:
+        client = object.__new__(AmySerialClient)
+        client.selected_synth = {"chord": "juno_050"}
+        client.patch_map = {"juno_050": 50}
+        client.synth_params = {"chord": {"sustain": 0.42}}
+
+        commands = AmySerialClient._param_commands_for_synth(
+            client,
+            "chord",
+            3,
+            {"sustain"},
+        )
+
+        self.assertEqual(commands, ["v0A,,,0.42,,i3Z"])
+        self.assertFalse(any("F" in command or "R" in command for command in commands))
+
+    def test_full_parameter_message_applies_only_changed_key(self) -> None:
+        client = object.__new__(AmySerialClient)
+        client.synth_params = {
+            "chord": {
+                "filter_hz": 8999.7,
+                "resonance": 1.348,
+                "sustain": 1.0,
+            }
+        }
+        client._adsr_override_active = {"chord": True}
+        applied: list[set[str] | None] = []
+        client._apply_supported_params = (
+            lambda role, parameter_keys=None: applied.append(parameter_keys)
+        )
+        client._configure_synth = lambda role: None
+
+        AmySerialClient._set_params(
+            client,
+            "chord",
+            [
+                "filter_hz", 8999.7,
+                "resonance", 1.348,
+                "sustain", 0.42,
+            ],
+        )
+
+        self.assertEqual(applied, [{"sustain"}])
 
 
 if __name__ == "__main__":
