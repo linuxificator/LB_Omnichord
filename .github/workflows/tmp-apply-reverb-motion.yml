@@ -1,0 +1,49 @@
+name: Temporary reverb and motion controls patch
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'feature/reverb-reset-and-control-safety'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/reverb-reset-and-control-safety
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply reverb and motion controls
+        run: python tools/tmp_apply_reverb_motion.py
+      - name: Validate syntax and QML contracts
+        run: |
+          python -m py_compile \
+            amysynth_version/qt_frontend/code/amy_serial.py \
+            amysynth_version/qt_frontend/code/main.py \
+            amysynth_version/qt_frontend/tests/integration/headless_app.py \
+            amysynth_version/qt_frontend/tests/integration/test_serial.py
+          grep -q 'ReverbPanel' amysynth_version/qt_frontend/gui/Main.qml
+          grep -q 'beginTempoNudge' amysynth_version/qt_frontend/gui/Main.qml
+          grep -q 'beginPitchBend' amysynth_version/qt_frontend/gui/Main.qml
+          ! grep -q '_REVERB_OFF_WIRE_LEVEL' amysynth_version/qt_frontend/code/amy_serial.py
+          git diff --check
+      - name: Commit implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            amysynth_version/qt_frontend/code/amy_serial.py \
+            amysynth_version/qt_frontend/code/main.py \
+            amysynth_version/qt_frontend/config/defaults.json \
+            amysynth_version/qt_frontend/gui/Main.qml \
+            amysynth_version/qt_frontend/gui/UtilitySection.qml \
+            amysynth_version/qt_frontend/tests/integration/headless_app.py \
+            amysynth_version/qt_frontend/tests/integration/test_serial.py
+          git diff --cached --check
+          git commit -m 'Redesign reverb and add tempo pitch hold controls'
+          git push origin HEAD:feature/reverb-reset-and-control-safety
