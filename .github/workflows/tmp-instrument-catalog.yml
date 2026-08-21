@@ -1,4 +1,4 @@
-name: Temporary instrument settings patch
+name: Temporary instrument settings validation
 
 on:
   pull_request:
@@ -9,56 +9,38 @@ on:
       - '.github/workflows/tmp-instrument-catalog.yml'
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  patch:
-    if: github.actor != 'github-actions[bot]'
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: feature/instrument-control-defaults
-      - name: Patch preset serialization
+
+      - name: Install minimal PySide runtime
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('amysynth_version/qt_frontend/code/main.py')
-          s = p.read_text(encoding='utf-8')
+          sudo apt-get update
+          sudo apt-get install -y libegl1
 
-          class_anchor = '\n\nclass InstrumentBackend(QObject):\n'
-          helper = '''\n\ndef collect_synth_parameter_overrides(\n    synths: tuple[SynthDefinition, ...],\n    values_by_synth: list[dict[str, float]],\n) -> dict[str, dict[str, float]]:\n    """Return only slider values which differ from instrument defaults."""\n    result: dict[str, dict[str, float]] = {}\n\n    for index, synth in enumerate(synths):\n        current_values = values_by_synth[index]\n        changed: dict[str, float] = {}\n\n        for control in synth.controls:\n            current = float(current_values[control.key])\n            if not math.isclose(\n                current,\n                float(control.default),\n                rel_tol=0.0,\n                abs_tol=1e-9,\n            ):\n                changed[control.key] = current\n\n        if changed:\n            result[synth.key] = changed\n\n    return result\n'''
-          if 'def collect_synth_parameter_overrides(' not in s:
-              if class_anchor not in s:
-                  raise SystemExit('InstrumentBackend class anchor missing')
-              s = s.replace(class_anchor, helper + class_anchor, 1)
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: amysynth_version/qt_frontend/requirements.txt
 
-          old_snapshot = '''        for role in ("chord", "strum", "bass"):\n            runtime = self._runtime(role)\n\n            synth_roles[role] = {\n                "selected": self._synths[\n                    runtime.selected_index\n                ].key,\n                "parameters": {\n                    synth.key: copy.deepcopy(\n                        runtime.values_by_synth[index]\n                    )\n                    for index, synth\n                    in enumerate(self._synths)\n                },\n            }\n'''
-          new_snapshot = '''        for role in ("chord", "strum", "bass"):\n            runtime = self._runtime(role)\n\n            synth_roles[role] = {\n                "selected": self._synths[\n                    runtime.selected_index\n                ].key,\n                "parameters": (\n                    collect_synth_parameter_overrides(\n                        self._synths,\n                        runtime.values_by_synth,\n                    )\n                ),\n            }\n'''
-          if old_snapshot in s:
-              s = s.replace(old_snapshot, new_snapshot, 1)
-          elif new_snapshot not in s:
-              raise SystemExit('preset snapshot anchor missing')
+      - name: Install frontend dependencies
+        working-directory: amysynth_version/qt_frontend
+        run: python -m pip install -r requirements.txt
 
-          old_apply = '''                    value = float(\n                        stored_values[\n                            control.key\n                        ]\n                    )\n                    values[control.key] = max(\n                        control.minimum,\n                        min(\n                            control.maximum,\n                            value,\n                        ),\n                    )\n'''
-          new_apply = '''                    value = float(\n                        stored_values[\n                            control.key\n                        ]\n                    )\n\n                    # Older presets used -1 as "use the patch/default".\n                    # With explicit instrument defaults this is equivalent\n                    # to the control being absent from the sparse preset.\n                    if (\n                        value < 0.0\n                        and control.default >= 0.0\n                    ):\n                        continue\n\n                    values[control.key] = max(\n                        control.minimum,\n                        min(\n                            control.maximum,\n                            value,\n                        ),\n                    )\n'''
-          if old_apply in s:
-              s = s.replace(old_apply, new_apply, 1)
-          elif new_apply not in s:
-              raise SystemExit('preset apply anchor missing')
+      - name: Run instrument state tests
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/test_instrument_defaults.py
 
-          compile(s, str(p), 'exec')
-          p.write_text(s, encoding='utf-8')
-          PY
-      - name: Commit application changes
+      - name: Verify defaults are reproducible from upstream AMY table
         run: |
-          if git diff --quiet -- amysynth_version/qt_frontend/code/main.py; then
-            echo 'main.py already current'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- amysynth_version/qt_frontend/code/main.py
-          git commit -m 'Store only non-default instrument slider values'
-          git push origin HEAD:feature/instrument-control-defaults
+          curl -fsSL https://raw.githubusercontent.com/shorepine/amy/main/src/patches.h -o /tmp/amy-patches.h
+          python3 amysynth_version/qt_frontend/instruments/generate_defaults.py \
+            /tmp/amy-patches.h \
+            amysynth_version/qt_frontend/instruments/synths.json
+          git diff --exit-code -- amysynth_version/qt_frontend/instruments/synths.json
