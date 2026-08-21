@@ -19,32 +19,29 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Apply remaining refactor and runtime fixes
-        run: |
-          python tools/tmp_finish_reverb_reset.py
-          python tools/tmp_fix_runtime_feedback.py
-      - name: Syntax and JSON checks
+      - name: Apply atomic chord-hold path and regressions
+        run: python tools/tmp_batch_chord_hold_and_tests.py
+      - name: Syntax checks
         run: |
           python -m py_compile \
-            amysynth_version/qt_frontend/code/control_limits.py \
-            amysynth_version/qt_frontend/code/synth_state.py \
             amysynth_version/qt_frontend/code/amy_serial.py \
             amysynth_version/qt_frontend/code/main.py \
-            amysynth_version/qt_frontend/tests/integration/headless_app.py
-          python -m json.tool amysynth_version/qt_frontend/instruments/synths.json >/dev/null
-          python -m json.tool amysynth_version/qt_frontend/config/defaults.json >/dev/null
-          python -m json.tool amysynth_version/qt_frontend/config/amy_config.json >/dev/null
+            amysynth_version/qt_frontend/tests/integration/harness.py \
+            amysynth_version/qt_frontend/tests/integration/test_serial.py \
+            amysynth_version/qt_frontend/tests/integration/test_native_controls.py \
+            amysynth_version/qt_frontend/tests/test_static_contracts.py
           git diff --check
-      - name: Commit remaining changes
+      - name: Commit regressions and fix
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
-            amysynth_version/qt_frontend/code/synth_state.py \
             amysynth_version/qt_frontend/code/amy_serial.py \
             amysynth_version/qt_frontend/code/main.py \
-            amysynth_version/qt_frontend/config/amy_config.json \
-            amysynth_version/qt_frontend/gui/Main.qml
+            amysynth_version/qt_frontend/tests/integration/harness.py \
+            amysynth_version/qt_frontend/tests/integration/test_serial.py \
+            amysynth_version/qt_frontend/tests/integration/test_native_controls.py \
+            amysynth_version/qt_frontend/tests/test_static_contracts.py
           git diff --cached --check
-          git commit -m 'Fix cold startup reverb and chord-hold rhythm behavior'
+          git commit -m 'Make manual chord hold a single rhythm transaction'
           git push origin HEAD:feature/reverb-reset-and-control-safety
