@@ -8,13 +8,11 @@ from catalog import patch_for_index, synth_index
 from harness import HeadlessApp
 
 
-def normalized_timbre(commands: list[str], synth: int) -> list[str]:
-    result: list[str] = []
-    for command in commands:
-        command = re.sub(rf"i{int(synth)}iv\d+", "i#iv#", command)
-        command = re.sub(rf"i{int(synth)}(?=[A-Za-zZ]|$)", "i#", command)
-        result.append(command)
-    return result
+def normalized_timbre(commands: list[str]) -> list[str]:
+    # Manual and rhythm chords intentionally use different voice-pool sizes
+    # (7 and 4). get_synth_commands() omits the synth number, so normalize only
+    # that allocation field and compare every per-voice timbre command exactly.
+    return [re.sub(r"iv\d+", "iv#", command, count=1) for command in commands]
 
 
 class NativeRhythmTests(unittest.TestCase):
@@ -53,8 +51,8 @@ class NativeRhythmTests(unittest.TestCase):
             brass3 = app.bridge.synth_commands(3)
             brass4 = app.bridge.synth_commands(4)
             self.assertEqual(
-                normalized_timbre(brass3, 3),
-                normalized_timbre(brass4, 4),
+                normalized_timbre(brass3),
+                normalized_timbre(brass4),
                 "manual/rhythm synths do not match with Brass Ensemble",
             )
             app.bridge.checkpoint("brass-running")
@@ -71,13 +69,13 @@ class NativeRhythmTests(unittest.TestCase):
             other3 = app.bridge.synth_commands(3)
             other4 = app.bridge.synth_commands(4)
             self.assertEqual(
-                normalized_timbre(other3, 3),
-                normalized_timbre(other4, 4),
+                normalized_timbre(other3),
+                normalized_timbre(other4),
                 "native AMY rhythm synth 4 did not follow the selected chord instrument",
             )
             self.assertNotEqual(
-                normalized_timbre(brass4, 4),
-                normalized_timbre(other4, 4),
+                normalized_timbre(brass4),
+                normalized_timbre(other4),
                 "native rhythm synth still has the Brass Ensemble timbre after switch",
             )
 
@@ -90,8 +88,8 @@ class NativeRhythmTests(unittest.TestCase):
 
             final4 = app.bridge.synth_commands(4)
             self.assertEqual(
-                normalized_timbre(other4, 4),
-                normalized_timbre(final4, 4),
+                normalized_timbre(other4),
+                normalized_timbre(final4),
                 "rhythm playback reverted synth 4 after the instrument switch",
             )
 
