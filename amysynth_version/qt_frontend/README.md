@@ -49,7 +49,7 @@ Time controls display milliseconds, resonance displays Q, and modulation depths 
 
 The host uses five independent AMY synth instances: drums, bass, strum, manually held chord and rhythm-triggered chord. Manual and rhythm chord voices share patch/settings but have independent voice pools and note lifetimes.
 
-Rhythm timing is compiled into AMY's 48-PPQ sequencer; Linux/Python is not used as the beat clock.
+Rhythm timing is compiled into AMY's 48-PPQ sequencer; Linux/Python is not used as the beat clock. A live tuning change updates the shared tuned chord state: held manual chords are retuned immediately, rhythm chord and bass sequencer events are rebuilt with the new pitches, and subsequent strum notes use the selected tuning. Bass retuning therefore appears in the AMY wire/debug stream mainly as rebuilt `H...n<note>...i1Z` sequencer events rather than standalone immediate bass note commands.
 
 The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
 
