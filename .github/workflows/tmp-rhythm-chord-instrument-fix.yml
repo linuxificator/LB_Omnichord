@@ -28,13 +28,13 @@ jobs:
           s = p.read_text(encoding='utf-8')
 
           old = '''        # _configure_synth loads each K patch and immediately follows it with\n        # the complete state above, so returning to a previously edited\n        # instrument cannot leave AMY at its factory slider values.\n        self._configure_synth(role)\n\n        if role == "chord" and self._manual_active_id is not None:\n'''
-          new = '''        # _configure_synth loads each K patch and immediately follows it with\n        # the complete state above, so returning to a previously edited\n        # instrument cannot leave AMY at its factory slider values.\n        self._configure_synth(role)\n\n        # Chord has two independent AMY synths: manual_chord and\n        # rhythm_chord.  A running sequencer must be refreshed after the\n        # rhythm_chord synth is repatched.  Keep the current AMY timebase so\n        # changing sound does not restart the bar or tempo phase.\n        if role == "chord" and self.rhythm_running:\n            self._rebuild_rhythm(reset_phase=False)\n\n        if role == "chord" and self._manual_active_id is not None:\n'''
+          new = '''        # _configure_synth loads each K patch and immediately follows it with\n        # the complete state above, so returning to a previously edited\n        # instrument cannot leave AMY at its factory slider values.\n        self._configure_synth(role)\n\n        # Chord has two independent AMY synths: manual_chord and\n        # rhythm_chord. A running sequencer must be refreshed after the\n        # rhythm_chord synth is repatched. Keep the current AMY timebase so\n        # changing sound does not restart the bar or tempo phase.\n        if role == "chord" and getattr(self, "rhythm_running", False):\n            self._rebuild_rhythm(reset_phase=False)\n\n        if role == "chord" and self._manual_active_id is not None:\n'''
           if old not in s:
               raise SystemExit('atomic chord restore anchor missing')
           s = s.replace(old, new, 1)
 
           old_legacy = '''        self.synth_params[role] = {}\n        self._adsr_override_active[role] = False\n        self._configure_synth(role)\n\n        # A chord patch hot-swap silences both independent chord pools. If a\n'''
-          new_legacy = '''        self.synth_params[role] = {}\n        self._adsr_override_active[role] = False\n        self._configure_synth(role)\n\n        if role == "chord" and self.rhythm_running:\n            self._rebuild_rhythm(reset_phase=False)\n\n        # A chord patch hot-swap silences both independent chord pools. If a\n'''
+          new_legacy = '''        self.synth_params[role] = {}\n        self._adsr_override_active[role] = False\n        self._configure_synth(role)\n\n        if role == "chord" and getattr(self, "rhythm_running", False):\n            self._rebuild_rhythm(reset_phase=False)\n\n        # A chord patch hot-swap silences both independent chord pools. If a\n'''
           if old_legacy not in s:
               raise SystemExit('legacy chord-name anchor missing')
           s = s.replace(old_legacy, new_legacy, 1)
