@@ -19,19 +19,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Apply refactor
+      - name: Apply remaining refactor and runtime fixes
         run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('tools/tmp_apply_reverb_reset.py')
-          text = p.read_text()
-          old = '''    if count != 1:\n        raise RuntimeError(f"{path}: expected one occurrence, found {count}: {old[:100]!r}")\n'''
-          new = '''    if count < 1:\n        raise RuntimeError(f"{path}: replacement anchor not found: {old[:100]!r}")\n'''
-          if old not in text:
-              raise SystemExit('replace_once helper definition not found')
-          p.write_text(text.replace(old, new, 1))
-          PY
-          python tools/tmp_apply_reverb_reset.py
+          python tools/tmp_finish_reverb_reset.py
+          python tools/tmp_fix_runtime_feedback.py
       - name: Syntax and JSON checks
         run: |
           python -m py_compile \
@@ -43,21 +34,17 @@ jobs:
           python -m json.tool amysynth_version/qt_frontend/instruments/synths.json >/dev/null
           python -m json.tool amysynth_version/qt_frontend/config/defaults.json >/dev/null
           python -m json.tool amysynth_version/qt_frontend/config/amy_config.json >/dev/null
-      - name: Commit generated refactor
+          git diff --check
+      - name: Commit remaining changes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
-            amysynth_version/qt_frontend/code/control_limits.py \
             amysynth_version/qt_frontend/code/synth_state.py \
             amysynth_version/qt_frontend/code/amy_serial.py \
             amysynth_version/qt_frontend/code/main.py \
-            amysynth_version/qt_frontend/tests/integration/headless_app.py \
-            amysynth_version/qt_frontend/config/defaults.json \
             amysynth_version/qt_frontend/config/amy_config.json \
-            amysynth_version/qt_frontend/instruments/synths.json \
-            amysynth_version/qt_frontend/gui/Main.qml \
-            amysynth_version/qt_frontend/gui/PresetResetButton.qml
+            amysynth_version/qt_frontend/gui/Main.qml
           git diff --cached --check
-          git commit -m 'Add safe synth controls and preset-aware reverb resets'
+          git commit -m 'Fix cold startup reverb and chord-hold rhythm behavior'
           git push origin HEAD:feature/reverb-reset-and-control-safety
