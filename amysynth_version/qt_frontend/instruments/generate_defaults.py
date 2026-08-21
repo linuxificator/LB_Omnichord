@@ -90,8 +90,8 @@ def clamp(value: float, minimum: float, maximum: float) -> float:
 
 def juno_native(patch: str) -> dict[str, float]:
     parts = commands(patch)
-    lfo = first_command(parts, "v1")
-    pulse = first_command(parts, "v2")
+    lfo = next((part for part in parts if part.startswith("v1") and "f" in part), None)
+    pulse = next((part for part in parts if part.startswith("v2") and "f" in part and "d" in part), None)
     filt = first_command(parts, "v0F")
     amp = first_command(parts, "v0a")
 
