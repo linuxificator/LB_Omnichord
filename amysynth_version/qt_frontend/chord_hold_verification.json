@@ -1,0 +1,19 @@
+{
+  "strum_text_removed": true,
+  "chord_activity_levels": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "manual_chords_work_at_activity_zero": true,
+  "hold_threshold_ms": 200,
+  "hold_behavior": {
+    "start": "sustained chord + temporary activity 0",
+    "release": "note stop + restore prior activity",
+    "rhythm_chord_gate": "immediate"
+  },
+  "ruby_syntax": "Syntax OK",
+  "strum_trim": 0.35
+}

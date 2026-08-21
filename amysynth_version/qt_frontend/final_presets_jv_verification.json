@@ -1,0 +1,221 @@
+{
+  "factory_presets": {
+    "count": 18,
+    "all_rhythm_off": true,
+    "existing_user_presets_overwritten": false,
+    "manifest": [
+      {
+        "preset": 1,
+        "name": "Midnight",
+        "rhythm": "slow_ballad",
+        "rhythm_running": false,
+        "tuning": "HARM",
+        "chord_synth": "prophet",
+        "strum_synth": "pluck",
+        "bass_synth": "sine"
+      },
+      {
+        "preset": 2,
+        "name": "Easy Breeze",
+        "rhythm": "bossa",
+        "rhythm_running": false,
+        "tuning": "EQ",
+        "chord_synth": "pretty_bell",
+        "strum_synth": "pluck",
+        "bass_synth": "fm"
+      },
+      {
+        "preset": 3,
+        "name": "Warm Soul",
+        "rhythm": "soul",
+        "rhythm_running": false,
+        "tuning": "HARM",
+        "chord_synth": "prophet",
+        "strum_synth": "pluck",
+        "bass_synth": "subpulse"
+      },
+      {
+        "preset": 4,
+        "name": "Acoustic Room",
+        "rhythm": "waltz",
+        "rhythm_running": false,
+        "tuning": "JV",
+        "chord_synth": "piano",
+        "strum_synth": "pluck",
+        "bass_synth": "sine"
+      },
+      {
+        "preset": 5,
+        "name": "Dream Pop",
+        "rhythm": "pop_8",
+        "rhythm_running": false,
+        "tuning": "EQ",
+        "chord_synth": "blade",
+        "strum_synth": "pluck",
+        "bass_synth": "fm"
+      },
+      {
+        "preset": 6,
+        "name": "Jazz Club",
+        "rhythm": "jazz_swing",
+        "rhythm_running": false,
+        "tuning": "JV",
+        "chord_synth": "piano",
+        "strum_synth": "pluck",
+        "bass_synth": "fm"
+      },
+      {
+        "preset": 7,
+        "name": "Latin Light",
+        "rhythm": "cha_cha",
+        "rhythm_running": false,
+        "tuning": "HARM",
+        "chord_synth": "pretty_bell",
+        "strum_synth": "pluck",
+        "bass_synth": "fm"
+      },
+      {
+        "preset": 8,
+        "name": "Deep Funk",
+        "rhythm": "funk",
+        "rhythm_running": false,
+        "tuning": "JV",
+        "chord_synth": "dsaw",
+        "strum_synth": "pluck",
+        "bass_synth": "subpulse"
+      },
+      {
+        "preset": 9,
+        "name": "Dub Garden",
+        "rhythm": "reggae",
+        "rhythm_running": false,
+        "tuning": "HARM",
+        "chord_synth": "pulse",
+        "strum_synth": "pluck",
+        "bass_synth": "subpulse"
+      },
+      {
+        "preset": 10,
+        "name": "Disco Glass",
+        "rhythm": "disco",
+        "rhythm_running": false,
+        "tuning": "EQ",
+        "chord_synth": "supersaw",
+        "strum_synth": "pluck",
+        "bass_synth": "subpulse"
+      },
+      {
+        "preset": 11,
+        "name": "House Floor",
+        "rhythm": "house",
+        "rhythm_running": false,
+        "tuning": "EQ",
+        "chord_synth": "prophet",
+        "strum_synth": "pulse",
+        "bass_synth": "tb303"
+      },
+      {
+        "preset": 12,
+        "name": "Two Step",
+        "rhythm": "garage_2step",
+        "rhythm_running": false,
+        "tuning": "JV",
+        "chord_synth": "mod_saw",
+        "strum_synth": "dpulse",
+        "bass_synth": "tb303"
+      },
+      {
+        "preset": 13,
+        "name": "Break Reactor",
+        "rhythm": "breakbeat",
+        "rhythm_running": false,
+        "tuning": "EQ",
+        "chord_synth": "mod_dsaw",
+        "strum_synth": "blade",
+        "bass_synth": "tb303"
+      },
+      {
+        "preset": 14,
+        "name": "Techno Pressure",
+        "rhythm": "techno",
+        "rhythm_running": false,
+        "tuning": "EQ",
+        "chord_synth": "zawa",
+        "strum_synth": "dpulse",
+        "bass_synth": "tb303"
+      },
+      {
+        "preset": 15,
+        "name": "Trance Lift",
+        "rhythm": "trance",
+        "rhythm_running": false,
+        "tuning": "JV",
+        "chord_synth": "supersaw",
+        "strum_synth": "blade",
+        "bass_synth": "fm"
+      },
+      {
+        "preset": 16,
+        "name": "DnB Voltage",
+        "rhythm": "drum_and_bass",
+        "rhythm_running": false,
+        "tuning": "EQ",
+        "chord_synth": "mod_dsaw",
+        "strum_synth": "mod_pulse",
+        "bass_synth": "subpulse"
+      },
+      {
+        "preset": 17,
+        "name": "Rave Lab",
+        "rhythm": "techno",
+        "rhythm_running": false,
+        "tuning": "HARM",
+        "chord_synth": "hoover",
+        "strum_synth": "zawa",
+        "bass_synth": "tb303"
+      },
+      {
+        "preset": 18,
+        "name": "Experimental Floor",
+        "rhythm": "breakbeat",
+        "rhythm_running": false,
+        "tuning": "JV",
+        "chord_synth": "mod_fm",
+        "strum_synth": "zawa",
+        "bass_synth": "fm"
+      }
+    ]
+  },
+  "store_feedback": {
+    "preset_button_flash_ms": 520
+  },
+  "JV": {
+    "entries": 144,
+    "min_factor": 0.9943689110435824,
+    "max_factor": 1.0056622340988624,
+    "C_chain_ratios": {
+      "C": 1.0,
+      "G": 1.5,
+      "D": 1.125,
+      "A": 1.6875,
+      "E": 1.265625,
+      "B": 1.8984375,
+      "Eb": 1.1865234375
+    },
+    "completion": {
+      "upward_from_Eb": [
+        "Eb",
+        "Bb",
+        "F"
+      ],
+      "downward_from_Eb": [
+        "Eb",
+        "Ab",
+        "Db",
+        "F#/Gb"
+      ]
+    }
+  },
+  "sonic_pi_receiver_changed": false,
+  "ruby_syntax": "Syntax OK"
+}

@@ -1,0 +1,12 @@
+?xml version="1.0"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+        <touch deviceName="wch.cn TouchScreen (USB 3-1)" mapToOutput="HDMI-A-2" mouseEmulation="yes"/>
+<theme><font place="ActiveWindow"><name>Nunito Sans</name><size>12</size><weight>Light</weight><slant>Normal</slant></font><font place="InactiveWindow"><name>Nunito Sans</name><size>12</size><weight>Light</weight><slant>Normal</slant></font><name>PiXtrix</name></theme>
+    <windowRules>
+        <windowRule title="LB Omnichord">
+            <action name="Focus" />
+            <action name="Raise" />
+            <action name="ToggleAlwaysOnTop" />
+        </windowRule>
+    </windowRules>
+</openbox_config>

@@ -1,0 +1,10 @@
+{
+  "old_idle_poll_frequency_hz": 20,
+  "new_idle_behavior": "blocking sync",
+  "wake_sources": [
+    "rhythm transport change",
+    "rhythm configuration change"
+  ],
+  "other_osc_receivers": "already blocking on sync",
+  "ruby_syntax": "Syntax OK"
+}

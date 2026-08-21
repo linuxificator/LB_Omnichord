@@ -1,0 +1,248 @@
+{
+  "serial": {
+    "port": "/dev/serial0",
+    "baud": 1000000,
+    "write_timeout": 0.5
+  },
+  "synth_ids": {
+    "drums": 0,
+    "bass": 1,
+    "strum": 2,
+    "manual_chord": 3,
+    "rhythm_chord": 4
+  },
+  "voices": {
+    "drums": 4,
+    "bass": 1,
+    "strum": 2,
+    "manual_chord": 7,
+    "rhythm_chord": 4
+  },
+  "default_synths": {
+    "chord": "juno_004",
+    "strum": "juno_028",
+    "bass": "dx7_143"
+  },
+  "drums": {
+    "velocity_gain": 5.0,
+    "sample_map": {
+      "bd_haus": {
+        "preset": 1,
+        "note": 39
+      },
+      "drum_bass_hard": {
+        "preset": 1,
+        "note": 39
+      },
+      "drum_bass_soft": {
+        "preset": 1,
+        "note": 39
+      },
+      "drum_snare_hard": {
+        "preset": 2,
+        "note": 45
+      },
+      "drum_snare_soft": {
+        "preset": 5,
+        "note": 41
+      },
+      "drum_cymbal_closed": {
+        "preset": 6,
+        "note": 53
+      },
+      "drum_cymbal_pedal": {
+        "preset": 7,
+        "note": 61
+      },
+      "drum_cymbal_open": {
+        "preset": 7,
+        "note": 56
+      },
+      "drum_tom_hi_soft": {
+        "preset": 8,
+        "note": 73
+      },
+      "drum_tom_mid_soft": {
+        "preset": 8,
+        "note": 63
+      },
+      "drum_tom_lo_soft": {
+        "preset": 8,
+        "note": 61
+      },
+      "elec_tick": {
+        "preset": 4,
+        "note": 51
+      },
+      "perc_bell": {
+        "preset": 10,
+        "note": 69
+      },
+      "perc_snap": {
+        "preset": 9,
+        "note": 94
+      }
+    }
+  },
+  "rhythm": {
+    "chord_gate_beats": 0.72,
+    "bass_gate_beats": 0.3,
+    "max_rhythm_chord_notes": 4,
+    "max_sequencer_items": 256,
+    "sequencer_reset_guard_ms": 10.0
+  },
+  "performance": {
+    "strum_gate_ms": 800,
+    "one_shot_chord_gate_ms": 650,
+    "strum_tail_ms": 450
+  },
+  "synth_patches": {
+    "juno_000": 0,
+    "juno_001": 1,
+    "juno_002": 2,
+    "juno_003": 3,
+    "juno_004": 4,
+    "juno_005": 5,
+    "juno_006": 6,
+    "juno_007": 7,
+    "juno_008": 8,
+    "juno_009": 9,
+    "juno_010": 10,
+    "juno_011": 11,
+    "juno_012": 12,
+    "juno_013": 13,
+    "juno_014": 14,
+    "juno_015": 15,
+    "juno_016": 16,
+    "juno_017": 17,
+    "juno_018": 18,
+    "juno_019": 19,
+    "juno_020": 20,
+    "juno_021": 21,
+    "juno_022": 22,
+    "juno_023": 23,
+    "juno_024": 24,
+    "juno_025": 25,
+    "juno_026": 26,
+    "juno_027": 27,
+    "juno_028": 28,
+    "juno_029": 29,
+    "juno_030": 30,
+    "juno_031": 31,
+    "juno_032": 32,
+    "juno_033": 33,
+    "juno_034": 34,
+    "juno_035": 35,
+    "juno_036": 36,
+    "juno_037": 37,
+    "juno_038": 38,
+    "juno_040": 40,
+    "juno_041": 41,
+    "juno_042": 42,
+    "juno_047": 47,
+    "juno_048": 48,
+    "juno_049": 49,
+    "juno_050": 50,
+    "juno_051": 51,
+    "juno_052": 52,
+    "juno_053": 53,
+    "juno_054": 54,
+    "juno_055": 55,
+    "juno_056": 56,
+    "juno_064": 64,
+    "juno_065": 65,
+    "juno_066": 66,
+    "juno_067": 67,
+    "juno_068": 68,
+    "juno_069": 69,
+    "juno_070": 70,
+    "juno_072": 72,
+    "juno_073": 73,
+    "juno_074": 74,
+    "juno_075": 75,
+    "juno_076": 76,
+    "juno_077": 77,
+    "juno_080": 80,
+    "juno_082": 82,
+    "juno_083": 83,
+    "juno_086": 86,
+    "juno_087": 87,
+    "juno_088": 88,
+    "juno_089": 89,
+    "juno_090": 90,
+    "juno_091": 91,
+    "juno_093": 93,
+    "juno_094": 94,
+    "juno_095": 95,
+    "juno_096": 96,
+    "juno_097": 97,
+    "juno_098": 98,
+    "juno_100": 100,
+    "juno_101": 101,
+    "juno_102": 102,
+    "juno_104": 104,
+    "juno_105": 105,
+    "juno_107": 107,
+    "juno_108": 108,
+    "juno_109": 109,
+    "juno_111": 111,
+    "juno_112": 112,
+    "juno_113": 113,
+    "juno_114": 114,
+    "juno_115": 115,
+    "juno_116": 116,
+    "juno_118": 118,
+    "juno_119": 119,
+    "juno_120": 120,
+    "juno_121": 121,
+    "juno_122": 122,
+    "juno_123": 123,
+    "juno_125": 125,
+    "juno_127": 127,
+    "dx7_128": 128,
+    "dx7_133": 133,
+    "dx7_138": 138,
+    "dx7_143": 143,
+    "dx7_148": 148,
+    "dx7_154": 154,
+    "dx7_160": 160,
+    "dx7_166": 166,
+    "dx7_172": 172,
+    "dx7_178": 178,
+    "dx7_184": 184,
+    "dx7_190": 190,
+    "dx7_196": 196,
+    "dx7_202": 202,
+    "dx7_213": 213,
+    "dx7_214": 214,
+    "dx7_215": 215,
+    "dx7_216": 216,
+    "dx7_244": 244,
+    "dx7_246": 246,
+    "juno_057": 57
+  },
+  "amy_max_oscs": 120,
+  "debug": {
+    "log_amy_commands": true,
+    "amy_command_log": "~/.omnichord/amy_debug.log",
+    "log_logical_events": true
+  },
+  "patch_compatibility": {
+    "57": {
+      "label": "Juno A82 Resonance Funk",
+      "reason": "All Juno sound-source amplitudes are zero; add a small noise excitation so the resonant VCF has input.",
+      "juno_noise_amp": 0.05
+    },
+    "68": {
+      "label": "Juno B15 Harpsichord 1",
+      "reason": "Factory patch requests 71265 Hz cutoff and Q 11.2; constrain the P4 fixed-point filter to a stable bright range.",
+      "juno_filter_hz": 16000.0,
+      "juno_resonance": 4.0
+    },
+    "74": {
+      "label": "Juno B23 Orchestral Pad",
+      "reason": "Factory patch sets gather/output osc amp const to zero; AMY skips rendering when amp const is zero.",
+      "juno_output_amp": 1.0
+    }
+  }
+}

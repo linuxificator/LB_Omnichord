@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+APP_DIR="${OMNICHORD_DIR:-$HOME/LB_Omnichord}"
+SERIAL_PORT="${OMNICHORD_SERIAL_PORT:-/dev/serial0}"
+
+# Wait briefly for the configured UART device to appear at graphical login.
+for i in $(seq 1 30); do
+    [ -e "$SERIAL_PORT" ] && break
+    sleep 1
+done
+
+cd "$APP_DIR"
+
+if [ -x "$APP_DIR/.venv/bin/python" ]; then
+    PYTHON="$APP_DIR/.venv/bin/python"
+elif [ -x "$HOME/omnichord-env/bin/python" ]; then
+    # Compatibility with the older installation layout.
+    PYTHON="$HOME/omnichord-env/bin/python"
+else
+    PYTHON=python3
+fi
+
+exec "$PYTHON" ./main.py --fullscreen --serial-port "$SERIAL_PORT"
