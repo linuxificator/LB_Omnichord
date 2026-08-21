@@ -2571,10 +2571,7 @@ class InstrumentBackend(QObject):
         self._emit_state_changed()
 
     def _send_rhythm_chord_enabled(self) -> None:
-        enabled = (
-            self._rhythm_running
-            and self._effective_chord_activity() > 0
-        )
+        enabled = self._effective_chord_activity() > 0
 
         self._debug(
             "osc_rhythm_chord_enabled",
@@ -3125,8 +3122,7 @@ class InstrumentBackend(QObject):
                 self._rhythm_running
             ),
             "rhythm_chord_enabled": bool(
-                self._rhythm_running
-                and self._effective_chord_activity() > 0
+                self._effective_chord_activity() > 0
             ),
         }
 

@@ -170,6 +170,9 @@ class NativeRhythmTests(unittest.TestCase):
             )
 
             switched_lines = app.bridge.lines_since(switch_start)
+            self.assertNotIn("zY0Z", switched_lines)
+            self.assertNotIn("S4096Z", switched_lines)
+            self.assertNotIn("zY1Z", switched_lines)
             scheduled_chords = [
                 line
                 for line in switched_lines

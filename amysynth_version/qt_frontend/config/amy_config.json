@@ -88,8 +88,22 @@
     "chord_gate_beats": 0.72,
     "bass_gate_beats": 0.3,
     "max_rhythm_chord_notes": 4,
-    "max_sequencer_items": 256,
-    "sequencer_reset_guard_ms": 10.0
+    "sequencer_reset_guard_ms": 10.0,
+    "max_sequencer_tags": 256,
+    "tag_ranges": {
+      "drums": {
+        "start": 0,
+        "count": 56
+      },
+      "bass": {
+        "start": 56,
+        "count": 56
+      },
+      "chords": {
+        "start": 112,
+        "count": 140
+      }
+    }
   },
   "performance": {
     "strum_gate_ms": 800,

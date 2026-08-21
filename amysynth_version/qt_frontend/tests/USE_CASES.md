@@ -242,6 +242,17 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 ### RHYTHM — sequencer invariants
 
+**RHYTHM-00 — drums, bass and automatic chords use independent AMY tag ranges**
+
+- Current AMY stores exactly one sequencer entry per user tag; reusing a tag replaces that entry, and `H0,0,<tag>` clears only that entry. Multiple simultaneous events therefore require distinct tags.
+- The application reserves non-overlapping ranges sized from the complete rhythm catalogue: drums 0..55, bass 56..111 and automatic chords 112..251. Tags 252..255 remain unused.
+- Every scheduled note-on/off owns one deterministic tag in its lane.
+- Holding/releasing a manual chord clears/reinstalls only the automatic-chord range; bass and drums keep running and transport remains started.
+- Bass on/off and bass retuning replace only the bass range. Tuning/chord pitch changes may replace both bass and automatic-chord ranges but must not touch percussion or stop transport.
+- A rhythm-style change may deliberately restart the bar; ordinary lane edits may not issue `RESET_SEQUENCER`.
+
+**Failure history:** whole-sequencer rebuilds were used for chord hold/release, pitch changes and other lane-local operations. On the ESP32-P4 this could make the rhythm audibly disappear while a manual chord was held and then return on release.
+
 **RHYTHM-01 — chord pitch follows the active chord**
 
 - With rhythm chord activity enabled, changing/pressing a chord rebuilds accompaniment pitch without changing the selected chord instrument.
