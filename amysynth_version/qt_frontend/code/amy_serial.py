@@ -938,6 +938,13 @@ class AmySerialClient:
         # instrument cannot leave AMY at its factory slider values.
         self._configure_synth(role)
 
+        # Chord has two independent AMY synths: manual_chord and
+        # rhythm_chord. A running sequencer must be refreshed after the
+        # rhythm_chord synth is repatched. Keep the current AMY timebase so
+        # changing sound does not restart the bar or tempo phase.
+        if role == "chord" and getattr(self, "rhythm_running", False):
+            self._rebuild_rhythm(reset_phase=False)
+
         if role == "chord" and self._manual_active_id is not None:
             for note in self._manual_active_notes:
                 self._wire(
@@ -962,6 +969,9 @@ class AmySerialClient:
         self.synth_params[role] = {}
         self._adsr_override_active[role] = False
         self._configure_synth(role)
+
+        if role == "chord" and getattr(self, "rhythm_running", False):
+            self._rebuild_rhythm(reset_phase=False)
 
         # A chord patch hot-swap silences both independent chord pools. If a
         # manual chord is physically held, restore it on the new patch.

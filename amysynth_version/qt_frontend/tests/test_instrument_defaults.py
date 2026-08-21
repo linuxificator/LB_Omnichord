@@ -281,5 +281,66 @@ class InstrumentDefaultTests(unittest.TestCase):
         )
 
 
+    def test_live_rhythm_rebuilds_without_phase_reset_on_chord_instrument_change(self) -> None:
+        client = object.__new__(AmySerialClient)
+        client.patch_map = {"juno_050": 50}
+        client.selected_synth = {"chord": "juno_000"}
+        client.synth_params = {"chord": {}}
+        client._adsr_override_active = {"chord": False}
+        client.synth_id = {
+            "strum": 2, "manual_chord": 3, "rhythm_chord": 4
+        }
+        client._manual_active_id = None
+        client._manual_active_notes = []
+        client.rhythm_running = True
+
+        calls: list[tuple[str, object]] = []
+        client._configure_synth = lambda role: calls.append(("configure", role))
+        client._rebuild_rhythm = (
+            lambda *, reset_phase: calls.append(("rebuild", reset_phase))
+        )
+
+        AmySerialClient._set_synth_state(
+            client,
+            "chord",
+            {
+                "name": "juno_050",
+                "params": ["resonance", 7.5],
+            },
+        )
+
+        self.assertEqual(
+            calls,
+            [("configure", "chord"), ("rebuild", False)],
+        )
+
+    def test_stopped_rhythm_is_not_rebuilt_on_chord_instrument_change(self) -> None:
+        client = object.__new__(AmySerialClient)
+        client.patch_map = {"juno_050": 50}
+        client.selected_synth = {"chord": "juno_000"}
+        client.synth_params = {"chord": {}}
+        client._adsr_override_active = {"chord": False}
+        client.synth_id = {
+            "strum": 2, "manual_chord": 3, "rhythm_chord": 4
+        }
+        client._manual_active_id = None
+        client._manual_active_notes = []
+        client.rhythm_running = False
+
+        calls: list[tuple[str, object]] = []
+        client._configure_synth = lambda role: calls.append(("configure", role))
+        client._rebuild_rhythm = (
+            lambda *, reset_phase: calls.append(("rebuild", reset_phase))
+        )
+
+        AmySerialClient._set_synth_state(
+            client,
+            "chord",
+            {"name": "juno_050", "params": ["resonance", 7.5]},
+        )
+
+        self.assertEqual(calls, [("configure", "chord")])
+
+
 if __name__ == "__main__":
     unittest.main()
