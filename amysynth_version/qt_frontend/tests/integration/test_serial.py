@@ -377,6 +377,25 @@ class SerialIntegrationTests(unittest.TestCase):
 
             start = app.bridge.count()
             app.action("pressChord", 0, 0)
+            # The localhost API returns before the asynchronous UART writer has
+            # necessarily emitted anything. Wait for the actual manual press,
+            # then for the targeted chord-tag clears; an idle-age heuristic can
+            # otherwise return while the output delta is still empty.
+            app.bridge.wait_for_lines(["l0i3Z"], start=start, timeout=8.0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                delta = app.bridge.lines_since(start)
+                cancellations = [
+                    line for line in delta if line.startswith("H0,0,")
+                ]
+                if cancellations:
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail(
+                    "manual chord hold did not clear the automatic-chord tag range; "
+                    "received:\n" + "\n".join(app.bridge.lines_since(start))
+                )
             app.bridge.wait_idle(timeout=8.0)
             delta = app.bridge.lines_since(start)
 
