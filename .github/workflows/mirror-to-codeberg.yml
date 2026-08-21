@@ -3,7 +3,7 @@ name: Mirror to Codeberg
 on:
   push:
     branches:
-      - '**'
+      - main
     tags:
       - '**'
   delete:
@@ -49,6 +49,6 @@ jobs:
           TARGET="git@codeberg.org:${CODEBERG_USER}/${CODEBERG_REPO}.git"
 
           git push "$TARGET" \
-            '+refs/heads/*:refs/heads/*' \
+            '+refs/heads/main:refs/heads/main' \
             '+refs/tags/*:refs/tags/*' \
             --prune

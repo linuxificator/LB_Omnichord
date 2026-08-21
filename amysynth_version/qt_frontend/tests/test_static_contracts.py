@@ -70,11 +70,19 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("self._runtime(role).transport_payload()", main_py)
         self.assertIn("def _apply_synth_state(", amy_py)
         self.assertIn("self._apply_synth_state(\n            role,", amy_py)
-        self.assertIn("resync_chord=True", amy_py)
-        self.assertIn('self._sync_synth_params(\n                "chord",', amy_py)
+        self.assertIn('self._sync_synth_params(\n                    "chord",', amy_py)
 
-        # These were the old parallel mutation/transport paths. Reintroducing
-        # them would make startup/preset/UI behavior capable of diverging again.
+        # Rhythm is now independent tagged lanes. Reintroducing the previous
+        # whole-sequencer rebuild helpers would again make lane-local edits able
+        # to interrupt drums/bass/chords together.
+        self.assertIn("class _TaggedSequencerLane:", amy_py)
+        self.assertIn("def _replace_lane(", amy_py)
+        self.assertIn('self._replace_lane("bass")', amy_py)
+        self.assertIn('self._replace_lane("chords")', amy_py)
+        self.assertNotIn("def _prepare_rhythm_rebuild(", amy_py)
+        self.assertNotIn("def _rebuild_rhythm(", amy_py)
+
+        # These were the old parallel synth mutation/transport paths.
         for forbidden in (
             "class SynthRuntime",
             "values_by_synth",
@@ -84,6 +92,46 @@ class StaticContractTests(unittest.TestCase):
             "def _send_synth_params(",
         ):
             self.assertNotIn(forbidden, main_py, forbidden)
+
+    def test_left_rail_has_no_rhythm_reset_and_uses_common_reset_labels(self) -> None:
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        self.assertIn("property int leftRailWidth: 64", qml)
+        self.assertNotIn("resetRhythmControlsToPreset", qml)
+        self.assertNotIn('text: "RHY"', qml)
+        self.assertNotIn('text: "BAS"', qml)
+        self.assertNotIn('text: "STR"', qml)
+        self.assertNotIn('text: "CHD"', qml)
+        self.assertNotIn('text: "ROWS"', qml)
+        self.assertGreaterEqual(qml.count('text: "RST"'), 4)
+
+    def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
+        panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        self.assertIn("id: controlsRow", panel)
+        self.assertEqual(panel.count("LabeledSlider {"), 3)
+        self.assertNotIn("VerticalVolume {", panel)
+        self.assertGreaterEqual(panel.count("width: 145"), 3)
+        self.assertIn('label: "LEV"', panel)
+        self.assertIn('label: "LIVE"', panel)
+        self.assertIn('label: "DAMP"', panel)
+        self.assertIn("width: 520", main)
+
+    def test_rhythm_transport_icon_is_bound_directly_to_backend_state(self) -> None:
+        qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
+        self.assertIn('text: root.controller.rhythmRunning ? "■" : "▶"', qml)
+        self.assertNotIn("Canvas {", qml)
+
+    def test_each_musical_role_has_a_distinct_amy_bus(self) -> None:
+        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            config["buses"],
+            {"drums": 0, "bass": 1, "strum": 2, "chord": 3},
+        )
+        amy_py = (ROOT / "code" / "amy_serial.py").read_text(encoding="utf-8")
+        self.assertIn('self.bus_id["strum"]', amy_py)
+        self.assertIn('self.bus_id["chord"]', amy_py)
+        self.assertIn('f"K{patch}i{synth}iv{voices}iy{bus}Z"', amy_py)
+        self.assertIn("self._apply_reverb_bus(bus)", amy_py)
 
 
 if __name__ == "__main__":

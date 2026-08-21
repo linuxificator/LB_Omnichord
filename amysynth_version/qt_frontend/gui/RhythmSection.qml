@@ -36,7 +36,7 @@ Item {
             }
             Connections {
                 target: root.controller
-                function onRhythmStateChanged() { root.synchronizeWheel(); transportSymbol.requestPaint() }
+                function onRhythmStateChanged() { root.synchronizeWheel() }
             }
             delegate: Item {
                 required property var modelData
@@ -63,10 +63,6 @@ Item {
                 if (initialized && !syncingFromBackend && currentIndex >= 0)
                     root.controller.setRhythmIndex(currentIndex)
             }
-
-            // A short tap on the visible item above/below the centre selects
-            // that item. TapHandler's drag threshold leaves normal flick/swipe
-            // gestures to the Tumbler.
         }
         Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -78,17 +74,22 @@ Item {
     Button {
         id: runButton
         x: wheelFrame.width + 7; y: (parent.height - height) / 2; width: 62; height: 62
-        contentItem: Canvas {
-            id: transportSymbol
+        contentItem: Item {
             anchors.fill: parent
-            onPaint: {
-                const c = getContext("2d"); c.reset()
-                c.fillStyle = root.controller.rhythmRunning ? "#fff8d5" : "#3e3006"
-                if (root.controller.rhythmRunning) {
-                    const side = 19; c.fillRect((width-side)/2, (height-side)/2, side, side)
-                } else {
-                    c.beginPath(); c.moveTo(width/2-9,height/2-14); c.lineTo(width/2+15,height/2); c.lineTo(width/2-9,height/2+14); c.closePath(); c.fill()
-                }
+
+            // Bind the glyph directly to the Qt property.  The previous Canvas
+            // depended on an imperative repaint after the backend call; if that
+            // call raised, the transport really stopped but the old STOP glyph
+            // remained painted.  This declaration always follows rhythmRunning.
+            Text {
+                anchors.centerIn: parent
+                anchors.horizontalCenterOffset: root.controller.rhythmRunning ? 0 : 2
+                text: root.controller.rhythmRunning ? "■" : "▶"
+                color: root.controller.rhythmRunning ? "#fff8d5" : "#3e3006"
+                font.pixelSize: root.controller.rhythmRunning ? 25 : 32
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
             }
         }
         background: Rectangle {
@@ -130,7 +131,6 @@ Item {
             width: parent.width - x
             height: parent.height
 
-            // Three independently framed groups, staggered vertically.
             ActivitySelector {
                 x: 0
                 y: 0

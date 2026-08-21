@@ -242,14 +242,25 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 ### RHYTHM — sequencer invariants
 
+**RHYTHM-00 — drums, bass and automatic chords use independent AMY tag ranges**
+
+- Current AMY stores exactly one sequencer entry per user tag; reusing a tag replaces that entry, and `H0,0,<tag>` clears only that entry. Multiple simultaneous events therefore require distinct tags.
+- The application reserves non-overlapping ranges sized from the complete rhythm catalogue: drums 0..55, bass 56..111 and automatic chords 112..251. Tags 252..255 remain unused.
+- Every scheduled note-on/off owns one deterministic tag in its lane.
+- Holding/releasing a manual chord clears/reinstalls only the automatic-chord range; bass and drums keep running and transport remains started.
+- Bass on/off and bass retuning replace only the bass range. Tuning/chord pitch changes may replace both bass and automatic-chord ranges but must not touch percussion or stop transport.
+- A rhythm-style change may deliberately restart the bar; ordinary lane edits may not issue `RESET_SEQUENCER`.
+
+**Failure history:** whole-sequencer rebuilds were used for chord hold/release, pitch changes and other lane-local operations. On the ESP32-P4 this could make the rhythm audibly disappear while a manual chord was held and then return on release.
+
 **RHYTHM-01 — chord pitch follows the active chord**
 
 - With rhythm chord activity enabled, changing/pressing a chord rebuilds accompaniment pitch without changing the selected chord instrument.
 
 **RHYTHM-02 — instrument change does not silently leave stale rhythm state**
 
-- Instrument configuration and rhythm scheduling must have one explicit ordering contract.
-- Tests must inspect both serial command order and native AMY synth state after a live switch.
+- Chord patch changes update synths 3/4 directly; existing tagged synth-4 events remain installed and use the new patch on their next firing.
+- A timbre-only switch must not stop transport or reset/rebuild unrelated sequencer lanes. Tests inspect both serial commands and native AMY synth state.
 
 **RHYTHM-03 — no unnecessary phase reset on a timbre-only change**
 
@@ -258,8 +269,17 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **RHYTHM-04 — starting automatic chords converges synth 4 first**
 
-- Starting rhythm from stopped state must clear stale sequencer events, cross the configured AMY reset guard, reapply the current logical chord parameters specifically to rhythm synth 4, then install automatic chord events and resume transport.
-- This reapplication uses the same stored chord state; it must not invent defaults, derive values independently, or reload the patch.
+- Starting rhythm from stopped state installs the authoritative tagged drum/bass/chord ranges and resumes transport only after those definitions are queued ahead of `zY1`.
+- Starting rhythm must not require `RESET_SEQUENCER`; tagged replacement itself removes stale lane entries.
+
+**RHYTHM-05 — stopping transport releases sounding accompaniment**
+
+- `zY0` stops future sequencer execution, so a note-off scheduled later in the pattern cannot be relied upon after Stop.
+- Every rhythm Stop must therefore immediately send all-off to percussion synth 0, bass synth 1 and automatic-chord synth 4.
+- Manual chord synth 3 and strum synth 2 are not rhythm-owned and must remain untouched.
+- The frontend Stop action must complete normally and emit the changed `rhythmRunning` state so the Play/Stop control follows the backend.
+
+**Failure history:** stopping while an automatic chord was sounding froze transport before its tagged note-off fired, leaving a hanging chord. The same stop path called a missing `_silence_accompaniment()` method after sending `zY0`, raising `AttributeError`; as a result the actual transport stopped but `rhythmStateChanged` was never emitted and the button remained visually stuck on STOP.
 
 ### TUNING — all note-producing paths follow the selected tuning
 

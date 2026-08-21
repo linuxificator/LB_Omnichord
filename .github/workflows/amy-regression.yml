@@ -25,6 +25,14 @@ on:
 permissions:
   contents: read
 
+# A feature branch can receive several quick follow-up commits while a hardware
+# regression is being fixed. Do not finish six obsolete jobs for every older
+# PR head; keep only the newest run for that PR/ref. Manual runs use their own
+# ref-scoped group and similarly supersede an older manual run for that ref.
+concurrency:
+  group: amy-regression-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 jobs:
   pr-matrix:
     if: github.event_name == 'pull_request'

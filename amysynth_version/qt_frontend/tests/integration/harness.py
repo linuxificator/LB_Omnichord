@@ -82,6 +82,7 @@ class SerialAmyBridge:
         os.set_blocking(self.master_fd, False)
 
         self.lines: list[str] = []
+        self.line_times: list[float] = []
         self.raw_chunks: list[bytes] = []
         self._buffer = bytearray()
         self._line_condition = threading.Condition()
@@ -139,7 +140,8 @@ class SerialAmyBridge:
             return
         with self._line_condition:
             self.lines.append(line)
-            self._last_rx = time.monotonic()
+            self.line_times.append(time.monotonic())
+            self._last_rx = self.line_times[-1]
             self._line_condition.notify_all()
         with self._serial_log_path.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
@@ -213,6 +215,10 @@ class SerialAmyBridge:
     def lines_since(self, start: int) -> list[str]:
         with self._line_condition:
             return list(self.lines[start:])
+
+    def timed_lines(self) -> list[tuple[str, float]]:
+        with self._line_condition:
+            return list(zip(self.lines, self.line_times))
 
     def wait_for_lines(
         self,

@@ -27,6 +27,9 @@ ApplicationWindow {
     property int octaveButtonWidth: 57
     property int inversionButtonWidth: 94
     property int controlSpacing: 6
+    property int leftRailWidth: 64
+    property int leftSliderWidth: 52
+    property int contentX: leftRailWidth
 
     property int chordRowContentWidth:
         wheelWidth
@@ -37,7 +40,8 @@ ApplicationWindow {
         + 20 * controlSpacing
 
     property int maximumChordRowWidth:
-        rowIndent * 3
+        contentX
+        + rowIndent * 3
         + chordRowContentWidth
 
     property int sectionHeight: 104
@@ -81,7 +85,8 @@ ApplicationWindow {
         + chordRowsHeight
 
     property int volumeX:
-        chordRowContentWidth
+        contentX
+        + chordRowContentWidth
         + volumeGap
 
     property int strumX:
@@ -240,10 +245,20 @@ ApplicationWindow {
                 visible:
                     window.titleHeight > 0
 
+                ReverbPanel {
+                    id: reverbPanel
+                    x: 0
+                    y: 0
+                    width: 520
+                    height: parent.height
+                    controller: backend
+                }
+
                 Text {
-                    anchors.fill: parent
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 16
+                    x: reverbPanel.width + 12
+                    y: 0
+                    width: Math.max(0, window.strumX - x - 12)
+                    height: parent.height
 
                     text: headerTitleText
                     color: "#493a38"
@@ -267,11 +282,12 @@ ApplicationWindow {
             }
 
             UtilitySection {
-                x: 0
+                x: window.contentX
                 y: window.utilityY
                 width:
                     window.volumeX
                     + window.volumeWidth
+                    - window.contentX
                 height:
                     window.sectionHeight
 
@@ -280,12 +296,43 @@ ApplicationWindow {
                 fullScreen:
                     window.visibility
                     === Window.FullScreen
+                leftExtension: window.leftRailWidth
 
                 onToggleFullscreenRequested:
                     window.toggleFullscreenMode()
             }
 
-            // Yellow ends at the percussion-volume control.
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.utilityY + 7
+                width: 42
+                height: 42
+                text: "UP"
+                panelColor: "#efb05c"
+                borderColor: "#a75d0a"
+                textColor: "#492606"
+                onPressedChanged: {
+                    if (pressed) backend.beginPitchBend(1)
+                    else backend.endPitchBend()
+                }
+            }
+
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.utilityY + window.sectionHeight - height - 7
+                width: 42
+                height: 42
+                text: "DWN"
+                panelColor: "#efb05c"
+                borderColor: "#a75d0a"
+                textColor: "#492606"
+                onPressedChanged: {
+                    if (pressed) backend.beginPitchBend(-1)
+                    else backend.endPitchBend()
+                }
+            }
+
+            // Yellow rhythm/drum family extends through the left control rail.
             Rectangle {
                 x: 0
                 y: window.rhythmY
@@ -302,6 +349,36 @@ ApplicationWindow {
                     anchors.fill: parent
                     family: "percussion"
                     ink: "#b49317"
+                }
+            }
+
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.rhythmY + 7
+                width: 42
+                height: 42
+                text: "UP"
+                panelColor: "#f4dc78"
+                borderColor: "#aa8719"
+                textColor: "#4c3505"
+                onPressedChanged: {
+                    if (pressed) backend.beginTempoNudge(1)
+                    else backend.endTempoNudge()
+                }
+            }
+
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.rhythmY + window.sectionHeight - height - 7
+                width: 42
+                height: 42
+                text: "DWN"
+                panelColor: "#f4dc78"
+                borderColor: "#aa8719"
+                textColor: "#4c3505"
+                onPressedChanged: {
+                    if (pressed) backend.beginTempoNudge(-1)
+                    else backend.endTempoNudge()
                 }
             }
 
@@ -365,8 +442,39 @@ ApplicationWindow {
                 }
             }
 
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.bassSynthY + (window.sectionHeight - height) / 2
+                width: 50
+                height: 50
+                text: "RST"
+                panelColor: "#d0d0cc"
+                borderColor: "#7b7b76"
+                onClicked: backend.resetBassToPreset()
+            }
+
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.strumSynthY + (window.sectionHeight - height) / 2
+                text: "RST"
+                panelColor: "#b9def3"
+                borderColor: "#589bc6"
+                textColor: "#12344d"
+                onClicked: backend.resetStrumToPreset()
+            }
+
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.chordSynthY + (window.sectionHeight - height) / 2
+                text: "RST"
+                panelColor: "#c7ddc5"
+                borderColor: "#649068"
+                textColor: "#1d4023"
+                onClicked: backend.resetChordSynthToPreset()
+            }
+
             RhythmSection {
-                x: 0
+                x: window.contentX
                 y: window.rhythmY
                 width:
                     window.chordRowContentWidth
@@ -380,7 +488,7 @@ ApplicationWindow {
             SynthSection {
                 id: bassSynthSection
 
-                x: 0
+                x: window.contentX
                 y: window.bassSynthY
                 width:
                     window.chordRowContentWidth
@@ -412,7 +520,7 @@ ApplicationWindow {
             SynthSection {
                 id: strumSynthSection
 
-                x: 0
+                x: window.contentX
                 y: window.strumSynthY
                 width:
                     window.chordRowContentWidth
@@ -444,7 +552,7 @@ ApplicationWindow {
             SynthSection {
                 id: chordSynthSection
 
-                x: 0
+                x: window.contentX
                 y: window.chordSynthY
                 width:
                     window.chordRowContentWidth
@@ -546,7 +654,7 @@ ApplicationWindow {
             Column {
                 id: chordRows
 
-                x: 0
+                x: window.contentX
                 y: window.chordRowsY
                 spacing: window.rowSpacing
 
@@ -561,7 +669,31 @@ ApplicationWindow {
 
                         width:
                             window.maximumChordRowWidth
+                            - window.contentX
                         height: window.rowHeight
+
+                        Rectangle {
+                            visible: rowItem.rowIndex === 0
+                            x: -window.contentX
+                            y: 0
+                            width: window.contentX + window.wheelWidth
+                            height: window.rowHeight
+                            radius: 10
+                            color: window.chordPanelColor
+                            border.color: window.chordPanelBorderColor
+                            border.width: 1
+                        }
+
+                        PresetResetButton {
+                            visible: rowItem.rowIndex === 0
+                            x: -window.contentX + (window.contentX - width) / 2
+                            y: (window.rowHeight - height) / 2
+                            text: "RST"
+                            panelColor: "#e5d9b2"
+                            borderColor: "#9f9165"
+                            textColor: "#4a4022"
+                            onClicked: backend.resetChordRowsToPreset()
+                        }
 
                         Button {
                             id: offButton

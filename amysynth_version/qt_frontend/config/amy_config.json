@@ -88,13 +88,28 @@
     "chord_gate_beats": 0.72,
     "bass_gate_beats": 0.3,
     "max_rhythm_chord_notes": 4,
-    "max_sequencer_items": 256,
-    "sequencer_reset_guard_ms": 10.0
+    "sequencer_reset_guard_ms": 10.0,
+    "max_sequencer_tags": 256,
+    "tag_ranges": {
+      "drums": {
+        "start": 0,
+        "count": 56
+      },
+      "bass": {
+        "start": 56,
+        "count": 56
+      },
+      "chords": {
+        "start": 112,
+        "count": 140
+      }
+    }
   },
   "performance": {
     "strum_gate_ms": 800,
     "one_shot_chord_gate_ms": 650,
-    "strum_tail_ms": 450
+    "strum_tail_ms": 450,
+    "synth_alloc_guard_ms": 10.0
   },
   "synth_patches": {
     "juno_000": 0,
@@ -235,14 +250,30 @@
     },
     "68": {
       "label": "Juno B15 Harpsichord 1",
-      "reason": "Factory patch requests 71265 Hz cutoff and Q 11.2; constrain the P4 fixed-point filter to a stable bright range.",
-      "juno_filter_hz": 16000.0,
+      "reason": "Factory patch requests an extreme filter state; constrain the P4 filter to a stable bright range.",
+      "juno_filter_hz": 6000.0,
       "juno_resonance": 4.0
     },
     "74": {
       "label": "Juno B23 Orchestral Pad",
       "reason": "Factory patch sets gather/output osc amp const to zero; AMY skips rendering when amp const is zero.",
       "juno_output_amp": 1.0
+    },
+    "89": {
+      "label": "Juno B26 Harpsichord 2",
+      "reason": "Factory filter base is at the unsafe top edge; keep the P4 filter in a stable bright range.",
+      "juno_filter_hz": 6000.0
+    },
+    "48": {
+      "label": "Juno A71 Sweep I",
+      "reason": "Factory filter base is at the previous 18 kHz UI limit; constrain it below the DSP safety ceiling.",
+      "juno_filter_hz": 9000.0
     }
+  },
+  "buses": {
+    "drums": 0,
+    "bass": 1,
+    "strum": 2,
+    "chord": 3
   }
 }

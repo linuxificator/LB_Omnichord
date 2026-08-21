@@ -17,7 +17,7 @@ def wire_float(value: float) -> str:
 
 def scheduled_note_ons(lines: list[str], synth: int) -> list[float]:
     pattern = re.compile(
-        rf"^H\d+,\d+n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
+        rf"^H\d+,\d+,\d+n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
     )
     notes: list[float] = []
     for line in lines:
@@ -156,11 +156,18 @@ class SerialIntegrationTests(unittest.TestCase):
             # pitch lanes from the same newly tuned chord state.
             harm_start = app.bridge.count()
             app.action("setTuningModeIndex", 0)  # HARM
-            app.bridge.wait_for_lines(
-                ["S4096Z", "zY1Z"], start=harm_start, timeout=8.0
-            )
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                harm_lines = app.bridge.lines_since(harm_start)
+                if scheduled_note_ons(harm_lines, 1) and scheduled_note_ons(harm_lines, 4):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("HARM tuning change did not replace bass/chord tagged events")
             app.bridge.wait_idle(timeout=8.0)
             harm_lines = app.bridge.lines_since(harm_start)
+            self.assertNotIn("zY0Z", harm_lines)
+            self.assertNotIn("S4096Z", harm_lines)
             harm_bass = scheduled_note_ons(harm_lines, 1)
             harm_rhythm_chords = scheduled_note_ons(harm_lines, 4)
             self.assertTrue(harm_bass, "HARM rebuild contains no bass note-ons")
@@ -200,7 +207,6 @@ class SerialIntegrationTests(unittest.TestCase):
             # The press also updates accompaniment gating/scheduling. Wait for
             # that transaction to finish so its HARM note-ons cannot leak into
             # the next EQ checkpoint.
-            app.bridge.wait_for_lines(["zY1Z"], start=press_start, timeout=8.0)
             app.bridge.wait_idle(timeout=8.0)
 
             manual_eq_start = app.bridge.count()
@@ -257,6 +263,37 @@ class SerialIntegrationTests(unittest.TestCase):
                 "HARM strum contains no intonation-adjusted pitch",
             )
 
+    def test_strum_patch_change_is_bus_isolated_from_chords(self) -> None:
+        meow = synth_index("Meow Brass")
+        sustainer = synth_index("Sustainer")
+        other = synth_index("Orchestral Pad")
+        meow_patch = patch_for_index(meow)
+        sustainer_patch = patch_for_index(sustainer)
+        other_patch = patch_for_index(other)
+
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("setChordSynthIndex", meow)
+            app.bridge.wait_for_lines(
+                [f"K{meow_patch}i3Z", f"K{meow_patch}i4Z"],
+                start=0,
+                timeout=8.0,
+            )
+            app.action("setStrumSynthIndex", sustainer)
+            app.bridge.wait_for_lines([f"K{sustainer_patch}i2Z"], start=0, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+
+            start = app.bridge.count()
+            app.action("setStrumSynthIndex", other)
+            lines = app.bridge.wait_for_lines([f"K{other_patch}i2Z"], start=start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            lines = app.bridge.lines_since(start)
+
+            self.assertIn("i2iy2Z", lines)
+            self.assertTrue(any(line.startswith("y2h") for line in lines), lines)
+            self.assertFalse(any("i3" in line or "i4" in line for line in lines), lines)
+            self.assertFalse(any(line.startswith("y3") for line in lines), lines)
+
     def test_serial_framing_and_live_chord_patch_order(self) -> None:
         brass_index = synth_index("Brass Ensemble")
         other_index = synth_index("Orchestral Pad")
@@ -289,38 +326,302 @@ class SerialIntegrationTests(unittest.TestCase):
             switch_start = app.bridge.count()
             app.action("setChordSynthIndex", other_index)
             app.bridge.wait_for_lines(
-                [f"K{other_patch}i3Z", f"K{other_patch}i4Z", "S4096Z"],
+                [f"K{other_patch}i3Z", f"K{other_patch}i4Z"],
                 start=switch_start,
                 timeout=8.0,
             )
             app.bridge.wait_idle(timeout=8.0)
             lines = app.bridge.lines_since(switch_start)
 
-            stop = lines.index("zY0Z")
-            reset = lines.index("S4096Z")
-            k3 = lines.index(f"K{other_patch}i3Z")
-            k4 = lines.index(f"K{other_patch}i4Z")
-            first_schedule = next(
-                index for index, line in enumerate(lines) if line.startswith("H")
-            )
-            self.assertLess(stop, reset)
-            self.assertLess(reset, k3)
-            self.assertLess(k3, k4)
-            self.assertLess(k4, first_schedule)
-
-            # A live rhythm refresh must define chord events against the
-            # dedicated rhythm chord synth 4, never manual synth 3.
-            scheduled = [line for line in lines if line.startswith("H")]
-            self.assertTrue(scheduled, "no sequencer events sent after switch")
-            self.assertTrue(
-                any("i4Z" in line for line in scheduled),
-                "refreshed rhythm contains no synth-4 chord events",
+            self.assertNotIn("zY0Z", lines)
+            self.assertNotIn("S4096Z", lines)
+            self.assertNotIn("zY1Z", lines)
+            self.assertLess(
+                lines.index(f"K{other_patch}i3Z"),
+                lines.index(f"K{other_patch}i4Z"),
             )
 
             # Once the new instrument switch begins, the old Brass patch may
             # not be reloaded into either chord synth by a stale host command.
             self.assertNotIn(f"K{brass_patch}i3Z", lines)
             self.assertNotIn(f"K{brass_patch}i4Z", lines)
+
+
+    def test_cold_start_guards_synth4_and_reverb_zero_is_exact(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            records = app.bridge.timed_lines()
+            lines = [line for line, _ in records]
+
+            # Four isolated buses: drums 0 are dry by default; bass/strum/chord
+            # buses also start at user reverb level zero. Liveness/damping are
+            # still defined at their neutral midpoint even while level is zero.
+            for bus in range(4):
+                self.assertIn(f"y{bus}h0,0.5,0.5Z", lines)
+            self.assertFalse(any("h0.001" in line for line in lines))
+
+            k4_index = next(
+                i for i, line in enumerate(lines)
+                if line.startswith("K") and "i4iv" in line and "iy3Z" in line
+            )
+            next_synth4_index = next(
+                i for i in range(k4_index + 1, len(lines))
+                if "i4" in lines[i]
+            )
+            elapsed = records[next_synth4_index][1] - records[k4_index][1]
+            self.assertGreaterEqual(
+                elapsed,
+                0.008,
+                f"synth 4 post-allocation command arrived after only {elapsed:.4f}s",
+            )
+
+            # User reverb applies to bass/strum/chords, never drums unless DRM
+            # is explicitly enabled.
+            start = app.bridge.count()
+            app.action("setReverbLevel", 0.4)
+            app.bridge.wait_for_lines(
+                [
+                    "y0h0,0.5,0.5Z",
+                    "y1h0.4,0.5,0.5Z",
+                    "y2h0.4,0.5,0.5Z",
+                    "y3h0.4,0.5,0.5Z",
+                ],
+                start=start,
+                timeout=5.0,
+            )
+            self.assertFalse(bool(app.query("reverbDrumsIncluded")))
+
+            start = app.bridge.count()
+            app.action("toggleReverbDrums")
+            app.bridge.wait_for_lines(
+                ["y0h0.4,0.5,0.5Z"], start=start, timeout=5.0
+            )
+            self.assertTrue(bool(app.query("reverbDrumsIncluded")))
+
+            # Level zero is exact on every bus, including drums when DRM is on.
+            start = app.bridge.count()
+            app.action("setReverbLevel", 0.0)
+            app.bridge.wait_for_lines(
+                [
+                    "y0h0,0.5,0.5Z",
+                    "y1h0,0.5,0.5Z",
+                    "y2h0,0.5,0.5Z",
+                    "y3h0,0.5,0.5Z",
+                ],
+                start=start,
+                timeout=5.0,
+            )
+            self.assertEqual(float(app.query("reverbLevel")), 0.0)
+
+    def test_long_manual_chord_hold_only_edits_chord_tag_range(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            if not bool(app.query("rhythmRunning")):
+                start = app.bridge.count()
+                app.action("toggleRhythm")
+                app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+                app.bridge.wait_idle(timeout=8.0)
+
+            # First establish real bass/chord tagged patterns. The cancellation
+            # assertion below is meaningful only for tags that were installed.
+            seed = app.bridge.count()
+            app.action("selectChord", 0, 0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                seeded = app.bridge.lines_since(seed)
+                if (
+                    any(line.startswith("H") and "i1Z" in line for line in seeded)
+                    and any(line.startswith("H") and "i4Z" in line for line in seeded)
+                ):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("failed to seed bass and rhythm-chord tag ranges")
+            time.sleep(0.75)  # allow one-shot chord release timer to drain
+            app.bridge.wait_idle(timeout=8.0)
+
+            start = app.bridge.count()
+            app.action("pressChord", 0, 0)
+            # The localhost API returns before the asynchronous UART writer has
+            # necessarily emitted anything. Wait for the actual manual press,
+            # then for the targeted chord-tag clears; an idle-age heuristic can
+            # otherwise return while the output delta is still empty.
+            app.bridge.wait_for_lines(["l0i3Z"], start=start, timeout=8.0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                delta = app.bridge.lines_since(start)
+                cancellations = [
+                    line for line in delta if line.startswith("H0,0,")
+                ]
+                if cancellations:
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail(
+                    "manual chord hold did not clear the automatic-chord tag range; "
+                    "received:\n" + "\n".join(app.bridge.lines_since(start))
+                )
+            app.bridge.wait_idle(timeout=8.0)
+            delta = app.bridge.lines_since(start)
+
+            self.assertNotIn("zY0Z", delta)
+            self.assertNotIn("S4096Z", delta)
+            self.assertNotIn("zY1Z", delta)
+            cancellations = [line for line in delta if line.startswith("H0,0,")]
+            self.assertTrue(cancellations, delta)
+            cancel_tags = {int(line.split(",", 2)[2][:-1]) for line in cancellations}
+            self.assertTrue(all(112 <= tag < 252 for tag in cancel_tags), cancel_tags)
+            self.assertFalse(
+                any(
+                    line.startswith("H0,0,")
+                    and int(line.split(",", 2)[2][:-1]) < 56
+                    for line in delta
+                ),
+                delta,
+            )
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+            time.sleep(1.0)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+            release_start = app.bridge.count()
+            app.action("releaseChord", 0, 0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                release_delta = app.bridge.lines_since(release_start)
+                if any(line.startswith("H") and "i4Z" in line for line in release_delta):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("release did not reinstall tagged rhythm chords")
+            release_delta = app.bridge.lines_since(release_start)
+            self.assertNotIn("zY0Z", release_delta)
+            self.assertNotIn("S4096Z", release_delta)
+            self.assertNotIn("zY1Z", release_delta)
+            self.assertFalse(any("i0Z" in line for line in release_delta if line.startswith("H")))
+            self.assertFalse(any("i1Z" in line for line in release_delta if line.startswith("H")))
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+    def test_stopping_rhythm_releases_sounding_accompaniment(self) -> None:
+        """Stopping mid-pattern must not strand a synth-4 chord or bass note."""
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("setRhythmChordActivity", 4.0)
+            app.action("setRhythmBassActivity", 4.0)
+            if not bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+
+            # Establish an active pitch state and let any one-shot manual chord
+            # release drain before the stop checkpoint.
+            app.action("selectChord", 0, 0)
+            time.sleep(0.75)
+            app.bridge.wait_idle(timeout=8.0)
+
+            if not bool(app.query("rhythmRunning")):
+                start = app.bridge.count()
+                app.action("toggleRhythm")
+                app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+            # The regression is the action call itself: the old implementation
+            # raised AttributeError after zY0 because _silence_accompaniment was
+            # missing, so the frontend never emitted rhythmStateChanged.
+            stop_start = app.bridge.count()
+            app.action("toggleRhythm")
+            lines = app.bridge.wait_for_lines(
+                ["zY0Z", "l0i0Z", "l0i1Z", "l0i4Z"],
+                start=stop_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            lines = app.bridge.lines_since(stop_start)
+
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            self.assertLess(lines.index("zY0Z"), lines.index("l0i4Z"))
+            self.assertLess(lines.index("zY0Z"), lines.index("l0i1Z"))
+            self.assertNotIn(
+                "l0i3Z",
+                lines,
+                "stopping rhythm must not release a manually held chord",
+            )
+
+    def test_tag_ranges_are_disjoint_and_lane_updates_do_not_cross(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            if not bool(app.query("rhythmRunning")):
+                start = app.bridge.count()
+                app.action("toggleRhythm")
+                app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+                app.bridge.wait_idle(timeout=8.0)
+
+            seed = app.bridge.count()
+            app.action("selectChord", 0, 0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                seeded = app.bridge.lines_since(seed)
+                if (
+                    any(line.startswith("H") and "i1Z" in line for line in seeded)
+                    and any(line.startswith("H") and "i4Z" in line for line in seeded)
+                ):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("failed to seed tag ranges before isolation test")
+            time.sleep(0.75)
+            app.bridge.wait_idle(timeout=8.0)
+
+            if bool(app.query("bassRunning")):
+                start = app.bridge.count()
+                app.action("toggleBassRunning")
+                deadline = time.monotonic() + 8.0
+                tags: set[int] = set()
+                lines: list[str] = []
+                while time.monotonic() < deadline:
+                    lines = app.bridge.lines_since(start)
+                    tags = {
+                        int(line.split(",", 2)[2][:-1])
+                        for line in lines
+                        if line.startswith("H0,0,")
+                        and 56 <= int(line.split(",", 2)[2][:-1]) < 112
+                    }
+                    if tags:
+                        break
+                    time.sleep(0.01)
+                else:
+                    self.fail(
+                        "bass disable did not clear its tagged sequencer lane; received:\n"
+                        + "\n".join(app.bridge.lines_since(start))
+                    )
+                app.bridge.wait_idle(timeout=8.0)
+                lines = app.bridge.lines_since(start)
+                self.assertTrue(all(56 <= tag < 112 for tag in tags), tags)
+                self.assertNotIn("zY0Z", lines)
+                self.assertNotIn("S4096Z", lines)
+
+            app.action("setRhythmChordActivity", 0.0)
+            app.bridge.wait_idle(timeout=8.0)
+            start = app.bridge.count()
+            app.action("setRhythmChordActivity", 3.0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                lines = app.bridge.lines_since(start)
+                if any(line.startswith("H") and "i4Z" in line for line in lines):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("chord lane was not reinstalled")
+            chord_tags = []
+            for line in lines:
+                if not line.startswith("H") or "i4Z" not in line:
+                    continue
+                header = line[1:].split("i", 1)[0]
+                parts = header.split(",", 3)
+                if len(parts) >= 3:
+                    tag_text = re.match(r"(\d+)", parts[2])
+                    if tag_text:
+                        chord_tags.append(int(tag_text.group(1)))
+            self.assertTrue(chord_tags, lines)
+            self.assertTrue(all(112 <= tag < 252 for tag in chord_tags), chord_tags)
 
 
 if __name__ == "__main__":

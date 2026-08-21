@@ -97,5 +97,52 @@ class NativeControlTests(unittest.TestCase):
             app.bridge.checkpoint("repeater-sustain")
 
 
+    def test_cold_start_defines_all_five_synths_in_real_amy(self) -> None:
+        with HeadlessApp(native_amy=True) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            for synth in range(5):
+                commands = app.bridge.synth_commands(synth)
+                self.assertTrue(commands, f"native AMY synth {synth} is undefined after cold start")
+            app.bridge.checkpoint("cold-start-all-synths", synths=(0, 1, 2, 3, 4))
+
+
+    def test_strum_patch_change_cannot_change_chord_synth_or_bus(self) -> None:
+        meow = synth_index("Meow Brass")
+        sustainer = synth_index("Sustainer")
+        other = synth_index("Orchestral Pad")
+
+        def bus_line(state: str, bus: int) -> str:
+            prefix = f"y{bus}"
+            matches = [line for line in state.splitlines() if line.startswith(prefix)]
+            self.assertEqual(len(matches), 1, state)
+            return matches[0]
+
+        with HeadlessApp(native_amy=True) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("setChordSynthIndex", meow)
+            app.action("setStrumSynthIndex", sustainer)
+            app.bridge.wait_idle(timeout=8.0)
+
+            before3 = app.bridge.synth_commands(3)
+            before4 = app.bridge.synth_commands(4)
+            before_bus3 = bus_line(app.bridge.dump_state("before-strum-switch"), 3)
+
+            start = app.bridge.count()
+            app.action("setStrumSynthIndex", other)
+            app.bridge.wait_for_lines(
+                [f"K{patch_for_index(other)}i2Z"], start=start, timeout=8.0
+            )
+            app.bridge.wait_idle(timeout=8.0)
+
+            after3 = app.bridge.synth_commands(3)
+            after4 = app.bridge.synth_commands(4)
+            after_bus3 = bus_line(app.bridge.dump_state("after-strum-switch"), 3)
+
+            self.assertEqual(before3, after3, "strum patch switch changed manual chord synth")
+            self.assertEqual(before4, after4, "strum patch switch changed rhythm chord synth")
+            self.assertEqual(before_bus3, after_bus3, "strum patch switch changed chord bus FX")
+            app.bridge.checkpoint("strum-isolated-from-chord", synths=(2, 3, 4))
+
+
 if __name__ == "__main__":
     unittest.main()
