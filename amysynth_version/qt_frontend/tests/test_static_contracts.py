@@ -133,6 +133,22 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('f"K{patch}i{synth}iv{voices}iy{bus}Z"', amy_py)
         self.assertIn("self._apply_reverb_bus(bus)", amy_py)
 
+    def test_silent_factory_juno_patches_get_explicit_excitation(self) -> None:
+        config = json.loads(
+            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
+        compatibility = config["patch_compatibility"]
+        for patch in ("57", "109"):
+            self.assertGreater(
+                float(compatibility[patch]["juno_noise_amp"]),
+                0.0,
+                patch,
+            )
+        self.assertEqual(
+            compatibility["109"]["label"],
+            "Juno B66 Toy Rhodes",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
