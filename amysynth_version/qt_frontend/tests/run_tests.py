@@ -23,6 +23,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
     "serial": (
         TESTS / "integration" / "test_serial.py",
+        TESTS / "integration" / "test_repatch_guard.py",
     ),
     "native-controls": (
         TESTS / "integration" / "test_native_controls.py",
