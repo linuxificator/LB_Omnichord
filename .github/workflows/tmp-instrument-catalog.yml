@@ -1,8 +1,11 @@
 name: Temporary instrument catalog dump
 
 on:
-  push:
-    branches: [feature/instrument-control-defaults]
+  pull_request:
+    paths:
+      - 'amysynth_version/qt_frontend/instruments/synths.json'
+      - '.github/workflows/tmp-instrument-catalog.yml'
+  workflow_dispatch:
 
 jobs:
   dump:
