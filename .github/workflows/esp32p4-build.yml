@@ -1,0 +1,51 @@
+name: ESP32-P4 firmware build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'amysynth_version/esp32p4/**'
+      - '.github/workflows/esp32p4-build.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'amysynth_version/esp32p4/**'
+      - '.github/workflows/esp32p4-build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: esp32p4-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build with ESP-IDF 6.0.2
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0.2
+          target: esp32p4
+          path: amysynth_version/esp32p4
+          command: bash prepare_amy.sh && idf.py build
+
+      - name: Upload firmware build
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp32p4-firmware
+          path: |
+            amysynth_version/esp32p4/build/*.bin
+            amysynth_version/esp32p4/build/*.elf
+            amysynth_version/esp32p4/build/*.map
+            amysynth_version/esp32p4/build/bootloader/bootloader.bin
+            amysynth_version/esp32p4/build/partition_table/partition-table.bin
+            amysynth_version/esp32p4/build/flash_args
+          if-no-files-found: error
+          retention-days: 14
