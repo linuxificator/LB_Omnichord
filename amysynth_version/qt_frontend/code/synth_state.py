@@ -10,7 +10,7 @@ from control_limits import clamp_control_value
 class SynthState:
     """Own one UI synth role's instrument selection and per-instrument values.
 
-    The class is deliberately the single mutation point for synth state.  UI
+    The class is deliberately the single mutation point for synth state. UI
     edits, preset loads, instrument switches, copying between roles and preset
     serialization all use these methods instead of modifying dictionaries in
     InstrumentBackend directly.
@@ -24,7 +24,8 @@ class SynthState:
             str(definition.key): index
             for index, definition in enumerate(self._definitions)
         }
-        self._selected_index = self._validate_index(selected_index)
+        self._default_selected_index = self._validate_index(selected_index)
+        self._selected_index = self._default_selected_index
         self._values_by_synth = self._default_values()
 
     def _validate_index(self, index: int) -> int:
@@ -54,12 +55,21 @@ class SynthState:
         return self._selected_index
 
     @property
+    def default_selected_index(self) -> int:
+        return self._default_selected_index
+
+    @property
     def selected_definition(self) -> Any:
         return self._definitions[self._selected_index]
 
     @property
     def selected_values(self) -> dict[str, float]:
         return self._values_by_synth[self._selected_index]
+
+    def reset_to_defaults(self) -> None:
+        """Restore catalogue values and this role's application synth choice."""
+        self._selected_index = self._default_selected_index
+        self._values_by_synth = self._default_values()
 
     def select(self, index: int) -> bool:
         try:
@@ -76,6 +86,8 @@ class SynthState:
             definition.key for definition in other._definitions
         ):
             raise ValueError("cannot copy synth state between different catalogs")
+        # Copy performance/session state only. Each role keeps its own
+        # application-default instrument for future sparse preset loads.
         self._selected_index = other._selected_index
         self._values_by_synth = copy.deepcopy(other._values_by_synth)
 
@@ -100,34 +112,57 @@ class SynthState:
         values[control.key] = clamped
         return True
 
+    def _overlay_parameters(
+        self,
+        values_by_synth: list[dict[str, float]],
+        data: dict[str, Any],
+    ) -> None:
+        all_parameters = data.get("parameters", {})
+        if not isinstance(all_parameters, dict):
+            return
+
+        for synth_index, definition in enumerate(self._definitions):
+            stored_values = all_parameters.get(definition.key, {})
+            if not isinstance(stored_values, dict):
+                continue
+            values = values_by_synth[synth_index]
+            for control in definition.controls:
+                if control.key not in stored_values:
+                    continue
+                try:
+                    stored = float(stored_values[control.key])
+                except (TypeError, ValueError):
+                    continue
+                # Legacy presets used negative values as "patch/default".
+                if stored < 0.0 and float(control.default) >= 0.0:
+                    continue
+                try:
+                    stored = clamp_control_value(control.key, stored)
+                except ValueError:
+                    continue
+                values[control.key] = max(
+                    float(control.minimum),
+                    min(float(control.maximum), stored),
+                )
+
     def load_preset(self, data: dict[str, Any]) -> None:
-        """Replace this role with defaults plus sparse preset overrides."""
-        selected_key = str(data.get("selected", self.selected_definition.key))
-        selected_index = self._key_to_index.get(selected_key, self._selected_index)
+        """Replace this role with application defaults plus sparse overrides.
+
+        Missing or unknown ``selected`` values always resolve to the role's
+        application-default synth. Missing parameter values always resolve to
+        the current catalogue default for that instrument.
+        """
+        default_key = str(
+            self._definitions[self._default_selected_index].key
+        )
+        selected_key = str(data.get("selected", default_key))
+        selected_index = self._key_to_index.get(
+            selected_key,
+            self._default_selected_index,
+        )
 
         values_by_synth = self._default_values()
-        all_parameters = data.get("parameters", {})
-        if isinstance(all_parameters, dict):
-            for synth_index, definition in enumerate(self._definitions):
-                stored_values = all_parameters.get(definition.key, {})
-                if not isinstance(stored_values, dict):
-                    continue
-                values = values_by_synth[synth_index]
-                for control in definition.controls:
-                    if control.key not in stored_values:
-                        continue
-                    stored = float(stored_values[control.key])
-                    # Legacy presets used negative values as "patch/default".
-                    if stored < 0.0 and float(control.default) >= 0.0:
-                        continue
-                    try:
-                        stored = clamp_control_value(control.key, stored)
-                    except ValueError:
-                        continue
-                    values[control.key] = max(
-                        float(control.minimum),
-                        min(float(control.maximum), stored),
-                    )
+        self._overlay_parameters(values_by_synth, data)
 
         self._selected_index = selected_index
         self._values_by_synth = values_by_synth
@@ -140,31 +175,9 @@ class SynthState:
         by the per-section UI reset buttons.
         """
         definition = self.selected_definition
-        new_values = {
-            str(control.key): float(control.default)
-            for control in definition.controls
-        }
-        all_parameters = data.get("parameters", {}) if isinstance(data, dict) else {}
-        stored_values = (
-            all_parameters.get(definition.key, {})
-            if isinstance(all_parameters, dict)
-            else {}
-        )
-        if isinstance(stored_values, dict):
-            for control in definition.controls:
-                if control.key not in stored_values:
-                    continue
-                stored = float(stored_values[control.key])
-                if stored < 0.0 and float(control.default) >= 0.0:
-                    continue
-                try:
-                    stored = clamp_control_value(control.key, stored)
-                except ValueError:
-                    continue
-                new_values[control.key] = max(
-                    float(control.minimum),
-                    min(float(control.maximum), stored),
-                )
+        values_by_synth = self._default_values()
+        self._overlay_parameters(values_by_synth, data)
+        new_values = values_by_synth[self._selected_index]
 
         old_values = self.selected_values
         changed = any(
@@ -203,7 +216,7 @@ class SynthState:
 
         The UI always has explicit numeric values, but AMY's factory patch is
         already the source of truth for controls whose application default is
-        identical to the native patch value.  Omitting those values avoids
+        identical to the native patch value. Omitting those values avoids
         rewriting partial CtrlCoef lists such as the Juno VCF base frequency.
         Application corrections and user/preset edits remain explicit.
         """
