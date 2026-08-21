@@ -735,10 +735,16 @@ class AmySerialClient:
         self,
         role: str,
         synth: int,
+        parameter_keys: set[str] | None = None,
     ) -> list[str]:
         """Build engine-relevant control commands for one synth.
 
-        Negative slider values mean "leave the factory patch value alone".
+        Missing controls leave the current patch value alone.  Negative values
+        are accepted only as a legacy "unset" sentinel and are never exposed
+        by the current UI.  When parameter_keys is provided, emit commands
+        only for those controls so moving one slider cannot resend unrelated
+        filter/LFO/envelope settings.
+
         Juno: osc0 is VCF/VCA gather, osc1 is the LFO, osc2 pulse,
         osc3 saw, osc4 sub.  DX7: osc0 is ALGO output, osc1 is its LFO.
         """
@@ -747,6 +753,8 @@ class AmySerialClient:
         commands: list[str] = []
 
         def nonneg(name: str) -> float | None:
+            if parameter_keys is not None and name not in parameter_keys:
+                return None
             value = params.get(name)
             if value is None or value < 0:
                 return None
@@ -845,20 +853,42 @@ class AmySerialClient:
 
             # This is a global ALGO-output ADSR layered on top of the DX7
             # operators' native envelopes.  The native operator envelopes are
-            # intentionally left intact.
-            attack = nonneg("attack_ms")
-            decay = nonneg("decay_ms")
-            sustain = nonneg("sustain")
-            release = nonneg("release_ms")
-            if any(v is not None for v in (attack, decay, sustain, release)):
-                a = 0.0 if attack is None else max(0.0, attack)
-                d = 0.0 if decay is None else max(0.0, decay)
-                sus = 1.0 if sustain is None else max(0.0, min(1.0, sustain))
-                r = 60000.0 if release is None else max(0.0, release)
-                commands.append(
-                    f"v0a,,,1A{self._f(a)},1,{self._f(d)},{self._f(sus)},"
-                    f"{self._f(r)},0i{synth}Z"
-                )
+            # intentionally left intact.  If any ADSR member changed, resend
+            # the complete global envelope because it belongs to us rather than
+            # to the factory DX7 operator patch.
+            adsr_keys = {
+                "attack_ms", "decay_ms", "sustain", "release_ms"
+            }
+            if (
+                parameter_keys is None
+                or bool(parameter_keys & adsr_keys)
+            ):
+                def current_nonneg(name: str) -> float | None:
+                    value = params.get(name)
+                    if value is None or value < 0:
+                        return None
+                    return float(value)
+
+                attack = current_nonneg("attack_ms")
+                decay = current_nonneg("decay_ms")
+                sustain = current_nonneg("sustain")
+                release = current_nonneg("release_ms")
+                if any(
+                    v is not None
+                    for v in (attack, decay, sustain, release)
+                ):
+                    a = 0.0 if attack is None else max(0.0, attack)
+                    d = 0.0 if decay is None else max(0.0, decay)
+                    sus = (
+                        1.0
+                        if sustain is None
+                        else max(0.0, min(1.0, sustain))
+                    )
+                    r = 60000.0 if release is None else max(0.0, release)
+                    commands.append(
+                        f"v0a,,,1A{self._f(a)},1,{self._f(d)},{self._f(sus)},"
+                        f"{self._f(r)},0i{synth}Z"
+                    )
 
         return commands
 
@@ -869,9 +899,15 @@ class AmySerialClient:
             for key in ("attack_ms", "decay_ms", "sustain", "release_ms")
         )
 
-    def _apply_supported_params(self, role: str) -> None:
+    def _apply_supported_params(
+        self,
+        role: str,
+        parameter_keys: set[str] | None = None,
+    ) -> None:
         for synth in self._role_synth_ids(role):
-            for command in self._param_commands_for_synth(role, synth):
+            for command in self._param_commands_for_synth(
+                role, synth, parameter_keys
+            ):
                 self._wire(command)
 
     def _set_synth_name(self, role: str, name: str) -> None:
@@ -884,6 +920,13 @@ class AmySerialClient:
             return
 
         self.selected_synth[role] = name
+
+        # A synth-name message is immediately followed by the complete slider
+        # state from the frontend.  Do not apply the previous instrument's
+        # controls while loading the new factory patch; clear them first, then
+        # let that following parameter message establish the new state.
+        self.synth_params[role] = {}
+        self._adsr_override_active[role] = False
         self._configure_synth(role)
 
         # A chord patch hot-swap silences both independent chord pools. If a
@@ -895,8 +938,27 @@ class AmySerialClient:
                 )
 
     def _set_params(self, role: str, values: Any) -> None:
+        old_params = self.synth_params[role]
+        new_params = self._params_from_list(values)
+
+        changed_keys: set[str] = set()
+        for key in set(old_params) | set(new_params):
+            old_value = old_params.get(key)
+            new_value = new_params.get(key)
+            if old_value is None or new_value is None:
+                if old_value != new_value:
+                    changed_keys.add(key)
+                continue
+            if not math.isclose(
+                float(old_value),
+                float(new_value),
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            ):
+                changed_keys.add(key)
+
         was_active = self._adsr_override_active.get(role, False)
-        self.synth_params[role] = self._params_from_list(values)
+        self.synth_params[role] = new_params
         now_active = self._adsr_is_active(role)
         self._adsr_override_active[role] = now_active
 
@@ -909,7 +971,8 @@ class AmySerialClient:
                     )
             return
 
-        self._apply_supported_params(role)
+        if changed_keys:
+            self._apply_supported_params(role, changed_keys)
 
     def _set_volume(self, role: str, value: Any) -> None:
         level = max(0.0, min(1.0, float(value)))
