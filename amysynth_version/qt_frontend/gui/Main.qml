@@ -27,7 +27,7 @@ ApplicationWindow {
     property int octaveButtonWidth: 57
     property int inversionButtonWidth: 94
     property int controlSpacing: 6
-    property int leftRailWidth: 116
+    property int leftRailWidth: 64
     property int leftSliderWidth: 52
     property int contentX: leftRailWidth
 
@@ -310,6 +310,28 @@ ApplicationWindow {
                 onEdited: (value) => backend.setPercussionReverb(value)
             }
 
+            Text {
+                x: 2
+                y: window.utilityY + 2
+                width: window.leftRailWidth - 4
+                text: "REV"
+                color: "#6b3048"
+                font.pixelSize: 9
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            Text {
+                x: 2
+                y: window.rhythmY + 2
+                width: window.leftRailWidth - 4
+                text: "DRM REV"
+                color: "#6b3048"
+                font.pixelSize: 9
+                font.bold: true
+                horizontalAlignment: Text.AlignHCenter
+            }
+
             UtilitySection {
                 x: window.contentX
                 y: window.utilityY
@@ -412,22 +434,11 @@ ApplicationWindow {
             }
 
             PresetResetButton {
-                x: 5
+                x: (window.leftRailWidth - width) / 2
                 y: window.bassSynthY + (window.sectionHeight - height) / 2
                 width: 50
                 height: 50
-                text: "RHY"
-                panelColor: "#ecece8"
-                borderColor: "#8c8c86"
-                onClicked: backend.resetRhythmControlsToPreset()
-            }
-
-            PresetResetButton {
-                x: 61
-                y: window.bassSynthY + (window.sectionHeight - height) / 2
-                width: 50
-                height: 50
-                text: "BAS"
+                text: "RST"
                 panelColor: "#d0d0cc"
                 borderColor: "#7b7b76"
                 onClicked: backend.resetBassToPreset()
@@ -436,7 +447,7 @@ ApplicationWindow {
             PresetResetButton {
                 x: (window.leftRailWidth - width) / 2
                 y: window.strumSynthY + (window.sectionHeight - height) / 2
-                text: "STR"
+                text: "RST"
                 panelColor: "#b9def3"
                 borderColor: "#589bc6"
                 textColor: "#12344d"
@@ -446,7 +457,7 @@ ApplicationWindow {
             PresetResetButton {
                 x: (window.leftRailWidth - width) / 2
                 y: window.chordSynthY + (window.sectionHeight - height) / 2
-                text: "CHD"
+                text: "RST"
                 panelColor: "#c7ddc5"
                 borderColor: "#649068"
                 textColor: "#1d4023"
@@ -649,6 +660,7 @@ ApplicationWindow {
 
                         width:
                             window.maximumChordRowWidth
+                            - window.contentX
                         height: window.rowHeight
 
                         Rectangle {
@@ -667,7 +679,7 @@ ApplicationWindow {
                             visible: rowItem.rowIndex === 0
                             x: -window.contentX + (window.contentX - width) / 2
                             y: (window.rowHeight - height) / 2
-                            text: "ROWS"
+                            text: "RST"
                             panelColor: "#e5d9b2"
                             borderColor: "#9f9165"
                             textColor: "#4a4022"

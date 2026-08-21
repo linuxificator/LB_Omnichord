@@ -550,6 +550,13 @@ class AmySerialClient:
             "main": int(buses.get("main", 0)),
             "percussion": int(buses.get("percussion", 1)),
         }
+        if (
+            self.bus_id["main"] == self.bus_id["percussion"]
+            or any(bus < 0 or bus > 3 for bus in self.bus_id.values())
+        ):
+            raise ValueError(
+                "main and percussion buses must be distinct AMY buses 0..3"
+            )
         self.reverb = {"main": 0.0, "percussion": 0.0}
 
         self.chord_notes: list[float] = []
@@ -709,19 +716,32 @@ class AmySerialClient:
     def _route_synth_bus(self, synth: int) -> None:
         self._wire(f"i{synth}iy{self._bus_for_synth(synth)}Z")
 
+    _REVERB_OFF_WIRE_LEVEL = 0.001
+
     def _apply_reverb_buses(self) -> None:
-        self._wire(
-            f"y{self.bus_id['main']}h{self._f(self.reverb['main'])}Z"
-        )
-        self._wire(
-            f"y{self.bus_id['percussion']}h{self._f(self.reverb['percussion'])}Z"
-        )
+        # Do not send h0 on a fresh engine.  On the ESP32-P4 an exact-zero
+        # reverb coefficient can produce low-frequency rumble; untouched AMY
+        # buses are already dry.
+        for lane in ("main", "percussion"):
+            level = self.reverb[lane]
+            if level > 0.0:
+                self._wire(
+                    f"y{self.bus_id[lane]}h{self._f(level)}Z"
+                )
 
     def _set_reverb(self, lane: str, value: Any) -> None:
         level = max(0.0, min(1.0, float(value)))
+        previous = self.reverb[lane]
+        if math.isclose(level, previous, rel_tol=0.0, abs_tol=1e-9):
+            return
         self.reverb[lane] = level
         bus = self.bus_id[lane]
-        self._wire(f"y{bus}h{self._f(level)}Z")
+        wire_level = (
+            level
+            if level > 0.0
+            else self._REVERB_OFF_WIRE_LEVEL
+        )
+        self._wire(f"y{bus}h{self._f(wire_level)}Z")
 
     def _configure_one_synth(self, role: str, synth: int) -> None:
         self._bump_synth_generation(synth)
@@ -734,6 +754,17 @@ class AmySerialClient:
             voices = self._voice_count_for_synth(synth)
             self._wire(f"K{patch}i{synth}iv{voices}Z")
             self._configured_synths.add(synth)
+
+            # First-time K/iv allocation is executed by AMY on an audio-block
+            # boundary.  Subsequent synth-tier commands (iy/iV/flags/etc.) can
+            # otherwise arrive while the instrument table entry is still NULL,
+            # producing "synth N not defined" warnings on the ESP32-P4.
+            guard_ms = float(
+                self.config.get("performance", {}).get(
+                    "synth_alloc_guard_ms", 10.0
+                )
+            )
+            self.writer.delay(max(0.0, guard_ms) / 1000.0)
         self._apply_patch_compatibility(patch, synth)
         self._route_synth_bus(synth)
         self._wire(f"i{synth}iV{self._f(self.volume[role])}Z")
@@ -807,7 +838,7 @@ class AmySerialClient:
             value = params.get(name)
             if value is None or value < 0:
                 return None
-            return float(value)
+            return clamp_control_value(name, float(value))
 
         lfo_hz = nonneg("lfo_hz")
         portamento = nonneg("portamento_ms")
@@ -916,7 +947,7 @@ class AmySerialClient:
                     value = params.get(name)
                     if value is None or value < 0:
                         return None
-                    return float(value)
+                    return clamp_control_value(name, float(value))
 
                 attack = current_nonneg("attack_ms")
                 decay = current_nonneg("decay_ms")

@@ -94,7 +94,8 @@
   "performance": {
     "strum_gate_ms": 800,
     "one_shot_chord_gate_ms": 650,
-    "strum_tail_ms": 450
+    "strum_tail_ms": 450,
+    "synth_alloc_guard_ms": 10.0
   },
   "synth_patches": {
     "juno_000": 0,

@@ -1701,10 +1701,96 @@ class InstrumentBackend(QObject):
             )
             self._selected_preset = 1
 
+    def _reset_presettable_state_to_defaults(self) -> None:
+        """Restore every presettable field to application/catalogue defaults."""
+        suffix_to_index = {
+            chord.suffix: index
+            for index, chord in enumerate(self._chords)
+        }
+        octave_to_index = {
+            name: index
+            for index, name in enumerate(OCTAVE_NAMES)
+        }
+        row_defaults = self._defaults["chord_rows"]
+        self._row_chord_indexes = [
+            suffix_to_index[str(row["chord"])]
+            for row in row_defaults
+        ]
+        self._row_octave_indexes = [
+            octave_to_index[str(row["octave"])]
+            for row in row_defaults
+        ]
+        self._row_inversion_indexes = []
+        for row_index, row in enumerate(row_defaults):
+            chord_index = self._row_chord_indexes[row_index]
+            inversion_count = len(self._chords[chord_index].inversions)
+            self._row_inversion_indexes.append(
+                int(row.get("inversion", 0)) % inversion_count
+            )
+
+        for role in ("chord", "strum", "bass"):
+            self._runtime(role).reset_to_defaults()
+
+        volumes = self._defaults["volumes"]
+        self._chord_volume = max(0.0, min(1.0, float(volumes["chord"])))
+        self._strum_volume = max(0.0, min(1.0, float(volumes["strum"])))
+        self._bass_volume = max(0.0, min(1.0, float(volumes["bass"])))
+        self._percussion_volume = max(
+            0.0, min(1.0, float(volumes["percussion"]))
+        )
+
+        effects = self._defaults.get("effects", {})
+        self._main_reverb = max(
+            0.0, min(1.0, float(effects.get("main_reverb", 0.0)))
+        )
+        self._percussion_reverb = max(
+            0.0, min(1.0, float(effects.get("percussion_reverb", 0.0)))
+        )
+
+        transport = self._defaults["transport"]
+        self._rhythm_running = bool(transport["rhythm_running"])
+        self._bass_running = bool(transport["bass_running"])
+
+        rhythm_key_to_index = {
+            rhythm.key: index
+            for index, rhythm in enumerate(self._rhythms)
+        }
+        default_rhythm_key = str(self._defaults["rhythm"]["selected"])
+        self._rhythm.selected_index = rhythm_key_to_index[default_rhythm_key]
+        self._rhythm.tempo_by_rhythm = [
+            rhythm.tempo_default for rhythm in self._rhythms
+        ]
+        self._rhythm.busyness_by_rhythm = [
+            source_activity_to_ui(rhythm.default_busyness)
+            for rhythm in self._rhythms
+        ]
+        self._rhythm.chord_activity_by_rhythm = [
+            source_activity_to_ui(rhythm.default_chord_activity)
+            for rhythm in self._rhythms
+        ]
+        self._rhythm.bass_activity_by_rhythm = [
+            source_activity_to_ui(rhythm.default_bass_activity)
+            for rhythm in self._rhythms
+        ]
+
+        tuning = self._defaults.get("tuning", {})
+        mode = str(tuning.get("mode", "EQ"))
+        self._tuning_mode_index = (
+            TUNING_MODE_NAMES.index(mode)
+            if mode in TUNING_MODE_NAMES
+            else DEFAULT_TUNING_MODE_INDEX
+        )
+        self._tuning_reference = max(
+            415,
+            min(466, int(tuning.get("reference_hz", DEFAULT_TUNING_REFERENCE))),
+        )
+
     def _apply_preset_data(
         self,
         data: dict[str, Any],
     ) -> None:
+        self._reset_presettable_state_to_defaults()
+
         suffix_to_index = {
             chord.suffix: index
             for index, chord
@@ -2167,62 +2253,6 @@ class InstrumentBackend(QObject):
         self._reset_synth_role_to_preset("chord")
 
     @Slot()
-    def resetRhythmControlsToPreset(self) -> None:
-        index = self._rhythm.selected_index
-        rhythm = self._rhythms[index]
-        rhythm_data = self._preset_reference_data.get("rhythm", {})
-        if not isinstance(rhythm_data, dict):
-            rhythm_data = {}
-        settings = rhythm_data.get("settings", {})
-        if not isinstance(settings, dict):
-            settings = {}
-        stored = settings.get(rhythm.key, {})
-        if not isinstance(stored, dict):
-            stored = {}
-        self._rhythm.tempo_by_rhythm[index] = max(
-            40.0, min(200.0, float(stored.get("tempo", rhythm.tempo_default)))
-        )
-        self._rhythm.busyness_by_rhythm[index] = max(
-            1,
-            min(
-                4,
-                int(
-                    stored.get(
-                        "percussion_activity",
-                        source_activity_to_ui(rhythm.default_busyness),
-                    )
-                ),
-            ),
-        )
-        self._rhythm.chord_activity_by_rhythm[index] = max(
-            0,
-            min(
-                4,
-                int(
-                    stored.get(
-                        "chord_activity",
-                        source_activity_to_ui(rhythm.default_chord_activity),
-                    )
-                ),
-            ),
-        )
-        self._rhythm.bass_activity_by_rhythm[index] = max(
-            1,
-            min(
-                4,
-                int(
-                    stored.get(
-                        "bass_activity",
-                        source_activity_to_ui(rhythm.default_bass_activity),
-                    )
-                ),
-            ),
-        )
-        self.rhythmControlsChanged.emit()
-        self._send_rhythm_chord_enabled()
-        self._send_rhythm_config()
-
-    @Slot()
     def resetChordRowsToPreset(self) -> None:
         rows = self._preset_reference_data.get("chord_rows", [])
         defaults = self._defaults["chord_rows"]
@@ -2647,7 +2677,6 @@ class InstrumentBackend(QObject):
 
         self.rhythmControlsChanged.emit()
         self._send_rhythm_chord_enabled()
-        self._send_rhythm_config()
 
     def _clear_touch_dropout_state(self) -> None:
         for timer in list(
