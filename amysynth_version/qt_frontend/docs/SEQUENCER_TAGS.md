@@ -31,6 +31,14 @@ Lane-local operations do not reset the sequencer:
 
 A rhythm-style change may deliberately restart the bar. Panic remains a full reset operation.
 
+## Start and stop
+
+Starting transport installs the complete current drum, bass and automatic-chord tag ranges first and queues `zY1` last.
+
+Stopping transport is different from clearing a lane. `zY0` prevents future sequencer events from firing, so a note that is currently sounding cannot rely on its later tagged note-off. Stop therefore performs an explicit all-off immediately after `zY0` for the rhythm-owned synths: percussion synth 0, bass synth 1 and automatic-chord synth 4. Manual chord synth 3 and strum synth 2 are deliberately left alone because they are controlled directly by the player rather than by rhythm transport.
+
+The real-serial regression tests this ordering and also requires the frontend `rhythmRunning` state to become false after Stop. This guards both against hanging accompaniment notes and against a transport button that remains visually stuck on STOP even though the AMY sequencer has stopped.
+
 ## Writer ordering
 
 Low-priority sequencer traffic has an independent generation per lane, so a new chord update cannot invalidate queued bass or percussion traffic. A full Start/style installation uses a separate `rhythm-full` generation.
