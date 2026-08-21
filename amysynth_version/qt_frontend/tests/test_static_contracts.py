@@ -104,6 +104,19 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn('text: "ROWS"', qml)
         self.assertGreaterEqual(qml.count('text: "RST"'), 4)
 
+    def test_reverb_controls_are_side_by_side_touch_targets(self) -> None:
+        qml = (ROOT / "gui" / "ReverbPanel.qml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("id: controlsRow", qml)
+        self.assertIn("component PinkControl: Item", qml)
+        self.assertIn("VerticalVolume {", qml)
+        self.assertEqual(qml.count("PinkControl {"), 3)
+        self.assertIn('labelText: "LEV"', qml)
+        self.assertIn('labelText: "LIVE"', qml)
+        self.assertIn('labelText: "DAMP"', qml)
+        self.assertNotIn("Column {", qml)
+
 
 if __name__ == "__main__":
     unittest.main()
