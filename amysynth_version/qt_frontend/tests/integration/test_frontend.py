@@ -49,6 +49,59 @@ class FrontendIntegrationTests(unittest.TestCase):
             )
             app.action("releaseChord", 1, 9)
 
+    def test_chord_gate_remembers_last_chord_and_strum_stays_live(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertEqual(int(app.query("chordGateState")), 0)
+
+            app.action("pressChord", 0, 0)
+            app.action("releaseChord", 0, 0)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertEqual(int(app.query("activeRowIndex")), 0)
+            self.assertEqual(int(app.query("activeRootSemitone")), 0)
+
+            app.action("toggleChordGate")
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("chordGateState")), 2)
+            # Gating the chord must not erase the remembered chord identity.
+            self.assertEqual(int(app.query("activeRowIndex")), 0)
+            self.assertEqual(int(app.query("activeRootSemitone")), 0)
+
+            start = app.bridge.count()
+            app.action("strumTap", 0.5)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertTrue(
+                any(
+                    "i2" in line and "n" in line and "l" in line
+                    for line in app.bridge.lines_since(start)
+                ),
+                "strum emitted no synth-2 note while chord gate was off",
+            )
+
+            start = app.bridge.count()
+            app.action("toggleChordGate")
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertTrue(
+                any(
+                    "i3" in line and "n" in line and "l1" in line
+                    for line in app.bridge.lines_since(start)
+                ),
+                "CHORD ON did not retrigger the remembered manual chord",
+            )
+
+    def test_bass_voicing_property_is_centered_and_stepwise(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertEqual(int(app.query("bassVoicingShift")), 0)
+            app.action("setBassVoicingShift", -1.0)
+            self.assertEqual(int(app.query("bassVoicingShift")), -1)
+            app.action("setBassVoicingShift", 1.0)
+            self.assertEqual(int(app.query("bassVoicingShift")), 1)
+            app.action("setBassVoicingShift", 99.0)
+            self.assertEqual(int(app.query("bassVoicingShift")), 6)
+
     def test_sustain_frontend_range_and_numeric_value(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)

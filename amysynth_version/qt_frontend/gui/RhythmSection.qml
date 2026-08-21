@@ -176,9 +176,9 @@ Item {
 
             ActivitySelector {
                 x: activityArea.width * 0.68
-                y: 36
+                y: 0
                 width: activityArea.width * 0.32
-                height: 58
+                height: 52
 
                 label: "bass activity"
                 currentLevel:
@@ -194,6 +194,31 @@ Item {
                         .setRhythmBassActivity(
                             level
                         )
+            }
+
+            LabeledSlider {
+                x: activityArea.width * 0.68
+                y: 56
+                width: activityArea.width * 0.32
+                height: 48
+
+                label: "bass voicing"
+                currentValue:
+                    root.controller.bassVoicingShift
+                fromValue: -6
+                toValue: 6
+                stepValue: 1
+                decimals: 0
+
+                textColor: "#4c3b08"
+                trackColor: "#eee2a5"
+                fillColor: "#c59518"
+                handleColor: "#fffbea"
+                borderColor: "#8a6810"
+
+                onEdited: (value) =>
+                    root.controller
+                        .setBassVoicingShift(value)
             }
         }
     }
