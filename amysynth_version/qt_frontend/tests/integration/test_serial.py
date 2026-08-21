@@ -124,6 +124,7 @@ class SerialIntegrationTests(unittest.TestCase):
             # reference. High accompaniment activity guarantees non-root notes
             # are represented in both rhythm-chord and bass schedules.
             app.action("setRowChordType", 0, 0)  # major = 0,4,7
+            app.action("setTuningReference", 440)
             app.action("setTuningModeIndex", 1)  # EQ
             app.action("setRhythmChordActivity", 4.0)
             app.action("setRhythmBassActivity", 4.0)
@@ -187,8 +188,21 @@ class SerialIntegrationTests(unittest.TestCase):
             )
 
             # A physically held chord must retune in place through synth 3.
+            press_start = app.bridge.count()
             app.action("pressChord", 0, 0)
+            press_notes = wait_for_immediate_note_ons(
+                app, press_start, 3, minimum_count=3
+            )
+            self.assertTrue(
+                contains_fractional_pitch(press_notes),
+                "held chord did not start with HARM intonation",
+            )
+            # The press also updates accompaniment gating/scheduling. Wait for
+            # that transaction to finish so its HARM note-ons cannot leak into
+            # the next EQ checkpoint.
+            app.bridge.wait_for_lines(["zY1Z"], start=press_start, timeout=8.0)
             app.bridge.wait_idle(timeout=8.0)
+
             manual_eq_start = app.bridge.count()
             app.action("setTuningModeIndex", 1)  # back to EQ while held
             eq_manual = wait_for_immediate_note_ons(
