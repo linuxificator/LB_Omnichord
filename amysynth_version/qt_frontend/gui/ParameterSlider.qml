@@ -14,20 +14,23 @@ Item {
 
     signal edited(string key, real value)
 
+    function syncSliderValue() {
+        slider.value = Number(root.control.value)
+    }
+
+    onControlChanged: syncSliderValue()
+
     Text {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.right: parent.right
 
         text:
-            root.control.minimum < 0
-            && slider.value < 0
-            ? root.control.label
-            : root.control.label
-                + " "
-                + Number(slider.value).toFixed(
-                    root.control.decimals
-                )
+            root.control.label
+            + " "
+            + Number(slider.value).toFixed(
+                root.control.decimals
+            )
 
         color: root.textColor
         font.pixelSize: 13
@@ -43,11 +46,13 @@ Item {
         anchors.bottom: parent.bottom
         height: 28
 
-        from: root.control.minimum
-        to: root.control.maximum
-        stepSize: root.control.step
-        value: root.control.value
+        from: Number(root.control.minimum)
+        to: Number(root.control.maximum)
+        stepSize: Number(root.control.step)
         live: true
+
+        Component.onCompleted:
+            root.syncSliderValue()
 
         onMoved:
             root.edited(
