@@ -1,0 +1,35 @@
+name: Temporary sequencer tag audit
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit:
+    if: github.head_ref == 'feature/reverb-reset-and-control-safety'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/reverb-reset-and-control-safety
+      - name: Measure maximum lane event counts
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('amysynth_version/qt_frontend/music/rhythms.json')
+          d=json.loads(p.read_text())
+          maxima={'drums':(0,''),'bass_hits':(0,''),'chord_hits':(0,'')}
+          for r in d['rhythms']:
+              # Runtime busyness selects the first N layers; the maximum is all layers.
+              drums=sum(len(layer.get('events',[])) for layer in r.get('percussion_layers',[]))
+              bass=max((len(level) for level in r.get('bass_levels',[])), default=0)
+              chords=max((len(level) for level in r.get('chord_levels',[])), default=0)
+              for key,val in [('drums',drums),('bass_hits',bass),('chord_hits',chords)]:
+                  if val>maxima[key][0]: maxima[key]=(val,r['id'])
+          print('MAXIMA', maxima)
+          print('required tags: drums=',maxima['drums'][0],
+                'bass=',maxima['bass_hits'][0]*2,
+                'chords=',maxima['chord_hits'][0]*5,
+                'total=',maxima['drums'][0]+maxima['bass_hits'][0]*2+maxima['chord_hits'][0]*5)
+          PY
