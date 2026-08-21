@@ -1,0 +1,33 @@
+name: Temporary four-bus regression fix
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'feature/reverb-reset-and-control-safety'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/reverb-reset-and-control-safety
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Update four-bus serial regression
+        run: python amysynth_version/qt_frontend/tests/tmp_fix_four_bus_reverb_test.py
+      - name: Validate
+        run: |
+          python -m py_compile amysynth_version/qt_frontend/tests/integration/test_serial.py
+          git diff --check
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add amysynth_version/qt_frontend/tests/integration/test_serial.py
+          git commit -m 'Update reverb regression for four isolated buses'
+          git push origin HEAD:feature/reverb-reset-and-control-safety
