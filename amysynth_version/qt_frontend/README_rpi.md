@@ -79,7 +79,7 @@ The default application directory is `$HOME/LB_Omnichord/amysynth_version/qt_fro
 ## Directory layout
 
 - `code/` — Python application and AMY serial backend
-- `gui/` — QML interface components
+- `gui/` — QML interface components and GUI assets
 - `config/` — application and serial configuration
 - `instruments/` — AMY instrument catalogue and factory presets
 - `music/` — chords, rhythms and intonation definitions
@@ -87,4 +87,4 @@ The default application directory is `$HOME/LB_Omnichord/amysynth_version/qt_fro
 - `rpi/` — Raspberry Pi startup helpers
 - `docs/` — implementation notes
 
-The `code/` directory contains canonical paths to runtime data/QML files. This keeps the existing tested Python/QML path assumptions intact while the canonical files live in the logical directories above.
+`code/main.py` references these canonical directories directly. No symlinks or old-layout compatibility files are required.
