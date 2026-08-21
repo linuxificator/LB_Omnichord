@@ -1,0 +1,34 @@
+name: Temporary tagged serial wait fix
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.head_ref == 'feature/reverb-reset-and-control-safety'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/reverb-reset-and-control-safety
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply deterministic serial wait
+        run: python amysynth_version/qt_frontend/tests/tmp_fix_tag_wait.py
+      - name: Check syntax
+        run: |
+          python -m py_compile amysynth_version/qt_frontend/tests/integration/test_serial.py
+          git diff --check
+      - name: Commit regression wait fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- amysynth_version/qt_frontend/tests/integration/test_serial.py
+          git diff --cached --check
+          git commit -m 'Wait for tagged chord hold transport deterministically'
+          git push origin HEAD:feature/reverb-reset-and-control-safety
