@@ -20,7 +20,12 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from amy_serial import AmySerialClient, load_amy_config
 
 
-APP_DIR = Path(__file__).resolve().parent
+CODE_DIR = Path(__file__).resolve().parent
+FRONTEND_DIR = CODE_DIR.parent
+GUI_DIR = FRONTEND_DIR / "gui"
+CONFIG_DIR = FRONTEND_DIR / "config"
+INSTRUMENT_DIR = FRONTEND_DIR / "instruments"
+MUSIC_DIR = FRONTEND_DIR / "music"
 
 NOTE_DEFINITIONS = (
     {"label": "D♭", "semitone": 1, "accidental": True},
@@ -94,38 +99,6 @@ STRUM_HIGH_MIDI = 107
 
 SynthRole = Literal["chord", "strum", "bass"]
 
-# Hidden migration only: old user presets created by the Sonic Pi version may
-# still live in ~/.omnichord.  They are translated to real AMY factory patch
-# keys on load; the UI/catalog itself contains no Sonic Pi synth entries.
-LEGACY_SYNTH_KEY_MAP = {
-    "beep": "juno_118",
-    "sine": "juno_047",
-    "saw": "juno_032",
-    "square": "juno_033",
-    "pulse": "juno_035",
-    "subpulse": "juno_031",
-    "tri": "juno_066",
-    "dsaw": "juno_094",
-    "dpulse": "juno_030",
-    "dtri": "juno_101",
-    "fm": "dx7_138",
-    "mod_fm": "dx7_246",
-    "mod_saw": "juno_048",
-    "mod_dsaw": "juno_088",
-    "mod_sine": "juno_101",
-    "mod_tri": "juno_066",
-    "mod_pulse": "juno_049",
-    "tb303": "juno_036",
-    "supersaw": "juno_094",
-    "hoover": "juno_125",
-    "prophet": "juno_004",
-    "zawa": "juno_088",
-    "dull_bell": "juno_095",
-    "pretty_bell": "dx7_166",
-    "blade": "juno_101",
-    "piano": "dx7_160",
-    "pluck": "juno_028",
-}
 
 
 def source_activity_to_ui(source_level: int) -> int:
@@ -1568,7 +1541,7 @@ class InstrumentBackend(QObject):
         )
 
         factory_dir = (
-            APP_DIR / "default_presets"
+            INSTRUMENT_DIR / "default_presets"
         )
         fallback = self._preset_snapshot()
 
@@ -1740,13 +1713,6 @@ class InstrumentBackend(QObject):
             for index, synth
             in enumerate(self._synths)
         }
-
-        # Translate old on-disk Sonic Pi preset keys without exposing them
-        # in the AMY synth catalogue.
-        selected_key = LEGACY_SYNTH_KEY_MAP.get(
-            selected_key,
-            selected_key,
-        )
 
         selected_index = key_to_index.get(
             selected_key,
@@ -3390,7 +3356,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--amy-config",
         type=Path,
-        default=APP_DIR / "amy_config.json",
+        default=CONFIG_DIR / "amy_config.json",
         help="AMY serial/backend JSON configuration file.",
     )
     parser.add_argument(
@@ -3568,31 +3534,30 @@ def main() -> int:
     # on for this diagnostic build; the output is only a few startup lines.
     os.environ.setdefault("QSG_INFO", "1")
 
-    defaults = load_defaults(APP_DIR / "defaults.json")
-    chords = load_chords(APP_DIR / "chords.csv")
+    defaults = load_defaults(CONFIG_DIR / "defaults.json")
+    chords = load_chords(MUSIC_DIR / "chords.csv")
     (
         synths,
         legacy_chord_synth_index,
         legacy_strum_synth_index,
         legacy_bass_synth_index,
-    ) = load_synth_catalog(APP_DIR / "synths.json")
-    rhythms = load_rhythm_catalog(APP_DIR / "rhythms.json")
+    ) = load_synth_catalog(INSTRUMENT_DIR / "synths.json")
+    rhythms = load_rhythm_catalog(MUSIC_DIR / "rhythms.json")
     title_config = load_title_config(
-        APP_DIR / "title.json"
+        CONFIG_DIR / "title.json"
     )
     intonation_eq = load_intonation_table(
-        APP_DIR / "intonation_eq.json"
+        MUSIC_DIR / "intonation_eq.json"
     )
     intonation_harm = load_intonation_table(
-        APP_DIR / "intonation_harm.json"
+        MUSIC_DIR / "intonation_harm.json"
     )
     intonation_jv = load_intonation_table(
-        APP_DIR / "intonation_jv.json"
+        MUSIC_DIR / "intonation_jv.json"
     )
 
     # Startup synth selections are controlled by defaults.json.
-    # Translate legacy Sonic Pi keys if an older defaults.json is copied in,
-    # and fall back to the catalogue defaults rather than aborting startup.
+    # Unknown keys fall back to the catalogue defaults.
     synth_index_by_key = {
         synth.key: index
         for index, synth in enumerate(synths)
@@ -3605,11 +3570,7 @@ def main() -> int:
         raw_key = str(
             defaults.get("synths", {}).get(role, "")
         )
-        key = LEGACY_SYNTH_KEY_MAP.get(
-            raw_key,
-            raw_key,
-        )
-        index = synth_index_by_key.get(key)
+        index = synth_index_by_key.get(raw_key)
         if index is not None:
             return index
 
@@ -3828,7 +3789,7 @@ def main() -> int:
     )
 
     engine.load(
-        QUrl.fromLocalFile(str(APP_DIR / "Main.qml"))
+        QUrl.fromLocalFile(str(GUI_DIR / "Main.qml"))
     )
 
     if not engine.rootObjects():

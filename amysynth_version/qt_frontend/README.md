@@ -25,7 +25,7 @@ From this directory after creating the virtual environment described in `README_
 .venv/bin/python code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --windowed
 ```
 
-The canonical data and QML files live in their logical directories. `code/` contains compatibility symlinks for the existing tested path lookups in `main.py`; this avoids changing application behaviour as part of the filesystem cleanup.
+The canonical data and QML files live in their logical directories. `code/` contains canonical paths for the existing tested path lookups in `main.py`; this avoids changing application behaviour as part of the filesystem cleanup.
 
 ## Runtime AMY allocation
 

@@ -87,4 +87,4 @@ The default application directory is `$HOME/LB_Omnichord/amysynth_version/qt_fro
 - `rpi/` — Raspberry Pi startup helpers
 - `docs/` — implementation notes
 
-The `code/` directory contains compatibility symlinks to runtime data/QML files. This keeps the existing tested Python/QML path assumptions intact while the canonical files live in the logical directories above.
+The `code/` directory contains canonical paths to runtime data/QML files. This keeps the existing tested Python/QML path assumptions intact while the canonical files live in the logical directories above.
