@@ -6,19 +6,44 @@ The application has three observable layers:
 
 1. **Frontend/backend state** — Qt `InstrumentBackend`, preset state and slider models.
 2. **Transport** — logical events translated to AMY wire commands and, in the Raspberry Pi setup, framed as 1,000,000-baud 8N1 serial lines.
-3. **AMY engine state/output** — the commands must actually configure current upstream AMY as intended. Native-Linux tests use the current `shorepine/amy` `main` branch and inspect `amy.get_synth_commands()` / `amy.dump_state()` after the same wire stream has been delivered.
+3. **AMY engine state/output** — the commands must actually configure current upstream AMY as intended. Native-Linux tests use the current `shorepine/amy` `main` branch and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
 
 Every defect below must have a permanent regression test before it is considered fixed.
+
+## Architecture invariant
+
+**ARCH-01 — one object owns synth state; one convergence path applies it**
+
+For each frontend role (chord, strum, bass), `SynthState` is the sole owner of:
+
+- selected instrument;
+- per-instrument slider values;
+- default construction;
+- preset overlay;
+- instrument switching;
+- UI slider mutation/clamping;
+- QML control-model values;
+- complete transport payload;
+- sparse preset serialization;
+- copying state between roles.
+
+Startup, preset loading, instrument switching and UI edits may not maintain independent dictionaries or independent transport logic. They mutate the same `SynthState` object through its methods and publish the same complete logical synth-state payload.
+
+On the AMY receiver side, normal complete synth-state messages converge through one `_apply_synth_state()` method. That method decides whether the operation is a patch change, a same-instrument parameter diff, or an ADSR reset and applies the result to all physical synth instances owned by that logical role. Legacy name-only / parameter-only handlers are compatibility adapters into the same method, not separate implementations.
+
+**Failure mode this prevents:** a preset could previously update the UI-side dictionary while a later UI edit followed a different send path. That made it possible for the UI to display the correct stored slider value while rhythm synth 4 retained another value until the slider was moved.
+
+A static regression test rejects reintroduction of the former parallel `SynthRuntime`/`values_by_synth`, global serializer and separate `_send_synth_name()` / `_send_synth_params()` frontend paths.
 
 ## Test suites
 
 | Suite | Purpose | Hardware/AMY |
 | --- | --- | --- |
-| `unit-controls` | catalogue defaults, control mapping, sparse preset state, small pure-Python invariants | none |
+| `unit-controls` | catalogue defaults, `SynthState`, control mapping, sparse preset state, structural invariants | none |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
 | `native-controls` | feed the real serial wire stream into native current AMY and inspect actual synth state | Linux PTY + native AMY |
-| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including live chord-instrument switching | Linux PTY + native AMY |
+| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + native AMY |
 | `presets` | per-instrument session state and sparse preset save/load semantics | none/headless backend |
 | `all` | all suites sequentially; intended for local/manual use. CI runs the component suites in parallel for a PR to `main`. | mixed |
 
@@ -42,6 +67,22 @@ Every defect below must have a permanent regression test before it is considered
 - Production serial mode is 1,000,000 baud, 8 data bits, no parity, 1 stop bit, no hardware flow control.
 - Every AMY command is terminated with `Z` and one LF transport delimiter.
 - A Linux PTY test must exercise the real `pyserial` writer rather than replacing it with a fake send method.
+
+**START-03 — clean-home P7 rhythm start preserves Chorus Vibes parameters**
+
+Exact hardware reproduction:
+
+1. remove everything from `~/.omnichord`, start the application and select preset 7;
+2. press a chord while rhythm is stopped — it must sound like the P7 default chord instrument, **Chorus Vibes** (`juno_066`);
+3. press Start in the rhythm;
+4. the first and all subsequent automatic rhythm chords must use exactly the same stored Chorus Vibes slider state as the manual chord;
+5. moving Cutoff afterward must not be necessary to synchronize the two chord paths.
+
+Preset 7 intentionally stores no chord parameter overrides. Its Chorus Vibes values therefore come entirely from the current instrument catalogue defaults, making this a direct test of startup/default-state propagation rather than user-preset persistence.
+
+The serial regression requires the current P7 synth-4 filter setting to be sent **after the sequencer clear and before the first scheduled `H...i4` chord event**. Rhythm start may not reload the patch merely to achieve synchronization. The native-AMY regression compares synth 3 and synth 4 filter/resonance state before and after Start and requires rhythm start not to alter those settings.
+
+**Observed failure (2026-08-21):** the manual chord sounded correctly mellow after selecting P7, but starting rhythm produced automatic chords that sounded substantially brighter, as though cutoff were higher. Moving the Cutoff slider once made manual and rhythm chords sound synchronized.
 
 ### CHORD — manual chord behavior
 
@@ -76,7 +117,7 @@ Every defect below must have a permanent regression test before it is considered
 **INST-02 — manual and rhythm chord synths are one logical instrument**
 
 - Chord synth 3 (manual) and synth 4 (rhythm) are separate voice pools but must have equivalent patch/control state at all times after a chord-instrument change.
-- Native AMY readback (`get_synth_commands(3/4)`) is the authority, not only the frontend's selected index.
+- Native AMY readback is the authority, not only the frontend's selected index.
 
 **INST-03 — live rhythm follows chord-instrument changes**
 
@@ -95,7 +136,7 @@ Expected:
 - synth 3 and synth 4 native AMY state are equivalent after the change;
 - the rhythm need not restart from beat zero solely because the instrument changed.
 
-**Current/observed failure:** manual chords change instrument correctly, while rhythm chords continue sounding as Brass Ensemble or otherwise diverge from the selected chord instrument. Previous fixes that merely resent slider state or rebuilt the sequencer did not reliably fix the audible behavior.
+**Observed failure:** manual chords changed instrument correctly, while rhythm chords continued sounding as Brass Ensemble or otherwise diverged from the selected chord instrument. Previous fixes that merely resent slider state or rebuilt the sequencer did not reliably fix the audible behavior.
 
 **INST-04 — switching away and back restores edited controls to AMY**
 
@@ -136,7 +177,9 @@ Expected:
 
 **CTRL-03 — one slider changes only its intended AMY parameters**
 
-- Moving one slider must not resend unrelated filter/LFO/envelope controls merely because the frontend sends a complete logical snapshot.
+- Moving one slider publishes the same complete logical state used by every other state source.
+- `AmySerialClient` must diff that complete state and emit only engine controls that actually changed.
+- A special frontend slider transport path is not permitted.
 
 **CTRL-04 — Repeater Sustain does not act like cutoff**
 
@@ -183,7 +226,7 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **PRESET-03 — loading overlays defaults**
 
-- Loading constructs current catalogue defaults first and overlays saved values.
+- Loading constructs current catalogue defaults first and overlays saved values through `SynthState.load_preset()`.
 - Legacy negative `-1` values are treated only as "unspecified/default" and may not re-enter the current UI range.
 
 ### RHYTHM — sequencer invariants
@@ -201,6 +244,11 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 - Changing only the chord timbre should preserve the running rhythmic phase where the AMY sequencer permits it.
 - If correctness ever requires a phase reset, that behavior must be explicit and tested rather than accidental.
+
+**RHYTHM-04 — starting automatic chords converges synth 4 first**
+
+- Starting rhythm from stopped state must clear stale sequencer events, cross the configured AMY reset guard, reapply the current logical chord parameters specifically to rhythm synth 4, then install automatic chord events and resume transport.
+- This reapplication uses the same stored chord state; it must not invent defaults, derive values independently, or reload the patch.
 
 ### UI/REPOSITORY — structural regressions
 
@@ -224,7 +272,7 @@ For serial/native suites, failures must preserve artifacts containing:
 - exact serial lines received from the PTY;
 - current upstream AMY commit SHA/version;
 - native AMY `dump_state()` output;
-- native `get_synth_commands()` readback for synths 3 and 4 at relevant checkpoints;
+- native synth-state readback for synths 3 and 4 at relevant checkpoints;
 - application stdout/stderr and native bridge diagnostics.
 
 Passing a native test therefore means not merely "the expected command was written" but "current AMY accepted the real serial wire stream and its readback state satisfies the invariant".
