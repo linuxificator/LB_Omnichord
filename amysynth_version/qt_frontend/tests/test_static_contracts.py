@@ -68,6 +68,9 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("runtime.set_control(key, value)", main_py)
         self.assertIn("self._runtime(role).transport_payload()", main_py)
         self.assertIn("def _apply_synth_state(", amy_py)
+        self.assertIn("self._apply_synth_state(\n            role,", amy_py)
+        self.assertIn("resync_chord=True", amy_py)
+        self.assertIn('self._sync_synth_params(\n                "chord",', amy_py)
 
         # These were the old parallel mutation/transport paths. Reintroducing
         # them would make startup/preset/UI behavior capable of diverging again.
