@@ -17,8 +17,8 @@ Item {
     Row {
         id: controlsRow
         anchors.fill: parent
-        anchors.margins: 7
-        spacing: 9
+        anchors.margins: 4
+        spacing: 6
 
         LabeledSlider {
             width: 145
@@ -73,8 +73,8 @@ Item {
 
         Button {
             id: drumButton
-            width: 56
-            height: 56
+            width: 50
+            height: 50
             anchors.verticalCenter: parent.verticalCenter
             text: "DRM"
             font.pixelSize: 12
