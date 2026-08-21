@@ -1,10 +1,10 @@
 # Instrument slider defaults
 
-`synt​hs.json` contains explicit initial values for every slider of every curated AMY instrument.
+`synths.json` contains explicit initial values for every slider of every curated AMY instrument.
 
 ## Source of the timbre controls
 
-The primary source is AMY's generated built-in patch table, `shorepine/amy/src/patches.h`. AMY documents patches 0–127 as Juno patches and 128–255 as DX7 patches. `generate_defaults.py` reads that patch table and copies values which have a direct meaning in the Omnichord controls instead of inventing replacements.
+The primary source is AMY's generated built-in patch table, `shorepine/amy/src/patches.h`. AMY documents patches 0–127 as Juno patches and 128–255 as DX7 patches in its tutorial: <https://shorepine.github.io/amy/tutorial.html>. `generate_defaults.py` reads that patch table and copies values which have a direct meaning in the Omnichord controls instead of inventing replacements.
 
 For Juno instruments this includes filter cutoff, resonance, LFO rate, pitch-LFO depth, filter-LFO depth, pulse width, PWM depth, portamento and the native amplitude-envelope values. For DX7 instruments it includes algorithm, feedback, LFO rate and pitch-LFO depth. Portamento defaults to zero unless we later expose a native value for it.
 
@@ -21,7 +21,11 @@ The AMY Juno envelope is normally retained. A few deliberate corrections are app
 
 The DX7's six operators already contain their own native envelopes. The four Omnichord ADSR controls are an *additional global ALGO-output envelope*, so there is no one-to-one native value to copy. Conservative profiles are therefore assigned by musical family (brass, strings, piano/e-piano, bass, vibes, mallets, organ, pipes/winds, guitar, chimes and atmospheric sounds). The native operator envelopes still do most of the shaping.
 
-The envelope choices follow conventional ADSR synthesis practice: plucked/struck instruments have fast attacks and decaying envelopes; organs maintain a high sustain; blown instruments have a short but nonzero onset and short release; pads/strings have slower attacks and releases. A few milliseconds of attack also avoids the hard discontinuity/click that a zero-time digital envelope can produce.
+The envelope choices follow conventional ADSR synthesis practice. Sound On Sound's synthesis references describe plucked acoustic sounds as having an immediate bright transient followed by decay, while sustained bowed/blown sounds build and hold differently; its ADSR reference defines attack/decay/sustain/release in the conventional way. Very short digital attacks can also produce audible clicks. References:
+
+- <https://www.soundonsound.com/techniques/synth-school-part-2>
+- <https://www.soundonsound.com/glossary/adsr-attack-decay-sustain-release>
+- <https://www.soundonsound.com/techniques/synthesizing-brass-instruments>
 
 ## Regenerating
 
