@@ -16,6 +16,8 @@ The UI uses physical parameter ranges only. The historical `-1 = use native patc
 
 Every chord, strum and bass instrument has its own slider state for the lifetime of the session. Changing a slider modifies only the currently selected instrument's state. Changing instruments sends the instrument name and its complete stored slider state as one logical backend operation. On the AMY side each `K` patch load is immediately followed by that instrument's parameter restore for the same synth instance. Chords use two AMY synth instances (manual chord and rhythm chord), so both are restored independently before moving to the next synth instance.
 
+A regression test covers the switch-away/switch-back case with a modified resonance value and also verifies the chord command ordering `K(manual) -> restored parameters(manual) -> K(rhythm) -> restored parameters(rhythm)`.
+
 Normal slider movements are incremental: although the frontend supplies a full logical parameter snapshot, the serial backend compares it to the previous snapshot and emits AMY wire commands only for controls which changed. This prevents a Sustain movement, for example, from unnecessarily reapplying filter or LFO settings.
 
 ## Envelope policy
