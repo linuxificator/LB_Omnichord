@@ -8,6 +8,7 @@ Item {
     required property var controller
     required property var tuningModeModel
     required property bool fullScreen
+    property int leftExtension: 0
 
     signal toggleFullscreenRequested()
 
@@ -49,9 +50,9 @@ Item {
 
     // Orange area deliberately ends at the tuning tap-control.
     Rectangle {
-        x: 0
+        x: -root.leftExtension
         y: 0
-        width: root.tuningX + root.tuningWidth
+        width: root.leftExtension + root.tuningX + root.tuningWidth
         height: parent.height
         radius: 12
         color: "#f4c77f"

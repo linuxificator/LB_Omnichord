@@ -555,8 +555,10 @@ class InstrumentBackend(QObject):
     strumVolumeChanged = Signal()
     bassVolumeChanged = Signal()
     percussionVolumeChanged = Signal()
-    mainReverbChanged = Signal()
-    percussionReverbChanged = Signal()
+    reverbLevelChanged = Signal()
+    reverbLivenessChanged = Signal()
+    reverbDampingChanged = Signal()
+    reverbDrumsIncludedChanged = Signal()
     bassRunningChanged = Signal()
 
     chordSynthStateChanged = Signal()
@@ -592,8 +594,7 @@ class InstrumentBackend(QObject):
         strum_amp_address: str,
         bass_amp_address: str,
         percussion_amp_address: str,
-        main_reverb_address: str,
-        percussion_reverb_address: str,
+        reverb_address: str,
         chord_synth_address: str,
         chord_params_address: str,
         strum_synth_address: str,
@@ -627,8 +628,7 @@ class InstrumentBackend(QObject):
         self._strum_amp_address = strum_amp_address
         self._bass_amp_address = bass_amp_address
         self._percussion_amp_address = percussion_amp_address
-        self._main_reverb_address = main_reverb_address
-        self._percussion_reverb_address = percussion_reverb_address
+        self._reverb_address = reverb_address
         self._chord_synth_address = chord_synth_address
         self._chord_params_address = chord_params_address
         self._strum_synth_address = strum_synth_address
@@ -755,12 +755,16 @@ class InstrumentBackend(QObject):
             volumes["percussion"]
         )
         effects = defaults.get("effects", {})
-        self._main_reverb = max(
-            0.0, min(1.0, float(effects.get("main_reverb", 0.0)))
+        self._reverb_level = max(
+            0.0, min(1.0, float(effects.get("reverb_level", 0.0)))
         )
-        self._percussion_reverb = max(
-            0.0, min(1.0, float(effects.get("percussion_reverb", 0.0)))
+        self._reverb_liveness = max(
+            0.0, min(1.0, float(effects.get("reverb_liveness", 0.5)))
         )
+        self._reverb_damping = max(
+            0.0, min(1.0, float(effects.get("reverb_damping", 0.5)))
+        )
+        self._reverb_drums = bool(effects.get("reverb_drums", False))
         self._bass_running = bool(
             transport["bass_running"]
         )
@@ -812,6 +816,24 @@ class InstrumentBackend(QObject):
         self._rhythm_running = bool(
             defaults["transport"]["rhythm_running"]
         )
+
+        # Tempo nudge: 1 BPM every 100 ms = 10 BPM/s. A quick tap keeps
+        # running to a 20 BPM total change; a held button keeps going.
+        self._tempo_nudge_timer = QTimer(self)
+        self._tempo_nudge_timer.setInterval(100)
+        self._tempo_nudge_timer.timeout.connect(self._tempo_nudge_tick)
+        self._tempo_nudge_direction = 0
+        self._tempo_nudge_origin = self.rhythmTempo
+        self._tempo_nudge_pressed = False
+
+        # Pitch bend is deliberately transient. _tuning_reference remains the
+        # stored/preset A-reference; this offset returns to zero on release.
+        self._pitch_bend_timer = QTimer(self)
+        self._pitch_bend_timer.setInterval(100)
+        self._pitch_bend_timer.timeout.connect(self._pitch_bend_tick)
+        self._pitch_bend_direction = 0
+        self._pitch_bend_offset_hz = 0.0
+        self._pitch_bend_returning = False
 
         self._strum_last_index: int | None = None
 
@@ -994,13 +1016,21 @@ class InstrumentBackend(QObject):
     def percussionVolume(self) -> float:
         return self._percussion_volume
 
-    @Property(float, notify=mainReverbChanged)
-    def mainReverb(self) -> float:
-        return self._main_reverb
+    @Property(float, notify=reverbLevelChanged)
+    def reverbLevel(self) -> float:
+        return self._reverb_level
 
-    @Property(float, notify=percussionReverbChanged)
-    def percussionReverb(self) -> float:
-        return self._percussion_reverb
+    @Property(float, notify=reverbLivenessChanged)
+    def reverbLiveness(self) -> float:
+        return self._reverb_liveness
+
+    @Property(float, notify=reverbDampingChanged)
+    def reverbDamping(self) -> float:
+        return self._reverb_damping
+
+    @Property(bool, notify=reverbDrumsIncludedChanged)
+    def reverbDrumsIncluded(self) -> bool:
+        return self._reverb_drums
 
     @Property(int, notify=chordSynthStateChanged)
     def selectedChordSynthIndex(self) -> int:
@@ -1090,7 +1120,7 @@ class InstrumentBackend(QObject):
 
     @Property(int, notify=tuningChanged)
     def tuningReference(self) -> int:
-        return self._tuning_reference
+        return int(round(self._effective_tuning_reference()))
 
     @Property(int, constant=True)
     def presetCount(self) -> int:
@@ -1175,23 +1205,49 @@ class InstrumentBackend(QObject):
             clamped,
         )
 
-    @Slot(float)
-    def setMainReverb(self, value: float) -> None:
-        clamped = max(0.0, min(1.0, float(value)))
-        if abs(clamped - self._main_reverb) < 0.0001:
-            return
-        self._main_reverb = clamped
-        self.mainReverbChanged.emit()
-        self._client.send_message(self._main_reverb_address, clamped)
+    def _reverb_payload(self) -> dict[str, Any]:
+        return {
+            "level": self._reverb_level,
+            "liveness": self._reverb_liveness,
+            "damping": self._reverb_damping,
+            "drums": self._reverb_drums,
+        }
+
+    def _send_reverb_state(self) -> None:
+        self._client.send_message(self._reverb_address, self._reverb_payload())
 
     @Slot(float)
-    def setPercussionReverb(self, value: float) -> None:
+    def setReverbLevel(self, value: float) -> None:
         clamped = max(0.0, min(1.0, float(value)))
-        if abs(clamped - self._percussion_reverb) < 0.0001:
+        if abs(clamped - self._reverb_level) < 0.0001:
             return
-        self._percussion_reverb = clamped
-        self.percussionReverbChanged.emit()
-        self._client.send_message(self._percussion_reverb_address, clamped)
+        self._reverb_level = clamped
+        self.reverbLevelChanged.emit()
+        self._send_reverb_state()
+
+    @Slot(float)
+    def setReverbLiveness(self, value: float) -> None:
+        clamped = max(0.0, min(1.0, float(value)))
+        if abs(clamped - self._reverb_liveness) < 0.0001:
+            return
+        self._reverb_liveness = clamped
+        self.reverbLivenessChanged.emit()
+        self._send_reverb_state()
+
+    @Slot(float)
+    def setReverbDamping(self, value: float) -> None:
+        clamped = max(0.0, min(1.0, float(value)))
+        if abs(clamped - self._reverb_damping) < 0.0001:
+            return
+        self._reverb_damping = clamped
+        self.reverbDampingChanged.emit()
+        self._send_reverb_state()
+
+    @Slot()
+    def toggleReverbDrums(self) -> None:
+        self._reverb_drums = not self._reverb_drums
+        self.reverbDrumsIncludedChanged.emit()
+        self._send_reverb_state()
 
     def _emit_synth_change(
         self,
@@ -1289,10 +1345,15 @@ class InstrumentBackend(QObject):
         self._emit_synth_change(role, selection_changed=False)
         self._send_synth_state(role)
 
+    def _effective_tuning_reference(self) -> float:
+        return max(
+            415.0,
+            min(466.0, float(self._tuning_reference) + self._pitch_bend_offset_hz),
+        )
+
     def _tuning_note_offset(self) -> float:
-        # A-reference tuning is global and remains exactly as before.
         return 12.0 * math.log2(
-            float(self._tuning_reference) / 440.0
+            self._effective_tuning_reference() / 440.0
         )
 
     def _intonation_factor(
@@ -1413,11 +1474,58 @@ class InstrumentBackend(QObject):
         self.tuningChanged.emit()
         self._refresh_tuning_on_active_notes()
 
+    def _stop_pitch_bend(self) -> None:
+        self._pitch_bend_timer.stop()
+        self._pitch_bend_direction = 0
+        self._pitch_bend_returning = False
+
+    def _publish_pitch_bend(self) -> None:
+        self.tuningChanged.emit()
+        self._refresh_tuning_on_active_notes()
+
+    def _pitch_bend_tick(self) -> None:
+        previous = self._pitch_bend_offset_hz
+        if self._pitch_bend_returning:
+            if abs(previous) <= 1.0:
+                self._pitch_bend_offset_hz = 0.0
+                self._stop_pitch_bend()
+            else:
+                self._pitch_bend_offset_hz = previous - math.copysign(1.0, previous)
+        else:
+            candidate = previous + float(self._pitch_bend_direction)
+            base = float(self._tuning_reference)
+            self._pitch_bend_offset_hz = max(415.0 - base, min(466.0 - base, candidate))
+            if math.isclose(self._pitch_bend_offset_hz, previous, abs_tol=1e-9):
+                return
+        if not math.isclose(previous, self._pitch_bend_offset_hz, abs_tol=1e-9):
+            self._publish_pitch_bend()
+
+    @Slot(int)
+    def beginPitchBend(self, direction: int) -> None:
+        direction = 1 if int(direction) > 0 else -1
+        self._pitch_bend_direction = direction
+        self._pitch_bend_returning = False
+        if not self._pitch_bend_timer.isActive():
+            self._pitch_bend_timer.start()
+
+    @Slot()
+    def endPitchBend(self) -> None:
+        self._pitch_bend_direction = 0
+        if math.isclose(self._pitch_bend_offset_hz, 0.0, abs_tol=1e-9):
+            self._stop_pitch_bend()
+            return
+        self._pitch_bend_returning = True
+        if not self._pitch_bend_timer.isActive():
+            self._pitch_bend_timer.start()
+
     @Slot(int)
     def setTuningReference(self, value: int) -> None:
         clamped = max(415, min(466, int(value)))
+        self._stop_pitch_bend()
+        self._pitch_bend_offset_hz = 0.0
 
         if clamped == self._tuning_reference:
+            self.tuningChanged.emit()
             return
 
         self._tuning_reference = clamped
@@ -1540,13 +1648,12 @@ class InstrumentBackend(QObject):
                 ),
             },
         }
-        effects: dict[str, float] = {}
-        if abs(self._main_reverb) > 1e-9:
-            effects["main_reverb"] = self._main_reverb
-        if abs(self._percussion_reverb) > 1e-9:
-            effects["percussion_reverb"] = self._percussion_reverb
-        if effects:
-            snapshot["effects"] = effects
+        snapshot["effects"] = {
+            "reverb_level": self._reverb_level,
+            "reverb_liveness": self._reverb_liveness,
+            "reverb_damping": self._reverb_damping,
+            "reverb_drums": self._reverb_drums,
+        }
         return snapshot
 
     def _ensure_preset_storage(self) -> None:
@@ -1740,12 +1847,10 @@ class InstrumentBackend(QObject):
         )
 
         effects = self._defaults.get("effects", {})
-        self._main_reverb = max(
-            0.0, min(1.0, float(effects.get("main_reverb", 0.0)))
-        )
-        self._percussion_reverb = max(
-            0.0, min(1.0, float(effects.get("percussion_reverb", 0.0)))
-        )
+        self._reverb_level = max(0.0, min(1.0, float(effects.get("reverb_level", 0.0))))
+        self._reverb_liveness = max(0.0, min(1.0, float(effects.get("reverb_liveness", 0.5))))
+        self._reverb_damping = max(0.0, min(1.0, float(effects.get("reverb_damping", 0.5))))
+        self._reverb_drums = bool(effects.get("reverb_drums", False))
 
         transport = self._defaults["transport"]
         self._rhythm_running = bool(transport["rhythm_running"])
@@ -1784,6 +1889,9 @@ class InstrumentBackend(QObject):
             415,
             min(466, int(tuning.get("reference_hz", DEFAULT_TUNING_REFERENCE))),
         )
+        self._stop_pitch_bend()
+        self._pitch_bend_offset_hz = 0.0
+        self._stop_tempo_nudge()
 
     def _apply_preset_data(
         self,
@@ -1927,25 +2035,12 @@ class InstrumentBackend(QObject):
         if not isinstance(effects, dict):
             effects = {}
         default_effects = self._defaults.get("effects", {})
-        self._main_reverb = max(
-            0.0,
-            min(
-                1.0,
-                float(effects.get("main_reverb", default_effects.get("main_reverb", 0.0))),
-            ),
-        )
-        self._percussion_reverb = max(
-            0.0,
-            min(
-                1.0,
-                float(
-                    effects.get(
-                        "percussion_reverb",
-                        default_effects.get("percussion_reverb", 0.0),
-                    )
-                ),
-            ),
-        )
+        legacy_main = effects.get("main_reverb", default_effects.get("reverb_level", 0.0))
+        legacy_drum = effects.get("percussion_reverb", 0.0)
+        self._reverb_level = max(0.0, min(1.0, float(effects.get("reverb_level", legacy_main))))
+        self._reverb_liveness = max(0.0, min(1.0, float(effects.get("reverb_liveness", default_effects.get("reverb_liveness", 0.5)))))
+        self._reverb_damping = max(0.0, min(1.0, float(effects.get("reverb_damping", default_effects.get("reverb_damping", 0.5)))))
+        self._reverb_drums = bool(effects.get("reverb_drums", float(legacy_drum) > 0.0))
 
         transport = data.get(
             "transport",
@@ -2110,6 +2205,9 @@ class InstrumentBackend(QObject):
                     ),
                 ),
             )
+        self._stop_pitch_bend()
+        self._pitch_bend_offset_hz = 0.0
+        self._stop_tempo_nudge()
 
         # Performance-state notes are deliberately never part of a preset.
         self._clear_touch_dropout_state()
@@ -2129,8 +2227,10 @@ class InstrumentBackend(QObject):
         self.strumVolumeChanged.emit()
         self.bassVolumeChanged.emit()
         self.percussionVolumeChanged.emit()
-        self.mainReverbChanged.emit()
-        self.percussionReverbChanged.emit()
+        self.reverbLevelChanged.emit()
+        self.reverbLivenessChanged.emit()
+        self.reverbDampingChanged.emit()
+        self.reverbDrumsIncludedChanged.emit()
         self.bassRunningChanged.emit()
 
         self.chordSynthStateChanged.emit()
@@ -2333,6 +2433,7 @@ class InstrumentBackend(QObject):
 
     @Slot(int)
     def setRhythmIndex(self, rhythm_index: int) -> None:
+        self._stop_tempo_nudge()
         if not 0 <= rhythm_index < len(self._rhythms):
             return
         if rhythm_index == self._rhythm.selected_index:
@@ -2343,22 +2444,50 @@ class InstrumentBackend(QObject):
         self.rhythmControlsChanged.emit()
         self._send_rhythm_config()
 
-    @Slot(float)
-    def setRhythmTempo(self, value: float) -> None:
-        clamped = max(
-            40.0,
-            min(200.0, float(value)),
-        )
-
+    def _set_rhythm_tempo_value(self, value: float) -> bool:
+        clamped = max(40.0, min(200.0, float(value)))
         index = self._rhythm.selected_index
-        if abs(
-            clamped - self._rhythm.tempo_by_rhythm[index]
-        ) < 0.0001:
-            return
-
+        if abs(clamped - self._rhythm.tempo_by_rhythm[index]) < 0.0001:
+            return False
         self._rhythm.tempo_by_rhythm[index] = clamped
         self.rhythmControlsChanged.emit()
         self._send_rhythm_config()
+        return True
+
+    def _stop_tempo_nudge(self) -> None:
+        self._tempo_nudge_timer.stop()
+        self._tempo_nudge_direction = 0
+        self._tempo_nudge_pressed = False
+
+    def _tempo_nudge_tick(self) -> None:
+        current = self.rhythmTempo
+        changed = self._set_rhythm_tempo_value(
+            current + float(self._tempo_nudge_direction)
+        )
+        moved = abs(self.rhythmTempo - self._tempo_nudge_origin)
+        if (not changed) or (not self._tempo_nudge_pressed and moved >= 20.0 - 1e-9):
+            self._stop_tempo_nudge()
+
+    @Slot(int)
+    def beginTempoNudge(self, direction: int) -> None:
+        self._stop_tempo_nudge()
+        self._tempo_nudge_direction = 1 if int(direction) > 0 else -1
+        self._tempo_nudge_origin = self.rhythmTempo
+        self._tempo_nudge_pressed = True
+        self._tempo_nudge_timer.start()
+
+    @Slot()
+    def endTempoNudge(self) -> None:
+        if self._tempo_nudge_direction == 0:
+            return
+        self._tempo_nudge_pressed = False
+        if abs(self.rhythmTempo - self._tempo_nudge_origin) >= 20.0 - 1e-9:
+            self._stop_tempo_nudge()
+
+    @Slot(float)
+    def setRhythmTempo(self, value: float) -> None:
+        self._stop_tempo_nudge()
+        self._set_rhythm_tempo_value(value)
 
     @Slot(float)
     def setRhythmBusyness(self, value: float) -> None:
@@ -3392,14 +3521,7 @@ class InstrumentBackend(QObject):
             self._percussion_amp_address,
             self._percussion_volume,
         )
-        self._client.send_message(
-            self._main_reverb_address,
-            self._main_reverb,
-        )
-        self._client.send_message(
-            self._percussion_reverb_address,
-            self._percussion_reverb,
-        )
+        self._send_reverb_state()
 
         self._send_synth_state("chord")
         self._send_synth_state("strum")
@@ -3528,12 +3650,8 @@ def parse_arguments() -> argparse.Namespace:
         default="/rhythm/amp",
     )
     parser.add_argument(
-        "--main-reverb-address",
-        default="/effects/main/reverb",
-    )
-    parser.add_argument(
-        "--percussion-reverb-address",
-        default="/effects/percussion/reverb",
+        "--reverb-address",
+        default="/effects/reverb",
     )
     parser.add_argument(
         "--chord-synth-address",
@@ -3742,8 +3860,7 @@ def main() -> int:
         "strum_amp": args.strum_amp_address,
         "bass_amp": args.bass_amp_address,
         "percussion_amp": args.percussion_amp_address,
-        "main_reverb": args.main_reverb_address,
-        "percussion_reverb": args.percussion_reverb_address,
+        "reverb": args.reverb_address,
         "chord_synth": args.chord_synth_address,
         "chord_params": args.chord_params_address,
         "strum_synth": args.strum_synth_address,
@@ -3795,8 +3912,7 @@ def main() -> int:
         strum_amp_address=args.strum_amp_address,
         bass_amp_address=args.bass_amp_address,
         percussion_amp_address=args.percussion_amp_address,
-        main_reverb_address=args.main_reverb_address,
-        percussion_reverb_address=args.percussion_reverb_address,
+        reverb_address=args.reverb_address,
         chord_synth_address=args.chord_synth_address,
         chord_params_address=args.chord_params_address,
         strum_synth_address=args.strum_synth_address,

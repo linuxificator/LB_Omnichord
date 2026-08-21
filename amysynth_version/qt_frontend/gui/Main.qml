@@ -245,10 +245,20 @@ ApplicationWindow {
                 visible:
                     window.titleHeight > 0
 
+                ReverbPanel {
+                    id: reverbPanel
+                    x: 0
+                    y: 0
+                    width: 360
+                    height: parent.height
+                    controller: backend
+                }
+
                 Text {
-                    anchors.fill: parent
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 16
+                    x: reverbPanel.width + 12
+                    y: 0
+                    width: Math.max(0, window.strumX - x - 12)
+                    height: parent.height
 
                     text: headerTitleText
                     color: "#493a38"
@@ -271,67 +281,6 @@ ApplicationWindow {
                 }
             }
 
-            Rectangle {
-                x: 0
-                y: window.utilityY
-                width: window.leftRailWidth
-                height:
-                    window.sectionHeight * 2
-                    + window.sectionGap
-                radius: 12
-                color: "#f7dce6"
-                border.color: "#c98da5"
-                border.width: 1
-            }
-
-            VerticalVolume {
-                x: (window.leftRailWidth - window.leftSliderWidth) / 2
-                y: window.utilityY
-                width: window.leftSliderWidth
-                height: window.sectionHeight
-                currentValue: backend.mainReverb
-                panelColor: "#f2c8d8"
-                panelBorderColor: "#bd839b"
-                fillColor: "#d87fa5"
-                textColor: "#5c2840"
-                onEdited: (value) => backend.setMainReverb(value)
-            }
-
-            VerticalVolume {
-                x: (window.leftRailWidth - window.leftSliderWidth) / 2
-                y: window.rhythmY
-                width: window.leftSliderWidth
-                height: window.sectionHeight
-                currentValue: backend.percussionReverb
-                panelColor: "#f2c8d8"
-                panelBorderColor: "#bd839b"
-                fillColor: "#d87fa5"
-                textColor: "#5c2840"
-                onEdited: (value) => backend.setPercussionReverb(value)
-            }
-
-            Text {
-                x: 2
-                y: window.utilityY + 2
-                width: window.leftRailWidth - 4
-                text: "REV"
-                color: "#6b3048"
-                font.pixelSize: 9
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-            }
-
-            Text {
-                x: 2
-                y: window.rhythmY + 2
-                width: window.leftRailWidth - 4
-                text: "DRM REV"
-                color: "#6b3048"
-                font.pixelSize: 9
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-            }
-
             UtilitySection {
                 x: window.contentX
                 y: window.utilityY
@@ -347,19 +296,49 @@ ApplicationWindow {
                 fullScreen:
                     window.visibility
                     === Window.FullScreen
+                leftExtension: window.leftRailWidth
 
                 onToggleFullscreenRequested:
                     window.toggleFullscreenMode()
             }
 
-            // Yellow ends at the percussion-volume control.
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.utilityY + 7
+                width: 42
+                height: 42
+                text: "UP"
+                panelColor: "#efb05c"
+                borderColor: "#a75d0a"
+                textColor: "#492606"
+                onPressedChanged: {
+                    if (pressed) backend.beginPitchBend(1)
+                    else backend.endPitchBend()
+                }
+            }
+
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.utilityY + window.sectionHeight - height - 7
+                width: 42
+                height: 42
+                text: "DWN"
+                panelColor: "#efb05c"
+                borderColor: "#a75d0a"
+                textColor: "#492606"
+                onPressedChanged: {
+                    if (pressed) backend.beginPitchBend(-1)
+                    else backend.endPitchBend()
+                }
+            }
+
+            // Yellow rhythm/drum family extends through the left control rail.
             Rectangle {
-                x: window.contentX
+                x: 0
                 y: window.rhythmY
                 width:
                     window.volumeX
                     + window.volumeWidth
-                    - window.contentX
                 height: window.sectionHeight
                 radius: 12
                 color: "#fbf0bd"
@@ -370,6 +349,36 @@ ApplicationWindow {
                     anchors.fill: parent
                     family: "percussion"
                     ink: "#b49317"
+                }
+            }
+
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.rhythmY + 7
+                width: 42
+                height: 42
+                text: "UP"
+                panelColor: "#f4dc78"
+                borderColor: "#aa8719"
+                textColor: "#4c3505"
+                onPressedChanged: {
+                    if (pressed) backend.beginTempoNudge(1)
+                    else backend.endTempoNudge()
+                }
+            }
+
+            PresetResetButton {
+                x: (window.leftRailWidth - width) / 2
+                y: window.rhythmY + window.sectionHeight - height - 7
+                width: 42
+                height: 42
+                text: "DWN"
+                panelColor: "#f4dc78"
+                borderColor: "#aa8719"
+                textColor: "#4c3505"
+                onPressedChanged: {
+                    if (pressed) backend.beginTempoNudge(-1)
+                    else backend.endTempoNudge()
                 }
             }
 

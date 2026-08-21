@@ -588,7 +588,12 @@ class AmySerialClient:
             raise ValueError(
                 "main and percussion buses must be distinct AMY buses 0..3"
             )
-        self.reverb = {"main": 0.0, "percussion": 0.0}
+        self.reverb = {
+            "level": 0.0,
+            "liveness": 0.5,
+            "damping": 0.5,
+            "drums": False,
+        }
 
         self.chord_notes: list[float] = []
         self.bass_notes: list[float] = []
@@ -771,32 +776,40 @@ class AmySerialClient:
     def _route_synth_bus(self, synth: int) -> None:
         self._wire(f"i{synth}iy{self._bus_for_synth(synth)}Z")
 
-    _REVERB_OFF_WIRE_LEVEL = 0.001
+    def _reverb_command(self, bus: int, *, enabled: bool) -> str:
+        level = self.reverb["level"] if enabled else 0.0
+        return (
+            f"y{int(bus)}h{self._f(level)},"
+            f"{self._f(self.reverb['liveness'])},"
+            f"{self._f(self.reverb['damping'])}Z"
+        )
 
     def _apply_reverb_buses(self) -> None:
-        # Do not send h0 on a fresh engine.  On the ESP32-P4 an exact-zero
-        # reverb coefficient can produce low-frequency rumble; untouched AMY
-        # buses are already dry.
-        for lane in ("main", "percussion"):
-            level = self.reverb[lane]
-            if level > 0.0:
-                self._wire(
-                    f"y{self.bus_id[lane]}h{self._f(level)}Z"
-                )
-
-    def _set_reverb(self, lane: str, value: Any) -> None:
-        level = max(0.0, min(1.0, float(value)))
-        previous = self.reverb[lane]
-        if math.isclose(level, previous, rel_tol=0.0, abs_tol=1e-9):
-            return
-        self.reverb[lane] = level
-        bus = self.bus_id[lane]
-        wire_level = (
-            level
-            if level > 0.0
-            else self._REVERB_OFF_WIRE_LEVEL
+        # Bus 0 contains every melodic role; bus 1 contains only drums.
+        # An exact h0 is intentional: zero must be truly dry, not a small
+        # non-zero approximation.  Omitting the fourth reverb field leaves
+        # AMY's crossover setting unchanged.
+        self._wire(self._reverb_command(self.bus_id["main"], enabled=True))
+        self._wire(
+            self._reverb_command(
+                self.bus_id["percussion"],
+                enabled=bool(self.reverb["drums"]),
+            )
         )
-        self._wire(f"y{bus}h{self._f(wire_level)}Z")
+
+    def _set_reverb(self, value: Any) -> None:
+        if not isinstance(value, dict):
+            return
+        updated = {
+            "level": max(0.0, min(1.0, float(value.get("level", self.reverb["level"])))),
+            "liveness": max(0.0, min(1.0, float(value.get("liveness", self.reverb["liveness"])))),
+            "damping": max(0.0, min(1.0, float(value.get("damping", self.reverb["damping"])))),
+            "drums": bool(value.get("drums", self.reverb["drums"])),
+        }
+        if updated == self.reverb:
+            return
+        self.reverb = updated
+        self._apply_reverb_buses()
 
     def _configure_one_synth(self, role: str, synth: int) -> None:
         self._bump_synth_generation(synth)
@@ -1514,10 +1527,8 @@ class AmySerialClient:
             self._set_volume("bass", value)
         elif address == a["percussion_amp"]:
             self._set_volume("drums", value)
-        elif address == a["main_reverb"]:
-            self._set_reverb("main", value)
-        elif address == a["percussion_reverb"]:
-            self._set_reverb("percussion", value)
+        elif address == a["reverb"]:
+            self._set_reverb(value)
         elif address == a["chord_synth"]:
             if isinstance(value, dict):
                 self._set_synth_state("chord", value)
