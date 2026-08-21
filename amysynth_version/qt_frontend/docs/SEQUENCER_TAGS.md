@@ -46,3 +46,7 @@ AMY fires repeating entries by comparing the sequencer's modulo-period offset wi
 ## Synth and bus isolation
 
 Sequencer tags isolate scheduled events; AMY synths isolate voice/oscillator ownership. Audio effects require one more boundary because Juno patches can contain bus-level EQ/chorus/reverb. The frontend therefore uses four AMY buses: drums 0, bass 1, strum 2, and both chord synths 3/4 on chord bus 3. A strum patch change can consequently alter only bus 2; it cannot change the sound of an already-playing chord on bus 3.
+
+On first allocation the target bus is included in the same AMY command as the patch and voice allocation (`K...i...iv...iy...`). This ensures bus-level FX embedded in a Juno patch are directed to the correct role from the start. On later repatches AMY preserves the synth's existing bus; the frontend then reapplies the Omnichord reverb state only to that role's bus.
+
+The regression suite reproduces the reported cross-talk case with **Meow Brass** on chord and **Sustainer** on strum. Changing only the strum patch must leave both chord synth configurations and chord bus 3 unchanged in native AMY state readback.
