@@ -1472,6 +1472,19 @@ class AmySerialClient:
         for lane_name in self._sequencer_lanes:
             self.writer.new_low_generation(lane_name)
 
+    def _silence_accompaniment(self) -> None:
+        """Immediately release every voice owned by the rhythm transport.
+
+        Stopping AMY's sequencer freezes future tagged events.  If transport is
+        stopped between a scheduled note-on and note-off, that note-off can no
+        longer fire.  Explicit all-off messages are therefore part of the stop
+        transaction.  Manual chord synth 3 and strum synth 2 are intentionally
+        excluded because they are controlled by the player's fingers, not by
+        rhythm transport.
+        """
+        for key in ("drums", "bass", "rhythm_chord"):
+            self._wire(f"l0i{self.synth_id[key]}Z")
+
     def _set_rhythm_config(self, payload_text: str) -> None:
         try:
             new_config = json.loads(str(payload_text))

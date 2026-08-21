@@ -272,6 +272,15 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 - Starting rhythm from stopped state installs the authoritative tagged drum/bass/chord ranges and resumes transport only after those definitions are queued ahead of `zY1`.
 - Starting rhythm must not require `RESET_SEQUENCER`; tagged replacement itself removes stale lane entries.
 
+**RHYTHM-05 — stopping transport releases sounding accompaniment**
+
+- `zY0` stops future sequencer execution, so a note-off scheduled later in the pattern cannot be relied upon after Stop.
+- Every rhythm Stop must therefore immediately send all-off to percussion synth 0, bass synth 1 and automatic-chord synth 4.
+- Manual chord synth 3 and strum synth 2 are not rhythm-owned and must remain untouched.
+- The frontend Stop action must complete normally and emit the changed `rhythmRunning` state so the Play/Stop control follows the backend.
+
+**Failure history:** stopping while an automatic chord was sounding froze transport before its tagged note-off fired, leaving a hanging chord. The same stop path called a missing `_silence_accompaniment()` method after sending `zY0`, raising `AttributeError`; as a result the actual transport stopped but `rhythmStateChanged` was never emitted and the button remained visually stuck on STOP.
+
 ### TUNING — all note-producing paths follow the selected tuning
 
 **TUNING-01 — live EQ/HARM/JV changes propagate everywhere**

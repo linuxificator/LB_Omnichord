@@ -502,6 +502,49 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertFalse(any("i1Z" in line for line in release_delta if line.startswith("H")))
             self.assertTrue(bool(app.query("rhythmRunning")))
 
+    def test_stopping_rhythm_releases_sounding_accompaniment(self) -> None:
+        """Stopping mid-pattern must not strand a synth-4 chord or bass note."""
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("setRhythmChordActivity", 4.0)
+            app.action("setRhythmBassActivity", 4.0)
+            if not bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+
+            # Establish an active pitch state and let any one-shot manual chord
+            # release drain before the stop checkpoint.
+            app.action("selectChord", 0, 0)
+            time.sleep(0.75)
+            app.bridge.wait_idle(timeout=8.0)
+
+            if not bool(app.query("rhythmRunning")):
+                start = app.bridge.count()
+                app.action("toggleRhythm")
+                app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+            # The regression is the action call itself: the old implementation
+            # raised AttributeError after zY0 because _silence_accompaniment was
+            # missing, so the frontend never emitted rhythmStateChanged.
+            stop_start = app.bridge.count()
+            app.action("toggleRhythm")
+            lines = app.bridge.wait_for_lines(
+                ["zY0Z", "l0i0Z", "l0i1Z", "l0i4Z"],
+                start=stop_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            lines = app.bridge.lines_since(stop_start)
+
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            self.assertLess(lines.index("zY0Z"), lines.index("l0i4Z"))
+            self.assertLess(lines.index("zY0Z"), lines.index("l0i1Z"))
+            self.assertNotIn(
+                "l0i3Z",
+                lines,
+                "stopping rhythm must not release a manually held chord",
+            )
+
     def test_tag_ranges_are_disjoint_and_lane_updates_do_not_cross(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=10.0)

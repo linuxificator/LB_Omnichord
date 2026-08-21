@@ -116,9 +116,10 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('label: "DAMP"', panel)
         self.assertIn("width: 520", main)
 
-    def test_rhythm_transport_canvas_erases_old_symbol(self) -> None:
+    def test_rhythm_transport_icon_is_bound_directly_to_backend_state(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
-        self.assertIn("c.clearRect(0, 0, width, height)", qml)
+        self.assertIn('text: root.controller.rhythmRunning ? "■" : "▶"', qml)
+        self.assertNotIn("Canvas {", qml)
 
     def test_each_musical_role_has_a_distinct_amy_bus(self) -> None:
         config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
