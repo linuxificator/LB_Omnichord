@@ -82,6 +82,11 @@ jobs:
             /tmp/amy-patches.h \
             amysynth_version/qt_frontend/instruments/synths.json
 
+      - name: Install minimal PySide runtime
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
