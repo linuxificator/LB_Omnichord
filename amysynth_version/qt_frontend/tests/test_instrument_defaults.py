@@ -224,5 +224,62 @@ class InstrumentDefaultTests(unittest.TestCase):
         self.assertEqual(applied, [{"sustain"}])
 
 
+    def test_atomic_instrument_state_restores_edited_resonance(self) -> None:
+        client = object.__new__(AmySerialClient)
+        client.patch_map = {"juno_050": 50}
+        client.selected_synth = {"chord": "juno_000"}
+        client.synth_params = {"chord": {"resonance": 0.93}}
+        client._adsr_override_active = {"chord": False}
+        client.synth_id = {
+            "strum": 2, "manual_chord": 3, "rhythm_chord": 4
+        }
+        client._manual_active_id = None
+        client._manual_active_notes = []
+
+        configured: list[tuple[str, dict[str, float]]] = []
+        client._configure_synth = lambda role: configured.append(
+            (role, dict(client.synth_params[role]))
+        )
+
+        AmySerialClient._set_synth_state(
+            client,
+            "chord",
+            {
+                "name": "juno_050",
+                "params": [
+                    "filter_hz", 8999.7,
+                    "resonance", 7.5,
+                    "attack_ms", 0.0,
+                    "decay_ms", 0.0,
+                    "sustain", 1.0,
+                    "release_ms", 0.0,
+                ],
+            },
+        )
+
+        self.assertEqual(client.selected_synth["chord"], "juno_050")
+        self.assertEqual(client.synth_params["chord"]["resonance"], 7.5)
+        self.assertEqual(configured, [("chord", client.synth_params["chord"])])
+
+    def test_chord_patch_and_restore_commands_are_adjacent_per_synth(self) -> None:
+        client = object.__new__(AmySerialClient)
+        emitted: list[str] = []
+        client._role_synth_ids = lambda role: (3, 4)
+        client._configure_one_synth = (
+            lambda role, synth: emitted.append(f"K:{synth}")
+        )
+        client._param_commands_for_synth = (
+            lambda role, synth: [f"R7.5:{synth}"]
+        )
+        client._wire = emitted.append
+
+        AmySerialClient._configure_synth(client, "chord")
+
+        self.assertEqual(
+            emitted,
+            ["K:3", "R7.5:3", "K:4", "R7.5:4"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

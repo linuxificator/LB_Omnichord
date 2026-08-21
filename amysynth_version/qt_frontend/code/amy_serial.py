@@ -697,9 +697,13 @@ class AmySerialClient:
         self._wire(f"i{synth}iV{self._f(self.volume[role])}Z")
 
     def _configure_synth(self, role: str) -> None:
+        # Keep each patch load and its complete parameter restore adjacent in
+        # the AMY command stream.  This is especially important for chord,
+        # which owns both the manual and rhythm synth instances.
         for synth in self._role_synth_ids(role):
             self._configure_one_synth(role, synth)
-        self._apply_supported_params(role)
+            for command in self._param_commands_for_synth(role, synth):
+                self._wire(command)
 
     def _configure_fixed_synths(self) -> None:
         # Drums deliberately do NOT use legacy patch 258 here.  That patch
@@ -909,6 +913,36 @@ class AmySerialClient:
                 role, synth, parameter_keys
             ):
                 self._wire(command)
+
+    def _set_synth_state(self, role: str, state: Any) -> None:
+        """Select an instrument and restore its full slider state atomically."""
+        if not isinstance(state, dict):
+            self._set_synth_name(role, str(state))
+            return
+
+        name = str(state.get("name", ""))
+        if role == "strum":
+            self._cancel_strum_tail()
+            self._wire(f"l0i{self.synth_id['strum']}Z")
+        if name not in self.patch_map:
+            print(f"AMY warning: refusing unknown synth {name!r}", flush=True)
+            return
+
+        params = self._params_from_list(state.get("params", []))
+        self.selected_synth[role] = name
+        self.synth_params[role] = params
+        self._adsr_override_active[role] = self._adsr_is_active(role)
+
+        # _configure_synth loads each K patch and immediately follows it with
+        # the complete state above, so returning to a previously edited
+        # instrument cannot leave AMY at its factory slider values.
+        self._configure_synth(role)
+
+        if role == "chord" and self._manual_active_id is not None:
+            for note in self._manual_active_notes:
+                self._wire(
+                    f"n{self._f(note)}l1i{self.synth_id['manual_chord']}Z"
+                )
 
     def _set_synth_name(self, role: str, name: str) -> None:
         name = str(name)
@@ -1322,11 +1356,20 @@ class AmySerialClient:
         elif address == a["percussion_amp"]:
             self._set_volume("drums", value)
         elif address == a["chord_synth"]:
-            self._set_synth_name("chord", str(value))
+            if isinstance(value, dict):
+                self._set_synth_state("chord", value)
+            else:
+                self._set_synth_name("chord", str(value))
         elif address == a["strum_synth"]:
-            self._set_synth_name("strum", str(value))
+            if isinstance(value, dict):
+                self._set_synth_state("strum", value)
+            else:
+                self._set_synth_name("strum", str(value))
         elif address == a["bass_synth"]:
-            self._set_synth_name("bass", str(value))
+            if isinstance(value, dict):
+                self._set_synth_state("bass", value)
+            else:
+                self._set_synth_name("bass", str(value))
         elif address == a["chord_params"]:
             self._set_params("chord", value)
         elif address == a["strum_params"]:

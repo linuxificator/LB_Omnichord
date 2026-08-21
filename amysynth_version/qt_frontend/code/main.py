@@ -3226,8 +3226,33 @@ class InstrumentBackend(QObject):
         self._client.send_message(address, arguments)
 
     def _send_synth_state(self, role: SynthRole) -> None:
-        self._send_synth_name(role)
-        self._send_synth_params(role)
+        # Instrument selection and its complete stored slider state are one
+        # logical operation.  Sending them separately allowed a patch reload
+        # to be observed without its restored per-instrument controls.
+        runtime = self._runtime(role)
+        synth = self._selected_synth(role)
+        values = runtime.values_by_synth[runtime.selected_index]
+
+        arguments: list[str | float] = []
+        for control in synth.controls:
+            arguments.extend(
+                [control.key, float(values[control.key])]
+            )
+
+        if role == "chord":
+            address = self._chord_synth_address
+        elif role == "strum":
+            address = self._strum_synth_address
+        else:
+            address = self._bass_synth_address
+
+        self._client.send_message(
+            address,
+            {
+                "name": synth.key,
+                "params": arguments,
+            },
+        )
 
     def _rhythm_payload(self) -> dict[str, Any]:
         rhythm = self._selected_rhythm()
