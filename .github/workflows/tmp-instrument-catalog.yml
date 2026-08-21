@@ -1,26 +1,60 @@
-name: Temporary instrument catalog dump
+name: Temporary instrument defaults generation
 
 on:
   pull_request:
     paths:
-      - 'amysynth_version/qt_frontend/instruments/synths.json'
+      - 'amysynth_version/qt_frontend/instruments/**'
       - '.github/workflows/tmp-instrument-catalog.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  dump:
+  generate:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Print compact catalog
+        with:
+          ref: feature/instrument-control-defaults
+      - name: Generate defaults from upstream AMY patches
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/shorepine/amy/main/src/patches.h -o /tmp/amy-patches.h
+          python3 amysynth_version/qt_frontend/instruments/generate_defaults.py \
+            /tmp/amy-patches.h \
+            amysynth_version/qt_frontend/instruments/synths.json
+      - name: Validate generated catalogue
         run: |
           python3 - <<'PY'
           import json
           from pathlib import Path
           p = Path('amysynth_version/qt_frontend/instruments/synths.json')
           data = json.loads(p.read_text())
-          for s in data['synths']:
-              defaults = {c['key']: c['default'] for c in s['controls']}
-              print(f"{s['key']}\t{s['engine']}\t{s.get('patch')}\t{s['label']}\t{defaults}")
-          print('COUNT', len(data['synths']))
+          assert len(data['synths']) == 123
+          for synth in data['synths']:
+              for control in synth['controls']:
+                  value = float(control['default'])
+                  lo = float(control['minimum'])
+                  hi = float(control['maximum'])
+                  assert lo <= value <= hi, (synth['key'], control['key'], value)
+                  assert value >= 0, (synth['key'], control['key'], value)
+          by_key = {s['key']: s for s in data['synths']}
+          def default(key, control):
+              return next(c['default'] for c in by_key[key]['controls'] if c['key'] == control)
+          assert default('juno_068', 'attack_ms') == 20.0
+          assert default('juno_089', 'attack_ms') == 20.0
+          assert default('juno_074', 'attack_ms') == 600.0
+          print('validated 123 instruments; all slider defaults explicit and in range')
           PY
+      - name: Commit generated catalogue
+        run: |
+          if git diff --quiet -- amysynth_version/qt_frontend/instruments/synths.json; then
+            echo 'catalogue already current'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- amysynth_version/qt_frontend/instruments/synths.json
+          git commit -m 'Populate per-instrument slider defaults'
+          git push origin HEAD:feature/instrument-control-defaults
