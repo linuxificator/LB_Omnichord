@@ -80,11 +80,11 @@ Exact hardware reproduction:
 
 Preset 7 intentionally stores no chord parameter overrides. Its Chorus Vibes values therefore come entirely from the current instrument catalogue defaults, making this a direct test of startup/default-state propagation rather than user-preset persistence.
 
-The serial regression requires the current P7 synth-4 filter setting to be sent **after the sequencer clear and before the first scheduled `H...i4` chord event**. Rhythm start may not reload the patch merely to achieve synchronization. The native-AMY regression compares synth 3 and synth 4 filter/resonance state before and after Start and requires rhythm start not to alter those settings.
+The serial regression requires the factory patch to remain authoritative for native filter coefficients. Chorus Vibes' `F27.365,0.181,,5.11,0,0` is a complete AMY CtrlCoef model: 27.365 Hz is only the base term, while note and envelope coefficients also contribute to the instantaneous cutoff. Starting rhythm therefore must **not** emit a redundant `v0F27.365i4Z` override. A real user slider edit, by contrast, is an explicit override and must update both chord synths 3 and 4.
 
-**Observed failure (2026-08-21):** the manual chord sounded correctly mellow after selecting P7, but starting rhythm produced automatic chords that sounded substantially brighter, as though cutoff were higher. Moving the Cutoff slider once made manual and rhythm chords sound synchronized.
+**Observed failure (2026-08-21):** the manual chord sounded correctly mellow after selecting P7, but automatic rhythm chords were effectively inaudible until the VCF base slider was moved. The visible native factory coefficient had been conflated with an application override.
 
-**Automated verification after the fix:** the real-serial test sees the current P7 synth-4 cutoff reasserted after `S4096Z` and before the first `H...i4Z` event. In the native-AMY checkpoint used while developing the fix, synth 3 and synth 4 both reported the same Chorus Vibes oscillator/filter/envelope state after Start (apart from the intentional voice-pool count), including the same `F27.365` filter value. This proves the host/serial/native-AMY path; the ESP32-P4 hardware result still requires physical listening/testing.
+**Automated verification after the fix:** the real-serial test proves that selecting P7 and starting rhythm do not resend the native VCF base coefficient, while a user cutoff edit is sent to both synth 3 and synth 4. Native-AMY tests require synth 3 and synth 4 to retain equivalent factory filter/resonance state across rhythm Start.
 
 ### CHORD — manual chord behavior
 
@@ -260,6 +260,22 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 - Starting rhythm from stopped state must clear stale sequencer events, cross the configured AMY reset guard, reapply the current logical chord parameters specifically to rhythm synth 4, then install automatic chord events and resume transport.
 - This reapplication uses the same stored chord state; it must not invent defaults, derive values independently, or reload the patch.
+
+### TUNING — all note-producing paths follow the selected tuning
+
+**TUNING-01 — live EQ/HARM/JV changes propagate everywhere**
+
+When an active chord exists, changing tuning mode or the A-reference tuning must use the same tuned-note functions for every musical note path:
+
+- manually held chord notes on synth 3 are retuned in place;
+- future automatic rhythm-chord events on synth 4 are rebuilt with the new tuned pitches;
+- future rhythm bass events on synth 1 are rebuilt from the retuned `bass_notes` state;
+- strum notes on synth 2 use the new tuning on the next gesture;
+- one-shot/manual chord selection uses the selected tuning as well.
+
+The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HARM, and requires non-root chord/bass/strum pitches to change. For example, an equal-tempered bass E at MIDI 40 becomes approximately `39.8631371` under the HARM table, while the C root remains unchanged. The test also verifies that a physically held chord is resent on synth 3 when tuning changes.
+
+**Debug-log interpretation:** rhythm bass is sequenced by AMY. A tuning change therefore appears primarily as a sequencer rebuild with new `H...,n<note>...i1Z` events, not necessarily as an immediate standalone `n...i1Z` command.
 
 ### UI/REPOSITORY — structural regressions
 
