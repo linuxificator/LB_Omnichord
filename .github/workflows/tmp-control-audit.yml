@@ -19,8 +19,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Apply refactor
-        run: python tools/tmp_apply_reverb_reset.py
+      - name: Fix helper duplicate-LFO assertion and apply refactor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('tools/tmp_apply_reverb_reset.py')
+          text = p.read_text()
+          old = '''replace_once(amy_serial, "                    f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\"\\n", "                    f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"\\n")\n# There are two identical lfo clamp snippets; replace second if still present.\ntext = amy_serial.read_text(encoding="utf-8")\ntext = text.replace("f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\"", "f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"")\n'''
+          new = '''text = amy_serial.read_text(encoding="utf-8")\nlfo_old = "f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\""\nif text.count(lfo_old) != 2:\n    raise RuntimeError(f"expected two LFO clamp sites, found {text.count(lfo_old)}")\ntext = text.replace(lfo_old, "f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"")\n'''
+          if old not in text:
+              raise SystemExit('temporary helper patch target missing')
+          p.write_text(text.replace(old, new, 1))
+          PY
+          python tools/tmp_apply_reverb_reset.py
       - name: Syntax and JSON checks
         run: |
           python -m py_compile \
