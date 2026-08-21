@@ -46,11 +46,17 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=8.0)
             lines = app.bridge.lines_since(switch_start)
 
+            stop = lines.index("zY0Z")
+            reset = lines.index("S4096Z")
             k3 = lines.index(f"K{other_patch}i3Z")
             k4 = lines.index(f"K{other_patch}i4Z")
-            reset = lines.index("S4096Z")
+            first_schedule = next(
+                index for index, line in enumerate(lines) if line.startswith("H")
+            )
+            self.assertLess(stop, reset)
+            self.assertLess(reset, k3)
             self.assertLess(k3, k4)
-            self.assertLess(k4, reset)
+            self.assertLess(k4, first_schedule)
 
             # A live rhythm refresh must define chord events against the
             # dedicated rhythm chord synth 4, never manual synth 3.
