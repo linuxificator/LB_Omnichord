@@ -4,7 +4,6 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 
 
 FRONTEND = Path(__file__).resolve().parents[1]
@@ -59,6 +58,7 @@ class InstrumentDefaultTests(unittest.TestCase):
         client._manual_active_id = None
         client._manual_active_notes = []
         client.rhythm_running = False
+        client._wire = lambda command: None
         return client
 
     def test_every_slider_has_explicit_physical_range(self) -> None:
@@ -248,26 +248,14 @@ class InstrumentDefaultTests(unittest.TestCase):
             ["K:3", "R7.5:3", "K:4", "R7.5:4"],
         )
 
-    def test_live_chord_instrument_transaction_preserves_phase(self) -> None:
+    def test_live_chord_instrument_change_does_not_rebuild_sequencer(self) -> None:
         client = self.bare_client()
         client.patch_map = {"juno_050": 50}
         client.rhythm_running = True
 
         calls: list[tuple[str, object]] = []
-
-        def prepare(*, reset_phase: bool):
-            calls.append(("prepare", reset_phase))
-            return 17, {"tempo": 108.0}
-
-        client._prepare_rhythm_rebuild = prepare
+        client._wire = lambda command: calls.append(("wire", command))
         client._configure_synth = lambda role: calls.append(("configure", role))
-        client.writer = SimpleNamespace(
-            delay=lambda seconds: calls.append(("delay", seconds))
-        )
-        client._rhythm_guard_seconds = lambda: 0.01
-        client._install_rhythm_schedule = (
-            lambda generation, config: calls.append(("install", generation))
-        )
 
         AmySerialClient._set_synth_state(
             client,
@@ -280,18 +268,21 @@ class InstrumentDefaultTests(unittest.TestCase):
 
         self.assertEqual(
             calls,
-            [
-                ("prepare", False),
-                ("configure", "chord"),
-                ("delay", 0.01),
-                ("install", 17),
-            ],
+            [("wire", "l0i4Z"), ("configure", "chord")],
+        )
+        self.assertFalse(
+            any(
+                command in {"zY0Z", "zY1Z", "S4096Z"}
+                for kind, command in calls
+                if kind == "wire"
+            )
         )
 
     def test_stopped_rhythm_is_not_rebuilt_on_chord_instrument_change(self) -> None:
         client = self.bare_client()
         client.patch_map = {"juno_050": 50}
         calls: list[tuple[str, object]] = []
+        client._wire = lambda command: calls.append(("wire", command))
         client._configure_synth = lambda role: calls.append(("configure", role))
 
         AmySerialClient._set_synth_state(
@@ -300,7 +291,10 @@ class InstrumentDefaultTests(unittest.TestCase):
             {"name": "juno_050", "params": ["resonance", 7.5]},
         )
 
-        self.assertEqual(calls, [("configure", "chord")])
+        self.assertEqual(
+            calls,
+            [("wire", "l0i4Z"), ("configure", "chord")],
+        )
 
 
 if __name__ == "__main__":
