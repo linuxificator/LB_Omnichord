@@ -1,0 +1,61 @@
+name: Temporary control range audit
+
+on:
+  push:
+    branches:
+      - feature/reverb-reset-and-control-safety
+    paths:
+      - '.github/workflows/tmp-control-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Audit synth control distributions
+        working-directory: amysynth_version/qt_frontend
+        run: |
+          python - <<'PY'
+          import json, math, statistics
+          from collections import defaultdict
+          from pathlib import Path
+
+          data = json.loads(Path('instruments/synths.json').read_text())
+          by_key = defaultdict(list)
+          for synth in data['synths']:
+              for c in synth['controls']:
+                  by_key[c['key']].append((float(c['default']), synth['label'], synth['key'], c))
+
+          def q(vals, p):
+              vals=sorted(vals)
+              if not vals: return None
+              i=(len(vals)-1)*p
+              lo=math.floor(i); hi=math.ceil(i)
+              if lo==hi: return vals[lo]
+              return vals[lo]*(hi-i)+vals[hi]*(i-lo)
+
+          for key in sorted(by_key):
+              rows=by_key[key]
+              vals=[v for v, *_ in rows]
+              print(f'CONTROL {key}: n={len(vals)} min={min(vals):.9g} q05={q(vals,.05):.9g} q50={q(vals,.5):.9g} q95={q(vals,.95):.9g} max={max(vals):.9g}')
+              for v,label,skey,c in sorted(rows, reverse=True)[:12]:
+                  print(f'  HIGH {v:.9g} {skey} {label} range=[{c["minimum"]},{c["maximum"]}] native={c.get("native_default")}')
+              print()
+
+          print('FILTER DEFAULTS >= 3000 Hz')
+          for v,label,skey,c in sorted(by_key.get('filter_hz', []), reverse=True):
+              if v >= 3000:
+                  print(f'  {v:.9g} {skey} {label} native={c.get("native_default")} range=[{c["minimum"]},{c["maximum"]}]')
+
+          cfg = Path('config/amy_config.json')
+          if cfg.exists():
+              raw=json.loads(cfg.read_text())
+              print('PATCH COMPATIBILITY')
+              print(json.dumps(raw.get('patch_compatibility', {}), indent=2))
+          PY
