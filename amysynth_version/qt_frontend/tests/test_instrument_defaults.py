@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 FRONTEND = Path(__file__).resolve().parents[1]
@@ -12,42 +13,7 @@ sys.path.insert(0, str(CODE))
 
 import main as omnichord  # noqa: E402
 from amy_serial import AmySerialClient  # noqa: E402
-
-
-class BackendHarness:
-    """Minimal non-QML harness for InstrumentBackend's synth-state methods."""
-
-    def __init__(self, synths: tuple[omnichord.SynthDefinition, ...]) -> None:
-        self._synths = synths
-        self._chord_synth = self._make_synth_runtime(0)
-        self._strum_synth = self._make_synth_runtime(0)
-        self._bass_synth = self._make_synth_runtime(0)
-        self.sent_roles: list[str] = []
-
-    def _make_synth_runtime(self, selected_index: int) -> omnichord.SynthRuntime:
-        return omnichord.SynthRuntime(
-            selected_index=selected_index,
-            values_by_synth=[
-                {
-                    control.key: control.default
-                    for control in synth.controls
-                }
-                for synth in self._synths
-            ],
-        )
-
-    def _fresh_synth_runtime(self, selected_index: int) -> omnichord.SynthRuntime:
-        return self._make_synth_runtime(selected_index)
-
-    def _runtime(self, role: str) -> omnichord.SynthRuntime:
-        if role == "chord":
-            return self._chord_synth
-        if role == "strum":
-            return self._strum_synth
-        return self._bass_synth
-
-    def _send_synth_params(self, role: str) -> None:
-        self.sent_roles.append(role)
+from synth_state import SynthState  # noqa: E402
 
 
 class InstrumentDefaultTests(unittest.TestCase):
@@ -70,6 +36,31 @@ class InstrumentDefaultTests(unittest.TestCase):
     def control_default(cls, synth: omnichord.SynthDefinition, key: str) -> float:
         return cls.control(synth, key).default
 
+    @staticmethod
+    def bare_client() -> AmySerialClient:
+        """Minimal receiver object for pure state-convergence unit tests."""
+        client = object.__new__(AmySerialClient)
+        client.selected_synth = {
+            "chord": "juno_000",
+            "strum": "juno_028",
+            "bass": "dx7_143",
+        }
+        client.synth_params = {"chord": {}, "strum": {}, "bass": {}}
+        client._adsr_override_active = {
+            "chord": False,
+            "strum": False,
+            "bass": False,
+        }
+        client.synth_id = {
+            "strum": 2,
+            "manual_chord": 3,
+            "rhythm_chord": 4,
+        }
+        client._manual_active_id = None
+        client._manual_active_notes = []
+        client.rhythm_running = False
+        return client
+
     def test_every_slider_has_explicit_physical_range(self) -> None:
         self.assertEqual(len(self.synths), 123)
         for synth in self.synths:
@@ -78,8 +69,6 @@ class InstrumentDefaultTests(unittest.TestCase):
                 self.assertGreaterEqual(control.default, control.minimum)
                 self.assertLessEqual(control.default, control.maximum)
 
-        # Sustain is a 0..1 level.  Zero must be the left edge, never the
-        # midpoint of a legacy -1..1 "native sentinel" range.
         for synth in self.synths:
             sustain = next(
                 (control for control in synth.controls if control.key == "sustain"),
@@ -103,79 +92,63 @@ class InstrumentDefaultTests(unittest.TestCase):
         )
 
     def test_four_edited_instruments_are_all_serialized_sparse(self) -> None:
-        values = [
-            {control.key: control.default for control in synth.controls}
-            for synth in self.synths
-        ]
+        state = SynthState(self.synths, 0)
         changed_keys = ["juno_007", "juno_008", "juno_068", "dx7_143"]
 
         for offset, key in enumerate(changed_keys, start=1):
             index = self.index_by_key[key]
+            self.assertTrue(state.select(index) or state.selected_index == index)
             synth = self.synths[index]
             control = self.control(synth, "attack_ms")
-            values[index]["attack_ms"] = min(
+            edited = min(
                 control.maximum,
                 control.default + 10.0 * offset,
             )
+            self.assertTrue(state.set_control("attack_ms", edited))
 
-        overrides = omnichord.collect_synth_parameter_overrides(self.synths, values)
+        overrides = state.sparse_overrides()
         self.assertEqual(set(overrides), set(changed_keys))
         for key in changed_keys:
             self.assertEqual(set(overrides[key]), {"attack_ms"})
 
     def test_slider_edit_survives_switch_away_and_back(self) -> None:
-        harness = BackendHarness(self.synths)
+        state = SynthState(self.synths, 0)
         piano_index = self.index_by_key["juno_007"]
         organ_index = self.index_by_key["juno_008"]
-        runtime = harness._chord_synth
 
-        runtime.selected_index = piano_index
-        original = runtime.values_by_synth[piano_index]["attack_ms"]
+        state.select(piano_index)
+        original = state.selected_values["attack_ms"]
         edited = original + 70.0
-        omnichord.InstrumentBackend._set_synth_control(
-            harness,
-            "chord",
-            "attack_ms",
-            edited,
-        )
+        self.assertTrue(state.set_control("attack_ms", edited))
 
-        runtime.selected_index = organ_index
-        runtime.selected_index = piano_index
-        self.assertEqual(runtime.values_by_synth[piano_index]["attack_ms"], edited)
-        self.assertEqual(harness.sent_roles, ["chord"])
+        self.assertTrue(state.select(organ_index))
+        self.assertTrue(state.select(piano_index))
+        self.assertEqual(state.selected_values["attack_ms"], edited)
 
     def test_sparse_preset_overlays_defaults_and_old_minus_one_is_unset(self) -> None:
-        harness = BackendHarness(self.synths)
+        state = SynthState(self.synths, 0)
         piano_key = "juno_007"
         piano = self.by_key[piano_key]
         default_attack = self.control_default(piano, "attack_ms")
         default_cutoff = self.control_default(piano, "filter_hz")
         edited_attack = default_attack + 80.0
 
-        data = {
-            "selected": piano_key,
-            "parameters": {
-                piano_key: {
-                    "attack_ms": edited_attack,
-                    "filter_hz": -1.0,
-                }
-            },
-        }
-
-        runtime = omnichord.InstrumentBackend._apply_synth_preset(
-            harness,
-            "chord",
-            data,
+        state.load_preset(
+            {
+                "selected": piano_key,
+                "parameters": {
+                    piano_key: {
+                        "attack_ms": edited_attack,
+                        "filter_hz": -1.0,
+                    }
+                },
+            }
         )
-        piano_index = self.index_by_key[piano_key]
-        values = runtime.values_by_synth[piano_index]
-        self.assertEqual(runtime.selected_index, piano_index)
-        self.assertEqual(values["attack_ms"], edited_attack)
-        self.assertEqual(values["filter_hz"], default_cutoff)
-
-        # A control absent from the sparse JSON must also be the instrument default.
+        self.assertEqual(state.selected_index, self.index_by_key[piano_key])
+        self.assertEqual(state.selected_values["attack_ms"], edited_attack)
+        self.assertEqual(state.selected_values["filter_hz"], default_cutoff)
         self.assertEqual(
-            values["release_ms"],
+            state.selected_values["release_ms"],
             self.control_default(piano, "release_ms"),
         )
 
@@ -195,46 +168,41 @@ class InstrumentDefaultTests(unittest.TestCase):
         self.assertEqual(commands, ["v0A,,,0.42,,i3Z"])
         self.assertFalse(any("F" in command or "R" in command for command in commands))
 
-    def test_full_parameter_message_applies_only_changed_key(self) -> None:
-        client = object.__new__(AmySerialClient)
-        client.synth_params = {
-            "chord": {
-                "filter_hz": 8999.7,
-                "resonance": 1.348,
-                "sustain": 1.0,
-            }
+    def test_full_state_message_applies_only_changed_key(self) -> None:
+        client = self.bare_client()
+        client.patch_map = {"juno_050": 50}
+        client.selected_synth["chord"] = "juno_050"
+        client.synth_params["chord"] = {
+            "filter_hz": 8999.7,
+            "resonance": 1.348,
+            "sustain": 1.0,
         }
-        client._adsr_override_active = {"chord": True}
+        client._adsr_override_active["chord"] = True
         applied: list[set[str] | None] = []
         client._apply_supported_params = (
             lambda role, parameter_keys=None: applied.append(parameter_keys)
         )
         client._configure_synth = lambda role: None
 
-        AmySerialClient._set_params(
+        AmySerialClient._set_synth_state(
             client,
             "chord",
-            [
-                "filter_hz", 8999.7,
-                "resonance", 1.348,
-                "sustain", 0.42,
-            ],
+            {
+                "name": "juno_050",
+                "params": [
+                    "filter_hz", 8999.7,
+                    "resonance", 1.348,
+                    "sustain", 0.42,
+                ],
+            },
         )
 
         self.assertEqual(applied, [{"sustain"}])
 
-
     def test_atomic_instrument_state_restores_edited_resonance(self) -> None:
-        client = object.__new__(AmySerialClient)
+        client = self.bare_client()
         client.patch_map = {"juno_050": 50}
-        client.selected_synth = {"chord": "juno_000"}
-        client.synth_params = {"chord": {"resonance": 0.93}}
-        client._adsr_override_active = {"chord": False}
-        client.synth_id = {
-            "strum": 2, "manual_chord": 3, "rhythm_chord": 4
-        }
-        client._manual_active_id = None
-        client._manual_active_notes = []
+        client.synth_params["chord"] = {"resonance": 0.93}
 
         configured: list[tuple[str, dict[str, float]]] = []
         client._configure_synth = lambda role: configured.append(
@@ -280,24 +248,25 @@ class InstrumentDefaultTests(unittest.TestCase):
             ["K:3", "R7.5:3", "K:4", "R7.5:4"],
         )
 
-
-    def test_live_rhythm_rebuilds_without_phase_reset_on_chord_instrument_change(self) -> None:
-        client = object.__new__(AmySerialClient)
+    def test_live_chord_instrument_transaction_preserves_phase(self) -> None:
+        client = self.bare_client()
         client.patch_map = {"juno_050": 50}
-        client.selected_synth = {"chord": "juno_000"}
-        client.synth_params = {"chord": {}}
-        client._adsr_override_active = {"chord": False}
-        client.synth_id = {
-            "strum": 2, "manual_chord": 3, "rhythm_chord": 4
-        }
-        client._manual_active_id = None
-        client._manual_active_notes = []
         client.rhythm_running = True
 
         calls: list[tuple[str, object]] = []
+
+        def prepare(*, reset_phase: bool):
+            calls.append(("prepare", reset_phase))
+            return 17, {"tempo": 108.0}
+
+        client._prepare_rhythm_rebuild = prepare
         client._configure_synth = lambda role: calls.append(("configure", role))
-        client._rebuild_rhythm = (
-            lambda *, reset_phase: calls.append(("rebuild", reset_phase))
+        client.writer = SimpleNamespace(
+            delay=lambda seconds: calls.append(("delay", seconds))
+        )
+        client._rhythm_guard_seconds = lambda: 0.01
+        client._install_rhythm_schedule = (
+            lambda generation, config: calls.append(("install", generation))
         )
 
         AmySerialClient._set_synth_state(
@@ -311,27 +280,19 @@ class InstrumentDefaultTests(unittest.TestCase):
 
         self.assertEqual(
             calls,
-            [("configure", "chord"), ("rebuild", False)],
+            [
+                ("prepare", False),
+                ("configure", "chord"),
+                ("delay", 0.01),
+                ("install", 17),
+            ],
         )
 
     def test_stopped_rhythm_is_not_rebuilt_on_chord_instrument_change(self) -> None:
-        client = object.__new__(AmySerialClient)
+        client = self.bare_client()
         client.patch_map = {"juno_050": 50}
-        client.selected_synth = {"chord": "juno_000"}
-        client.synth_params = {"chord": {}}
-        client._adsr_override_active = {"chord": False}
-        client.synth_id = {
-            "strum": 2, "manual_chord": 3, "rhythm_chord": 4
-        }
-        client._manual_active_id = None
-        client._manual_active_notes = []
-        client.rhythm_running = False
-
         calls: list[tuple[str, object]] = []
         client._configure_synth = lambda role: calls.append(("configure", role))
-        client._rebuild_rhythm = (
-            lambda *, reset_phase: calls.append(("rebuild", reset_phase))
-        )
 
         AmySerialClient._set_synth_state(
             client,
