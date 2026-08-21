@@ -37,7 +37,7 @@ def wait_for_health(process: subprocess.Popen[str], timeout: float = 20.0) -> No
         if process.poll() is not None:
             stdout, stderr = process.communicate(timeout=1)
             raise AssertionError(
-                f"Qt application exited early with {process.returncode}\n"
+                f"headless Qt application exited early with {process.returncode}\n"
                 f"stdout:\n{stdout}\nstderr:\n{stderr}"
             )
         try:
@@ -108,16 +108,11 @@ def main() -> int:
         env["HOME"] = str(home)
         env["PYTHONUNBUFFERED"] = "1"
         env["OMNICHORD_TEST_API_PORT"] = str(PORT)
-        env["QT_QPA_PLATFORM"] = "offscreen"
-        env["QT_QUICK_BACKEND"] = "software"
 
         process = subprocess.Popen(
             [
-                "xvfb-run",
-                "-a",
                 sys.executable,
                 str(TEST_APP),
-                "--windowed",
                 "--serial-port",
                 serial_port,
                 "--serial-baud",
@@ -182,7 +177,7 @@ def main() -> int:
             action("releaseChord", 1, 9)
             time.sleep(1.6)
 
-            print("Qt/AMY integration test passed")
+            print("Headless Qt/AMY integration test passed")
             return 0
         finally:
             stdout, stderr = terminate_process_group(process)
