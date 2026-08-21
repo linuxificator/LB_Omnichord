@@ -26,136 +26,131 @@ Item {
         root.controller.setReverbDamping(value)
     }
 
-    component PinkRow: Item {
-        id: row
+    // Reuse the large touch target and press/hold behavior of the section
+    // volume controls.  The three reverb controls are deliberately arranged
+    // side by side rather than as thin stacked horizontal sliders.
+    component PinkControl: Item {
+        id: control
+
         required property string labelText
         required property real currentValue
         required property var editFunction
 
         Text {
-            x: 6
-            width: 42
-            anchors.verticalCenter: parent.verticalCenter
-            text: row.labelText
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: 14
+
+            text: control.labelText
             color: "#6b3048"
             font.pixelSize: 10
             font.bold: true
-            horizontalAlignment: Text.AlignRight
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
         }
 
-        Slider {
-            id: slider
-            x: 54
-            width: parent.width - 96
-            anchors.verticalCenter: parent.verticalCenter
-            height: 22
-            from: 0
-            to: 1
-            stepSize: 0.01
-            value: row.currentValue
-            live: true
-            snapMode: Slider.SnapAlways
-            onMoved: row.editFunction(value)
-
-            background: Rectangle {
-                x: slider.leftPadding
-                y: slider.topPadding + slider.availableHeight / 2 - height / 2
-                width: slider.availableWidth
-                height: 6
-                radius: 3
-                color: "#e8b7ca"
-
-                Rectangle {
-                    width: slider.visualPosition * parent.width
-                    height: parent.height
-                    radius: 3
-                    color: "#d87fa5"
-                }
-            }
-
-            handle: Rectangle {
-                x: slider.leftPadding
-                   + slider.visualPosition * (slider.availableWidth - width)
-                y: slider.topPadding + slider.availableHeight / 2 - height / 2
-                width: 15
-                height: 15
-                radius: 8
-                color: "#fff7fb"
-                border.color: "#a75f7d"
-                border.width: 2
-            }
-        }
-
-        Text {
+        VerticalVolume {
+            anchors.left: parent.left
             anchors.right: parent.right
-            width: 36
-            anchors.verticalCenter: parent.verticalCenter
-            text: Number(row.currentValue).toFixed(2)
-            color: "#6b3048"
-            font.pixelSize: 9
-            horizontalAlignment: Text.AlignLeft
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.topMargin: 14
+
+            currentValue: control.currentValue
+            panelColor: "#f3c9d9"
+            panelBorderColor: "#bd7694"
+            fillColor: "#d36f99"
+            textColor: "#6b3048"
+
+            onEdited: function(value) {
+                control.editFunction(value)
+            }
         }
     }
 
-    Column {
-        x: 3
-        y: 3
-        width: parent.width - 72
-        height: parent.height - 6
-        spacing: 0
+    Row {
+        id: controlsRow
 
-        PinkRow {
-            width: parent.width
-            height: parent.height / 3
+        x: 4
+        y: 3
+        width: parent.width - 8
+        height: parent.height - 6
+        spacing: 4
+
+        PinkControl {
+            width: 94
+            height: parent.height
             labelText: "LEV"
             currentValue: root.controller.reverbLevel
             editFunction: root.updateLevel
         }
 
-        PinkRow {
-            width: parent.width
-            height: parent.height / 3
+        PinkControl {
+            width: 94
+            height: parent.height
             labelText: "LIVE"
             currentValue: root.controller.reverbLiveness
             editFunction: root.updateLiveness
         }
 
-        PinkRow {
-            width: parent.width
-            height: parent.height / 3
+        PinkControl {
+            width: 94
+            height: parent.height
             labelText: "DAMP"
             currentValue: root.controller.reverbDamping
             editFunction: root.updateDamping
         }
-    }
 
-    Button {
-        id: drumButton
-        width: 56
-        height: 56
-        x: parent.width - width - 8
-        anchors.verticalCenter: parent.verticalCenter
-        text: "DRM"
-        font.pixelSize: 12
-        font.bold: true
+        Item {
+            width: 56
+            height: parent.height
 
-        contentItem: Text {
-            text: drumButton.text
-            color: root.controller.reverbDrumsIncluded ? "#ffffff" : "#6b3048"
-            font: drumButton.font
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
+            Button {
+                id: drumButton
+
+                width: 56
+                height: 56
+                anchors.centerIn: parent
+
+                text: "DRM"
+                font.pixelSize: 12
+                font.bold: true
+
+                contentItem: Text {
+                    text: drumButton.text
+                    color:
+                        root.controller.reverbDrumsIncluded
+                        ? "#ffffff"
+                        : "#6b3048"
+                    font: drumButton.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                background: Rectangle {
+                    radius: width / 2
+                    color:
+                        root.controller.reverbDrumsIncluded
+                        ? "#b64f7a"
+                        : (
+                            drumButton.pressed
+                            ? "#d48aa8"
+                            : "#efbfd1"
+                        )
+                    border.color:
+                        root.controller.reverbDrumsIncluded
+                        ? "#7e294d"
+                        : "#b96e8d"
+                    border.width:
+                        root.controller.reverbDrumsIncluded
+                        ? 3
+                        : 2
+                }
+
+                onClicked:
+                    root.controller.toggleReverbDrums()
+            }
         }
-
-        background: Rectangle {
-            radius: width / 2
-            color: root.controller.reverbDrumsIncluded
-                   ? "#b64f7a"
-                   : (drumButton.pressed ? "#d48aa8" : "#efbfd1")
-            border.color: root.controller.reverbDrumsIncluded ? "#7e294d" : "#b96e8d"
-            border.width: root.controller.reverbDrumsIncluded ? 3 : 2
-        }
-
-        onClicked: root.controller.toggleReverbDrums()
     }
 }
