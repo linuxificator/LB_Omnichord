@@ -7,7 +7,7 @@ Sonic Pi is not used by this version.
 ## Layout
 
 - `code/` — Python application/backend (`main.py`, `amy_serial.py`)
-- `gui/` — QML interface components and directly rendered instrument watermarks
+- `gui/` — QML interface components and GUI assets
 - `config/` — serial/application defaults
 - `instruments/` — curated AMY Juno/DX7 catalogue and 18 factory presets
 - `music/` — chord, rhythm and intonation definitions
@@ -25,7 +25,7 @@ From this directory after creating the virtual environment described in `README_
 .venv/bin/python code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --windowed
 ```
 
-The canonical data and QML files live in their logical directories. `code/` contains canonical paths for the existing tested path lookups in `main.py`; this avoids changing application behaviour as part of the filesystem cleanup.
+`main.py` addresses the canonical `gui/`, `config/`, `instruments/` and `music/` directories directly. There are no compatibility symlinks or duplicate runtime data files in `code/`.
 
 ## Runtime AMY allocation
 
@@ -33,4 +33,4 @@ The host uses five independent AMY synth instances: drums, bass, strum, manually
 
 Rhythm timing is compiled into AMY's 48-PPQ sequencer; Linux/Python is not used as the beat clock.
 
-The tuba watermark no longer requires a PNG runtime asset. It is drawn directly by `gui/InstrumentWatermarks.qml` together with the other background instrument artwork.
+The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
