@@ -1,5 +1,0 @@
-{
-  "replaced_kill_node_calls": 7,
-  "replacement": "stop_synth_id(node)",
-  "ruby_syntax": "Syntax OK"
-}
