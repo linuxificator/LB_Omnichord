@@ -15,14 +15,14 @@ def parameter_signature(commands: list[str], prefix: str) -> list[str]:
     return values
 
 
-def normalized_chord_synth(commands: list[str], synth: int) -> list[str]:
+def normalized_chord_synth(commands: list[str]) -> list[str]:
     result: list[str] = []
     for command in commands:
         # Manual chords intentionally have 7 voices while rhythm chords have 4.
-        # The per-voice timbre must nevertheless be identical.
-        command = re.sub(rf"i{int(synth)}iv\d+", "i#iv#", command)
-        command = re.sub(rf"i{int(synth)}(?=[A-Za-zZ]|$)", "i#", command)
-        result.append(command)
+        # get_synth_commands() omits the synth number itself, so voice-pool size
+        # is the only allocation difference to remove. Everything describing
+        # the per-voice oscillator/timbre remains compared exactly.
+        result.append(re.sub(r"iv\d+", "iv#", command, count=1))
     return result
 
 
@@ -44,8 +44,8 @@ class NativeControlTests(unittest.TestCase):
             before3 = app.bridge.synth_commands(3)
             before4 = app.bridge.synth_commands(4)
             self.assertEqual(
-                normalized_chord_synth(before3, 3),
-                normalized_chord_synth(before4, 4),
+                normalized_chord_synth(before3),
+                normalized_chord_synth(before4),
                 "manual and rhythm chord timbres already differ before edit",
             )
             before_filter3 = (
@@ -90,8 +90,8 @@ class NativeControlTests(unittest.TestCase):
                 "native AMY filter state changed on rhythm Repeater synth",
             )
             self.assertEqual(
-                normalized_chord_synth(after3, 3),
-                normalized_chord_synth(after4, 4),
+                normalized_chord_synth(after3),
+                normalized_chord_synth(after4),
                 "manual and rhythm chord timbres diverged after Sustain edit",
             )
             app.bridge.checkpoint("repeater-sustain")
