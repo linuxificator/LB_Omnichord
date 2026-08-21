@@ -77,6 +77,8 @@ The checked-in project configuration was generated with ESP-IDF **6.0.2**. The C
 
 AMY follows current upstream `shorepine/amy` `main` by default. To build against a specific AMY commit, set `AMY_REF` before running `prepare_amy.sh`.
 
+The short-DMA scheduling fix from upstream AMY PR #1119 is required by this target. `prepare_amy.sh` checks that the selected AMY revision contains that merged fix; it does **not** carry the older local workaround that removed `vTaskDelay()`.
+
 ## Ubuntu: install ESP-IDF 6.0.2
 
 The following is the normal native development setup.
@@ -153,15 +155,19 @@ The script:
 3. changes AMY to a 128-sample block at 48 kHz;
 4. selects Philips I2S framing for the PCM5102A;
 5. uses two DMA descriptors with 64 frames each;
-6. fixes the FreeRTOS task entry-point signatures required by current ESP-IDF;
-7. writes the ESP-IDF component `CMakeLists.txt` used by this project;
-8. prints the exact AMY commit that was prepared.
+6. verifies that the selected AMY contains the merged #1119 short-DMA scheduling fix;
+7. fixes FreeRTOS task entry-point signatures when required by the selected upstream revision;
+8. enables the P4-only shared-aux-reverb implementation;
+9. writes the ESP-IDF component `CMakeLists.txt` used by this project;
+10. prints the exact AMY commit that was prepared.
 
 To build a specific AMY commit instead of current `main`:
 
 ```bash
 AMY_REF=<40-character-commit-sha> bash prepare_amy.sh
 ```
+
+A deliberately old commit from before AMY PR #1119 will be rejected because its render-task scheduling is not compatible with the short 2×64 DMA ring used here.
 
 ## Build
 
@@ -256,11 +262,11 @@ The workflow has concurrency cancellation enabled, so a newer commit to the same
 
 ## Current AMY target modifications
 
-The firmware currently deliberately differs from stock upstream AMY in these areas:
+The firmware deliberately differs from stock upstream AMY only in target-specific areas. `prepare_amy.sh` applies these changes after cloning current upstream `main`.
 
 ### 48 kHz, 128-sample blocks
 
-Stock AMY normally builds with 256-sample blocks at 44.1 kHz on this path. `prepare_amy.sh` changes it to:
+Stock AMY normally builds with 256-sample blocks at 44.1 kHz on this path. This target uses:
 
 ```text
 AMY_SAMPLE_RATE = 48000
@@ -268,7 +274,9 @@ AMY_BLOCK_SIZE  = 128
 BLOCK_SIZE_BITS = 7
 ```
 
-### I2S
+This 128-sample block size is intentional: it is the best performance/latency operating point established by the ESP32-P4 tests for this project.
+
+### I2S and DMA
 
 The external PCM5102A uses Philips I2S framing. The firmware uses:
 
@@ -286,24 +294,65 @@ dma_desc_num  = 2
 dma_frame_num = AMY_BLOCK_SIZE / 2 = 64
 ```
 
+Current upstream AMY contains the merged #1119 fix that only yields the max-priority audio task when rendering really exceeds the block budget and I2S did not block. That upstream logic is retained unchanged.
+
+### Shared aux reverb
+
+The Omnichord keeps four separate dry AMY buses for role isolation:
+
+```text
+bus 0 = drums
+bus 1 = bass
+bus 2 = strum
+bus 3 = chords
+```
+
+EQ, chorus, echo, bus volume, and patch isolation therefore remain per bus. Reverb is different: the P4 target compiles AMY with `AMY_SHARED_REVERB=1` and uses **one** stereo room reverb as an aux effect for all four buses.
+
+The native AMY wire syntax is unchanged:
+
+```text
+yNh<level>,<liveness>,<damping>Z
+```
+
+On this P4 build:
+
+- `N` still selects the source bus;
+- `level` is that bus's send gain into the shared room;
+- `liveness` and `damping` configure the single shared room;
+- the Qt frontend sends the user reverb level to bass, strum, and chord buses;
+- the drum send is zero when DRM is off and follows the same user level when DRM is on.
+
+The audio path is:
+
+```text
+bus EQ/chorus/echo
+        |
+        +-------------------------------> dry final mix
+        |
+        +-- post-fader reverb send --\
+        +-- post-fader reverb send ---+--> one stereo reverb --> wet return
+        +-- post-fader reverb send ---+
+        +-- DRM-gated drum send ------/
+```
+
+The send is formed after each bus's volume scaling, so lowering a role volume also lowers the amount of that role entering the room. AMY runs the reverb engine exactly once per 128-sample block and adds only its wet return to the normal dry mix. Reverb tails continue to run when the current input block is silent.
+
+This removes the previous failure mode where enabling reverb on several buses attempted to allocate several complete reverb delay networks. One AMY stereo reverb contains 27,648 delay samples (about 111 kB of sample storage when `SAMPLE` is 32-bit), plus small state/scratch allocations; four independent instances would require roughly four times the delay storage and four reverb DSP passes per audio block.
+
 ### LP-core UART
 
 The low-power core receives the 1 Mbaud serial stream on GPIO15. Complete messages are placed into a shared ring and signalled to the HP side through the ESP32-P4 LP mailbox. A high-priority HP FreeRTOS task then calls `amy_add_message()`.
 
 The UART forwarding task runs one priority below AMY's render task, so audio rendering can preempt command forwarding.
 
-## Reverb/delay memory note
+## Delay memory / PSRAM note
 
-AMY exposes a separate `ram_caps_delay` allocator for echo/reverb delay lines. This is important on the ESP32-P4 because multiple reverb instances allocate large delay buffers.
+AMY exposes a separate `ram_caps_delay` allocator for echo and reverb delay lines. The checked-in `sdkconfig` currently has ESP PSRAM disabled, so the generic ESP-IDF AMY defaults allocate these delay lines from normal/default-capability RAM.
 
-At the time this README was introduced, the checked-in `sdkconfig` still had ESP PSRAM disabled, so AMY's generic ESP-IDF default uses normal/default-capability RAM for delay lines. If the firmware is configured to use multiple independent AMY bus reverbs, that can exhaust internal memory and produce messages such as:
+The shared-reverb design means room reverb no longer needs one large allocation per musical bus. This should make the current internal-RAM configuration practical for the room effect while preserving the four-bus architecture.
 
-```text
-unable to alloc delay line of 4096 samples
-init_stereo_reverb: allocation failed, reverb disabled
-```
-
-The runtime reverb-memory configuration should therefore be treated as a separate target configuration issue rather than worked around in the Qt frontend. Once PSRAM is enabled for this board, large AMY delay allocations can be explicitly placed in PSRAM while keeping render-critical state in internal RAM.
+PSRAM can still be enabled later and selected for large delay/effect storage if measurements show that echo, chorus, future effects, or sample caching need more memory. Render-critical AMY state can remain in internal RAM while bulk delay/sample storage uses PSRAM.
 
 ## Cleaning generated files
 
