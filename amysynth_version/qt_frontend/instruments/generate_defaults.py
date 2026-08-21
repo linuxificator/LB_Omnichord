@@ -25,6 +25,27 @@ PATCH_LINE = re.compile(
 )
 NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
 
+# -1 used to mean "leave the factory patch unchanged".  Defaults are now
+# explicit for every instrument, so that sentinel must not be part of the UI
+# range.  These are the actual lower bounds accepted by the AMY translation
+# layer for the exposed controls.
+CONTROL_MINIMUMS: dict[str, float] = {
+    "filter_hz": 20.0,
+    "resonance": 0.51,
+    "lfo_hz": 0.01,
+    "vibrato_depth": 0.0,
+    "filter_lfo_depth": 0.0,
+    "pulse_width": 0.05,
+    "pwm_depth": 0.0,
+    "portamento_ms": 0.0,
+    "attack_ms": 0.0,
+    "decay_ms": 0.0,
+    "sustain": 0.0,
+    "release_ms": 0.0,
+    "algorithm": 1.0,
+    "feedback": 0.0,
+}
+
 
 def c_unescape(text: str) -> str:
     return bytes(text, "utf-8").decode("unicode_escape")
@@ -90,14 +111,36 @@ def clamp(value: float, minimum: float, maximum: float) -> float:
 
 def juno_native(patch: str) -> dict[str, float]:
     parts = commands(patch)
-    lfo = next((part for part in parts if part.startswith("v1") and "f" in part), None)
-    pulse = next((part for part in parts if part.startswith("v2") and "f" in part and "d" in part), None)
+    lfo = next(
+        (part for part in parts if part.startswith("v1") and "f" in part),
+        None,
+    )
+    pulse = next(
+        (
+            part
+            for part in parts
+            if part.startswith("v2") and "f" in part and "d" in part
+        ),
+        None,
+    )
     filt = first_command(parts, "v0F")
     amp = first_command(parts, "v0a")
 
-    lfo_values = csv_after(lfo, "f", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
-    pitch_values = csv_after(pulse, "f", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
-    duty_values = csv_after(pulse, "d", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+    lfo_values = csv_after(
+        lfo,
+        "f",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+    )
+    pitch_values = csv_after(
+        pulse,
+        "f",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+    )
+    duty_values = csv_after(
+        pulse,
+        "d",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+    )
     filter_values = csv_after(filt, "F", "R")
     amp_values = csv_after(amp, "A", "B")
 
@@ -121,7 +164,11 @@ def dx7_native(patch: str) -> dict[str, float]:
     parts = commands(patch)
     lfo = first_command(parts, "v1")
     algo = first_command(parts, "v0")
-    lfo_values = csv_after(lfo, "f", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
+    lfo_values = csv_after(
+        lfo,
+        "f",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+    )
     pitch_values = csv_after(algo, "f", "b")
     algorithm_match = re.search(r"o(\d+)$", algo or "")
     return {
@@ -221,25 +268,35 @@ def populate(catalog: dict, patches: dict[int, str]) -> None:
 
         for key, value in defaults.items():
             control = controls[key]
+            control["minimum"] = CONTROL_MINIMUMS[key]
             control["default"] = clamp(
                 value,
                 float(control["minimum"]),
                 float(control["maximum"]),
             )
 
-    catalog["schema_version"] = max(4, int(catalog.get("schema_version", 0)))
+    catalog["schema_version"] = max(5, int(catalog.get("schema_version", 0)))
     catalog["source"]["slider_defaults"] = (
         "Native AMY factory patch values where directly mappable; "
-        "musical VCA envelope profiles/corrections documented in README_defaults.md"
+        "musical VCA envelope profiles/corrections documented in "
+        "README_defaults.md; UI ranges use physical control minima and no "
+        "longer expose the legacy -1 sentinel"
     )
 
 
 def main() -> int:
     if len(sys.argv) not in (2, 3):
-        print(f"usage: {Path(sys.argv[0]).name} PATCHES_H [SYNTHS_JSON]", file=sys.stderr)
+        print(
+            f"usage: {Path(sys.argv[0]).name} PATCHES_H [SYNTHS_JSON]",
+            file=sys.stderr,
+        )
         return 2
     patches_path = Path(sys.argv[1])
-    catalog_path = Path(sys.argv[2]) if len(sys.argv) == 3 else Path(__file__).with_name("synths.json")
+    catalog_path = (
+        Path(sys.argv[2])
+        if len(sys.argv) == 3
+        else Path(__file__).with_name("synths.json")
+    )
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     populate(catalog, load_patch_commands(patches_path))
     catalog_path.write_text(
