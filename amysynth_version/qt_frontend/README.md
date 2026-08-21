@@ -31,13 +31,19 @@ From this directory after creating the virtual environment described in `README_
 
 Synth state is intentionally object-oriented and single-path.
 
-`code/synth_state.py` defines `SynthState`, which owns one logical role's selected instrument and all per-instrument slider values. The same object handles catalogue defaults, preset overlays, instrument switches, UI slider edits, QML control-model values, complete transport payloads, state copying and sparse preset serialization.
+`code/synth_state.py` defines `SynthState`, which owns one logical role's selected instrument and all per-instrument slider values. The same object handles catalogue defaults, preset overlays, instrument switches, UI slider edits, QML control-model values, transport payloads, state copying and sparse preset serialization.
 
-`InstrumentBackend` therefore does not maintain a second slider/preset dictionary. Startup, preset loading, instrument selection and UI edits mutate the role's `SynthState` and publish the same complete logical state. A UI slider edit is not a special parameter packet: it modifies `SynthState`, then sends the same complete state representation used after preset and instrument changes.
+`InstrumentBackend` therefore does not maintain a second slider/preset dictionary. Startup, preset loading, instrument selection and UI edits mutate the role's `SynthState` and publish the same logical state. A UI slider edit is not a special parameter packet: it modifies `SynthState`, then follows the same state-convergence path used after preset and instrument changes.
 
-On the receiver side, `AmySerialClient._apply_synth_state()` is the normal convergence point. It compares the incoming complete state with current AMY-side state and decides whether to load a patch or emit only the parameters that changed. The old name-only and parameter-only handlers exist only as compatibility adapters into that method. For the chord role, both manual synth 3 and rhythm synth 4 are derived from this one logical state.
+The catalogue distinguishes an AMY `native_default` from the application/UI `default`. If both are equal, AMY's factory patch remains authoritative and that control is omitted from the engine-override payload. Application corrections, stored preset overrides and user edits are sent explicitly. On the receiver side, `AmySerialClient._apply_synth_state()` is the single normal convergence point; if an override is removed, it reloads the patch and reapplies the remaining overrides so the native value is restored deterministically.
 
-When automatic rhythm chords start, the current chord parameters are explicitly reasserted on rhythm synth 4 after the sequencer-reset guard and before the new automatic chord events are installed. This prevents startup/preset state from diverging at the ESP32-P4 audio-block boundary.
+For the chord role, manual synth 3 and rhythm synth 4 are derived from this one logical state. When automatic rhythm chords start, only actual engine overrides are reasserted on rhythm synth 4 after the sequencer-reset guard and before automatic chord events are installed. Native factory coefficients are not redundantly rewritten.
+
+## Control units
+
+Frequency controls display real frequencies in Hz and use logarithmic slider travel. For Juno patches, `VCF base` is specifically the constant/base term of AMY's filter-frequency control model; the instantaneous cutoff also depends on note tracking, envelope and modulation coefficients stored in the factory patch. For example, Chorus Vibes has a native VCF base of about 27 Hz, but that does not mean its audible filter is fixed at 27 Hz.
+
+Time controls display milliseconds, resonance displays Q, and modulation depths retain their documented physical/domain units. If a MIDI-note-valued control is exposed, the UI formats it as a note name and octave such as `C4` or `F♯3`, not as a raw MIDI integer.
 
 ## Runtime AMY allocation
 
