@@ -63,10 +63,6 @@ Item {
                 if (initialized && !syncingFromBackend && currentIndex >= 0)
                     root.controller.setRhythmIndex(currentIndex)
             }
-
-            // A short tap on the visible item above/below the centre selects
-            // that item. TapHandler's drag threshold leaves normal flick/swipe
-            // gestures to the Tumbler.
         }
         Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -82,12 +78,22 @@ Item {
             id: transportSymbol
             anchors.fill: parent
             onPaint: {
-                const c = getContext("2d"); c.reset()
+                const c = getContext("2d")
+                c.reset()
+                // Canvas is persistent across paints. Erase the previous stop
+                // square/play triangle before drawing the new transport state.
+                c.clearRect(0, 0, width, height)
                 c.fillStyle = root.controller.rhythmRunning ? "#fff8d5" : "#3e3006"
                 if (root.controller.rhythmRunning) {
-                    const side = 19; c.fillRect((width-side)/2, (height-side)/2, side, side)
+                    const side = 19
+                    c.fillRect((width-side)/2, (height-side)/2, side, side)
                 } else {
-                    c.beginPath(); c.moveTo(width/2-9,height/2-14); c.lineTo(width/2+15,height/2); c.lineTo(width/2-9,height/2+14); c.closePath(); c.fill()
+                    c.beginPath()
+                    c.moveTo(width/2-9,height/2-14)
+                    c.lineTo(width/2+15,height/2)
+                    c.lineTo(width/2-9,height/2+14)
+                    c.closePath()
+                    c.fill()
                 }
             }
         }
@@ -130,7 +136,6 @@ Item {
             width: parent.width - x
             height: parent.height
 
-            // Three independently framed groups, staggered vertically.
             ActivitySelector {
                 x: 0
                 y: 0
