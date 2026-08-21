@@ -17,7 +17,7 @@ from PySide6.QtCore import QObject, Property, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
-from amy_serial import AmySerialClient, load_amy_config
+from amy_serial import AmyLocalClient, AmySerialClient, load_amy_config
 from control_limits import bounded_control_range, clamp_control_value
 from synth_state import SynthState
 
@@ -3573,6 +3573,14 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Override serial.baud from amy_config.json.",
     )
+    parser.add_argument(
+        "--local-amy",
+        action="store_true",
+        help=(
+            "Run AMY in this Python process using the installed upstream "
+            "amy/c_amy package instead of sending wire commands over UART."
+        ),
+    )
 
     window_group = parser.add_mutually_exclusive_group()
     window_group.add_argument(
@@ -3875,18 +3883,28 @@ def main() -> int:
         "panic": args.panic_address,
     }
 
-    print(
-        "AMY serial backend: "
-        f"{amy_config['serial']['port']} @ "
-        f"{amy_config['serial']['baud']} baud",
-        file=sys.stderr,
-        flush=True,
-    )
-
-    amy_client = AmySerialClient(
-        config=amy_config,
-        addresses=address_map,
-    )
+    if args.local_amy:
+        print(
+            "AMY backend: local in-process desktop AMY",
+            file=sys.stderr,
+            flush=True,
+        )
+        amy_client = AmyLocalClient(
+            config=amy_config,
+            addresses=address_map,
+        )
+    else:
+        print(
+            "AMY serial backend: "
+            f"{amy_config['serial']['port']} @ "
+            f"{amy_config['serial']['baud']} baud",
+            file=sys.stderr,
+            flush=True,
+        )
+        amy_client = AmySerialClient(
+            config=amy_config,
+            addresses=address_map,
+        )
 
     backend = InstrumentBackend(
         chords=chords,

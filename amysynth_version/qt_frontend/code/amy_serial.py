@@ -428,6 +428,63 @@ class _SerialWriter:
         self.serial.close()
 
 
+class _LocalAmyWriter(_SerialWriter):
+    """Use the same priority/generation queue against in-process AMY."""
+
+    def __init__(self, debug_log: _DebugLog | None = None) -> None:
+        from collections import deque
+
+        try:
+            import amy as amy_module  # type: ignore
+            import c_amy  # type: ignore
+        except ImportError as exc:
+            raise RuntimeError(
+                "Local AMY mode requires the upstream AMY Python package; "
+                "install it into this virtual environment with `pip install .` "
+                "from a shorepine/amy checkout."
+            ) from exc
+
+        self.debug_log = debug_log
+        self._amy = amy_module
+        self._c_amy = c_amy
+        # Current upstream live() owns the platform audio backend. Do not load
+        # AMY's default MIDI synths: the Omnichord allocates its own synths 0..4.
+        self._amy.live(default_synths=0)
+
+        self._high = deque()
+        self._low = deque()
+        self._lane_generation: dict[str, int] = {}
+        self._closed = False
+        self._condition = threading.Condition()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="amy-local-writer",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def _write(self, command: str, lane: str) -> None:
+        command = command.strip()
+        if not command.endswith("Z"):
+            command += "Z"
+        if self.debug_log is not None:
+            self.debug_log.write(f"TX-{lane}", command)
+        self._amy.send_wire(command)
+
+    def close(self) -> None:
+        with self._condition:
+            if self._closed:
+                return
+            for lane in list(self._lane_generation):
+                self._lane_generation[lane] += 1
+            self._low.clear()
+            self._closed = True
+            self._condition.notify_all()
+
+        self._thread.join(timeout=1.0)
+        self._c_amy.stop()
+
+
 class _TaggedSequencerLane:
     """One logical AMY sequencer lane backed by a reserved user-tag range.
 
@@ -519,6 +576,8 @@ class AmySerialClient:
         self,
         config: dict[str, Any],
         addresses: dict[str, str],
+        *,
+        writer_factory: Any | None = None,
     ) -> None:
         self.config = config
         self.addr = addresses
@@ -529,13 +588,16 @@ class AmySerialClient:
                 f"AMY command log: {self.debug_log.path}",
                 flush=True,
             )
-        serial_cfg = config["serial"]
-        self.writer = _SerialWriter(
-            str(serial_cfg["port"]),
-            int(serial_cfg["baud"]),
-            float(serial_cfg.get("write_timeout", 0.5)),
-            self.debug_log,
-        )
+        if writer_factory is None:
+            serial_cfg = config["serial"]
+            self.writer = _SerialWriter(
+                str(serial_cfg["port"]),
+                int(serial_cfg["baud"]),
+                float(serial_cfg.get("write_timeout", 0.5)),
+                self.debug_log,
+            )
+        else:
+            self.writer = writer_factory(self.debug_log)
 
         ids = config["synth_ids"]
         self.synth_id = {
@@ -1598,3 +1660,18 @@ class AmySerialClient:
         finally:
             self.writer.close()
             self.debug_log.close()
+
+
+class AmyLocalClient(AmySerialClient):
+    """Run the unchanged Omnichord wire backend against local desktop AMY."""
+
+    def __init__(
+        self,
+        config: dict[str, Any],
+        addresses: dict[str, str],
+    ) -> None:
+        super().__init__(
+            config=config,
+            addresses=addresses,
+            writer_factory=_LocalAmyWriter,
+        )
