@@ -900,7 +900,8 @@ class AmySerialClient:
         self._bump_synth_generation(synth)
         patch = self._patch(role)
         bus = self._bus_for_synth(synth)
-        if synth in self._configured_synths:
+        already_configured = synth in self._configured_synths
+        if already_configured:
             # The synth already owns its dedicated bus. Current AMY preserves
             # that bus across a repatch, so patch-level EQ/chorus remain local.
             self._wire(f"l0i{synth}Z")
@@ -927,6 +928,19 @@ class AmySerialClient:
         # this role's room after the patch is loaded. Other role buses are not
         # touched.
         self._apply_reverb_bus(bus)
+
+        if already_configured:
+            # A ROM repatch is not a cheap parameter edit in AMY: it releases,
+            # resets and reallocates the voice's oscillator block.  Keep the
+            # next patch transaction out of the same audio-block burst.  This
+            # is especially important during startup/preset restore, where the
+            # chord, strum and bass patches are otherwise queued back-to-back.
+            guard_ms = float(
+                self.config.get("performance", {}).get(
+                    "synth_alloc_guard_ms", 10.0
+                )
+            )
+            self.writer.delay(max(0.0, guard_ms) / 1000.0)
 
     def _configure_synth(self, role: str) -> None:
         # Keep each patch load and its complete parameter restore adjacent in
