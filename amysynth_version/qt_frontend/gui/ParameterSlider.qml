@@ -14,8 +14,40 @@ Item {
 
     signal edited(string key, real value)
 
+    function isLogScale() {
+        return String(root.control.scale || "linear") === "log"
+    }
+
+    function controlToSlider(value) {
+        var numeric = Number(value)
+        if (!isLogScale())
+            return numeric
+        var minimum = Math.max(Number(root.control.minimum), 1e-12)
+        return Math.log(Math.max(numeric, minimum))
+    }
+
+    function sliderToControl(value) {
+        return isLogScale() ? Math.exp(Number(value)) : Number(value)
+    }
+
+    function midiNoteName(value) {
+        var rounded = Math.round(Number(value))
+        var names = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
+        var note = ((rounded % 12) + 12) % 12
+        var octave = Math.floor(rounded / 12) - 1
+        return names[note] + octave
+    }
+
+    function formattedValue(value) {
+        var unit = String(root.control.unit || "")
+        if (unit === "note")
+            return midiNoteName(value)
+        var text = Number(value).toFixed(Number(root.control.decimals))
+        return unit.length > 0 ? text + " " + unit : text
+    }
+
     function syncSliderValue() {
-        slider.value = Number(root.control.value)
+        slider.value = controlToSlider(root.control.value)
     }
 
     onControlChanged: syncSliderValue()
@@ -28,8 +60,8 @@ Item {
         text:
             root.control.label
             + " "
-            + Number(slider.value).toFixed(
-                root.control.decimals
+            + root.formattedValue(
+                root.sliderToControl(slider.value)
             )
 
         color: root.textColor
@@ -46,9 +78,18 @@ Item {
         anchors.bottom: parent.bottom
         height: 28
 
-        from: Number(root.control.minimum)
-        to: Number(root.control.maximum)
-        stepSize: Number(root.control.step)
+        from:
+            root.isLogScale()
+            ? Math.log(Math.max(Number(root.control.minimum), 1e-12))
+            : Number(root.control.minimum)
+        to:
+            root.isLogScale()
+            ? Math.log(Math.max(Number(root.control.maximum), 1e-12))
+            : Number(root.control.maximum)
+        stepSize:
+            root.isLogScale()
+            ? 0
+            : Number(root.control.step)
         live: true
 
         Component.onCompleted:
@@ -57,7 +98,7 @@ Item {
         onMoved:
             root.edited(
                 root.control.key,
-                value
+                root.sliderToControl(value)
             )
 
         background: Rectangle {

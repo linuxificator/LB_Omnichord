@@ -46,6 +46,26 @@ CONTROL_MINIMUMS: dict[str, float] = {
     "feedback": 0.0,
 }
 
+# Human-facing presentation belongs to the control definition rather than QML
+# key-specific conditionals.  Frequency controls display Hz and use a
+# logarithmic travel, matching how frequency is perceived.
+CONTROL_DISPLAY: dict[str, tuple[str, str, str]] = {
+    "filter_hz": ("VCF base", "Hz", "log"),
+    "resonance": ("Resonance", "Q", "linear"),
+    "lfo_hz": ("LFO rate", "Hz", "log"),
+    "vibrato_depth": ("Vibrato", "oct", "linear"),
+    "filter_lfo_depth": ("VCF LFO", "oct", "linear"),
+    "pulse_width": ("Pulse width", "", "linear"),
+    "pwm_depth": ("PWM depth", "", "linear"),
+    "portamento_ms": ("Portamento", "ms", "linear"),
+    "attack_ms": ("Attack", "ms", "linear"),
+    "decay_ms": ("Decay", "ms", "linear"),
+    "sustain": ("Sustain", "", "linear"),
+    "release_ms": ("Release", "ms", "linear"),
+    "algorithm": ("Algorithm", "", "linear"),
+    "feedback": ("Feedback", "", "linear"),
+}
+
 
 def c_unescape(text: str) -> str:
     return bytes(text, "utf-8").decode("unicode_escape")
@@ -226,6 +246,11 @@ def apply_juno_musical_corrections(label: str, values: dict[str, float]) -> None
     if label in {"Harpsichord 1", "Harpsichord 2"}:
         # Keep the plucked decay, but avoid a waveform-phase click at note-on.
         values["attack_ms"] = 20.0
+        if label == "Harpsichord 1":
+            # Keep the UI default consistent with the P4 stability correction
+            # applied immediately after AMY factory patch 68 is loaded.
+            values["filter_hz"] = 16000.0
+            values["resonance"] = 4.0
     elif label == "Orchestral Pad":
         values.update(
             attack_ms=600.0,
@@ -250,10 +275,12 @@ def populate(catalog: dict, patches: dict[int, str]) -> None:
         label = str(synth["label"])
 
         if engine == "Juno":
-            defaults = juno_native(patch)
+            native_defaults = juno_native(patch)
+            defaults = dict(native_defaults)
             apply_juno_musical_corrections(label, defaults)
         elif engine == "DX7":
-            defaults = dx7_native(patch)
+            native_defaults = dx7_native(patch)
+            defaults = dict(native_defaults)
             defaults.update(dx7_envelope(label))
         else:
             raise ValueError(f"unsupported engine {engine!r} for {synth['key']}")
@@ -269,18 +296,26 @@ def populate(catalog: dict, patches: dict[int, str]) -> None:
         for key, value in defaults.items():
             control = controls[key]
             control["minimum"] = CONTROL_MINIMUMS[key]
-            control["default"] = clamp(
-                value,
-                float(control["minimum"]),
-                float(control["maximum"]),
+            minimum = float(control["minimum"])
+            maximum = float(control["maximum"])
+            native_value = native_defaults.get(key)
+            control["native_default"] = (
+                None
+                if native_value is None
+                else clamp(native_value, minimum, maximum)
             )
+            control["default"] = clamp(value, minimum, maximum)
+            label_text, unit, scale = CONTROL_DISPLAY[key]
+            control["label"] = label_text
+            control["unit"] = unit
+            control["scale"] = scale
 
     catalog["schema_version"] = max(5, int(catalog.get("schema_version", 0)))
     catalog["source"]["slider_defaults"] = (
-        "Native AMY factory patch values where directly mappable; "
-        "musical VCA envelope profiles/corrections documented in "
-        "README_defaults.md; UI ranges use physical control minima and no "
-        "longer expose the legacy -1 sentinel"
+        "Native AMY factory values are retained separately from application "
+        "defaults so unchanged native controls are not retransmitted; musical "
+        "VCA corrections are documented in README_defaults.md; frequency "
+        "controls display Hz with logarithmic slider travel"
     )
 
 

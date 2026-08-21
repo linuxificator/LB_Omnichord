@@ -133,10 +133,13 @@ class SynthControl:
     label: str
     group: str
     default: float
+    native_default: float | None
     minimum: float
     maximum: float
     step: float
     decimals: int
+    unit: str
+    scale: str
 
 
 @dataclass(frozen=True)
@@ -435,10 +438,17 @@ def load_synth_catalog(
                 label=str(control["label"]),
                 group=str(control["group"]),
                 default=float(control["default"]),
+                native_default=(
+                    None
+                    if control.get("native_default") is None
+                    else float(control["native_default"])
+                ),
                 minimum=float(control["minimum"]),
                 maximum=float(control["maximum"]),
                 step=float(control["step"]),
                 decimals=int(control["decimals"]),
+                unit=str(control.get("unit", "")),
+                scale=str(control.get("scale", "linear")),
             )
             for control in raw_synth["controls"]
         )

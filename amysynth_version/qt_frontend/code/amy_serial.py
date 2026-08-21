@@ -976,6 +976,7 @@ class AmySerialClient:
         old_params = dict(self.synth_params[role])
         new_params = dict(params)
         changed_keys = self._changed_param_keys(old_params, new_params)
+        removed_keys = set(old_params) - set(new_params)
         name_changed = force_patch or self.selected_synth[role] != name
         was_active = self._adsr_override_active.get(role, False)
 
@@ -983,9 +984,16 @@ class AmySerialClient:
             self._cancel_strum_tail()
             self._wire(f"l0i{self.synth_id['strum']}Z")
 
+        # Missing keys mean "return this control to the native patch".
+        # AMY has no generic per-control undo operation, so convergence in that
+        # case is a deliberate patch reload followed by the remaining sparse
+        # overrides. This keeps defaults, preset loads, UI edits and switch-back
+        # restoration on one transaction path.
+        patch_required = name_changed or bool(removed_keys)
+
         rhythm_generation: int | None = None
         rhythm_config: dict[str, Any] | None = None
-        if role == "chord" and name_changed and self.rhythm_running:
+        if role == "chord" and patch_required and self.rhythm_running:
             rhythm_generation, rhythm_config = self._prepare_rhythm_rebuild(
                 reset_phase=False
             )
@@ -994,8 +1002,9 @@ class AmySerialClient:
         self.synth_params[role] = new_params
         now_active = self._adsr_is_active(role)
         self._adsr_override_active[role] = now_active
+        patch_required = patch_required or (was_active and not now_active)
 
-        if name_changed or (was_active and not now_active):
+        if patch_required:
             self._configure_synth(role)
         elif changed_keys:
             self._apply_supported_params(role, changed_keys)
@@ -1004,7 +1013,7 @@ class AmySerialClient:
             self.writer.delay(self._rhythm_guard_seconds())
             self._install_rhythm_schedule(rhythm_generation, rhythm_config)
 
-        if role == "chord" and name_changed:
+        if role == "chord" and patch_required:
             self._restore_manual_chord_after_patch()
 
     def _set_synth_state(self, role: str, state: Any) -> None:
@@ -1294,11 +1303,10 @@ class AmySerialClient:
         if generation is None or config is None:
             return
 
-        # The ESP32-P4 command path applies patch/parameter deltas at audio
-        # block boundaries. Before the first automatic chord after transport
-        # starts, explicitly converge synth 4 from the same stored chord state
-        # used by manual synth 3. This closes the startup/preset race observed
-        # on hardware without reloading the patch.
+        # Before the first automatic chord, reapply only actual engine
+        # overrides. Native AMY patch values are deliberately omitted: a Juno
+        # filter such as Chorus Vibes has a 27.365 Hz base coefficient plus note
+        # and envelope coefficients, and rewriting the base term is unnecessary.
         if resync_chord and self.rhythm_chord_enabled:
             self._sync_synth_params(
                 "chord",

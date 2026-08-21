@@ -29,9 +29,10 @@ class StaticContractTests(unittest.TestCase):
         qml = (ROOT / "gui" / "ParameterSlider.qml").read_text(
             encoding="utf-8"
         )
-        self.assertIn("Number(slider.value).toFixed", qml)
-        self.assertIn("from: Number(root.control.minimum)", qml)
-        self.assertIn("to: Number(root.control.maximum)", qml)
+        self.assertIn("formattedValue", qml)
+        self.assertIn("Math.log", qml)
+        self.assertIn("Math.exp", qml)
+        self.assertIn("midiNoteName", qml)
 
     def test_catalogue_uses_physical_ranges_and_clean_labels(self) -> None:
         data = json.loads(

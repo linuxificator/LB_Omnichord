@@ -136,16 +136,38 @@ class SynthState:
                 "maximum": control.maximum,
                 "step": control.step,
                 "decimals": control.decimals,
+                "unit": getattr(control, "unit", ""),
+                "scale": getattr(control, "scale", "linear"),
             }
             for control in self.selected_definition.controls
             if control.group == group
         ]
 
     def transport_payload(self) -> dict[str, Any]:
+        """Return the complete engine override state for the selected patch.
+
+        The UI always has explicit numeric values, but AMY's factory patch is
+        already the source of truth for controls whose application default is
+        identical to the native patch value.  Omitting those values avoids
+        rewriting partial CtrlCoef lists such as the Juno VCF base frequency.
+        Application corrections and user/preset edits remain explicit.
+        """
         arguments: list[str | float] = []
         values = self.selected_values
         for control in self.selected_definition.controls:
-            arguments.extend([control.key, float(values[control.key])])
+            current = float(values[control.key])
+            native = getattr(control, "native_default", None)
+            if (
+                native is not None
+                and math.isclose(
+                    current,
+                    float(native),
+                    rel_tol=0.0,
+                    abs_tol=1e-9,
+                )
+            ):
+                continue
+            arguments.extend([control.key, current])
         return {
             "name": self.selected_definition.key,
             "params": arguments,

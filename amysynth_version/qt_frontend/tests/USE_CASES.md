@@ -165,6 +165,15 @@ Expected:
 
 ### CTRL — slider meaning, ranges and isolation
 
+**CTRL-00 — native patch value is not automatically an engine override**
+
+- A numeric UI default may represent an AMY factory-patch coefficient.
+- If the application default equals that native value, selecting a preset or starting rhythm must not retransmit it as an override.
+- Juno frequency controls are CtrlCoef models: for Chorus Vibes the factory `F27.365,0.181,,5.11,0,0` means a 27.365 Hz **base** plus note/envelope modulation, not MIDI note 27.
+- Frequency sliders display values in Hz with the unit after the number and logarithmic travel. A future MIDI-note-valued control must display note names such as C4 rather than a raw MIDI integer.
+
+**Failure history:** with factory P7/Chorus Vibes, automatic rhythm chords were effectively inaudible until Cutoff was moved. The UI/transport model was treating the visible native VCF base coefficient as an explicit override instead of leaving the complete AMY factory filter model authoritative.
+
 **CTRL-01 — every instrument has explicit physical defaults**
 
 - Every slider of every curated instrument has a numeric default within its physical UI range.

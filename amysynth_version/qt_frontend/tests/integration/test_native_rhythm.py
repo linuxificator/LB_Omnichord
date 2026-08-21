@@ -57,9 +57,16 @@ class NativeRhythmTests(unittest.TestCase):
             start = app.bridge.count()
             if not bool(app.query("rhythmRunning")):
                 app.action("toggleRhythm")
-            app.bridge.wait_for_lines(["zY1Z", cutoff4], start=start, timeout=8.0)
+            app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
             time.sleep(0.35)
             app.bridge.wait_idle(timeout=8.0)
+
+            start_lines = app.bridge.lines_since(start)
+            self.assertNotIn(
+                cutoff4,
+                start_lines,
+                "native AMY base cutoff was redundantly rewritten at rhythm start",
+            )
 
             after3 = app.bridge.synth_commands(3)
             after4 = app.bridge.synth_commands(4)
