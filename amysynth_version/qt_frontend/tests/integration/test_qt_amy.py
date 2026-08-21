@@ -91,6 +91,8 @@ def main() -> int:
         env["HOME"] = str(home)
         env["PYTHONUNBUFFERED"] = "1"
         env["OMNICHORD_TEST_API_PORT"] = str(PORT)
+        env["QT_QPA_PLATFORM"] = "offscreen"
+        env["QT_QUICK_BACKEND"] = "software"
 
         process = subprocess.Popen(
             [
