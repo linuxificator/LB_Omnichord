@@ -1,11 +1,9 @@
 name: Temporary control range audit
 
 on:
-  push:
+  pull_request:
     branches:
-      - feature/reverb-reset-and-control-safety
-    paths:
-      - '.github/workflows/tmp-control-audit.yml'
+      - main
 
 permissions:
   contents: read
@@ -22,7 +20,7 @@ jobs:
         working-directory: amysynth_version/qt_frontend
         run: |
           python - <<'PY'
-          import json, math, statistics
+          import json, math
           from collections import defaultdict
           from pathlib import Path
 
@@ -34,7 +32,6 @@ jobs:
 
           def q(vals, p):
               vals=sorted(vals)
-              if not vals: return None
               i=(len(vals)-1)*p
               lo=math.floor(i); hi=math.ceil(i)
               if lo==hi: return vals[lo]
@@ -53,9 +50,7 @@ jobs:
               if v >= 3000:
                   print(f'  {v:.9g} {skey} {label} native={c.get("native_default")} range=[{c["minimum"]},{c["maximum"]}]')
 
-          cfg = Path('config/amy_config.json')
-          if cfg.exists():
-              raw=json.loads(cfg.read_text())
-              print('PATCH COMPATIBILITY')
-              print(json.dumps(raw.get('patch_compatibility', {}), indent=2))
+          raw=json.loads(Path('config/amy_config.json').read_text())
+          print('PATCH COMPATIBILITY')
+          print(json.dumps(raw.get('patch_compatibility', {}), indent=2))
           PY
