@@ -1,0 +1,28 @@
+bashrc alias:
+alias get_idf='. $HOME/esp/esp-idf/export.sh'
+
+sed's for amy source:
+sed -i 's/#define AMY_BLOCK_SIZE 256/#define AMY_BLOCK_SIZE 128/'     components/amy/src/amy.h
+sed -i 's/#define BLOCK_SIZE_BITS 8/#define BLOCK_SIZE_BITS 7/'     components/amy/src/amy.h
+sed -i 's/#define AMY_SAMPLE_RATE 44100/#define AMY_SAMPLE_RATE 48000/'     components/amy/src/amy.h
+sed -i  's/I2S_STD_MSB_SLOT_DEFAULT_CONFIG/I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG/g'  components/amy/src/i2s.c
+sed -i 's/void run_midi_task() {/void run_midi_task(void *pvParameters) {\
+    (void)pvParameters;/' \
+components/amy/src/amy_midi.c
+sed -i 's/void esp_fill_audio_buffer_task() {/void esp_fill_audio_buffer_task(void *pvParameters) {\
+    (void)pvParameters;/' components/amy/src/i2s.c
+
+howto build:
+get_ifd
+idf.py build
+idf.py flash monitor
+
+
+must be in dialout group
+
+added to i2s.c:
+
+    chan_cfg.dma_desc_num  = 2;
+    chan_cfg.dma_frame_num = AMY_BLOCK_SIZE / 2;
+
+But should it be there? Isn't there already a define to set the DMA buffers?
