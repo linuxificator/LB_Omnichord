@@ -357,6 +357,24 @@ class SerialIntegrationTests(unittest.TestCase):
                 app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
                 app.bridge.wait_idle(timeout=8.0)
 
+            # First establish real bass/chord tagged patterns. The cancellation
+            # assertion below is meaningful only for tags that were installed.
+            seed = app.bridge.count()
+            app.action("selectChord", 0, 0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                seeded = app.bridge.lines_since(seed)
+                if (
+                    any(line.startswith("H") and "i1Z" in line for line in seeded)
+                    and any(line.startswith("H") and "i4Z" in line for line in seeded)
+                ):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("failed to seed bass and rhythm-chord tag ranges")
+            time.sleep(0.75)  # allow one-shot chord release timer to drain
+            app.bridge.wait_idle(timeout=8.0)
+
             start = app.bridge.count()
             app.action("pressChord", 0, 0)
             app.bridge.wait_idle(timeout=8.0)
@@ -369,6 +387,14 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertTrue(cancellations, delta)
             cancel_tags = {int(line.split(",", 2)[2][:-1]) for line in cancellations}
             self.assertTrue(all(112 <= tag < 252 for tag in cancel_tags), cancel_tags)
+            self.assertFalse(
+                any(
+                    line.startswith("H0,0,")
+                    and int(line.split(",", 2)[2][:-1]) < 56
+                    for line in delta
+                ),
+                delta,
+            )
             self.assertTrue(bool(app.query("rhythmRunning")))
 
             time.sleep(1.0)
@@ -400,6 +426,22 @@ class SerialIntegrationTests(unittest.TestCase):
                 app.action("toggleRhythm")
                 app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
                 app.bridge.wait_idle(timeout=8.0)
+
+            seed = app.bridge.count()
+            app.action("selectChord", 0, 0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                seeded = app.bridge.lines_since(seed)
+                if (
+                    any(line.startswith("H") and "i1Z" in line for line in seeded)
+                    and any(line.startswith("H") and "i4Z" in line for line in seeded)
+                ):
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("failed to seed tag ranges before isolation test")
+            time.sleep(0.75)
+            app.bridge.wait_idle(timeout=8.0)
 
             if bool(app.query("bassRunning")):
                 start = app.bridge.count()

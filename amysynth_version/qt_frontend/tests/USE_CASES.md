@@ -259,8 +259,8 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **RHYTHM-02 — instrument change does not silently leave stale rhythm state**
 
-- Instrument configuration and rhythm scheduling must have one explicit ordering contract.
-- Tests must inspect both serial command order and native AMY synth state after a live switch.
+- Chord patch changes update synths 3/4 directly; existing tagged synth-4 events remain installed and use the new patch on their next firing.
+- A timbre-only switch must not stop transport or reset/rebuild unrelated sequencer lanes. Tests inspect both serial commands and native AMY synth state.
 
 **RHYTHM-03 — no unnecessary phase reset on a timbre-only change**
 
@@ -269,8 +269,8 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **RHYTHM-04 — starting automatic chords converges synth 4 first**
 
-- Starting rhythm from stopped state must clear stale sequencer events, cross the configured AMY reset guard, reapply the current logical chord parameters specifically to rhythm synth 4, then install automatic chord events and resume transport.
-- This reapplication uses the same stored chord state; it must not invent defaults, derive values independently, or reload the patch.
+- Starting rhythm from stopped state installs the authoritative tagged drum/bass/chord ranges and resumes transport only after those definitions are queued ahead of `zY1`.
+- Starting rhythm must not require `RESET_SEQUENCER`; tagged replacement itself removes stale lane entries.
 
 ### TUNING — all note-producing paths follow the selected tuning
 

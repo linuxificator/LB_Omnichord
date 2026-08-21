@@ -474,11 +474,13 @@ class _TaggedSequencerLane:
 
         for index, (tick, period, body) in enumerate(events):
             tag = self.start + index
+            period_value = max(1, int(period))
+            tick_value = max(0, int(tick)) % period_value
             body = str(body)
             if body.endswith("Z"):
                 body = body[:-1]
             commands.append(
-                f"H{max(0, int(tick))},{max(1, int(period))},{tag}{body}Z"
+                f"H{tick_value},{period_value},{tag}{body}Z"
             )
 
         # Clear tags no longer used by the new pattern. Keep using the maximum
@@ -1335,11 +1337,7 @@ class AmySerialClient:
 
         raise KeyError(lane_name)
 
-    def _invalidate_full_rhythm_transaction(self) -> None:
-        self.writer.new_low_generation("rhythm-full")
-
     def _replace_lane(self, lane_name: str) -> None:
-        self._invalidate_full_rhythm_transaction()
         lane = self._sequencer_lanes[lane_name]
         try:
             lane.enqueue(self._lane_events(lane_name))
@@ -1396,7 +1394,8 @@ class AmySerialClient:
             self._wire(f"S{RESET_TIMEBASE}Z")
             self._replace_all_lanes(resume_transport=True)
         else:
-            self._replace_all_lanes(resume_transport=False)
+            for lane_name in ("drums", "bass", "chords"):
+                self._replace_lane(lane_name)
 
     def _start_rhythm(self) -> None:
         if self.rhythm_running:
