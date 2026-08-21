@@ -42,3 +42,7 @@ On Start, `zY1` is queued as the final item in the complete transaction, after a
 ## Period wrapping
 
 AMY fires repeating entries by comparing the sequencer's modulo-period offset with the stored tick. Every generated tick is therefore normalized into `0..period-1`. This matters for note-offs near the end of a bar: `tick + gate` may cross the period boundary and must wrap rather than become an event which can never fire.
+
+## Synth and bus isolation
+
+Sequencer tags isolate scheduled events; AMY synths isolate voice/oscillator ownership. Audio effects require one more boundary because Juno patches can contain bus-level EQ/chorus/reverb. The frontend therefore uses four AMY buses: drums 0, bass 1, strum 2, and both chord synths 3/4 on chord bus 3. A strum patch change can consequently alter only bus 2; it cannot change the sound of an already-playing chord on bus 3.

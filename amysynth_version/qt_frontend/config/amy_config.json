@@ -271,7 +271,9 @@
     }
   },
   "buses": {
-    "main": 0,
-    "percussion": 1
+    "drums": 0,
+    "bass": 1,
+    "strum": 2,
+    "chord": 3
   }
 }

@@ -249,7 +249,7 @@ ApplicationWindow {
                     id: reverbPanel
                     x: 0
                     y: 0
-                    width: 360
+                    width: 520
                     height: parent.height
                     controller: backend
                 }

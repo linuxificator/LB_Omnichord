@@ -263,6 +263,37 @@ class SerialIntegrationTests(unittest.TestCase):
                 "HARM strum contains no intonation-adjusted pitch",
             )
 
+    def test_strum_patch_change_is_bus_isolated_from_chords(self) -> None:
+        meow = synth_index("Meow Brass")
+        sustainer = synth_index("Sustainer")
+        other = synth_index("Orchestral Pad")
+        meow_patch = patch_for_index(meow)
+        sustainer_patch = patch_for_index(sustainer)
+        other_patch = patch_for_index(other)
+
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("setChordSynthIndex", meow)
+            app.bridge.wait_for_lines(
+                [f"K{meow_patch}i3Z", f"K{meow_patch}i4Z"],
+                start=0,
+                timeout=8.0,
+            )
+            app.action("setStrumSynthIndex", sustainer)
+            app.bridge.wait_for_lines([f"K{sustainer_patch}i2Z"], start=0, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+
+            start = app.bridge.count()
+            app.action("setStrumSynthIndex", other)
+            lines = app.bridge.wait_for_lines([f"K{other_patch}i2Z"], start=start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            lines = app.bridge.lines_since(start)
+
+            self.assertIn("i2iy2Z", lines)
+            self.assertTrue(any(line.startswith("y2h") for line in lines), lines)
+            self.assertFalse(any("i3" in line or "i4" in line for line in lines), lines)
+            self.assertFalse(any(line.startswith("y3") for line in lines), lines)
+
     def test_serial_framing_and_live_chord_patch_order(self) -> None:
         brass_index = synth_index("Brass Ensemble")
         other_index = synth_index("Orchestral Pad")
@@ -328,7 +359,7 @@ class SerialIntegrationTests(unittest.TestCase):
 
             k4_index = next(
                 i for i, line in enumerate(lines)
-                if line.startswith("K") and "i4iv" in line
+                if line.startswith("K") and "i4iv" in line and "iy3Z" in line
             )
             next_synth4_index = next(
                 i for i in range(k4_index + 1, len(lines))

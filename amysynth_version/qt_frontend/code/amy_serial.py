@@ -640,15 +640,18 @@ class AmySerialClient:
         }
         buses = config.get("buses", {})
         self.bus_id = {
-            "main": int(buses.get("main", 0)),
-            "percussion": int(buses.get("percussion", 1)),
+            "drums": int(buses.get("drums", 0)),
+            "bass": int(buses.get("bass", 1)),
+            "strum": int(buses.get("strum", 2)),
+            "chord": int(buses.get("chord", 3)),
         }
+        bus_values = tuple(self.bus_id.values())
         if (
-            self.bus_id["main"] == self.bus_id["percussion"]
-            or any(bus < 0 or bus > 3 for bus in self.bus_id.values())
+            len(set(bus_values)) != 4
+            or any(bus < 0 or bus > 3 for bus in bus_values)
         ):
             raise ValueError(
-                "main and percussion buses must be distinct AMY buses 0..3"
+                "drums, bass, strum and chord must use four distinct AMY buses 0..3"
             )
         self.reverb = {
             "level": 0.0,
@@ -829,11 +832,18 @@ class AmySerialClient:
             self._wire(command)
 
     def _bus_for_synth(self, synth: int) -> int:
-        return (
-            self.bus_id["percussion"]
-            if synth == self.synth_id["drums"]
-            else self.bus_id["main"]
-        )
+        if synth == self.synth_id["drums"]:
+            return self.bus_id["drums"]
+        if synth == self.synth_id["bass"]:
+            return self.bus_id["bass"]
+        if synth == self.synth_id["strum"]:
+            return self.bus_id["strum"]
+        if synth in (
+            self.synth_id["manual_chord"],
+            self.synth_id["rhythm_chord"],
+        ):
+            return self.bus_id["chord"]
+        raise KeyError(f"no AMY bus assigned for synth {synth}")
 
     def _route_synth_bus(self, synth: int) -> None:
         self._wire(f"i{synth}iy{self._bus_for_synth(synth)}Z")
@@ -846,18 +856,31 @@ class AmySerialClient:
             f"{self._f(self.reverb['damping'])}Z"
         )
 
-    def _apply_reverb_buses(self) -> None:
-        # Bus 0 contains every melodic role; bus 1 contains only drums.
-        # An exact h0 is intentional: zero must be truly dry, not a small
-        # non-zero approximation.  Omitting the fourth reverb field leaves
-        # AMY's crossover setting unchanged.
-        self._wire(self._reverb_command(self.bus_id["main"], enabled=True))
+    def _reverb_enabled_for_bus(self, bus: int) -> bool:
+        if int(bus) == self.bus_id["drums"]:
+            return bool(self.reverb["drums"])
+        return True
+
+    def _apply_reverb_bus(self, bus: int) -> None:
         self._wire(
             self._reverb_command(
-                self.bus_id["percussion"],
-                enabled=bool(self.reverb["drums"]),
+                int(bus),
+                enabled=self._reverb_enabled_for_bus(int(bus)),
             )
         )
+
+    def _apply_reverb_buses(self) -> None:
+        # Every musical role owns its own bus so loading a Juno patch cannot
+        # leak the patch's bus-level EQ/chorus/reverb into another role.
+        # The user reverb is intentionally shared across the three melodic
+        # buses; drums receive the same room only when DRM is enabled.
+        for bus in (
+            self.bus_id["drums"],
+            self.bus_id["bass"],
+            self.bus_id["strum"],
+            self.bus_id["chord"],
+        ):
+            self._apply_reverb_bus(bus)
 
     def _set_reverb(self, value: Any) -> None:
         if not isinstance(value, dict):
@@ -876,19 +899,20 @@ class AmySerialClient:
     def _configure_one_synth(self, role: str, synth: int) -> None:
         self._bump_synth_generation(synth)
         patch = self._patch(role)
+        bus = self._bus_for_synth(synth)
         if synth in self._configured_synths:
-            # Hot-swapping a patch on an existing synth retains num_voices.
+            # The synth already owns its dedicated bus. Current AMY preserves
+            # that bus across a repatch, so patch-level EQ/chorus remain local.
             self._wire(f"l0i{synth}Z")
             self._wire(f"K{patch}i{synth}Z")
         else:
             voices = self._voice_count_for_synth(synth)
-            self._wire(f"K{patch}i{synth}iv{voices}Z")
+            # Put the bus in the allocation/patch event itself. Many Juno ROM
+            # patches contain bus FX; without iy here those startup FX briefly
+            # (and persistently) land on default bus 0 before a later route.
+            self._wire(f"K{patch}i{synth}iv{voices}iy{bus}Z")
             self._configured_synths.add(synth)
 
-            # First-time K/iv allocation is executed by AMY on an audio-block
-            # boundary.  Subsequent synth-tier commands (iy/iV/flags/etc.) can
-            # otherwise arrive while the instrument table entry is still NULL,
-            # producing "synth N not defined" warnings on the ESP32-P4.
             guard_ms = float(
                 self.config.get("performance", {}).get(
                     "synth_alloc_guard_ms", 10.0
@@ -898,6 +922,11 @@ class AmySerialClient:
         self._apply_patch_compatibility(patch, synth)
         self._route_synth_bus(synth)
         self._wire(f"i{synth}iV{self._f(self.volume[role])}Z")
+        # A patch may carry its own reverb setting for this bus. The Omnichord
+        # reverb controls are the application-level authority, so restore only
+        # this role's room after the patch is loaded. Other role buses are not
+        # touched.
+        self._apply_reverb_bus(bus)
 
     def _configure_synth(self, role: str) -> None:
         # Keep each patch load and its complete parameter restore adjacent in

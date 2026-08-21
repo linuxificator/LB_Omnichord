@@ -118,5 +118,30 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn("Column {", qml)
 
 
+    def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
+        panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        self.assertEqual(panel.count("LabeledSlider {"), 3)
+        self.assertNotIn("VerticalVolume {", panel)
+        self.assertGreaterEqual(panel.count("width: 145"), 3)
+        self.assertIn("width: 520", main)
+
+    def test_rhythm_transport_canvas_erases_old_symbol(self) -> None:
+        qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
+        self.assertIn("c.clearRect(0, 0, width, height)", qml)
+
+    def test_each_musical_role_has_a_distinct_amy_bus(self) -> None:
+        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            config["buses"],
+            {"drums": 0, "bass": 1, "strum": 2, "chord": 3},
+        )
+        amy_py = (ROOT / "code" / "amy_serial.py").read_text(encoding="utf-8")
+        self.assertIn('self.bus_id["strum"]', amy_py)
+        self.assertIn('self.bus_id["chord"]', amy_py)
+        self.assertIn('f"K{patch}i{synth}iv{voices}iy{bus}Z"', amy_py)
+        self.assertIn("self._apply_reverb_bus(bus)", amy_py)
+
+
 if __name__ == "__main__":
     unittest.main()
