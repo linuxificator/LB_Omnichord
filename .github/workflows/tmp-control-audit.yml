@@ -19,17 +19,30 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Fix helper duplicate-LFO assertion and apply refactor
+      - name: Harden helper matching and apply refactor
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('tools/tmp_apply_reverb_reset.py')
           text = p.read_text()
-          old = '''replace_once(amy_serial, "                    f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\"\\n", "                    f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"\\n")\n# There are two identical lfo clamp snippets; replace second if still present.\ntext = amy_serial.read_text(encoding="utf-8")\ntext = text.replace("f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\"", "f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"")\n'''
-          new = '''text = amy_serial.read_text(encoding="utf-8")\nlfo_old = "f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\""\nif text.count(lfo_old) != 2:\n    raise RuntimeError(f"expected two LFO clamp sites, found {text.count(lfo_old)}")\ntext = text.replace(lfo_old, "f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"")\n'''
-          if old not in text:
-              raise SystemExit('temporary helper patch target missing')
-          p.write_text(text.replace(old, new, 1))
+
+          # The same LFO clamp occurs once in each engine path.
+          lfo_start = text.index('# Replace old local hard clamps')
+          lfo_end = text.index('# Logical reverb dispatch.', lfo_start)
+          lfo_block = text[lfo_start:lfo_end]
+          old_line = '''replace_once(amy_serial, "                    f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\"\\n", "                    f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"\\n")\n# There are two identical lfo clamp snippets; replace second if still present.\ntext = amy_serial.read_text(encoding="utf-8")\ntext = text.replace("f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\"", "f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"")\n'''
+          new_line = '''text = amy_serial.read_text(encoding="utf-8")\nlfo_old = "f\\\"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z\\\""\nif text.count(lfo_old) != 2:\n    raise RuntimeError(f"expected two LFO clamp sites, found {text.count(lfo_old)}")\ntext = text.replace(lfo_old, "f\\\"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z\\\"")\n'''
+          if old_line not in lfo_block:
+              raise SystemExit('LFO helper patch target missing')
+          text = text[:lfo_start] + lfo_block.replace(old_line, new_line, 1) + text[lfo_end:]
+
+          # Use section-specific QML anchors; several panels intentionally share
+          # the same width/x expressions.
+          q_start = text.index('# Utility shifts right and keeps original width.')
+          q_end = text.index('# Pink connected panel + two reverb controls', q_start)
+          q_block = '''# Utility shifts right and keeps original width.\nreplace_once(\n    main_qml,\n    '''\"'''            UtilitySection {\\n                x: 0\\n                y: window.utilityY\\n                width:\\n                    window.volumeX\\n                    + window.volumeWidth\\n                height:\\n                    window.sectionHeight\\n'''\"''',\n    '''\"'''            UtilitySection {\\n                x: window.contentX\\n                y: window.utilityY\\n                width:\\n                    window.volumeX\\n                    + window.volumeWidth\\n                    - window.contentX\\n                height:\\n                    window.sectionHeight\\n'''\"''',\n)\n# Rhythm yellow starts at the original content edge.\nreplace_once(\n    main_qml,\n    '''\"'''            // Yellow ends at the percussion-volume control.\\n            Rectangle {\\n                x: 0\\n                y: window.rhythmY\\n                width:\\n                    window.volumeX\\n                    + window.volumeWidth\\n'''\"''',\n    '''\"'''            // Yellow ends at the percussion-volume control.\\n            Rectangle {\\n                x: window.contentX\\n                y: window.rhythmY\\n                width:\\n                    window.volumeX\\n                    + window.volumeWidth\\n                    - window.contentX\\n'''\"''',\n)\n# Actual sections shift right while the bass/strum/chord background bars remain\n# at x=0 and therefore become the reset-button extensions.\nreplace_once(\n    main_qml,\n    '''\"'''            RhythmSection {\\n                x: 0\\n                y: window.rhythmY\\n'''\"''',\n    '''\"'''            RhythmSection {\\n                x: window.contentX\\n                y: window.rhythmY\\n'''\"''',\n)\nfor section_id in (\"bassSynthSection\", \"strumSynthSection\", \"chordSynthSection\"):\n    replace_once(\n        main_qml,\n        f'''\"'''            SynthSection {{{{\\n                id: {{section_id}}\\n\\n                x: 0\\n'''\"'''.replace('{{{{', '{{'),\n        f'''\"'''            SynthSection {{{{\\n                id: {{section_id}}\\n\\n                x: window.contentX\\n'''\"'''.replace('{{{{', '{{'),\n    )\n# Chord rows shift right; only row 0 later receives a left extension.\nreplace_once(\n    main_qml,\n    \"                x: 0\\n                y: window.chordRowsY\\n\",\n    \"                x: window.contentX\\n                y: window.chordRowsY\\n\",\n)\n\n'''
+          text = text[:q_start] + q_block + text[q_end:]
+          p.write_text(text)
           PY
           python tools/tmp_apply_reverb_reset.py
       - name: Syntax and JSON checks
