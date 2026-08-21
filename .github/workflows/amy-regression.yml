@@ -1,0 +1,147 @@
+name: AMY frontend regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'amysynth_version/qt_frontend/**'
+      - '.github/workflows/amy-regression.yml'
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Test subset to run
+        required: true
+        default: unit-controls
+        type: choice
+        options:
+          - unit-controls
+          - frontend
+          - serial
+          - presets
+          - native-controls
+          - native-rhythm
+          - all
+
+permissions:
+  contents: read
+
+jobs:
+  pr-matrix:
+    if: github.event_name == 'pull_request'
+    name: ${{ matrix.suite }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - unit-controls
+          - frontend
+          - serial
+          - presets
+          - native-controls
+          - native-rhythm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: amysynth_version/qt_frontend/requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: amysynth_version/qt_frontend
+        run: python -m pip install -r requirements.txt
+
+      - name: Install current upstream AMY
+        if: startsWith(matrix.suite, 'native-')
+        run: |
+          git clone --depth 1 https://github.com/shorepine/amy.git /tmp/amy-upstream
+          python -m pip install /tmp/amy-upstream
+          mkdir -p amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}
+          git -C /tmp/amy-upstream rev-parse HEAD \
+            > amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}/amy_commit.txt
+          python - <<'PY' > amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}/amy_version.txt
+          import amy
+          print(getattr(amy, '__version__', 'unknown'))
+          print('sample_rate', amy.AMY_SAMPLE_RATE)
+          print('block_size', amy.AMY_BLOCK_SIZE)
+          PY
+
+      - name: Run selected regression suite
+        working-directory: amysynth_version/qt_frontend
+        env:
+          OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
+        run: python tests/run_tests.py --suite '${{ matrix.suite }}'
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-regression-${{ matrix.suite }}
+          path: amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}
+          if-no-files-found: ignore
+          retention-days: 14
+
+  manual:
+    if: github.event_name == 'workflow_dispatch'
+    name: manual-${{ inputs.suite }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: amysynth_version/qt_frontend/requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: amysynth_version/qt_frontend
+        run: python -m pip install -r requirements.txt
+
+      - name: Install current upstream AMY when required
+        if: inputs.suite == 'all' || startsWith(inputs.suite, 'native-')
+        run: |
+          git clone --depth 1 https://github.com/shorepine/amy.git /tmp/amy-upstream
+          python -m pip install /tmp/amy-upstream
+          mkdir -p amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}
+          git -C /tmp/amy-upstream rev-parse HEAD \
+            > amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}/amy_commit.txt
+          python - <<'PY' > amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}/amy_version.txt
+          import amy
+          print(getattr(amy, '__version__', 'unknown'))
+          print('sample_rate', amy.AMY_SAMPLE_RATE)
+          print('block_size', amy.AMY_BLOCK_SIZE)
+          PY
+
+      - name: Run requested regression suite
+        working-directory: amysynth_version/qt_frontend
+        env:
+          OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
+        run: python tests/run_tests.py --suite '${{ inputs.suite }}'
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amy-regression-manual-${{ inputs.suite }}
+          path: amysynth_version/qt_frontend/test-artifacts
+          if-no-files-found: ignore
+          retention-days: 14

@@ -18,6 +18,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from amy_serial import AmySerialClient, load_amy_config
+from synth_state import SynthState
 
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -132,10 +133,13 @@ class SynthControl:
     label: str
     group: str
     default: float
+    native_default: float | None
     minimum: float
     maximum: float
     step: float
     decimals: int
+    unit: str
+    scale: str
 
 
 @dataclass(frozen=True)
@@ -144,11 +148,6 @@ class SynthDefinition:
     label: str
     controls: tuple[SynthControl, ...]
 
-
-@dataclass
-class SynthRuntime:
-    selected_index: int
-    values_by_synth: list[dict[str, float]]
 
 
 @dataclass(frozen=True)
@@ -439,10 +438,17 @@ def load_synth_catalog(
                 label=str(control["label"]),
                 group=str(control["group"]),
                 default=float(control["default"]),
+                native_default=(
+                    None
+                    if control.get("native_default") is None
+                    else float(control["native_default"])
+                ),
                 minimum=float(control["minimum"]),
                 maximum=float(control["maximum"]),
                 step=float(control["step"]),
                 decimals=int(control["decimals"]),
+                unit=str(control.get("unit", "")),
+                scale=str(control.get("scale", "linear")),
             )
             for control in raw_synth["controls"]
         )
@@ -528,6 +534,7 @@ def load_rhythm_catalog(
             )
 
     return tuple(rhythms)
+
 
 
 class InstrumentBackend(QObject):
@@ -911,19 +918,10 @@ class InstrumentBackend(QObject):
     def _make_synth_runtime(
         self,
         selected_index: int,
-    ) -> SynthRuntime:
-        return SynthRuntime(
-            selected_index=selected_index,
-            values_by_synth=[
-                {
-                    control.key: control.default
-                    for control in synth.controls
-                }
-                for synth in self._synths
-            ],
-        )
+    ) -> SynthState:
+        return SynthState(self._synths, selected_index)
 
-    def _runtime(self, role: SynthRole) -> SynthRuntime:
+    def _runtime(self, role: SynthRole) -> SynthState:
         if role == "chord":
             return self._chord_synth
         if role == "strum":
@@ -1073,23 +1071,7 @@ class InstrumentBackend(QObject):
         role: SynthRole,
         group: str,
     ) -> list[dict[str, Any]]:
-        runtime = self._runtime(role)
-        synth = self._synths[runtime.selected_index]
-        values = runtime.values_by_synth[runtime.selected_index]
-
-        return [
-            {
-                "key": control.key,
-                "label": control.label,
-                "value": values[control.key],
-                "minimum": control.minimum,
-                "maximum": control.maximum,
-                "step": control.step,
-                "decimals": control.decimals,
-            }
-            for control in synth.controls
-            if control.group == group
-        ]
+        return self._runtime(role).control_model(group)
 
     def _selected_rhythm(self) -> RhythmDefinition:
         return self._rhythms[self._rhythm.selected_index]
@@ -1159,18 +1141,31 @@ class InstrumentBackend(QObject):
             clamped,
         )
 
+    def _emit_synth_change(
+        self,
+        role: SynthRole,
+        *,
+        selection_changed: bool,
+    ) -> None:
+        if role == "chord":
+            if selection_changed:
+                self.chordSynthStateChanged.emit()
+            self.chordSynthControlsChanged.emit()
+        elif role == "strum":
+            if selection_changed:
+                self.strumSynthStateChanged.emit()
+            self.strumSynthControlsChanged.emit()
+        else:
+            if selection_changed:
+                self.bassSynthStateChanged.emit()
+            self.bassSynthControlsChanged.emit()
+
     @Slot()
     def copyStrumToChord(self) -> None:
-        self._chord_synth.selected_index = (
-            self._strum_synth.selected_index
-        )
-        self._chord_synth.values_by_synth = copy.deepcopy(
-            self._strum_synth.values_by_synth
-        )
+        self._chord_synth.copy_from(self._strum_synth)
         self._chord_volume = self._strum_volume
 
-        self.chordSynthStateChanged.emit()
-        self.chordSynthControlsChanged.emit()
+        self._emit_synth_change("chord", selection_changed=True)
         self.chordVolumeChanged.emit()
 
         self._send_synth_state("chord")
@@ -1196,26 +1191,10 @@ class InstrumentBackend(QObject):
         role: SynthRole,
         synth_index: int,
     ) -> None:
-        if not 0 <= synth_index < len(self._synths):
-            return
-
         runtime = self._runtime(role)
-
-        if runtime.selected_index == synth_index:
+        if not runtime.select(synth_index):
             return
-
-        runtime.selected_index = synth_index
-
-        if role == "chord":
-            self.chordSynthStateChanged.emit()
-            self.chordSynthControlsChanged.emit()
-        elif role == "strum":
-            self.strumSynthStateChanged.emit()
-            self.strumSynthControlsChanged.emit()
-        else:
-            self.bassSynthStateChanged.emit()
-            self.bassSynthControlsChanged.emit()
-
+        self._emit_synth_change(role, selection_changed=True)
         self._send_synth_state(role)
 
     @Slot(str, float)
@@ -1249,32 +1228,14 @@ class InstrumentBackend(QObject):
         value: float,
     ) -> None:
         runtime = self._runtime(role)
-        synth = self._synths[runtime.selected_index]
-
-        control = next(
-            (
-                item
-                for item in synth.controls
-                if item.key == key
-            ),
-            None,
-        )
-
-        if control is None:
+        if not runtime.set_control(key, value):
             return
 
-        clamped = max(
-            control.minimum,
-            min(control.maximum, float(value)),
-        )
-
-        values = runtime.values_by_synth[runtime.selected_index]
-
-        if abs(clamped - values[key]) < 0.0001:
-            return
-
-        values[key] = clamped
-        self._send_synth_params(role)
+        # UI edits publish the same complete logical state as preset loads and
+        # instrument switches. AmySerialClient diffs this state and sends only
+        # the engine parameters which actually changed.
+        self._emit_synth_change(role, selection_changed=False)
+        self._send_synth_state(role)
 
     def _tuning_note_offset(self) -> float:
         # A-reference tuning is global and remains exactly as before.
@@ -1446,13 +1407,7 @@ class InstrumentBackend(QObject):
                 "selected": self._synths[
                     runtime.selected_index
                 ].key,
-                "parameters": {
-                    synth.key: copy.deepcopy(
-                        runtime.values_by_synth[index]
-                    )
-                    for index, synth
-                    in enumerate(self._synths)
-                },
+                "parameters": runtime.sparse_overrides(),
             }
 
         rhythm_settings = {}
@@ -1685,91 +1640,6 @@ class InstrumentBackend(QObject):
             )
             self._selected_preset = 1
 
-    def _fresh_synth_runtime(
-        self,
-        selected_index: int,
-    ) -> SynthRuntime:
-        return self._make_synth_runtime(
-            selected_index
-        )
-
-    def _apply_synth_preset(
-        self,
-        role: SynthRole,
-        data: dict[str, Any],
-    ) -> SynthRuntime:
-        selected_key = str(
-            data.get(
-                "selected",
-                self._synths[
-                    self._runtime(role)
-                    .selected_index
-                ].key,
-            )
-        )
-
-        key_to_index = {
-            synth.key: index
-            for index, synth
-            in enumerate(self._synths)
-        }
-
-        selected_index = key_to_index.get(
-            selected_key,
-            self._runtime(role).selected_index,
-        )
-
-        runtime = self._fresh_synth_runtime(
-            selected_index
-        )
-
-        all_parameters = data.get(
-            "parameters",
-            {},
-        )
-
-        if isinstance(all_parameters, dict):
-            for synth_index, synth in enumerate(
-                self._synths
-            ):
-                stored_values = (
-                    all_parameters.get(
-                        synth.key,
-                        {},
-                    )
-                )
-
-                if not isinstance(
-                    stored_values,
-                    dict,
-                ):
-                    continue
-
-                values = (
-                    runtime.values_by_synth[
-                        synth_index
-                    ]
-                )
-
-                for control in synth.controls:
-                    if control.key not in stored_values:
-                        continue
-
-                    value = float(
-                        stored_values[
-                            control.key
-                        ]
-                    )
-                    values[control.key] = max(
-                        control.minimum,
-                        min(
-                            control.maximum,
-                            value,
-                        ),
-                    )
-
-        return runtime
-
     def _apply_preset_data(
         self,
         data: dict[str, Any],
@@ -1849,35 +1719,10 @@ class InstrumentBackend(QObject):
         synth_data = data.get("synths", {})
 
         if isinstance(synth_data, dict):
-            for role in (
-                "chord",
-                "strum",
-                "bass",
-            ):
-                role_data = synth_data.get(
-                    role,
-                    {},
-                )
-
-                if not isinstance(
-                    role_data,
-                    dict,
-                ):
-                    continue
-
-                runtime = (
-                    self._apply_synth_preset(
-                        role,
-                        role_data,
-                    )
-                )
-
-                if role == "chord":
-                    self._chord_synth = runtime
-                elif role == "strum":
-                    self._strum_synth = runtime
-                else:
-                    self._bass_synth = runtime
+            for role in ("chord", "strum", "bass"):
+                role_data = synth_data.get(role, {})
+                if isinstance(role_data, dict):
+                    self._runtime(role).load_preset(role_data)
 
         volumes = data.get("volumes", {})
 
@@ -3153,45 +2998,19 @@ class InstrumentBackend(QObject):
         self,
         role: SynthRole,
     ) -> SynthDefinition:
-        runtime = self._runtime(role)
-        return self._synths[runtime.selected_index]
+        return self._runtime(role).selected_definition
 
-    def _send_synth_name(self, role: SynthRole) -> None:
-        synth = self._selected_synth(role)
-
+    def _send_synth_state(self, role: SynthRole) -> None:
         if role == "chord":
             address = self._chord_synth_address
         elif role == "strum":
             address = self._strum_synth_address
         else:
             address = self._bass_synth_address
-
-        self._client.send_message(address, synth.key)
-
-    def _send_synth_params(self, role: SynthRole) -> None:
-        runtime = self._runtime(role)
-        synth = self._selected_synth(role)
-        values = runtime.values_by_synth[runtime.selected_index]
-
-        arguments: list[str | float] = []
-
-        for control in synth.controls:
-            arguments.extend(
-                [control.key, float(values[control.key])]
-            )
-
-        if role == "chord":
-            address = self._chord_params_address
-        elif role == "strum":
-            address = self._strum_params_address
-        else:
-            address = self._bass_params_address
-
-        self._client.send_message(address, arguments)
-
-    def _send_synth_state(self, role: SynthRole) -> None:
-        self._send_synth_name(role)
-        self._send_synth_params(role)
+        self._client.send_message(
+            address,
+            self._runtime(role).transport_payload(),
+        )
 
     def _rhythm_payload(self) -> dict[str, Any]:
         rhythm = self._selected_rhythm()
