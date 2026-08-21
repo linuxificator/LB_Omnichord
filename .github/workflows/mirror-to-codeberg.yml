@@ -1,0 +1,54 @@
+name: Mirror to Codeberg
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  delete:
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure SSH
+        env:
+          CODEBERG_SSH_KEY: ${{ secrets.CODEBERG_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$CODEBERG_SSH_KEY" > ~/.ssh/codeberg
+          chmod 600 ~/.ssh/codeberg
+
+          ssh-keyscan codeberg.org >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+          cat >> ~/.ssh/config <<'EOF'
+          Host codeberg.org
+              IdentityFile ~/.ssh/codeberg
+              IdentitiesOnly yes
+          EOF
+
+      - name: Clone GitHub repository
+        run: |
+          git clone --bare \
+            "https://github.com/${GITHUB_REPOSITORY}.git" repo.git
+
+      - name: Mirror branches and tags to Codeberg
+        env:
+          CODEBERG_USER: ${{ secrets.CODEBERG_USER }}
+          CODEBERG_REPO: ${{ secrets.CODEBERG_REPO }}
+        run: |
+          set -euo pipefail
+          cd repo.git
+
+          TARGET="git@codeberg.org:${CODEBERG_USER}/${CODEBERG_REPO}.git"
+
+          git push "$TARGET" \
+            '+refs/heads/*:refs/heads/*' \
+            '+refs/tags/*:refs/tags/*' \
+            --prune
