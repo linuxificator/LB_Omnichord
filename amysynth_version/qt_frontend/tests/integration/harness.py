@@ -254,9 +254,12 @@ class SerialAmyBridge:
     def synth_commands(self, synth: int) -> list[str]:
         if not self.native_amy:
             raise RuntimeError("native AMY is not enabled")
-        assert self.amy is not None
+        assert self.c_amy is not None
         with self._amy_lock:
-            result = list(self.amy.get_synth_commands(int(synth), False))
+            # The high-level amy.get_synth_commands wrapper is a replayable
+            # text blob.  The C API returns the typed list of individual wire
+            # commands, which is what state comparisons need.
+            result = list(self.c_amy.get_synth_commands(int(synth), False))
         self._write_native_log(f"SYNTH-{synth}", result)
         return result
 
