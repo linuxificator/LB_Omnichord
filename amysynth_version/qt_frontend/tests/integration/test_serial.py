@@ -353,8 +353,11 @@ class SerialIntegrationTests(unittest.TestCase):
             records = app.bridge.timed_lines()
             lines = [line for line, _ in records]
 
-            self.assertIn("y0h0,0.5,0.5Z", lines)
-            self.assertIn("y1h0,0.5,0.5Z", lines)
+            # Four isolated buses: drums 0 are dry by default; bass/strum/chord
+            # buses also start at user reverb level zero. Liveness/damping are
+            # still defined at their neutral midpoint even while level is zero.
+            for bus in range(4):
+                self.assertIn(f"y{bus}h0,0.5,0.5Z", lines)
             self.assertFalse(any("h0.001" in line for line in lines))
 
             k4_index = next(
@@ -372,26 +375,41 @@ class SerialIntegrationTests(unittest.TestCase):
                 f"synth 4 post-allocation command arrived after only {elapsed:.4f}s",
             )
 
+            # User reverb applies to bass/strum/chords, never drums unless DRM
+            # is explicitly enabled.
             start = app.bridge.count()
             app.action("setReverbLevel", 0.4)
             app.bridge.wait_for_lines(
-                ["y0h0.4,0.5,0.5Z", "y1h0,0.5,0.5Z"],
-                start=start, timeout=5.0,
+                [
+                    "y0h0,0.5,0.5Z",
+                    "y1h0.4,0.5,0.5Z",
+                    "y2h0.4,0.5,0.5Z",
+                    "y3h0.4,0.5,0.5Z",
+                ],
+                start=start,
+                timeout=5.0,
             )
             self.assertFalse(bool(app.query("reverbDrumsIncluded")))
 
             start = app.bridge.count()
             app.action("toggleReverbDrums")
             app.bridge.wait_for_lines(
-                ["y1h0.4,0.5,0.5Z"], start=start, timeout=5.0
+                ["y0h0.4,0.5,0.5Z"], start=start, timeout=5.0
             )
             self.assertTrue(bool(app.query("reverbDrumsIncluded")))
 
+            # Level zero is exact on every bus, including drums when DRM is on.
             start = app.bridge.count()
             app.action("setReverbLevel", 0.0)
             app.bridge.wait_for_lines(
-                ["y0h0,0.5,0.5Z", "y1h0,0.5,0.5Z"],
-                start=start, timeout=5.0,
+                [
+                    "y0h0,0.5,0.5Z",
+                    "y1h0,0.5,0.5Z",
+                    "y2h0,0.5,0.5Z",
+                    "y3h0,0.5,0.5Z",
+                ],
+                start=start,
+                timeout=5.0,
             )
             self.assertEqual(float(app.query("reverbLevel")), 0.0)
 
