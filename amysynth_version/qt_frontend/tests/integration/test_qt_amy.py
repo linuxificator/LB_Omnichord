@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import pty
+import signal
 import subprocess
 import sys
 import tempfile
@@ -80,6 +81,22 @@ def action(name: str, *args: object) -> dict:
     return result
 
 
+def terminate_process_group(process: subprocess.Popen[str]) -> tuple[str, str]:
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    try:
+        return process.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        return process.communicate(timeout=5)
+
+
 def main() -> int:
     master_fd, slave_fd = pty.openpty()
     serial_port = os.ttyname(slave_fd)
@@ -111,6 +128,7 @@ def main() -> int:
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=True,
         )
 
         try:
@@ -131,21 +149,34 @@ def main() -> int:
             )
             print(f"startup AMY commands: {len(startup)}")
 
+            # Factory preset P1 selects HARM tuning. Row 0 is C minor/O3.
             start = len(tx_commands(log_path))
             action("pressChord", 0, 0)
             wait_for_commands(
                 log_path,
-                ["l0i3Z", "n48l1i3Z", "n52l1i3Z", "n55l1i3Z"],
+                [
+                    "l0i3Z",
+                    "n48l1i3Z",
+                    "n51.1564129l1i3Z",
+                    "n55.01955l1i3Z",
+                ],
                 start,
             )
             action("releaseChord", 0, 0)
             time.sleep(1.6)
 
+            # Row 1 is A minor7/O3, using the same HARM table.
             start = len(tx_commands(log_path))
             action("pressChord", 1, 9)
             wait_for_commands(
                 log_path,
-                ["l0i3Z", "n57l1i3Z", "n60l1i3Z", "n64l1i3Z"],
+                [
+                    "l0i3Z",
+                    "n57l1i3Z",
+                    "n60.1564129l1i3Z",
+                    "n64.01955l1i3Z",
+                    "n66.6882591l1i3Z",
+                ],
                 start,
             )
             action("releaseChord", 1, 9)
@@ -154,12 +185,7 @@ def main() -> int:
             print("Qt/AMY integration test passed")
             return 0
         finally:
-            process.terminate()
-            try:
-                stdout, stderr = process.communicate(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                stdout, stderr = process.communicate(timeout=5)
+            stdout, stderr = terminate_process_group(process)
             if stdout:
                 print(stdout)
             if stderr:
