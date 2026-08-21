@@ -20,11 +20,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Xvfb and Qt X11 runtime
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb xauth libegl1 libgl1 libxcb-cursor0
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -36,6 +31,6 @@ jobs:
         working-directory: amysynth_version/qt_frontend
         run: python -m pip install -r requirements.txt
 
-      - name: Run Qt/AMY integration test
+      - name: Run headless Qt/AMY integration test
         working-directory: amysynth_version/qt_frontend
         run: python tests/integration/test_qt_amy.py
