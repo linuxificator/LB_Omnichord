@@ -41,7 +41,7 @@ jobs:
       - name: Mirror branches and tags to Codeberg
         env:
           CODEBERG_USER: ${{ secrets.CODEBERG_USER }}
-          CODEBERG_REPO: ${{ secrets.CODEBERG_REPO }}
+          CODEBERG_REPO: ${{ vars.CODEBERG_REPO }}
         run: |
           set -euo pipefail
           cd repo.git
