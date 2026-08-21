@@ -2,13 +2,23 @@
 
 `synths.json` contains explicit initial values for every slider of every curated AMY instrument.
 
-## Source of the timbre controls
+## AMY source policy
+
+This project intentionally follows the latest AMY `main` branch for the instrument catalogue and wire semantics. During the August 21, 2026 slider/default work, the current AMY `main` was commit `b6626ec22de5f6cedbbf4c34677ad8b8b6d0149c`, version 1.2.155.
 
 The primary source is AMY's generated built-in patch table, `shorepine/amy/src/patches.h`. AMY documents patches 0–127 as Juno patches and 128–255 as DX7 patches in its tutorial: <https://shorepine.github.io/amy/tutorial.html>. `generate_defaults.py` reads that patch table and copies values which have a direct meaning in the Omnichord controls instead of inventing replacements.
 
 For Juno instruments this includes filter cutoff, resonance, LFO rate, pitch-LFO depth, filter-LFO depth, pulse width, PWM depth, portamento and the native amplitude-envelope values. For DX7 instruments it includes algorithm, feedback, LFO rate and pitch-LFO depth. Portamento defaults to zero unless we later expose a native value for it.
 
 The generated JSON is checked into the repository; the Raspberry Pi application does not download anything at startup.
+
+## Slider ranges and runtime updates
+
+The old frontend used `-1` inside each slider range as a sentinel for "leave the factory patch value unchanged". That sentinel is no longer part of the UI because every instrument now has an explicit default. It caused several bad UI effects, most visibly on Sustain: a `-1..1` range put `0.00` in the middle of the track, and negative values were displayed without their numeric value.
+
+The catalogue now uses physical/control minima instead: Sustain is `0.00..1.00`, envelope times and modulation depths start at zero, filter cutoff starts at 20 Hz, Juno resonance at 0.51, pulse width at 0.05, and DX7 algorithm at 1. Legacy negative values are still accepted while reading old preset JSON and mean "unspecified/use the current instrument default"; they are never presented as slider positions.
+
+A slider edit also no longer blindly retransmits every other parameter. The frontend may send a complete logical parameter snapshot, but `AmySerialClient` diffs it against the previous snapshot and generates AMY wire commands only for controls that actually changed. This is particularly important for patches such as Juno A73 Repeater: changing Sustain updates only the amplitude breakpoint (`A` field) and does not resend filter cutoff/resonance (`F`/`R`). On an instrument change the old parameter snapshot is cleared, the new factory patch is loaded, and then the complete saved/default state for the newly selected instrument is applied.
 
 ## Envelope policy
 
@@ -29,11 +39,11 @@ The envelope choices follow conventional ADSR synthesis practice. Sound On Sound
 
 ## Regenerating
 
-Download the AMY patch table and regenerate the checked-in catalogue:
+Download the current AMY `main` patch table and regenerate the checked-in catalogue:
 
 ```bash
 curl -L https://raw.githubusercontent.com/shorepine/amy/main/src/patches.h -o /tmp/amy-patches.h
 python3 instruments/generate_defaults.py /tmp/amy-patches.h instruments/synths.json
 ```
 
-Review the diff before committing. If AMY changes its factory patches, direct timbre defaults may change as a consequence; the explicit musical corrections in `generate_defaults.py` remain stable until deliberately edited.
+Review the diff before committing. Because this project follows latest AMY, direct timbre defaults may change when AMY changes its factory patches; the explicit musical corrections in `generate_defaults.py` remain stable until deliberately edited.
