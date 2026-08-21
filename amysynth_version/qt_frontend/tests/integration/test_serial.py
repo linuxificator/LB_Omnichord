@@ -573,14 +573,27 @@ class SerialIntegrationTests(unittest.TestCase):
             if bool(app.query("bassRunning")):
                 start = app.bridge.count()
                 app.action("toggleBassRunning")
+                deadline = time.monotonic() + 8.0
+                tags: set[int] = set()
+                lines: list[str] = []
+                while time.monotonic() < deadline:
+                    lines = app.bridge.lines_since(start)
+                    tags = {
+                        int(line.split(",", 2)[2][:-1])
+                        for line in lines
+                        if line.startswith("H0,0,")
+                        and 56 <= int(line.split(",", 2)[2][:-1]) < 112
+                    }
+                    if tags:
+                        break
+                    time.sleep(0.01)
+                else:
+                    self.fail(
+                        "bass disable did not clear its tagged sequencer lane; received:\n"
+                        + "\n".join(app.bridge.lines_since(start))
+                    )
                 app.bridge.wait_idle(timeout=8.0)
                 lines = app.bridge.lines_since(start)
-                tags = {
-                    int(line.split(",", 2)[2][:-1])
-                    for line in lines
-                    if line.startswith("H0,0,")
-                }
-                self.assertTrue(tags)
                 self.assertTrue(all(56 <= tag < 112 for tag in tags), tags)
                 self.assertNotIn("zY0Z", lines)
                 self.assertNotIn("S4096Z", lines)
