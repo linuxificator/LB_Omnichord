@@ -20,10 +20,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Xvfb
+      - name: Install Xvfb and Qt X11 runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y xvfb xauth libegl1 libgl1
+          sudo apt-get install -y xvfb xauth libegl1 libgl1 libxcb-cursor0
 
       - name: Set up Python
         uses: actions/setup-python@v5
