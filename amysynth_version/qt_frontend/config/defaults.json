@@ -42,5 +42,9 @@
   "window": {
     "start_fullscreen": false,
     "scale_to_fit": true
+  },
+  "effects": {
+    "main_reverb": 0.0,
+    "percussion_reverb": 0.0
   }
 }

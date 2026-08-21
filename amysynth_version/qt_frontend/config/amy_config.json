@@ -235,14 +235,28 @@
     },
     "68": {
       "label": "Juno B15 Harpsichord 1",
-      "reason": "Factory patch requests 71265 Hz cutoff and Q 11.2; constrain the P4 fixed-point filter to a stable bright range.",
-      "juno_filter_hz": 16000.0,
+      "reason": "Factory patch requests an extreme filter state; constrain the P4 filter to a stable bright range.",
+      "juno_filter_hz": 6000.0,
       "juno_resonance": 4.0
     },
     "74": {
       "label": "Juno B23 Orchestral Pad",
       "reason": "Factory patch sets gather/output osc amp const to zero; AMY skips rendering when amp const is zero.",
       "juno_output_amp": 1.0
+    },
+    "89": {
+      "label": "Juno B26 Harpsichord 2",
+      "reason": "Factory filter base is at the unsafe top edge; keep the P4 filter in a stable bright range.",
+      "juno_filter_hz": 6000.0
+    },
+    "48": {
+      "label": "Juno A71 Sweep I",
+      "reason": "Factory filter base is at the previous 18 kHz UI limit; constrain it below the DSP safety ceiling.",
+      "juno_filter_hz": 9000.0
     }
+  },
+  "buses": {
+    "main": 0,
+    "percussion": 1
   }
 }

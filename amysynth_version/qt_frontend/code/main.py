@@ -18,6 +18,7 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from amy_serial import AmySerialClient, load_amy_config
+from control_limits import bounded_control_range, clamp_control_value
 from synth_state import SynthState
 
 
@@ -432,26 +433,36 @@ def load_synth_catalog(
     synths: list[SynthDefinition] = []
 
     for raw_synth in raw["synths"]:
-        controls = tuple(
-            SynthControl(
-                key=str(control["key"]),
-                label=str(control["label"]),
-                group=str(control["group"]),
-                default=float(control["default"]),
-                native_default=(
-                    None
-                    if control.get("native_default") is None
-                    else float(control["native_default"])
-                ),
-                minimum=float(control["minimum"]),
-                maximum=float(control["maximum"]),
-                step=float(control["step"]),
-                decimals=int(control["decimals"]),
-                unit=str(control.get("unit", "")),
-                scale=str(control.get("scale", "linear")),
+        controls_list: list[SynthControl] = []
+        for control in raw_synth["controls"]:
+            key = str(control["key"])
+            minimum, maximum = bounded_control_range(
+                key,
+                float(control["minimum"]),
+                float(control["maximum"]),
             )
-            for control in raw_synth["controls"]
-        )
+            default = clamp_control_value(key, float(control["default"]))
+            default = max(minimum, min(maximum, default))
+            controls_list.append(
+                SynthControl(
+                    key=key,
+                    label=str(control["label"]),
+                    group=str(control["group"]),
+                    default=default,
+                    native_default=(
+                        None
+                        if control.get("native_default") is None
+                        else float(control["native_default"])
+                    ),
+                    minimum=minimum,
+                    maximum=maximum,
+                    step=float(control["step"]),
+                    decimals=int(control["decimals"]),
+                    unit=str(control.get("unit", "")),
+                    scale=str(control.get("scale", "linear")),
+                )
+            )
+        controls = tuple(controls_list)
 
         synths.append(
             SynthDefinition(
@@ -544,6 +555,8 @@ class InstrumentBackend(QObject):
     strumVolumeChanged = Signal()
     bassVolumeChanged = Signal()
     percussionVolumeChanged = Signal()
+    mainReverbChanged = Signal()
+    percussionReverbChanged = Signal()
     bassRunningChanged = Signal()
 
     chordSynthStateChanged = Signal()
@@ -579,6 +592,8 @@ class InstrumentBackend(QObject):
         strum_amp_address: str,
         bass_amp_address: str,
         percussion_amp_address: str,
+        main_reverb_address: str,
+        percussion_reverb_address: str,
         chord_synth_address: str,
         chord_params_address: str,
         strum_synth_address: str,
@@ -612,6 +627,8 @@ class InstrumentBackend(QObject):
         self._strum_amp_address = strum_amp_address
         self._bass_amp_address = bass_amp_address
         self._percussion_amp_address = percussion_amp_address
+        self._main_reverb_address = main_reverb_address
+        self._percussion_reverb_address = percussion_reverb_address
         self._chord_synth_address = chord_synth_address
         self._chord_params_address = chord_params_address
         self._strum_synth_address = strum_synth_address
@@ -675,6 +692,8 @@ class InstrumentBackend(QObject):
                 flush=True,
             )
 
+        self._defaults = copy.deepcopy(defaults)
+        self._preset_reference_data: dict[str, Any] = {}
         self._selected_preset = 1
         self._tuning_mode_index = (
             DEFAULT_TUNING_MODE_INDEX
@@ -734,6 +753,13 @@ class InstrumentBackend(QObject):
         self._bass_volume = float(volumes["bass"])
         self._percussion_volume = float(
             volumes["percussion"]
+        )
+        effects = defaults.get("effects", {})
+        self._main_reverb = max(
+            0.0, min(1.0, float(effects.get("main_reverb", 0.0)))
+        )
+        self._percussion_reverb = max(
+            0.0, min(1.0, float(effects.get("percussion_reverb", 0.0)))
         )
         self._bass_running = bool(
             transport["bass_running"]
@@ -968,6 +994,14 @@ class InstrumentBackend(QObject):
     def percussionVolume(self) -> float:
         return self._percussion_volume
 
+    @Property(float, notify=mainReverbChanged)
+    def mainReverb(self) -> float:
+        return self._main_reverb
+
+    @Property(float, notify=percussionReverbChanged)
+    def percussionReverb(self) -> float:
+        return self._percussion_reverb
+
     @Property(int, notify=chordSynthStateChanged)
     def selectedChordSynthIndex(self) -> int:
         return self._chord_synth.selected_index
@@ -1140,6 +1174,24 @@ class InstrumentBackend(QObject):
             self._percussion_amp_address,
             clamped,
         )
+
+    @Slot(float)
+    def setMainReverb(self, value: float) -> None:
+        clamped = max(0.0, min(1.0, float(value)))
+        if abs(clamped - self._main_reverb) < 0.0001:
+            return
+        self._main_reverb = clamped
+        self.mainReverbChanged.emit()
+        self._client.send_message(self._main_reverb_address, clamped)
+
+    @Slot(float)
+    def setPercussionReverb(self, value: float) -> None:
+        clamped = max(0.0, min(1.0, float(value)))
+        if abs(clamped - self._percussion_reverb) < 0.0001:
+            return
+        self._percussion_reverb = clamped
+        self.percussionReverbChanged.emit()
+        self._client.send_message(self._percussion_reverb_address, clamped)
 
     def _emit_synth_change(
         self,
@@ -1434,7 +1486,7 @@ class InstrumentBackend(QObject):
                 ),
             }
 
-        return {
+        snapshot: dict[str, Any] = {
             "version": 1,
             "chord_rows": [
                 {
@@ -1488,6 +1540,14 @@ class InstrumentBackend(QObject):
                 ),
             },
         }
+        effects: dict[str, float] = {}
+        if abs(self._main_reverb) > 1e-9:
+            effects["main_reverb"] = self._main_reverb
+        if abs(self._percussion_reverb) > 1e-9:
+            effects["percussion_reverb"] = self._percussion_reverb
+        if effects:
+            snapshot["effects"] = effects
+        return snapshot
 
     def _ensure_preset_storage(self) -> None:
         self._preset_dir.mkdir(
@@ -1623,6 +1683,7 @@ class InstrumentBackend(QObject):
                 preset_number
             )
             self._apply_preset_data(data)
+            self._preset_reference_data = copy.deepcopy(data)
             self._selected_preset = (
                 preset_number
             )
@@ -1775,6 +1836,30 @@ class InstrumentBackend(QObject):
                     ),
                 ),
             )
+
+        effects = data.get("effects", {})
+        if not isinstance(effects, dict):
+            effects = {}
+        default_effects = self._defaults.get("effects", {})
+        self._main_reverb = max(
+            0.0,
+            min(
+                1.0,
+                float(effects.get("main_reverb", default_effects.get("main_reverb", 0.0))),
+            ),
+        )
+        self._percussion_reverb = max(
+            0.0,
+            min(
+                1.0,
+                float(
+                    effects.get(
+                        "percussion_reverb",
+                        default_effects.get("percussion_reverb", 0.0),
+                    )
+                ),
+            ),
+        )
 
         transport = data.get(
             "transport",
@@ -1958,6 +2043,8 @@ class InstrumentBackend(QObject):
         self.strumVolumeChanged.emit()
         self.bassVolumeChanged.emit()
         self.percussionVolumeChanged.emit()
+        self.mainReverbChanged.emit()
+        self.percussionReverbChanged.emit()
         self.bassRunningChanged.emit()
 
         self.chordSynthStateChanged.emit()
@@ -2008,6 +2095,7 @@ class InstrumentBackend(QObject):
             return
 
         self._selected_preset = preset_number
+        self._preset_reference_data = copy.deepcopy(data)
         self._write_last_preset()
 
         self._emit_full_preset_state()
@@ -2017,17 +2105,153 @@ class InstrumentBackend(QObject):
 
     @Slot()
     def storeSelectedPreset(self) -> None:
+        snapshot = self._preset_snapshot()
         self._write_json_atomic(
             self._preset_path(
                 self._selected_preset
             ),
-            self._preset_snapshot(),
+            snapshot,
         )
+        self._preset_reference_data = copy.deepcopy(snapshot)
         self._write_last_preset()
         self.presetChanged.emit()
         self.presetStored.emit(
             self._selected_preset
         )
+
+    def _preset_role_data(self, role: SynthRole) -> dict[str, Any]:
+        synths = self._preset_reference_data.get("synths", {})
+        if not isinstance(synths, dict):
+            return {}
+        value = synths.get(role, {})
+        return value if isinstance(value, dict) else {}
+
+    def _preset_volume_for_role(self, role: SynthRole) -> float:
+        volumes = self._preset_reference_data.get("volumes", {})
+        if not isinstance(volumes, dict):
+            volumes = {}
+        default = float(self._defaults["volumes"][role])
+        return max(0.0, min(1.0, float(volumes.get(role, default))))
+
+    def _reset_synth_role_to_preset(self, role: SynthRole) -> None:
+        runtime = self._runtime(role)
+        runtime.reset_selected_from_preset(self._preset_role_data(role))
+        volume = self._preset_volume_for_role(role)
+        if role == "chord":
+            self._chord_volume = volume
+            self.chordVolumeChanged.emit()
+            amp_address = self._chord_amp_address
+        elif role == "strum":
+            self._strum_volume = volume
+            self.strumVolumeChanged.emit()
+            amp_address = self._strum_amp_address
+        else:
+            self._bass_volume = volume
+            self.bassVolumeChanged.emit()
+            amp_address = self._bass_amp_address
+        self._emit_synth_change(role, selection_changed=False)
+        self._send_synth_state(role)
+        self._client.send_message(amp_address, volume)
+
+    @Slot()
+    def resetBassToPreset(self) -> None:
+        # Deliberately does not touch bass synth selection or bass on/off.
+        self._reset_synth_role_to_preset("bass")
+
+    @Slot()
+    def resetStrumToPreset(self) -> None:
+        self._reset_synth_role_to_preset("strum")
+
+    @Slot()
+    def resetChordSynthToPreset(self) -> None:
+        self._reset_synth_role_to_preset("chord")
+
+    @Slot()
+    def resetRhythmControlsToPreset(self) -> None:
+        index = self._rhythm.selected_index
+        rhythm = self._rhythms[index]
+        rhythm_data = self._preset_reference_data.get("rhythm", {})
+        if not isinstance(rhythm_data, dict):
+            rhythm_data = {}
+        settings = rhythm_data.get("settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+        stored = settings.get(rhythm.key, {})
+        if not isinstance(stored, dict):
+            stored = {}
+        self._rhythm.tempo_by_rhythm[index] = max(
+            40.0, min(200.0, float(stored.get("tempo", rhythm.tempo_default)))
+        )
+        self._rhythm.busyness_by_rhythm[index] = max(
+            1,
+            min(
+                4,
+                int(
+                    stored.get(
+                        "percussion_activity",
+                        source_activity_to_ui(rhythm.default_busyness),
+                    )
+                ),
+            ),
+        )
+        self._rhythm.chord_activity_by_rhythm[index] = max(
+            0,
+            min(
+                4,
+                int(
+                    stored.get(
+                        "chord_activity",
+                        source_activity_to_ui(rhythm.default_chord_activity),
+                    )
+                ),
+            ),
+        )
+        self._rhythm.bass_activity_by_rhythm[index] = max(
+            1,
+            min(
+                4,
+                int(
+                    stored.get(
+                        "bass_activity",
+                        source_activity_to_ui(rhythm.default_bass_activity),
+                    )
+                ),
+            ),
+        )
+        self.rhythmControlsChanged.emit()
+        self._send_rhythm_chord_enabled()
+        self._send_rhythm_config()
+
+    @Slot()
+    def resetChordRowsToPreset(self) -> None:
+        rows = self._preset_reference_data.get("chord_rows", [])
+        defaults = self._defaults["chord_rows"]
+        if not isinstance(rows, list) or len(rows) != ROW_COUNT:
+            rows = defaults
+        suffix_to_index = {chord.suffix: i for i, chord in enumerate(self._chords)}
+        octave_to_index = {name: i for i, name in enumerate(OCTAVE_NAMES)}
+        for row_index in range(ROW_COUNT):
+            stored = rows[row_index] if isinstance(rows[row_index], dict) else {}
+            fallback = defaults[row_index]
+            chord_key = str(stored.get("chord", fallback["chord"]))
+            octave_key = str(stored.get("octave", fallback["octave"]))
+            chord_index = suffix_to_index.get(
+                chord_key, suffix_to_index[str(fallback["chord"])]
+            )
+            octave_index = octave_to_index.get(
+                octave_key, octave_to_index[str(fallback["octave"])]
+            )
+            self._row_chord_indexes[row_index] = chord_index
+            self._row_octave_indexes[row_index] = octave_index
+            inversion_count = len(self._chords[chord_index].inversions)
+            self._row_inversion_indexes[row_index] = (
+                int(stored.get("inversion", fallback.get("inversion", 0)))
+                % inversion_count
+            )
+        self._strum_last_index = None
+        self._emit_state_changed()
+        for row_index in range(ROW_COUNT):
+            self._refresh_row_chord_notes(row_index)
 
     @Slot()
     def panic(self) -> None:
@@ -3138,6 +3362,14 @@ class InstrumentBackend(QObject):
             self._percussion_amp_address,
             self._percussion_volume,
         )
+        self._client.send_message(
+            self._main_reverb_address,
+            self._main_reverb,
+        )
+        self._client.send_message(
+            self._percussion_reverb_address,
+            self._percussion_reverb,
+        )
 
         self._send_synth_state("chord")
         self._send_synth_state("strum")
@@ -3264,6 +3496,14 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--percussion-amp-address",
         default="/rhythm/amp",
+    )
+    parser.add_argument(
+        "--main-reverb-address",
+        default="/effects/main/reverb",
+    )
+    parser.add_argument(
+        "--percussion-reverb-address",
+        default="/effects/percussion/reverb",
     )
     parser.add_argument(
         "--chord-synth-address",
@@ -3472,6 +3712,8 @@ def main() -> int:
         "strum_amp": args.strum_amp_address,
         "bass_amp": args.bass_amp_address,
         "percussion_amp": args.percussion_amp_address,
+        "main_reverb": args.main_reverb_address,
+        "percussion_reverb": args.percussion_reverb_address,
         "chord_synth": args.chord_synth_address,
         "chord_params": args.chord_params_address,
         "strum_synth": args.strum_synth_address,
@@ -3523,6 +3765,8 @@ def main() -> int:
         strum_amp_address=args.strum_amp_address,
         bass_amp_address=args.bass_amp_address,
         percussion_amp_address=args.percussion_amp_address,
+        main_reverb_address=args.main_reverb_address,
+        percussion_reverb_address=args.percussion_reverb_address,
         chord_synth_address=args.chord_synth_address,
         chord_params_address=args.chord_params_address,
         strum_synth_address=args.strum_synth_address,

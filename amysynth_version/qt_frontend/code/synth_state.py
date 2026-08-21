@@ -4,6 +4,8 @@ import copy
 import math
 from typing import Any, Sequence
 
+from control_limits import clamp_control_value
+
 
 class SynthState:
     """Own one UI synth role's instrument selection and per-instrument values.
@@ -82,9 +84,10 @@ class SynthState:
         control = self._control_for(definition, str(key))
         if control is None:
             return False
+        clamped = clamp_control_value(control.key, float(value))
         clamped = max(
             float(control.minimum),
-            min(float(control.maximum), float(value)),
+            min(float(control.maximum), clamped),
         )
         values = self.selected_values
         if math.isclose(
@@ -117,6 +120,10 @@ class SynthState:
                     # Legacy presets used negative values as "patch/default".
                     if stored < 0.0 and float(control.default) >= 0.0:
                         continue
+                    try:
+                        stored = clamp_control_value(control.key, stored)
+                    except ValueError:
+                        continue
                     values[control.key] = max(
                         float(control.minimum),
                         min(float(control.maximum), stored),
@@ -124,6 +131,54 @@ class SynthState:
 
         self._selected_index = selected_index
         self._values_by_synth = values_by_synth
+
+    def reset_selected_from_preset(self, data: dict[str, Any]) -> bool:
+        """Restore the current instrument without changing instrument selection.
+
+        Sparse preset parameters are keyed by instrument. Missing values mean
+        application catalogue defaults. This is the exact reset semantics used
+        by the per-section UI reset buttons.
+        """
+        definition = self.selected_definition
+        new_values = {
+            str(control.key): float(control.default)
+            for control in definition.controls
+        }
+        all_parameters = data.get("parameters", {}) if isinstance(data, dict) else {}
+        stored_values = (
+            all_parameters.get(definition.key, {})
+            if isinstance(all_parameters, dict)
+            else {}
+        )
+        if isinstance(stored_values, dict):
+            for control in definition.controls:
+                if control.key not in stored_values:
+                    continue
+                stored = float(stored_values[control.key])
+                if stored < 0.0 and float(control.default) >= 0.0:
+                    continue
+                try:
+                    stored = clamp_control_value(control.key, stored)
+                except ValueError:
+                    continue
+                new_values[control.key] = max(
+                    float(control.minimum),
+                    min(float(control.maximum), stored),
+                )
+
+        old_values = self.selected_values
+        changed = any(
+            not math.isclose(
+                float(old_values.get(key, value)),
+                float(value),
+                rel_tol=0.0,
+                abs_tol=1e-9,
+            )
+            for key, value in new_values.items()
+        )
+        if changed:
+            self._values_by_synth[self._selected_index] = new_values
+        return changed
 
     def control_model(self, group: str) -> list[dict[str, Any]]:
         values = self.selected_values

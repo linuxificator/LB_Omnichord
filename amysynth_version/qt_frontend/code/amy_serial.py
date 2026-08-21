@@ -11,6 +11,8 @@ from typing import Any
 
 import serial
 
+from control_limits import clamp_control_value
+
 
 AMY_PPQ = 48
 RESET_SEQUENCER = 4096
@@ -23,6 +25,7 @@ DEFAULT_CONFIG: dict[str, Any] = {'serial': {'port': '/dev/serial0', 'baud': 100
  'synth_ids': {'drums': 0, 'bass': 1, 'strum': 2, 'manual_chord': 3, 'rhythm_chord': 4},
  'voices': {'drums': 4, 'bass': 1, 'strum': 2, 'manual_chord': 7, 'rhythm_chord': 4},
  'default_synths': {'chord': 'juno_004', 'strum': 'juno_028', 'bass': 'dx7_143'},
+ 'buses': {'main': 0, 'percussion': 1},
  'drums': {'velocity_gain': 5.0,
            'sample_map': {'bd_haus': {'preset': 1, 'note': 39},
                           'drum_bass_hard': {'preset': 1, 'note': 39},
@@ -179,8 +182,14 @@ DEFAULT_CONFIG: dict[str, Any] = {'serial': {'port': '/dev/serial0', 'baud': 100
                                 'reason': 'Factory patch requests 71265 Hz cutoff and Q 11.2; '
                                           'constrain the P4 fixed-point filter to a stable bright '
                                           'range.',
-                                'juno_filter_hz': 16000.0,
+                                'juno_filter_hz': 6000.0,
                                 'juno_resonance': 4.0},
+                         '89': {'label': 'Juno B26 Harpsichord 2',
+                                'reason': 'Factory filter base is at the unsafe top edge; keep the P4 filter stable.',
+                                'juno_filter_hz': 6000.0},
+                         '48': {'label': 'Juno A71 Sweep I',
+                                'reason': 'Factory filter base is at the previous 18 kHz UI limit; keep below safety ceiling.',
+                                'juno_filter_hz': 9000.0},
                          '74': {'label': 'Juno B23 Orchestral Pad',
                                 'reason': 'Factory patch sets gather/output osc amp const to zero; '
                                           'AMY skips rendering when amp const is zero.',
@@ -536,6 +545,12 @@ class AmySerialClient:
             "bass": 0.5,
             "drums": 0.5,
         }
+        buses = config.get("buses", {})
+        self.bus_id = {
+            "main": int(buses.get("main", 0)),
+            "percussion": int(buses.get("percussion", 1)),
+        }
+        self.reverb = {"main": 0.0, "percussion": 0.0}
 
         self.chord_notes: list[float] = []
         self.bass_notes: list[float] = []
@@ -671,9 +686,11 @@ class AmySerialClient:
         if "juno_noise_amp" in raw:
             out.append(f"v5a{self._f(float(raw['juno_noise_amp']))}i{synth}Z")
         if "juno_filter_hz" in raw:
-            out.append(f"v0F{self._f(float(raw['juno_filter_hz']))}i{synth}Z")
+            value = clamp_control_value("filter_hz", float(raw["juno_filter_hz"]))
+            out.append(f"v0F{self._f(value)}i{synth}Z")
         if "juno_resonance" in raw:
-            out.append(f"v0R{self._f(float(raw['juno_resonance']))}i{synth}Z")
+            value = clamp_control_value("resonance", float(raw["juno_resonance"]))
+            out.append(f"v0R{self._f(value)}i{synth}Z")
         if "juno_output_amp" in raw:
             out.append(f"v0a{self._f(float(raw['juno_output_amp']))}i{synth}Z")
         return out
@@ -681,6 +698,30 @@ class AmySerialClient:
     def _apply_patch_compatibility(self, patch: int, synth: int) -> None:
         for command in self._patch_compatibility_commands(patch, synth):
             self._wire(command)
+
+    def _bus_for_synth(self, synth: int) -> int:
+        return (
+            self.bus_id["percussion"]
+            if synth == self.synth_id["drums"]
+            else self.bus_id["main"]
+        )
+
+    def _route_synth_bus(self, synth: int) -> None:
+        self._wire(f"i{synth}iy{self._bus_for_synth(synth)}Z")
+
+    def _apply_reverb_buses(self) -> None:
+        self._wire(
+            f"y{self.bus_id['main']}h{self._f(self.reverb['main'])}Z"
+        )
+        self._wire(
+            f"y{self.bus_id['percussion']}h{self._f(self.reverb['percussion'])}Z"
+        )
+
+    def _set_reverb(self, lane: str, value: Any) -> None:
+        level = max(0.0, min(1.0, float(value)))
+        self.reverb[lane] = level
+        bus = self.bus_id[lane]
+        self._wire(f"y{bus}h{self._f(level)}Z")
 
     def _configure_one_synth(self, role: str, synth: int) -> None:
         self._bump_synth_generation(synth)
@@ -694,6 +735,7 @@ class AmySerialClient:
             self._wire(f"K{patch}i{synth}iv{voices}Z")
             self._configured_synths.add(synth)
         self._apply_patch_compatibility(patch, synth)
+        self._route_synth_bus(synth)
         self._wire(f"i{synth}iV{self._f(self.volume[role])}Z")
 
     def _configure_synth(self, role: str) -> None:
@@ -716,12 +758,14 @@ class AmySerialClient:
         self._bump_synth_generation(drums)
         self._wire(f"i{drums}iv{drum_voices}in1Z")
         self._wire(f"v0w7i{drums}Z")
+        self._route_synth_bus(drums)
         self._wire(f"i{drums}iV{self._f(self.volume['drums'])}Z")
         self._configured_synths.add(drums)
 
         self._configure_synth("bass")
         self._configure_synth("strum")
         self._configure_synth("chord")
+        self._apply_reverb_buses()
 
     @staticmethod
     def _params_from_list(values: Any) -> dict[str, float]:
@@ -730,7 +774,8 @@ class AmySerialClient:
         result: dict[str, float] = {}
         for index in range(0, len(values) - 1, 2):
             try:
-                result[str(values[index])] = float(values[index + 1])
+                key = str(values[index])
+                result[key] = clamp_control_value(key, float(values[index + 1]))
             except (TypeError, ValueError):
                 pass
         return result
@@ -770,17 +815,17 @@ class AmySerialClient:
         if 0 <= patch <= 127:  # Juno
             cutoff = nonneg("filter_hz")
             if cutoff is not None:
-                cutoff = max(20.0, min(18000.0, cutoff))
+                cutoff = clamp_control_value("filter_hz", cutoff)
                 commands.append(f"v0F{self._f(cutoff)}i{synth}Z")
 
             resonance = nonneg("resonance")
             if resonance is not None:
-                resonance = max(0.51, min(12.0, resonance))
+                resonance = clamp_control_value("resonance", resonance)
                 commands.append(f"v0R{self._f(resonance)}i{synth}Z")
 
             if lfo_hz is not None:
                 commands.append(
-                    f"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z"
+                    f"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z"
                 )
 
             # Merely changing LFO frequency is inaudible when the patch has
@@ -794,7 +839,7 @@ class AmySerialClient:
 
             vcf_lfo = nonneg("filter_lfo_depth")
             if vcf_lfo is not None:
-                depth = max(0.0, min(4.0, vcf_lfo))
+                depth = clamp_control_value("filter_lfo_depth", vcf_lfo)
                 commands.append(f"v0F,,,,,{self._f(depth)}i{synth}Z")
 
             pulse_width = nonneg("pulse_width")
@@ -842,7 +887,7 @@ class AmySerialClient:
 
             if lfo_hz is not None:
                 commands.append(
-                    f"v1f{self._f(max(0.01, min(20.0, lfo_hz)))}i{synth}Z"
+                    f"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z"
                 )
 
             vibrato = nonneg("vibrato_depth")
@@ -1417,6 +1462,10 @@ class AmySerialClient:
             self._set_volume("bass", value)
         elif address == a["percussion_amp"]:
             self._set_volume("drums", value)
+        elif address == a["main_reverb"]:
+            self._set_reverb("main", value)
+        elif address == a["percussion_reverb"]:
+            self._set_reverb("percussion", value)
         elif address == a["chord_synth"]:
             if isinstance(value, dict):
                 self._set_synth_state("chord", value)
