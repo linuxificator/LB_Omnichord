@@ -84,6 +84,8 @@ The serial regression requires the current P7 synth-4 filter setting to be sent 
 
 **Observed failure (2026-08-21):** the manual chord sounded correctly mellow after selecting P7, but starting rhythm produced automatic chords that sounded substantially brighter, as though cutoff were higher. Moving the Cutoff slider once made manual and rhythm chords sound synchronized.
 
+**Automated verification after the fix:** the real-serial test sees the current P7 synth-4 cutoff reasserted after `S4096Z` and before the first `H...i4Z` event. In the native-AMY checkpoint used while developing the fix, synth 3 and synth 4 both reported the same Chorus Vibes oscillator/filter/envelope state after Start (apart from the intentional voice-pool count), including the same `F27.365` filter value. This proves the host/serial/native-AMY path; the ESP32-P4 hardware result still requires physical listening/testing.
+
 ### CHORD — manual chord behavior
 
 **CHORD-01 — chord press emits the correct tuned notes**
