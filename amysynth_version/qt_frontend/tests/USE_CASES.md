@@ -1,0 +1,230 @@
+# AMY Omnichord regression catalogue
+
+This file is the executable-test contract for the active `amysynth_version/qt_frontend` application. The Sonic Pi version is frozen and is intentionally outside this test plan.
+
+The application has three observable layers:
+
+1. **Frontend/backend state** — Qt `InstrumentBackend`, preset state and slider models.
+2. **Transport** — logical events translated to AMY wire commands and, in the Raspberry Pi setup, framed as 1,000,000-baud 8N1 serial lines.
+3. **AMY engine state/output** — the commands must actually configure current upstream AMY as intended. Native-Linux tests use the current `shorepine/amy` `main` branch and inspect `amy.get_synth_commands()` / `amy.dump_state()` after the same wire stream has been delivered.
+
+Every defect below must have a permanent regression test before it is considered fixed.
+
+## Test suites
+
+| Suite | Purpose | Hardware/AMY |
+| --- | --- | --- |
+| `unit-controls` | catalogue defaults, control mapping, sparse preset state, small pure-Python invariants | none |
+| `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
+| `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
+| `native-controls` | feed the real serial wire stream into native current AMY and inspect actual synth state | Linux PTY + native AMY |
+| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including live chord-instrument switching | Linux PTY + native AMY |
+| `presets` | per-instrument session state and sparse preset save/load semantics | none/headless backend |
+| `all` | all suites sequentially; intended for local/manual use. CI runs the component suites in parallel for a PR to `main`. | mixed |
+
+`python tests/run_tests.py --suite <name>` selects one suite. `--list` prints the available suites.
+
+## Required behavior and regression history
+
+### START — startup and basic transport
+
+**START-01 — deterministic startup**
+
+- Start the headless application with a pseudo serial device.
+- AMY transport stops the sequencer, clears the previous oscillator/instrument allocation and creates drums, bass, strum, manual-chord and rhythm-chord synths.
+- Startup must finish without a real display server.
+- The command log must contain the expected reset and synth setup commands.
+
+**Failure history:** the first CI attempt depended on XCB/Xvfb runtime libraries. The regression harness was changed to `QCoreApplication`; GUI rendering is not part of the functional test process.
+
+**START-02 — real serial framing**
+
+- Production serial mode is 1,000,000 baud, 8 data bits, no parity, 1 stop bit, no hardware flow control.
+- Every AMY command is terminated with `Z` and one LF transport delimiter.
+- A Linux PTY test must exercise the real `pyserial` writer rather than replacing it with a fake send method.
+
+### CHORD — manual chord behavior
+
+**CHORD-01 — chord press emits the correct tuned notes**
+
+- Pressing representative chord buttons through the test-control API must produce the expected AMY note-on commands.
+- The configured tuning table is part of the expected output; tests must not assume equal temperament when a preset selects HARM/JV tuning.
+
+**CHORD-02 — release does not produce false re-triggers**
+
+- A held chord must not repeatedly drop to activity 0 and re-trigger because of touch-release bounce.
+- Quick intentional taps must remain responsive.
+
+**Failure history:** earlier builds showed erratic repeated chord starts while a chord was held. Debugging introduced explicit chord-touch state and release filtering.
+
+### STRUM — strum input
+
+**STRUM-01 — press/touch makes sound immediately**
+
+- `strumStart()` must emit a note on finger/mouse down; a stationary press may not require a move event before producing sound.
+- A sweep must not exceed the configured live voice count and must eventually release the tail.
+
+**Failure history:** the strum area visibly accepted mouse/touch input but emitted no AMY commands/sound in an earlier AMY build.
+
+### INSTRUMENT — selected patch identity
+
+**INST-01 — selecting an instrument changes the manual chord synth**
+
+- Selecting a chord instrument must configure manual chord synth 3 with that instrument.
+- A subsequent chord press must use the selected instrument.
+
+**INST-02 — manual and rhythm chord synths are one logical instrument**
+
+- Chord synth 3 (manual) and synth 4 (rhythm) are separate voice pools but must have equivalent patch/control state at all times after a chord-instrument change.
+- Native AMY readback (`get_synth_commands(3/4)`) is the authority, not only the frontend's selected index.
+
+**INST-03 — live rhythm follows chord-instrument changes**
+
+Exact reproduction sequence:
+
+1. select **Brass Ensemble** as the chord instrument;
+2. enable/start a rhythm with chord activity;
+3. press a chord and allow rhythm chords to sound;
+4. select a different chord instrument while rhythm keeps running;
+5. press another chord.
+
+Expected:
+
+- the manual chord uses the new instrument;
+- every subsequent rhythm chord also uses the new instrument;
+- synth 3 and synth 4 native AMY state are equivalent after the change;
+- the rhythm need not restart from beat zero solely because the instrument changed.
+
+**Current/observed failure:** manual chords change instrument correctly, while rhythm chords continue sounding as Brass Ensemble or otherwise diverge from the selected chord instrument. Previous fixes that merely resent slider state or rebuilt the sequencer did not reliably fix the audible behavior.
+
+**INST-04 — switching away and back restores edited controls to AMY**
+
+Sequence:
+
+1. select instrument A;
+2. move a clearly audible slider (for example resonance);
+3. select instrument B;
+4. select instrument A again.
+
+Expected:
+
+- the UI shows the edited value;
+- both chord synth 3 and rhythm synth 4 receive and retain the edited value in actual AMY state;
+- the sound matches the restored setting.
+
+**Failure history:** the slider returned visually to its edited position, but AMY sounded as if the stored value had not been resent.
+
+**INST-05 — Juno A82 / Resonance Funk remains audible**
+
+- Selecting the curated Juno A82-compatible entry must produce a usable output on current AMY with the documented compatibility excitation.
+
+**Failure history:** the patch was silent in an earlier version because its sound-source amplitudes provided no excitation for the resonant filter.
+
+### CTRL — slider meaning, ranges and isolation
+
+**CTRL-01 — every instrument has explicit physical defaults**
+
+- Every slider of every curated instrument has a numeric default within its physical UI range.
+- No current UI slider uses `-1` as an exposed "native/default" sentinel.
+
+**CTRL-02 — Sustain range is exactly physical 0..1**
+
+- Sustain zero is the left edge, not the middle of the slider.
+- The label always renders a numeric value such as `Sustain 0.00`.
+
+**Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the control; negative values also caused the numeric text to disappear.
+
+**CTRL-03 — one slider changes only its intended AMY parameters**
+
+- Moving one slider must not resend unrelated filter/LFO/envelope controls merely because the frontend sends a complete logical snapshot.
+
+**CTRL-04 — Repeater Sustain does not act like cutoff**
+
+- On Juno A73 **Repeater**, changing Sustain must update the amplitude breakpoint only.
+- It must not emit or modify filter cutoff (`F`) or resonance (`R`).
+- Native AMY readback must show the filter state unchanged after the Sustain edit.
+
+**Failure history:** moving Sustain audibly changed the Repeater as though cutoff had moved because unrelated controls were retransmitted.
+
+**CTRL-05 — musically appropriate attack defaults**
+
+- Harpsichord 1/2 use a short non-zero de-click attack (currently 20 ms).
+- Orchestral Pad uses a slow pad-style attack/release rather than the previous effectively instantaneous attack.
+- Regeneration from upstream AMY must retain explicit documented musical corrections.
+
+**Failure history:** Harpsichord and Orchestral Pad sounded harsh/horrible with the former 0 ms default attack; increasing attack manually fixed the sound.
+
+### STATE — per-instrument session memory
+
+**STATE-01 — controls belong to the instrument, not the role globally**
+
+Sequence:
+
+1. select Piano and change several controls;
+2. select Organ and change other controls;
+3. return to Piano.
+
+Expected: Piano returns with its edited Piano values, while Organ retains its own edited values independently.
+
+**STATE-02 — defaults apply on first selection**
+
+- First selection of an instrument uses catalogue defaults unless the loaded preset contains an override for that instrument/control.
+
+### PRESET — persistence
+
+**PRESET-01 — store every modified instrument**
+
+- If four different instruments were edited during the session and Store is pressed, the user preset contains all four modified instruments, not only the currently selected one.
+
+**PRESET-02 — sparse storage**
+
+- Presets store only controls differing from that instrument's defaults.
+- Unmodified instruments/controls are omitted.
+
+**PRESET-03 — loading overlays defaults**
+
+- Loading constructs current catalogue defaults first and overlays saved values.
+- Legacy negative `-1` values are treated only as "unspecified/default" and may not re-enter the current UI range.
+
+### RHYTHM — sequencer invariants
+
+**RHYTHM-01 — chord pitch follows the active chord**
+
+- With rhythm chord activity enabled, changing/pressing a chord rebuilds accompaniment pitch without changing the selected chord instrument.
+
+**RHYTHM-02 — instrument change does not silently leave stale rhythm state**
+
+- Instrument configuration and rhythm scheduling must have one explicit ordering contract.
+- Tests must inspect both serial command order and native AMY synth state after a live switch.
+
+**RHYTHM-03 — no unnecessary phase reset on a timbre-only change**
+
+- Changing only the chord timbre should preserve the running rhythmic phase where the AMY sequencer permits it.
+- If correctness ever requires a phase reset, that behavior must be explicit and tested rather than accidental.
+
+### UI/REPOSITORY — structural regressions
+
+**UI-01 — tuba watermark asset resolves from the canonical GUI directory**
+
+- `gui/InstrumentWatermarks.qml` and `gui/tuba_watermark.png` remain colocated and no compatibility symlink is required.
+
+**Failure history:** after directory reorganization the PNG existed but the watermark disappeared because relative resolution occurred through a `code/` symlink. The repository now has no compatibility symlinks.
+
+**UI-02 — instrument names contain useful names only**
+
+- Curated names must not acquire redundant `PATCH` suffixes or unwanted generic engine prefixes in the visible label.
+
+**Failure history:** labels previously appeared with unwanted Juno/DX7 prefixes and later a `PATCH` suffix.
+
+## Proof produced by CI
+
+For serial/native suites, failures must preserve artifacts containing:
+
+- frontend logical/AMY command log;
+- exact serial lines received from the PTY;
+- current upstream AMY commit SHA/version;
+- native AMY `dump_state()` output;
+- native `get_synth_commands()` readback for synths 3 and 4 at relevant checkpoints;
+- application stdout/stderr and native bridge diagnostics.
+
+Passing a native test therefore means not merely "the expected command was written" but "current AMY accepted the real serial wire stream and its readback state satisfies the invariant".
