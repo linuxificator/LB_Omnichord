@@ -42,3 +42,5 @@ jobs:
           git diff --cached --check
           git commit -m 'Use independent sequencer tag ranges'
           git push origin HEAD:feature/reverb-reset-and-control-safety
+
+# Retry after fixing literal regex replacement in the temporary helper.
