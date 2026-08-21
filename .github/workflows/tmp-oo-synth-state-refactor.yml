@@ -1,0 +1,208 @@
+name: Temporary OO synth state refactor
+
+on:
+  pull_request:
+    paths:
+      - 'amysynth_version/qt_frontend/code/synth_state.py'
+      - '.github/workflows/tmp-oo-synth-state-refactor.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/instrument-control-defaults
+
+      - name: Refactor frontend and AMY state paths
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('amysynth_version/qt_frontend')
+          main_path = root / 'code/main.py'
+          amy_path = root / 'code/amy_serial.py'
+
+          def sub1(pattern, replacement, text, label):
+              new, count = re.subn(pattern, replacement, text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one replacement, got {count}')
+              return new
+
+          # ---------------- frontend ----------------
+          s = main_path.read_text(encoding='utf-8')
+          old_import = 'from amy_serial import AmySerialClient, load_amy_config\n'
+          if old_import not in s:
+              raise SystemExit('main import anchor missing')
+          s = s.replace(
+              old_import,
+              old_import + 'from synth_state import SynthState\n',
+              1,
+          )
+
+          s = sub1(
+              r'\n@dataclass\nclass SynthRuntime:.*?\n\n@dataclass\(frozen=True\)\nclass RhythmDefinition:',
+              '\n\n@dataclass(frozen=True)\nclass RhythmDefinition:',
+              s,
+              'remove SynthRuntime',
+          )
+          s = sub1(
+              r'\ndef collect_synth_parameter_overrides\(.*?\n\nclass InstrumentBackend',
+              '\n\nclass InstrumentBackend',
+              s,
+              'remove global synth serializer',
+          )
+
+          s = sub1(
+              r'    def _make_synth_runtime\(.*?(?=    def _emit_state_changed)',
+              '''    def _make_synth_runtime(\n        self,\n        selected_index: int,\n    ) -> SynthState:\n        return SynthState(self._synths, selected_index)\n\n    def _runtime(self, role: SynthRole) -> SynthState:\n        if role == "chord":\n            return self._chord_synth\n        if role == "strum":\n            return self._strum_synth\n        return self._bass_synth\n\n''',
+              s,
+              'SynthState factory/runtime',
+          )
+
+          s = sub1(
+              r'    def _control_model\(.*?(?=    def _selected_rhythm)',
+              '''    def _control_model(\n        self,\n        role: SynthRole,\n        group: str,\n    ) -> list[dict[str, Any]]:\n        return self._runtime(role).control_model(group)\n\n''',
+              s,
+              'control model delegate',
+          )
+
+          s = sub1(
+              r'    @Slot\(\)\n    def copyStrumToChord\(.*?(?=    @Slot\(int\)\n    def setChordSynthIndex)',
+              '''    def _emit_synth_change(\n        self,\n        role: SynthRole,\n        *,\n        selection_changed: bool,\n    ) -> None:\n        if role == "chord":\n            if selection_changed:\n                self.chordSynthStateChanged.emit()\n            self.chordSynthControlsChanged.emit()\n        elif role == "strum":\n            if selection_changed:\n                self.strumSynthStateChanged.emit()\n            self.strumSynthControlsChanged.emit()\n        else:\n            if selection_changed:\n                self.bassSynthStateChanged.emit()\n            self.bassSynthControlsChanged.emit()\n\n    @Slot()\n    def copyStrumToChord(self) -> None:\n        self._chord_synth.copy_from(self._strum_synth)\n        self._chord_volume = self._strum_volume\n\n        self._emit_synth_change("chord", selection_changed=True)\n        self.chordVolumeChanged.emit()\n\n        self._send_synth_state("chord")\n        self._client.send_message(\n            self._chord_amp_address,\n            self._chord_volume,\n        )\n\n''',
+              s,
+              'copy/emit synth state',
+          )
+
+          s = sub1(
+              r'    def _set_synth_index\(.*?(?=    @Slot\(str, float\)\n    def setChordSynthControl)',
+              '''    def _set_synth_index(\n        self,\n        role: SynthRole,\n        synth_index: int,\n    ) -> None:\n        runtime = self._runtime(role)\n        if not runtime.select(synth_index):\n            return\n        self._emit_synth_change(role, selection_changed=True)\n        self._send_synth_state(role)\n\n''',
+              s,
+              'select synth delegate',
+          )
+
+          s = sub1(
+              r'    def _set_synth_control\(.*?(?=    def _tuning_note_offset)',
+              '''    def _set_synth_control(\n        self,\n        role: SynthRole,\n        key: str,\n        value: float,\n    ) -> None:\n        runtime = self._runtime(role)\n        if not runtime.set_control(key, value):\n            return\n\n        # UI edits publish the same complete logical state as preset loads and\n        # instrument switches. AmySerialClient diffs this state and sends only\n        # the engine parameters which actually changed.\n        self._emit_synth_change(role, selection_changed=False)\n        self._send_synth_state(role)\n\n''',
+              s,
+              'set synth control delegate',
+          )
+
+          s = sub1(
+              r'                "parameters": \(\n                    collect_synth_parameter_overrides\(\n                        self\._synths,\n                        runtime\.values_by_synth,\n                    \)\n                \),',
+              '                "parameters": runtime.sparse_overrides(),',
+              s,
+              'preset sparse serialization',
+          )
+
+          s = sub1(
+              r'    def _fresh_synth_runtime\(.*?(?=    def _apply_preset_data)',
+              '',
+              s,
+              'remove duplicate preset synth construction',
+          )
+
+          s = sub1(
+              r'        synth_data = data\.get\("synths", \{\}\).*?(?=        volumes = data\.get)',
+              '''        synth_data = data.get("synths", {})\n\n        if isinstance(synth_data, dict):\n            for role in ("chord", "strum", "bass"):\n                role_data = synth_data.get(role, {})\n                if isinstance(role_data, dict):\n                    self._runtime(role).load_preset(role_data)\n\n''',
+              s,
+              'preset load delegates to SynthState',
+          )
+
+          s = sub1(
+              r'    def _selected_synth\(.*?(?=    def _rhythm_payload)',
+              '''    def _selected_synth(\n        self,\n        role: SynthRole,\n    ) -> SynthDefinition:\n        return self._runtime(role).selected_definition\n\n    def _send_synth_state(self, role: SynthRole) -> None:\n        if role == "chord":\n            address = self._chord_synth_address\n        elif role == "strum":\n            address = self._strum_synth_address\n        else:\n            address = self._bass_synth_address\n        self._client.send_message(\n            address,\n            self._runtime(role).transport_payload(),\n        )\n\n''',
+              s,
+              'single frontend synth transport path',
+          )
+
+          forbidden = (
+              'SynthRuntime',
+              'values_by_synth',
+              'collect_synth_parameter_overrides',
+              '_fresh_synth_runtime',
+              '_apply_synth_preset',
+              '_send_synth_name',
+              '_send_synth_params',
+          )
+          for token in forbidden:
+              if token in s:
+                  raise SystemExit(f'main.py still contains duplicate path: {token}')
+          compile(s, str(main_path), 'exec')
+          main_path.write_text(s, encoding='utf-8')
+
+          # ---------------- AMY receiver ----------------
+          a = amy_path.read_text(encoding='utf-8')
+
+          a = sub1(
+              r'    def _apply_supported_params\(.*?(?=    def _restore_manual_chord_after_patch)',
+              '''    def _sync_synth_params(\n        self,\n        role: str,\n        synth_ids: tuple[int, ...] | None = None,\n        parameter_keys: set[str] | None = None,\n    ) -> None:\n        targets = self._role_synth_ids(role) if synth_ids is None else synth_ids\n        for synth in targets:\n            for command in self._param_commands_for_synth(\n                role, synth, parameter_keys\n            ):\n                self._wire(command)\n\n    def _apply_supported_params(\n        self,\n        role: str,\n        parameter_keys: set[str] | None = None,\n    ) -> None:\n        self._sync_synth_params(role, parameter_keys=parameter_keys)\n\n''',
+              a,
+              'central AMY param sync',
+          )
+
+          a = sub1(
+              r'    def _select_synth\(.*?(?=    def _set_volume)',
+              '''    @staticmethod\n    def _changed_param_keys(\n        old_params: dict[str, float],\n        new_params: dict[str, float],\n    ) -> set[str]:\n        changed: set[str] = set()\n        for key in set(old_params) | set(new_params):\n            old_value = old_params.get(key)\n            new_value = new_params.get(key)\n            if old_value is None or new_value is None:\n                if old_value != new_value:\n                    changed.add(key)\n                continue\n            if not math.isclose(\n                float(old_value),\n                float(new_value),\n                rel_tol=0.0,\n                abs_tol=1e-12,\n            ):\n                changed.add(key)\n        return changed\n\n    def _apply_synth_state(\n        self,\n        role: str,\n        name: str,\n        params: dict[str, float],\n        *,\n        force_patch: bool = False,\n    ) -> None:\n        """Converge one logical synth role onto the supplied complete state.\n\n        This is the only normal synth-state mutation path on the AMY side.\n        Startup/preset messages, instrument switches and slider edits all arrive\n        here as the same complete state. A same-instrument update is diffed and\n        changes only affected parameters; an instrument change performs the\n        ordered patch transaction.\n        """\n        name = str(name)\n        if name not in self.patch_map:\n            print(f"AMY warning: refusing unknown synth {name!r}", flush=True)\n            return\n\n        old_params = dict(self.synth_params[role])\n        new_params = dict(params)\n        changed_keys = self._changed_param_keys(old_params, new_params)\n        name_changed = force_patch or self.selected_synth[role] != name\n        was_active = self._adsr_override_active.get(role, False)\n\n        if role == "strum" and name_changed:\n            self._cancel_strum_tail()\n            self._wire(f"l0i{self.synth_id['strum']}Z")\n\n        rhythm_generation: int | None = None\n        rhythm_config: dict[str, Any] | None = None\n        if role == "chord" and name_changed and self.rhythm_running:\n            rhythm_generation, rhythm_config = self._prepare_rhythm_rebuild(\n                reset_phase=False\n            )\n\n        self.selected_synth[role] = name\n        self.synth_params[role] = new_params\n        now_active = self._adsr_is_active(role)\n        self._adsr_override_active[role] = now_active\n\n        if name_changed or (was_active and not now_active):\n            self._configure_synth(role)\n        elif changed_keys:\n            self._apply_supported_params(role, changed_keys)\n\n        if rhythm_generation is not None and rhythm_config is not None:\n            self.writer.delay(self._rhythm_guard_seconds())\n            self._install_rhythm_schedule(rhythm_generation, rhythm_config)\n\n        if role == "chord" and name_changed:\n            self._restore_manual_chord_after_patch()\n\n    def _set_synth_state(self, role: str, state: Any) -> None:\n        if not isinstance(state, dict):\n            self._set_synth_name(role, str(state))\n            return\n        self._apply_synth_state(\n            role,\n            str(state.get("name", "")),\n            self._params_from_list(state.get("params", [])),\n        )\n\n    def _set_synth_name(self, role: str, name: str) -> None:\n        # Compatibility for old senders. New frontend code always sends the\n        # complete state object.\n        self._apply_synth_state(role, str(name), {}, force_patch=True)\n\n    def _set_params(self, role: str, values: Any) -> None:\n        # Compatibility for old senders: feed the parameter-only packet back\n        # through the same complete-state convergence method.\n        self._apply_synth_state(\n            role,\n            self.selected_synth[role],\n            self._params_from_list(values),\n        )\n\n''',
+              a,
+              'single AMY synth state convergence path',
+          )
+
+          a = sub1(
+              r'    def _rebuild_rhythm\(self, \*, reset_phase: bool\) -> None:\n        generation, config = self\._prepare_rhythm_rebuild\(\n            reset_phase=reset_phase\n        \)\n        if generation is None or config is None:\n            return\n        self\._install_rhythm_schedule\(generation, config\)\n',
+              '''    def _rebuild_rhythm(\n        self,\n        *,\n        reset_phase: bool,\n        resync_chord: bool = False,\n    ) -> None:\n        generation, config = self._prepare_rhythm_rebuild(\n            reset_phase=reset_phase\n        )\n        if generation is None or config is None:\n            return\n\n        # The ESP32-P4 command path applies patch/parameter deltas at audio\n        # block boundaries. Before the first automatic chord after transport\n        # starts, explicitly converge synth 4 from the same stored chord state\n        # used by manual synth 3. This closes the startup/preset race observed\n        # on hardware without reloading the patch.\n        if resync_chord and self.rhythm_chord_enabled:\n            self._sync_synth_params(\n                "chord",\n                (self.synth_id["rhythm_chord"],),\n            )\n\n        self._install_rhythm_schedule(generation, config)\n''',
+              a,
+              'rhythm optional synth4 convergence',
+          )
+
+          old_start = '''            if new_state:\n                self.rhythm_running = True\n                self._rebuild_rhythm(reset_phase=True)\n'''
+          new_start = '''            if new_state:\n                self.rhythm_running = True\n                self._rebuild_rhythm(\n                    reset_phase=True,\n                    resync_chord=True,\n                )\n'''
+          if old_start not in a:
+              raise SystemExit('rhythm start anchor missing')
+          a = a.replace(old_start, new_start, 1)
+
+          old_enable = '''            if self.rhythm_running:\n                self._rebuild_rhythm(reset_phase=False)\n        elif address == a["rhythm_running"]:\n'''
+          new_enable = '''            if self.rhythm_running:\n                self._rebuild_rhythm(\n                    reset_phase=False,\n                    resync_chord=enabled,\n                )\n        elif address == a["rhythm_running"]:\n'''
+          if old_enable not in a:
+              raise SystemExit('rhythm chord enable anchor missing')
+          a = a.replace(old_enable, new_enable, 1)
+
+          compile(a, str(amy_path), 'exec')
+          amy_path.write_text(a, encoding='utf-8')
+          PY
+
+      - name: Update unit suite
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('amysynth_version/qt_frontend/tests/run_tests.py')
+          s = p.read_text(encoding='utf-8')
+          old = '''    "unit-controls": (\n        TESTS / "test_instrument_defaults.py",\n        TESTS / "test_static_contracts.py",\n    ),\n'''
+          new = '''    "unit-controls": (\n        TESTS / "test_instrument_defaults.py",\n        TESTS / "test_synth_state.py",\n        TESTS / "test_static_contracts.py",\n    ),\n'''
+          if old not in s:
+              raise SystemExit('unit suite anchor missing')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Compile refactored modules
+        run: |
+          python3 -m py_compile \
+            amysynth_version/qt_frontend/code/main.py \
+            amysynth_version/qt_frontend/code/synth_state.py \
+            amysynth_version/qt_frontend/code/amy_serial.py
+
+      - name: Commit refactor
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            amysynth_version/qt_frontend/code/main.py \
+            amysynth_version/qt_frontend/code/amy_serial.py \
+            amysynth_version/qt_frontend/tests/run_tests.py
+          git commit -m 'Centralize synth state mutation and transport'
+          git push origin HEAD:feature/instrument-control-defaults
