@@ -1,0 +1,23 @@
+name: Temporary instrument catalog dump
+
+on:
+  push:
+    branches: [feature/instrument-control-defaults]
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Print compact catalog
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('amysynth_version/qt_frontend/instruments/synths.json')
+          data = json.loads(p.read_text())
+          for s in data['synths']:
+              defaults = {c['key']: c['default'] for c in s['controls']}
+              print(f"{s['key']}\t{s['engine']}\t{s.get('patch')}\t{s['label']}\t{defaults}")
+          print('COUNT', len(data['synths']))
+          PY
