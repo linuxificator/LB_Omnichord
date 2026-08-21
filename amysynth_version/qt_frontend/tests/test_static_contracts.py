@@ -70,11 +70,19 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("self._runtime(role).transport_payload()", main_py)
         self.assertIn("def _apply_synth_state(", amy_py)
         self.assertIn("self._apply_synth_state(\n            role,", amy_py)
-        self.assertIn("resync_chord=True", amy_py)
-        self.assertIn('self._sync_synth_params(\n                "chord",', amy_py)
+        self.assertIn('self._sync_synth_params(\n                    "chord",', amy_py)
 
-        # These were the old parallel mutation/transport paths. Reintroducing
-        # them would make startup/preset/UI behavior capable of diverging again.
+        # Rhythm is now independent tagged lanes. Reintroducing the previous
+        # whole-sequencer rebuild helpers would again make lane-local edits able
+        # to interrupt drums/bass/chords together.
+        self.assertIn("class _TaggedSequencerLane:", amy_py)
+        self.assertIn("def _replace_lane(", amy_py)
+        self.assertIn('self._replace_lane("bass")', amy_py)
+        self.assertIn('self._replace_lane("chords")', amy_py)
+        self.assertNotIn("def _prepare_rhythm_rebuild(", amy_py)
+        self.assertNotIn("def _rebuild_rhythm(", amy_py)
+
+        # These were the old parallel synth mutation/transport paths.
         for forbidden in (
             "class SynthRuntime",
             "values_by_synth",
@@ -85,9 +93,8 @@ class StaticContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, main_py, forbidden)
 
-
     def test_left_rail_has_no_rhythm_reset_and_uses_common_reset_labels(self) -> None:
-        qml = (FRONTEND / "gui" / "Main.qml").read_text(encoding="utf-8")
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         self.assertIn("property int leftRailWidth: 64", qml)
         self.assertNotIn("resetRhythmControlsToPreset", qml)
         self.assertNotIn('text: "RHY"', qml)
