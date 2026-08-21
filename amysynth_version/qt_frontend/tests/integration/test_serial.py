@@ -1,13 +1,45 @@
 from __future__ import annotations
 
+import re
 import unittest
 
 from catalog import control_default, patch_for_index, synth_index
 from harness import HeadlessApp
 
 
+_NOTE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
+
+
 def wire_float(value: float) -> str:
     return f"{float(value):.9g}"
+
+
+def scheduled_note_ons(lines: list[str], synth: int) -> list[float]:
+    pattern = re.compile(
+        rf"^H\d+,\d+n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
+    )
+    notes: list[float] = []
+    for line in lines:
+        match = pattern.match(line)
+        if match and float(match.group("vel")) > 0.0:
+            notes.append(float(match.group("note")))
+    return notes
+
+
+def immediate_note_ons(lines: list[str], synth: int) -> list[float]:
+    pattern = re.compile(
+        rf"^n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
+    )
+    notes: list[float] = []
+    for line in lines:
+        match = pattern.match(line)
+        if match and float(match.group("vel")) > 0.0:
+            notes.append(float(match.group("note")))
+    return notes
+
+
+def contains_fractional_pitch(notes: list[float]) -> bool:
+    return any(abs(note - round(note)) > 1e-5 for note in notes)
 
 
 class SerialIntegrationTests(unittest.TestCase):
@@ -60,6 +92,141 @@ class SerialIntegrationTests(unittest.TestCase):
             )
             self.assertNotIn(f"K{chorus_patch}i3Z", edit_lines)
             self.assertNotIn(f"K{chorus_patch}i4Z", edit_lines)
+
+    def test_every_note_path_follows_live_tuning_change(self) -> None:
+        """EQ/HARM changes must reach manual, rhythm, bass and strum pitches."""
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            # Use a known C-major chord so HARM changes E/G while C remains the
+            # reference. High accompaniment activity guarantees non-root notes
+            # are represented in both rhythm-chord and bass schedules.
+            app.action("setRowChordType", 0, 0)  # major = 0,4,7
+            app.action("setTuningModeIndex", 1)  # EQ
+            app.action("setRhythmChordActivity", 4.0)
+            app.action("setRhythmBassActivity", 4.0)
+            if not bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+            app.action("selectChord", 0, 0)  # C major becomes the active chord
+            app.bridge.wait_idle(timeout=8.0)
+
+            eq_start = app.bridge.count()
+            if not bool(app.query("rhythmRunning")):
+                app.action("toggleRhythm")
+            else:
+                # Re-publish active pitch state and force a schedule rebuild in
+                # the known EQ state.
+                app.action("setTuningModeIndex", 0)
+                app.action("setTuningModeIndex", 1)
+            app.bridge.wait_for_lines(["zY1Z"], start=eq_start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            eq_lines = app.bridge.lines_since(eq_start)
+            eq_bass = scheduled_note_ons(eq_lines, 1)
+            eq_rhythm_chords = scheduled_note_ons(eq_lines, 4)
+            self.assertTrue(eq_bass, "EQ schedule contains no bass note-ons")
+            self.assertTrue(
+                eq_rhythm_chords,
+                "EQ schedule contains no automatic chord note-ons",
+            )
+
+            # Changing only the tuning mode must rebuild both accompaniment
+            # pitch lanes from the same newly tuned chord state.
+            harm_start = app.bridge.count()
+            app.action("setTuningModeIndex", 0)  # HARM
+            app.bridge.wait_for_lines(
+                ["S4096Z", "zY1Z"], start=harm_start, timeout=8.0
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            harm_lines = app.bridge.lines_since(harm_start)
+            harm_bass = scheduled_note_ons(harm_lines, 1)
+            harm_rhythm_chords = scheduled_note_ons(harm_lines, 4)
+            self.assertTrue(harm_bass, "HARM rebuild contains no bass note-ons")
+            self.assertTrue(
+                harm_rhythm_chords,
+                "HARM rebuild contains no automatic chord note-ons",
+            )
+            self.assertNotEqual(
+                eq_bass,
+                harm_bass,
+                "bass schedule did not change pitch when EQ changed to HARM",
+            )
+            self.assertNotEqual(
+                eq_rhythm_chords,
+                harm_rhythm_chords,
+                "rhythm-chord schedule did not change pitch when EQ changed to HARM",
+            )
+            self.assertTrue(
+                contains_fractional_pitch(harm_bass),
+                "HARM bass schedule contains no intonation-adjusted pitch",
+            )
+            self.assertTrue(
+                contains_fractional_pitch(harm_rhythm_chords),
+                "HARM rhythm-chord schedule contains no intonation-adjusted pitch",
+            )
+
+            # A physically held chord must retune in place through synth 3.
+            app.action("pressChord", 0, 0)
+            app.bridge.wait_idle(timeout=8.0)
+            manual_eq_start = app.bridge.count()
+            app.action("setTuningModeIndex", 1)  # back to EQ while held
+            app.bridge.wait_idle(timeout=8.0)
+            eq_manual = immediate_note_ons(
+                app.bridge.lines_since(manual_eq_start), 3
+            )
+            self.assertTrue(eq_manual, "held chord was not resent for EQ")
+            self.assertFalse(
+                contains_fractional_pitch(eq_manual),
+                "equal-tempered C-major chord unexpectedly contains fractional pitches",
+            )
+
+            manual_harm_start = app.bridge.count()
+            app.action("setTuningModeIndex", 0)
+            app.bridge.wait_idle(timeout=8.0)
+            harm_manual = immediate_note_ons(
+                app.bridge.lines_since(manual_harm_start), 3
+            )
+            self.assertTrue(harm_manual, "held chord was not resent for HARM")
+            self.assertTrue(
+                contains_fractional_pitch(harm_manual),
+                "held chord did not acquire HARM intonation",
+            )
+            self.assertNotEqual(eq_manual, harm_manual)
+            app.action("releaseChord", 0, 0)
+            app.bridge.wait_idle(timeout=8.0)
+
+            # Strum notes are generated at gesture time. The same touch
+            # positions must therefore produce equal-tempered notes in EQ and
+            # intonation-adjusted notes in HARM.
+            app.action("setTuningModeIndex", 1)
+            app.bridge.wait_idle(timeout=8.0)
+            eq_strum_start = app.bridge.count()
+            for y in (0.21, 0.37, 0.53, 0.69):
+                app.action("strumTap", y)
+            app.bridge.wait_idle(timeout=8.0)
+            eq_strum = immediate_note_ons(
+                app.bridge.lines_since(eq_strum_start), 2
+            )
+            self.assertTrue(eq_strum, "EQ strum generated no notes")
+
+            app.action("setTuningModeIndex", 0)
+            app.bridge.wait_idle(timeout=8.0)
+            harm_strum_start = app.bridge.count()
+            for y in (0.21, 0.37, 0.53, 0.69):
+                app.action("strumTap", y)
+            app.bridge.wait_idle(timeout=8.0)
+            harm_strum = immediate_note_ons(
+                app.bridge.lines_since(harm_strum_start), 2
+            )
+            self.assertEqual(len(eq_strum), len(harm_strum))
+            self.assertNotEqual(
+                eq_strum,
+                harm_strum,
+                "strum pitches did not follow the tuning change",
+            )
+            self.assertTrue(
+                contains_fractional_pitch(harm_strum),
+                "HARM strum contains no intonation-adjusted pitch",
+            )
 
     def test_serial_framing_and_live_chord_patch_order(self) -> None:
         brass_index = synth_index("Brass Ensemble")
