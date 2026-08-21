@@ -903,16 +903,25 @@ class AmySerialClient:
             for key in ("attack_ms", "decay_ms", "sustain", "release_ms")
         )
 
+    def _sync_synth_params(
+        self,
+        role: str,
+        synth_ids: tuple[int, ...] | None = None,
+        parameter_keys: set[str] | None = None,
+    ) -> None:
+        targets = self._role_synth_ids(role) if synth_ids is None else synth_ids
+        for synth in targets:
+            for command in self._param_commands_for_synth(
+                role, synth, parameter_keys
+            ):
+                self._wire(command)
+
     def _apply_supported_params(
         self,
         role: str,
         parameter_keys: set[str] | None = None,
     ) -> None:
-        for synth in self._role_synth_ids(role):
-            for command in self._param_commands_for_synth(
-                role, synth, parameter_keys
-            ):
-                self._wire(command)
+        self._sync_synth_params(role, parameter_keys=parameter_keys)
 
     def _restore_manual_chord_after_patch(self) -> None:
         if self._manual_active_id is None:
@@ -921,75 +930,18 @@ class AmySerialClient:
         for note in self._manual_active_notes:
             self._wire(f"n{self._f(note)}l1i{synth}Z")
 
-    def _select_synth(
-        self,
-        role: str,
-        name: str,
-        params: dict[str, float],
-    ) -> None:
-        """Apply one instrument selection as an ordered AMY transaction."""
-        name = str(name)
-        if name not in self.patch_map:
-            print(f"AMY warning: refusing unknown synth {name!r}", flush=True)
-            return
-
-        if role == "strum":
-            self._cancel_strum_tail()
-            self._wire(f"l0i{self.synth_id['strum']}Z")
-
-        # If chord accompaniment is live, stop and clear its old sequencer
-        # events BEFORE changing synth 4.  The previous implementation did the
-        # rebuild after repatching, leaving a window in which old scheduled
-        # events could race the patch transition on the target device.
-        rhythm_generation: int | None = None
-        rhythm_config: dict[str, Any] | None = None
-        if role == "chord" and getattr(self, "rhythm_running", False):
-            rhythm_generation, rhythm_config = self._prepare_rhythm_rebuild(
-                reset_phase=False
-            )
-
-        self.selected_synth[role] = name
-        self.synth_params[role] = dict(params)
-        self._adsr_override_active[role] = self._adsr_is_active(role)
-        self._configure_synth(role)
-
-        if rhythm_generation is not None and rhythm_config is not None:
-            # K/parameter commands are deltas as well.  Give AMY several audio
-            # blocks to settle the new synth definitions before restarting the
-            # sequencer, rather than relying on UART parser timing.
-            self.writer.delay(self._rhythm_guard_seconds())
-            self._install_rhythm_schedule(rhythm_generation, rhythm_config)
-
-        if role == "chord":
-            self._restore_manual_chord_after_patch()
-
-    def _set_synth_state(self, role: str, state: Any) -> None:
-        """Select an instrument and restore its complete stored slider state."""
-        if not isinstance(state, dict):
-            self._set_synth_name(role, str(state))
-            return
-        self._select_synth(
-            role,
-            str(state.get("name", "")),
-            self._params_from_list(state.get("params", [])),
-        )
-
-    def _set_synth_name(self, role: str, name: str) -> None:
-        # Legacy logical callers have no parameter payload.  Route them through
-        # the same transaction instead of maintaining a second patch path.
-        self._select_synth(role, str(name), {})
-
-    def _set_params(self, role: str, values: Any) -> None:
-        old_params = self.synth_params[role]
-        new_params = self._params_from_list(values)
-
-        changed_keys: set[str] = set()
+    @staticmethod
+    def _changed_param_keys(
+        old_params: dict[str, float],
+        new_params: dict[str, float],
+    ) -> set[str]:
+        changed: set[str] = set()
         for key in set(old_params) | set(new_params):
             old_value = old_params.get(key)
             new_value = new_params.get(key)
             if old_value is None or new_value is None:
                 if old_value != new_value:
-                    changed_keys.add(key)
+                    changed.add(key)
                 continue
             if not math.isclose(
                 float(old_value),
@@ -997,24 +949,87 @@ class AmySerialClient:
                 rel_tol=0.0,
                 abs_tol=1e-12,
             ):
-                changed_keys.add(key)
+                changed.add(key)
+        return changed
 
+    def _apply_synth_state(
+        self,
+        role: str,
+        name: str,
+        params: dict[str, float],
+        *,
+        force_patch: bool = False,
+    ) -> None:
+        """Converge one logical synth role onto the supplied complete state.
+
+        This is the only normal synth-state mutation path on the AMY side.
+        Startup/preset messages, instrument switches and slider edits all arrive
+        here as the same complete state. A same-instrument update is diffed and
+        changes only affected parameters; an instrument change performs the
+        ordered patch transaction.
+        """
+        name = str(name)
+        if name not in self.patch_map:
+            print(f"AMY warning: refusing unknown synth {name!r}", flush=True)
+            return
+
+        old_params = dict(self.synth_params[role])
+        new_params = dict(params)
+        changed_keys = self._changed_param_keys(old_params, new_params)
+        name_changed = force_patch or self.selected_synth[role] != name
         was_active = self._adsr_override_active.get(role, False)
+
+        if role == "strum" and name_changed:
+            self._cancel_strum_tail()
+            self._wire(f"l0i{self.synth_id['strum']}Z")
+
+        rhythm_generation: int | None = None
+        rhythm_config: dict[str, Any] | None = None
+        if role == "chord" and name_changed and self.rhythm_running:
+            rhythm_generation, rhythm_config = self._prepare_rhythm_rebuild(
+                reset_phase=False
+            )
+
+        self.selected_synth[role] = name
         self.synth_params[role] = new_params
         now_active = self._adsr_is_active(role)
         self._adsr_override_active[role] = now_active
 
-        if was_active and not now_active:
+        if name_changed or (was_active and not now_active):
             self._configure_synth(role)
-            if role == "chord" and self._manual_active_id is not None:
-                for note in self._manual_active_notes:
-                    self._wire(
-                        f"n{self._f(note)}l1i{self.synth_id['manual_chord']}Z"
-                    )
-            return
-
-        if changed_keys:
+        elif changed_keys:
             self._apply_supported_params(role, changed_keys)
+
+        if rhythm_generation is not None and rhythm_config is not None:
+            self.writer.delay(self._rhythm_guard_seconds())
+            self._install_rhythm_schedule(rhythm_generation, rhythm_config)
+
+        if role == "chord" and name_changed:
+            self._restore_manual_chord_after_patch()
+
+    def _set_synth_state(self, role: str, state: Any) -> None:
+        if not isinstance(state, dict):
+            self._set_synth_name(role, str(state))
+            return
+        self._apply_synth_state(
+            role,
+            str(state.get("name", "")),
+            self._params_from_list(state.get("params", [])),
+        )
+
+    def _set_synth_name(self, role: str, name: str) -> None:
+        # Compatibility for old senders. New frontend code always sends the
+        # complete state object.
+        self._apply_synth_state(role, str(name), {}, force_patch=True)
+
+    def _set_params(self, role: str, values: Any) -> None:
+        # Compatibility for old senders: feed the parameter-only packet back
+        # through the same complete-state convergence method.
+        self._apply_synth_state(
+            role,
+            self.selected_synth[role],
+            self._params_from_list(values),
+        )
 
     def _set_volume(self, role: str, value: Any) -> None:
         level = max(0.0, min(1.0, float(value)))
@@ -1267,12 +1282,29 @@ class AmySerialClient:
         self._rhythm_commands(generation)
         self._wire("zY1Z", low_generation=generation)
 
-    def _rebuild_rhythm(self, *, reset_phase: bool) -> None:
+    def _rebuild_rhythm(
+        self,
+        *,
+        reset_phase: bool,
+        resync_chord: bool = False,
+    ) -> None:
         generation, config = self._prepare_rhythm_rebuild(
             reset_phase=reset_phase
         )
         if generation is None or config is None:
             return
+
+        # The ESP32-P4 command path applies patch/parameter deltas at audio
+        # block boundaries. Before the first automatic chord after transport
+        # starts, explicitly converge synth 4 from the same stored chord state
+        # used by manual synth 3. This closes the startup/preset race observed
+        # on hardware without reloading the patch.
+        if resync_chord and self.rhythm_chord_enabled:
+            self._sync_synth_params(
+                "chord",
+                (self.synth_id["rhythm_chord"],),
+            )
+
         self._install_rhythm_schedule(generation, config)
 
     def _cancel_strum_tail(self) -> None:
@@ -1428,12 +1460,18 @@ class AmySerialClient:
             if not enabled:
                 self._wire(f"l0i{self.synth_id['rhythm_chord']}Z")
             if self.rhythm_running:
-                self._rebuild_rhythm(reset_phase=False)
+                self._rebuild_rhythm(
+                    reset_phase=False,
+                    resync_chord=enabled,
+                )
         elif address == a["rhythm_running"]:
             new_state = bool(int(value))
             if new_state:
                 self.rhythm_running = True
-                self._rebuild_rhythm(reset_phase=True)
+                self._rebuild_rhythm(
+                    reset_phase=True,
+                    resync_chord=True,
+                )
             else:
                 self.rhythm_running = False
                 self.writer.new_low_generation()
