@@ -57,6 +57,30 @@ class StaticContractTests(unittest.TestCase):
                     self.assertEqual(minimum, 0.0)
                     self.assertEqual(maximum, 1.0)
 
+    def test_synth_state_has_one_frontend_and_one_receiver_path(self) -> None:
+        main_py = (ROOT / "code" / "main.py").read_text(encoding="utf-8")
+        amy_py = (ROOT / "code" / "amy_serial.py").read_text(encoding="utf-8")
+        state_py = (ROOT / "code" / "synth_state.py").read_text(encoding="utf-8")
+
+        self.assertIn("class SynthState:", state_py)
+        self.assertIn("from synth_state import SynthState", main_py)
+        self.assertIn("self._runtime(role).load_preset(role_data)", main_py)
+        self.assertIn("runtime.set_control(key, value)", main_py)
+        self.assertIn("self._runtime(role).transport_payload()", main_py)
+        self.assertIn("def _apply_synth_state(", amy_py)
+
+        # These were the old parallel mutation/transport paths. Reintroducing
+        # them would make startup/preset/UI behavior capable of diverging again.
+        for forbidden in (
+            "class SynthRuntime",
+            "values_by_synth",
+            "collect_synth_parameter_overrides",
+            "def _apply_synth_preset(",
+            "def _send_synth_name(",
+            "def _send_synth_params(",
+        ):
+            self.assertNotIn(forbidden, main_py, forbidden)
+
 
 if __name__ == "__main__":
     unittest.main()
