@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 import unittest
 
 from catalog import control_default, patch_for_index, synth_index
@@ -36,6 +37,27 @@ def immediate_note_ons(lines: list[str], synth: int) -> list[float]:
         if match and float(match.group("vel")) > 0.0:
             notes.append(float(match.group("note")))
     return notes
+
+
+def wait_for_immediate_note_ons(
+    app: HeadlessApp,
+    start: int,
+    synth: int,
+    *,
+    minimum_count: int,
+    timeout: float = 5.0,
+) -> list[float]:
+    """Wait for queued writer output instead of inferring it from idle age."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        notes = immediate_note_ons(app.bridge.lines_since(start), synth)
+        if len(notes) >= minimum_count:
+            return notes
+        time.sleep(0.01)
+    raise AssertionError(
+        f"expected at least {minimum_count} note-ons for synth {synth}; "
+        f"received:\n" + "\n".join(app.bridge.lines_since(start))
+    )
 
 
 def contains_fractional_pitch(notes: list[float]) -> bool:
@@ -169,11 +191,9 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=8.0)
             manual_eq_start = app.bridge.count()
             app.action("setTuningModeIndex", 1)  # back to EQ while held
-            app.bridge.wait_idle(timeout=8.0)
-            eq_manual = immediate_note_ons(
-                app.bridge.lines_since(manual_eq_start), 3
+            eq_manual = wait_for_immediate_note_ons(
+                app, manual_eq_start, 3, minimum_count=3
             )
-            self.assertTrue(eq_manual, "held chord was not resent for EQ")
             self.assertFalse(
                 contains_fractional_pitch(eq_manual),
                 "equal-tempered C-major chord unexpectedly contains fractional pitches",
@@ -181,11 +201,9 @@ class SerialIntegrationTests(unittest.TestCase):
 
             manual_harm_start = app.bridge.count()
             app.action("setTuningModeIndex", 0)
-            app.bridge.wait_idle(timeout=8.0)
-            harm_manual = immediate_note_ons(
-                app.bridge.lines_since(manual_harm_start), 3
+            harm_manual = wait_for_immediate_note_ons(
+                app, manual_harm_start, 3, minimum_count=3
             )
-            self.assertTrue(harm_manual, "held chord was not resent for HARM")
             self.assertTrue(
                 contains_fractional_pitch(harm_manual),
                 "held chord did not acquire HARM intonation",
@@ -202,20 +220,17 @@ class SerialIntegrationTests(unittest.TestCase):
             eq_strum_start = app.bridge.count()
             for y in (0.21, 0.37, 0.53, 0.69):
                 app.action("strumTap", y)
-            app.bridge.wait_idle(timeout=8.0)
-            eq_strum = immediate_note_ons(
-                app.bridge.lines_since(eq_strum_start), 2
+            eq_strum = wait_for_immediate_note_ons(
+                app, eq_strum_start, 2, minimum_count=4
             )
-            self.assertTrue(eq_strum, "EQ strum generated no notes")
 
             app.action("setTuningModeIndex", 0)
             app.bridge.wait_idle(timeout=8.0)
             harm_strum_start = app.bridge.count()
             for y in (0.21, 0.37, 0.53, 0.69):
                 app.action("strumTap", y)
-            app.bridge.wait_idle(timeout=8.0)
-            harm_strum = immediate_note_ons(
-                app.bridge.lines_since(harm_strum_start), 2
+            harm_strum = wait_for_immediate_note_ons(
+                app, harm_strum_start, 2, minimum_count=4
             )
             self.assertEqual(len(eq_strum), len(harm_strum))
             self.assertNotEqual(
