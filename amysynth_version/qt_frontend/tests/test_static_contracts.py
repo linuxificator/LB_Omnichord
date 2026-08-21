@@ -104,26 +104,16 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn('text: "ROWS"', qml)
         self.assertGreaterEqual(qml.count('text: "RST"'), 4)
 
-    def test_reverb_controls_are_side_by_side_touch_targets(self) -> None:
-        qml = (ROOT / "gui" / "ReverbPanel.qml").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("id: controlsRow", qml)
-        self.assertIn("component PinkControl: Item", qml)
-        self.assertIn("VerticalVolume {", qml)
-        self.assertEqual(qml.count("PinkControl {"), 3)
-        self.assertIn('labelText: "LEV"', qml)
-        self.assertIn('labelText: "LIVE"', qml)
-        self.assertIn('labelText: "DAMP"', qml)
-        self.assertNotIn("Column {", qml)
-
-
     def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
         panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        self.assertIn("id: controlsRow", panel)
         self.assertEqual(panel.count("LabeledSlider {"), 3)
         self.assertNotIn("VerticalVolume {", panel)
         self.assertGreaterEqual(panel.count("width: 145"), 3)
+        self.assertIn('label: "LEV"', panel)
+        self.assertIn('label: "LIVE"', panel)
+        self.assertIn('label: "DAMP"', panel)
         self.assertIn("width: 520", main)
 
     def test_rhythm_transport_canvas_erases_old_symbol(self) -> None:
