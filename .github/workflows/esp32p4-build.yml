@@ -33,19 +33,63 @@ jobs:
           esp_idf_version: v6.0.2
           target: esp32p4
           path: amysynth_version/esp32p4
-          command: bash prepare_amy.sh && idf.py build
+          command: bash prepare_amy.sh && idf.py build && idf.py merge-bin -o build/merged-flash.bin -f raw
 
-      - name: Upload firmware build
+      - name: Assemble portable flash package
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          project=amysynth_version/esp32p4
+          build="$project/build"
+          package="$project/ci-flash"
+
+          rm -rf "$package"
+          mkdir -p "$package/bootloader" "$package/partition_table"
+
+          cp "$build/amy_p4_test.bin" "$package/"
+          cp "$build/amy_p4_test.elf" "$package/"
+          cp "$build/amy_p4_test.map" "$package/"
+          cp "$build/bootloader/bootloader.bin" "$package/bootloader/"
+          cp "$build/partition_table/partition-table.bin" "$package/partition_table/"
+          cp "$build/flash_project_args" "$package/"
+          cp "$build/flash_app_args" "$package/"
+          cp "$build/flash_bootloader_args" "$package/"
+          cp "$build/flasher_args.json" "$package/"
+          cp "$build/merged-flash.bin" "$package/"
+
+          # Keep the legacy name as well because older instructions used it.
+          if [[ -f "$build/flash_args" ]]; then
+            cp "$build/flash_args" "$package/"
+          fi
+
+          cat > "$package/BUILD_INFO" <<EOF
+          repository=${GITHUB_REPOSITORY}
+          commit=${GITHUB_SHA}
+          workflow_run=${GITHUB_RUN_ID}
+          esp_idf=v6.0.2
+          target=esp32p4
+          EOF
+
+          # The argument file must be usable from the artifact root.
+          (
+            cd "$package"
+            test -f amy_p4_test.bin
+            test -f bootloader/bootloader.bin
+            test -f partition_table/partition-table.bin
+            test -f flash_project_args
+            test -f flasher_args.json
+            test -f merged-flash.bin
+            grep -q 'amy_p4_test.bin' flash_project_args
+            grep -q 'bootloader/bootloader.bin' flash_project_args
+            grep -q 'partition_table/partition-table.bin' flash_project_args
+          )
+
+      - name: Upload portable firmware artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: esp32p4-firmware
-          path: |
-            amysynth_version/esp32p4/build/*.bin
-            amysynth_version/esp32p4/build/*.elf
-            amysynth_version/esp32p4/build/*.map
-            amysynth_version/esp32p4/build/bootloader/bootloader.bin
-            amysynth_version/esp32p4/build/partition_table/partition-table.bin
-            amysynth_version/esp32p4/build/flash_args
+          path: amysynth_version/esp32p4/ci-flash/
           if-no-files-found: error
           retention-days: 14
