@@ -97,5 +97,14 @@ class NativeControlTests(unittest.TestCase):
             app.bridge.checkpoint("repeater-sustain")
 
 
+    def test_cold_start_defines_all_five_synths_in_real_amy(self) -> None:
+        with HeadlessApp(native_amy=True) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            for synth in range(5):
+                commands = app.bridge.synth_commands(synth)
+                self.assertTrue(commands, f"native AMY synth {synth} is undefined after cold start")
+            app.bridge.checkpoint("cold-start-all-synths", synths=(0, 1, 2, 3, 4))
+
+
 if __name__ == "__main__":
     unittest.main()

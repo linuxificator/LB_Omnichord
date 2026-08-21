@@ -1171,6 +1171,10 @@ class AmySerialClient:
             return
         self.chord_notes = [float(x) for x in payload.get("notes", [])]
         self.bass_notes = [float(x) for x in payload.get("bass_notes", [])]
+        if "rhythm_chord_enabled" in payload:
+            self.rhythm_chord_enabled = bool(
+                payload.get("rhythm_chord_enabled")
+            )
 
         if payload.get("play_now") and self.chord_notes:
             synth = self.synth_id["manual_chord"]

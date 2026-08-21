@@ -323,5 +323,71 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertNotIn(f"K{brass_patch}i4Z", lines)
 
 
+    def test_cold_start_guards_synth4_and_zero_reverb_is_not_sent(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            records = app.bridge.timed_lines()
+            lines = [line for line, _ in records]
+
+            self.assertNotIn("y0h0Z", lines)
+            self.assertNotIn("y1h0Z", lines)
+
+            k4_index = next(
+                i for i, line in enumerate(lines)
+                if line.startswith("K") and "i4iv" in line
+            )
+            next_synth4_index = next(
+                i for i in range(k4_index + 1, len(lines))
+                if "i4" in lines[i]
+            )
+            elapsed = records[next_synth4_index][1] - records[k4_index][1]
+            self.assertGreaterEqual(
+                elapsed,
+                0.008,
+                f"synth 4 post-allocation command arrived after only {elapsed:.4f}s",
+            )
+
+            start = app.bridge.count()
+            app.action("setPercussionReverb", 0.05)
+            app.bridge.wait_for_lines(["y1h0.05Z"], start=start, timeout=5.0)
+            start = app.bridge.count()
+            app.action("setPercussionReverb", 0.0)
+            app.bridge.wait_for_lines(["y1h0.001Z"], start=start, timeout=5.0)
+            self.assertEqual(float(app.query("percussionReverb")), 0.0)
+
+    def test_long_manual_chord_hold_keeps_rhythm_transport_and_percussion_alive(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            if not bool(app.query("rhythmRunning")):
+                start = app.bridge.count()
+                app.action("toggleRhythm")
+                app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+                app.bridge.wait_idle(timeout=8.0)
+
+            start = app.bridge.count()
+            app.action("pressChord", 0, 0)
+            app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            delta = app.bridge.lines_since(start)
+
+            # One rebuild only. It removes automatic chord events but keeps
+            # percussion/bass and resumes the same transport.
+            self.assertEqual(delta.count("zY0Z"), 1, "manual chord press rebuilt rhythm more than once")
+            self.assertTrue(any(line.startswith("H") and "i0Z" in line for line in delta), delta)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+            time.sleep(1.0)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+            release_start = app.bridge.count()
+            app.action("releaseChord", 0, 0)
+            app.bridge.wait_for_lines(["zY1Z"], start=release_start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            release_delta = app.bridge.lines_since(release_start)
+            self.assertEqual(release_delta.count("zY0Z"), 1, "manual chord release rebuilt rhythm more than once")
+            self.assertTrue(any(line.startswith("H") and "i0Z" in line for line in release_delta), release_delta)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+
 if __name__ == "__main__":
     unittest.main()

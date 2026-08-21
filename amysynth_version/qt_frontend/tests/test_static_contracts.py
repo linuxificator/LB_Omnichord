@@ -86,5 +86,17 @@ class StaticContractTests(unittest.TestCase):
             self.assertNotIn(forbidden, main_py, forbidden)
 
 
+    def test_left_rail_has_no_rhythm_reset_and_uses_common_reset_labels(self) -> None:
+        qml = (FRONTEND / "gui" / "Main.qml").read_text(encoding="utf-8")
+        self.assertIn("property int leftRailWidth: 64", qml)
+        self.assertNotIn("resetRhythmControlsToPreset", qml)
+        self.assertNotIn('text: "RHY"', qml)
+        self.assertNotIn('text: "BAS"', qml)
+        self.assertNotIn('text: "STR"', qml)
+        self.assertNotIn('text: "CHD"', qml)
+        self.assertNotIn('text: "ROWS"', qml)
+        self.assertGreaterEqual(qml.count('text: "RST"'), 4)
+
+
 if __name__ == "__main__":
     unittest.main()

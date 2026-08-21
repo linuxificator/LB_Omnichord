@@ -2644,7 +2644,7 @@ class InstrumentBackend(QObject):
             ),
         )
 
-    def _update_hold_override(self) -> None:
+    def _update_hold_override(self, *, publish: bool = True) -> None:
         should_override = bool(
             self._promoted_chords
         )
@@ -2676,7 +2676,8 @@ class InstrumentBackend(QObject):
         )
 
         self.rhythmControlsChanged.emit()
-        self._send_rhythm_chord_enabled()
+        if publish:
+            self._send_rhythm_chord_enabled()
 
     def _clear_touch_dropout_state(self) -> None:
         for timer in list(
@@ -2913,7 +2914,7 @@ class InstrumentBackend(QObject):
         # This emits chord activity 0 and closes the automatic chord gate
         # before sending the manual note-on.
         self._promoted_chords.add(key)
-        self._update_hold_override()
+        self._update_hold_override(publish=False)
 
         # Last pressed chord becomes the active chord used by strum/bass.
         # Other simultaneously pressed chord voices continue independently.
@@ -3122,6 +3123,10 @@ class InstrumentBackend(QObject):
             "play_now": bool(play_now),
             "rhythm_running": bool(
                 self._rhythm_running
+            ),
+            "rhythm_chord_enabled": bool(
+                self._rhythm_running
+                and self._effective_chord_activity() > 0
             ),
         }
 
