@@ -18,8 +18,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feature/instrument-control-defaults
-      - name: Generate defaults from upstream AMY patches
+      - name: Correct generator and generate defaults
         run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('amysynth_version/qt_frontend/instruments/generate_defaults.py')
+          s = p.read_text()
+          old = '''    lfo = first_command(parts, "v1")\n    pulse = first_command(parts, "v2")\n'''
+          new = '''    lfo = next((part for part in parts if part.startswith("v1") and "f" in part), None)\n    pulse = next((part for part in parts if part.startswith("v2") and "f" in part and "d" in part), None)\n'''
+          if old not in s:
+              raise SystemExit('Juno command-selection anchor missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
           curl -fsSL https://raw.githubusercontent.com/shorepine/amy/main/src/patches.h -o /tmp/amy-patches.h
           python3 amysynth_version/qt_frontend/instruments/generate_defaults.py \
             /tmp/amy-patches.h \
@@ -42,19 +52,23 @@ jobs:
           by_key = {s['key']: s for s in data['synths']}
           def default(key, control):
               return next(c['default'] for c in by_key[key]['controls'] if c['key'] == control)
+          assert default('juno_000', 'lfo_hz') == 0.945
+          assert default('juno_000', 'pulse_width') == 0.902
           assert default('juno_068', 'attack_ms') == 20.0
           assert default('juno_089', 'attack_ms') == 20.0
           assert default('juno_074', 'attack_ms') == 600.0
+          assert default('dx7_128', 'algorithm') == 22.0
+          assert default('dx7_128', 'feedback') == 0.16
           print('validated 123 instruments; all slider defaults explicit and in range')
           PY
-      - name: Commit generated catalogue
+      - name: Commit generator and catalogue
         run: |
-          if git diff --quiet -- amysynth_version/qt_frontend/instruments/synths.json; then
-            echo 'catalogue already current'
+          if git diff --quiet -- amysynth_version/qt_frontend/instruments/generate_defaults.py amysynth_version/qt_frontend/instruments/synths.json; then
+            echo 'generator and catalogue already current'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- amysynth_version/qt_frontend/instruments/synths.json
-          git commit -m 'Populate per-instrument slider defaults'
+          git add -- amysynth_version/qt_frontend/instruments/generate_defaults.py amysynth_version/qt_frontend/instruments/synths.json
+          git commit -m 'Correct AMY modulation defaults'
           git push origin HEAD:feature/instrument-control-defaults
