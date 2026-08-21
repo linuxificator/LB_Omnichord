@@ -1,0 +1,1 @@
+../gui/StrumPad.qml

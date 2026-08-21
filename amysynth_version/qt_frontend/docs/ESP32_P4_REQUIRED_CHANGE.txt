@@ -1,0 +1,16 @@
+The LP-UART HP forwarding task must have more than a 4096-byte stack because
+amy_add_message() can parse and instantiate complete Juno/DX7 patches on this
+task's stack.
+
+In main/main.c change:
+
+    #define AMY_COMMAND_TASK_STACK 4096
+
+to:
+
+    #define AMY_COMMAND_TASK_STACK (16 * 1024)
+
+Then rebuild and flash the ESP32-P4.
+
+This Omnichord revision also fixes the Pi-side AMY wire ordering and removes
+note-off commands sent to synths before they have been defined.
