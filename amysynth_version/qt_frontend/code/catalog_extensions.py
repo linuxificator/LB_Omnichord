@@ -24,7 +24,7 @@ def load_synth_catalog(
                     app_core.SynthControl(
                         key="feedback",
                         label="DECAY",
-                        group="TONE",
+                        group="extra",
                         default=0.985,
                         native_default=0.985,
                         minimum=0.90,
