@@ -7,6 +7,7 @@ from synth_programs import SynthProgram, resolve_program
 
 
 KS_WAVE = 6
+KS_DECAY_CONTROL = "ks_feedback"
 
 
 class ProgramAmySerialClient(base.AmySerialClient):
@@ -63,7 +64,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
         if program.kind != "karplus_strong":
             return []
         feedback = self.synth_params[role].get(
-            "feedback",
+            KS_DECAY_CONTROL,
             0.985 if program.feedback is None else program.feedback,
         )
         feedback = max(0.0, min(0.9999, float(feedback)))
@@ -88,7 +89,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
         if program is None or program.is_rom_patch:
             super()._apply_supported_params(role, parameter_keys)
             return
-        if parameter_keys is not None and "feedback" not in parameter_keys:
+        if parameter_keys is not None and KS_DECAY_CONTROL not in parameter_keys:
             return
         for synth in self._role_synth_ids(role):
             for command in self._physical_param_commands(role, synth, program):
