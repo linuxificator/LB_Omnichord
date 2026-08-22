@@ -59,15 +59,17 @@ class StaticContractTests(unittest.TestCase):
                     self.assertEqual(maximum, 1.0)
 
     def test_synth_state_has_one_frontend_and_one_receiver_path(self) -> None:
-        # main.py is intentionally a thin compatibility entry point now.  The
-        # historical application core stays byte-for-byte in app_core.py while
-        # new live-performance state is isolated in performance_backend.py.
         entry_py = (ROOT / "code" / "main.py").read_text(encoding="utf-8")
         core_py = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
         perf_py = (ROOT / "code" / "performance_backend.py").read_text(
             encoding="utf-8"
         )
-        amy_py = (ROOT / "code" / "amy_serial.py").read_text(encoding="utf-8")
+        public_amy_py = (ROOT / "code" / "amy_serial.py").read_text(
+            encoding="utf-8"
+        )
+        transport_py = (ROOT / "code" / "amy_transport.py").read_text(
+            encoding="utf-8"
+        )
         state_py = (ROOT / "code" / "synth_state.py").read_text(encoding="utf-8")
 
         self.assertIn("class SynthState:", state_py)
@@ -75,23 +77,28 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("self._runtime(role).load_preset(role_data)", core_py)
         self.assertIn("runtime.set_control(key, value)", core_py)
         self.assertIn("self._runtime(role).transport_payload()", core_py)
-        self.assertIn("from performance_backend import InstrumentBackend", entry_py)
+        self.assertIn("from gated_backend import InstrumentBackend", entry_py)
         self.assertIn("class InstrumentBackend(app_core.InstrumentBackend):", perf_py)
-        self.assertIn("def _apply_synth_state(", amy_py)
-        self.assertIn("self._apply_synth_state(\n            role,", amy_py)
-        self.assertIn('self._sync_synth_params(\n                    "chord",', amy_py)
+
+        # The public transport facade owns configuration/program selection; the
+        # stable protocol implementation remains independently inspectable.
+        self.assertIn("from config_loader import load_amy_config", public_amy_py)
+        self.assertNotIn("DEFAULT_CONFIG: dict", public_amy_py)
+        self.assertIn("ProgramAmySerialClient as AmySerialClient", public_amy_py)
+        self.assertIn("def _apply_synth_state(", transport_py)
+        self.assertIn("self._apply_synth_state(\n            role,", transport_py)
+        self.assertIn('self._sync_synth_params(\n                    "chord",', transport_py)
 
         # Rhythm is now independent tagged lanes. Reintroducing the previous
         # whole-sequencer rebuild helpers would again make lane-local edits able
         # to interrupt drums/bass/chords together.
-        self.assertIn("class _TaggedSequencerLane:", amy_py)
-        self.assertIn("def _replace_lane(", amy_py)
-        self.assertIn('self._replace_lane("bass")', amy_py)
-        self.assertIn('self._replace_lane("chords")', amy_py)
-        self.assertNotIn("def _prepare_rhythm_rebuild(", amy_py)
-        self.assertNotIn("def _rebuild_rhythm(", amy_py)
+        self.assertIn("class _TaggedSequencerLane:", transport_py)
+        self.assertIn("def _replace_lane(", transport_py)
+        self.assertIn('self._replace_lane("bass")', transport_py)
+        self.assertIn('self._replace_lane("chords")', transport_py)
+        self.assertNotIn("def _prepare_rhythm_rebuild(", transport_py)
+        self.assertNotIn("def _rebuild_rhythm(", transport_py)
 
-        # These were the old parallel synth mutation/transport paths.
         for forbidden in (
             "class SynthRuntime",
             "values_by_synth",
@@ -131,6 +138,16 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("root.controller.bassVoicingShift", qml)
         self.assertIn(".setBassVoicingShift(value)", qml)
 
+    def test_gated_strum_header_uses_blue_shared_parameter_sliders(self) -> None:
+        qml = (ROOT / "gui_extended" / "Main.qml").read_text(encoding="utf-8")
+        self.assertIn('text: "GTD"', qml)
+        self.assertEqual(qml.count("Base.ParameterSlider {"), 2)
+        self.assertIn("backend.strumGateEnabled", qml)
+        self.assertIn("backend.setStrumGateAttack(value)", qml)
+        self.assertIn("backend.setStrumGateSustain(value)", qml)
+        self.assertIn('fillColor: "#2474b8"', qml)
+        self.assertIn("opacity: enabled ? 1.0 : 0.38", qml)
+
     def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
         panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
@@ -154,11 +171,13 @@ class StaticContractTests(unittest.TestCase):
             config["buses"],
             {"drums": 0, "bass": 1, "strum": 2, "chord": 3},
         )
-        amy_py = (ROOT / "code" / "amy_serial.py").read_text(encoding="utf-8")
-        self.assertIn('self.bus_id["strum"]', amy_py)
-        self.assertIn('self.bus_id["chord"]', amy_py)
-        self.assertIn('f"K{patch}i{synth}iv{voices}iy{bus}Z"', amy_py)
-        self.assertIn("self._apply_reverb_bus(bus)", amy_py)
+        transport_py = (ROOT / "code" / "amy_transport.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('self.bus_id["strum"]', transport_py)
+        self.assertIn('self.bus_id["chord"]', transport_py)
+        self.assertIn('f"K{patch}i{synth}iv{voices}iy{bus}Z"', transport_py)
+        self.assertIn("self._apply_reverb_bus(bus)", transport_py)
 
     def test_silent_factory_juno_patches_get_explicit_excitation(self) -> None:
         config = json.loads(
