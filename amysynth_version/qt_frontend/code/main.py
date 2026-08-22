@@ -19,11 +19,12 @@ from program_amy import ProgramAmyLocalClient, ProgramAmySerialClient
 _original_catalog_loader = _core.load_synth_catalog
 
 
-def _load_synth_catalog(path):
+def load_synth_catalog(path):
+    """Public catalogue loader including non-ROM synth programs."""
     return _extended_catalog(_original_catalog_loader, path)
 
 
-_core.load_synth_catalog = _load_synth_catalog
+_core.load_synth_catalog = load_synth_catalog
 _core.load_amy_config = load_amy_config
 _core.AmySerialClient = ProgramAmySerialClient
 _core.AmyLocalClient = ProgramAmyLocalClient
