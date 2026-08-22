@@ -369,6 +369,14 @@ void app_main(void)
     config.features.audio_in = 0;
     config.features.startup_bleep = 0;
 
+    /*
+     * Physical Strings uses AMY's Karplus-Strong oscillator.  Upstream AMY
+     * defaults to a single KS delay buffer; reserve enough for all melodic
+     * Omnichord roles (1 bass + 2 strum + 7 manual chord + 4 rhythm chord),
+     * with two spare buffers for future voice-layout changes.
+     */
+    config.ks_oscs = 16;
+
 
     /*
      * PCM5102A
