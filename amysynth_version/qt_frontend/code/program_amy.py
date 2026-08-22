@@ -1,30 +1,20 @@
 from __future__ import annotations
 
-import threading
 from typing import Any
 
 import amy_transport as base
 from synth_programs import SynthProgram, resolve_program
 
 
-STRUM_GATE_ADDRESS = "/strum/gate"
 KS_WAVE = 6
 
 
 class ProgramAmySerialClient(base.AmySerialClient):
     """AMY client whose instrument identity is a SynthProgram, not a patch id."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self._strum_gate_enabled = False
-        self._strum_gate_attack = 0.20
-        self._strum_gate_sustain = 0.50
-        self._strum_gate_generation = 0
-        self._strum_gate_level = 1.0
-        super().__init__(*args, **kwargs)
-
     def _program(self, role: str) -> SynthProgram | None:
         # Several transport unit tests deliberately exercise methods on a
-        # partially constructed client.  The generalized layer must remain a
+        # partially constructed client. The generalized layer must remain a
         # transparent extension in that case, not make the old low-level
         # contracts depend on full application configuration.
         config = getattr(self, "config", None)
@@ -151,131 +141,6 @@ class ProgramAmySerialClient(base.AmySerialClient):
 
         if role == "chord" and patch_required:
             self._restore_manual_chord_after_patch()
-
-    # ------------------------------------------------------------------
-    # Original-Omnichord-style strum gate
-    # ------------------------------------------------------------------
-
-    def _emit_strum_gate_level(self, level: float) -> None:
-        self._strum_gate_level = max(0.0, min(1.0, float(level)))
-        synth = self.synth_id["strum"]
-        effective = self.volume["strum"] * self._strum_gate_level
-        self._wire(f"i{synth}iV{self._f(effective)}Z")
-
-    def _schedule_gate_level(
-        self,
-        generation: int,
-        delay_s: float,
-        level: float,
-        *,
-        final: bool = False,
-    ) -> None:
-        def apply() -> None:
-            if generation != self._strum_gate_generation:
-                return
-            self._emit_strum_gate_level(level)
-            if not final:
-                return
-            synth = self.synth_id["strum"]
-            with self._strum_lock:
-                if generation != self._strum_gate_generation:
-                    return
-                self._strum_active_notes.clear()
-            self._wire(f"l0i{synth}Z")
-
-        timer = threading.Timer(max(0.0, delay_s), apply)
-        timer.daemon = True
-        timer.start()
-
-    def _set_strum_gate(self, value: Any) -> None:
-        if not isinstance(value, dict):
-            return
-        was_enabled = self._strum_gate_enabled
-        self._strum_gate_enabled = bool(value.get("enabled", was_enabled))
-        self._strum_gate_attack = max(
-            0.0,
-            min(1.0, float(value.get("attack", self._strum_gate_attack))),
-        )
-        self._strum_gate_sustain = max(
-            0.0,
-            min(1.0, float(value.get("sustain", self._strum_gate_sustain))),
-        )
-        if was_enabled and not self._strum_gate_enabled:
-            self._strum_gate_generation += 1
-            self._emit_strum_gate_level(1.0)
-
-    def _cancel_strum_tail(self) -> None:
-        self._strum_gate_generation += 1
-        super()._cancel_strum_tail()
-
-    def _set_volume(self, role: str, value: Any) -> None:
-        if role != "strum" or not self._strum_gate_enabled:
-            super()._set_volume(role, value)
-            return
-        level = max(0.0, min(1.0, float(value)))
-        self.volume[role] = level
-        self._emit_strum_gate_level(self._strum_gate_level)
-
-    def _strum_note_on(self, note: float) -> None:
-        if not self._strum_gate_enabled:
-            super()._strum_note_on(note)
-            return
-
-        synth = self.synth_id["strum"]
-        midi_key = int(round(note))
-        self._strum_gate_generation += 1
-        generation = self._strum_gate_generation
-
-        with self._strum_lock:
-            duplicate_index = next(
-                (
-                    i
-                    for i, old_note in enumerate(self._strum_active_notes)
-                    if int(round(old_note)) == midi_key
-                ),
-                None,
-            )
-            if duplicate_index is not None:
-                old = self._strum_active_notes.pop(duplicate_index)
-                self._wire(f"n{self._f(old)}l0i{synth}Z")
-
-            max_live = max(1, self.voice_count["strum"])
-            while len(self._strum_active_notes) >= max_live:
-                old = self._strum_active_notes.pop(0)
-                self._wire(f"n{self._f(old)}l0i{synth}Z")
-
-            # The gate is outside the selected timbre: every ROM patch and the
-            # physical-string program therefore receives the same Omnichord
-            # articulation without rewriting its native oscillator envelopes.
-            self._emit_strum_gate_level(0.0)
-            self._wire(f"n{self._f(note)}l1i{synth}Z")
-            self._strum_active_notes.append(note)
-
-        # Normalized UI knobs map to an RC-like opening and decay. Attack is
-        # deliberately much shorter than sustain: 0..300 ms and 60..1600 ms.
-        attack_s = 0.300 * self._strum_gate_attack
-        sustain_s = 0.060 + 1.540 * self._strum_gate_sustain
-
-        attack_steps = 6 if attack_s > 0.001 else 1
-        for step in range(1, attack_steps + 1):
-            frac = step / attack_steps
-            self._schedule_gate_level(generation, attack_s * frac, frac)
-
-        decay_steps = 10
-        for step in range(1, decay_steps + 1):
-            frac = step / decay_steps
-            self._schedule_gate_level(
-                generation,
-                attack_s + sustain_s * frac,
-                1.0 - frac,
-                final=(step == decay_steps),
-            )
-
-    def send_message(self, address: str, value: Any) -> None:
-        if str(address) == STRUM_GATE_ADDRESS:
-            self._set_strum_gate(value)
-            return
-        super().send_message(address, value)
 
 
 class ProgramAmyLocalClient(ProgramAmySerialClient):
