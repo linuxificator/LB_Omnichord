@@ -23,7 +23,18 @@ class ProgramAmySerialClient(base.AmySerialClient):
         super().__init__(*args, **kwargs)
 
     def _program(self, role: str) -> SynthProgram | None:
-        return resolve_program(self.selected_synth[role], self.config)
+        # Several transport unit tests deliberately exercise methods on a
+        # partially constructed client.  The generalized layer must remain a
+        # transparent extension in that case, not make the old low-level
+        # contracts depend on full application configuration.
+        config = getattr(self, "config", None)
+        selected = getattr(self, "selected_synth", None)
+        if not isinstance(config, dict) or not isinstance(selected, dict):
+            return None
+        key = selected.get(role)
+        if key is None:
+            return None
+        return resolve_program(str(key), config)
 
     def _configure_physical_one(
         self, role: str, synth: int, program: SynthProgram
@@ -34,11 +45,9 @@ class ProgramAmySerialClient(base.AmySerialClient):
         bus = self._bus_for_synth(synth)
 
         # Explicit voice geometry makes a physical model no different from a
-        # ROM patch to AMY's synth allocator.  Re-stating it is intentional:
+        # ROM patch to AMY's synth allocator. Re-stating it is intentional:
         # the previous program may have been a 6-osc Juno or 8-osc DX7 voice.
-        self._wire(
-            f"i{synth}iv{voices}in{program.oscs_per_voice}iy{bus}Z"
-        )
+        self._wire(f"i{synth}iv{voices}in{program.oscs_per_voice}iy{bus}Z")
         self._configured_synths.add(synth)
         guard_ms = float(
             self.config.get("performance", {}).get(
@@ -50,9 +59,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
         if program.kind == "karplus_strong":
             wave = KS_WAVE if program.wave is None else int(program.wave)
             feedback = 0.985 if program.feedback is None else program.feedback
-            self._wire(
-                f"v0w{wave}b{self._f(feedback)}i{synth}Z"
-            )
+            self._wire(f"v0w{wave}b{self._f(feedback)}i{synth}Z")
         else:
             raise ValueError(f"unsupported non-ROM program {program.kind!r}")
 
@@ -105,7 +112,14 @@ class ProgramAmySerialClient(base.AmySerialClient):
         *,
         force_patch: bool = False,
     ) -> None:
-        program = resolve_program(str(name), self.config)
+        config = getattr(self, "config", None)
+        if not isinstance(config, dict):
+            super()._apply_synth_state(
+                role, name, params, force_patch=force_patch
+            )
+            return
+
+        program = resolve_program(str(name), config)
         if program is None:
             print(f"AMY warning: refusing unknown synth program {name!r}", flush=True)
             return
@@ -237,7 +251,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
             self._wire(f"n{self._f(note)}l1i{synth}Z")
             self._strum_active_notes.append(note)
 
-        # Normalized UI knobs map to an RC-like opening and decay.  Attack is
+        # Normalized UI knobs map to an RC-like opening and decay. Attack is
         # deliberately much shorter than sustain: 0..300 ms and 60..1600 ms.
         attack_s = 0.300 * self._strum_gate_attack
         sustain_s = 0.060 + 1.540 * self._strum_gate_sustain
@@ -245,11 +259,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
         attack_steps = 6 if attack_s > 0.001 else 1
         for step in range(1, attack_steps + 1):
             frac = step / attack_steps
-            self._schedule_gate_level(
-                generation,
-                attack_s * frac,
-                frac,
-            )
+            self._schedule_gate_level(generation, attack_s * frac, frac)
 
         decay_steps = 10
         for step in range(1, decay_steps + 1):
