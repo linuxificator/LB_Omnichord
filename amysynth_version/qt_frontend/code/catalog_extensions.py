@@ -22,7 +22,7 @@ def load_synth_catalog(
                 label="Ph. Strings",
                 controls=(
                     app_core.SynthControl(
-                        key="feedback",
+                        key="ks_feedback",
                         label="DECAY",
                         group="extra",
                         default=0.985,
