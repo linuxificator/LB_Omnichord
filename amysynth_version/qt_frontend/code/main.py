@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 # Keep the historical `main` import surface stable while new architecture is
 # layered around the already-large application core.
 import app_core as _core
@@ -26,6 +28,7 @@ _core.load_amy_config = load_amy_config
 _core.AmySerialClient = ProgramAmySerialClient
 _core.AmyLocalClient = ProgramAmyLocalClient
 _core.InstrumentBackend = InstrumentBackend
+_core.GUI_DIR = Path(__file__).resolve().parents[1] / "gui_extended"
 
 
 if __name__ == "__main__":
