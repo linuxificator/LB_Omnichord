@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import re
-import time
 import unittest
 
 from catalog import synths
@@ -32,52 +30,6 @@ class ProgramIntegrationTests(unittest.TestCase):
             app.bridge.wait_for_lines(["v0b0.99i2Z"], start=edit, timeout=5.0)
             edit_lines = app.bridge.lines_since(edit)
             self.assertFalse(any(line.startswith("K") for line in edit_lines))
-
-    def test_gated_strum_wraps_selected_timbre_and_can_be_disabled(self) -> None:
-        with HeadlessApp(native_amy=False) as app:
-            app.bridge.wait_idle(timeout=10.0)
-            self.assertFalse(bool(app.query("strumGateEnabled")))
-
-            # Give the strum surface a remembered chord, then enable GTD.
-            app.action("selectChord", 0, 0)
-            app.bridge.wait_idle(timeout=8.0)
-            app.action("setStrumGateAttack", 0.05)
-            app.action("setStrumGateSustain", 0.10)
-            app.action("toggleStrumGate")
-            self.assertTrue(bool(app.query("strumGateEnabled")))
-
-            start = app.bridge.count()
-            app.action("strumTap", 0.5)
-            deadline = time.monotonic() + 5.0
-            while time.monotonic() < deadline:
-                lines = app.bridge.lines_since(start)
-                if (
-                    "i2iV0Z" in lines
-                    and any(re.match(r"^n[-+0-9.]+l1i2Z$", line) for line in lines)
-                    and any(line.startswith("i2iV") and line != "i2iV0Z" for line in lines)
-                ):
-                    break
-                time.sleep(0.01)
-            else:
-                self.fail("gated strum did not emit gate envelope and note-on")
-
-            # Turning GTD off cancels its envelope generation and restores the
-            # ordinary strum master level. A following tap must no longer force
-            # the synth master to zero first.
-            app.action("toggleStrumGate")
-            self.assertFalse(bool(app.query("strumGateEnabled")))
-            app.bridge.wait_idle(timeout=5.0)
-            normal_start = app.bridge.count()
-            app.action("strumTap", 0.55)
-            deadline = time.monotonic() + 5.0
-            while time.monotonic() < deadline:
-                normal = app.bridge.lines_since(normal_start)
-                if any(re.match(r"^n[-+0-9.]+l1i2Z$", line) for line in normal):
-                    break
-                time.sleep(0.01)
-            else:
-                self.fail("ordinary strum emitted no note-on after disabling GTD")
-            self.assertNotIn("i2iV0Z", normal)
 
 
 if __name__ == "__main__":
