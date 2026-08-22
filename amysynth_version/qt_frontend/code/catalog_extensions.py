@@ -19,7 +19,7 @@ def load_synth_catalog(
         synths.append(
             app_core.SynthDefinition(
                 key=PHYSICAL_STRINGS_KEY,
-                label="Physical Strings",
+                label="Ph. Strings",
                 controls=(
                     app_core.SynthControl(
                         key="feedback",
