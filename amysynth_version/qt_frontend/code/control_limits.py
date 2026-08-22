@@ -19,7 +19,12 @@ CONTROL_LIMITS: dict[str, tuple[float, float]] = {
     "sustain": (0.0, 1.0),
     "release_ms": (0.0, 10000.0),
     "algorithm": (1.0, 32.0),
+    # DX7 operator feedback uses AMY's normalized 0..0.5 range.
     "feedback": (0.0, 0.5),
+    # Karplus-Strong uses the AMY oscillator feedback coefficient as its
+    # physical decay control. Keep it distinct from DX7 feedback so the two
+    # synth engines can expose appropriate UI ranges without weakening either.
+    "ks_feedback": (0.90, 0.9999),
 }
 
 

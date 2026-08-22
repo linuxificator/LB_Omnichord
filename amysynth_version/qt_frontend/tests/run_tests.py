@@ -17,6 +17,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
         TESTS / "test_synth_state.py",
         TESTS / "test_sequencer_tags.py",
         TESTS / "test_performance_logic.py",
+        TESTS / "test_program_architecture.py",
         TESTS / "test_static_contracts.py",
     ),
     "frontend": (
@@ -24,6 +25,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
     "serial": (
         TESTS / "integration" / "test_serial.py",
+        TESTS / "integration" / "test_programs.py",
     ),
     "native-controls": (
         TESTS / "integration" / "test_native_controls.py",

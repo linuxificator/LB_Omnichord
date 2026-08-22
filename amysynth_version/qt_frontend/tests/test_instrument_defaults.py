@@ -62,7 +62,16 @@ class InstrumentDefaultTests(unittest.TestCase):
         return client
 
     def test_every_slider_has_explicit_physical_range(self) -> None:
-        self.assertEqual(len(self.synths), 123)
+        self.assertEqual(len(self.synths), 124)
+        self.assertIn("physical_strings", self.by_key)
+        physical = self.by_key["physical_strings"]
+        self.assertEqual(physical.label, "Ph. Strings")
+        decay = self.control(physical, "ks_feedback")
+        self.assertEqual(decay.label, "DECAY")
+        self.assertEqual(decay.group, "extra")
+        self.assertGreaterEqual(decay.minimum, 0.90)
+        self.assertGreater(decay.maximum, 0.99)
+
         for synth in self.synths:
             for control in synth.controls:
                 self.assertGreaterEqual(control.minimum, 0.0, (synth.key, control.key))
