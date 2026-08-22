@@ -2,9 +2,10 @@ from __future__ import annotations
 
 """Public AMY transport surface.
 
-The transport implementation is intentionally isolated in amy_transport.py.
+The stable transport implementation is isolated in amy_transport.py.
 Configuration loading lives in config_loader.py so there is exactly one
-runtime configuration source: config/amy_config.json.
+runtime configuration source: config/amy_config.json.  Program-aware clients
+are then layered on top of the stable transport.
 """
 
 import amy_transport as _transport
@@ -21,3 +22,10 @@ for _name, _value in vars(_transport).items():
     globals()[_name] = _value
 
 del _name, _value
+
+# Override only the two client classes with the generalized program layer.
+# program_amy imports amy_transport directly, so this does not form a cycle.
+from program_amy import (  # noqa: E402
+    ProgramAmyLocalClient as AmyLocalClient,
+    ProgramAmySerialClient as AmySerialClient,
+)
