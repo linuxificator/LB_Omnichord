@@ -268,6 +268,11 @@
       "label": "Juno A71 Sweep I",
       "reason": "Factory filter base is at the previous 18 kHz UI limit; constrain it below the DSP safety ceiling.",
       "juno_filter_hz": 9000.0
+    },
+    "109": {
+      "label": "Juno B66 Toy Rhodes",
+      "reason": "Factory patch has zero amplitude on every Juno sound source; add a small noise excitation so its high-Q filter has input.",
+      "juno_noise_amp": 0.05
     }
   },
   "buses": {
