@@ -77,7 +77,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("self._runtime(role).load_preset(role_data)", core_py)
         self.assertIn("runtime.set_control(key, value)", core_py)
         self.assertIn("self._runtime(role).transport_payload()", core_py)
-        self.assertIn("from gated_backend import InstrumentBackend", entry_py)
+        self.assertIn("from performance_backend import InstrumentBackend", entry_py)
         self.assertIn("class InstrumentBackend(app_core.InstrumentBackend):", perf_py)
 
         # The public transport facade owns configuration/program selection; the
@@ -137,16 +137,6 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("stepValue: 1", qml)
         self.assertIn("root.controller.bassVoicingShift", qml)
         self.assertIn(".setBassVoicingShift(value)", qml)
-
-    def test_gated_strum_header_uses_blue_shared_parameter_sliders(self) -> None:
-        qml = (ROOT / "gui_extended" / "Main.qml").read_text(encoding="utf-8")
-        self.assertIn('text: "GTD"', qml)
-        self.assertEqual(qml.count("Base.ParameterSlider {"), 2)
-        self.assertIn("backend.strumGateEnabled", qml)
-        self.assertIn("backend.setStrumGateAttack(value)", qml)
-        self.assertIn("backend.setStrumGateSustain(value)", qml)
-        self.assertIn('fillColor: "#2474b8"', qml)
-        self.assertIn("opacity: enabled ? 1.0 : 0.38", qml)
 
     def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
         panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")
