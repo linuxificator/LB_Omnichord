@@ -19,6 +19,12 @@ class ProgramIntegrationTests(unittest.TestCase):
                 timeout=8.0,
             )
             app.bridge.wait_idle(timeout=8.0)
+
+            controls = app.query("strumExtraControls")
+            self.assertEqual(len(controls), 1, controls)
+            self.assertEqual(controls[0]["key"], "feedback")
+            self.assertEqual(controls[0]["label"], "DECAY")
+
             lines = app.bridge.lines_since(start)
             self.assertFalse(
                 any(line.startswith("K") and "i2" in line for line in lines),
