@@ -37,7 +37,8 @@
     "bass_running": true
   },
   "rhythm": {
-    "selected": "waltz"
+    "selected": "waltz",
+    "bass_voicing_shift": 0
   },
   "window": {
     "start_fullscreen": false,

@@ -59,15 +59,24 @@ class StaticContractTests(unittest.TestCase):
                     self.assertEqual(maximum, 1.0)
 
     def test_synth_state_has_one_frontend_and_one_receiver_path(self) -> None:
-        main_py = (ROOT / "code" / "main.py").read_text(encoding="utf-8")
+        # main.py is intentionally a thin compatibility entry point now.  The
+        # historical application core stays byte-for-byte in app_core.py while
+        # new live-performance state is isolated in performance_backend.py.
+        entry_py = (ROOT / "code" / "main.py").read_text(encoding="utf-8")
+        core_py = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        perf_py = (ROOT / "code" / "performance_backend.py").read_text(
+            encoding="utf-8"
+        )
         amy_py = (ROOT / "code" / "amy_serial.py").read_text(encoding="utf-8")
         state_py = (ROOT / "code" / "synth_state.py").read_text(encoding="utf-8")
 
         self.assertIn("class SynthState:", state_py)
-        self.assertIn("from synth_state import SynthState", main_py)
-        self.assertIn("self._runtime(role).load_preset(role_data)", main_py)
-        self.assertIn("runtime.set_control(key, value)", main_py)
-        self.assertIn("self._runtime(role).transport_payload()", main_py)
+        self.assertIn("from synth_state import SynthState", core_py)
+        self.assertIn("self._runtime(role).load_preset(role_data)", core_py)
+        self.assertIn("runtime.set_control(key, value)", core_py)
+        self.assertIn("self._runtime(role).transport_payload()", core_py)
+        self.assertIn("from performance_backend import InstrumentBackend", entry_py)
+        self.assertIn("class InstrumentBackend(app_core.InstrumentBackend):", perf_py)
         self.assertIn("def _apply_synth_state(", amy_py)
         self.assertIn("self._apply_synth_state(\n            role,", amy_py)
         self.assertIn('self._sync_synth_params(\n                    "chord",', amy_py)
@@ -91,7 +100,7 @@ class StaticContractTests(unittest.TestCase):
             "def _send_synth_name(",
             "def _send_synth_params(",
         ):
-            self.assertNotIn(forbidden, main_py, forbidden)
+            self.assertNotIn(forbidden, core_py, forbidden)
 
     def test_left_rail_has_no_rhythm_reset_and_uses_common_reset_labels(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
@@ -103,6 +112,24 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn('text: "CHD"', qml)
         self.assertNotIn('text: "ROWS"', qml)
         self.assertGreaterEqual(qml.count('text: "RST"'), 4)
+
+    def test_chord_gate_and_grouped_row_roll_controls_are_present(self) -> None:
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        self.assertIn("text: backend.chordGateButtonText", qml)
+        self.assertIn("enabled: backend.chordGateState !== 0", qml)
+        self.assertIn("backend.toggleChordGate()", qml)
+        self.assertIn("backend.rollChordRows(-1)", qml)
+        self.assertIn("backend.rollChordRows(1)", qml)
+
+    def test_bass_activity_has_adjacent_voicing_slider(self) -> None:
+        qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
+        self.assertIn('label: "bass activity"', qml)
+        self.assertIn('label: "bass voicing"', qml)
+        self.assertIn("fromValue: -6", qml)
+        self.assertIn("toValue: 6", qml)
+        self.assertIn("stepValue: 1", qml)
+        self.assertIn("root.controller.bassVoicingShift", qml)
+        self.assertIn(".setBassVoicingShift(value)", qml)
 
     def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
         panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")

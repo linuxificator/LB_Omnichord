@@ -676,23 +676,49 @@ ApplicationWindow {
                             visible: rowItem.rowIndex === 0
                             x: -window.contentX
                             y: 0
-                            width: window.contentX + window.wheelWidth
-                            height: window.rowHeight
+                            width: window.contentX
+                            height: 148
                             radius: 10
                             color: window.chordPanelColor
                             border.color: window.chordPanelBorderColor
                             border.width: 1
                         }
 
-                        PresetResetButton {
+                        Column {
                             visible: rowItem.rowIndex === 0
-                            x: -window.contentX + (window.contentX - width) / 2
-                            y: (window.rowHeight - height) / 2
-                            text: "RST"
-                            panelColor: "#e5d9b2"
-                            borderColor: "#9f9165"
-                            textColor: "#4a4022"
-                            onClicked: backend.resetChordRowsToPreset()
+                            x: -window.contentX + (window.contentX - 42) / 2
+                            y: 7
+                            spacing: 4
+
+                            PresetResetButton {
+                                width: 42
+                                height: 42
+                                text: "RST"
+                                panelColor: "#e5d9b2"
+                                borderColor: "#9f9165"
+                                textColor: "#4a4022"
+                                onClicked: backend.resetChordRowsToPreset()
+                            }
+
+                            PresetResetButton {
+                                width: 42
+                                height: 42
+                                text: "UP"
+                                panelColor: "#e5d9b2"
+                                borderColor: "#9f9165"
+                                textColor: "#4a4022"
+                                onClicked: backend.rollChordRows(-1)
+                            }
+
+                            PresetResetButton {
+                                width: 42
+                                height: 42
+                                text: "DWN"
+                                panelColor: "#e5d9b2"
+                                borderColor: "#9f9165"
+                                textColor: "#4a4022"
+                                onClicked: backend.rollChordRows(1)
+                            }
                         }
 
                         Button {
@@ -707,12 +733,12 @@ ApplicationWindow {
                                 window.rowIndent * 3
                                 - window.controlSpacing
                             height: window.rowHeight
-                            text: "CHORD\nOFF"
+                            text: backend.chordGateButtonText
+                            enabled: backend.chordGateState !== 0
+                            opacity: enabled ? 1.0 : 0.35
 
-                            property bool selected: {
-                                backend.stateVersion
-                                return backend.isOff
-                            }
+                            property bool selected:
+                                backend.chordGateState === 2
 
                             font.pixelSize: 14
                             font.bold: true
@@ -747,7 +773,7 @@ ApplicationWindow {
                             }
 
                             onClicked:
-                                backend.turnOff()
+                                backend.toggleChordGate()
                         }
 
                         Row {
