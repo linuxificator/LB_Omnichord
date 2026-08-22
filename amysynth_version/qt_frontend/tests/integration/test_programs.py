@@ -22,8 +22,10 @@ class ProgramIntegrationTests(unittest.TestCase):
 
             controls = app.query("strumExtraControls")
             self.assertEqual(len(controls), 1, controls)
-            self.assertEqual(controls[0]["key"], "feedback")
+            self.assertEqual(controls[0]["key"], "ks_feedback")
             self.assertEqual(controls[0]["label"], "DECAY")
+            self.assertGreaterEqual(float(controls[0]["minimum"]), 0.90)
+            self.assertGreater(float(controls[0]["maximum"]), 0.99)
 
             lines = app.bridge.lines_since(start)
             self.assertFalse(
@@ -32,7 +34,7 @@ class ProgramIntegrationTests(unittest.TestCase):
             )
 
             edit = app.bridge.count()
-            app.action("setStrumSynthControl", "feedback", 0.99)
+            app.action("setStrumSynthControl", "ks_feedback", 0.99)
             app.bridge.wait_for_lines(["v0b0.99i2Z"], start=edit, timeout=5.0)
             edit_lines = app.bridge.lines_since(edit)
             self.assertFalse(any(line.startswith("K") for line in edit_lines))
