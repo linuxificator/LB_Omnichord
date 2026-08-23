@@ -6,19 +6,24 @@ Button {
 
     // The mode switch intentionally projects one chord-row indent farther to
     // the right than the CHORD ON/OFF button below the chord-type rail.
-    // Keeping that 30 px extension inside this shared component gives MIDI and
-    // OMNI exactly the same geometry without duplicating the rainbow styling.
     property int extensionWidth: 30
 
-    font.pixelSize: 17
+    padding: 0
+    leftPadding: 0
+    rightPadding: 0
+    topPadding: 0
+    bottomPadding: 0
+    font.pixelSize: 24
     font.bold: true
 
     contentItem: Item {
+        x: 0
+        y: 0
+        width: root.width + root.extensionWidth
+        height: root.height
+
         Text {
-            x: 0
-            y: 0
-            width: root.width + root.extensionWidth
-            height: root.height
+            anchors.fill: parent
             text: root.text
             color: "#ffffff"
             font: root.font
@@ -30,6 +35,8 @@ Button {
     }
 
     background: Rectangle {
+        x: 0
+        y: 0
         width: root.width + root.extensionWidth
         height: root.height
         radius: 9
@@ -48,8 +55,6 @@ Button {
         }
     }
 
-    // Extend the hit area together with the visible button. The normal Button
-    // keeps ownership of its original area; this covers only the extra indent.
     MouseArea {
         x: root.width
         y: 0
