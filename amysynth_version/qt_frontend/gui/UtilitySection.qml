@@ -71,8 +71,12 @@ Item {
             - 14
         height: parent.height - 16
         coupled: root.tuningCoupled
-        onClicked:
+        onClicked: {
+            if (root.tuningCoupled) {
+                root.controller.syncMidiTuningFromOmni()
+            }
             root.toggleTuningCouplingRequested()
+        }
     }
 
     Frame {
