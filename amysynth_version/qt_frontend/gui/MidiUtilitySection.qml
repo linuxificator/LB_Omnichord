@@ -10,9 +10,6 @@ Item {
     required property bool fullScreen
     property int leftExtension: 0
     property bool tuningCoupled: true
-
-    property int localTuningModeIndex: controller.selectedTuningModeIndex
-    property real localTuningReference: controller.tuningReference
     property int localSelectedPreset: 1
 
     signal toggleFullscreenRequested()
@@ -33,33 +30,45 @@ Item {
     readonly property int presetX:
         escapeX + escapeWidth + utilityGap
 
-    function syncFromOmniTuning() {
-        if (!root.tuningCoupled) {
+    readonly property int effectiveTuningModeIndex:
+        root.tuningCoupled
+        ? root.controller.selectedTuningModeIndex
+        : root.controller.midiTuningModeIndex
+
+    readonly property int effectiveTuningReference:
+        root.tuningCoupled
+        ? root.controller.tuningReference
+        : root.controller.midiTuningReference
+
+    function synchronizeTuningWheel() {
+        if (!tuningWheel.initialized) {
             return
         }
-        root.localTuningModeIndex =
-            root.controller.selectedTuningModeIndex
-        root.localTuningReference =
-            root.controller.tuningReference
-        if (tuningWheel.initialized) {
+        if (tuningWheel.currentIndex !== root.effectiveTuningModeIndex) {
             tuningWheel.syncing = true
-            tuningWheel.currentIndex = root.localTuningModeIndex
+            tuningWheel.currentIndex = root.effectiveTuningModeIndex
             Qt.callLater(function() {
                 tuningWheel.syncing = false
             })
         }
     }
 
-    onTuningCoupledChanged: {
-        if (tuningCoupled) {
-            syncFromOmniTuning()
-        }
-    }
+    onTuningCoupledChanged:
+        root.synchronizeTuningWheel()
 
     Connections {
         target: root.controller
+
         function onTuningChanged() {
-            root.syncFromOmniTuning()
+            if (root.tuningCoupled) {
+                root.synchronizeTuningWheel()
+            }
+        }
+
+        function onMidiTuningChanged() {
+            if (!root.tuningCoupled) {
+                root.synchronizeTuningWheel()
+            }
         }
     }
 
@@ -80,8 +89,12 @@ Item {
         width: root.tuningX - root.wheelWidth - 14
         height: parent.height - 16
         coupled: root.tuningCoupled
-        onClicked:
+        onClicked: {
+            if (root.tuningCoupled) {
+                root.controller.syncMidiTuningFromOmni()
+            }
             root.toggleTuningCouplingRequested()
+        }
     }
 
     Frame {
@@ -113,7 +126,7 @@ Item {
 
             Component.onCompleted: {
                 syncing = true
-                currentIndex = root.localTuningModeIndex
+                currentIndex = root.effectiveTuningModeIndex
                 Qt.callLater(function() {
                     tuningWheel.syncing = false
                     tuningWheel.initialized = true
@@ -153,8 +166,11 @@ Item {
 
             onCurrentIndexChanged: {
                 if (initialized && !syncing && currentIndex >= 0) {
-                    // UI-only for now: never call the musical backend here.
-                    root.localTuningModeIndex = currentIndex
+                    if (root.tuningCoupled) {
+                        root.controller.setTuningModeIndex(currentIndex)
+                    } else {
+                        root.controller.setMidiTuningModeIndex(currentIndex)
+                    }
                 }
             }
         }
@@ -176,7 +192,7 @@ Item {
         y: 0
         width: root.tuningWidth
         height: parent.height
-        currentValue: root.localTuningReference
+        currentValue: root.effectiveTuningReference
         fromValue: 415
         toValue: 466
         stepValue: 1
@@ -186,8 +202,11 @@ Item {
         textColor: "#492606"
 
         onEdited: (value) => {
-            // UI-only for now: never call the musical backend here.
-            root.localTuningReference = value
+            if (root.tuningCoupled) {
+                root.controller.setTuningReference(value)
+            } else {
+                root.controller.setMidiTuningReference(value)
+            }
         }
     }
 
@@ -216,7 +235,6 @@ Item {
             border.width: 2
         }
 
-        // Panic is intentionally live in both screens.
         onClicked: root.controller.panic()
     }
 
