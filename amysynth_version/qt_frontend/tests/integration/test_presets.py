@@ -61,6 +61,111 @@ class PresetIntegrationTests(unittest.TestCase):
                 "preset contains missing or non-modified chord instruments",
             )
 
+    def test_section_rst_restores_stored_synth_selection(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            stored = {
+                "chord": 7,
+                "strum": 8,
+                "bass": 9,
+            }
+            app.action("setChordSynthIndex", stored["chord"])
+            app.action("setStrumSynthIndex", stored["strum"])
+            app.action("setBassSynthIndex", stored["bass"])
+            app.action("storeSelectedPreset")
+
+            app.action("setChordSynthIndex", 10)
+            app.action("setStrumSynthIndex", 11)
+            app.action("setBassSynthIndex", 12)
+
+            app.action("resetChordSynthToPreset")
+            app.action("resetStrumToPreset")
+            app.action("resetBassToPreset")
+            app.bridge.wait_idle(timeout=8.0)
+
+            self.assertEqual(
+                int(app.query("selectedChordSynthIndex")), stored["chord"]
+            )
+            self.assertEqual(
+                int(app.query("selectedStrumSynthIndex")), stored["strum"]
+            )
+            self.assertEqual(
+                int(app.query("selectedBassSynthIndex")), stored["bass"]
+            )
+
+    def test_rhythm_running_is_live_state_not_preset_state(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertFalse(bool(app.query("rhythmRunning")))
+
+            # Storing while the rhythm is running must not persist that state.
+            app.action("toggleRhythm")
+            self.assertTrue(bool(app.query("rhythmRunning")))
+            app.action("storeSelectedPreset")
+
+            preset_path = app.home / ".omnichord" / "p1.json"
+            data = json.loads(preset_path.read_text(encoding="utf-8"))
+            self.assertNotIn("rhythm_running", data.get("transport", {}))
+
+            # A legacy preset may still contain rhythm_running=true.  Loading it
+            # while stopped must ignore that old field rather than start drums.
+            data.setdefault("transport", {})["rhythm_running"] = True
+            preset_path.write_text(
+                json.dumps(data, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            app.action("toggleRhythm")
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            app.action("selectPreset", 2)
+            app.action("selectPreset", 1)
+            self.assertFalse(bool(app.query("rhythmRunning")))
+
+            # Conversely, changing presets while already running must not stop
+            # the live transport merely because the destination preset is dry.
+            app.action("toggleRhythm")
+            self.assertTrue(bool(app.query("rhythmRunning")))
+            app.action("selectPreset", 2)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
+    def test_running_rhythm_switch_keeps_tempo_and_resumes_transport(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            # Give two styles distinct remembered tempos while stopped.
+            app.action("setRhythmIndex", 0)
+            app.action("setRhythmTempo", 100.0)
+            app.action("setRhythmIndex", 1)
+            app.action("setRhythmTempo", 80.0)
+            app.action("setRhythmIndex", 0)
+            self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
+
+            app.action("toggleRhythm")
+            self.assertTrue(bool(app.query("rhythmRunning")))
+            app.bridge.wait_idle(timeout=8.0)
+            checkpoint = app.bridge.count()
+
+            app.action("setRhythmIndex", 1)
+            app.bridge.wait_idle(timeout=8.0)
+
+            self.assertTrue(bool(app.query("rhythmRunning")))
+            self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
+            self.assertIn(
+                "zY1Z",
+                app.bridge.lines_since(checkpoint),
+                "running style switch did not resume AMY rhythm transport",
+            )
+
+            # Stopped switching still recalls the destination style's own
+            # stored tempo; only live switching transfers tempo.
+            app.action("toggleRhythm")
+            app.action("setRhythmIndex", 2)
+            app.action("setRhythmTempo", 73.0)
+            app.action("setRhythmIndex", 0)
+            self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
+            app.action("setRhythmIndex", 2)
+            self.assertAlmostEqual(float(app.query("rhythmTempo")), 73.0)
+
 
 if __name__ == "__main__":
     unittest.main()
