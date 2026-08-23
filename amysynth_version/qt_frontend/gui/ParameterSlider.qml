@@ -13,6 +13,7 @@ Item {
     property color borderColor: "#315b39"
 
     signal edited(string key, real value)
+    signal activated()
 
     function isLogScale() {
         return String(root.control.scale || "linear") === "log"
@@ -94,6 +95,11 @@ Item {
 
         Component.onCompleted:
             root.syncSliderValue()
+
+        onPressedChanged: {
+            if (pressed)
+                root.activated()
+        }
 
         onMoved:
             root.edited(
