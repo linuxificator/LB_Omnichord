@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 
 Item {
     id: root
@@ -48,6 +49,17 @@ Item {
             "text": "#32194b"
         }
     ]
+
+    Rectangle {
+        anchors.fill: parent
+        color: "#f4f0e6"
+    }
+
+    // Consume unused-space touches so no hidden Omnichord control underneath
+    // the MIDI screen can be activated through a transparent gap.
+    MouseArea {
+        anchors.fill: parent
+    }
 
     QtObject {
         id: midiReverbState
