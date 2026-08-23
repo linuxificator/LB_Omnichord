@@ -9,8 +9,10 @@ Item {
     required property var tuningModeModel
     required property bool fullScreen
     property int leftExtension: 0
+    property bool tuningCoupled: true
 
     signal toggleFullscreenRequested()
+    signal toggleTuningCouplingRequested()
 
     readonly property int wheelWidth: 150
     readonly property int tuningX: 231
@@ -58,58 +60,19 @@ Item {
         color: "#f4c77f"
         border.color: "#bd7517"
         border.width: 1
+    }
 
-        Canvas {
-            x: root.wheelWidth + 7
-            y: 8
-            width:
-                root.tuningX
-                - root.wheelWidth
-                - 14
-            height: parent.height - 16
-            opacity: 0.54
-
-            onPaint: {
-                const c = getContext("2d")
-                c.reset()
-
-                c.strokeStyle = "#c97817"
-                c.lineWidth = 4
-                c.lineCap = "round"
-
-                const cx = width / 2
-                const top = height * 0.16
-                const forkBottom = height * 0.58
-
-                c.beginPath()
-                c.moveTo(cx - 13, top)
-                c.lineTo(cx - 13, height * 0.38)
-                c.quadraticCurveTo(
-                    cx - 13,
-                    forkBottom,
-                    cx,
-                    forkBottom
-                )
-                c.quadraticCurveTo(
-                    cx + 13,
-                    forkBottom,
-                    cx + 13,
-                    height * 0.38
-                )
-                c.lineTo(cx + 13, top)
-                c.stroke()
-
-                c.beginPath()
-                c.moveTo(cx, forkBottom)
-                c.lineTo(cx, height * 0.84)
-                c.stroke()
-
-                c.beginPath()
-                c.moveTo(cx - 9, height * 0.84)
-                c.lineTo(cx + 9, height * 0.84)
-                c.stroke()
-            }
-        }
+    TuningLinkButton {
+        x: root.wheelWidth + 7
+        y: 8
+        width:
+            root.tuningX
+            - root.wheelWidth
+            - 14
+        height: parent.height - 16
+        coupled: root.tuningCoupled
+        onClicked:
+            root.toggleTuningCouplingRequested()
     }
 
     Frame {
