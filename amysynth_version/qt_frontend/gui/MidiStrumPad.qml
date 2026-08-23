@@ -3,8 +3,18 @@ import QtQuick
 Item {
     id: root
 
+    required property var controller
+    required property int rowIndex
+    required property bool tuningCoupled
+
     property color padColor: "#5d9fd0"
     property bool gestureActive: false
+
+    function normalizedY(y) {
+        if (root.height <= 0)
+            return 0.5
+        return Math.max(0.0, Math.min(1.0, y / root.height))
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -50,8 +60,6 @@ Item {
         }
     }
 
-    // MIDI-screen strumming is deliberately UI-only for this stage. Capture
-    // the touch so the outer Flickable does not scroll, but send no music.
     MultiPointTouchArea {
         anchors.fill: parent
         z: 1000
@@ -59,14 +67,44 @@ Item {
         maximumTouchPoints: 1
         mouseEnabled: true
 
-        onPressed:
+        onPressed: (points) => {
+            if (!points || points.length === 0)
+                return
             root.gestureActive = true
+            root.controller.midiPreviewStart(
+                root.rowIndex,
+                root.normalizedY(points[0].y),
+                root.tuningCoupled
+            )
+        }
 
-        onReleased:
-            root.gestureActive = false
+        onUpdated: (points) => {
+            if (
+                !root.gestureActive
+                || !points
+                || points.length === 0
+            )
+                return
+            root.controller.midiPreviewMove(
+                root.rowIndex,
+                root.normalizedY(points[0].y),
+                root.tuningCoupled
+            )
+        }
 
-        onCanceled:
+        onReleased: {
+            if (!root.gestureActive)
+                return
             root.gestureActive = false
+            root.controller.midiPreviewEnd()
+        }
+
+        onCanceled: {
+            if (!root.gestureActive)
+                return
+            root.gestureActive = false
+            root.controller.midiPreviewEnd()
+        }
 
         onGestureStarted: (gesture) =>
             gesture.grab()
