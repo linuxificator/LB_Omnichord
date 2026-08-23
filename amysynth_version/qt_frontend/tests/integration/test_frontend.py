@@ -136,6 +136,69 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("setReverbLevel", 9.0)
             self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
 
+    def test_midi_rows_use_real_catalog_controls_and_channels_one_to_six(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            self.assertEqual(
+                [int(app.action("midiChannel", row)) for row in range(6)],
+                [1, 2, 3, 4, 5, 6],
+            )
+
+            names = list(app.query("midiSynthNames"))
+            self.assertGreater(len(names), 1)
+            self.assertEqual(names[-1], "Drum Kit 0")
+
+            controls = list(app.action("midiExtraControls", 0)) + list(
+                app.action("midiCommonControls", 0)
+            )
+            keys = {str(control["key"]) for control in controls}
+            self.assertIn("filter_hz", keys)
+            self.assertIn("attack_ms", keys)
+            self.assertNotIn("brightness", keys)
+
+            app.action("setMidiSynthIndex", 0, len(names) - 1)
+            self.assertEqual(list(app.action("midiExtraControls", 0)), [])
+            self.assertEqual(list(app.action("midiCommonControls", 0)), [])
+
+    def test_midi_strum_previews_synth_and_drumkit_without_changing_omni_catalog(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            names = list(app.query("midiSynthNames"))
+
+            # With no selected Omnichord chord yet, MIDI preview falls back to
+            # C major and still emits a normal synth-2 strum note.
+            self.assertEqual(int(app.query("activeRowIndex")), -1)
+            start = app.bridge.count()
+            app.action("midiPreviewStart", 0, 0.5, True)
+            app.bridge.wait_idle(timeout=3.0)
+            synth_lines = app.bridge.lines_since(start)
+            self.assertTrue(
+                any("i2" in line and "n" in line and "l1" in line for line in synth_lines),
+                "MIDI synth preview emitted no synth-2 note",
+            )
+            app.action("midiPreviewEnd")
+            app.action("finishMidiPreview")
+            app.bridge.wait_idle(timeout=3.0)
+
+            # Drum Kit 0 is MIDI-only and previews through the existing drum
+            # synth; selecting it must not attempt to configure synth 2 with a
+            # fake ROM patch/program.
+            app.action("setMidiSynthIndex", 0, len(names) - 1)
+            start = app.bridge.count()
+            app.action("midiPreviewStart", 0, 0.5, True)
+            app.bridge.wait_idle(timeout=3.0)
+            drum_lines = app.bridge.lines_since(start)
+            self.assertTrue(
+                any(line.startswith("p") and "i0Z" in line for line in drum_lines),
+                "Drum Kit 0 preview emitted no synth-0 sample hit",
+            )
+            self.assertFalse(
+                any("drum_kit_0" in line for line in drum_lines),
+                "MIDI-only drum label leaked into AMY wire protocol",
+            )
+            app.action("midiPreviewEnd")
+
 
 if __name__ == "__main__":
     unittest.main()
