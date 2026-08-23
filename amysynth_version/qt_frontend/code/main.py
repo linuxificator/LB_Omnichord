@@ -7,7 +7,7 @@ from app_core import *  # noqa: F401,F403
 
 from catalog_extensions import load_synth_catalog as _extended_catalog
 from config_loader import load_amy_config
-from performance_backend import InstrumentBackend
+from midi_integration import InstrumentBackend
 from program_amy import ProgramAmyLocalClient, ProgramAmySerialClient
 
 
