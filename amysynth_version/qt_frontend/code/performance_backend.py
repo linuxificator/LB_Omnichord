@@ -38,6 +38,34 @@ class InstrumentBackend(app_core.InstrumentBackend):
         self._bass_voicing_shift = 0
         super().__init__(*args, **kwargs)
 
+    def _reset_synth_role_to_preset(self, role: app_core.SynthRole) -> None:
+        """Restore a synth role's preset instrument, parameters and volume.
+
+        The stable core's reset helper intentionally restores only parameters
+        of the *currently selected* synth.  The section RST buttons have a
+        different contract: return the whole role to the stored preset, or to
+        the application's role default when the preset has no synth selection.
+        """
+        runtime = self._runtime(role)
+        previous_index = runtime.selected_index
+
+        # load_preset() already implements the desired sparse-preset fallback:
+        # missing/unknown selected -> role default, missing controls -> catalogue
+        # defaults.  The base reset helper then restores the role volume and
+        # publishes the resulting complete synth state to AMY.
+        runtime.load_preset(self._preset_role_data(role))
+        super()._reset_synth_role_to_preset(role)
+
+        # The base helper emits control changes but deliberately assumes that
+        # selection cannot change.  RST can now change it, so notify the wheel.
+        if runtime.selected_index != previous_index:
+            if role == "chord":
+                self.chordSynthStateChanged.emit()
+            elif role == "strum":
+                self.strumSynthStateChanged.emit()
+            else:
+                self.bassSynthStateChanged.emit()
+
     def _set_chord_gate_state(self, state: int, *, emit: bool = True) -> bool:
         state = max(CHORD_GATE_NONE, min(CHORD_GATE_OFF, int(state)))
         if state == self._chord_gate_state:
@@ -180,6 +208,32 @@ class InstrumentBackend(app_core.InstrumentBackend):
             self._send_chord_state(play_now=False)
 
     @Slot(int)
+    def setRhythmIndex(self, rhythm_index: int) -> None:
+        """Switch rhythm style without changing a running transport tempo.
+
+        Stopped transport retains the core behaviour: each rhythm recalls its
+        own stored tempo.  While running, the destination rhythm inherits the
+        tempo that is already sounding and the transport remains running.
+        """
+        self._stop_tempo_nudge()
+        if not 0 <= rhythm_index < len(self._rhythms):
+            return
+
+        previous_index = self._rhythm.selected_index
+        if rhythm_index == previous_index:
+            return
+
+        running_tempo = self._rhythm.tempo_by_rhythm[previous_index]
+        self._rhythm.selected_index = rhythm_index
+
+        if self._rhythm_running:
+            self._rhythm.tempo_by_rhythm[rhythm_index] = running_tempo
+
+        self.rhythmStateChanged.emit()
+        self.rhythmControlsChanged.emit()
+        self._send_rhythm_config()
+
+    @Slot(int)
     def rollChordRows(self, direction: int) -> None:
         if int(direction) == 0:
             return
@@ -205,7 +259,13 @@ class InstrumentBackend(app_core.InstrumentBackend):
         )
 
     def _apply_preset_data(self, data: dict[str, Any]) -> None:
+        # Drum transport is live session state, not preset state.  Preserve it
+        # across preset selection; during startup its pre-preset value comes
+        # from defaults.json and is therefore always False.
+        rhythm_was_running = bool(getattr(self, "_rhythm_running", False))
         super()._apply_preset_data(data)
+        self._rhythm_running = rhythm_was_running
+
         rhythm = data.get("rhythm", {})
         if not isinstance(rhythm, dict):
             rhythm = {}
@@ -218,6 +278,14 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     def _preset_snapshot(self) -> dict[str, Any]:
         snapshot = super()._preset_snapshot()
+
+        # Do not persist drum start/stop.  Existing preset files that still
+        # contain rhythm_running are harmless because _apply_preset_data()
+        # restores the live value after the core has parsed them.
+        transport = snapshot.get("transport")
+        if isinstance(transport, dict):
+            transport.pop("rhythm_running", None)
+
         rhythm = snapshot.setdefault("rhythm", {})
         rhythm["bass_voicing_shift"] = self._bass_voicing_shift
         return snapshot
