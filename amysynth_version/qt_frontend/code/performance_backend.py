@@ -17,6 +17,7 @@ CHORD_GATE_NONE = 0
 CHORD_GATE_ON = 1
 CHORD_GATE_OFF = 2
 BASS_VOICING_LIMIT = 6
+REVERB_LEVEL_MAX = 2.0
 
 
 class InstrumentBackend(app_core.InstrumentBackend):
@@ -207,6 +208,16 @@ class InstrumentBackend(app_core.InstrumentBackend):
         if self._active_row >= 0 and self._active_root_semitone >= 0:
             self._send_chord_state(play_now=False)
 
+    @Slot(float)
+    def setReverbLevel(self, value: float) -> None:
+        """Expose AMY reverb wet-return gain through 2.0 (about +6 dB)."""
+        clamped = max(0.0, min(REVERB_LEVEL_MAX, float(value)))
+        if abs(clamped - self._reverb_level) < 0.0001:
+            return
+        self._reverb_level = clamped
+        self.reverbLevelChanged.emit()
+        self._send_reverb_state()
+
     @Slot(int)
     def setRhythmIndex(self, rhythm_index: int) -> None:
         """Switch rhythm style without changing a running transport tempo.
@@ -257,6 +268,11 @@ class InstrumentBackend(app_core.InstrumentBackend):
             rhythm.get("bass_voicing_shift", 0),
             limit=BASS_VOICING_LIMIT,
         )
+        effects = self._defaults.get("effects", {})
+        self._reverb_level = max(
+            0.0,
+            min(REVERB_LEVEL_MAX, float(effects.get("reverb_level", 0.0))),
+        )
 
     def _apply_preset_data(self, data: dict[str, Any]) -> None:
         # Drum transport is live session state, not preset state.  Preserve it
@@ -273,6 +289,25 @@ class InstrumentBackend(app_core.InstrumentBackend):
             rhythm.get("bass_voicing_shift", self._bass_voicing_shift),
             limit=BASS_VOICING_LIMIT,
         )
+
+        # The stable core predates the extended wet-return range and clamps
+        # preset reverb to 1.0. Re-read just this value with the live 0..2 range.
+        effects = data.get("effects", {})
+        if not isinstance(effects, dict):
+            effects = {}
+        default_effects = self._defaults.get("effects", {})
+        legacy_main = effects.get(
+            "main_reverb",
+            default_effects.get("reverb_level", 0.0),
+        )
+        self._reverb_level = max(
+            0.0,
+            min(
+                REVERB_LEVEL_MAX,
+                float(effects.get("reverb_level", legacy_main)),
+            ),
+        )
+
         # Chord identity/gating is live performance state, never preset state.
         self._chord_gate_state = CHORD_GATE_NONE
 
