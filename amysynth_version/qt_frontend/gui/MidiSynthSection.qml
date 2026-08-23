@@ -62,6 +62,17 @@ Item {
         border.width: 1
     }
 
+    // A press anywhere in this coloured section makes this row the preview
+    // source. Pointer handlers can observe the press without stealing the
+    // grab from the actual button/tumbler/slider underneath it.
+    TapHandler {
+        gesturePolicy: TapHandler.DragThreshold
+        onPressedChanged: {
+            if (pressed)
+                root.markInteraction()
+        }
+    }
+
     PresetResetButton {
         x: (root.leftRailWidth - width) / 2
         y: (root.height - height) / 2
@@ -259,6 +270,7 @@ Item {
                         handleColor: "#ffffff"
                         borderColor: Qt.darker(root.accentColor, 1.2)
 
+                        onActivated: root.markInteraction()
                         onEdited: (key, value) => {
                             root.controller.setMidiSynthControl(
                                 root.rowIndex,
@@ -301,6 +313,7 @@ Item {
                         handleColor: "#ffffff"
                         borderColor: Qt.darker(root.accentColor, 1.2)
 
+                        onActivated: root.markInteraction()
                         onEdited: (key, value) => {
                             root.controller.setMidiSynthControl(
                                 root.rowIndex,
