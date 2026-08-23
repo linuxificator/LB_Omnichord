@@ -10,6 +10,16 @@ from synth_programs import SynthProgram, resolve_program
 KS_WAVE = 6
 KS_DECAY_CONTROL = "ks_feedback"
 REVERB_LEVEL_MAX = 2.0
+DRUM_PREVIEW_SAMPLES = (
+    "drum_bass_hard",
+    "drum_tom_lo_soft",
+    "drum_snare_hard",
+    "drum_tom_mid_soft",
+    "drum_tom_hi_soft",
+    "drum_cymbal_closed",
+    "drum_cymbal_open",
+    "perc_bell",
+)
 
 
 class ProgramAmySerialClient(base.AmySerialClient):
@@ -28,6 +38,26 @@ class ProgramAmySerialClient(base.AmySerialClient):
         if key is None:
             return None
         return resolve_program(str(key), config)
+
+    def preview_drum(self, preview_index: int) -> None:
+        """Add one Drum Kit 0 preview hit without changing drum configuration."""
+        sample_map = self.config.get("drums", {}).get("sample_map", {})
+        if not isinstance(sample_map, dict):
+            return
+        name = DRUM_PREVIEW_SAMPLES[
+            max(0, min(len(DRUM_PREVIEW_SAMPLES) - 1, int(preview_index)))
+        ]
+        hit = sample_map.get(name)
+        if not isinstance(hit, dict):
+            return
+        gain = max(
+            0.0,
+            float(self.config.get("drums", {}).get("velocity_gain", 5.0)),
+        )
+        self._wire(
+            f"p{int(hit['preset'])}n{self._f(float(hit['note']))}"
+            f"l{self._f(gain)}i{self.synth_id['drums']}Z"
+        )
 
     def _set_reverb(self, value: Any) -> None:
         """Accept the Omnichord's extended 0..2 wet-return gain range."""
