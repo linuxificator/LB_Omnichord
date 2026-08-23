@@ -128,7 +128,7 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("selectPreset", 2)
             self.assertTrue(bool(app.query("rhythmRunning")))
 
-    def test_running_rhythm_switch_keeps_tempo_and_resumes_transport(self) -> None:
+    def test_running_rhythm_switch_keeps_tempo_and_clock_running(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
 
@@ -150,10 +150,33 @@ class PresetIntegrationTests(unittest.TestCase):
 
             self.assertTrue(bool(app.query("rhythmRunning")))
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
-            self.assertIn(
+
+            switched = app.bridge.lines_since(checkpoint)
+            self.assertNotIn(
+                "zY0Z",
+                switched,
+                "live style switch stopped AMY rhythm transport",
+            )
+            self.assertNotIn(
                 "zY1Z",
-                app.bridge.lines_since(checkpoint),
-                "running style switch did not resume AMY rhythm transport",
+                switched,
+                "live style switch restarted AMY rhythm transport",
+            )
+            self.assertNotIn(
+                "S16384Z",
+                switched,
+                "live style switch reset the sequencer timebase",
+            )
+            for synth in (0, 1, 4):
+                self.assertNotIn(
+                    f"l0i{synth}Z",
+                    switched,
+                    f"live style switch explicitly silenced synth {synth}",
+                )
+
+            self.assertTrue(
+                any(line.startswith("H") and "i0Z" in line for line in switched),
+                "live style switch did not replace tagged drum events",
             )
 
             # Stopped switching still recalls the destination style's own
