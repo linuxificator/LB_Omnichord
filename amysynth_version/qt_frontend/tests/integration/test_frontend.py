@@ -116,6 +116,26 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertGreaterEqual(float(sustain["value"]), 0.0)
             self.assertLessEqual(float(sustain["value"]), 1.0)
 
+    def test_reverb_level_reaches_two_and_is_clamped_there(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            start = app.bridge.count()
+
+            app.action("setReverbLevel", 2.0)
+            app.bridge.wait_idle(timeout=3.0)
+
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
+            lines = app.bridge.lines_since(start)
+            for bus in (1, 2, 3):
+                self.assertIn(
+                    f"y{bus}h2,0.5,0.5Z",
+                    lines,
+                    f"reverb level 2.0 did not reach AMY bus {bus}",
+                )
+
+            app.action("setReverbLevel", 9.0)
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
+
 
 if __name__ == "__main__":
     unittest.main()
