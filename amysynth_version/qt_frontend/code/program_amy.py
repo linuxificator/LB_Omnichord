@@ -9,6 +9,7 @@ from synth_programs import SynthProgram, resolve_program
 
 KS_WAVE = 6
 KS_DECAY_CONTROL = "ks_feedback"
+REVERB_LEVEL_MAX = 2.0
 
 
 class ProgramAmySerialClient(base.AmySerialClient):
@@ -27,6 +28,33 @@ class ProgramAmySerialClient(base.AmySerialClient):
         if key is None:
             return None
         return resolve_program(str(key), config)
+
+    def _set_reverb(self, value: Any) -> None:
+        """Accept the Omnichord's extended 0..2 wet-return gain range."""
+        if not isinstance(value, dict):
+            return
+        updated = {
+            "level": max(
+                0.0,
+                min(
+                    REVERB_LEVEL_MAX,
+                    float(value.get("level", self.reverb["level"])),
+                ),
+            ),
+            "liveness": max(
+                0.0,
+                min(1.0, float(value.get("liveness", self.reverb["liveness"]))),
+            ),
+            "damping": max(
+                0.0,
+                min(1.0, float(value.get("damping", self.reverb["damping"]))),
+            ),
+            "drums": bool(value.get("drums", self.reverb["drums"])),
+        }
+        if updated == self.reverb:
+            return
+        self.reverb = updated
+        self._apply_reverb_buses()
 
     def _set_rhythm_config(self, payload_text: str) -> None:
         """Hot-swap a running rhythm without stopping or resetting its clock.
