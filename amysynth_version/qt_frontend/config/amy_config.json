@@ -18,6 +18,16 @@
     "manual_chord": 7,
     "rhythm_chord": 4
   },
+  "midi_player": {
+    "synth_ids": [5, 6, 7, 8, 9, 10],
+    "drum_synth_id": 11,
+    "voices_per_synth": 4,
+    "drum_voices": 8
+  },
+  "midi_input": {
+    "enabled": true,
+    "device_glob": "/dev/snd/midiC*D*"
+  },
   "default_synths": {
     "chord": "juno_004",
     "strum": "juno_028",
@@ -69,7 +79,7 @@
     "strum_tail_ms": 450,
     "synth_alloc_guard_ms": 10.0
   },
-  "amy_max_oscs": 120,
+  "amy_max_oscs": 336,
   "debug": {
     "log_amy_commands": true,
     "amy_command_log": "~/.omnichord/amy_debug.log",
@@ -112,6 +122,8 @@
     "drums": 0,
     "bass": 1,
     "strum": 2,
-    "chord": 3
+    "chord": 3,
+    "midi": 4,
+    "midi_drums": 5
   }
 }
