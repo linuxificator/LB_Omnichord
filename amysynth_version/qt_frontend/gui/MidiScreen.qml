@@ -6,7 +6,7 @@ Item {
 
     required property var hostWindow
     property bool tuningCoupled: true
-    property color activeStrumColor: "#5d9fd0"
+    property int activeMidiRow: 0
 
     signal showOmniRequested()
     signal toggleTuningCouplingRequested()
@@ -49,6 +49,9 @@ Item {
             "text": "#32194b"
         }
     ]
+
+    readonly property color activeStrumColor:
+        root.synthThemes[root.activeMidiRow].accent
 
     Rectangle {
         anchors.fill: parent
@@ -144,8 +147,6 @@ Item {
             root.toggleTuningCouplingRequested()
     }
 
-    // Keep the orange UP/DWN controls visually identical, but MIDI tuning is
-    // UI-only in this first stage so these deliberately have no callbacks.
     PresetResetButton {
         x: (root.hostWindow.leftRailWidth - width) / 2
         y: root.hostWindow.utilityY + 7
@@ -155,6 +156,15 @@ Item {
         panelColor: "#efb05c"
         borderColor: "#a75d0a"
         textColor: "#492606"
+        onPressedChanged: {
+            if (pressed) {
+                if (root.tuningCoupled) backend.beginPitchBend(1)
+                else backend.beginMidiPitchBend(1)
+            } else {
+                if (root.tuningCoupled) backend.endPitchBend()
+                else backend.endMidiPitchBend()
+            }
+        }
     }
 
     PresetResetButton {
@@ -170,6 +180,15 @@ Item {
         panelColor: "#efb05c"
         borderColor: "#a75d0a"
         textColor: "#492606"
+        onPressedChanged: {
+            if (pressed) {
+                if (root.tuningCoupled) backend.beginPitchBend(-1)
+                else backend.beginMidiPitchBend(-1)
+            } else {
+                if (root.tuningCoupled) backend.endPitchBend()
+                else backend.endMidiPitchBend()
+            }
+        }
     }
 
     Repeater {
@@ -192,7 +211,9 @@ Item {
                 + root.hostWindow.volumeWidth
             height: root.hostWindow.sectionHeight
 
-            synthModel: synthNames
+            controller: backend
+            rowIndex: index
+            synthModel: backend.midiSynthNames
             leftRailWidth: root.hostWindow.leftRailWidth
             contentX: root.hostWindow.contentX
             volumeX: root.hostWindow.volumeX
@@ -204,8 +225,8 @@ Item {
             accentColor: modelData.accent
             textColor: modelData.text
 
-            onInteracted: (barColor) =>
-                root.activeStrumColor = barColor
+            onInteracted: (rowIndex) =>
+                root.activeMidiRow = rowIndex
         }
     }
 
@@ -224,7 +245,10 @@ Item {
             - root.hostWindow.controlSpacing
         height: root.hostWindow.rowHeight
         text: "OMNI"
-        onClicked: root.showOmniRequested()
+        onClicked: {
+            backend.finishMidiPreview()
+            root.showOmniRequested()
+        }
     }
 
     MidiStrumPad {
@@ -232,6 +256,9 @@ Item {
         y: 0
         width: root.hostWindow.strumWidth
         height: root.hostWindow.totalControlHeight
+        controller: backend
+        rowIndex: root.activeMidiRow
+        tuningCoupled: root.tuningCoupled
         padColor: root.activeStrumColor
     }
 }
