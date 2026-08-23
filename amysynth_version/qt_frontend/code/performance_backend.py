@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, QTimer, Signal, Slot
 
 import app_core
 from performance_logic import (
@@ -11,6 +12,7 @@ from performance_logic import (
     roll_bass_voicing,
     roll_chord_indexes,
 )
+from synth_state import SynthState
 
 
 CHORD_GATE_NONE = 0
@@ -18,6 +20,9 @@ CHORD_GATE_ON = 1
 CHORD_GATE_OFF = 2
 BASS_VOICING_LIMIT = 6
 REVERB_LEVEL_MAX = 2.0
+MIDI_ROW_COUNT = 6
+MIDI_DRUM_KIT_KEY = "drum_kit_0"
+MIDI_DRUM_PREVIEW_STEPS = 8
 
 
 class InstrumentBackend(app_core.InstrumentBackend):
@@ -31,6 +36,8 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     chordGateChanged = Signal()
     bassVoicingChanged = Signal()
+    midiStateChanged = Signal()
+    midiTuningChanged = Signal()
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Base construction loads a preset through virtual methods, so these
@@ -38,6 +45,37 @@ class InstrumentBackend(app_core.InstrumentBackend):
         self._chord_gate_state = CHORD_GATE_NONE
         self._bass_voicing_shift = 0
         super().__init__(*args, **kwargs)
+
+        # MIDI setup deliberately owns its own six UI instrument states.  The
+        # normal Omnichord catalogue is reused verbatim and the one ESP32 drum
+        # kit is appended only to this MIDI-facing catalogue.
+        drum_kit = app_core.SynthDefinition(
+            key=MIDI_DRUM_KIT_KEY,
+            label="Drum Kit 0",
+            controls=(),
+        )
+        self._midi_synth_definitions = tuple(self._synths) + (drum_kit,)
+        self._midi_synth_rows = [
+            SynthState(self._midi_synth_definitions, 0)
+            for _ in range(MIDI_ROW_COUNT)
+        ]
+        self._midi_channels = [index + 1 for index in range(MIDI_ROW_COUNT)]
+        self._midi_volumes = [0.5] * MIDI_ROW_COUNT
+        self._midi_state_version = 0
+
+        # The MIDI tuning shadow is only used while tuning is decoupled.  When
+        # coupled, MIDI UI and preview use the live Omnichord tuning directly.
+        self._midi_tuning_mode_index = self._tuning_mode_index
+        self._midi_tuning_reference = float(self._effective_tuning_reference())
+        self._midi_pitch_bend_offset_hz = 0.0
+        self._midi_pitch_bend_timer = QTimer(self)
+        self._midi_pitch_bend_timer.setInterval(100)
+        self._midi_pitch_bend_timer.timeout.connect(self._midi_pitch_bend_tick)
+        self._midi_pitch_bend_direction = 0
+        self._midi_pitch_bend_returning = False
+
+        self._midi_preview_row = -1
+        self._midi_preview_last_index: int | None = None
 
     def _reset_synth_role_to_preset(self, role: app_core.SynthRole) -> None:
         """Restore a synth role's preset instrument, parameters and volume.
@@ -97,6 +135,376 @@ class InstrumentBackend(app_core.InstrumentBackend):
     @Property(int, notify=bassVoicingChanged)
     def bassVoicingShift(self) -> int:
         return self._bass_voicing_shift
+
+    @Property(int, notify=midiStateChanged)
+    def midiStateVersion(self) -> int:
+        return self._midi_state_version
+
+    @Property("QVariantList", constant=True)
+    def midiSynthNames(self) -> list[str]:
+        return [definition.label for definition in self._midi_synth_definitions]
+
+    @Property(int, notify=midiTuningChanged)
+    def midiTuningModeIndex(self) -> int:
+        return self._midi_tuning_mode_index
+
+    @Property(int, notify=midiTuningChanged)
+    def midiTuningReference(self) -> int:
+        return int(round(self._effective_midi_tuning_reference()))
+
+    def _valid_midi_row(self, row_index: int) -> bool:
+        return 0 <= int(row_index) < MIDI_ROW_COUNT
+
+    def _midi_runtime(self, row_index: int) -> SynthState:
+        return self._midi_synth_rows[int(row_index)]
+
+    def _emit_midi_state_changed(self) -> None:
+        self._midi_state_version += 1
+        self.midiStateChanged.emit()
+
+    @Slot(int, result=int)
+    def midiSynthIndex(self, row_index: int) -> int:
+        if not self._valid_midi_row(row_index):
+            return 0
+        return self._midi_runtime(row_index).selected_index
+
+    @Slot(int, result="QVariantList")
+    def midiCommonControls(self, row_index: int) -> list[dict[str, Any]]:
+        if not self._valid_midi_row(row_index):
+            return []
+        return self._midi_runtime(row_index).control_model("common")
+
+    @Slot(int, result="QVariantList")
+    def midiExtraControls(self, row_index: int) -> list[dict[str, Any]]:
+        if not self._valid_midi_row(row_index):
+            return []
+        return self._midi_runtime(row_index).control_model("extra")
+
+    @Slot(int, result=float)
+    def midiVolume(self, row_index: int) -> float:
+        if not self._valid_midi_row(row_index):
+            return 0.5
+        return float(self._midi_volumes[int(row_index)])
+
+    @Slot(int, result=int)
+    def midiChannel(self, row_index: int) -> int:
+        if not self._valid_midi_row(row_index):
+            return 1
+        return int(self._midi_channels[int(row_index)])
+
+    @Slot(int, int)
+    def setMidiSynthIndex(self, row_index: int, synth_index: int) -> None:
+        if not self._valid_midi_row(row_index):
+            return
+        if self._midi_runtime(row_index).select(synth_index):
+            self._emit_midi_state_changed()
+
+    @Slot(int, str, float)
+    def setMidiSynthControl(
+        self,
+        row_index: int,
+        key: str,
+        value: float,
+    ) -> None:
+        if not self._valid_midi_row(row_index):
+            return
+        if self._midi_runtime(row_index).set_control(key, value):
+            self._emit_midi_state_changed()
+
+    @Slot(int, float)
+    def setMidiVolume(self, row_index: int, value: float) -> None:
+        if not self._valid_midi_row(row_index):
+            return
+        row = int(row_index)
+        clamped = max(0.0, min(1.0, float(value)))
+        if math.isclose(clamped, self._midi_volumes[row], abs_tol=1e-4):
+            return
+        self._midi_volumes[row] = clamped
+        self._emit_midi_state_changed()
+
+    @Slot(int)
+    def cycleMidiChannel(self, row_index: int) -> None:
+        if not self._valid_midi_row(row_index):
+            return
+        row = int(row_index)
+        current = self._midi_channels[row]
+        self._midi_channels[row] = 0 if current == 16 else current + 1
+        if current == 0:
+            self._midi_channels[row] = 1
+        self._emit_midi_state_changed()
+
+    @Slot(int)
+    def resetMidiSynthRow(self, row_index: int) -> None:
+        if not self._valid_midi_row(row_index):
+            return
+        row = int(row_index)
+        self._midi_synth_rows[row].reset_to_defaults()
+        self._midi_volumes[row] = 0.5
+        # MIDI channel is routing state, not part of an instrument reset.
+        self._emit_midi_state_changed()
+
+    def _effective_midi_tuning_reference(self) -> float:
+        return max(
+            415.0,
+            min(
+                466.0,
+                float(self._midi_tuning_reference)
+                + self._midi_pitch_bend_offset_hz,
+            ),
+        )
+
+    @Slot()
+    def syncMidiTuningFromOmni(self) -> None:
+        self._stop_midi_pitch_bend()
+        self._midi_pitch_bend_offset_hz = 0.0
+        self._midi_tuning_mode_index = self._tuning_mode_index
+        self._midi_tuning_reference = self._effective_tuning_reference()
+        self.midiTuningChanged.emit()
+
+    @Slot(int)
+    def setMidiTuningModeIndex(self, index: int) -> None:
+        clamped = max(
+            0,
+            min(len(app_core.TUNING_MODE_NAMES) - 1, int(index)),
+        )
+        if clamped == self._midi_tuning_mode_index:
+            return
+        self._midi_tuning_mode_index = clamped
+        self.midiTuningChanged.emit()
+
+    @Slot(int)
+    def setMidiTuningReference(self, value: int) -> None:
+        clamped = max(415, min(466, int(value)))
+        self._stop_midi_pitch_bend()
+        self._midi_pitch_bend_offset_hz = 0.0
+        if clamped == int(round(self._midi_tuning_reference)):
+            self.midiTuningChanged.emit()
+            return
+        self._midi_tuning_reference = float(clamped)
+        self.midiTuningChanged.emit()
+
+    def _stop_midi_pitch_bend(self) -> None:
+        self._midi_pitch_bend_timer.stop()
+        self._midi_pitch_bend_direction = 0
+        self._midi_pitch_bend_returning = False
+
+    def _midi_pitch_bend_tick(self) -> None:
+        previous = self._midi_pitch_bend_offset_hz
+        if self._midi_pitch_bend_returning:
+            if abs(previous) <= 1.0:
+                self._midi_pitch_bend_offset_hz = 0.0
+                self._stop_midi_pitch_bend()
+            else:
+                self._midi_pitch_bend_offset_hz = (
+                    previous - math.copysign(1.0, previous)
+                )
+        else:
+            candidate = previous + float(self._midi_pitch_bend_direction)
+            base = float(self._midi_tuning_reference)
+            self._midi_pitch_bend_offset_hz = max(
+                415.0 - base,
+                min(466.0 - base, candidate),
+            )
+            if math.isclose(
+                self._midi_pitch_bend_offset_hz,
+                previous,
+                abs_tol=1e-9,
+            ):
+                return
+        if not math.isclose(
+            previous,
+            self._midi_pitch_bend_offset_hz,
+            abs_tol=1e-9,
+        ):
+            self.midiTuningChanged.emit()
+
+    @Slot(int)
+    def beginMidiPitchBend(self, direction: int) -> None:
+        self._midi_pitch_bend_direction = 1 if int(direction) > 0 else -1
+        self._midi_pitch_bend_returning = False
+        if not self._midi_pitch_bend_timer.isActive():
+            self._midi_pitch_bend_timer.start()
+
+    @Slot()
+    def endMidiPitchBend(self) -> None:
+        self._midi_pitch_bend_direction = 0
+        if math.isclose(self._midi_pitch_bend_offset_hz, 0.0, abs_tol=1e-9):
+            self._stop_midi_pitch_bend()
+            return
+        self._midi_pitch_bend_returning = True
+        if not self._midi_pitch_bend_timer.isActive():
+            self._midi_pitch_bend_timer.start()
+
+    def _midi_preview_chord(self) -> tuple[int, set[int]]:
+        if self._active_row >= 0 and self._active_root_semitone >= 0:
+            root = self._active_root_semitone
+            chord = self._chords[self._row_chord_indexes[self._active_row]]
+            pitch_classes = {
+                (root + interval) % 12
+                for interval in chord.intervals
+            }
+            return root, pitch_classes
+
+        # Before the player has selected an Omnichord chord, preview C major.
+        return 0, {0, 4, 7}
+
+    def _midi_preview_notes(self) -> tuple[list[int], int]:
+        root, pitch_classes = self._midi_preview_chord()
+        notes = [
+            note
+            for note in range(app_core.STRUM_LOW_MIDI, app_core.STRUM_HIGH_MIDI + 1)
+            if note % 12 in pitch_classes
+        ]
+        return notes, root
+
+    def _midi_preview_index(self, normalized_y: float) -> int | None:
+        notes, _ = self._midi_preview_notes()
+        if not notes:
+            return None
+        y = max(0.0, min(1.0, float(normalized_y)))
+        return round((1.0 - y) * (len(notes) - 1))
+
+    @staticmethod
+    def _midi_drum_preview_index(normalized_y: float) -> int:
+        y = max(0.0, min(1.0, float(normalized_y)))
+        return round((1.0 - y) * (MIDI_DRUM_PREVIEW_STEPS - 1))
+
+    def _midi_preview_is_drum(self, row_index: int) -> bool:
+        return (
+            self._midi_runtime(row_index).selected_definition.key
+            == MIDI_DRUM_KIT_KEY
+        )
+
+    def _midi_preview_tuned_note(
+        self,
+        note: int | float,
+        root_semitone: int,
+        coupled: bool,
+    ) -> float:
+        if coupled:
+            return self._tuned_note(note, root_semitone)
+
+        reference_offset = 12.0 * math.log2(
+            self._effective_midi_tuning_reference() / 440.0
+        )
+        mode = app_core.TUNING_MODE_NAMES[self._midi_tuning_mode_index]
+        factor = 1.0
+        if mode in self._intonation_tables:
+            root_pc = int(root_semitone) % 12
+            note_pc = int(math.floor(float(note) + 0.5)) % 12
+            factor = self._intonation_tables[mode][root_pc][note_pc]
+        return float(note) + reference_offset + 12.0 * math.log2(factor)
+
+    def _prepare_midi_preview(self, row_index: int) -> None:
+        runtime = self._midi_runtime(row_index)
+        self._client.send_message(
+            self._strum_synth_address,
+            runtime.transport_payload(),
+        )
+        self._client.send_message(
+            self._strum_amp_address,
+            self._midi_volumes[int(row_index)],
+        )
+
+    def _play_midi_preview_index(
+        self,
+        row_index: int,
+        index: int,
+        coupled: bool,
+    ) -> None:
+        if self._midi_preview_is_drum(row_index):
+            preview_drum = getattr(self._client, "preview_drum", None)
+            if callable(preview_drum):
+                preview_drum(int(index))
+            return
+
+        notes, root = self._midi_preview_notes()
+        if not 0 <= int(index) < len(notes):
+            return
+        tuned = self._midi_preview_tuned_note(
+            notes[int(index)],
+            root,
+            bool(coupled),
+        )
+        self._client.send_message(
+            self._strum_note_address,
+            f"{tuned:.12f}",
+        )
+
+    @Slot(int, float, bool)
+    def midiPreviewStart(
+        self,
+        row_index: int,
+        normalized_y: float,
+        coupled: bool,
+    ) -> None:
+        if not self._valid_midi_row(row_index):
+            return
+        row = int(row_index)
+        self._midi_preview_row = row
+
+        if self._midi_preview_is_drum(row):
+            index = self._midi_drum_preview_index(normalized_y)
+        else:
+            self._prepare_midi_preview(row)
+            index = self._midi_preview_index(normalized_y)
+            if index is None:
+                self._midi_preview_last_index = None
+                return
+
+        self._midi_preview_last_index = int(index)
+        self._play_midi_preview_index(row, int(index), bool(coupled))
+
+    @Slot(int, float, bool)
+    def midiPreviewMove(
+        self,
+        row_index: int,
+        normalized_y: float,
+        coupled: bool,
+    ) -> None:
+        if not self._valid_midi_row(row_index):
+            return
+        row = int(row_index)
+        if row != self._midi_preview_row:
+            self.midiPreviewStart(row, normalized_y, coupled)
+            return
+
+        if self._midi_preview_is_drum(row):
+            new_index = self._midi_drum_preview_index(normalized_y)
+        else:
+            candidate = self._midi_preview_index(normalized_y)
+            if candidate is None:
+                self._midi_preview_last_index = None
+                return
+            new_index = int(candidate)
+
+        if self._midi_preview_last_index is None:
+            self._midi_preview_last_index = new_index
+            self._play_midi_preview_index(row, new_index, bool(coupled))
+            return
+        old_index = self._midi_preview_last_index
+        if new_index == old_index:
+            return
+
+        direction = 1 if new_index > old_index else -1
+        for index in range(old_index + direction, new_index + direction, direction):
+            self._play_midi_preview_index(row, index, bool(coupled))
+        self._midi_preview_last_index = new_index
+
+    @Slot()
+    def midiPreviewEnd(self) -> None:
+        self._midi_preview_last_index = None
+        self._midi_preview_row = -1
+
+    @Slot()
+    def finishMidiPreview(self) -> None:
+        """Return the borrowed physical strum synth to Omnichord state."""
+        self.midiPreviewEnd()
+        self._send_synth_state("strum")
+        self._client.send_message(
+            self._strum_amp_address,
+            self._strum_volume,
+        )
 
     def _chord_gate_enabled(self) -> bool:
         return (
@@ -340,4 +748,5 @@ class InstrumentBackend(app_core.InstrumentBackend):
     def panic(self) -> None:
         self._chord_gate_state = CHORD_GATE_NONE
         super().panic()
+        self.finishMidiPreview()
         self.chordGateChanged.emit()
