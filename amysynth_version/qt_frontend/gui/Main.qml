@@ -98,6 +98,11 @@ ApplicationWindow {
     property color accentColor: "#2474b8"
     property color textColor: "#171717"
 
+    // Screen mode is deliberately presentation-only. Switching never sends a
+    // transport, note, patch or effect command to AMY.
+    property bool midiScreen: false
+    property bool tuningCoupled: true
+
     function setFullscreenMode(fullscreen) {
         if (fullscreen) {
             window.showFullScreen()
@@ -297,9 +302,13 @@ ApplicationWindow {
                     window.visibility
                     === Window.FullScreen
                 leftExtension: window.leftRailWidth
+                tuningCoupled: window.tuningCoupled
 
                 onToggleFullscreenRequested:
                     window.toggleFullscreenMode()
+
+                onToggleTuningCouplingRequested:
+                    window.tuningCoupled = !window.tuningCoupled
             }
 
             PresetResetButton {
@@ -721,59 +730,13 @@ ApplicationWindow {
                             }
                         }
 
+                        // The gate control moved to the shared left edge below
+                        // the chord-type RST/UP/DWN stack.
                         Button {
                             id: offButton
-
-                            visible:
-                                rowItem.rowIndex === 3
-
-                            x: 0
-                            y: 0
-                            width:
-                                window.rowIndent * 3
-                                - window.controlSpacing
-                            height: window.rowHeight
-                            text: backend.chordGateButtonText
-                            enabled: backend.chordGateState !== 0
-                            opacity: enabled ? 1.0 : 0.35
-
-                            property bool selected:
-                                backend.chordGateState === 2
-
-                            font.pixelSize: 14
-                            font.bold: true
-
-                            contentItem: Text {
-                                text: offButton.text
-                                color: "#fff7e8"
-                                font: offButton.font
-                                horizontalAlignment:
-                                    Text.AlignHCenter
-                                verticalAlignment:
-                                    Text.AlignVCenter
-                            }
-
-                            background: Rectangle {
-                                radius: 9
-                                color:
-                                    offButton.selected
-                                    ? "#704323"
-                                    : (
-                                        offButton.hovered
-                                        ? "#8a5a34"
-                                        : "#7b5030"
-                                    )
-                                border.color:
-                                    offButton.selected
-                                    ? "#d6aa7f"
-                                    : "#9d714b"
-                                border.width:
-                                    offButton.selected
-                                    ? 3 : 1
-                            }
-
-                            onClicked:
-                                backend.toggleChordGate()
+                            visible: false
+                            width: 1
+                            height: 1
                         }
 
                         Row {
@@ -1357,6 +1320,82 @@ ApplicationWindow {
                 }
             }
 
+            // Moved left and up: aligned with the third chord row and with the
+            // left edge of the section backgrounds.
+            Button {
+                id: chordGateButton
+
+                x: 0
+                y:
+                    window.chordRowsY
+                    + 2
+                    * (
+                        window.rowHeight
+                        + window.rowSpacing
+                    )
+                width:
+                    window.contentX
+                    + 2 * window.rowIndent
+                    - window.controlSpacing
+                height: window.rowHeight
+                text: backend.chordGateButtonText
+                enabled: backend.chordGateState !== 0
+                opacity: enabled ? 1.0 : 0.35
+
+                property bool selected:
+                    backend.chordGateState === 2
+
+                font.pixelSize: 14
+                font.bold: true
+
+                contentItem: Text {
+                    text: chordGateButton.text
+                    color: "#fff7e8"
+                    font: chordGateButton.font
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                }
+
+                background: Rectangle {
+                    radius: 9
+                    color:
+                        chordGateButton.selected
+                        ? "#704323"
+                        : (
+                            chordGateButton.hovered
+                            ? "#8a5a34"
+                            : "#7b5030"
+                        )
+                    border.color:
+                        chordGateButton.selected
+                        ? "#d6aa7f"
+                        : "#9d714b"
+                    border.width:
+                        chordGateButton.selected ? 3 : 1
+                }
+
+                onClicked:
+                    backend.toggleChordGate()
+            }
+
+            RainbowModeButton {
+                x: 0
+                y:
+                    window.chordRowsY
+                    + 3
+                    * (
+                        window.rowHeight
+                        + window.rowSpacing
+                    )
+                width:
+                    window.contentX
+                    + 2 * window.rowIndent
+                    - window.controlSpacing
+                height: window.rowHeight
+                text: "MIDI"
+                onClicked:
+                    window.midiScreen = true
+            }
 
             StrumPad {
                 x: window.strumX
@@ -1365,6 +1404,20 @@ ApplicationWindow {
                 height:
                     window.totalControlHeight
                 controller: backend
+            }
+
+            MidiScreen {
+                anchors.fill: parent
+                z: 10000
+                visible: window.midiScreen
+                hostWindow: window
+                tuningCoupled: window.tuningCoupled
+
+                onShowOmniRequested:
+                    window.midiScreen = false
+
+                onToggleTuningCouplingRequested:
+                    window.tuningCoupled = !window.tuningCoupled
             }
         }
     }
