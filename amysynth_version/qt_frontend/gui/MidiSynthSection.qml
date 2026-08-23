@@ -4,6 +4,8 @@ import QtQuick.Controls
 Item {
     id: root
 
+    required property var controller
+    required property int rowIndex
     required property var synthModel
 
     property int leftRailWidth: 64
@@ -17,35 +19,39 @@ Item {
     property color accentColor: "#2f7fb4"
     property color textColor: "#17212a"
 
-    property int selectedSynthIndex: 0
-    // UI convention is MIDI channels 1..16; index 16 is omni/all (A).
-    property int channelIndex: 0
-    property real volumeValue: 0.5
+    signal interacted(int rowIndex)
 
-    property real brightnessValue: 0.5
-    property real modulationValue: 0.0
-    property real detuneValue: 0.0
-    property real attackValue: 0.05
-    property real sustainValue: 0.75
-    property real releaseValue: 0.25
-
-    signal interacted(color barColor)
-
-    function markInteraction() {
-        root.interacted(root.panelColor)
+    readonly property int selectedSynthIndex: {
+        root.controller.midiStateVersion
+        return root.controller.midiSynthIndex(root.rowIndex)
     }
 
-    function resetUi() {
-        root.selectedSynthIndex = 0
-        synthWheel.currentIndex = 0
-        root.brightnessValue = 0.5
-        root.modulationValue = 0.0
-        root.detuneValue = 0.0
-        root.attackValue = 0.05
-        root.sustainValue = 0.75
-        root.releaseValue = 0.25
-        root.volumeValue = 0.5
-        root.markInteraction()
+    readonly property var commonControls: {
+        root.controller.midiStateVersion
+        return root.controller.midiCommonControls(root.rowIndex)
+    }
+
+    readonly property var extraControls: {
+        root.controller.midiStateVersion
+        return root.controller.midiExtraControls(root.rowIndex)
+    }
+
+    function markInteraction() {
+        root.interacted(root.rowIndex)
+    }
+
+    function synchronizeWheel() {
+        if (!synthWheel.initialized) {
+            return
+        }
+        const wanted = root.controller.midiSynthIndex(root.rowIndex)
+        if (synthWheel.currentIndex !== wanted) {
+            synthWheel.syncing = true
+            synthWheel.currentIndex = wanted
+            Qt.callLater(function() {
+                synthWheel.syncing = false
+            })
+        }
     }
 
     Rectangle {
@@ -65,7 +71,10 @@ Item {
         panelColor: Qt.lighter(root.panelColor, 1.05)
         borderColor: root.borderColor
         textColor: root.textColor
-        onClicked: root.resetUi()
+        onClicked: {
+            root.controller.resetMidiSynthRow(root.rowIndex)
+            root.markInteraction()
+        }
     }
 
     Frame {
@@ -95,12 +104,22 @@ Item {
             flickDeceleration: 1200
 
             property bool initialized: false
+            property bool syncing: false
 
             Component.onCompleted: {
+                syncing = true
                 currentIndex = root.selectedSynthIndex
                 Qt.callLater(function() {
+                    synthWheel.syncing = false
                     synthWheel.initialized = true
                 })
+            }
+
+            Connections {
+                target: root.controller
+                function onMidiStateChanged() {
+                    root.synchronizeWheel()
+                }
             }
 
             delegate: Item {
@@ -137,8 +156,15 @@ Item {
             }
 
             onCurrentIndexChanged: {
-                if (initialized && currentIndex >= 0) {
-                    root.selectedSynthIndex = currentIndex
+                if (
+                    initialized
+                    && !syncing
+                    && currentIndex >= 0
+                ) {
+                    root.controller.setMidiSynthIndex(
+                        root.rowIndex,
+                        currentIndex
+                    )
                     root.markInteraction()
                 }
             }
@@ -163,10 +189,11 @@ Item {
         y: (parent.height - height) / 2
         width: 62
         height: 62
-        text:
-            root.channelIndex < 16
-            ? String(root.channelIndex + 1)
-            : "A"
+        text: {
+            root.controller.midiStateVersion
+            const channel = root.controller.midiChannel(root.rowIndex)
+            return channel === 0 ? "A" : String(channel)
+        }
         font.pixelSize: 20
         font.bold: true
 
@@ -189,7 +216,7 @@ Item {
         }
 
         onClicked: {
-            root.channelIndex = (root.channelIndex + 1) % 17
+            root.controller.cycleMidiChannel(root.rowIndex)
             root.markInteraction()
         }
     }
@@ -203,134 +230,86 @@ Item {
         height: parent.height
         spacing: 8
 
-        Row {
+        Item {
             width: parent.width
             height: (parent.height - sliderColumn.spacing) / 2
-            spacing: 8
 
-            LabeledSlider {
-                width: (parent.width - 16) / 3
-                height: parent.height
-                label: "BRI"
-                currentValue: root.brightnessValue
-                fromValue: 0
-                toValue: 1
-                stepValue: 0.01
-                decimals: 2
-                textColor: root.textColor
-                trackColor: Qt.lighter(root.panelColor, 1.08)
-                fillColor: root.accentColor
-                handleColor: "#ffffff"
-                borderColor: Qt.darker(root.accentColor, 1.2)
-                onEdited: (value) => {
-                    root.brightnessValue = value
-                    root.markInteraction()
-                }
-            }
+            Row {
+                id: extraRow
+                anchors.fill: parent
+                spacing: 8
 
-            LabeledSlider {
-                width: (parent.width - 16) / 3
-                height: parent.height
-                label: "MOD"
-                currentValue: root.modulationValue
-                fromValue: 0
-                toValue: 1
-                stepValue: 0.01
-                decimals: 2
-                textColor: root.textColor
-                trackColor: Qt.lighter(root.panelColor, 1.08)
-                fillColor: root.accentColor
-                handleColor: "#ffffff"
-                borderColor: Qt.darker(root.accentColor, 1.2)
-                onEdited: (value) => {
-                    root.modulationValue = value
-                    root.markInteraction()
-                }
-            }
+                Repeater {
+                    id: extraRepeater
+                    model: root.extraControls
 
-            LabeledSlider {
-                width: (parent.width - 16) / 3
-                height: parent.height
-                label: "DET"
-                currentValue: root.detuneValue
-                fromValue: -1
-                toValue: 1
-                stepValue: 0.01
-                decimals: 2
-                textColor: root.textColor
-                trackColor: Qt.lighter(root.panelColor, 1.08)
-                fillColor: root.accentColor
-                handleColor: "#ffffff"
-                borderColor: Qt.darker(root.accentColor, 1.2)
-                onEdited: (value) => {
-                    root.detuneValue = value
-                    root.markInteraction()
+                    delegate: ParameterSlider {
+                        required property var modelData
+
+                        width:
+                            (
+                                extraRow.width
+                                - (extraRepeater.count - 1) * extraRow.spacing
+                            ) / extraRepeater.count
+                        height: extraRow.height
+                        control: modelData
+                        textColor: root.textColor
+                        trackColor: Qt.lighter(root.panelColor, 1.08)
+                        fillColor: root.accentColor
+                        handleColor: "#ffffff"
+                        borderColor: Qt.darker(root.accentColor, 1.2)
+
+                        onEdited: (key, value) => {
+                            root.controller.setMidiSynthControl(
+                                root.rowIndex,
+                                key,
+                                value
+                            )
+                            root.markInteraction()
+                        }
+                    }
                 }
             }
         }
 
-        Row {
+        Item {
             width: parent.width
             height: (parent.height - sliderColumn.spacing) / 2
-            spacing: 8
 
-            LabeledSlider {
-                width: (parent.width - 16) / 3
-                height: parent.height
-                label: "ATK"
-                currentValue: root.attackValue
-                fromValue: 0
-                toValue: 1
-                stepValue: 0.01
-                decimals: 2
-                textColor: root.textColor
-                trackColor: Qt.lighter(root.panelColor, 1.08)
-                fillColor: root.accentColor
-                handleColor: "#ffffff"
-                borderColor: Qt.darker(root.accentColor, 1.2)
-                onEdited: (value) => {
-                    root.attackValue = value
-                    root.markInteraction()
-                }
-            }
+            Row {
+                id: commonRow
+                anchors.fill: parent
+                spacing: 8
 
-            LabeledSlider {
-                width: (parent.width - 16) / 3
-                height: parent.height
-                label: "SUS"
-                currentValue: root.sustainValue
-                fromValue: 0
-                toValue: 1
-                stepValue: 0.01
-                decimals: 2
-                textColor: root.textColor
-                trackColor: Qt.lighter(root.panelColor, 1.08)
-                fillColor: root.accentColor
-                handleColor: "#ffffff"
-                borderColor: Qt.darker(root.accentColor, 1.2)
-                onEdited: (value) => {
-                    root.sustainValue = value
-                    root.markInteraction()
-                }
-            }
+                Repeater {
+                    id: commonRepeater
+                    model: root.commonControls
 
-            LabeledSlider {
-                width: (parent.width - 16) / 3
-                height: parent.height
-                label: "REL"
-                currentValue: root.releaseValue
-                fromValue: 0
-                toValue: 1
-                stepValue: 0.01
-                decimals: 2
-                textColor: root.textColor
-                trackColor: Qt.lighter(root.panelColor, 1.08)
-                fillColor: root.accentColor
-                handleColor: "#ffffff"
-                borderColor: Qt.darker(root.accentColor, 1.2)
-                onEdited: (value) => {
-                    root.releaseValue = value
-                    root.markInteraction()
+                    delegate: ParameterSlider {
+                        required property var modelData
+
+                        width:
+                            (
+                                commonRow.width
+                                - (commonRepeater.count - 1) * commonRow.spacing
+                            ) / commonRepeater.count
+                        height: commonRow.height
+                        control: modelData
+                        textColor: root.textColor
+                        trackColor: Qt.lighter(root.panelColor, 1.08)
+                        fillColor: root.accentColor
+                        handleColor: "#ffffff"
+                        borderColor: Qt.darker(root.accentColor, 1.2)
+
+                        onEdited: (key, value) => {
+                            root.controller.setMidiSynthControl(
+                                root.rowIndex,
+                                key,
+                                value
+                            )
+                            root.markInteraction()
+                        }
+                    }
                 }
             }
         }
@@ -341,14 +320,17 @@ Item {
         y: 0
         width: root.volumeWidth
         height: parent.height
-        currentValue: root.volumeValue
+        currentValue: {
+            root.controller.midiStateVersion
+            return root.controller.midiVolume(root.rowIndex)
+        }
         panelColor: Qt.lighter(root.panelColor, 1.03)
         panelBorderColor: root.borderColor
         fillColor: root.accentColor
         textColor: root.textColor
 
         onEdited: (value) => {
-            root.volumeValue = value
+            root.controller.setMidiVolume(root.rowIndex, value)
             root.markInteraction()
         }
     }
