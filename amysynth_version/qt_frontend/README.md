@@ -117,11 +117,14 @@ Unix wire-protocol socket as `run_local.sh`. The Pi build requires 64-bit
 Raspberry Pi OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG
 is Apple Silicon-only, ad-hoc signed and not Apple-notarized.
 
-The release pipeline and packaged runtime were validated end to end on
-2026-08-24. Release `R20260824T204611` passed all 79 tests, clean-home startup
-and CI smoke checks; its downloaded AppImage was subsequently tested on Linux
-with working UI and audio. Use the repository's GitHub Releases page for the
-current artifact rather than treating this validation tag as a hard-coded
-update channel.
+The three-platform release pipeline was validated end to end on 2026-08-24.
+Release `R20260824T212125` passed all 80 tests. CI then started both AppImages
+on native x64/aarch64 Linux runners and started the app from the mounted DMG on
+a native Apple-Silicon runner, requiring the AMY-service and frontend socket
+markers before publication. The earlier x64 release `R20260824T204611` was also
+downloaded and physically tested on Linux with working UI and audio. Raspberry
+Pi and macOS still need physical-device/audio validation. Use the repository's
+GitHub Releases page for the current artifacts rather than treating either tag
+as a hard-coded update channel.
 
 [Open GitHub Releases](https://github.com/linuxificator/LB_Omnichord/releases)

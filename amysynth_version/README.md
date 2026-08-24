@@ -19,3 +19,8 @@ the complete AMY regression matrix passes. Each release contains Linux x86_64
 and Raspberry Pi 4/5 aarch64 AppImages plus a macOS Apple Silicon DMG. Every
 package contains the Qt frontend and compatible AMY runtime while preserving
 their separate-process wire-protocol boundary.
+
+The three-platform baseline release is `R20260824T212125`: all 80 tests passed,
+and every final package was started on a native runner before publication. The
+Linux x64 package also has separate physical UI/audio validation; Raspberry Pi
+and macOS physical-device/audio validation remains outstanding.

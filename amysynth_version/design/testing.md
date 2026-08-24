@@ -80,19 +80,21 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 
 The AppImages bundle PySide6, the frontend assets and the pinned AMY bus-mixer
 fork built with the ESP32-compatible tiny PCM bank. The executable starts AMY
-as a separate child process and connects the Qt process through the existing
-Unix `SOCK_SEQPACKET` wire-protocol boundary. Packaging therefore does not
-collapse the application and synthesizer architectures into one process.
+as a separate child process. Linux uses the existing Unix `SOCK_SEQPACKET`
+wire-protocol boundary. macOS uses newline-framed Unix `SOCK_STREAM`, because
+Darwin does not support Unix-domain `SOCK_SEQPACKET`. Packaging therefore does
+not collapse the application and synthesizer architectures into one process.
 
 `packaging/build_appimage.sh` builds either Linux AppImage;
 `packaging/build_macos_dmg.sh` builds the Apple Silicon application/DMG. The
 workflow pins PyInstaller and verifies SHA-256 hashes for each architecture's
 appimagetool and type-2 runtime. `--package-self-test` verifies imports and
-required assets on all platforms. Linux CI additionally performs a timed
-headless launch and requires both the AMY-service-ready and
-frontend-socket-connection markers before publishing. Native/headless Linux CI
-uses `tests/alsa-null.conf`: AMY runs its real audio callback against ALSA's
-null PCM without requiring an audio card.
+required assets on all platforms. CI starts each final package and requires
+both the AMY-service-ready and frontend-socket-connection markers before
+publishing. The DMG is first verified and mounted read-only; CI starts the app
+from that mounted release image. Native/headless Linux CI uses
+`tests/alsa-null.conf`: AMY runs its real audio callback against ALSA's null PCM
+without requiring an audio card.
 
 The Raspberry Pi package targets 64-bit Raspberry Pi OS on Pi 4 and Pi 5. It is
 built natively as aarch64 using Pi 4 as the minimum CPU baseline; Pi 5 does not
@@ -113,7 +115,11 @@ The first end-to-end release-candidate run was validated on 2026-08-24:
   physically tested on Linux with working UI and audio.
 
 This proves the release mechanism and that particular x86_64 artifact. The
-Raspberry Pi and macOS packages still require their first physical-device test.
+first complete three-platform release, `R20260824T212125`, subsequently passed
+all 80 tests and final-package startup on native x64 Linux, native aarch64 Linux
+and native Apple-Silicon macOS runners. It published all three packages and
+their checksums only after AMY and Qt connected successfully. The Raspberry Pi
+and macOS packages still require their first physical-device/audio test.
 Future releases are not automatically considered physically tested merely
 because the pipeline succeeded.
 

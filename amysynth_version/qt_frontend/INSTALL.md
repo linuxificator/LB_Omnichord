@@ -9,8 +9,10 @@ The Raspberry Pi/UART path has been exercised on the project hardware. The
 Linux two-process socket path has also been exercised with working audio,
 multibus routing and the ESP32-compatible tiny drum bank. The published x86_64
 AppImage was downloaded from GitHub Releases and physically validated with
-working UI and audio on Linux on 2026-08-24. macOS and WSL remain development
-guidance rather than validated release recipes.
+working UI and audio on Linux on 2026-08-24. Release `R20260824T212125` also
+passed native packaged-runtime validation for Linux x64, Linux aarch64 and
+macOS arm64. Raspberry Pi and macOS still require physical-device/audio tests;
+WSL remains development guidance rather than a validated release recipe.
 
 ## Repository layout
 
