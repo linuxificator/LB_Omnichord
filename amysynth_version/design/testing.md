@@ -85,7 +85,9 @@ workflow pins PyInstaller and verifies SHA-256 hashes for appimagetool and its
 type-2 runtime. The packaged `--appimage-self-test` verifies imports and
 required assets; CI then performs a timed headless launch and requires both the
 AMY-service-ready and frontend-socket-connection markers before creating a
-release.
+release. Native CI uses `tests/alsa-null.conf`: AMY runs its real audio callback
+against ALSA's null PCM, so engine startup is exercised without pretending the
+hosted runner has an audio card.
 
 Each test should verify:
 

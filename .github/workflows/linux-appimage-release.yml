@@ -97,6 +97,7 @@ jobs:
       - name: Validate packaged application
         working-directory: amysynth_version/qt_frontend
         env:
+          ALSA_CONFIG_PATH: ${{ github.workspace }}/amysynth_version/qt_frontend/tests/alsa-null.conf
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
           "dist/${{ steps.release.outputs.file }}" --appimage-self-test

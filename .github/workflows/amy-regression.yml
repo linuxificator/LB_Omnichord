@@ -89,6 +89,7 @@ jobs:
       - name: Run selected regression suite
         working-directory: amysynth_version/qt_frontend
         env:
+          ALSA_CONFIG_PATH: ${{ github.workspace }}/amysynth_version/qt_frontend/tests/alsa-null.conf
           OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
         run: python tests/run_tests.py --suite '${{ matrix.suite }}'
 
@@ -145,6 +146,7 @@ jobs:
       - name: Run requested regression suite
         working-directory: amysynth_version/qt_frontend
         env:
+          ALSA_CONFIG_PATH: ${{ github.workspace }}/amysynth_version/qt_frontend/tests/alsa-null.conf
           OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
         run: python tests/run_tests.py --suite '${{ inputs.suite }}'
 

@@ -21,6 +21,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("uses: ./.github/workflows/amy-regression.yml", release)
         self.assertRegex(release, r"build-and-release:\n\s+needs: tests")
         self.assertIn("workflow_call:", regression)
+        self.assertIn("ALSA_CONFIG_PATH:", regression)
+        self.assertTrue((FRONTEND / "tests" / "alsa-null.conf").is_file())
         for suite in (
             "unit",
             "frontend",
