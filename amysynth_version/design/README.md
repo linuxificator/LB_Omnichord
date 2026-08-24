@@ -24,6 +24,7 @@ Core rules:
 - Shared state is explicit; tuning is shared only when coupling is enabled.
 - `rhythm_bahavior.md` is the authoritative rhythm transport/tempo contract.
 - `testing.md` defines the maintained local suites and CI responsibilities;
-  detailed executable scenarios live in `../qt_frontend/tests/USE_CASES.md`.
+  it also defines Linux release packaging and validation. Detailed executable
+  scenarios live in `../qt_frontend/tests/USE_CASES.md`.
 
 When implementation and design differ, the difference must be documented before changing behavior.

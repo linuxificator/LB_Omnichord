@@ -4,6 +4,27 @@ This frontend runs the Qt/PySide6 user interface on Raspberry Pi and sends the
 native AMY wire protocol over UART to the ESP32-P4. The Sonic Pi implementation
 is frozen legacy material and is never modified as part of this AMY version.
 
+## Raspberry Pi AppImage
+
+GitHub Releases also provide a self-contained `RaspberryPi-aarch64.AppImage`
+for 64-bit Raspberry Pi OS. It targets the Raspberry Pi 4 instruction-set
+baseline and runs on both Pi 4 and Pi 5; separate builds are unnecessary. Pi 3
+and older models are outside the supported release target.
+
+The AppImage bundles the pinned native AMY service and uses the Pi's local
+audio output. It preserves the process boundary: its launcher starts AMY and
+Qt as separate processes and they exchange AMY wire packets over a private
+Unix socket. Use this package when the Pi itself should synthesize audio. The
+source install and UART instructions below remain the path for driving an
+external ESP32-P4 instead.
+
+Make the downloaded package executable and start it directly:
+
+```bash
+chmod +x LB_Omnichord.R*.RaspberryPi-aarch64.AppImage
+./LB_Omnichord.R*.RaspberryPi-aarch64.AppImage
+```
+
 ## Wiring
 
 Connect only UART TX and ground:

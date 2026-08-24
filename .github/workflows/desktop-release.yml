@@ -1,0 +1,264 @@
+name: Test and release desktop packages
+
+on:
+  push:
+    branches: [main, testing_and_packaging]
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-package-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    uses: ./.github/workflows/amy-regression.yml
+
+  release-metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      stamp: ${{ steps.release.outputs.stamp }}
+    steps:
+      - name: Create release names
+        id: release
+        shell: bash
+        run: |
+          instant="$(date -u +%Y%m%dT%H%M%S)"
+          echo "tag=R${instant}" >> "$GITHUB_OUTPUT"
+          echo "stamp=R${instant/T/}" >> "$GITHUB_OUTPUT"
+
+  linux-appimages:
+    needs: [tests, release-metadata]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            arch: x86_64
+            platform: Linux-x86_64
+            tool_sha256: a6d71e2b6cd66f8e8d16c37ad164658985e0cf5fcaa950c90a482890cb9d13e0
+            runtime_sha256: 1cc49bcf1e2ccd593c379adb17c9f85a36d619088296504de95b1d06215aebbf
+          - runner: ubuntu-22.04-arm
+            arch: aarch64
+            platform: RaspberryPi-aarch64
+            tool_sha256: 1b00524ba8c6b678dc15ef88a5c25ec24def36cdfc7e3abb32ddcd068e8007fe
+            runtime_sha256: 7d5d772b7c32f0c84caf0a452a3072a5709027d7eac5856feb89a7a7a8881372
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: amysynth_version/qt_frontend/requirements.txt
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libfuse2
+          python -m pip install \
+            -r amysynth_version/qt_frontend/requirements.txt \
+            'pyinstaller==6.22.2'
+
+      - name: Install pinned AMY with ESP32-compatible drum bank
+        run: |
+          git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
+          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb apply \
+            "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
+          AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
+          amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
+          if nm -D "$amy_so" | grep -Eq 'gamma9001|amy_set_gamma'; then
+            echo 'AMY was built with the wrong PCM bank' >&2
+            exit 1
+          fi
+
+      - name: Download verified AppImage tools
+        env:
+          APPIMAGE_ARCH: ${{ matrix.arch }}
+          TOOL_SHA256: ${{ matrix.tool_sha256 }}
+          RUNTIME_SHA256: ${{ matrix.runtime_sha256 }}
+        run: |
+          curl -L --fail --silent --show-error \
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${APPIMAGE_ARCH}.AppImage" \
+            -o /tmp/appimagetool
+          echo "$TOOL_SHA256  /tmp/appimagetool" | sha256sum --check --strict
+          curl -L --fail --silent --show-error \
+            "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-${APPIMAGE_ARCH}" \
+            -o /tmp/appimage-runtime
+          echo "$RUNTIME_SHA256  /tmp/appimage-runtime" | sha256sum --check --strict
+          chmod +x /tmp/appimagetool
+
+      - name: Build AppImage
+        working-directory: amysynth_version/qt_frontend
+        env:
+          APPIMAGETOOL: /tmp/appimagetool
+          APPIMAGE_RUNTIME_FILE: /tmp/appimage-runtime
+          OMNICHORD_APPIMAGE_ARCH: ${{ matrix.arch }}
+          OMNICHORD_APPIMAGE_PLATFORM: ${{ matrix.platform }}
+          OMNICHORD_RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+        run: packaging/build_appimage.sh
+
+      - name: Validate packaged application
+        working-directory: amysynth_version/qt_frontend
+        env:
+          ALSA_CONFIG_PATH: ${{ github.workspace }}/amysynth_version/qt_frontend/tests/alsa-null.conf
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          package="dist/LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.${{ matrix.platform }}.AppImage"
+          "$package" --package-self-test
+          set +e
+          QT_QPA_PLATFORM=offscreen timeout --signal=TERM 8s \
+            "$package" --windowed > /tmp/omnichord-package-smoke.log 2>&1
+          smoke_status=$?
+          set -e
+          cat /tmp/omnichord-package-smoke.log
+          if [[ "$smoke_status" -ne 124 && "$smoke_status" -ne 143 ]]; then
+            echo "AppImage smoke test stopped unexpectedly: $smoke_status" >&2
+            exit 1
+          fi
+          grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
+          grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
+          package_name="$(basename "$package")"
+          (cd dist && sha256sum "$package_name" > "$package_name.sha256")
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ matrix.platform }}
+          path: |
+            amysynth_version/qt_frontend/dist/*.AppImage
+            amysynth_version/qt_frontend/dist/*.sha256
+          if-no-files-found: error
+          retention-days: 2
+
+  macos-dmg:
+    needs: [tests, release-metadata]
+    runs-on: macos-15
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: amysynth_version/qt_frontend/requirements.txt
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install \
+            -r amysynth_version/qt_frontend/requirements.txt \
+            'pyinstaller==6.22.2'
+
+      - name: Install pinned AMY with ESP32-compatible drum bank
+        run: |
+          git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
+          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb apply \
+            "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
+          AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
+
+      - name: Build and validate DMG
+        working-directory: amysynth_version/qt_frontend
+        env:
+          OMNICHORD_RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+        run: |
+          packaging/build_macos_dmg.sh
+          package="dist/LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.macOS-arm64.dmg"
+          hdiutil verify "$package"
+          mountpoint="/tmp/lb-omnichord-dmg"
+          mkdir -p "$mountpoint"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" "$package"
+          trap 'hdiutil detach "$mountpoint"' EXIT
+          app="$mountpoint/LB_Omnichord.app/Contents/MacOS/LB_Omnichord"
+          "$app" --package-self-test
+          QT_QPA_PLATFORM=offscreen "$app" --windowed \
+            > /tmp/omnichord-package-smoke.log 2>&1 &
+          app_pid=$!
+          for _ in {1..80}; do
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              wait "$app_pid"
+              echo 'Packaged macOS application stopped during startup' >&2
+              exit 1
+            fi
+            if grep -q 'AMY backend: external socket' \
+              /tmp/omnichord-package-smoke.log; then
+              break
+            fi
+            sleep 0.1
+          done
+          cat /tmp/omnichord-package-smoke.log
+          grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
+          grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
+          kill -TERM "$app_pid"
+          wait "$app_pid" || test "$?" -eq 143
+          package_name="$(basename "$package")"
+          (cd dist && shasum -a 256 "$package_name" > "$package_name.sha256")
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-macOS-arm64
+          path: |
+            amysynth_version/qt_frontend/dist/*.dmg
+            amysynth_version/qt_frontend/dist/*.sha256
+          if-no-files-found: error
+          retention-days: 2
+
+  publish-release:
+    needs: [release-metadata, linux-appimages, macos-dmg]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all validated packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: package-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create tag and three-part GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
+          RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+        run: |
+          linux_file="LB_Omnichord.${RELEASE_STAMP}.Linux-x86_64.AppImage"
+          pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
+          mac_file="LB_Omnichord.${RELEASE_STAMP}.macOS-arm64.dmg"
+          {
+            echo '## Linux x64'
+            echo
+            echo "Download \`$linux_file\` and its SHA-256 file."
+            echo
+            echo '## Raspberry Pi 4 / 5 (64-bit Raspberry Pi OS)'
+            echo
+            echo "Download \`$pi_file\` and its SHA-256 file. This Pi 4 baseline also runs on Pi 5."
+            echo
+            echo '## macOS Apple Silicon'
+            echo
+            echo "Download \`$mac_file\` and its SHA-256 file. This build is ad-hoc signed but not Apple-notarized."
+          } > release-notes.md
+          gh release create "$RELEASE_TAG" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" \
+            --notes-file release-notes.md

@@ -99,14 +99,29 @@ buses and 336 oscillators, and verify resulting AMY synth state. A passing
 native test is therefore stronger than merely finding an expected command in
 the host log. See `../design/testing.md` for the complete local/CI inventory.
 
-## Linux AppImage releases
+## Desktop releases
 
-Every successful complete test run after an update to `main` publishes an
-x86_64 AppImage under this repository's GitHub Releases. Tags use
-`RYYYYMMDDTHHMMSS`; assets use
-`LB_Omnichord.RYYYYMMDDHHMMSS.AppImage`. Both timestamps are UTC.
+Every successful complete test run after an update to `main` publishes one
+three-platform GitHub Release. Tags use `RYYYYMMDDTHHMMSS`; asset timestamps
+omit the `T`. The release page has separate sections and downloads for:
 
-The AppImage contains the Qt frontend and the supported AMY fork with the tiny
-PCM drum bank. At runtime they remain separate processes connected through the
-same Unix wire-protocol socket as `run_local.sh`. Download the accompanying
-`.sha256` asset to verify the file.
+- Linux x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Linux-x86_64.AppImage`
+- Raspberry Pi 4/5: `LB_Omnichord.RYYYYMMDDHHMMSS.RaspberryPi-aarch64.AppImage`
+- macOS Apple Silicon: `LB_Omnichord.RYYYYMMDDHHMMSS.macOS-arm64.dmg`
+
+Each package has a matching `.sha256` asset. All timestamps are UTC.
+
+Every package contains the Qt frontend and supported AMY fork with the tiny PCM
+drum bank. At runtime they remain separate processes connected through the same
+Unix wire-protocol socket as `run_local.sh`. The Pi build requires 64-bit
+Raspberry Pi OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG
+is Apple Silicon-only, ad-hoc signed and not Apple-notarized.
+
+The release pipeline and packaged runtime were validated end to end on
+2026-08-24. Release `R20260824T204611` passed all 79 tests, clean-home startup
+and CI smoke checks; its downloaded AppImage was subsequently tested on Linux
+with working UI and audio. Use the repository's GitHub Releases page for the
+current artifact rather than treating this validation tag as a hard-coded
+update channel.
+
+[Open GitHub Releases](https://github.com/linuxificator/LB_Omnichord/releases)

@@ -12,3 +12,10 @@ New behavior, fixes, documentation and tests belong under `amysynth_version`.
 Start with `design/README.md` for behavioral contracts,
 `design/testing.md` for the test/CI structure and `qt_frontend/INSTALL.md` for
 installation and launch instructions.
+
+Desktop packages are published under the repository's
+[GitHub Releases](https://github.com/linuxificator/LB_Omnichord/releases) after
+the complete AMY regression matrix passes. Each release contains Linux x86_64
+and Raspberry Pi 4/5 aarch64 AppImages plus a macOS Apple Silicon DMG. Every
+package contains the Qt frontend and compatible AMY runtime while preserving
+their separate-process wire-protocol boundary.

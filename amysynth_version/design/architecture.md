@@ -22,8 +22,11 @@ messages cross an `AF_UNIX` `SOCK_SEQPACKET` socket; on Android the same packet
 contract crosses the app-private `amy.sock`; on ESP32-P4 they cross serial.
 
 The Linux convenience launcher owns both child processes only as a development
-shell wrapper. The Qt process itself neither starts nor stops AMY. Each socket
-packet contains one complete logical AMY wire request, matching the
+shell wrapper. Released Linux and Raspberry Pi AppImages and the macOS app
+bundle use an equivalent packaging wrapper: it starts the bundled AMY
+executable as a separate child, waits for its private socket and then starts
+Qt. The Qt process itself neither imports AMY nor starts or stops its service.
+Each socket packet contains one complete logical AMY wire request, matching the
 `upstream/android-oboe` service and decoupled hello-world reference.
 
 ## Transport independence

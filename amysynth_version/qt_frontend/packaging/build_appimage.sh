@@ -7,16 +7,26 @@ output_dir="${OMNICHORD_APPIMAGE_OUTPUT_DIR:-$frontend_dir/dist}"
 release_stamp="${OMNICHORD_RELEASE_STAMP:?set OMNICHORD_RELEASE_STAMP to RYYYYMMDDHHMMSS}"
 appimage_tool="${APPIMAGETOOL:-appimagetool}"
 runtime_file="${APPIMAGE_RUNTIME_FILE:-}"
+appimage_arch="${OMNICHORD_APPIMAGE_ARCH:-x86_64}"
+platform_name="${OMNICHORD_APPIMAGE_PLATFORM:-Linux-x86_64}"
 
 case "$release_stamp" in
     R[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
     *) echo "Invalid OMNICHORD_RELEASE_STAMP: $release_stamp" >&2; exit 2 ;;
 esac
+case "$appimage_arch" in
+    x86_64|aarch64) ;;
+    *) echo "Unsupported AppImage architecture: $appimage_arch" >&2; exit 2 ;;
+esac
+case "$platform_name" in
+    Linux-x86_64|RaspberryPi-aarch64) ;;
+    *) echo "Unsupported AppImage platform name: $platform_name" >&2; exit 2 ;;
+esac
 
 app_dir="$build_root/AppDir"
 pyinstaller_dist="$build_root/pyinstaller-dist"
 pyinstaller_work="$build_root/pyinstaller-work"
-output="$output_dir/LB_Omnichord.${release_stamp}.AppImage"
+output="$output_dir/LB_Omnichord.${release_stamp}.${platform_name}.AppImage"
 
 rm -rf "$build_root"
 mkdir -p \
@@ -64,6 +74,6 @@ runtime_args=()
 if [[ -n "$runtime_file" ]]; then
     runtime_args=(--runtime-file "$runtime_file")
 fi
-ARCH=x86_64 "$appimage_tool" "${runtime_args[@]}" "$app_dir" "$output"
+ARCH="$appimage_arch" "$appimage_tool" "${runtime_args[@]}" "$app_dir" "$output"
 chmod +x "$output"
 printf '%s\n' "$output"

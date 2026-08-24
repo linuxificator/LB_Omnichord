@@ -124,7 +124,7 @@ def main_entry() -> int:
     arguments = sys.argv[1:]
     if arguments and arguments[0] == "--amy-service":
         return run_service(arguments[1:])
-    if arguments == ["--appimage-self-test"]:
+    if arguments in (["--package-self-test"], ["--appimage-self-test"]):
         return self_test()
     return run_frontend(arguments)
 

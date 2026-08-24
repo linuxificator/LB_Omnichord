@@ -47,12 +47,13 @@ Four repository workflows are maintained:
   and accepts a selected suite or `all` through manual dispatch. Native jobs
   install the AMY fork at the commit pinned in the workflow and record that SHA
   in their artifacts.
-- `Test and release Linux AppImage` runs after every update of `main`. It calls
-  the complete regression matrix and, only after all suites pass, builds and
-  validates the x86_64 AppImage, creates the timestamped tag and publishes both
-  the AppImage and its SHA-256 file as a GitHub Release. Manual dispatch is
-  available for an explicitly requested release candidate from another branch;
-  ordinary feature-branch pushes never publish releases.
+- `Test and release desktop packages` runs after every update of `main`. It
+  calls the complete regression matrix and, only after all suites pass, builds
+  and validates Linux x86_64, Raspberry Pi aarch64 and macOS arm64 packages.
+  One timestamped tag/release contains all three packages and their SHA-256
+  files. Manual dispatch is available for an explicitly requested release
+  candidate from another branch; ordinary feature-branch pushes never publish
+  releases.
 - `ESP32-P4 firmware build` builds and validates the firmware package when the
   ESP32-P4 project changes. It is a build/package check, not part of the Python
   frontend suite.
@@ -63,7 +64,8 @@ Four repository workflows are maintained:
 Pull-request frontend and firmware workflows cancel obsolete runs for the same
 ref. Main-branch releases are serialized and never cancelled, so two closely
 spaced merges cannot overwrite or skip one another. Regression CI uses Ubuntu
-24.04; the AppImage is built on Ubuntu 22.04 for broader glibc compatibility.
+24.04. The x86_64 and Raspberry Pi AppImages are built natively on Ubuntu 22.04
+x86_64/aarch64 runners; the DMG is built natively on a macOS 15 arm64 runner.
 Diagnostics are retained for 14 days where a workflow produces artifacts.
 
 ## Linux release naming and contents
@@ -71,8 +73,10 @@ Diagnostics are retained for 14 days where a workflow produces artifacts.
 Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 
 - Git tag and release: `R20260824T223000`
-- application asset: `LB_Omnichord.R20260824223000.AppImage`
-- checksum asset: `LB_Omnichord.R20260824223000.AppImage.sha256`
+- Linux asset: `LB_Omnichord.R20260824223000.Linux-x86_64.AppImage`
+- Raspberry Pi asset: `LB_Omnichord.R20260824223000.RaspberryPi-aarch64.AppImage`
+- macOS asset: `LB_Omnichord.R20260824223000.macOS-arm64.dmg`
+- one matching `.sha256` file for each package
 
 The AppImage bundles PySide6, the frontend assets and the pinned AMY bus-mixer
 fork built with the ESP32-compatible tiny PCM bank. The executable starts AMY
@@ -80,14 +84,38 @@ as a separate child process and connects the Qt process through the existing
 Unix `SOCK_SEQPACKET` wire-protocol boundary. Packaging therefore does not
 collapse the application and synthesizer architectures into one process.
 
-`packaging/build_appimage.sh` is the local and CI build entry point. The
-workflow pins PyInstaller and verifies SHA-256 hashes for appimagetool and its
-type-2 runtime. The packaged `--appimage-self-test` verifies imports and
-required assets; CI then performs a timed headless launch and requires both the
-AMY-service-ready and frontend-socket-connection markers before creating a
-release. Native CI uses `tests/alsa-null.conf`: AMY runs its real audio callback
-against ALSA's null PCM, so engine startup is exercised without pretending the
-hosted runner has an audio card.
+`packaging/build_appimage.sh` builds either Linux AppImage;
+`packaging/build_macos_dmg.sh` builds the Apple Silicon application/DMG. The
+workflow pins PyInstaller and verifies SHA-256 hashes for each architecture's
+appimagetool and type-2 runtime. `--package-self-test` verifies imports and
+required assets on all platforms. Linux CI additionally performs a timed
+headless launch and requires both the AMY-service-ready and
+frontend-socket-connection markers before publishing. Native/headless Linux CI
+uses `tests/alsa-null.conf`: AMY runs its real audio callback against ALSA's
+null PCM without requiring an audio card.
+
+The Raspberry Pi package targets 64-bit Raspberry Pi OS on Pi 4 and Pi 5. It is
+built natively as aarch64 using Pi 4 as the minimum CPU baseline; Pi 5 does not
+need a separate build. Pi 3 and older are outside the packaging contract. The
+macOS package targets Apple Silicon (`arm64`). It is ad-hoc signed for bundle
+integrity but is not Apple-notarized; Intel/universal packaging and notarization
+are separate future work.
+
+## Validated release baseline
+
+The first end-to-end release-candidate run was validated on 2026-08-24:
+
+- all 79 tests passed on GitHub Actions, including both native 11-bus suites;
+- CI built, self-tested and headless-started the AppImage from a clean home;
+- clean startup installed the packaged MIDI factory presets M1–M18;
+- tag `R20260824T204611` and its x86_64 AppImage/SHA-256 assets were published;
+- that published x86_64 AppImage was downloaded from GitHub Releases and
+  physically tested on Linux with working UI and audio.
+
+This proves the release mechanism and that particular x86_64 artifact. The
+Raspberry Pi and macOS packages still require their first physical-device test.
+Future releases are not automatically considered physically tested merely
+because the pipeline succeeded.
 
 Each test should verify:
 
