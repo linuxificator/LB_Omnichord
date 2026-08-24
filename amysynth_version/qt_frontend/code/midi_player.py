@@ -226,6 +226,19 @@ class MidiAmyEngine:
         value = patch_map.get(str(key))
         return None if value is None else int(value)
 
+    def _wait_for_synth_allocation(self) -> None:
+        writer = getattr(self.client, "writer", None)
+        delay = getattr(writer, "delay", None)
+        if not callable(delay):
+            return
+        guard_ms = float(
+            self.client.config.get("performance", {}).get(
+                "synth_alloc_guard_ms",
+                10.0,
+            )
+        )
+        delay(max(0.0, guard_ms) / 1000.0)
+
     def _route(self, synth: int, bus: int) -> None:
         self._wire(f"i{synth}iy{bus}Z")
 
@@ -399,6 +412,10 @@ class MidiAmyEngine:
                 self._wire(
                     f"K{patch}i{synth}iv{self.voices}iy{self.midi_bus}Z"
                 )
+            # Loading a ROM patch reallocates its oscillator block. Keep its
+            # compatibility, parameter, routing and volume commands behind
+            # the same allocation barrier used by the Omnichord synth path.
+            self._wait_for_synth_allocation()
             for command in self._compat_commands(patch, synth):
                 self._wire(command)
             for command in self._param_commands(patch, synth, params):
