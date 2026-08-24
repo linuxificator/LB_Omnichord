@@ -1,0 +1,165 @@
+# AMY Omnichord UI Behavior Reference
+
+## Purpose
+
+This document collects user interface and interaction decisions for the AMY Omnichord application. It is intended as a behavioral reference for future implementation work and regression testing.
+
+The application is not a generic synthesizer UI. It is a musical instrument interface where immediate feedback, predictable touch behavior, and preserving the original Omnichord playing style are primary goals.
+
+## Design principles
+
+### Direct musical interaction
+
+Controls used during performance must have predictable behavior. A musician should not need to understand internal state machines to play the instrument.
+
+### Separate configuration and performance state
+
+Instrument selection, tuning, rhythm, chord configuration and MIDI settings have explicit state ownership. UI appearance must not accidentally create hidden coupling between features.
+
+### Transport independence
+
+The Qt application generates AMY wire commands only. The UI must not depend on whether AMY runs locally or on ESP32-P4 hardware.
+
+## Screen organization
+
+### OMNI screen
+
+The OMNI screen is the primary performance screen.
+
+Elements:
+
+- chord buttons;
+- strum area;
+- rhythm controls;
+- instrument selection;
+- octave controls;
+- tuning controls;
+- transport and mode controls.
+
+The layout should resemble the original Omnichord concept: large playable areas, minimal precision tapping requirements, and immediate visual feedback.
+
+## MIDI screen
+
+The MIDI screen provides external keyboard and MIDI-oriented control while preserving the same AMY sound generation path.
+
+Rules:
+
+- MIDI must use the same synth concepts as OMNI;
+- MIDI and OMNI tuning can be coupled or independent;
+- switching screens must not silently modify musical parameters;
+- selecting an instrument must fully initialize the selected patch.
+
+## Tuning behavior
+
+### Independent mode
+
+When tuning is not linked:
+
+- OMNI tuning state is independent;
+- MIDI tuning state is independent;
+- changing one never changes the other;
+- both screens show their own actual value.
+
+### Coupled mode
+
+When tuning is linked:
+
+- both screens display the same value;
+- changing tuning from either screen updates both immediately;
+- enabling the link performs an explicit synchronization operation.
+
+The implementation must not use hidden "effective tuning" values selected by the active screen.
+
+## Touch behavior
+
+### Tap
+
+Tap actions should trigger immediately and must not require a second interaction to initialize state.
+
+### Press and hold
+
+Long presses are used where continuous musical interaction is required.
+
+Examples:
+
+- holding a chord keeps the chord active;
+- holding performance controls must not repeatedly reset state;
+- accidental short releases should not create unwanted retriggers.
+
+### Strum behavior
+
+The strum area is a performance control, not a normal button.
+
+Requirements:
+
+- touch and mouse input behave identically;
+- active instrument must already be initialized;
+- strum must work immediately after application start and screen selection;
+- strum must generate the same AMY commands regardless of transport.
+
+## Rhythm behavior
+
+Rhythm controls must preserve musical continuity.
+
+Rules:
+
+- changing rhythm while playing must not create unrelated chord or note events;
+- activity levels represent musical layers, not arbitrary volume controls;
+- rhythm state changes must be deterministic and testable.
+
+## Visual design
+
+### Buttons
+
+Buttons used for mode switching must have:
+
+- readable text size;
+- centered text horizontally and vertically;
+- consistent spacing;
+- clear active/inactive indication.
+
+### Colors
+
+Colors are used to communicate function:
+
+- green elements indicate active/playable performance areas;
+- different functional groups should remain visually distinguishable;
+- visual changes should not replace actual state feedback.
+
+### Typography
+
+Labels must remain readable on touch displays. Small decorative text is acceptable only where it does not affect operation.
+
+## Presets
+
+Presets define musical starting points but must not create hidden coupling.
+
+Rules:
+
+- missing values use defined defaults;
+- loading a preset must initialize all required runtime state;
+- preset loading must not depend on a user changing another control first.
+
+## Testing implications
+
+The following behaviors must be regression tested:
+
+1. Start application and immediately play OMNI.
+2. Start application and immediately play MIDI strum.
+3. Change instrument and verify immediate sound.
+4. Change MIDI tuning while linked and verify OMNI updates.
+5. Change OMNI tuning while linked and verify MIDI updates.
+6. Disable tuning link and verify independent operation.
+7. Re-enable link and verify explicit synchronization.
+8. Change rhythm during playback.
+9. Switch screens without unintended parameter changes.
+10. Verify local AMY and remote AMY produce identical wire command streams.
+
+## Open questions
+
+Items requiring future decisions:
+
+- exact persistence rules for tuning values;
+- final MIDI drum/percussion architecture;
+- additional AMY bus allocation rules;
+- factory versus user preset storage model.
