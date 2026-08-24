@@ -26,7 +26,7 @@ Item {
         Tumbler {
             id: rhythmWheel
             anchors.fill: parent; anchors.margins: 3
-            model: root.rhythmModel; visibleItemCount: 3; wrap: true; flickDeceleration: 1200
+            model: root.rhythmModel; visibleItemCount: 3; wrap: true
             property bool initialized: false
             property bool syncingFromBackend: false
             Component.onCompleted: {

@@ -1,6 +1,0 @@
-{
-  "cause": "backend QObject could be released before QML engine teardown",
-  "fix": "explicitly destroy QML engine before backend",
-  "runtime_behavior_changed": false,
-  "multitouch_behavior_changed": false
-}

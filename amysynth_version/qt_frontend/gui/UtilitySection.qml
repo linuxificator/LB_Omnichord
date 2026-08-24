@@ -105,7 +105,6 @@ Item {
             model: root.tuningModeModel
             visibleItemCount: 3
             wrap: true
-            flickDeceleration: 1200
 
             property bool initialized: false
             property bool syncingFromBackend: false

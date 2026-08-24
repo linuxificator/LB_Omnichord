@@ -1,7 +1,0 @@
-{
-  "functional_diff_from_previous_patch": "replace aborted-bar sleep 0.001 with blocking sync :omnichord_rhythm_wake",
-  "synthetic_tiny_sleep": false,
-  "idle_polling": false,
-  "zero_time_live_loop_satisfied_by_sync": true,
-  "ruby_syntax": "Syntax OK"
-}

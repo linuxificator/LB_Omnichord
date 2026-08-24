@@ -1,9 +1,0 @@
-{
-  "cause": "rhythm_player aborted a live_loop iteration on transport OFF before any sleep/sync, triggering Sonic Pi ZeroTimeLoopError",
-  "fix": {
-    "aborted_iteration_sleep_beats": 0.001,
-    "idle_polling_added": false,
-    "next_idle_action": "sync :omnichord_rhythm_wake"
-  },
-  "ruby_syntax": "Syntax OK"
-}

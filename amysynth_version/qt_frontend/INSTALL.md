@@ -3,12 +3,16 @@
 This document covers the two supported runtime layouts for the AMY version of LB Omnichord:
 
 1. **Raspberry Pi frontend + ESP32-P4 AMY over UART** — the hardware layout used for the instrument.
-2. **Local desktop AMY** — the Qt frontend and the upstream AMY Python extension run on the same computer. This path is useful for development and does not need the ESP32-P4.
+2. **Local desktop AMY** — the Qt frontend and the supported AMY bus-mixer fork run on the same computer. This path is useful for development and does not need the ESP32-P4.
 
 The Raspberry Pi/UART path has been exercised on the project hardware. The
 Linux two-process socket path has also been exercised with working audio,
-multibus routing and the ESP32-compatible tiny drum bank. macOS and WSL remain
-development guidance rather than validated release recipes.
+multibus routing and the ESP32-compatible tiny drum bank. The published x86_64
+AppImage was downloaded from GitHub Releases and physically validated with
+working UI and audio on Linux on 2026-08-24. Release `R20260824T212125` also
+passed native packaged-runtime validation for Linux x64, Linux aarch64 and
+macOS arm64. Raspberry Pi and macOS still require physical-device/audio tests;
+WSL remains development guidance rather than a validated release recipe.
 
 ## Repository layout
 
@@ -270,6 +274,73 @@ aconnect -lio
 
 Select a Virtual Raw MIDI ALSA output in VMPK, then start/restart Omnichord.
 Direct ALSA Sequencer subscription is not implemented.
+
+# Automated tests
+
+Use the same Python environment as the frontend:
+
+```bash
+python tests/run_tests.py --list
+python tests/run_tests.py
+python tests/run_tests.py --suite all
+```
+
+The command without `--suite` runs all automatically discovered unit tests.
+`all` additionally needs Linux PTY/local-socket support, PySide6, pyserial and
+the LB Omnichord AMY bus-mixer fork. Native suites start AMY with 11 buses and
+336 oscillators; an ordinary four-bus upstream build is deliberately rejected
+instead of silently routing extra buses to bus 0. Run `./prepare_local_amy.sh`
+first when the supported fork is not installed. The full suite and CI layout
+are documented in `../design/testing.md`.
+
+## Install a released Linux x86_64 AppImage
+
+Download `LB_Omnichord.R<date><time>.Linux-x86_64.AppImage` and its `.sha256` file from the
+[GitHub Releases page](https://github.com/linuxificator/LB_Omnichord/releases),
+then run:
+
+```bash
+sha256sum --check LB_Omnichord.R*.Linux-x86_64.AppImage.sha256
+chmod +x LB_Omnichord.R*.Linux-x86_64.AppImage
+./LB_Omnichord.R*.Linux-x86_64.AppImage --windowed
+```
+
+The x86_64 AppImage already contains PySide6 and the compatible AMY service; a
+separate Python environment or AMY checkout is not needed. AMY still runs as a
+separate child process and communicates with the frontend over a private local
+socket. The release is built on Ubuntu 22.04 for use on contemporary x86_64
+Linux distributions. Release `R20260824T204611` is the first artifact confirmed
+after download to start and produce working UI/audio; newer releases remain
+discoverable through GitHub Releases and must pass the same automated gate.
+
+## Install the Raspberry Pi 4/5 AppImage
+
+Use a 64-bit Raspberry Pi OS installation. Download the
+`RaspberryPi-aarch64.AppImage` asset and checksum, then run:
+
+```bash
+sha256sum --check LB_Omnichord.R*.RaspberryPi-aarch64.AppImage.sha256
+chmod +x LB_Omnichord.R*.RaspberryPi-aarch64.AppImage
+./LB_Omnichord.R*.RaspberryPi-aarch64.AppImage --windowed
+```
+
+One Pi 4 baseline is used for both Pi 4 and Pi 5; no separate Pi 5 build is
+needed. Pi 3 and older are not supported by this package. This packaged path is
+separate from the Raspberry Pi + ESP32-P4 UART deployment described above.
+
+## Install the macOS DMG
+
+Download `LB_Omnichord.R<date><time>.macOS-arm64.dmg` and verify it with:
+
+```bash
+shasum -a 256 -c LB_Omnichord.R*.macOS-arm64.dmg.sha256
+```
+
+Open the DMG and copy `LB_Omnichord.app` to Applications. The first macOS
+package targets Apple Silicon only. It is ad-hoc signed but not notarized with
+an Apple Developer ID, so Gatekeeper may require Control-click **Open** and an
+explicit confirmation on first launch. Intel Macs are not supported by this
+DMG.
 
 # Troubleshooting
 

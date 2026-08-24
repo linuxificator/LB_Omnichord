@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -12,15 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 
 SUITES: dict[str, tuple[Path, ...]] = {
-    "unit-controls": (
-        TESTS / "test_instrument_defaults.py",
-        TESTS / "test_synth_state.py",
-        TESTS / "test_sequencer_tags.py",
-        TESTS / "test_performance_logic.py",
-        TESTS / "test_program_architecture.py",
-        TESTS / "test_static_contracts.py",
-        TESTS / "test_preset_migration.py",
-    ),
+    # Every top-level test_*.py file is a dependency-free/unit contract. Auto
+    # discovery prevents a new unit test from silently being omitted locally
+    # and in CI, as happened with the MIDI engine and socket tests.
+    "unit": tuple(sorted(TESTS.glob("test_*.py"))),
     "frontend": (
         TESTS / "integration" / "test_frontend.py",
     ),
@@ -39,7 +35,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
 }
 ALL_ORDER = (
-    "unit-controls",
+    "unit",
     "frontend",
     "serial",
     "presets",
@@ -54,7 +50,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--suite",
-        default=os.environ.get("OMNICHORD_TEST_SUITE", "unit-controls"),
+        default=os.environ.get("OMNICHORD_TEST_SUITE", "unit"),
         choices=tuple(SUITES) + ("all",),
     )
     parser.add_argument(
@@ -74,6 +70,7 @@ def run_script(script: Path, *, suite: str) -> None:
         )
     )
     suite_artifacts = artifact_root / suite
+    shutil.rmtree(suite_artifacts, ignore_errors=True)
     suite_artifacts.mkdir(parents=True, exist_ok=True)
     env["OMNICHORD_TEST_ARTIFACT_DIR"] = str(suite_artifacts)
 

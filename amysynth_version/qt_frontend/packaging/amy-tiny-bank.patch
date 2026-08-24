@@ -1,0 +1,40 @@
+diff --git a/setup.py b/setup.py
+index 6c6ddce0..abc2ae14 100644
+--- a/setup.py
++++ b/setup.py
+@@ -1,5 +1,6 @@
+ from distutils.core import setup, Extension
+ from setuptools import find_packages
++from setuptools.command.build_ext import build_ext
+ import glob
+ import os
+ import subprocess
+@@ -20,13 +21,20 @@ link_args = ["-L/opt/homebrew/lib","-lpthread"]
+ # the web build: generate build/drums_bin.c from sounds/gamma9001/ and link it.
+ gamma_manifest = os.path.join('sounds', 'gamma9001', 'manifest.json')
+ gamma_drums_bin_c = os.path.join('build', 'drums_bin.c')
+-if os.path.exists(gamma_manifest):
++use_gamma9001 = os.environ.get('AMY_PCM_BANK', 'gamma9001').lower() != 'tiny'
++if use_gamma9001 and os.path.exists(gamma_manifest):
+ 	if not os.path.exists(gamma_drums_bin_c) or \
+ 			os.path.getmtime(gamma_drums_bin_c) < os.path.getmtime(gamma_manifest):
+ 		subprocess.check_call([sys.executable, '-m', 'amy.headers', 'gamma9001'])
+ 	sources.append(gamma_drums_bin_c)
+ 	comp_args.append("-DGAMMA9001")
+ 
++class AmyBuildExt(build_ext):
++	def finalize_options(self):
++		super().finalize_options()
++		if not use_gamma9001:
++			self.force = True
++
+ if os.uname()[0] == 'Darwin':
+ 	frameworks = ['CoreAudio', 'AudioToolbox', 'AudioUnit', 'CoreFoundation', 'CoreMIDI', 'Cocoa']
+ 	sources += ['src/macos_midi.m']
+@@ -43,4 +51,5 @@ extension_mod = Extension("c_amy", sources=sources, \
+ 
+ setup(name = "amy", 
+ 	packages=find_packages(include=['amy']),
+-	ext_modules=[extension_mod])
++	ext_modules=[extension_mod],
++	cmdclass={'build_ext': AmyBuildExt})

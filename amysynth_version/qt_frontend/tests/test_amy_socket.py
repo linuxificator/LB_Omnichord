@@ -6,6 +6,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +45,37 @@ class AmySocketWriterTests(unittest.TestCase):
                 server.close()
 
             self.assertEqual(packets, [b"K215i5Z", b"n60l1i5Z"])
+
+    def test_macos_stream_transport_frames_each_wire_request(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="amy-stream-test-") as tmp:
+            path = Path(tmp) / "amy.sock"
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(str(path))
+            server.listen(1)
+            received = bytearray()
+            complete = threading.Event()
+
+            def receive() -> None:
+                client, _ = server.accept()
+                with client:
+                    while received.count(b"\n") < 2:
+                        received.extend(client.recv(1024))
+                    complete.set()
+
+            thread = threading.Thread(target=receive, daemon=True)
+            thread.start()
+            with patch("amy_transport.sys.platform", "darwin"):
+                writer = _UnixSocketWriter(str(path))
+            try:
+                writer.high("K215i5Z")
+                writer.high("n60l1i5Z")
+                self.assertTrue(complete.wait(2.0))
+            finally:
+                writer.close()
+                thread.join(timeout=1.0)
+                server.close()
+
+            self.assertEqual(bytes(received), b"K215i5Z\nn60l1i5Z\n")
 
 
 if __name__ == "__main__":

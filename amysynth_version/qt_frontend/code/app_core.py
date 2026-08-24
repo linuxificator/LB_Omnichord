@@ -579,6 +579,14 @@ class InstrumentBackend(QObject):
     presetChanged = Signal()
     presetStored = Signal(int)
 
+    # These integration signals live in the base meta-object so PySide 6.8 on
+    # aarch64 does not append subclass signals after inherited slots. Newer
+    # PySide versions silently reorder them, but 6.8 rejects that meta-object.
+    midiStateChanged = Signal()
+    midiTuningChanged = Signal()
+    midiPresetChanged = Signal()
+    midiPresetStored = Signal(int)
+
     def __init__(
         self,
         chords: tuple[ChordType, ...],

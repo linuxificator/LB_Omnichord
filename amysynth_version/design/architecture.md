@@ -18,12 +18,18 @@ separate AMY service / ESP32-P4
 
 The Qt application must not import AMY, call AMY synthesis APIs, or manage the
 AMY service lifetime. It only produces AMY wire messages. On Linux those
-messages cross an `AF_UNIX` `SOCK_SEQPACKET` socket; on Android the same packet
-contract crosses the app-private `amy.sock`; on ESP32-P4 they cross serial.
+messages cross an `AF_UNIX` `SOCK_SEQPACKET` socket; on macOS, which does not
+provide Unix-domain `SOCK_SEQPACKET`, they use a Unix `SOCK_STREAM` with one
+newline-framed AMY request per record. Android uses the app-private `amy.sock`;
+ESP32-P4 uses serial. Framing is a transport concern and does not expose the AMY
+Python API to Qt.
 
 The Linux convenience launcher owns both child processes only as a development
-shell wrapper. The Qt process itself neither starts nor stops AMY. Each socket
-packet contains one complete logical AMY wire request, matching the
+shell wrapper. Released Linux and Raspberry Pi AppImages and the macOS app
+bundle use an equivalent packaging wrapper: it starts the bundled AMY
+executable as a separate child, waits for its private socket and then starts
+Qt. The Qt process itself neither imports AMY nor starts or stops its service.
+Each socket packet contains one complete logical AMY wire request, matching the
 `upstream/android-oboe` service and decoupled hello-world reference.
 
 ## Transport independence
