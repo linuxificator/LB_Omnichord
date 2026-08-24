@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import QObject, Property, Signal, Slot
 
 from midi_player import MIDI_PRESET_COUNT, MidiPlayerBackend
 from performance_backend import InstrumentBackend as OmniInstrumentBackend
@@ -33,8 +33,8 @@ class InstrumentBackend(OmniInstrumentBackend):
         self._midi_player.presetChanged.connect(self.midiPresetChanged)
         self._midi_player.presetStored.connect(self.midiPresetStored)
 
-    @Property(object, constant=True)
-    def midiPlayer(self) -> object:
+    @Property(QObject, constant=True)
+    def midiPlayer(self) -> QObject:
         return self._midi_player
 
     @Property(int, notify=midiStateChanged)

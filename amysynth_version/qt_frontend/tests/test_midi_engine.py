@@ -64,7 +64,6 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(
             client.events,
             [
-                ("wire", "l0i5Z"),
                 ("wire", "K215i5iv4iy4Z"),
                 ("delay", 0.012),
                 ("wire", "compat-215-5"),
@@ -73,6 +72,29 @@ class MidiAmyEngineTests(unittest.TestCase):
                 ("wire", "i5iV0.28Z"),
             ],
         )
+
+    def test_only_reconfiguration_silences_an_existing_synth(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        engine.configure_row(5, "dx7_215", {}, 0.5)
+        first_commands = [value for kind, value in client.events if kind == "wire"]
+        self.assertNotIn("l0i10Z", first_commands)
+
+        client.events.clear()
+        engine.configure_row(5, "dx7_215", {}, 0.5)
+        second_commands = [value for kind, value in client.events if kind == "wire"]
+        self.assertEqual(second_commands[0], "l0i10Z")
+
+    def test_unallocated_drum_row_is_not_sent_a_note_off(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        engine.silence_row(5)
+
+        self.assertEqual(client.events, [])
 
     def test_every_midi_instrument_has_an_isolated_effect_bus(self) -> None:
         client = _Client()

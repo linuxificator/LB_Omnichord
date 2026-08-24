@@ -150,6 +150,11 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('label: "DAMP"', panel)
         self.assertIn("width: 520", main)
 
+        midi_integration = (
+            ROOT / "code" / "midi_integration.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("@Property(QObject, constant=True)", midi_integration)
+
     def test_rhythm_transport_icon_is_bound_directly_to_backend_state(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
         self.assertIn('text: root.controller.rhythmRunning ? "■" : "▶"', qml)

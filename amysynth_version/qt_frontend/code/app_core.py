@@ -817,9 +817,9 @@ class InstrumentBackend(QObject):
                 for rhythm in rhythms
             ],
         )
-        self._rhythm_running = bool(
-            defaults["transport"]["rhythm_running"]
-        )
+        # Rhythm transport is live session state, never startup/preset state.
+        self._rhythm_running = False
+        self._running_tempo: float | None = None
 
         # Tempo nudge: 1 BPM every 100 ms = 10 BPM/s. A quick tap keeps
         # running to a 20 BPM total change; a held button keeps going.
@@ -1082,6 +1082,8 @@ class InstrumentBackend(QObject):
 
     @Property(float, notify=rhythmControlsChanged)
     def rhythmTempo(self) -> float:
+        if self._rhythm_running and self._running_tempo is not None:
+            return self._running_tempo
         return self._rhythm.tempo_by_rhythm[
             self._rhythm.selected_index
         ]
@@ -1581,8 +1583,9 @@ class InstrumentBackend(QObject):
         ):
             rhythm_settings[rhythm.key] = {
                 "tempo": (
-                    self._rhythm
-                    .tempo_by_rhythm[index]
+                    self.rhythmTempo
+                    if index == self._rhythm.selected_index
+                    else self._rhythm.tempo_by_rhythm[index]
                 ),
                 "percussion_activity": (
                     self._rhythm
@@ -1630,9 +1633,6 @@ class InstrumentBackend(QObject):
                 ),
             },
             "transport": {
-                "rhythm_running": (
-                    self._rhythm_running
-                ),
                 "bass_running": (
                     self._bass_running
                 ),
@@ -1929,7 +1929,8 @@ class InstrumentBackend(QObject):
         self._reverb_drums = bool(effects.get("reverb_drums", False))
 
         transport = self._defaults["transport"]
-        self._rhythm_running = bool(transport["rhythm_running"])
+        self._rhythm_running = False
+        self._running_tempo = None
         self._bass_running = bool(transport["bass_running"])
 
         rhythm_key_to_index = {
@@ -1973,6 +1974,8 @@ class InstrumentBackend(QObject):
         self,
         data: dict[str, Any],
     ) -> None:
+        rhythm_was_running = self._rhythm_running
+        live_tempo = self.rhythmTempo if rhythm_was_running else None
         self._reset_presettable_state_to_defaults()
 
         suffix_to_index = {
@@ -2124,12 +2127,6 @@ class InstrumentBackend(QObject):
         )
 
         if isinstance(transport, dict):
-            self._rhythm_running = bool(
-                transport.get(
-                    "rhythm_running",
-                    self._rhythm_running,
-                )
-            )
             self._bass_running = bool(
                 transport.get(
                     "bass_running",
@@ -2285,6 +2282,12 @@ class InstrumentBackend(QObject):
         self._pitch_bend_offset_hz = 0.0
         self._stop_tempo_nudge()
 
+        # Presets may provide rhythm configuration, but never transport state.
+        # While running, their stored tempo remains stored and the independent
+        # live tempo continues to drive both the UI and AMY sequencer.
+        self._rhythm_running = rhythm_was_running
+        self._running_tempo = live_tempo
+
         # Performance-state notes are deliberately never part of a preset.
         self._clear_touch_dropout_state()
 
@@ -2363,7 +2366,10 @@ class InstrumentBackend(QObject):
         self._emit_full_preset_state()
         self.presetChanged.emit()
 
-        self.send_initial_state()
+        if self._rhythm_running:
+            self._send_live_preset_state()
+        else:
+            self.send_initial_state()
 
     @Slot()
     def storeSelectedPreset(self) -> None:
@@ -2463,6 +2469,7 @@ class InstrumentBackend(QObject):
     def panic(self) -> None:
         # Stop and invalidate all performance state locally first.
         self._rhythm_running = False
+        self._running_tempo = None
         self._bass_running = False
         self._clear_touch_dropout_state()
 
@@ -2523,9 +2530,11 @@ class InstrumentBackend(QObject):
     def _set_rhythm_tempo_value(self, value: float) -> bool:
         clamped = max(40.0, min(200.0, float(value)))
         index = self._rhythm.selected_index
-        if abs(clamped - self._rhythm.tempo_by_rhythm[index]) < 0.0001:
+        if abs(clamped - self.rhythmTempo) < 0.0001:
             return False
         self._rhythm.tempo_by_rhythm[index] = clamped
+        if self._rhythm_running:
+            self._running_tempo = clamped
         self.rhythmControlsChanged.emit()
         self._send_rhythm_config()
         return True
@@ -2621,9 +2630,11 @@ class InstrumentBackend(QObject):
 
     @Slot()
     def toggleRhythm(self) -> None:
-        self._rhythm_running = not self._rhythm_running
-
-        if self._rhythm_running:
+        if not self._rhythm_running:
+            self._running_tempo = self._rhythm.tempo_by_rhythm[
+                self._rhythm.selected_index
+            ]
+            self._rhythm_running = True
             self._send_rhythm_config()
 
             # Publish the accompaniment gate before starting AMY transport.
@@ -2635,6 +2646,13 @@ class InstrumentBackend(QObject):
                 1,
             )
         else:
+            # Stopping retains the effective live configuration in the UI.
+            if self._running_tempo is not None:
+                self._rhythm.tempo_by_rhythm[
+                    self._rhythm.selected_index
+                ] = self._running_tempo
+            self._rhythm_running = False
+            self._running_tempo = None
             # Close the automatic-chord path before stopping transport.
             self._send_rhythm_chord_enabled()
             self._client.send_message(
@@ -3506,7 +3524,7 @@ class InstrumentBackend(QObject):
             "label": rhythm.label,
             "meter": rhythm.meter,
             "length_beats": rhythm.length_beats,
-            "tempo": self._rhythm.tempo_by_rhythm[index],
+            "tempo": self.rhythmTempo,
             "busyness": busyness,
             "chord_activity": chord_activity,
             "bass_activity": bass_activity,
@@ -3550,15 +3568,35 @@ class InstrumentBackend(QObject):
             payload,
         )
 
+    def _send_live_preset_state(self) -> None:
+        """Apply preset configuration without touching live rhythm transport."""
+        self._client.send_message(self._chord_amp_address, self._chord_volume)
+        self._client.send_message(self._strum_amp_address, self._strum_volume)
+        self._client.send_message(self._bass_amp_address, self._bass_volume)
+        self._client.send_message(
+            self._percussion_amp_address,
+            self._percussion_volume,
+        )
+        self._send_reverb_state()
+        self._send_synth_state("chord")
+        self._send_synth_state("strum")
+        self._send_synth_state("bass")
+        self._send_rhythm_config()
+        self._client.send_message(
+            self._bass_running_address,
+            1 if self._bass_running else 0,
+        )
+        self._send_rhythm_chord_enabled()
+
     def send_initial_state(self) -> None:
         self._debug(
             "send_initial_state_enter",
             **self._debug_chord_state(),
         )
 
-        # Hard-quiesce the receiver before replacing complete instrument state.
-        # Do not derive the initial gate from self._rhythm_running here:
-        # transport may be true in the preset we are about to start.
+        # Hard-quiesce the receiver during startup/recovery before replacing
+        # complete instrument state. Live preset changes deliberately use
+        # _send_live_preset_state() and never enter this transport-reset path.
         self._client.send_message(
             self._rhythm_chord_enabled_address,
             0,

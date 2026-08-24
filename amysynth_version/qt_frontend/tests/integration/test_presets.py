@@ -189,6 +189,52 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setRhythmIndex", 2)
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 73.0)
 
+    def test_running_preset_switch_preserves_live_tempo_and_transport(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            preset_one_path = app.home / ".omnichord" / "p1.json"
+            preset_two_path = app.home / ".omnichord" / "p2.json"
+            preset_one = json.loads(preset_one_path.read_text(encoding="utf-8"))
+            preset_two = json.loads(preset_two_path.read_text(encoding="utf-8"))
+            rhythm_one = str(preset_one["rhythm"]["selected"])
+            rhythm_two = str(preset_two["rhythm"]["selected"])
+            preset_one["rhythm"]["settings"][rhythm_one]["tempo"] = 100.0
+            preset_two["rhythm"]["settings"][rhythm_two]["tempo"] = 75.0
+            preset_one_path.write_text(
+                json.dumps(preset_one), encoding="utf-8"
+            )
+            preset_two_path.write_text(
+                json.dumps(preset_two), encoding="utf-8"
+            )
+
+            app.action("selectPreset", 1)
+            self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
+            app.action("toggleRhythm")
+            app.action("setRhythmTempo", 107.0)
+            app.bridge.wait_idle(timeout=8.0)
+            checkpoint = app.bridge.count()
+
+            app.action("selectPreset", 2)
+            app.bridge.wait_idle(timeout=8.0)
+
+            self.assertTrue(bool(app.query("rhythmRunning")))
+            self.assertAlmostEqual(float(app.query("rhythmTempo")), 107.0)
+            switched = app.bridge.lines_since(checkpoint)
+            self.assertNotIn("zY0Z", switched)
+            self.assertNotIn("zY1Z", switched)
+            self.assertNotIn("S16384Z", switched)
+
+            # STR stores the effective live tempo, not the dormant preset
+            # tempo that was deliberately ignored during the live switch.
+            app.action("storeSelectedPreset")
+            stored = json.loads(preset_two_path.read_text(encoding="utf-8"))
+            selected = str(stored["rhythm"]["selected"])
+            self.assertAlmostEqual(
+                float(stored["rhythm"]["settings"][selected]["tempo"]),
+                107.0,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

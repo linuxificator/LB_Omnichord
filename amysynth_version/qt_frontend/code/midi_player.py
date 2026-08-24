@@ -370,6 +370,8 @@ class MidiAmyEngine:
         return out
 
     def silence_row(self, row: int) -> None:
+        if row not in self._configured_rows:
+            return
         synth = self.row_synths[row]
         self._wire(f"l0i{synth}Z")
         for key in [key for key in self._active_notes if key[0] == row]:
@@ -531,9 +533,10 @@ class MidiAmyEngine:
         )
 
     def all_notes_off(self) -> None:
-        for synth in self.row_synths:
-            self._wire(f"l0i{synth}Z")
-        self._wire(f"l0i{self.drum_synth}Z")
+        for row in sorted(self._configured_rows):
+            self._wire(f"l0i{self.row_synths[row]}Z")
+        if self._drum_configured:
+            self._wire(f"l0i{self.drum_synth}Z")
         self._active_notes.clear()
 
     def rebuild(self) -> None:
