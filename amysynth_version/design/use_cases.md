@@ -1,57 +1,61 @@
-# Use cases and test cases
+# Use Cases and Test Cases
 
-## UC-001 Start application
+## UC-001 Application startup
 
-Expected:
-- OMNI loads
-- MIDI loads
-- tuning starts coupled
-- only AMY wire commands are produced
-
-## UC-002 Change OMNI tuning while coupled
+Given a clean start:
 
 Expected:
-- MIDI shows same tuning
-- MIDI notes use new tuning
+- OMNI UI loads
+- MIDI UI state initializes
+- tuning coupling starts enabled
+- generated audio actions are AMY wire commands
 
-## UC-003 Change MIDI tuning while coupled
+## UC-002 OMNI tuning change while coupled
+
+Action:
+- change tuning reference in OMNI
 
 Expected:
-- OMNI shows same tuning
+- MIDI displays the same value
+- MIDI note generation uses the new tuning
 
-## UC-004 Disconnect tuning
+## UC-003 MIDI tuning change while coupled
+
+Action:
+- change tuning from MIDI screen
 
 Expected:
-- OMNI and MIDI tune independently
+- OMNI immediately reflects the same tuning
 
-## UC-005 MIDI note input
+## UC-004 Independent tuning
+
+Action:
+- disable tuning link
+
+Expected:
+- OMNI and MIDI tuning values can differ
+
+## UC-005 MIDI note routing
 
 Input:
-- MIDI note number
+- MIDI note and channel
 
 Expected:
-- channel routing selects configured synth
-- pitch is converted to fractional AMY pitch
-- AMY receives wire command
+- configured MIDI row receives the note
+- pitch conversion uses active tuning
+- AMY wire command is generated
 
-## UC-006 MIDI channel change
-
-Expected:
-- only selected channel routing changes
-- duplicate channels remain allowed
-
-## UC-007 Screen switching
+## UC-006 Screen switching
 
 Expected:
-- audio state is unchanged
+- switching OMNI/MIDI does not stop rhythm, notes or sequences
 
-## UC-008 MIDI preset load
-
-Expected:
-- MIDI instruments, parameters, volumes and channels restore
-- OMNI presets are untouched
-
-## UC-009 Local versus ESP32 AMY
+## UC-007 Local versus ESP32 AMY
 
 Expected:
-- identical wire command stream for identical actions
+- identical musical actions create equivalent wire commands
+
+## UC-008 Presets
+
+Expected:
+- OMNI presets and MIDI presets remain independent
