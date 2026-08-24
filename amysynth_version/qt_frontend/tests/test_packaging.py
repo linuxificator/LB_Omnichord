@@ -53,7 +53,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('"--amy-service"', entry)
         self.assertIn('"--amy-socket"', entry)
         self.assertIn("local_amy_service.main()", entry)
-        self.assertIn("configure_frontend_asset_paths(main)", entry)
+        self.assertIn("configure_frontend_asset_paths(app_core)", entry)
+        self.assertLess(entry.index("import app_core"), entry.index("import main"))
         self.assertNotIn("amy.live(", entry)
 
     def test_release_stamp_validation_matches_asset_format(self) -> None:

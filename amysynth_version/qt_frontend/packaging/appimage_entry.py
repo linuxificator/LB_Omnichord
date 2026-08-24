@@ -16,13 +16,23 @@ APP_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 CONFIG_PATH = APP_ROOT / "config" / "amy_config.json"
 
 
-def configure_frontend_asset_paths(main_module: object) -> None:
-    core = main_module._core
+def configure_frontend_asset_paths(core: object) -> None:
     core.FRONTEND_DIR = APP_ROOT
     core.GUI_DIR = APP_ROOT / "gui"
     core.CONFIG_DIR = APP_ROOT / "config"
     core.INSTRUMENT_DIR = APP_ROOT / "instruments"
     core.MUSIC_DIR = APP_ROOT / "music"
+
+
+def import_frontend() -> object:
+    # Configure app_core before importing main: main imports midi_player, whose
+    # factory-preset constant is deliberately resolved once at import time.
+    import app_core
+
+    configure_frontend_asset_paths(app_core)
+    import main
+
+    return main
 
 
 def run_service(arguments: list[str]) -> int:
@@ -37,9 +47,7 @@ def self_test() -> int:
     import c_amy  # noqa: F401
     import PySide6  # noqa: F401
     import local_amy_service  # noqa: F401
-    import main
-
-    configure_frontend_asset_paths(main)
+    import_frontend()
 
     required = (
         APP_ROOT / "licence.txt",
@@ -103,9 +111,8 @@ def run_frontend(arguments: list[str]) -> int:
                 raise RuntimeError("AMY service did not create its socket in time")
             time.sleep(0.05)
 
-        import main
+        main = import_frontend()
 
-        configure_frontend_asset_paths(main)
         sys.argv = [sys.argv[0], "--amy-socket", str(socket), *arguments]
         return int(main._core.main())
     finally:
