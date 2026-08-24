@@ -1,37 +1,50 @@
 # Architecture
 
-## Main flow
+## Main data flow
 
-GUI controls do not talk directly to AMY.
+The frontend architecture is:
 
 ```
 Qt GUI
   |
-application state
+application state and controllers
   |
-AMY wire command generator
+AMY wire command generation
   |
 transport
   |
-AMY
+AMY engine
 ```
 
-Transports:
-- local development AMY transport
-- ESP32 serial transport
+The Qt application must not call AMY synthesis APIs directly.
 
-Both must receive identical wire commands.
+## Transport independence
+
+Supported transports:
+
+- local AMY execution for development and testing
+- serial transport to ESP32-P4
+
+The same user action must result in the same AMY wire command stream regardless of transport.
 
 ## Audio ownership
 
-OMNI:
-- chord
+OMNI owns:
+
+- chords
 - strum
 - bass
-- drums
+- rhythm/drums
 
-MIDI:
-- MIDI melodic instruments
+MIDI owns:
+
+- MIDI instrument rows
+- MIDI routing
+- MIDI preview
 - MIDI drums
 
-MIDI must use separate AMY buses from OMNI.
+OMNI and MIDI must not accidentally share mutable synth state or AMY buses.
+
+## ESP32-P4 direction
+
+Future ESP32 firmware work expands AMY bus availability and keeps the wire protocol boundary intact.
