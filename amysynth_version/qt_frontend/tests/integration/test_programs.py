@@ -42,7 +42,7 @@ class ProgramIntegrationTests(unittest.TestCase):
             app.action("selectChord", 0, 0)
             high_note = app.bridge.count()
             app.action("strumTap", 0.0)
-            app.bridge.wait_for_lines(["i2iV5Z"], start=high_note, timeout=5.0)
+            app.bridge.wait_for_lines(["i2iV4.2Z"], start=high_note, timeout=5.0)
 
 
 if __name__ == "__main__":
