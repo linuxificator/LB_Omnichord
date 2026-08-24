@@ -2,7 +2,7 @@ name: Test and release desktop packages
 
 on:
   push:
-    branches: [main, testing_and_packaging]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
