@@ -9,6 +9,41 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StaticContractTests(unittest.TestCase):
+    def test_midi_qml_uses_its_own_bindable_metaobject(self) -> None:
+        requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
+        self.assertIn("PySide6>=6.6", requirements)
+        screen = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        synth = (ROOT / "gui" / "MidiSynthSection.qml").read_text(
+            encoding="utf-8"
+        )
+        utility = (ROOT / "gui" / "MidiUtilitySection.qml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("controller: backend.midiPlayer", screen)
+        self.assertIn("root.controller.stateVersion", synth)
+        self.assertIn("root.controller.tuningModeIndex", utility)
+        self.assertNotIn("root.controller.midiStateVersion", synth)
+
+    def test_local_launcher_validates_but_never_builds_amy(self) -> None:
+        launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
+        self.assertIn("import c_amy", launcher)
+        self.assertIn("gamma9001|amy_set_gamma", launcher)
+        self.assertNotIn('"$frontend_dir/prepare_local_amy.sh"', launcher)
+        self.assertNotIn("pip install", launcher)
+        self.assertLess(
+            launcher.index("gamma9001|amy_set_gamma"),
+            launcher.index("code/local_amy_service.py"),
+        )
+
+    def test_midi_cc_bar_clears_omni_button_and_aligns_to_sections(self) -> None:
+        qml = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        self.assertIn("id: omniButton", qml)
+        self.assertIn("+ omniButton.width", qml)
+        self.assertIn("+ omniButton.extensionWidth", qml)
+        self.assertIn("+ root.hostWindow.controlSpacing", qml)
+        self.assertIn("root.hostWindow.volumeX", qml)
+        self.assertIn("+ root.hostWindow.volumeWidth", qml)
+
     def test_frontend_tree_contains_no_symlinks(self) -> None:
         generated_roots = {"build", "dist", "test-artifacts"}
         symlinks = [

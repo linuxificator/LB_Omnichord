@@ -22,18 +22,18 @@ Item {
     signal interacted(int rowIndex)
 
     readonly property int selectedSynthIndex: {
-        root.controller.midiStateVersion
-        return root.controller.midiSynthIndex(root.rowIndex)
+        root.controller.stateVersion
+        return root.controller.synthIndex(root.rowIndex)
     }
 
     readonly property var commonControls: {
-        root.controller.midiStateVersion
-        return root.controller.midiCommonControls(root.rowIndex)
+        root.controller.stateVersion
+        return root.controller.commonControls(root.rowIndex)
     }
 
     readonly property var extraControls: {
-        root.controller.midiStateVersion
-        return root.controller.midiExtraControls(root.rowIndex)
+        root.controller.stateVersion
+        return root.controller.extraControls(root.rowIndex)
     }
 
     function markInteraction() {
@@ -44,7 +44,7 @@ Item {
         if (!synthWheel.initialized) {
             return
         }
-        const wanted = root.controller.midiSynthIndex(root.rowIndex)
+        const wanted = root.controller.synthIndex(root.rowIndex)
         if (synthWheel.currentIndex !== wanted) {
             synthWheel.syncing = true
             synthWheel.currentIndex = wanted
@@ -83,7 +83,7 @@ Item {
         borderColor: root.borderColor
         textColor: root.textColor
         onClicked: {
-            root.controller.resetMidiSynthRow(root.rowIndex)
+            root.controller.resetRow(root.rowIndex)
             root.markInteraction()
         }
     }
@@ -127,7 +127,7 @@ Item {
 
             Connections {
                 target: root.controller
-                function onMidiStateChanged() {
+                function onStateChanged() {
                     root.synchronizeWheel()
                 }
             }
@@ -171,7 +171,7 @@ Item {
                     && !syncing
                     && currentIndex >= 0
                 ) {
-                    root.controller.setMidiSynthIndex(
+                    root.controller.setSynthIndex(
                         root.rowIndex,
                         currentIndex
                     )
@@ -200,8 +200,8 @@ Item {
         width: 62
         height: 62
         text: {
-            root.controller.midiStateVersion
-            const channel = root.controller.midiChannel(root.rowIndex)
+            root.controller.stateVersion
+            const channel = root.controller.channel(root.rowIndex)
             return channel === 0 ? "A" : String(channel)
         }
         font.pixelSize: 20
@@ -226,7 +226,7 @@ Item {
         }
 
         onClicked: {
-            root.controller.cycleMidiChannel(root.rowIndex)
+            root.controller.cycleChannel(root.rowIndex)
             root.markInteraction()
         }
     }
@@ -271,7 +271,7 @@ Item {
 
                         onActivated: root.markInteraction()
                         onEdited: (key, value) => {
-                            root.controller.setMidiSynthControl(
+                            root.controller.setControl(
                                 root.rowIndex,
                                 key,
                                 value
@@ -314,7 +314,7 @@ Item {
 
                         onActivated: root.markInteraction()
                         onEdited: (key, value) => {
-                            root.controller.setMidiSynthControl(
+                            root.controller.setControl(
                                 root.rowIndex,
                                 key,
                                 value
@@ -333,8 +333,8 @@ Item {
         width: root.volumeWidth
         height: parent.height
         currentValue: {
-            root.controller.midiStateVersion
-            return root.controller.midiVolume(root.rowIndex)
+            root.controller.stateVersion
+            return root.controller.volume(root.rowIndex)
         }
         panelColor: Qt.lighter(root.panelColor, 1.03)
         panelBorderColor: root.borderColor
@@ -342,7 +342,7 @@ Item {
         textColor: root.textColor
 
         onEdited: (value) => {
-            root.controller.setMidiVolume(root.rowIndex, value)
+            root.controller.setVolume(root.rowIndex, value)
             root.markInteraction()
         }
     }

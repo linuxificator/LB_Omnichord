@@ -74,6 +74,8 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
+Re-run the requirements command after updating an existing environment.
+
 ## Run
 
 Windowed:

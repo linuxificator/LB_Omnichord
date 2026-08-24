@@ -32,10 +32,6 @@ class InstrumentBackend(OmniInstrumentBackend):
     def midiPlayer(self) -> QObject:
         return self._midi_player
 
-    @Property(int, notify=OmniInstrumentBackend.midiStateChanged)
-    def midiStateVersion(self) -> int:
-        return self._midi_player.stateVersion
-
     @Property("QVariantList", constant=True)
     def midiSynthNames(self) -> list[str]:
         return self._midi_player.synthNames
@@ -44,21 +40,12 @@ class InstrumentBackend(OmniInstrumentBackend):
     def midiPresetCount(self) -> int:
         return MIDI_PRESET_COUNT
 
-    @Property(int, notify=OmniInstrumentBackend.midiPresetChanged)
+    # Kept as a read-only compatibility query for the integration harness.
+    # QML observes MidiPlayerBackend.selectedPreset directly, where the notify
+    # signal belongs to the same Qt meta-object.
+    @Property(int)
     def selectedMidiPreset(self) -> int:
         return self._midi_player.selectedPreset
-
-    @Property(bool, notify=OmniInstrumentBackend.midiTuningChanged)
-    def midiTuningCoupled(self) -> bool:
-        return self._midi_player.tuningCoupled
-
-    @Property(int, notify=OmniInstrumentBackend.midiTuningChanged)
-    def midiTuningModeIndex(self) -> int:
-        return self._midi_player.tuningModeIndex
-
-    @Property(int, notify=OmniInstrumentBackend.midiTuningChanged)
-    def midiTuningReference(self) -> int:
-        return self._midi_player.tuningReference
 
     @Slot(int, result=int)
     def midiSynthIndex(self, row: int) -> int:

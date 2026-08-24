@@ -249,8 +249,8 @@ def apply_juno_musical_corrections(label: str, values: dict[str, float]) -> None
         if label == "Harpsichord 1":
             # Keep the UI default consistent with the P4 stability correction
             # applied immediately after AMY factory patch 68 is loaded.
-            values["filter_hz"] = 16000.0
-            values["resonance"] = 4.0
+            values["filter_hz"] = 4000.0
+            values["resonance"] = 1.0
     elif label == "Orchestral Pad":
         values.update(
             attack_ms=600.0,

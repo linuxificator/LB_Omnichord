@@ -7,9 +7,43 @@ Item {
     required property var hostWindow
     property bool tuningCoupled: true
     property int activeMidiRow: 0
+    property var midiControlModel: []
 
     signal showOmniRequested()
     signal toggleTuningCouplingRequested()
+
+    onVisibleChanged: {
+        if (visible) {
+            Qt.callLater(function() {
+                midiControlBar.publishCapacity()
+            })
+        }
+    }
+
+    Timer {
+        interval: 100
+        running: root.visible || backend.midiPlayer.testCcLogging
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            backend.midiPlayer.setControlIndicatorCapacity(
+                midiControlBar.indicatorCapacity
+            )
+            root.midiControlModel = backend.midiPlayer
+                .commonControls(-1)
+                .slice(0, midiControlBar.indicatorCapacity)
+            backend.midiPlayer.testLogControlIndicatorLayout(
+                midiControlBar.x,
+                midiControlBar.width,
+                midiControlBar.indicatorCapacity,
+                midiControlRow.implicitWidth,
+                midiControlRepeater.count,
+                midiControlBar.x
+                + midiControlBar.horizontalPadding
+                + midiControlRow.implicitWidth
+            )
+        }
+    }
 
     readonly property var synthThemes: [
         {
@@ -54,6 +88,29 @@ Item {
         root.synthThemes[root.activeMidiRow].accent
 
     Rectangle {
+        id: midiControlBar
+
+        readonly property int indicatorWidth: 74
+        readonly property int indicatorSpacing: 10
+        readonly property int horizontalPadding: 8
+        readonly property int indicatorCapacity: Math.max(
+            1,
+            Math.floor(
+                (width - 2 * horizontalPadding)
+                / (indicatorWidth + indicatorSpacing)
+            )
+        )
+
+        function publishCapacity() {
+            backend.midiPlayer.setControlIndicatorCapacity(indicatorCapacity)
+        }
+
+        onIndicatorCapacityChanged: {
+            if (root.visible || backend.midiPlayer.testCcLogging) {
+                publishCapacity()
+            }
+        }
+
         anchors.fill: parent
         color: "#f4f0e6"
     }
@@ -107,7 +164,8 @@ Item {
             - root.hostWindow.contentX
         height: root.hostWindow.sectionHeight
 
-        controller: backend
+        controller: backend.midiPlayer
+        omniController: backend
         tuningModeModel: tuningModeNames
         fullScreen:
             root.hostWindow.visibility
@@ -186,9 +244,9 @@ Item {
                 + root.hostWindow.volumeWidth
             height: root.hostWindow.sectionHeight
 
-            controller: backend
+            controller: backend.midiPlayer
             rowIndex: index
-            synthModel: backend.midiSynthNames
+            synthModel: backend.midiPlayer.synthNames
             leftRailWidth: root.hostWindow.leftRailWidth
             contentX: root.hostWindow.contentX
             volumeX: root.hostWindow.volumeX
@@ -206,6 +264,7 @@ Item {
     }
 
     RainbowModeButton {
+        id: omniButton
         x: 0
         y:
             root.hostWindow.chordRowsY
@@ -223,6 +282,87 @@ Item {
         onClicked: {
             backend.finishMidiPreview()
             root.showOmniRequested()
+        }
+    }
+
+    Rectangle {
+        x:
+            omniButton.x
+            + omniButton.width
+            + omniButton.extensionWidth
+            + root.hostWindow.controlSpacing
+        y:
+            root.hostWindow.chordRowsY
+            + 3 * (root.hostWindow.rowHeight + root.hostWindow.rowSpacing)
+        width: Math.max(
+            0,
+            root.hostWindow.volumeX
+            + root.hostWindow.volumeWidth
+            - x
+        )
+        height: root.hostWindow.rowHeight
+        radius: 12
+        color: "#c8c8c4"
+        border.color: "#777772"
+        clip: true
+
+        Row {
+            id: midiControlRow
+            anchors.left: parent.left
+            anchors.leftMargin: midiControlBar.horizontalPadding
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: midiControlBar.indicatorSpacing
+
+            Repeater {
+                id: midiControlRepeater
+                model: root.midiControlModel
+
+                delegate: Item {
+                    required property var modelData
+                    width: midiControlBar.indicatorWidth
+                    height: 68
+
+                    Rectangle {
+                        id: radioKnob
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 46
+                        height: 46
+                        radius: 23
+                        color: "#686864"
+                        border.color: "#e8e8df"
+                        border.width: 2
+                        rotation: Number(modelData.value) * 270 / 127 - 135
+
+                        Rectangle {
+                            x: parent.width / 2 - 2
+                            y: 4
+                            width: 4
+                            height: 14
+                            radius: 2
+                            color: "#f2d56b"
+                        }
+
+                        Behavior on rotation {
+                            NumberAnimation { duration: 90 }
+                        }
+                    }
+
+                    Text {
+                        anchors.bottom: parent.bottom
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        text: "CH" + modelData.channel + " CC" + modelData.controller
+                        color: "#292927"
+                        font.pixelSize: 11
+                    }
+
+                    SequentialAnimation on opacity {
+                        running: Boolean(modelData.replaced)
+                        loops: 2
+                        NumberAnimation { to: 0.2; duration: 90 }
+                        NumberAnimation { to: 1.0; duration: 90 }
+                    }
+                }
+            }
         }
     }
 

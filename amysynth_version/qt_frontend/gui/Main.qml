@@ -100,8 +100,9 @@ ApplicationWindow {
 
     // Screen mode is deliberately presentation-only. Switching never sends a
     // transport, note, patch or effect command to AMY.
-    property bool midiScreen: false
+    property bool midiScreen: backend.midiPlayer.testCcLogging
     property bool tuningCoupled: true
+    property bool strumLadderMode: false
 
     function setFullscreenMode(fullscreen) {
         if (fullscreen) {
@@ -262,7 +263,7 @@ ApplicationWindow {
                 Text {
                     x: reverbPanel.width + 12
                     y: 0
-                    width: Math.max(0, window.strumX - x - 12)
+                    width: Math.max(0, window.strumX - x - 86)
                     height: parent.height
 
                     text: headerTitleText
@@ -283,6 +284,30 @@ ApplicationWindow {
 
                     elide: Text.ElideRight
                     maximumLineCount: 1
+                }
+
+                Rectangle {
+                    x: window.strumX - 74
+                    width: 74 + window.strumWidth
+                    height: parent.height
+                    color: "#dcecf7"
+                    radius: 12
+                    border.color: "#8bb9d8"
+
+                    PresetResetButton {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 54
+                        height: Math.min(52, parent.height - 8)
+                        text: window.strumLadderMode ? "LDR" : "APG"
+                        panelColor: "#5d9fd0"
+                        borderColor: "#2f648c"
+                        textColor: "#071c2c"
+                        onClicked: {
+                            window.strumLadderMode = !window.strumLadderMode
+                        }
+                    }
                 }
             }
 
@@ -1403,6 +1428,7 @@ ApplicationWindow {
                 height:
                     window.totalControlHeight
                 controller: backend
+                ladderMode: window.strumLadderMode
             }
 
             MidiScreen {

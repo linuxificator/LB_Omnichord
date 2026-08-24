@@ -39,8 +39,15 @@
       "label": "Physical Strings",
       "oscs_per_voice": 1,
       "wave": 6,
-      "feedback": 0.985
+      "feedback": 0.985,
+      "high_note_gain": 10.0,
+      "high_note_start": 60,
+      "high_note_full": 96
     }
+  },
+  "instrument_levels": {
+    "juno_074": 0.2,
+    "juno_089": 0.4
   },
   "drums": {
     "velocity_gain": 5.0,
@@ -95,8 +102,8 @@
     "68": {
       "label": "Juno B15 Harpsichord 1",
       "reason": "Factory patch requests an extreme filter state; constrain the P4 filter to a stable bright range.",
-      "juno_filter_hz": 6000.0,
-      "juno_resonance": 4.0
+      "juno_filter_hz": 4000.0,
+      "juno_resonance": 1.0
     },
     "74": {
       "label": "Juno B23 Orchestral Pad",
@@ -116,6 +123,11 @@
     "109": {
       "label": "Juno B66 Toy Rhodes",
       "reason": "Factory patch has zero amplitude on every Juno sound source; add a small noise excitation so its high-Q filter has input.",
+      "juno_noise_amp": 0.05
+    },
+    "116": {
+      "label": "Juno B73 High Bells",
+      "reason": "Factory patch has no audible excitation on current AMY; add a small noise source for the resonant voice.",
       "juno_noise_amp": 0.05
     }
   },

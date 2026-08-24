@@ -26,5 +26,7 @@ Core rules:
 - `testing.md` defines the maintained local suites and CI responsibilities;
   it also defines Linux release packaging and validation. Detailed executable
   scenarios live in `../qt_frontend/tests/USE_CASES.md`.
+- `sound_balance.md` defines user storage/config overrides, strum modes, MIDI
+  control indicators and the instrument-balance measurement contract.
 
 When implementation and design differ, the difference must be documented before changing behavior.

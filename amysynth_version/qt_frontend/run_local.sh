@@ -13,6 +13,16 @@ fi
 
 . "$venv_dir/bin/activate"
 
+# The AMY service is provisioned separately from the frontend runtime.  Only
+# validate its PCM-bank contract here; never build or install AMY while
+# launching the wire-protocol client and service processes.
+amy_extension="$(python -c 'import c_amy; print(c_amy.__file__)')"
+if nm -D "$amy_extension" | grep -E 'gamma9001|amy_set_gamma' >/dev/null; then
+    echo "AMY service has the incompatible Gamma9001 PCM bank: $amy_extension" >&2
+    echo "Provision the service separately with ./prepare_local_amy.sh before launching." >&2
+    exit 1
+fi
+
 python "$frontend_dir/code/local_amy_service.py" \
     --socket "$socket_path" \
     --config "$frontend_dir/config/amy_config.json" &

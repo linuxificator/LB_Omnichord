@@ -39,6 +39,11 @@ class ProgramIntegrationTests(unittest.TestCase):
             edit_lines = app.bridge.lines_since(edit)
             self.assertFalse(any(line.startswith("K") for line in edit_lines))
 
+            app.action("selectChord", 0, 0)
+            high_note = app.bridge.count()
+            app.action("strumTap", 0.0)
+            app.bridge.wait_for_lines(["i2iV5Z"], start=high_note, timeout=5.0)
+
 
 if __name__ == "__main__":
     unittest.main()

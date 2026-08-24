@@ -151,7 +151,8 @@ class ProgramAmySerialClient(base.AmySerialClient):
             raise ValueError(f"unsupported non-ROM program {program.kind!r}")
 
         self._route_synth_bus(synth)
-        self._wire(f"i{synth}iV{self._f(self.volume[role])}Z")
+        level = self.volume[role] * self._instrument_level(role)
+        self._wire(f"i{synth}iV{self._f(level)}Z")
         self._apply_reverb_bus(bus)
 
     def _physical_param_commands(
@@ -165,6 +166,22 @@ class ProgramAmySerialClient(base.AmySerialClient):
         )
         feedback = max(0.0, min(0.9999, float(feedback)))
         return [f"v0b{self._f(feedback)}i{synth}Z"]
+
+    def _strum_note_on(self, note: float) -> None:
+        program = self._program("strum")
+        if program is not None and program.kind == "karplus_strong":
+            raw = self.config.get("synth_programs", {}).get(program.key, {})
+            start = float(raw.get("high_note_start", 60.0))
+            full = max(start + 1.0, float(raw.get("high_note_full", 96.0)))
+            maximum = max(1.0, float(raw.get("high_note_gain", 1.0)))
+            amount = max(0.0, min(1.0, (float(note) - start) / (full - start)))
+            level = (
+                self.volume["strum"]
+                * self._instrument_level("strum")
+                * (1.0 + amount * (maximum - 1.0))
+            )
+            self._wire(f"i{self.synth_id['strum']}iV{self._f(level)}Z")
+        super()._strum_note_on(note)
 
     def _configure_synth(self, role: str) -> None:
         program = self._program(role)

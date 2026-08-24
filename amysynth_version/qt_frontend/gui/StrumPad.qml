@@ -4,6 +4,7 @@ Item {
     id: root
 
     required property var controller
+    property bool ladderMode: false
 
     property bool gestureActive: false
 
@@ -89,6 +90,7 @@ Item {
             root.gestureActive = true
             root.controller.strumStart(
                 root.normalizedY(points[0].y)
+                + (root.ladderMode ? 2.0 : 0.0)
             )
         }
 
@@ -102,6 +104,7 @@ Item {
 
             root.controller.strumMove(
                 root.normalizedY(points[0].y)
+                + (root.ladderMode ? 2.0 : 0.0)
             )
         }
 

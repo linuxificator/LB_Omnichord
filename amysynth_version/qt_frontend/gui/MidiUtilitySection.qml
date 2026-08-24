@@ -6,6 +6,7 @@ Item {
     id: root
 
     required property var controller
+    required property var omniController
     required property var tuningModeModel
     required property bool fullScreen
     property int leftExtension: 0
@@ -31,9 +32,9 @@ Item {
         if (!tuningWheel.initialized) {
             return
         }
-        if (tuningWheel.currentIndex !== root.controller.midiTuningModeIndex) {
+        if (tuningWheel.currentIndex !== root.controller.tuningModeIndex) {
             tuningWheel.syncing = true
-            tuningWheel.currentIndex = root.controller.midiTuningModeIndex
+            tuningWheel.currentIndex = root.controller.tuningModeIndex
             Qt.callLater(function() {
                 tuningWheel.syncing = false
             })
@@ -46,7 +47,7 @@ Item {
     Connections {
         target: root.controller
 
-        function onMidiTuningChanged() {
+        function onTuningChanged() {
             root.synchronizeTuningWheel()
         }
     }
@@ -70,9 +71,9 @@ Item {
         coupled: root.tuningCoupled
         onClicked: {
             if (root.tuningCoupled) {
-                root.controller.setMidiTuningCoupled(false)
+                root.controller.setTuningCoupled(false)
             } else {
-                root.controller.coupleTuningFromMidi()
+                root.omniController.coupleTuningFromMidi()
             }
             root.toggleTuningCouplingRequested()
         }
@@ -106,7 +107,7 @@ Item {
 
             Component.onCompleted: {
                 syncing = true
-                currentIndex = root.controller.midiTuningModeIndex
+                currentIndex = root.controller.tuningModeIndex
                 Qt.callLater(function() {
                     tuningWheel.syncing = false
                     tuningWheel.initialized = true
@@ -146,7 +147,7 @@ Item {
 
             onCurrentIndexChanged: {
                 if (initialized && !syncing && currentIndex >= 0) {
-                    root.controller.setMidiTuningModeIndex(currentIndex)
+                    root.controller.setTuningModeIndex(currentIndex)
                 }
             }
         }
@@ -168,7 +169,7 @@ Item {
         y: 0
         width: root.tuningWidth
         height: parent.height
-        currentValue: root.controller.midiTuningReference
+        currentValue: root.controller.tuningReference
         fromValue: 415
         toValue: 466
         stepValue: 1
@@ -177,7 +178,7 @@ Item {
         fillColor: "#cc6f0c"
         textColor: "#492606"
 
-        onEdited: (value) => root.controller.setMidiTuningReference(value)
+        onEdited: (value) => root.controller.setTuningReference(value)
     }
 
     Button {
@@ -205,7 +206,7 @@ Item {
             border.width: 2
         }
 
-        onClicked: root.controller.panic()
+        onClicked: root.omniController.panic()
     }
 
     Button {
@@ -273,7 +274,7 @@ Item {
             }
 
             onClicked:
-                root.controller.storeSelectedMidiPreset()
+                root.controller.storeSelectedPreset()
         }
 
         Row {
@@ -291,7 +292,7 @@ Item {
 
                     property int presetNumber: index + 1
                     property bool selected:
-                        root.controller.selectedMidiPreset === presetNumber
+                        root.controller.selectedPreset === presetNumber
                     property bool storeFlash: false
 
                     width: 48
@@ -344,7 +345,7 @@ Item {
 
                     Connections {
                         target: root.controller
-                        function onMidiPresetStored(presetNumber) {
+                        function onPresetStored(presetNumber) {
                             if (presetNumber === presetButton.presetNumber) {
                                 presetButton.storeFlash = true
                                 storeFlashTimer.restart()
@@ -353,7 +354,7 @@ Item {
                     }
 
                     onClicked:
-                        root.controller.selectMidiPreset(presetNumber)
+                        root.controller.selectPreset(presetNumber)
                 }
             }
         }

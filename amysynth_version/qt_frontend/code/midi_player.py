@@ -15,12 +15,12 @@ import app_core
 from control_limits import clamp_control_value
 from synth_programs import resolve_program
 from synth_state import SynthState
+from user_data import MIDI_PRESET_DIR
 
 
 MIDI_ROW_COUNT = 6
 MIDI_PRESET_COUNT = 18
 MIDI_DRUM_KEY = "drum_kit_0"
-MIDI_PRESET_DIR = Path.home() / ".omnichord" / "midi"
 MIDI_FACTORY_DIR = app_core.INSTRUMENT_DIR / "midi_default_presets"
 MIDI_LAST_PRESET_FILE = "last_preset.json"
 MIDI_PREVIEW_LOW = app_core.STRUM_LOW_MIDI
@@ -60,10 +60,12 @@ class _LinuxRawMidiReader:
     def __init__(
         self,
         callback: Callable[[int, int, int, bool], None],
+        control_callback: Callable[[int, int, int], None],
         device_glob: str,
         enabled: bool,
     ) -> None:
         self._callback = callback
+        self._control_callback = control_callback
         self._glob = str(device_glob)
         self._enabled = bool(enabled)
         self._stop = threading.Event()
@@ -126,6 +128,9 @@ class _LinuxRawMidiReader:
             elif hi == 0x80:
                 note, velocity = payload
                 self._callback(channel, note, velocity, False)
+            elif hi == 0xB0:
+                controller, value = payload
+                self._control_callback(channel, controller, value)
 
         state["running"] = running
         state["pending"] = pending
@@ -228,6 +233,15 @@ class MidiAmyEngine:
 
     def _f(self, value: float) -> str:
         return self.client._f(value)
+
+    def balanced_volume(self, key: str, volume: float) -> float:
+        levels = self.client.config.get("instrument_levels", {})
+        multiplier = (
+            max(0.0, float(levels.get(str(key), 1.0)))
+            if isinstance(levels, dict)
+            else 1.0
+        )
+        return float(volume) * multiplier
 
     def _patch(self, key: str) -> int | None:
         patch_map = getattr(self.client, "patch_map", {})
@@ -439,7 +453,7 @@ class MidiAmyEngine:
 
         self._configured_rows.add(row)
         self._route(synth, bus)
-        self.set_row_volume(row, volume)
+        self.set_row_volume(row, self.balanced_volume(key, volume))
 
     def set_row_volume(self, row: int, volume: float) -> None:
         value = max(0.0, min(1.0, float(volume)))
@@ -647,6 +661,13 @@ class MidiPlayerBackend(QObject):
         self._reverb_liveness = 0.5
         self._reverb_damping = 0.5
         self._reverb_drums = False
+        self._midi_controls: list[dict[str, int]] = []
+        self._midi_control_values: dict[tuple[int, int], int] = {}
+        self._midi_control_clock = 0
+        self._midi_control_capacity = 17
+        self._midi_control_lock = threading.Lock()
+        raw_cc_log = os.environ.get("OMNICHORD_TEST_MIDI_CC_LOG", "")
+        self._midi_cc_test_log = Path(raw_cc_log) if raw_cc_log else None
 
         self.engine = MidiAmyEngine(client)
         self._preview_row = -1
@@ -660,6 +681,7 @@ class MidiPlayerBackend(QObject):
         midi_cfg = client.config.get("midi_input", {})
         self._reader = _LinuxRawMidiReader(
             self.process_midi_note,
+            self.process_midi_control,
             str(
                 midi_cfg.get(
                     "device_glob",
@@ -675,6 +697,10 @@ class MidiPlayerBackend(QObject):
     @Property(int, notify=stateChanged)
     def stateVersion(self) -> int:
         return self._state_version
+
+    @Property(bool, constant=True)
+    def testCcLogging(self) -> bool:
+        return self._midi_cc_test_log is not None
 
     @Property("QVariantList", constant=True)
     def synthNames(self) -> list[str]:
@@ -716,6 +742,98 @@ class MidiPlayerBackend(QObject):
     def reverbDrumsIncluded(self) -> bool:
         return self._reverb_drums
 
+    def process_midi_control(self, channel: int, controller: int, value: int) -> None:
+        channel = max(1, min(16, int(channel)))
+        controller = max(0, min(127, int(controller)))
+        value = max(0, min(127, int(value)))
+        with self._midi_control_lock:
+            key = (channel, controller)
+            previous = self._midi_control_values.get(key)
+            self._midi_control_values[key] = value
+            # Some controllers (including VMPK) publish current CC values when
+            # switching channel.  The first value is only a baseline.
+            if previous is None or previous == value:
+                return
+            self._midi_control_clock += 1
+            match = next(
+                (item for item in self._midi_controls
+                 if item["channel"] == channel
+                 and item["controller"] == controller),
+                None,
+            )
+            replaced = 0
+            evicted: tuple[int, int] | None = None
+            if match is None:
+                if len(self._midi_controls) >= self._midi_control_capacity:
+                    match = min(
+                        self._midi_controls,
+                        key=lambda item: item["lastSeen"],
+                    )
+                    evicted = (match["channel"], match["controller"])
+                    replaced = 1
+                else:
+                    match = {}
+                    self._midi_controls.append(match)
+            match.update({
+                "channel": channel,
+                "controller": controller,
+                "value": value,
+                "lastSeen": self._midi_control_clock,
+                "pulse": self._midi_control_clock,
+                "replaced": replaced,
+            })
+            self._write_cc_test_log({
+                "event": "change",
+                "channel": channel,
+                "controller": controller,
+                "clock": self._midi_control_clock,
+                "capacity": self._midi_control_capacity,
+                "count": len(self._midi_controls),
+                "evicted": list(evicted) if evicted else None,
+            })
+
+    def _write_cc_test_log(self, record: dict[str, Any]) -> None:
+        if getattr(self, "_midi_cc_test_log", None) is None:
+            return
+        with self._midi_cc_test_log.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+
+    @Slot(float, float, int, float, int, float)
+    def testLogControlIndicatorLayout(
+        self,
+        bar_x: float,
+        bar_width: float,
+        capacity: int,
+        row_width: float,
+        count: int,
+        last_right: float,
+    ) -> None:
+        with self._midi_control_lock:
+            self._write_cc_test_log({
+                "event": "layout",
+                "barX": float(bar_x),
+                "barWidth": float(bar_width),
+                "capacity": int(capacity),
+                "rowWidth": float(row_width),
+                "count": int(count),
+                "lastRight": float(last_right),
+            })
+
+    @Slot(int)
+    def setControlIndicatorCapacity(self, capacity: int) -> None:
+        """Match the LRU pool to the number of indicators visible in QML."""
+        capacity = max(1, int(capacity))
+        with self._midi_control_lock:
+            if capacity == self._midi_control_capacity:
+                return
+            self._midi_control_capacity = capacity
+            while len(self._midi_controls) > capacity:
+                oldest = min(
+                    self._midi_controls,
+                    key=lambda item: item["lastSeen"],
+                )
+                self._midi_controls.remove(oldest)
+
     def _emit_state(self) -> None:
         self._state_version += 1
         self.stateChanged.emit()
@@ -747,6 +865,9 @@ class MidiPlayerBackend(QObject):
 
     @Slot(int, result="QVariantList")
     def commonControls(self, row: int) -> list[dict[str, Any]]:
+        if int(row) == -1:
+            with self._midi_control_lock:
+                return [dict(item) for item in self._midi_controls]
         if not self._valid_row(row):
             return []
         return self._runtime(row).control_model("common")
@@ -805,7 +926,11 @@ class MidiPlayerBackend(QObject):
             return
         self.volumes[row] = value
         if not self._is_drum(row):
-            self.engine.set_row_volume(row, value)
+            key = str(self._runtime(row).selected_definition.key)
+            self.engine.set_row_volume(
+                row,
+                self.engine.balanced_volume(key, value),
+            )
         self._emit_state()
 
     @Slot(int)

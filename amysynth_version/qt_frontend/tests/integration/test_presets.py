@@ -44,7 +44,7 @@ class PresetIntegrationTests(unittest.TestCase):
             )
 
             app.action("storeSelectedPreset")
-            preset_path = app.home / ".omnichord" / "p1.json"
+            preset_path = app.home / ".omnichord" / "omni_presets" / "p1.json"
             data = json.loads(preset_path.read_text(encoding="utf-8"))
             parameters = data["synths"]["chord"]["parameters"]
 
@@ -104,7 +104,7 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertTrue(bool(app.query("rhythmRunning")))
             app.action("storeSelectedPreset")
 
-            preset_path = app.home / ".omnichord" / "p1.json"
+            preset_path = app.home / ".omnichord" / "omni_presets" / "p1.json"
             data = json.loads(preset_path.read_text(encoding="utf-8"))
             self.assertNotIn("rhythm_running", data.get("transport", {}))
 
@@ -193,8 +193,8 @@ class PresetIntegrationTests(unittest.TestCase):
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
 
-            preset_one_path = app.home / ".omnichord" / "p1.json"
-            preset_two_path = app.home / ".omnichord" / "p2.json"
+            preset_one_path = app.home / ".omnichord" / "omni_presets" / "p1.json"
+            preset_two_path = app.home / ".omnichord" / "omni_presets" / "p2.json"
             preset_one = json.loads(preset_one_path.read_text(encoding="utf-8"))
             preset_two = json.loads(preset_two_path.read_text(encoding="utf-8"))
             rhythm_one = str(preset_one["rhythm"]["selected"])

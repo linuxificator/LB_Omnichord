@@ -143,3 +143,10 @@ Important regression tests:
 - MIDI preview stays within its live voice allocation and emits no stale offs
 - OMNI and MIDI reverb controls generate commands for only their owned buses
 - live preset/rhythm changes preserve tempo without transport/timebase reset
+- legacy user data migrates to separate OMNI/MIDI preset directories
+- editable user configuration is seeded once and has startup priority
+- APG and chord-family LDR strum note sets remain deterministic
+- MIDI CC running status updates indicators without changing musical state;
+  indicators fill the available width before least-recently-used replacement
+- instrument balance captures cover low/middle/high registers and report RMS,
+  peak, crest factor and clipping

@@ -16,8 +16,14 @@ Default channels are 1-6. Duplicate channel assignments are allowed.
 
 On Linux the frontend currently reads ALSA raw-MIDI character devices directly
 from the configurable `/dev/snd/midiC*D*` glob on a background thread. It parses
-Note On, Note Off, velocity-zero Note Off and running status. System real-time
-bytes are ignored; SysEx, CC and Program Change are not application inputs.
+Note On, Note Off, velocity-zero Note Off, Control Change and running status.
+System real-time bytes are ignored; SysEx and Program Change are not application
+inputs. A channel-status byte by itself creates no indicator. The first value
+seen for each channel/controller pair establishes a baseline; only a later,
+different value counts as control movement. This prevents controller-state
+snapshots sent during a VMPK channel switch from creating indicators. Actual
+CC changes drive the left-to-right, capacity-aware indicators and no musical
+mapping.
 Channel 0 in a row means omni/all incoming channels.
 
 ALSA Sequencer-only applications such as VMPK do not create a raw-MIDI device.

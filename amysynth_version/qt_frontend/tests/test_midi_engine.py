@@ -51,6 +51,14 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
+        client = _Client()
+        client.config["instrument_levels"] = {"dx7_215": 0.4}
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+        engine.configure_row(0, "dx7_215", {}, 0.5)
+        self.assertIn(("wire", "i5iV0.2Z"), client.events)
+
     def test_rom_patch_waits_before_parameters_and_routing(self) -> None:
         client = _Client()
         engine = MidiAmyEngine(client)

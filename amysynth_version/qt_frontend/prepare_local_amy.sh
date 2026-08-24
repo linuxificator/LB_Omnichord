@@ -27,7 +27,7 @@ AMY_PCM_BANK=tiny python -m pip install \
     "$amy_root"
 
 amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
-if nm -D "$amy_so" | grep -Eq 'gamma9001|amy_set_gamma'; then
+if nm -D "$amy_so" | grep -E 'gamma9001|amy_set_gamma' >/dev/null; then
     echo "AMY verification failed: Gamma9001 symbols are still present" >&2
     exit 1
 fi

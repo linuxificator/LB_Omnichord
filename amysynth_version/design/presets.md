@@ -26,8 +26,12 @@ The tuning link/coupling state is runtime-only and is not stored.
 
 M1 is the most accessible/mellow preset. Higher numbers progressively introduce more unusual and experimental combinations.
 
-Factory OMNI presets are copied into `~/.omnichord` without overwriting valid
+Factory OMNI presets are copied into `~/.omnichord/omni_presets` without overwriting valid
 user presets. The recognizable obsolete bootstrap bank—18 byte-identical files
 using `prophet`, `pluck`, `fm` and `waltz`—is first moved to a timestamped
 `legacy-presets-*` archive and then replaced with current AMY factory presets.
 Any non-identical or edited bank is preserved.
+
+MIDI presets use the independent `~/.omnichord/midi_presets` directory.
+Older root-level OMNI presets and the former `~/.omnichord/midi` directory are
+migrated on startup without overwriting new-layout files.

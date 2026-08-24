@@ -916,7 +916,8 @@ class AmySerialClient:
             self.writer.delay(max(0.0, guard_ms) / 1000.0)
         self._apply_patch_compatibility(patch, synth)
         self._route_synth_bus(synth)
-        self._wire(f"i{synth}iV{self._f(self.volume[role])}Z")
+        level = self.volume[role] * self._instrument_level(role)
+        self._wire(f"i{synth}iV{self._f(level)}Z")
         # A patch may carry its own reverb setting for this bus. The Omnichord
         # reverb controls are the application-level authority, so restore only
         # this role's room after the patch is loaded. Other role buses are not
@@ -1281,8 +1282,16 @@ class AmySerialClient:
     def _set_volume(self, role: str, value: Any) -> None:
         level = max(0.0, min(1.0, float(value)))
         self.volume[role] = level
+        output_level = level * self._instrument_level(role)
         for synth in self._role_synth_ids(role):
-            self._wire(f"i{synth}iV{self._f(level)}Z")
+            self._wire(f"i{synth}iV{self._f(output_level)}Z")
+
+    def _instrument_level(self, role: str) -> float:
+        levels = self.config.get("instrument_levels", {})
+        if not isinstance(levels, dict):
+            return 1.0
+        key = self.selected_synth.get(role, "")
+        return max(0.0, float(levels.get(key, 1.0)))
 
     # ------------------------------------------------------------------
     # Manual chord voice (synth 3)

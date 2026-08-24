@@ -24,6 +24,7 @@ from amy_serial import (
 )
 from control_limits import bounded_control_range, clamp_control_value
 from synth_state import SynthState
+from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -79,7 +80,7 @@ DEFAULT_TUNING_MODE_INDEX = 1
 DEFAULT_TUNING_REFERENCE = 440
 
 PRESET_COUNT = 18
-PRESET_DIRECTORY = Path.home() / ".omnichord"
+PRESET_DIRECTORY = OMNI_PRESET_DIR
 LAST_PRESET_FILE = "last_preset.json"
 
 # Chord-touch dropout filter, derived from the captured Pi touchscreen trace.
@@ -848,6 +849,7 @@ class InstrumentBackend(QObject):
         self._pitch_bend_returning = False
 
         self._strum_last_index: int | None = None
+        self._strum_ladder_mode = False
 
         # A held chord temporarily suppresses automatic rhythmic chords
         # without altering the user's stored activity setting.
@@ -3407,8 +3409,39 @@ class InstrumentBackend(QObject):
             if midi_note % 12 in pitch_classes
         ]
 
+    def _ladder_notes(self) -> list[int]:
+        if self._active_row < 0 or self._active_root_semitone < 0:
+            return []
+        chord = self._chords[self._row_chord_indexes[self._active_row]]
+        suffix = chord.suffix
+        if "diminished" in suffix or "flat5" in suffix:
+            intervals = (0, 2, 3, 5, 6, 8, 9, 11)
+        elif "augmented" in suffix or "sharp5" in suffix:
+            intervals = (0, 2, 4, 6, 8, 10)
+        elif suffix == "5":
+            intervals = (0, 2, 4, 7, 9)
+        elif suffix.startswith("minor"):
+            intervals = (0, 3, 5, 7, 10)
+        elif "dominant" in suffix or suffix == "7_sus4":
+            intervals = (0, 2, 4, 5, 7, 9, 10)
+        elif suffix.startswith("sus"):
+            intervals = (0, 2, 5, 7, 9)
+        else:
+            intervals = (0, 2, 4, 7, 9)
+        pitch_classes = {
+            (self._active_root_semitone + interval) % 12
+            for interval in intervals
+        }
+        return [
+            note for note in range(STRUM_LOW_MIDI, STRUM_HIGH_MIDI + 1)
+            if note % 12 in pitch_classes
+        ]
+
+    def _strum_notes(self) -> list[int]:
+        return self._ladder_notes() if self._strum_ladder_mode else self._arpeggio_notes()
+
     def _strum_index(self, normalized_y: float) -> int | None:
-        notes = self._arpeggio_notes()
+        notes = self._strum_notes()
 
         if not notes:
             return None
@@ -3417,7 +3450,7 @@ class InstrumentBackend(QObject):
         return round((1.0 - y) * (len(notes) - 1))
 
     def _play_strum_index(self, index: int) -> None:
-        notes = self._arpeggio_notes()
+        notes = self._strum_notes()
         if not notes or index < 0 or index >= len(notes):
             return
         self._client.send_message(
@@ -3435,8 +3468,14 @@ class InstrumentBackend(QObject):
             return
         self._play_strum_index(index)
 
+    def _decode_strum_position(self, value: float) -> float:
+        value = float(value)
+        self._strum_ladder_mode = value >= 2.0
+        return value - 2.0 if self._strum_ladder_mode else value
+
     @Slot(float)
     def strumStart(self, normalized_y: float) -> None:
+        normalized_y = self._decode_strum_position(normalized_y)
         self._strum_last_index = self._strum_index(
             normalized_y
         )
@@ -3448,7 +3487,8 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def strumMove(self, normalized_y: float) -> None:
-        notes = self._arpeggio_notes()
+        normalized_y = self._decode_strum_position(normalized_y)
+        notes = self._strum_notes()
         new_index = self._strum_index(normalized_y)
 
         if new_index is None:
@@ -3859,6 +3899,9 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> int:
     args = parse_arguments()
 
+    migrate_user_layout()
+    user_config_dir = ensure_user_configs(CONFIG_DIR)
+
     # These Qt choices must be made before the first application/window is
     # constructed.
     if args.software_renderer:
@@ -3877,7 +3920,7 @@ def main() -> int:
     # on for this diagnostic build; the output is only a few startup lines.
     os.environ.setdefault("QSG_INFO", "1")
 
-    defaults = load_defaults(CONFIG_DIR / "defaults.json")
+    defaults = load_defaults(user_config_dir / "defaults.json")
     chords = load_chords(MUSIC_DIR / "chords.csv")
     (
         synths,
@@ -3887,7 +3930,7 @@ def main() -> int:
     ) = load_synth_catalog(INSTRUMENT_DIR / "synths.json")
     rhythms = load_rhythm_catalog(MUSIC_DIR / "rhythms.json")
     title_config = load_title_config(
-        CONFIG_DIR / "title.json"
+        user_config_dir / "title.json"
     )
     intonation_eq = load_intonation_table(
         MUSIC_DIR / "intonation_eq.json"
@@ -3983,6 +4026,8 @@ def main() -> int:
     )
 
     amy_config_path = args.amy_config.expanduser().resolve()
+    if amy_config_path == (CONFIG_DIR / "amy_config.json").resolve():
+        amy_config_path = user_config_dir / "amy_config.json"
     amy_config = load_amy_config(amy_config_path)
     if args.serial_port is not None:
         amy_config["serial"]["port"] = args.serial_port
