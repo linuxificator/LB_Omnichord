@@ -18,6 +18,7 @@ class InstrumentBackend(OmniInstrumentBackend):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self._syncing_tuning = False
         self._midi_player = MidiPlayerBackend(
             owner=self,
             synths=tuple(self._synths),
@@ -25,6 +26,10 @@ class InstrumentBackend(OmniInstrumentBackend):
         )
         self._midi_player.stateChanged.connect(self.midiStateChanged)
         self._midi_player.tuningChanged.connect(self.midiTuningChanged)
+        self._midi_player.tuningChanged.connect(
+            self._sync_omni_tuning_when_coupled
+        )
+        self.tuningChanged.connect(self._sync_midi_tuning_when_coupled)
         self._midi_player.presetChanged.connect(self.midiPresetChanged)
         self._midi_player.presetStored.connect(self.midiPresetStored)
 
@@ -112,9 +117,51 @@ class InstrumentBackend(OmniInstrumentBackend):
     def setMidiTuningCoupled(self, coupled: bool) -> None:
         self._midi_player.setTuningCoupled(coupled)
 
+    def _sync_midi_tuning_when_coupled(self) -> None:
+        if not self._midi_player.tuningCoupled or self._syncing_tuning:
+            return
+        self._syncing_tuning = True
+        try:
+            self._midi_player.syncFromOmni()
+        finally:
+            self._syncing_tuning = False
+
+    def _sync_omni_tuning_when_coupled(self) -> None:
+        if not self._midi_player.tuningCoupled or self._syncing_tuning:
+            return
+        self._syncing_tuning = True
+        try:
+            self._copy_midi_tuning_to_omni()
+        finally:
+            self._syncing_tuning = False
+
+    def _copy_midi_tuning_to_omni(self) -> None:
+        self.setTuningModeIndex(self._midi_player.tuningModeIndex)
+        self.setTuningReference(self._midi_player.tuningReference)
+
     @Slot()
     def syncMidiTuningFromOmni(self) -> None:
         self._midi_player.syncFromOmni()
+
+    @Slot()
+    def syncOmniTuningFromMidi(self) -> None:
+        if self._syncing_tuning:
+            return
+        self._syncing_tuning = True
+        try:
+            self._copy_midi_tuning_to_omni()
+        finally:
+            self._syncing_tuning = False
+
+    @Slot()
+    def coupleTuningFromOmni(self) -> None:
+        self._midi_player.syncFromOmni()
+        self._midi_player.setTuningCoupled(True)
+
+    @Slot()
+    def coupleTuningFromMidi(self) -> None:
+        self.syncOmniTuningFromMidi()
+        self._midi_player.setTuningCoupled(True)
 
     @Slot(int)
     def setMidiTuningModeIndex(self, index: int) -> None:

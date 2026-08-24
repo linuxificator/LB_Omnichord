@@ -30,23 +30,13 @@ Item {
     readonly property int presetX:
         escapeX + escapeWidth + utilityGap
 
-    readonly property int effectiveTuningModeIndex:
-        root.tuningCoupled
-        ? root.controller.selectedTuningModeIndex
-        : root.controller.midiTuningModeIndex
-
-    readonly property int effectiveTuningReference:
-        root.tuningCoupled
-        ? root.controller.tuningReference
-        : root.controller.midiTuningReference
-
     function synchronizeTuningWheel() {
         if (!tuningWheel.initialized) {
             return
         }
-        if (tuningWheel.currentIndex !== root.effectiveTuningModeIndex) {
+        if (tuningWheel.currentIndex !== root.controller.midiTuningModeIndex) {
             tuningWheel.syncing = true
-            tuningWheel.currentIndex = root.effectiveTuningModeIndex
+            tuningWheel.currentIndex = root.controller.midiTuningModeIndex
             Qt.callLater(function() {
                 tuningWheel.syncing = false
             })
@@ -59,16 +49,8 @@ Item {
     Connections {
         target: root.controller
 
-        function onTuningChanged() {
-            if (root.tuningCoupled) {
-                root.synchronizeTuningWheel()
-            }
-        }
-
         function onMidiTuningChanged() {
-            if (!root.tuningCoupled) {
-                root.synchronizeTuningWheel()
-            }
+            root.synchronizeTuningWheel()
         }
     }
 
@@ -91,7 +73,9 @@ Item {
         coupled: root.tuningCoupled
         onClicked: {
             if (root.tuningCoupled) {
-                root.controller.syncMidiTuningFromOmni()
+                root.controller.setMidiTuningCoupled(false)
+            } else {
+                root.controller.coupleTuningFromMidi()
             }
             root.toggleTuningCouplingRequested()
         }
@@ -126,7 +110,7 @@ Item {
 
             Component.onCompleted: {
                 syncing = true
-                currentIndex = root.effectiveTuningModeIndex
+                currentIndex = root.controller.midiTuningModeIndex
                 Qt.callLater(function() {
                     tuningWheel.syncing = false
                     tuningWheel.initialized = true
@@ -166,11 +150,7 @@ Item {
 
             onCurrentIndexChanged: {
                 if (initialized && !syncing && currentIndex >= 0) {
-                    if (root.tuningCoupled) {
-                        root.controller.setTuningModeIndex(currentIndex)
-                    } else {
-                        root.controller.setMidiTuningModeIndex(currentIndex)
-                    }
+                    root.controller.setMidiTuningModeIndex(currentIndex)
                 }
             }
         }
@@ -192,7 +172,7 @@ Item {
         y: 0
         width: root.tuningWidth
         height: parent.height
-        currentValue: root.effectiveTuningReference
+        currentValue: root.controller.midiTuningReference
         fromValue: 415
         toValue: 466
         stepValue: 1
@@ -201,13 +181,7 @@ Item {
         fillColor: "#cc6f0c"
         textColor: "#492606"
 
-        onEdited: (value) => {
-            if (root.tuningCoupled) {
-                root.controller.setTuningReference(value)
-            } else {
-                root.controller.setMidiTuningReference(value)
-            }
-        }
+        onEdited: (value) => root.controller.setMidiTuningReference(value)
     }
 
     Button {

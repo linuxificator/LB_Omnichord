@@ -579,6 +579,7 @@ class MidiPlayerBackend(QObject):
 
         self._ensure_preset_storage()
         self._load_startup_preset()
+        self.syncFromOmni()
         self._apply_all_to_engine()
 
         midi_cfg = client.config.get("midi_input", {})
@@ -618,14 +619,10 @@ class MidiPlayerBackend(QObject):
 
     @Property(int, notify=tuningChanged)
     def tuningModeIndex(self) -> int:
-        if self._tuning_coupled:
-            return int(self.owner.selectedTuningModeIndex)
         return int(self._tuning_mode_index)
 
     @Property(int, notify=tuningChanged)
     def tuningReference(self) -> int:
-        if self._tuning_coupled:
-            return int(self.owner.tuningReference)
         return int(round(self._effective_local_reference()))
 
     @Property(float, notify=reverbLevelChanged)
@@ -956,11 +953,23 @@ class MidiPlayerBackend(QObject):
         self.tuningChanged.emit()
 
     def syncFromOmni(self) -> None:
-        self._tuning_mode_index = int(self.owner.selectedTuningModeIndex)
-        self._tuning_reference = float(self.owner.tuningReference)
+        mode_index = int(self.owner.selectedTuningModeIndex)
+        reference = float(self.owner.tuningReference)
+        changed = (
+            mode_index != self._tuning_mode_index
+            or not math.isclose(
+                reference,
+                self._tuning_reference,
+                abs_tol=1e-9,
+            )
+            or not math.isclose(self._bend_offset, 0.0, abs_tol=1e-9)
+        )
+        self._tuning_mode_index = mode_index
+        self._tuning_reference = reference
         self._stop_bend()
         self._bend_offset = 0.0
-        self.tuningChanged.emit()
+        if changed:
+            self.tuningChanged.emit()
 
     @Slot(int)
     def setTuningModeIndex(self, index: int) -> None:
@@ -968,9 +977,6 @@ class MidiPlayerBackend(QObject):
             0,
             min(len(app_core.TUNING_MODE_NAMES) - 1, int(index)),
         )
-        if self._tuning_coupled:
-            self.owner.setTuningModeIndex(index)
-            return
         if index != self._tuning_mode_index:
             self._tuning_mode_index = index
             self.tuningChanged.emit()
@@ -978,11 +984,15 @@ class MidiPlayerBackend(QObject):
     @Slot(int)
     def setTuningReference(self, value: int) -> None:
         value = max(415, min(466, int(value)))
-        if self._tuning_coupled:
-            self.owner.setTuningReference(value)
-            return
         self._stop_bend()
         self._bend_offset = 0.0
+        if math.isclose(
+            self._tuning_reference,
+            float(value),
+            abs_tol=1e-9,
+        ):
+            self.tuningChanged.emit()
+            return
         self._tuning_reference = float(value)
         self.tuningChanged.emit()
 
@@ -1053,8 +1063,6 @@ class MidiPlayerBackend(QObject):
         return 0, {0, 4, 7}
 
     def _tune(self, note: int | float, root: int) -> float:
-        if self._tuning_coupled:
-            return float(self.owner._tuned_note(note, root))
         reference_offset = 12.0 * math.log2(
             self._effective_local_reference() / 440.0
         )

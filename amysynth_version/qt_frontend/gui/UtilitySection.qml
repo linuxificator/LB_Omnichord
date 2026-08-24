@@ -73,7 +73,9 @@ Item {
         coupled: root.tuningCoupled
         onClicked: {
             if (root.tuningCoupled) {
-                root.controller.syncMidiTuningFromOmni()
+                root.controller.setMidiTuningCoupled(false)
+            } else {
+                root.controller.coupleTuningFromOmni()
             }
             root.toggleTuningCouplingRequested()
         }
