@@ -74,7 +74,9 @@ def main() -> int:
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
 
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+    stream_transport = sys.platform == "darwin"
+    socket_type = socket.SOCK_STREAM if stream_transport else socket.SOCK_SEQPACKET
+    server = socket.socket(socket.AF_UNIX, socket_type)
     try:
         server.bind(str(args.socket))
         args.socket.chmod(0o600)
@@ -89,6 +91,7 @@ def main() -> int:
                 continue
             with client:
                 client.settimeout(0.25)
+                buffered = b""
                 while running:
                     try:
                         packet = client.recv(4096)
@@ -96,7 +99,14 @@ def main() -> int:
                         continue
                     if not packet:
                         break
-                    amy.send_wire(packet.decode("ascii"))
+                    if not stream_transport:
+                        amy.send_wire(packet.decode("ascii"))
+                        continue
+                    buffered += packet
+                    while b"\n" in buffered:
+                        request, buffered = buffered.split(b"\n", 1)
+                        if request:
+                            amy.send_wire(request.decode("ascii"))
     finally:
         server.close()
         remove_stale_socket(args.socket)

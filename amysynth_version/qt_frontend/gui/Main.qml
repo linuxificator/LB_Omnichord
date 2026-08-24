@@ -773,7 +773,6 @@ ApplicationWindow {
                                     model: chordNames
                                     visibleItemCount: 3
                                     wrap: true
-                                    flickDeceleration: 1200
 
                                     property bool initialized:
                                         false

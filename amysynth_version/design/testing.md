@@ -78,7 +78,7 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 - macOS asset: `LB_Omnichord.R20260824223000.macOS-arm64.dmg`
 - one matching `.sha256` file for each package
 
-The AppImage bundles PySide6, the frontend assets and the pinned AMY bus-mixer
+The AppImages bundle PySide6, the frontend assets and the pinned AMY bus-mixer
 fork built with the ESP32-compatible tiny PCM bank. The executable starts AMY
 as a separate child process and connects the Qt process through the existing
 Unix `SOCK_SEQPACKET` wire-protocol boundary. Packaging therefore does not

@@ -4,6 +4,7 @@ import json
 import math
 import queue
 import socket
+import sys
 import threading
 import time
 from datetime import datetime
@@ -430,7 +431,7 @@ class _SerialWriter:
 
 
 class _UnixSocketWriter(_SerialWriter):
-    """Priority writer for a separately managed AMY SOCK_SEQPACKET service."""
+    """Priority writer for a separately managed local AMY service."""
 
     def __init__(
         self,
@@ -440,7 +441,13 @@ class _UnixSocketWriter(_SerialWriter):
         from collections import deque
 
         self.debug_log = debug_log
-        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        self._stream_transport = sys.platform == "darwin"
+        socket_type = (
+            socket.SOCK_STREAM
+            if self._stream_transport
+            else socket.SOCK_SEQPACKET
+        )
+        self.socket = socket.socket(socket.AF_UNIX, socket_type)
         try:
             self.socket.connect(str(socket_path))
         except BaseException:
@@ -465,7 +472,8 @@ class _UnixSocketWriter(_SerialWriter):
             command += "Z"
         if self.debug_log is not None:
             self.debug_log.write(f"TX-{lane}", command)
-        self.socket.sendall(command.encode("ascii"))
+        framing = "\n" if self._stream_transport else ""
+        self.socket.sendall((command + framing).encode("ascii"))
 
     def close(self) -> None:
         super().close()

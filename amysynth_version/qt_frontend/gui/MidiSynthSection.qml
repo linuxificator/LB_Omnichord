@@ -112,7 +112,6 @@ Item {
             model: root.synthModel
             visibleItemCount: 3
             wrap: true
-            flickDeceleration: 1200
 
             property bool initialized: false
             property bool syncing: false

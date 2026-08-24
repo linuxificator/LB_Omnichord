@@ -117,18 +117,26 @@ jobs:
         run: |
           package="dist/LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.${{ matrix.platform }}.AppImage"
           "$package" --package-self-test
-          set +e
-          QT_QPA_PLATFORM=offscreen timeout --signal=TERM 8s \
-            "$package" --windowed > /tmp/omnichord-package-smoke.log 2>&1
-          smoke_status=$?
-          set -e
+          QT_QPA_PLATFORM=offscreen "$package" --windowed \
+            > /tmp/omnichord-package-smoke.log 2>&1 &
+          app_pid=$!
+          for _ in {1..80}; do
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat /tmp/omnichord-package-smoke.log
+              echo 'AppImage stopped during startup' >&2
+              exit 1
+            fi
+            if grep -q 'AMY backend: external socket' \
+              /tmp/omnichord-package-smoke.log; then
+              break
+            fi
+            sleep 0.1
+          done
           cat /tmp/omnichord-package-smoke.log
-          if [[ "$smoke_status" -ne 124 && "$smoke_status" -ne 143 ]]; then
-            echo "AppImage smoke test stopped unexpectedly: $smoke_status" >&2
-            exit 1
-          fi
           grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
           grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
+          kill -TERM "$app_pid"
+          wait "$app_pid" || true
           package_name="$(basename "$package")"
           (cd dist && sha256sum "$package_name" > "$package_name.sha256")
 
