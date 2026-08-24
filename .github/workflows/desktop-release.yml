@@ -193,7 +193,20 @@ jobs:
           mountpoint="/tmp/lb-omnichord-dmg"
           mkdir -p "$mountpoint"
           hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" "$package"
-          trap 'hdiutil detach "$mountpoint"' EXIT
+          cleanup_dmg() {
+            if [[ -n "${app_pid:-}" ]] && kill -0 "$app_pid" 2>/dev/null; then
+              kill -TERM "$app_pid" 2>/dev/null || true
+              wait "$app_pid" || true
+            fi
+            for _ in {1..5}; do
+              if hdiutil detach "$mountpoint"; then
+                return
+              fi
+              sleep 1
+            done
+            hdiutil detach -force "$mountpoint"
+          }
+          trap cleanup_dmg EXIT
           app="$mountpoint/LB_Omnichord.app/Contents/MacOS/LB_Omnichord"
           "$app" --package-self-test
           QT_QPA_PLATFORM=offscreen "$app" --windowed \
@@ -221,6 +234,9 @@ jobs:
           grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
           kill -TERM "$app_pid"
           wait "$app_pid" || test "$?" -eq 143
+          app_pid=""
+          cleanup_dmg
+          trap - EXIT
           package_name="$(basename "$package")"
           (cd dist && shasum -a 256 "$package_name" > "$package_name.sha256")
 
