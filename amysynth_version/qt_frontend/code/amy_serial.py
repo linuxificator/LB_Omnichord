@@ -26,6 +26,6 @@ del _name, _value
 # Override only the two client classes with the generalized program layer.
 # program_amy imports amy_transport directly, so this does not form a cycle.
 from program_amy import (  # noqa: E402
-    ProgramAmyLocalClient as AmyLocalClient,
     ProgramAmySerialClient as AmySerialClient,
+    ProgramAmySocketClient as AmySocketClient,
 )

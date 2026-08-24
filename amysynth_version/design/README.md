@@ -2,6 +2,10 @@
 
 This directory is the design contract for the AMY Synth Omnichord implementation.
 
+This is the only active implementation contract. The repository's Sonic Pi
+version is frozen legacy material: it is not maintained, tested or modified as
+part of AMY development.
+
 The documents define:
 
 - architecture boundaries
@@ -18,5 +22,6 @@ Core rules:
 - AMY transport may be local development or ESP32-P4 serial without changing behavior.
 - OMNI and MIDI remain separate subsystems.
 - Shared state is explicit; tuning is shared only when coupling is enabled.
+- `rhythm_bahavior.md` is the authoritative rhythm transport/tempo contract.
 
 When implementation and design differ, the difference must be documented before changing behavior.

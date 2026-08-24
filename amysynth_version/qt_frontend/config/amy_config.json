@@ -80,6 +80,7 @@
     "synth_alloc_guard_ms": 10.0
   },
   "amy_max_oscs": 336,
+  "amy_max_buses": 11,
   "debug": {
     "log_amy_commands": true,
     "amy_command_log": "~/.omnichord/amy_debug.log",
@@ -123,7 +124,7 @@
     "bass": 1,
     "strum": 2,
     "chord": 3,
-    "midi": 4,
-    "midi_drums": 5
+    "midi_rows": [4, 5, 6, 7, 8, 9],
+    "midi_drums": 10
   }
 }

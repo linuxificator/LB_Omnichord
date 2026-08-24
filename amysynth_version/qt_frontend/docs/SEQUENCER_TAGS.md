@@ -29,7 +29,10 @@ Lane-local operations do not reset the sequencer:
 - chord timbre changes repatch synths 3/4 without replacing their sequencer events;
 - normal activity/config changes replace the affected tagged patterns while transport continues.
 
-A rhythm-style change may deliberately restart the bar. Panic remains a full reset operation.
+A live rhythm-style or preset change replaces tagged events without stopping
+transport or resetting the timebase. The new meter enters at the current
+sequencer phase. Only explicit Start begins a new transport run; Panic remains
+a full reset operation. `../../design/rhythm_bahavior.md` is authoritative.
 
 ## Start and stop
 

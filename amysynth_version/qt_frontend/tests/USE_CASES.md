@@ -109,6 +109,39 @@ The serial regression requires the factory patch to remain authoritative for nat
 
 **Failure history:** the strum area visibly accepted mouse/touch input but emitted no AMY commands/sound in an earlier AMY build.
 
+### MIDI — input, tuning, preview and effects
+
+**MIDI-01 — Linux raw-MIDI input reaches matching rows**
+
+- The Linux reader opens configured `/dev/snd/midiC*D*` devices non-blocking.
+- It parses Note On/Off, velocity-zero Note Off and running status.
+- A row receives notes for its selected channel; channel 0 receives all.
+- SysEx, CC, Program Change and real-time clock are not musical inputs in the
+  current implementation.
+
+**MIDI-02 — incoming notes use active MIDI tuning**
+
+- At A=440 and C root, C4/60 remains 60 under EQ, HARM and JV.
+- E4/64 is 64 under EQ and fractional under HARM/JV.
+- The exact tuned onset pitch is retained for its matching Note Off.
+- Coupled tuning synchronizes from the section that changes; decoupled OMNI and
+  MIDI tuning state cannot mutate one another.
+
+**MIDI-03 — preview stays within allocated voices**
+
+- Each pitched MIDI row has four voices.
+- Before a fifth live preview onset, the oldest preview note is explicitly
+  released.
+- Tail callbacks release only notes still tracked as active; no preview sweep
+  may overflow AMY's forgotten-note pool or emit unmatched delayed Note Offs.
+
+**MIDI-04 — MIDI reverb is independent and bus-scoped**
+
+- The MIDI header controls buses 4–9 and optionally drum bus 10.
+- The OMNI header controls buses 0–3 and cannot mutate MIDI UI state.
+- `midiPlayer` is exposed to QML as a `QObject`, so all four reverb slots are
+  callable rather than opaque QVariant/Python attributes.
+
 ### INSTRUMENT — selected patch identity
 
 **INST-01 — selecting an instrument changes the manual chord synth**
@@ -249,7 +282,7 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 - Every scheduled note-on/off owns one deterministic tag in its lane.
 - Holding/releasing a manual chord clears/reinstalls only the automatic-chord range; bass and drums keep running and transport remains started.
 - Bass on/off and bass retuning replace only the bass range. Tuning/chord pitch changes may replace both bass and automatic-chord ranges but must not touch percussion or stop transport.
-- A rhythm-style change may deliberately restart the bar; ordinary lane edits may not issue `RESET_SEQUENCER`.
+- A live rhythm-style or preset change must preserve tempo and sequencer timebase; it may replace tagged pattern events but may not stop/restart transport or issue `RESET_SEQUENCER`.
 
 **Failure history:** whole-sequencer rebuilds were used for chord hold/release, pitch changes and other lane-local operations. On the ESP32-P4 this could make the rhythm audibly disappear while a manual chord was held and then return on release.
 

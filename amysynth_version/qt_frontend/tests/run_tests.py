@@ -19,6 +19,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
         TESTS / "test_performance_logic.py",
         TESTS / "test_program_architecture.py",
         TESTS / "test_static_contracts.py",
+        TESTS / "test_preset_migration.py",
     ),
     "frontend": (
         TESTS / "integration" / "test_frontend.py",

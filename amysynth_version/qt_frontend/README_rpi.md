@@ -1,6 +1,8 @@
 # Raspberry Pi setup — AMY Omnichord Qt frontend
 
-This frontend runs the Qt/PySide6 user interface on Raspberry Pi and sends the native AMY wire protocol over UART to the ESP32-P4. Sonic Pi is not part of this version.
+This frontend runs the Qt/PySide6 user interface on Raspberry Pi and sends the
+native AMY wire protocol over UART to the ESP32-P4. The Sonic Pi implementation
+is frozen legacy material and is never modified as part of this AMY version.
 
 ## Wiring
 
@@ -52,6 +54,30 @@ Fullscreen:
 ```
 
 The program may also use `/dev/ttyAMA0` or a USB UART such as `/dev/ttyUSB0` when supplied with `--serial-port`.
+
+## USB MIDI input
+
+The current Linux input backend opens every ALSA raw-MIDI character device
+matching `/dev/snd/midiC*D*`. It receives Note On/Off, including velocity-zero
+Note Off and running status. The glob and enable flag are configured under
+`midi_input` in `config/amy_config.json`.
+
+Check physical/virtual raw devices with:
+
+```bash
+amidi -l
+ls -l /dev/snd/midiC*D*
+```
+
+ALSA Sequencer-only software such as VMPK is not visible to this reader. For
+testing, load `snd-virmidi`, select a Virtual Raw MIDI output in VMPK, and then
+start/restart the frontend:
+
+```bash
+sudo modprobe snd-virmidi
+amidi -l
+aconnect -lio
+```
 
 ## Direct UART test
 

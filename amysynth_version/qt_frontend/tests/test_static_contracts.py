@@ -77,7 +77,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("self._runtime(role).load_preset(role_data)", core_py)
         self.assertIn("runtime.set_control(key, value)", core_py)
         self.assertIn("self._runtime(role).transport_payload()", core_py)
-        self.assertIn("from performance_backend import InstrumentBackend", entry_py)
+        self.assertIn("from midi_integration import InstrumentBackend", entry_py)
         self.assertIn("class InstrumentBackend(app_core.InstrumentBackend):", perf_py)
 
         # The public transport facade owns configuration/program selection; the
@@ -150,6 +150,23 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('label: "DAMP"', panel)
         self.assertIn("width: 520", main)
 
+        midi_integration = (
+            ROOT / "code" / "midi_integration.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("@Property(QObject, constant=True)", midi_integration)
+
+    def test_rainbow_mode_button_text_is_large_and_centered(self) -> None:
+        qml = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("font.pixelSize: height * 0.55", qml)
+        self.assertIn(
+            "anchors.horizontalCenterOffset: root.extensionWidth / 2",
+            qml,
+        )
+        self.assertIn("horizontalAlignment: Text.AlignHCenter", qml)
+        self.assertIn("verticalAlignment: Text.AlignVCenter", qml)
+
     def test_rhythm_transport_icon_is_bound_directly_to_backend_state(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
         self.assertIn('text: root.controller.rhythmRunning ? "■" : "▶"', qml)
@@ -159,8 +176,16 @@ class StaticContractTests(unittest.TestCase):
         config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
         self.assertEqual(
             config["buses"],
-            {"drums": 0, "bass": 1, "strum": 2, "chord": 3},
+            {
+                "drums": 0,
+                "bass": 1,
+                "strum": 2,
+                "chord": 3,
+                "midi_rows": [4, 5, 6, 7, 8, 9],
+                "midi_drums": 10,
+            },
         )
+        self.assertGreaterEqual(config["amy_max_buses"], 11)
         transport_py = (ROOT / "code" / "amy_transport.py").read_text(
             encoding="utf-8"
         )

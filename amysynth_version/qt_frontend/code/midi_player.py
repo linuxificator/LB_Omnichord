@@ -200,19 +200,27 @@ class MidiAmyEngine:
         self.drum_synth = int(midi_cfg.get("drum_synth_id", 11))
         self.voices = int(midi_cfg.get("voices_per_synth", 4))
         self.drum_voices = int(midi_cfg.get("drum_voices", 8))
-        self.midi_bus = int(buses.get("midi", 4))
-        self.drum_bus = int(buses.get("midi_drums", 5))
+        raw_row_buses = buses.get("midi_rows", [4, 5, 6, 7, 8, 9])
+        self.row_buses = tuple(int(bus) for bus in raw_row_buses)
+        self.drum_bus = int(buses.get("midi_drums", 10))
         if (
-            self.midi_bus == self.drum_bus
-            or self.midi_bus < 4
-            or self.drum_bus < 4
+            len(self.row_buses) != MIDI_ROW_COUNT
+            or len(set(self.row_buses)) != MIDI_ROW_COUNT
+            or self.drum_bus in self.row_buses
+            or any(bus < 4 for bus in (*self.row_buses, self.drum_bus))
         ):
             raise ValueError(
-                "MIDI melodic and drum buses must be distinct buses >= 4"
+                "six MIDI row buses and the MIDI drum bus must be distinct "
+                "buses >= 4"
             )
         self._configured_rows: set[int] = set()
         self._drum_configured = False
         self._active_notes: dict[tuple[int, int, int], float] = {}
+        self._preview_lock = threading.Lock()
+        self._preview_active_notes: dict[int, list[float]] = {
+            row: [] for row in range(MIDI_ROW_COUNT)
+        }
+        self._preview_tail_tokens = [0] * MIDI_ROW_COUNT
         self.configure_drum_synth()
 
     def _wire(self, command: str) -> None:
@@ -225,6 +233,19 @@ class MidiAmyEngine:
         patch_map = getattr(self.client, "patch_map", {})
         value = patch_map.get(str(key))
         return None if value is None else int(value)
+
+    def _wait_for_synth_allocation(self) -> None:
+        writer = getattr(self.client, "writer", None)
+        delay = getattr(writer, "delay", None)
+        if not callable(delay):
+            return
+        guard_ms = float(
+            self.client.config.get("performance", {}).get(
+                "synth_alloc_guard_ms",
+                10.0,
+            )
+        )
+        delay(max(0.0, guard_ms) / 1000.0)
 
     def _route(self, synth: int, bus: int) -> None:
         self._wire(f"i{synth}iy{bus}Z")
@@ -354,6 +375,11 @@ class MidiAmyEngine:
         return out
 
     def silence_row(self, row: int) -> None:
+        if row not in self._configured_rows:
+            return
+        with self._preview_lock:
+            self._preview_tail_tokens[row] += 1
+            self._preview_active_notes[row].clear()
         synth = self.row_synths[row]
         self._wire(f"l0i{synth}Z")
         for key in [key for key in self._active_notes if key[0] == row]:
@@ -367,6 +393,7 @@ class MidiAmyEngine:
         volume: float,
     ) -> None:
         synth = self.row_synths[row]
+        bus = self.row_buses[row]
         self.silence_row(row)
         program = resolve_program(str(key), self.client.config)
         patch = self._patch(key)
@@ -381,7 +408,7 @@ class MidiAmyEngine:
                 0.985 if program.feedback is None else float(program.feedback)
             )
             self._wire(
-                f"i{synth}iv{self.voices}in1iy{self.midi_bus}Z"
+                f"i{synth}iv{self.voices}in1iy{bus}Z"
             )
             self._wire(
                 f"v0w{wave}b{self._f(feedback)}i{synth}Z"
@@ -397,8 +424,12 @@ class MidiAmyEngine:
                 self._wire(f"K{patch}i{synth}Z")
             else:
                 self._wire(
-                    f"K{patch}i{synth}iv{self.voices}iy{self.midi_bus}Z"
+                    f"K{patch}i{synth}iv{self.voices}iy{bus}Z"
                 )
+            # Loading a ROM patch reallocates its oscillator block. Keep its
+            # compatibility, parameter, routing and volume commands behind
+            # the same allocation barrier used by the Omnichord synth path.
+            self._wait_for_synth_allocation()
             for command in self._compat_commands(patch, synth):
                 self._wire(command)
             for command in self._param_commands(patch, synth, params):
@@ -407,7 +438,7 @@ class MidiAmyEngine:
             raise ValueError(f"unknown MIDI synth {key!r}")
 
         self._configured_rows.add(row)
-        self._route(synth, self.midi_bus)
+        self._route(synth, bus)
         self.set_row_volume(row, volume)
 
     def set_row_volume(self, row: int, volume: float) -> None:
@@ -426,10 +457,11 @@ class MidiAmyEngine:
         level = max(0.0, min(MIDI_REVERB_MAX, float(level)))
         liveness = max(0.0, min(1.0, float(liveness)))
         damping = max(0.0, min(1.0, float(damping)))
-        self._wire(
-            f"y{self.midi_bus}h{self._f(level)},"
-            f"{self._f(liveness)},{self._f(damping)}Z"
-        )
+        for bus in self.row_buses:
+            self._wire(
+                f"y{bus}h{self._f(level)},"
+                f"{self._f(liveness)},{self._f(damping)}Z"
+            )
         drum_level = level if drums else 0.0
         self._wire(
             f"y{self.drum_bus}h{self._f(drum_level)},"
@@ -471,14 +503,52 @@ class MidiAmyEngine:
     ) -> None:
         synth = self.row_synths[row]
         level = max(0.0, min(1.0, velocity / 127.0))
-        self._wire(
-            f"n{self._f(note)}l{self._f(level)}i{synth}Z"
+        midi_key = int(round(note))
+
+        with self._preview_lock:
+            self._preview_tail_tokens[row] += 1
+            token = self._preview_tail_tokens[row]
+            active = self._preview_active_notes[row]
+
+            duplicate_index = next(
+                (
+                    index
+                    for index, active_note in enumerate(active)
+                    if int(round(active_note)) == midi_key
+                ),
+                None,
+            )
+            if duplicate_index is not None:
+                old = active.pop(duplicate_index)
+                self._wire(f"n{self._f(old)}l0i{synth}Z")
+
+            while len(active) >= max(1, self.voices):
+                old = active.pop(0)
+                self._wire(f"n{self._f(old)}l0i{synth}Z")
+
+            self._wire(
+                f"n{self._f(note)}l{self._f(level)}i{synth}Z"
+            )
+            active.append(float(note))
+
+        tail_ms = float(
+            self.client.config.get("performance", {}).get(
+                "strum_tail_ms",
+                450.0,
+            )
         )
 
         def release() -> None:
-            self._wire(f"n{self._f(note)}l0i{synth}Z")
+            with self._preview_lock:
+                if token != self._preview_tail_tokens[row]:
+                    return
+                self._preview_tail_tokens[row] += 1
+                notes = list(self._preview_active_notes[row])
+                self._preview_active_notes[row].clear()
+            for active_note in notes:
+                self._wire(f"n{self._f(active_note)}l0i{synth}Z")
 
-        timer = threading.Timer(0.45, release)
+        timer = threading.Timer(max(0.01, tail_ms / 1000.0), release)
         timer.daemon = True
         timer.start()
 
@@ -509,9 +579,14 @@ class MidiAmyEngine:
         )
 
     def all_notes_off(self) -> None:
-        for synth in self.row_synths:
-            self._wire(f"l0i{synth}Z")
-        self._wire(f"l0i{self.drum_synth}Z")
+        with self._preview_lock:
+            for row in range(MIDI_ROW_COUNT):
+                self._preview_tail_tokens[row] += 1
+                self._preview_active_notes[row].clear()
+        for row in sorted(self._configured_rows):
+            self._wire(f"l0i{self.row_synths[row]}Z")
+        if self._drum_configured:
+            self._wire(f"l0i{self.drum_synth}Z")
         self._active_notes.clear()
 
     def rebuild(self) -> None:
@@ -579,6 +654,7 @@ class MidiPlayerBackend(QObject):
 
         self._ensure_preset_storage()
         self._load_startup_preset()
+        self.syncFromOmni()
         self._apply_all_to_engine()
 
         midi_cfg = client.config.get("midi_input", {})
@@ -618,14 +694,10 @@ class MidiPlayerBackend(QObject):
 
     @Property(int, notify=tuningChanged)
     def tuningModeIndex(self) -> int:
-        if self._tuning_coupled:
-            return int(self.owner.selectedTuningModeIndex)
         return int(self._tuning_mode_index)
 
     @Property(int, notify=tuningChanged)
     def tuningReference(self) -> int:
-        if self._tuning_coupled:
-            return int(self.owner.tuningReference)
         return int(round(self._effective_local_reference()))
 
     @Property(float, notify=reverbLevelChanged)
@@ -693,10 +765,16 @@ class MidiPlayerBackend(QObject):
             self.engine.silence_row(row)
             return
         runtime = self._runtime(row)
+        payload = runtime.transport_payload()
+        arguments = list(payload["params"])
+        params = {
+            str(arguments[index]): float(arguments[index + 1])
+            for index in range(0, len(arguments), 2)
+        }
         self.engine.configure_row(
             row,
             str(runtime.selected_definition.key),
-            dict(runtime.selected_values),
+            params,
             self.volumes[row],
         )
         self._apply_reverb()
@@ -956,11 +1034,23 @@ class MidiPlayerBackend(QObject):
         self.tuningChanged.emit()
 
     def syncFromOmni(self) -> None:
-        self._tuning_mode_index = int(self.owner.selectedTuningModeIndex)
-        self._tuning_reference = float(self.owner.tuningReference)
+        mode_index = int(self.owner.selectedTuningModeIndex)
+        reference = float(self.owner.tuningReference)
+        changed = (
+            mode_index != self._tuning_mode_index
+            or not math.isclose(
+                reference,
+                self._tuning_reference,
+                abs_tol=1e-9,
+            )
+            or not math.isclose(self._bend_offset, 0.0, abs_tol=1e-9)
+        )
+        self._tuning_mode_index = mode_index
+        self._tuning_reference = reference
         self._stop_bend()
         self._bend_offset = 0.0
-        self.tuningChanged.emit()
+        if changed:
+            self.tuningChanged.emit()
 
     @Slot(int)
     def setTuningModeIndex(self, index: int) -> None:
@@ -968,9 +1058,6 @@ class MidiPlayerBackend(QObject):
             0,
             min(len(app_core.TUNING_MODE_NAMES) - 1, int(index)),
         )
-        if self._tuning_coupled:
-            self.owner.setTuningModeIndex(index)
-            return
         if index != self._tuning_mode_index:
             self._tuning_mode_index = index
             self.tuningChanged.emit()
@@ -978,11 +1065,15 @@ class MidiPlayerBackend(QObject):
     @Slot(int)
     def setTuningReference(self, value: int) -> None:
         value = max(415, min(466, int(value)))
-        if self._tuning_coupled:
-            self.owner.setTuningReference(value)
-            return
         self._stop_bend()
         self._bend_offset = 0.0
+        if math.isclose(
+            self._tuning_reference,
+            float(value),
+            abs_tol=1e-9,
+        ):
+            self.tuningChanged.emit()
+            return
         self._tuning_reference = float(value)
         self.tuningChanged.emit()
 
@@ -1053,8 +1144,6 @@ class MidiPlayerBackend(QObject):
         return 0, {0, 4, 7}
 
     def _tune(self, note: int | float, root: int) -> float:
-        if self._tuning_coupled:
-            return float(self.owner._tuned_note(note, root))
         reference_offset = 12.0 * math.log2(
             self._effective_local_reference() / 440.0
         )
@@ -1259,6 +1348,9 @@ class MidiPlayerBackend(QObject):
         for row in range(MIDI_ROW_COUNT):
             self._configure_row(row)
         self._apply_reverb()
+
+    def send_initial_state(self) -> None:
+        self._apply_all_to_engine()
 
     def rebuild_after_panic(self) -> None:
         self.engine.rebuild()

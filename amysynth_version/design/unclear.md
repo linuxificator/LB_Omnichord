@@ -1,32 +1,27 @@
 # Unclear items and conflicts
 
-## AMY resource allocation
+Resolved decisions have been moved to their authoritative design documents.
+This file contains only genuinely open work.
 
-Need final verification of:
-- exact oscillator allocation for MIDI voices
-- final ESP32-P4 AMY configuration values
-- final bus numbering
+## ESP32-P4 complete resource build
 
-## MIDI drums
-
-Clarify whether all MIDI drums remain inside AMY drum handling or require a dedicated mapping layer.
-
-## Presets
-
-Need final decision on whether tuning reference values are persistent. Coupling itself is not persistent.
-
-## MIDI polyphony
-
-Need final limits per MIDI channel and voice stealing behavior.
+The logical allocation is fixed: synths 0–4 for OMNI, synths 5–10 for MIDI
+rows, synth 11 for MIDI drums, and buses 0–10 as documented in
+`architecture.md`. The remaining work is validating/finalizing those resource
+limits and independent OMNI/MIDI room behavior in the ESP32-P4 AMY build.
 
 ## USB MIDI
 
-Need final Raspberry Pi MIDI device selection policy.
+The current policy is configurable ALSA raw MIDI using `/dev/snd/midiC*D*`.
+Direct ALSA Sequencer support and a UI device selector remain possible future
+work, particularly for software sources such as VMPK.
 
 ## Live parameter changes
 
 Need rules for which changes affect currently playing notes and which only affect new notes.
 
-## Migration
+## External MIDI and preview concurrency
 
-Need migration strategy for old presets after MIDI preset separation.
+Preview strums are bounded to four tracked notes and do not cause voice
+stealing by themselves. Define the desired priority when external MIDI already
+occupies all four voices and preview is used simultaneously on the same row.
