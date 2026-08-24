@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import QObject, Property, Signal, Slot
+from PySide6.QtCore import QObject, Property, Slot
 
 from midi_player import MIDI_PRESET_COUNT, MidiPlayerBackend
 from performance_backend import InstrumentBackend as OmniInstrumentBackend
@@ -10,11 +10,6 @@ from performance_backend import InstrumentBackend as OmniInstrumentBackend
 
 class InstrumentBackend(OmniInstrumentBackend):
     """Narrow integration seam between Omnichord and independent MIDI player."""
-
-    midiStateChanged = Signal()
-    midiTuningChanged = Signal()
-    midiPresetChanged = Signal()
-    midiPresetStored = Signal(int)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -37,7 +32,7 @@ class InstrumentBackend(OmniInstrumentBackend):
     def midiPlayer(self) -> QObject:
         return self._midi_player
 
-    @Property(int, notify=midiStateChanged)
+    @Property(int, notify=OmniInstrumentBackend.midiStateChanged)
     def midiStateVersion(self) -> int:
         return self._midi_player.stateVersion
 
@@ -49,19 +44,19 @@ class InstrumentBackend(OmniInstrumentBackend):
     def midiPresetCount(self) -> int:
         return MIDI_PRESET_COUNT
 
-    @Property(int, notify=midiPresetChanged)
+    @Property(int, notify=OmniInstrumentBackend.midiPresetChanged)
     def selectedMidiPreset(self) -> int:
         return self._midi_player.selectedPreset
 
-    @Property(bool, notify=midiTuningChanged)
+    @Property(bool, notify=OmniInstrumentBackend.midiTuningChanged)
     def midiTuningCoupled(self) -> bool:
         return self._midi_player.tuningCoupled
 
-    @Property(int, notify=midiTuningChanged)
+    @Property(int, notify=OmniInstrumentBackend.midiTuningChanged)
     def midiTuningModeIndex(self) -> int:
         return self._midi_player.tuningModeIndex
 
-    @Property(int, notify=midiTuningChanged)
+    @Property(int, notify=OmniInstrumentBackend.midiTuningChanged)
     def midiTuningReference(self) -> int:
         return self._midi_player.tuningReference
 
