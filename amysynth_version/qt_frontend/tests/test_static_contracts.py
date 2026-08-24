@@ -155,6 +155,18 @@ class StaticContractTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("@Property(QObject, constant=True)", midi_integration)
 
+    def test_rainbow_mode_button_text_is_large_and_centered(self) -> None:
+        qml = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("font.pixelSize: height * 0.55", qml)
+        self.assertIn(
+            "anchors.horizontalCenterOffset: root.extensionWidth / 2",
+            qml,
+        )
+        self.assertIn("horizontalAlignment: Text.AlignHCenter", qml)
+        self.assertIn("verticalAlignment: Text.AlignVCenter", qml)
+
     def test_rhythm_transport_icon_is_bound_directly_to_backend_state(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
         self.assertIn('text: root.controller.rhythmRunning ? "■" : "▶"', qml)

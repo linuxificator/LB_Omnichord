@@ -13,7 +13,7 @@ Button {
     rightPadding: 0
     topPadding: 0
     bottomPadding: 0
-    font.pixelSize: 24
+    font.pixelSize: height * 0.55
     font.bold: true
 
     contentItem: Item {
@@ -23,7 +23,10 @@ Button {
         height: root.height
 
         Text {
-            anchors.fill: parent
+            width: root.width
+            height: root.height
+            anchors.centerIn: parent
+            anchors.horizontalCenterOffset: root.extensionWidth / 2
             text: root.text
             color: "#ffffff"
             font: root.font
