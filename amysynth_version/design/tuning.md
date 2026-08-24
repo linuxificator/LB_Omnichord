@@ -1,25 +1,30 @@
 # Tuning Design
 
-## Startup
+## Runtime state
 
-Tuning coupling always starts enabled.
+Tuning coupling is runtime UI state and is not stored in presets.
 
-The coupling state is live UI state and is never stored in presets.
+Default startup state:
+
+```
+tuningCoupled = true
+```
 
 ## Coupled mode
 
-OMNI and MIDI share one tuning state.
+OMNI and MIDI use one shared tuning state.
 
-Changing tuning from either screen must immediately update:
-- the displayed value in both screens
+A change from either screen must update:
+
+- displayed tuning value in both screens
 - generated note frequencies
 
 ## Decoupled mode
 
-OMNI and MIDI maintain independent tuning states.
+OMNI and MIDI have separate tuning states.
 
 Changing one does not affect the other.
 
-## MIDI note conversion
+## MIDI conversion
 
-Incoming MIDI notes are converted to AMY fractional pitches according to the active MIDI tuning state before wire commands are generated.
+MIDI notes are converted to AMY pitch values using the active MIDI tuning state before generating wire commands.
