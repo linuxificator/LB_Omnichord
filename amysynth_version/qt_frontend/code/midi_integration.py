@@ -221,3 +221,7 @@ class InstrumentBackend(OmniInstrumentBackend):
     def panic(self) -> None:
         super().panic()
         self._midi_player.rebuild_after_panic()
+
+    def send_initial_state(self) -> None:
+        super().send_initial_state()
+        self._midi_player.send_initial_state()

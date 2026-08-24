@@ -10,11 +10,8 @@ Item {
     required property bool fullScreen
     property int leftExtension: 0
     property bool tuningCoupled: true
-    property int localSelectedPreset: 1
-
     signal toggleFullscreenRequested()
     signal toggleTuningCouplingRequested()
-    signal localPresetStored(int presetNumber)
 
     readonly property int wheelWidth: 150
     readonly property int tuningX: 231
@@ -277,7 +274,7 @@ Item {
             }
 
             onClicked:
-                root.localPresetStored(root.localSelectedPreset)
+                root.controller.storeSelectedMidiPreset()
         }
 
         Row {
@@ -295,7 +292,7 @@ Item {
 
                     property int presetNumber: index + 1
                     property bool selected:
-                        root.localSelectedPreset === presetNumber
+                        root.controller.selectedMidiPreset === presetNumber
                     property bool storeFlash: false
 
                     width: 48
@@ -347,8 +344,8 @@ Item {
                     }
 
                     Connections {
-                        target: root
-                        function onLocalPresetStored(presetNumber) {
+                        target: root.controller
+                        function onMidiPresetStored(presetNumber) {
                             if (presetNumber === presetButton.presetNumber) {
                                 presetButton.storeFlash = true
                                 storeFlashTimer.restart()
@@ -357,7 +354,7 @@ Item {
                     }
 
                     onClicked:
-                        root.localSelectedPreset = presetNumber
+                        root.controller.selectMidiPreset(presetNumber)
                 }
             }
         }

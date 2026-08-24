@@ -1268,6 +1268,9 @@ class MidiPlayerBackend(QObject):
             self._configure_row(row)
         self._apply_reverb()
 
+    def send_initial_state(self) -> None:
+        self._apply_all_to_engine()
+
     def rebuild_after_panic(self) -> None:
         self.engine.rebuild()
         self._apply_all_to_engine()
