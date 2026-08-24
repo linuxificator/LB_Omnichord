@@ -1,6 +1,61 @@
 # Testing Design
 
-Tests are based on use cases.
+Tests are based on the executable use cases in
+`../qt_frontend/tests/USE_CASES.md`. The Sonic Pi implementation is frozen
+legacy material and is outside these tests and workflows.
+
+`qt_frontend/tests/run_tests.py` is the single local and CI entry point. Its
+`unit` suite automatically discovers every top-level `test_*.py`; integration
+suites remain explicit because they have different runtime/native-AMY needs.
+The native suites start AMY with the production capacity of 11 buses and 336
+oscillators. CI installs a pinned revision of the LB Omnichord AMY bus-mixer
+fork so a passing run tests the deployed architecture reproducibly.
+
+## Local suites
+
+Run commands from `qt_frontend` in the frontend virtual environment:
+
+```bash
+python tests/run_tests.py --list
+python tests/run_tests.py                 # unit, the default
+python tests/run_tests.py --suite all     # complete local matrix
+```
+
+The maintained suites are:
+
+| Suite | Scope | Extra requirement |
+| --- | --- | --- |
+| `unit` | all top-level `tests/test_*.py` contracts | none beyond frontend dependencies |
+| `frontend` | headless QML/backend interaction | PySide6 and local TCP/PTY support |
+| `serial` | production pyserial output over a Linux PTY | pyserial and PTY support |
+| `presets` | factory/user preset loading and migration | PySide6 and PTY support |
+| `native-controls` | delivered wire commands and native synth state | pinned LB AMY fork |
+| `native-rhythm` | sequencer/rhythm behavior in native AMY | pinned LB AMY fork |
+| `all` | all suites above, in dependency order | all requirements above |
+
+Top-level unit tests are discovered automatically. Integration suites are
+listed explicitly because their process, PTY and native-engine requirements
+differ. `test-artifacts/<suite>/` is recreated for every suite invocation and
+is intentionally ignored by Git.
+
+## GitHub Actions
+
+Three repository workflows are maintained:
+
+- `AMY frontend regression` runs the six component suites in parallel for AMY
+  frontend pull requests and pushes to `main`, and accepts a selected suite or
+  `all` through manual dispatch. Native jobs install the AMY fork at the commit
+  pinned in the workflow and record that SHA in their artifacts.
+- `ESP32-P4 firmware build` builds and validates the firmware package when the
+  ESP32-P4 project changes. It is a build/package check, not part of the Python
+  frontend suite.
+- `Mirror to Codeberg` mirrors branches and tags. It is delivery automation,
+  not a test; concurrency ensures branch-cleanup events collapse to one final
+  authoritative mirror.
+
+Frontend and firmware workflows cancel obsolete runs for the same ref. CI uses
+Ubuntu 24.04. Diagnostics are retained for 14 days where a workflow produces
+artifacts.
 
 Each test should verify:
 

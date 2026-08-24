@@ -109,8 +109,18 @@ The default application directory is `$HOME/LB_Omnichord/amysynth_version/qt_fro
 - `config/` — application and serial configuration
 - `instruments/` — AMY instrument catalogue and factory presets
 - `music/` — chords, rhythms and intonation definitions
-- `tests/` — touch and regression/verification material
+- `tests/` — automated regression suites and the manual touchscreen diagnostic
 - `rpi/` — Raspberry Pi startup helpers
 - `docs/` — implementation notes
 
 `code/main.py` references these canonical directories directly. No symlinks or old-layout compatibility files are required.
+
+## Automated tests
+
+From this directory, `python tests/run_tests.py` runs the automatically
+discovered unit suite. Use `python tests/run_tests.py --list` for all suite
+names or `python tests/run_tests.py --suite all` for the complete matrix. The
+two native suites require the pinned LB AMY bus-mixer fork and are principally
+intended for Linux development/CI; they are not required to run the Qt-only
+frontend on a Raspberry Pi connected to an ESP32-P4. See
+`../design/testing.md` for details.

@@ -9,6 +9,16 @@ on:
   delete:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+# Branch cleanup can emit many delete events at once. One final mirror of the
+# complete refs is authoritative; serializing the workflow avoids concurrent
+# --prune pushes racing each other at Codeberg.
+concurrency:
+  group: codeberg-mirror
+  cancel-in-progress: true
+
 jobs:
   mirror:
     runs-on: ubuntu-latest

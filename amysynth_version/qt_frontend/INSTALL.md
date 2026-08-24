@@ -271,6 +271,24 @@ aconnect -lio
 Select a Virtual Raw MIDI ALSA output in VMPK, then start/restart Omnichord.
 Direct ALSA Sequencer subscription is not implemented.
 
+# Automated tests
+
+Use the same Python environment as the frontend:
+
+```bash
+python tests/run_tests.py --list
+python tests/run_tests.py
+python tests/run_tests.py --suite all
+```
+
+The command without `--suite` runs all automatically discovered unit tests.
+`all` additionally needs Linux PTY/local-socket support, PySide6, pyserial and
+the LB Omnichord AMY bus-mixer fork. Native suites start AMY with 11 buses and
+336 oscillators; an ordinary four-bus upstream build is deliberately rejected
+instead of silently routing extra buses to bus 0. Run `./prepare_local_amy.sh`
+first when the supported fork is not installed. The full suite and CI layout
+are documented in `../design/testing.md`.
+
 # Troubleshooting
 
 ## No local AMY module

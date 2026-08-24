@@ -80,10 +80,21 @@ The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWater
 
 ```bash
 python tests/run_tests.py --list
+python tests/run_tests.py
+python tests/run_tests.py --suite unit
 python tests/run_tests.py --suite serial
 python tests/run_tests.py --suite native-rhythm
 ```
 
-The component suites are `unit-controls`, `frontend`, `serial`, `presets`, `native-controls` and `native-rhythm`; `all` runs them sequentially for local/manual use. Pull requests targeting `main` run all component suites in parallel.
+The component suites are `unit`, `frontend`, `serial`, `presets`,
+`native-controls` and `native-rhythm`; `all` runs them sequentially for
+local/manual use. The `unit` suite automatically includes every top-level
+`tests/test_*.py`. Pull requests targeting `main` and pushes to `main` run all
+component suites in parallel.
 
-The serial suite exercises the production `pyserial` writer through a Linux PTY. Native suites feed that same wire stream into current upstream AMY and verify resulting AMY synth state, so passing is stronger than merely finding an expected command in the host log.
+Without `--suite`, the runner executes `unit`. The serial suite exercises the
+production `pyserial` writer through a Linux PTY. Native suites feed that same
+wire stream into the pinned LB Omnichord AMY bus-mixer fork, started with 11
+buses and 336 oscillators, and verify resulting AMY synth state. A passing
+native test is therefore stronger than merely finding an expected command in
+the host log. See `../design/testing.md` for the complete local/CI inventory.

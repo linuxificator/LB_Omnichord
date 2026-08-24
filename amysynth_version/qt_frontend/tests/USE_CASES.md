@@ -6,7 +6,7 @@ The application has three observable layers:
 
 1. **Frontend/backend state** — Qt `InstrumentBackend`, preset state and slider models.
 2. **Transport** — logical events translated to AMY wire commands and, in the Raspberry Pi setup, framed as 1,000,000-baud 8N1 serial lines.
-3. **AMY engine state/output** — the commands must actually configure current upstream AMY as intended. Native-Linux tests use the current `shorepine/amy` `main` branch and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
+3. **AMY engine state/output** — the commands must actually configure the supported AMY runtime as intended. Native-Linux tests use the pinned `linuxificator/amy` bus-mixer revision from CI and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
 
 Every defect below must have a permanent regression test before it is considered fixed.
 
@@ -39,11 +39,11 @@ A static regression test rejects reintroduction of the former parallel `SynthRun
 
 | Suite | Purpose | Hardware/AMY |
 | --- | --- | --- |
-| `unit-controls` | catalogue defaults, `SynthState`, control mapping, sparse preset state, structural invariants | none |
+| `unit` | all top-level `test_*.py`: catalogue/state, MIDI engine, socket framing, migration and structural invariants | none |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
-| `native-controls` | feed the real serial wire stream into native current AMY and inspect actual synth state | Linux PTY + native AMY |
-| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + native AMY |
+| `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned LB AMY fork |
+| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + pinned LB AMY fork |
 | `presets` | per-instrument session state and sparse preset save/load semantics | none/headless backend |
 | `all` | all suites sequentially; intended for local/manual use. CI runs the component suites in parallel for a PR to `main`. | mixed |
 
@@ -350,9 +350,9 @@ For serial/native suites, failures must preserve artifacts containing:
 
 - frontend logical/AMY command log;
 - exact serial lines received from the PTY;
-- current upstream AMY commit SHA/version;
+- pinned LB Omnichord AMY fork commit SHA/version;
 - native AMY `dump_state()` output;
 - native synth-state readback for synths 3 and 4 at relevant checkpoints;
 - application stdout/stderr and native bridge diagnostics.
 
-Passing a native test therefore means not merely "the expected command was written" but "current AMY accepted the real serial wire stream and its readback state satisfies the invariant".
+Passing a native test therefore means not merely "the expected command was written" but "the supported 11-bus AMY runtime accepted the real serial wire stream and its readback state satisfies the invariant". CI pins the fork by commit and stores that commit in the test artifact; dependency updates are deliberate rather than silently following an upstream branch.

@@ -6,15 +6,20 @@ on:
     paths:
       - 'amysynth_version/qt_frontend/**'
       - '.github/workflows/amy-regression.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'amysynth_version/qt_frontend/**'
+      - '.github/workflows/amy-regression.yml'
   workflow_dispatch:
     inputs:
       suite:
         description: Test subset to run
         required: true
-        default: unit-controls
+        default: unit
         type: choice
         options:
-          - unit-controls
+          - unit
           - frontend
           - serial
           - presets
@@ -34,8 +39,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pr-matrix:
-    if: github.event_name == 'pull_request'
+  regression-matrix:
+    if: github.event_name != 'workflow_dispatch'
     name: ${{ matrix.suite }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -43,7 +48,7 @@ jobs:
       fail-fast: false
       matrix:
         suite:
-          - unit-controls
+          - unit
           - frontend
           - serial
           - presets
@@ -69,13 +74,14 @@ jobs:
         working-directory: amysynth_version/qt_frontend
         run: python -m pip install -r requirements.txt
 
-      - name: Install current upstream AMY
+      - name: Install pinned LB Omnichord AMY
         if: startsWith(matrix.suite, 'native-')
         run: |
-          git clone --depth 1 https://github.com/shorepine/amy.git /tmp/amy-upstream
-          python -m pip install /tmp/amy-upstream
+          git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
+          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          python -m pip install /tmp/amy-lb
           mkdir -p amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}
-          git -C /tmp/amy-upstream rev-parse HEAD \
+          git -C /tmp/amy-lb rev-parse HEAD \
             > amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}/amy_commit.txt
           python - <<'PY' > amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}/amy_version.txt
           import amy
@@ -124,13 +130,14 @@ jobs:
         working-directory: amysynth_version/qt_frontend
         run: python -m pip install -r requirements.txt
 
-      - name: Install current upstream AMY when required
+      - name: Install pinned LB Omnichord AMY when required
         if: inputs.suite == 'all' || startsWith(inputs.suite, 'native-')
         run: |
-          git clone --depth 1 https://github.com/shorepine/amy.git /tmp/amy-upstream
-          python -m pip install /tmp/amy-upstream
+          git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
+          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          python -m pip install /tmp/amy-lb
           mkdir -p amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}
-          git -C /tmp/amy-upstream rev-parse HEAD \
+          git -C /tmp/amy-lb rev-parse HEAD \
             > amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}/amy_commit.txt
           python - <<'PY' > amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}/amy_version.txt
           import amy
