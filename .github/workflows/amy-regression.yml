@@ -1,12 +1,8 @@
 name: AMY frontend regression
 
 on:
+  workflow_call:
   pull_request:
-    branches: [main]
-    paths:
-      - 'amysynth_version/qt_frontend/**'
-      - '.github/workflows/amy-regression.yml'
-  push:
     branches: [main]
     paths:
       - 'amysynth_version/qt_frontend/**'

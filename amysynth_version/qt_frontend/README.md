@@ -98,3 +98,15 @@ wire stream into the pinned LB Omnichord AMY bus-mixer fork, started with 11
 buses and 336 oscillators, and verify resulting AMY synth state. A passing
 native test is therefore stronger than merely finding an expected command in
 the host log. See `../design/testing.md` for the complete local/CI inventory.
+
+## Linux AppImage releases
+
+Every successful complete test run after an update to `main` publishes an
+x86_64 AppImage under this repository's GitHub Releases. Tags use
+`RYYYYMMDDTHHMMSS`; assets use
+`LB_Omnichord.RYYYYMMDDHHMMSS.AppImage`. Both timestamps are UTC.
+
+The AppImage contains the Qt frontend and the supported AMY fork with the tiny
+PCM drum bank. At runtime they remain separate processes connected through the
+same Unix wire-protocol socket as `run_local.sh`. Download the accompanying
+`.sha256` asset to verify the file.

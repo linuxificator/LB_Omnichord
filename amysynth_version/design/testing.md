@@ -40,12 +40,19 @@ is intentionally ignored by Git.
 
 ## GitHub Actions
 
-Three repository workflows are maintained:
+Four repository workflows are maintained:
 
 - `AMY frontend regression` runs the six component suites in parallel for AMY
-  frontend pull requests and pushes to `main`, and accepts a selected suite or
-  `all` through manual dispatch. Native jobs install the AMY fork at the commit
-  pinned in the workflow and record that SHA in their artifacts.
+  frontend pull requests, is reused as the test gate of the release workflow,
+  and accepts a selected suite or `all` through manual dispatch. Native jobs
+  install the AMY fork at the commit pinned in the workflow and record that SHA
+  in their artifacts.
+- `Test and release Linux AppImage` runs after every update of `main`. It calls
+  the complete regression matrix and, only after all suites pass, builds and
+  validates the x86_64 AppImage, creates the timestamped tag and publishes both
+  the AppImage and its SHA-256 file as a GitHub Release. Manual dispatch is
+  available for an explicitly requested release candidate from another branch;
+  ordinary feature-branch pushes never publish releases.
 - `ESP32-P4 firmware build` builds and validates the firmware package when the
   ESP32-P4 project changes. It is a build/package check, not part of the Python
   frontend suite.
@@ -53,9 +60,32 @@ Three repository workflows are maintained:
   not a test; concurrency ensures branch-cleanup events collapse to one final
   authoritative mirror.
 
-Frontend and firmware workflows cancel obsolete runs for the same ref. CI uses
-Ubuntu 24.04. Diagnostics are retained for 14 days where a workflow produces
-artifacts.
+Pull-request frontend and firmware workflows cancel obsolete runs for the same
+ref. Main-branch releases are serialized and never cancelled, so two closely
+spaced merges cannot overwrite or skip one another. Regression CI uses Ubuntu
+24.04; the AppImage is built on Ubuntu 22.04 for broader glibc compatibility.
+Diagnostics are retained for 14 days where a workflow produces artifacts.
+
+## Linux release naming and contents
+
+Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
+
+- Git tag and release: `R20260824T223000`
+- application asset: `LB_Omnichord.R20260824223000.AppImage`
+- checksum asset: `LB_Omnichord.R20260824223000.AppImage.sha256`
+
+The AppImage bundles PySide6, the frontend assets and the pinned AMY bus-mixer
+fork built with the ESP32-compatible tiny PCM bank. The executable starts AMY
+as a separate child process and connects the Qt process through the existing
+Unix `SOCK_SEQPACKET` wire-protocol boundary. Packaging therefore does not
+collapse the application and synthesizer architectures into one process.
+
+`packaging/build_appimage.sh` is the local and CI build entry point. The
+workflow pins PyInstaller and verifies SHA-256 hashes for appimagetool and its
+type-2 runtime. The packaged `--appimage-self-test` verifies imports and
+required assets; CI then performs a timed headless launch and requires both the
+AMY-service-ready and frontend-socket-connection markers before creating a
+release.
 
 Each test should verify:
 

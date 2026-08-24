@@ -1,0 +1,132 @@
+name: Test and release Linux AppImage
+
+on:
+  push:
+    branches: [main]
+  # Explicitly permits a release candidate from a non-main branch for physical
+  # package testing. Normal releases remain automatic main-branch pushes.
+  workflow_dispatch:
+
+# Every main commit gets its own release. Queue closely spaced merges instead
+# of cancelling an older release after its tests have already begun.
+concurrency:
+  group: linux-appimage-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    uses: ./.github/workflows/amy-regression.yml
+
+  build-and-release:
+    needs: tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: amysynth_version/qt_frontend/requirements.txt
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libfuse2
+          python -m pip install \
+            -r amysynth_version/qt_frontend/requirements.txt \
+            'pyinstaller==6.22.2'
+
+      - name: Install pinned AMY with ESP32-compatible drum bank
+        run: |
+          git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
+          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb apply \
+            "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
+          AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
+          amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
+          if nm -D "$amy_so" | grep -Eq 'gamma9001|amy_set_gamma'; then
+            echo 'AMY was built with the wrong PCM bank' >&2
+            exit 1
+          fi
+
+      - name: Create release names
+        id: release
+        shell: bash
+        run: |
+          instant="$(date -u +%Y%m%dT%H%M%S)"
+          tag="R${instant}"
+          stamp="R${instant/T/}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "stamp=$stamp" >> "$GITHUB_OUTPUT"
+          echo "file=LB_Omnichord.${stamp}.AppImage" >> "$GITHUB_OUTPUT"
+
+      - name: Download verified appimagetool
+        run: |
+          curl -L --fail --silent --show-error \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage \
+            -o /tmp/appimagetool
+          echo 'a6d71e2b6cd66f8e8d16c37ad164658985e0cf5fcaa950c90a482890cb9d13e0  /tmp/appimagetool' \
+            | sha256sum --check --strict
+          curl -L --fail --silent --show-error \
+            https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 \
+            -o /tmp/appimage-runtime-x86_64
+          echo '1cc49bcf1e2ccd593c379adb17c9f85a36d619088296504de95b1d06215aebbf  /tmp/appimage-runtime-x86_64' \
+            | sha256sum --check --strict
+          chmod +x /tmp/appimagetool
+
+      - name: Build AppImage
+        working-directory: amysynth_version/qt_frontend
+        env:
+          APPIMAGETOOL: /tmp/appimagetool
+          APPIMAGE_RUNTIME_FILE: /tmp/appimage-runtime-x86_64
+          OMNICHORD_RELEASE_STAMP: ${{ steps.release.outputs.stamp }}
+        run: packaging/build_appimage.sh
+
+      - name: Validate packaged application
+        working-directory: amysynth_version/qt_frontend
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          "dist/${{ steps.release.outputs.file }}" --appimage-self-test
+          set +e
+          QT_QPA_PLATFORM=offscreen timeout --signal=TERM 8s \
+            "dist/${{ steps.release.outputs.file }}" --windowed \
+            > /tmp/omnichord-appimage-smoke.log 2>&1
+          smoke_status=$?
+          set -e
+          cat /tmp/omnichord-appimage-smoke.log
+          if [[ "$smoke_status" -ne 124 && "$smoke_status" -ne 143 ]]; then
+            echo "AppImage smoke test stopped unexpectedly: $smoke_status" >&2
+            exit 1
+          fi
+          grep -q 'AMY service ready:' /tmp/omnichord-appimage-smoke.log
+          grep -q 'AMY backend: external socket' /tmp/omnichord-appimage-smoke.log
+          sha256sum "dist/${{ steps.release.outputs.file }}" \
+            > "dist/${{ steps.release.outputs.file }}.sha256"
+
+      - name: Create tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_FILE: ${{ steps.release.outputs.file }}
+        working-directory: amysynth_version/qt_frontend
+        run: |
+          gh release create "$RELEASE_TAG" \
+            "dist/$RELEASE_FILE" \
+            "dist/$RELEASE_FILE.sha256" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$RELEASE_TAG" \
+            --generate-notes

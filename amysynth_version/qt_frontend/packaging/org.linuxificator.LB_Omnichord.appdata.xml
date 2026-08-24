@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.linuxificator.LB_Omnichord</id>
+  <name>LB Omnichord</name>
+  <summary>Omnichord instrument using the AMY synthesizer</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-LB-Omnichord</project_license>
+  <developer id="org.linuxificator">
+    <name>linuxificator</name>
+  </developer>
+  <launchable type="desktop-id">org.linuxificator.LB_Omnichord.desktop</launchable>
+  <description>
+    <p>LB Omnichord combines its Qt instrument interface with a separate bundled AMY audio service.</p>
+  </description>
+  <content_rating type="oars-1.1"/>
+  <url type="homepage">https://github.com/linuxificator/LB_Omnichord</url>
+</component>

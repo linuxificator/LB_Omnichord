@@ -10,10 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class StaticContractTests(unittest.TestCase):
     def test_frontend_tree_contains_no_symlinks(self) -> None:
+        generated_roots = {"build", "dist", "test-artifacts"}
         symlinks = [
             str(path.relative_to(ROOT))
             for path in ROOT.rglob("*")
             if path.is_symlink()
+            and not generated_roots.intersection(path.relative_to(ROOT).parts)
         ]
         self.assertEqual(symlinks, [], f"unexpected symlinks: {symlinks}")
 

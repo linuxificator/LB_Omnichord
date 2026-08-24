@@ -289,6 +289,23 @@ instead of silently routing extra buses to bus 0. Run `./prepare_local_amy.sh`
 first when the supported fork is not installed. The full suite and CI layout
 are documented in `../design/testing.md`.
 
+## Install a released Linux AppImage
+
+Download `LB_Omnichord.R<date><time>.AppImage` and its `.sha256` file from this
+repository's GitHub Releases, then run:
+
+```bash
+sha256sum --check LB_Omnichord.R*.AppImage.sha256
+chmod +x LB_Omnichord.R*.AppImage
+./LB_Omnichord.R*.AppImage --windowed
+```
+
+The x86_64 AppImage already contains PySide6 and the compatible AMY service; a
+separate Python environment or AMY checkout is not needed. AMY still runs as a
+separate child process and communicates with the frontend over a private local
+socket. The release is built on Ubuntu 22.04 for use on contemporary x86_64
+Linux distributions.
+
 # Troubleshooting
 
 ## No local AMY module
