@@ -113,12 +113,15 @@ The default directory is `$HOME/LB_Omnichord/amysynth_version/qt_frontend`, the 
 
 # 2. Local desktop AMY
 
-Local mode uses the same Omnichord wire-command backend, but instead of writing the commands to a serial port it feeds them directly to the upstream Python `amy`/`c_amy` package. The application starts AMY with `amy.live(default_synths=0)` and then allocates the same Omnichord synths 0..4 used by the ESP32-P4 layout.
+Local mode consists of two processes. `local_amy_service.py` owns AMY and the
+desktop audio device. The Qt application only sends AMY wire packets over a
+filesystem `AF_UNIX` `SOCK_SEQPACKET` socket. It does not import AMY or call an
+AMY API. This deliberately matches the Android AMY-service boundary.
 
-Run local mode with:
+Start both processes with:
 
 ```text
---local-amy
+./run_local.sh --windowed
 ```
 
 The upstream AMY project currently documents Python installation from a source checkout with:
@@ -127,7 +130,22 @@ The upstream AMY project currently documents Python installation from a source c
 python -m pip install .
 ```
 
-Install AMY into the **same virtual environment** as this frontend so `code/main.py` can import both `amy` and `c_amy`.
+Install AMY into the environment used by the service. The Qt process remains
+independent of those modules. `OMNICHORD_VENV` can override the launcher's
+default `../omnichord-env`; `OMNICHORD_AMY_SOCKET` can override
+`~/.omnichord/amy.sock`.
+
+The ESP32-P4 drum mapping uses AMY's tiny PCM bank. Prepare the local AMY fork
+with the same bank before first use (and after rebuilding AMY):
+
+```bash
+./prepare_local_amy.sh
+```
+
+This invokes the fork's `AMY_PCM_BANK=tiny` build option and verifies that the
+installed extension does not contain Gamma9001 symbols. Without this explicit
+choice, Linux presets 0–18 refer to a different TR-808 table and the same wire
+commands produce congas/tones in place of hats and snares.
 
 ## Linux
 
@@ -161,7 +179,7 @@ Run the frontend:
 
 ```bash
 cd ../LB_Omnichord/amysynth_version/qt_frontend
-.venv/bin/python code/main.py --local-amy --windowed
+./run_local.sh --windowed
 ```
 
 AMY uses the desktop's default audio device through its current native audio backend.
@@ -197,7 +215,7 @@ Then run:
 
 ```bash
 cd ../LB_Omnichord/amysynth_version/qt_frontend
-.venv/bin/python code/main.py --local-amy --windowed
+./run_local.sh --windowed
 ```
 
 The upstream AMY Python build links the macOS CoreAudio/CoreMIDI frameworks itself.
@@ -226,7 +244,7 @@ sudo apt install git python3-venv python3-pip python3-dev build-essential
 Keep the repositories in the WSL Linux filesystem (for example under `~/src`) rather than under `/mnt/c` for better build performance. Then install both the frontend and AMY in one virtual environment exactly as in the Linux section and run:
 
 ```bash
-.venv/bin/python code/main.py --local-amy --windowed
+./run_local.sh --windowed
 ```
 
 On a normal Windows 11 WSLg installation the Qt window and AMY audio should be forwarded to the Windows desktop. This project has not yet validated that path.
@@ -237,12 +255,12 @@ For reference, upstream AMY's native Windows C example instead requires Visual S
 
 # Reverb and runtime notes
 
-The Omnichord uses two AMY buses:
+The complete application uses eleven isolated AMY buses: four for OMNI, six
+for the individual MIDI instruments and one for MIDI drums. See
+`../design/architecture.md` for the authoritative mapping.
 
-- the main bus contains chord, strum and bass;
-- the percussion bus contains drums only.
-
-The header reverb controls program AMY's reverb `level`, `liveness` and `damping` values. `DRM` decides whether the percussion bus receives the same reverb. With `DRM` off the drum bus is explicitly programmed with reverb level 0. The fourth AMY reverb parameter, crossover frequency, is not changed by the UI.
+OMNI and MIDI each have independent header reverb state. Within either section,
+`DRM` decides whether that section's drum bus receives the same room.
 
 # Troubleshooting
 

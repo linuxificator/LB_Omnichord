@@ -17,7 +17,11 @@ from PySide6.QtCore import QObject, Property, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
-from amy_serial import AmyLocalClient, AmySerialClient, load_amy_config
+from amy_serial import (
+    AmySerialClient,
+    AmySocketClient,
+    load_amy_config,
+)
 from control_limits import bounded_control_range, clamp_control_value
 from synth_state import SynthState
 
@@ -1662,6 +1666,8 @@ class InstrumentBackend(QObject):
             exist_ok=True,
         )
 
+        self._archive_legacy_bootstrap_presets()
+
         factory_dir = (
             INSTRUMENT_DIR / "default_presets"
         )
@@ -1735,6 +1741,76 @@ class InstrumentBackend(QObject):
                 last_path,
                 {"preset": 1},
             )
+
+    def _archive_legacy_bootstrap_presets(self) -> Path | None:
+        """Move the obsolete identical bootstrap bank out of the active bank.
+
+        Early Qt builds created all eighteen user presets from one placeholder
+        snapshot.  Its synth and rhythm identifiers predate the AMY catalog, so
+        retaining that bank makes every preset button appear ineffective.  The
+        deliberately narrow signature below avoids replacing user-edited banks.
+        """
+        paths = [
+            self._preset_path(preset_number)
+            for preset_number in range(1, PRESET_COUNT + 1)
+        ]
+
+        if not all(path.is_file() for path in paths):
+            return None
+
+        try:
+            presets = [
+                json.loads(path.read_text(encoding="utf-8"))
+                for path in paths
+            ]
+        except (OSError, ValueError, json.JSONDecodeError):
+            return None
+
+        first = presets[0]
+        if not isinstance(first, dict) or any(
+            preset != first for preset in presets[1:]
+        ):
+            return None
+
+        synths = first.get("synths")
+        rhythm = first.get("rhythm")
+        if not isinstance(synths, dict) or not isinstance(rhythm, dict):
+            return None
+
+        try:
+            signature = (
+                synths["chord"]["selected"],
+                synths["strum"]["selected"],
+                synths["bass"]["selected"],
+                rhythm["selected"],
+            )
+        except (KeyError, TypeError):
+            return None
+
+        if signature != ("prophet", "pluck", "fm", "waltz"):
+            return None
+
+        archive_dir = self._preset_dir / (
+            "legacy-presets-" + time.strftime("%Y%m%d-%H%M%S")
+        )
+        suffix = 1
+        while archive_dir.exists():
+            archive_dir = self._preset_dir / (
+                "legacy-presets-"
+                + time.strftime("%Y%m%d-%H%M%S")
+                + f"-{suffix}"
+            )
+            suffix += 1
+
+        archive_dir.mkdir()
+        for path in paths:
+            path.replace(archive_dir / path.name)
+
+        print(
+            "Archived obsolete preset bank to "
+            f"{archive_dir}; installing current factory presets."
+        )
+        return archive_dir
 
     def _read_preset(
         self,
@@ -3575,11 +3651,17 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument(
         "--local-amy",
-        action="store_true",
+        action="store_const",
+        const=str(Path.home() / ".omnichord" / "amy.sock"),
+        dest="amy_socket",
         help=(
-            "Run AMY in this Python process using the installed upstream "
-            "amy/c_amy package instead of sending wire commands over UART."
+            "Connect to the external AMY service at ~/.omnichord/amy.sock."
         ),
+    )
+    parser.add_argument(
+        "--amy-socket",
+        default=None,
+        help="Connect to an external AMY AF_UNIX SOCK_SEQPACKET socket.",
     )
 
     window_group = parser.add_mutually_exclusive_group()
@@ -3883,15 +3965,16 @@ def main() -> int:
         "panic": args.panic_address,
     }
 
-    if args.local_amy:
+    if args.amy_socket:
         print(
-            "AMY backend: local in-process desktop AMY",
+            f"AMY backend: external socket {args.amy_socket}",
             file=sys.stderr,
             flush=True,
         )
-        amy_client = AmyLocalClient(
+        amy_client = AmySocketClient(
             config=amy_config,
             addresses=address_map,
+            socket_path=str(Path(args.amy_socket).expanduser()),
         )
     else:
         print(

@@ -64,31 +64,6 @@ Item {
         anchors.fill: parent
     }
 
-    QtObject {
-        id: midiReverbState
-
-        property real reverbLevel: 0.0
-        property real reverbLiveness: 0.5
-        property real reverbDamping: 0.5
-        property bool reverbDrumsIncluded: false
-
-        function setReverbLevel(value) {
-            reverbLevel = Math.max(0, Math.min(2, Number(value)))
-        }
-
-        function setReverbLiveness(value) {
-            reverbLiveness = Math.max(0, Math.min(1, Number(value)))
-        }
-
-        function setReverbDamping(value) {
-            reverbDamping = Math.max(0, Math.min(1, Number(value)))
-        }
-
-        function toggleReverbDrums() {
-            reverbDrumsIncluded = !reverbDrumsIncluded
-        }
-    }
-
     Item {
         id: midiTitle
         x: 0
@@ -103,7 +78,7 @@ Item {
             y: 0
             width: 520
             height: parent.height
-            controller: midiReverbState
+            controller: backend.midiPlayer
         }
 
         Text {

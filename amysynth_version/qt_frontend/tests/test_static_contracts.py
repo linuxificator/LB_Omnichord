@@ -77,7 +77,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("self._runtime(role).load_preset(role_data)", core_py)
         self.assertIn("runtime.set_control(key, value)", core_py)
         self.assertIn("self._runtime(role).transport_payload()", core_py)
-        self.assertIn("from performance_backend import InstrumentBackend", entry_py)
+        self.assertIn("from midi_integration import InstrumentBackend", entry_py)
         self.assertIn("class InstrumentBackend(app_core.InstrumentBackend):", perf_py)
 
         # The public transport facade owns configuration/program selection; the
@@ -159,8 +159,16 @@ class StaticContractTests(unittest.TestCase):
         config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
         self.assertEqual(
             config["buses"],
-            {"drums": 0, "bass": 1, "strum": 2, "chord": 3},
+            {
+                "drums": 0,
+                "bass": 1,
+                "strum": 2,
+                "chord": 3,
+                "midi_rows": [4, 5, 6, 7, 8, 9],
+                "midi_drums": 10,
+            },
         )
+        self.assertGreaterEqual(config["amy_max_buses"], 11)
         transport_py = (ROOT / "code" / "amy_transport.py").read_text(
             encoding="utf-8"
         )

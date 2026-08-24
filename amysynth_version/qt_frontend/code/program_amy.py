@@ -240,14 +240,20 @@ class ProgramAmySerialClient(base.AmySerialClient):
             self._restore_manual_chord_after_patch()
 
 
-class ProgramAmyLocalClient(ProgramAmySerialClient):
+class ProgramAmySocketClient(ProgramAmySerialClient):
+    """Program-aware wire client for an external local AMY service."""
+
     def __init__(
         self,
         config: dict[str, Any],
         addresses: dict[str, str],
+        socket_path: str,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
-            writer_factory=base._LocalAmyWriter,
+            writer_factory=lambda debug_log: base._UnixSocketWriter(
+                socket_path,
+                debug_log,
+            ),
         )

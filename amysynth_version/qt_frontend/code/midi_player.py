@@ -200,15 +200,18 @@ class MidiAmyEngine:
         self.drum_synth = int(midi_cfg.get("drum_synth_id", 11))
         self.voices = int(midi_cfg.get("voices_per_synth", 4))
         self.drum_voices = int(midi_cfg.get("drum_voices", 8))
-        self.midi_bus = int(buses.get("midi", 4))
-        self.drum_bus = int(buses.get("midi_drums", 5))
+        raw_row_buses = buses.get("midi_rows", [4, 5, 6, 7, 8, 9])
+        self.row_buses = tuple(int(bus) for bus in raw_row_buses)
+        self.drum_bus = int(buses.get("midi_drums", 10))
         if (
-            self.midi_bus == self.drum_bus
-            or self.midi_bus < 4
-            or self.drum_bus < 4
+            len(self.row_buses) != MIDI_ROW_COUNT
+            or len(set(self.row_buses)) != MIDI_ROW_COUNT
+            or self.drum_bus in self.row_buses
+            or any(bus < 4 for bus in (*self.row_buses, self.drum_bus))
         ):
             raise ValueError(
-                "MIDI melodic and drum buses must be distinct buses >= 4"
+                "six MIDI row buses and the MIDI drum bus must be distinct "
+                "buses >= 4"
             )
         self._configured_rows: set[int] = set()
         self._drum_configured = False
@@ -380,6 +383,7 @@ class MidiAmyEngine:
         volume: float,
     ) -> None:
         synth = self.row_synths[row]
+        bus = self.row_buses[row]
         self.silence_row(row)
         program = resolve_program(str(key), self.client.config)
         patch = self._patch(key)
@@ -394,7 +398,7 @@ class MidiAmyEngine:
                 0.985 if program.feedback is None else float(program.feedback)
             )
             self._wire(
-                f"i{synth}iv{self.voices}in1iy{self.midi_bus}Z"
+                f"i{synth}iv{self.voices}in1iy{bus}Z"
             )
             self._wire(
                 f"v0w{wave}b{self._f(feedback)}i{synth}Z"
@@ -410,7 +414,7 @@ class MidiAmyEngine:
                 self._wire(f"K{patch}i{synth}Z")
             else:
                 self._wire(
-                    f"K{patch}i{synth}iv{self.voices}iy{self.midi_bus}Z"
+                    f"K{patch}i{synth}iv{self.voices}iy{bus}Z"
                 )
             # Loading a ROM patch reallocates its oscillator block. Keep its
             # compatibility, parameter, routing and volume commands behind
@@ -424,7 +428,7 @@ class MidiAmyEngine:
             raise ValueError(f"unknown MIDI synth {key!r}")
 
         self._configured_rows.add(row)
-        self._route(synth, self.midi_bus)
+        self._route(synth, bus)
         self.set_row_volume(row, volume)
 
     def set_row_volume(self, row: int, volume: float) -> None:
@@ -443,10 +447,11 @@ class MidiAmyEngine:
         level = max(0.0, min(MIDI_REVERB_MAX, float(level)))
         liveness = max(0.0, min(1.0, float(liveness)))
         damping = max(0.0, min(1.0, float(damping)))
-        self._wire(
-            f"y{self.midi_bus}h{self._f(level)},"
-            f"{self._f(liveness)},{self._f(damping)}Z"
-        )
+        for bus in self.row_buses:
+            self._wire(
+                f"y{bus}h{self._f(level)},"
+                f"{self._f(liveness)},{self._f(damping)}Z"
+            )
         drum_level = level if drums else 0.0
         self._wire(
             f"y{self.drum_bus}h{self._f(drum_level)},"
@@ -707,10 +712,16 @@ class MidiPlayerBackend(QObject):
             self.engine.silence_row(row)
             return
         runtime = self._runtime(row)
+        payload = runtime.transport_payload()
+        arguments = list(payload["params"])
+        params = {
+            str(arguments[index]): float(arguments[index + 1])
+            for index in range(0, len(arguments), 2)
+        }
         self.engine.configure_row(
             row,
             str(runtime.selected_definition.key),
-            dict(runtime.selected_values),
+            params,
             self.volumes[row],
         )
         self._apply_reverb()
