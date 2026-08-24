@@ -56,6 +56,10 @@ MIDI owns:
 - MIDI preview
 - MIDI drums
 
+The current AMY instrument IDs are 0–4 for OMNI, 5–10 for the six MIDI rows,
+and 11 for MIDI drums. A MIDI row showing Drum Kit 0 routes hits through synth
+11 and does not allocate its otherwise corresponding pitched synth.
+
 OMNI and MIDI must not accidentally share mutable synth state or AMY buses.
 
 ## Bus ownership
@@ -78,3 +82,9 @@ whether bus 10 joins the MIDI room.
 
 ESP32 firmware must provide at least eleven buses before this complete MIDI bus
 layout is deployed there. This does not change the wire-protocol boundary.
+
+The older four-bus ESP32-P4 documentation describes the proven OMNI-only audio
+baseline, not the resource contract of the complete OMNI+MIDI application. The
+complete target also has to preserve independent OMNI and MIDI reverb state;
+a build exposing only one shared room's liveness/damping cannot satisfy that
+contract without extending the target-side mixer/effect implementation.

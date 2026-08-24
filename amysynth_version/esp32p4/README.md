@@ -298,6 +298,13 @@ Current upstream AMY contains the merged #1119 fix that only yields the max-prio
 
 ### Shared aux reverb
 
+This section records the proven four-bus OMNI-only ESP32-P4 baseline. The full
+Qt OMNI+MIDI design now requires eleven buses and independent OMNI/MIDI reverb
+state as specified in `../design/architecture.md`. In particular, this
+single-shared-room build cannot independently retain both sections' liveness
+and damping; target-side multibus/effect work and hardware validation are still
+required before claiming feature parity with the Linux service.
+
 The Omnichord keeps four separate dry AMY buses for role isolation:
 
 ```text

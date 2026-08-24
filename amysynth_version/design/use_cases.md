@@ -45,6 +45,19 @@ Expected:
 - pitch conversion uses active tuning
 - AMY wire command is generated
 
+For A=440 and C as intonation root, C4/60 remains 60 in every mode because it
+is the root. E4/64 remains 64 in EQ but becomes a fractional AMY note in HARM
+and JV. Its matching Note Off must use the pitch remembered at Note On.
+
+## UC-005A Software MIDI on Linux
+
+Given VMPK or another ALSA Sequencer-only source:
+
+Expected:
+- it is not mistaken for a `/dev/snd/midiC*D*` raw-MIDI device;
+- current testing uses `snd-virmidi` as a Sequencer-to-raw bridge;
+- the frontend consumes Note On/Off from that virtual raw device.
+
 ## UC-006 Screen switching
 
 Expected:

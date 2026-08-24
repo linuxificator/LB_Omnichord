@@ -5,7 +5,10 @@ This document covers the two supported runtime layouts for the AMY version of LB
 1. **Raspberry Pi frontend + ESP32-P4 AMY over UART** — the hardware layout used for the instrument.
 2. **Local desktop AMY** — the Qt frontend and the upstream AMY Python extension run on the same computer. This path is useful for development and does not need the ESP32-P4.
 
-The Raspberry Pi/UART path has been exercised on the project hardware. The local desktop path is implemented but has not yet been hardware/audio-tested as part of this project, so the platform instructions below follow the current upstream AMY build instructions and should be treated as development instructions rather than a validated release recipe.
+The Raspberry Pi/UART path has been exercised on the project hardware. The
+Linux two-process socket path has also been exercised with working audio,
+multibus routing and the ESP32-compatible tiny drum bank. macOS and WSL remain
+development guidance rather than validated release recipes.
 
 ## Repository layout
 
@@ -15,7 +18,8 @@ All commands below assume the AMY frontend directory:
 LB_Omnichord/amysynth_version/qt_frontend
 ```
 
-The Sonic Pi version is unrelated to this installation.
+The Sonic Pi version is frozen legacy material. It is unrelated to this
+installation and must not be modified as part of AMY work.
 
 ---
 
@@ -124,16 +128,12 @@ Start both processes with:
 ./run_local.sh --windowed
 ```
 
-The upstream AMY project currently documents Python installation from a source checkout with:
-
-```bash
-python -m pip install .
-```
-
-Install AMY into the environment used by the service. The Qt process remains
-independent of those modules. `OMNICHORD_VENV` can override the launcher's
+Install the bus-mixer/tiny-bank-capable AMY fork into the environment used by
+the service. The Qt process remains independent of those modules.
+`OMNICHORD_VENV` can override the launcher's
 default `../omnichord-env`; `OMNICHORD_AMY_SOCKET` can override
-`~/.omnichord/amy.sock`.
+`~/.omnichord/amy.sock`; and `OMNICHORD_AMY_ROOT` can override the expected AMY
+checkout at `../amyfork/amy`.
 
 The ESP32-P4 drum mapping uses AMY's tiny PCM bank. Prepare the local AMY fork
 with the same bank before first use (and after rebuilding AMY):
@@ -166,14 +166,10 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Install current upstream AMY into that environment. The following keeps the AMY source beside the Omnichord repository, but any source location is fine:
-
-```bash
-cd ../../..
-git clone https://github.com/shorepine/amy.git
-cd amy
-../LB_Omnichord/amysynth_version/qt_frontend/.venv/bin/python -m pip install .
-```
+Place the project AMY fork at `../amyfork/amy` relative to the LB_Omnichord
+repository, or set `OMNICHORD_AMY_ROOT`. Then run
+`./prepare_local_amy.sh`; a generic upstream/Gamma9001 build is not compatible
+with the shipped drum mapping.
 
 Run the frontend:
 
@@ -202,14 +198,9 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-Clone and install AMY into the same environment:
-
-```bash
-cd ../../..
-git clone https://github.com/shorepine/amy.git
-cd amy
-../LB_Omnichord/amysynth_version/qt_frontend/.venv/bin/python -m pip install .
-```
+Use the same project AMY fork and `prepare_local_amy.sh` process described for
+Linux. The fork must support the bus count and `AMY_PCM_BANK=tiny`; installing a
+generic Gamma9001 build changes the drum preset meanings.
 
 Then run:
 
@@ -249,7 +240,10 @@ Keep the repositories in the WSL Linux filesystem (for example under `~/src`) ra
 
 On a normal Windows 11 WSLg installation the Qt window and AMY audio should be forwarded to the Windows desktop. This project has not yet validated that path.
 
-For reference, upstream AMY's native Windows C example instead requires Visual Studio Build Tools 2022 with the C++ workload and can be built from `amy/windows`; that native C executable is not what `--local-amy` imports.
+For reference, upstream AMY's native Windows C example instead requires Visual
+Studio Build Tools 2022 with the C++ workload and can be built from
+`amy/windows`; that native C executable is not the separate Python-backed AMY
+service used by `run_local.sh`.
 
 ---
 
@@ -261,6 +255,21 @@ for the individual MIDI instruments and one for MIDI drums. See
 
 OMNI and MIDI each have independent header reverb state. Within either section,
 `DRM` decides whether that section's drum bus receives the same room.
+
+# Linux MIDI input
+
+The frontend reads ALSA raw-MIDI devices matching `/dev/snd/midiC*D*` by
+default. Check them with `amidi -l`. VMPK is normally an ALSA Sequencer-only
+source and therefore needs a virtual raw bridge for the current backend:
+
+```bash
+sudo modprobe snd-virmidi
+amidi -l
+aconnect -lio
+```
+
+Select a Virtual Raw MIDI ALSA output in VMPK, then start/restart Omnichord.
+Direct ALSA Sequencer subscription is not implemented.
 
 # Troubleshooting
 

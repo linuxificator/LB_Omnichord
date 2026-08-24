@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -95,6 +96,31 @@ class MidiAmyEngineTests(unittest.TestCase):
         engine.silence_row(5)
 
         self.assertEqual(client.events, [])
+
+    def test_strum_preview_releases_before_exceeding_voice_count(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        class Timer:
+            def __init__(self, _delay: float, callback: object) -> None:
+                self.callback = callback
+                self.daemon = False
+
+            def start(self) -> None:
+                return
+
+        with patch("midi_player.threading.Timer", Timer):
+            for note in (60.0, 64.0, 67.0, 71.0, 72.0):
+                engine.preview_note(0, note)
+
+        commands = [value for kind, value in client.events if kind == "wire"]
+        fifth_on = commands.index("n72l0.826771654i5Z")
+        self.assertEqual(commands[fifth_on - 1], "n60l0i5Z")
+        self.assertEqual(
+            engine._preview_active_notes[0],
+            [64.0, 67.0, 71.0, 72.0],
+        )
 
     def test_every_midi_instrument_has_an_isolated_effect_bus(self) -> None:
         client = _Client()

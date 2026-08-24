@@ -9,6 +9,11 @@ The application has two main views:
 
 The MIDI/OMNI switch changes only the visible UI. It must never stop, reset, or alter active music playback.
 
+The large lower-left mode switch uses the shared rainbow button on both views.
+Its MIDI/OMNI label is centered on the complete visible shape, including the
+right-hand extension, and uses 55% of the button height so `OMNI` remains
+inside the button at the supported layouts.
+
 ## Common controls
 
 The following remain available in both screens:
@@ -29,6 +34,7 @@ The MIDI view contains:
 - Instrument parameters.
 - Volume controls.
 - MIDI preview strum.
+- Independent MIDI reverb controls for level, liveness, damping and drum send.
 
 No watermark is shown on the MIDI screen.
 

@@ -216,6 +216,11 @@ class MidiAmyEngine:
         self._configured_rows: set[int] = set()
         self._drum_configured = False
         self._active_notes: dict[tuple[int, int, int], float] = {}
+        self._preview_lock = threading.Lock()
+        self._preview_active_notes: dict[int, list[float]] = {
+            row: [] for row in range(MIDI_ROW_COUNT)
+        }
+        self._preview_tail_tokens = [0] * MIDI_ROW_COUNT
         self.configure_drum_synth()
 
     def _wire(self, command: str) -> None:
@@ -372,6 +377,9 @@ class MidiAmyEngine:
     def silence_row(self, row: int) -> None:
         if row not in self._configured_rows:
             return
+        with self._preview_lock:
+            self._preview_tail_tokens[row] += 1
+            self._preview_active_notes[row].clear()
         synth = self.row_synths[row]
         self._wire(f"l0i{synth}Z")
         for key in [key for key in self._active_notes if key[0] == row]:
@@ -495,14 +503,52 @@ class MidiAmyEngine:
     ) -> None:
         synth = self.row_synths[row]
         level = max(0.0, min(1.0, velocity / 127.0))
-        self._wire(
-            f"n{self._f(note)}l{self._f(level)}i{synth}Z"
+        midi_key = int(round(note))
+
+        with self._preview_lock:
+            self._preview_tail_tokens[row] += 1
+            token = self._preview_tail_tokens[row]
+            active = self._preview_active_notes[row]
+
+            duplicate_index = next(
+                (
+                    index
+                    for index, active_note in enumerate(active)
+                    if int(round(active_note)) == midi_key
+                ),
+                None,
+            )
+            if duplicate_index is not None:
+                old = active.pop(duplicate_index)
+                self._wire(f"n{self._f(old)}l0i{synth}Z")
+
+            while len(active) >= max(1, self.voices):
+                old = active.pop(0)
+                self._wire(f"n{self._f(old)}l0i{synth}Z")
+
+            self._wire(
+                f"n{self._f(note)}l{self._f(level)}i{synth}Z"
+            )
+            active.append(float(note))
+
+        tail_ms = float(
+            self.client.config.get("performance", {}).get(
+                "strum_tail_ms",
+                450.0,
+            )
         )
 
         def release() -> None:
-            self._wire(f"n{self._f(note)}l0i{synth}Z")
+            with self._preview_lock:
+                if token != self._preview_tail_tokens[row]:
+                    return
+                self._preview_tail_tokens[row] += 1
+                notes = list(self._preview_active_notes[row])
+                self._preview_active_notes[row].clear()
+            for active_note in notes:
+                self._wire(f"n{self._f(active_note)}l0i{synth}Z")
 
-        timer = threading.Timer(0.45, release)
+        timer = threading.Timer(max(0.01, tail_ms / 1000.0), release)
         timer.daemon = True
         timer.start()
 
@@ -533,6 +579,10 @@ class MidiAmyEngine:
         )
 
     def all_notes_off(self) -> None:
+        with self._preview_lock:
+            for row in range(MIDI_ROW_COUNT):
+                self._preview_tail_tokens[row] += 1
+                self._preview_active_notes[row].clear()
         for row in sorted(self._configured_rows):
             self._wire(f"l0i{self.row_synths[row]}Z")
         if self._drum_configured:

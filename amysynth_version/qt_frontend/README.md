@@ -1,8 +1,12 @@
 # LB Omnichord — AMY / ESP32-P4 version
 
-This directory contains the actively developed Qt frontend for the AMY-based Omnichord. The Raspberry Pi runs the PySide6/Qt Quick interface and sends native AMY wire-protocol commands over UART to AMY running on the ESP32-P4.
+This directory contains the actively developed Qt frontend for the AMY-based
+Omnichord. It sends native AMY wire commands either over UART to AMY on the
+ESP32-P4 or over a Unix packet socket to a separate local AMY service.
 
-Sonic Pi is not used by this version.
+The Sonic Pi version elsewhere in the repository is frozen legacy material. It
+is not a backend option for this frontend and must not be changed as part of
+AMY work.
 
 ## Layout
 
@@ -16,6 +20,15 @@ Sonic Pi is not used by this version.
 - `docs/` — ESP32-P4 notes, screenshots and historical implementation notes
 
 For Raspberry Pi installation, UART wiring, 1,000,000-baud 8N1 serial configuration, direct transport testing and startup instructions, see `README_rpi.md`.
+
+For local Linux development with a separate AMY process, use:
+
+```bash
+./run_local.sh --windowed
+```
+
+The Qt process does not import AMY or own its lifetime; the launcher is only a
+shell-level convenience wrapper for the two independent processes.
 
 ## Running
 
@@ -47,9 +60,17 @@ Time controls display milliseconds, resonance displays Q, and modulation depths 
 
 ## Runtime AMY allocation
 
-The host uses five independent AMY synth instances: drums, bass, strum, manually held chord and rhythm-triggered chord. Manual and rhythm chord voices share patch/settings but have independent voice pools and note lifetimes.
+OMNI uses five independent AMY synth instances: drums 0, bass 1, strum 2,
+manually held chord 3 and rhythm-triggered chord 4. MIDI uses pitched synths
+5–10 and drum synth 11. Manual and rhythm chord voices share patch/settings but
+have independent voice pools and note lifetimes. The eleven-bus mapping is
+documented in `../design/architecture.md`.
 
 Rhythm timing is compiled into AMY's 48-PPQ sequencer; Linux/Python is not used as the beat clock. A live tuning change updates the shared tuned chord state: held manual chords are retuned immediately, rhythm chord and bass sequencer events are rebuilt with the new pitches, and subsequent strum notes use the selected tuning. Bass retuning therefore appears in the AMY wire/debug stream mainly as rebuilt `H...n<note>...i1Z` sequencer events rather than standalone immediate bass note commands.
+
+Linux MIDI input currently opens ALSA raw-MIDI devices matching
+`/dev/snd/midiC*D*`. VMPK exposes an ALSA Sequencer port rather than a raw device;
+use `snd-virmidi` as a bridge for current testing. See `../design/midi.md`.
 
 The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
 
