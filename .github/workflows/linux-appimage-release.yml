@@ -2,7 +2,7 @@ name: Test and release Linux AppImage
 
 on:
   push:
-    branches: [main]
+    branches: [main, testing_and_packaging]
   # Explicitly permits a release candidate from a non-main branch for physical
   # package testing. Normal releases remain automatic main-branch pushes.
   workflow_dispatch:
