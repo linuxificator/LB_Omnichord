@@ -1,86 +1,150 @@
 # LB Omnichord - Test history and failure archive
 
-This document records known tests, failures, observations and fixes. It exists to prevent future agents from repeating unsuccessful approaches.
+This file is a historical engineering log for Codex. Its purpose is to prevent repeating failed approaches and to preserve why fixes were chosen.
 
-## Purpose
+## Rule for future debugging
 
-Before changing code, check whether the issue is already described here. Prefer reproducing the original failure boundary over redesigning components.
+Do not jump to architecture changes. Find the failing boundary:
 
-## Architecture validation tests
+UI input -> UI state -> AMY wire command -> transport -> AMY parser -> render -> audio output.
 
-### Android/Godot AMY communication proof of concept
+A working boundary must not be replaced while debugging another boundary.
 
-Goal:
-- Verify that a client application can control AMY without embedding AMY.
+# Architecture tests
 
-Expected result:
-- Android/Godot application and AMY service run as separate processes.
-- Communication happens through the socket/wire protocol.
+## Android / Godot proof of concept
 
-Failed approach:
-- Trying to control AMY service lifetime from the client.
+Purpose:
+Validate that AMY can be used as an independent service.
 
-Resolution:
-- Keep service ownership separate.
+Expected architecture:
 
-## Qt frontend tests
+Client process
+    |
+    | socket / wire protocol
+    |
+AMY service
 
-### Strum input test
+Important failure:
+The client attempted to manage AMY service lifetime.
+
+Fix:
+Restore process separation. The client sends commands only.
+
+Lesson:
+Never add start/stop coupling to clients.
+
+# Qt frontend tests
+
+## Chord command generation
+
+Observed:
+Chord interaction generated expected AMY commands.
+
+Conclusion:
+The AMY path was functioning.
+
+## Strum input failure
 
 Symptom:
-- Chord buttons generated AMY commands.
-- Strum interaction produced no sound.
+
+- Chords played correctly.
+- Touch and mouse interaction with strum surface produced no sound.
+
+Wrong direction avoided:
+Changing AMY architecture.
 
 Investigation:
-- Added AMY command logging.
-- Verified chord command generation.
-- Determined that the failure was in the UI input path, not AMY synthesis.
 
-Rule:
-- Always check UI event generation before changing synth architecture.
+- Added AMY debug command logging.
+- Compared chord and strum paths.
+- Determined that the failure was before synthesis.
 
-### Instrument names
+Resolution approach:
+Fix the UI event path.
+
+Lesson:
+A missing UI event is not a synth problem.
+
+## Instrument naming issue
 
 Symptom:
-- Instrument names received meaningless PATCH suffixes.
+User-visible names contained technical PATCH suffixes.
 
-Resolution:
-- Remove implementation details from user-visible names.
+Cause:
+Internal AMY patch terminology leaked into the UI.
 
-## ESP32-P4 audio tests
+Fix:
+Keep implementation details out of user-facing text.
 
-### 48 kHz low latency audio
+# AMY / ESP32-P4 tests
 
-Validated configuration:
-- AMY render block: 64 samples.
-- I2S DMA: 2x32.
-- No vTaskDelay in render path.
+## Audio latency baseline
+
+Validated:
+
+- 48 kHz audio.
+- 64 sample render blocks.
+- I2S DMA 2x32.
+- No scheduler delay in render loop.
+
+Problem:
+Periodic distortion occurred when scheduling delays were introduced.
+
+Fix:
+Remove vTaskDelay from the audio render path.
+
+Measured result:
+The 64 sample configuration became stable with very low latency.
+
+## Heavy patch testing
 
 Observation:
-- Removing scheduler delay was required to eliminate periodic distortion.
+Effects-heavy patches can require different DMA settings.
 
-### Larger blocks / heavy patches
+Rule:
+Do measurements before changing the audio pipeline.
 
-Observation:
-- Complex patches with effects may require larger DMA buffers.
-- Measure latency and underruns instead of assuming a change is harmless.
+# SD/sample streaming design tests
 
-## SD sample streaming tests
+Validated design principles:
 
-Design assumptions tested:
-- Fixed block reads.
-- First chunk priority.
-- Raw sample area separated from metadata filesystem.
+- Runtime sample access should avoid filesystem overhead.
+- Fixed block reads are preferred.
+- First chunk latency is more important than maximum throughput.
 
-Important lesson:
-- Optimizing sustained throughput must not make first-note latency worse.
+Failure mode avoided:
+Long background reads delaying the first part of a new sample.
 
-## General debugging procedure
+# Historical architecture mistakes to avoid
 
-1. Reproduce the issue.
-2. Identify the failing boundary.
-3. Add minimal logging or instrumentation.
-4. Fix only the failing layer.
-5. Re-test the original failure.
+## Embedding AMY into GUI
 
-Never replace a working architecture because of a local defect.
+Attempt:
+Use Python AMY bindings directly from the GUI.
+
+Why rejected:
+
+- Breaks process separation.
+- Couples UI and audio engine.
+- Makes Android/Godot reference architecture invalid.
+
+Correct design:
+AMY remains a separate wire-protocol endpoint.
+
+## Replacing components to solve local bugs
+
+Pattern observed:
+A local issue led to proposals for new frameworks or different ownership models.
+
+Correct approach:
+Instrument the failing boundary first.
+
+# Remaining tests to document when performed
+
+- Complete Qt visual regression test.
+- Patch browser behavior test.
+- Rhythm interaction test.
+- MIDI input test.
+- ESP32-P4 UART transport test.
+- SD-card benchmark results.
