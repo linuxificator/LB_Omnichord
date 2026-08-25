@@ -44,6 +44,65 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("root.hostWindow.volumeX", qml)
         self.assertIn("+ root.hostWindow.volumeWidth", qml)
 
+    def test_every_numeric_control_family_supports_midi_learn(self) -> None:
+        parameter = (ROOT / "gui" / "ParameterSlider.qml").read_text(
+            encoding="utf-8"
+        )
+        labeled = (ROOT / "gui" / "LabeledSlider.qml").read_text(
+            encoding="utf-8"
+        )
+        volume = (ROOT / "gui" / "VerticalVolume.qml").read_text(
+            encoding="utf-8"
+        )
+        tuning = (ROOT / "gui" / "TapNumber.qml").read_text(
+            encoding="utf-8"
+        )
+        for component in (parameter, labeled, volume, tuning):
+            self.assertIn("activateControlTarget", component)
+            self.assertIn("controlTargetTapped", component)
+            self.assertIn("midiBound", component)
+            self.assertIn('"#35b85a"', component)
+            self.assertIn("midiBindingGesture", component)
+
+        self.assertIn("controlTargetMoved", parameter)
+        self.assertIn("controlTargetMoved", labeled)
+        self.assertIn("if (root.midiBindingGesture)", parameter)
+        self.assertIn("if (root.midiBindingGesture)", labeled)
+
+        combined = "\n".join(
+            (ROOT / "gui" / name).read_text(encoding="utf-8")
+            for name in (
+                "Main.qml",
+                "MidiSynthSection.qml",
+                "SynthSection.qml",
+                "ReverbPanel.qml",
+                "UtilitySection.qml",
+                "MidiUtilitySection.qml",
+                "RhythmSection.qml",
+            )
+        )
+        for kind in (
+            "synth_control",
+            "volume",
+            "reverb_level",
+            "reverb_liveness",
+            "reverb_damping",
+            "tuning_reference",
+            "rhythm_tempo",
+            "bass_voicing",
+        ):
+            self.assertIn(f'"kind": "{kind}"', combined)
+
+    def test_midi_and_omni_control_led_states_are_rendered(self) -> None:
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        omni = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        for state in ("learn", "bound", "blue"):
+            self.assertIn(f'modelData.state === "{state}"', midi)
+        self.assertIn("modelData.evicting", midi)
+        self.assertIn("selectControlIndicator", midi)
+        self.assertIn("id: omniMidiControlLed", omni)
+        self.assertIn("backend.midiPlayer.omniControlLedState", omni)
+
     def test_frontend_tree_contains_no_symlinks(self) -> None:
         generated_roots = {"build", "dist", "test-artifacts"}
         symlinks = [

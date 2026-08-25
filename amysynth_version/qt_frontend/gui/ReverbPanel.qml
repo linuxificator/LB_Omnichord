@@ -5,6 +5,8 @@ Item {
     id: root
 
     required property var controller
+    required property var midiControlRouter
+    property string controlScreen: "omni"
 
     Rectangle {
         anchors.fill: parent
@@ -34,6 +36,11 @@ Item {
             fillColor: "#d87fa5"
             handleColor: "#fff7fb"
             borderColor: "#a75f7d"
+            midiControlRouter: root.midiControlRouter
+            midiTarget: ({
+                "screen": root.controlScreen,
+                "kind": "reverb_level"
+            })
             onEdited: (value) => root.controller.setReverbLevel(value)
         }
 
@@ -51,6 +58,11 @@ Item {
             fillColor: "#d87fa5"
             handleColor: "#fff7fb"
             borderColor: "#a75f7d"
+            midiControlRouter: root.midiControlRouter
+            midiTarget: ({
+                "screen": root.controlScreen,
+                "kind": "reverb_liveness"
+            })
             onEdited: (value) => root.controller.setReverbLiveness(value)
         }
 
@@ -68,6 +80,11 @@ Item {
             fillColor: "#d87fa5"
             handleColor: "#fff7fb"
             borderColor: "#a75f7d"
+            midiControlRouter: root.midiControlRouter
+            midiTarget: ({
+                "screen": root.controlScreen,
+                "kind": "reverb_damping"
+            })
             onEdited: (value) => root.controller.setReverbDamping(value)
         }
 

@@ -13,12 +13,34 @@ Frame {
     property color panelBorderColor: "#a76512"
     property color fillColor: "#cf7411"
     property color textColor: "#4b2804"
+    property var midiControlRouter: null
+    property var midiTarget: ({})
+    property bool midiBindingGesture: false
+
+    readonly property bool midiBound: {
+        if (root.midiControlRouter === null)
+            return false
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.isControlTargetBound(root.midiTarget)
+    }
 
     property int holdDelayMs: 380
     property int repeatIntervalMs: 75
     property int repeatDirection: 0
 
     signal edited(int value)
+    signal activated()
+
+    function beginMidiInteraction() {
+        if (root.midiControlRouter === null)
+            return false
+        const learned = root.midiControlRouter.activateControlTarget(
+            root.midiTarget
+        )
+        if (!learned)
+            root.midiControlRouter.controlTargetTapped(root.midiTarget)
+        return learned
+    }
 
     padding: 4
 
@@ -93,7 +115,7 @@ Frame {
                 )
                 * parent.height
             radius: 3
-            color: root.fillColor
+            color: root.midiBound ? "#35b85a" : root.fillColor
         }
     }
 
@@ -176,13 +198,21 @@ Frame {
             }
         ]
 
-        onPressed:
-            root.beginPress(numberPoint.y)
+        onPressed: {
+            root.midiBindingGesture = root.beginMidiInteraction()
+            root.activated()
+            if (!root.midiBindingGesture)
+                root.beginPress(numberPoint.y)
+        }
 
-        onReleased:
+        onReleased: {
             root.endPress()
+            root.midiBindingGesture = false
+        }
 
-        onCanceled:
+        onCanceled: {
             root.endPress()
+            root.midiBindingGesture = false
+        }
     }
 }

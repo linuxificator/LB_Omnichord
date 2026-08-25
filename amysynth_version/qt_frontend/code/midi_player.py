@@ -6,6 +6,7 @@ import math
 import os
 import select
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -13,6 +14,7 @@ from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
 
 import app_core
 from control_limits import clamp_control_value
+from midi_control import MidiControlState
 from synth_programs import resolve_program
 from synth_state import SynthState
 from user_data import MIDI_PRESET_DIR
@@ -621,6 +623,8 @@ class MidiPlayerBackend(QObject):
     reverbLivenessChanged = Signal()
     reverbDampingChanged = Signal()
     reverbDrumsIncludedChanged = Signal()
+    bindingStateChanged = Signal()
+    _queuedControlChange = Signal(int, int, int)
 
     def __init__(
         self,
@@ -661,13 +665,15 @@ class MidiPlayerBackend(QObject):
         self._reverb_liveness = 0.5
         self._reverb_damping = 0.5
         self._reverb_drums = False
-        self._midi_controls: list[dict[str, int]] = []
-        self._midi_control_values: dict[tuple[int, int], int] = {}
-        self._midi_control_clock = 0
-        self._midi_control_capacity = 17
+        self._midi_control_state = MidiControlState(capacity=17)
+        self._binding_version = 0
         self._midi_control_lock = threading.Lock()
         raw_cc_log = os.environ.get("OMNICHORD_TEST_MIDI_CC_LOG", "")
         self._midi_cc_test_log = Path(raw_cc_log) if raw_cc_log else None
+        self._queuedControlChange.connect(self.process_midi_control)
+        self._blue_expiry_timer = QTimer(self)
+        self._blue_expiry_timer.setInterval(250)
+        self._blue_expiry_timer.timeout.connect(self._expire_blue_controls)
 
         self.engine = MidiAmyEngine(client)
         self._preview_row = -1
@@ -681,7 +687,7 @@ class MidiPlayerBackend(QObject):
         midi_cfg = client.config.get("midi_input", {})
         self._reader = _LinuxRawMidiReader(
             self.process_midi_note,
-            self.process_midi_control,
+            self._queue_midi_control,
             str(
                 midi_cfg.get(
                     "device_glob",
@@ -697,6 +703,15 @@ class MidiPlayerBackend(QObject):
     @Property(int, notify=stateChanged)
     def stateVersion(self) -> int:
         return self._state_version
+
+    @Property(int, notify=bindingStateChanged)
+    def bindingVersion(self) -> int:
+        return self._binding_version
+
+    @Property(str, notify=bindingStateChanged)
+    def omniControlLedState(self) -> str:
+        with self._midi_control_lock:
+            return self._midi_control_state.omni_led_state()
 
     @Property(bool, constant=True)
     def testCcLogging(self) -> bool:
@@ -742,55 +757,46 @@ class MidiPlayerBackend(QObject):
     def reverbDrumsIncluded(self) -> bool:
         return self._reverb_drums
 
+    def _queue_midi_control(self, channel: int, controller: int, value: int) -> None:
+        """Move raw-MIDI thread callbacks onto this QObject's Qt thread."""
+        self._queuedControlChange.emit(
+            max(1, min(16, int(channel))),
+            max(0, min(127, int(controller))),
+            max(0, min(127, int(value))),
+        )
+
+    @Slot(int, int, int)
     def process_midi_control(self, channel: int, controller: int, value: int) -> None:
-        channel = max(1, min(16, int(channel)))
-        controller = max(0, min(127, int(controller)))
-        value = max(0, min(127, int(value)))
         with self._midi_control_lock:
-            key = (channel, controller)
-            previous = self._midi_control_values.get(key)
-            self._midi_control_values[key] = value
-            # Some controllers (including VMPK) publish current CC values when
-            # switching channel.  The first value is only a baseline.
-            if previous is None or previous == value:
-                return
-            self._midi_control_clock += 1
-            match = next(
-                (item for item in self._midi_controls
-                 if item["channel"] == channel
-                 and item["controller"] == controller),
-                None,
+            before = {
+                (item["channel"], item["controller"])
+                for item in self._midi_control_state.controls
+            }
+            changed, target, key = self._midi_control_state.observe(
+                channel,
+                controller,
+                value,
+                now=time.monotonic(),
             )
-            replaced = 0
-            evicted: tuple[int, int] | None = None
-            if match is None:
-                if len(self._midi_controls) >= self._midi_control_capacity:
-                    match = min(
-                        self._midi_controls,
-                        key=lambda item: item["lastSeen"],
-                    )
-                    evicted = (match["channel"], match["controller"])
-                    replaced = 1
-                else:
-                    match = {}
-                    self._midi_controls.append(match)
-            match.update({
-                "channel": channel,
-                "controller": controller,
-                "value": value,
-                "lastSeen": self._midi_control_clock,
-                "pulse": self._midi_control_clock,
-                "replaced": replaced,
-            })
+            if not changed or key is None:
+                return
+            after = {
+                (item["channel"], item["controller"])
+                for item in self._midi_control_state.controls
+            }
+            evicted = next(iter(before - after), None)
             self._write_cc_test_log({
                 "event": "change",
-                "channel": channel,
-                "controller": controller,
-                "clock": self._midi_control_clock,
-                "capacity": self._midi_control_capacity,
-                "count": len(self._midi_controls),
+                "channel": key[0],
+                "controller": key[1],
+                "clock": self._midi_control_state.clock,
+                "capacity": self._midi_control_state.capacity,
+                "count": len(self._midi_control_state.controls),
                 "evicted": list(evicted) if evicted else None,
+                "mapped": target is not None,
             })
+        if target is not None:
+            self._apply_control_target(target, int(value))
 
     def _write_cc_test_log(self, record: dict[str, Any]) -> None:
         if getattr(self, "_midi_cc_test_log", None) is None:
@@ -819,20 +825,419 @@ class MidiPlayerBackend(QObject):
                 "lastRight": float(last_right),
             })
 
+    @Slot("QVariantList")
+    def testLogControlIndicatorState(self, items: list[dict[str, Any]]) -> None:
+        if self._midi_cc_test_log is None:
+            return
+        self._write_cc_test_log(
+            {
+                "event": "indicator-state",
+                "items": [
+                    {
+                        "channel": int(item.get("channel", 0)),
+                        "controller": int(item.get("controller", -1)),
+                        "state": str(item.get("state", "idle")),
+                        "evicting": bool(item.get("evicting", False)),
+                    }
+                    for item in items
+                    if isinstance(item, dict)
+                ],
+            }
+        )
+
     @Slot(int)
     def setControlIndicatorCapacity(self, capacity: int) -> None:
         """Match the LRU pool to the number of indicators visible in QML."""
         capacity = max(1, int(capacity))
         with self._midi_control_lock:
-            if capacity == self._midi_control_capacity:
-                return
-            self._midi_control_capacity = capacity
-            while len(self._midi_controls) > capacity:
-                oldest = min(
-                    self._midi_controls,
-                    key=lambda item: item["lastSeen"],
+            self._midi_control_state.set_capacity(capacity)
+
+    def _bump_binding_state(self) -> None:
+        self._binding_version += 1
+        with self._midi_control_lock:
+            led_state = self._midi_control_state.omni_led_state()
+            bindings = len(self._midi_control_state.bindings)
+        self._write_cc_test_log(
+            {
+                "event": "binding-state",
+                "version": self._binding_version,
+                "omniLed": led_state,
+                "bindings": bindings,
+            }
+        )
+        self.bindingStateChanged.emit()
+
+    def _sync_blue_timer(self) -> None:
+        with self._midi_control_lock:
+            active = bool(self._midi_control_state.blue_since)
+        if active and not self._blue_expiry_timer.isActive():
+            self._blue_expiry_timer.start()
+        elif not active:
+            self._blue_expiry_timer.stop()
+
+    def _expire_blue_controls(self) -> None:
+        with self._midi_control_lock:
+            changed = self._midi_control_state.expire_blue()
+        self._sync_blue_timer()
+        if changed:
+            self._write_cc_test_log({"event": "blue-expired"})
+            self._bump_binding_state()
+
+    def _definition_for_target(
+        self,
+        screen: str,
+        instrument: str,
+    ) -> Any | None:
+        definitions = (
+            self.definitions if screen == "midi" else tuple(self.owner._synths)
+        )
+        return next(
+            (
+                definition
+                for definition in definitions
+                if str(definition.key) == str(instrument)
+            ),
+            None,
+        )
+
+    def _normalize_control_target(
+        self,
+        raw: Any,
+    ) -> dict[str, Any] | None:
+        if not isinstance(raw, dict):
+            return None
+        screen = str(raw.get("screen", ""))
+        kind = str(raw.get("kind", ""))
+        if screen not in ("midi", "omni"):
+            return None
+
+        target: dict[str, Any] = {"screen": screen, "kind": kind}
+        if kind == "synth_control":
+            control = str(raw.get("control", ""))
+            if not control:
+                return None
+            if screen == "midi":
+                row = int(raw.get("row", -1))
+                if not self._valid_row(row):
+                    return None
+                instrument = str(
+                    raw.get(
+                        "instrument",
+                        self._runtime(row).selected_definition.key,
+                    )
                 )
-                self._midi_controls.remove(oldest)
+                target["row"] = row
+                location = str(row)
+            else:
+                role = str(raw.get("role", ""))
+                if role not in ("chord", "strum", "bass"):
+                    return None
+                instrument = str(
+                    raw.get(
+                        "instrument",
+                        self.owner._runtime(role).selected_definition.key,
+                    )
+                )
+                target["role"] = role
+                location = role
+            definition = self._definition_for_target(screen, instrument)
+            if definition is None or not any(
+                str(item.key) == control for item in definition.controls
+            ):
+                return None
+            target.update({"instrument": instrument, "control": control})
+            target["id"] = (
+                f"{screen}:synth_control:{location}:{instrument}:{control}"
+            )
+            return target
+
+        if kind == "volume":
+            if screen == "midi":
+                row = int(raw.get("row", -1))
+                if not self._valid_row(row):
+                    return None
+                target["row"] = row
+                location = str(row)
+            else:
+                role = str(raw.get("role", ""))
+                if role not in ("chord", "strum", "bass", "percussion"):
+                    return None
+                target["role"] = role
+                location = role
+            target["id"] = f"{screen}:volume:{location}"
+            return target
+
+        if kind in (
+            "reverb_level",
+            "reverb_liveness",
+            "reverb_damping",
+            "tuning_reference",
+        ):
+            target["id"] = f"{screen}:{kind}"
+            return target
+
+        if screen == "omni" and kind in ("rhythm_tempo", "bass_voicing"):
+            target["id"] = f"omni:{kind}"
+            return target
+        return None
+
+    def _target_range(
+        self,
+        target: dict[str, Any],
+    ) -> tuple[float, float, float, str] | None:
+        kind = str(target["kind"])
+        screen = str(target["screen"])
+        if kind == "synth_control":
+            definition = self._definition_for_target(
+                screen,
+                str(target["instrument"]),
+            )
+            if definition is None:
+                return None
+            control = next(
+                (
+                    item
+                    for item in definition.controls
+                    if str(item.key) == str(target["control"])
+                ),
+                None,
+            )
+            if control is None:
+                return None
+            return (
+                float(control.minimum),
+                float(control.maximum),
+                float(control.step),
+                str(getattr(control, "scale", "linear")),
+            )
+        if kind == "volume":
+            return 0.0, 1.0, 0.01, "linear"
+        if kind == "reverb_level":
+            return 0.0, MIDI_REVERB_MAX, 0.01, "linear"
+        if kind in ("reverb_liveness", "reverb_damping"):
+            return 0.0, 1.0, 0.01, "linear"
+        if kind == "tuning_reference":
+            return 415.0, 466.0, 1.0, "linear"
+        if kind == "rhythm_tempo":
+            return 40.0, 200.0, 1.0, "linear"
+        if kind == "bass_voicing":
+            return -6.0, 6.0, 1.0, "linear"
+        return None
+
+    def _mapped_target_value(
+        self,
+        target: dict[str, Any],
+        midi_value: int,
+    ) -> float | None:
+        target_range = self._target_range(target)
+        if target_range is None:
+            return None
+        minimum, maximum, step, scale = target_range
+        position = max(0.0, min(1.0, float(midi_value) / 127.0))
+        if scale == "log" and minimum > 0.0:
+            value = math.exp(
+                math.log(minimum)
+                + position * (math.log(maximum) - math.log(minimum))
+            )
+        else:
+            value = minimum + position * (maximum - minimum)
+        if step > 0.0:
+            value = minimum + round((value - minimum) / step) * step
+        return max(minimum, min(maximum, value))
+
+    def _apply_control_target(
+        self,
+        target: dict[str, Any],
+        midi_value: int,
+    ) -> None:
+        value = self._mapped_target_value(target, midi_value)
+        if value is None:
+            return
+        screen = str(target["screen"])
+        kind = str(target["kind"])
+
+        if kind == "synth_control":
+            definition = self._definition_for_target(
+                screen,
+                str(target["instrument"]),
+            )
+            if definition is None:
+                return
+            definitions = (
+                self.definitions if screen == "midi" else tuple(self.owner._synths)
+            )
+            index = next(
+                (
+                    item_index
+                    for item_index, item in enumerate(definitions)
+                    if str(item.key) == str(target["instrument"])
+                ),
+                None,
+            )
+            if index is None:
+                return
+            if screen == "midi":
+                row = int(target["row"])
+                self.setSynthIndex(row, index)
+                self.setControl(row, str(target["control"]), value)
+            else:
+                role = str(target["role"])
+                if role == "chord":
+                    self.owner.setChordSynthIndex(index)
+                    self.owner.setChordSynthControl(str(target["control"]), value)
+                elif role == "strum":
+                    self.owner.setStrumSynthIndex(index)
+                    self.owner.setStrumSynthControl(str(target["control"]), value)
+                else:
+                    self.owner.setBassSynthIndex(index)
+                    self.owner.setBassSynthControl(str(target["control"]), value)
+        elif kind == "volume":
+            if screen == "midi":
+                self.setVolume(int(target["row"]), value)
+            else:
+                setter = {
+                    "chord": self.owner.setChordVolume,
+                    "strum": self.owner.setStrumVolume,
+                    "bass": self.owner.setBassVolume,
+                    "percussion": self.owner.setPercussionVolume,
+                }[str(target["role"])]
+                setter(value)
+        elif kind.startswith("reverb_"):
+            controller = self if screen == "midi" else self.owner
+            setter = {
+                "reverb_level": controller.setReverbLevel,
+                "reverb_liveness": controller.setReverbLiveness,
+                "reverb_damping": controller.setReverbDamping,
+            }[kind]
+            setter(value)
+        elif kind == "tuning_reference":
+            if screen == "midi":
+                self.setTuningReference(round(value))
+            else:
+                self.owner.setTuningReference(round(value))
+        elif kind == "rhythm_tempo":
+            self.owner.setRhythmTempo(value)
+        elif kind == "bass_voicing":
+            self.owner.setBassVoicingShift(value)
+
+        self._write_cc_test_log(
+            {
+                "event": "apply",
+                "target": target["id"],
+                "midiValue": int(midi_value),
+                "mappedValue": float(value),
+            }
+        )
+
+    @Slot(int, int)
+    def selectControlIndicator(self, channel: int, controller: int) -> None:
+        with self._midi_control_lock:
+            self._midi_control_state.select_control((channel, controller))
+        self._sync_blue_timer()
+        self._bump_binding_state()
+
+    @Slot("QVariantMap", result=bool)
+    def activateControlTarget(self, raw: dict[str, Any]) -> bool:
+        target = self._normalize_control_target(raw)
+        if target is None:
+            return False
+        with self._midi_control_lock:
+            learned = self._midi_control_state.bind_learned_target(target)
+        if learned:
+            self._write_cc_test_log(
+                {"event": "bind", "target": target["id"]}
+            )
+            self._sync_blue_timer()
+            self._bump_binding_state()
+        return learned
+
+    @Slot("QVariantMap", result=bool)
+    def isControlTargetBound(self, raw: dict[str, Any]) -> bool:
+        target = self._normalize_control_target(raw)
+        if target is None:
+            return False
+        with self._midi_control_lock:
+            return self._midi_control_state.is_target_bound(target)
+
+    @Slot("QVariantMap")
+    def controlTargetTapped(self, raw: dict[str, Any]) -> None:
+        target = self._normalize_control_target(raw)
+        if target is None:
+            return
+        with self._midi_control_lock:
+            changed = self._midi_control_state.target_tapped(target)
+        if changed:
+            self._write_cc_test_log(
+                {"event": "unbind", "reason": "double-tap", "target": target["id"]}
+            )
+            self._sync_blue_timer()
+            self._bump_binding_state()
+
+    @Slot("QVariantMap")
+    def controlTargetMoved(self, raw: dict[str, Any]) -> None:
+        target = self._normalize_control_target(raw)
+        if target is None:
+            return
+        with self._midi_control_lock:
+            changed = self._midi_control_state.target_moved(target)
+        if changed:
+            self._write_cc_test_log(
+                {"event": "unbind", "reason": "move", "target": target["id"]}
+            )
+            self._sync_blue_timer()
+            self._bump_binding_state()
+
+    @Slot(int, int, int)
+    def injectControl(self, channel: int, controller: int, value: int) -> None:
+        self.process_midi_control(channel, controller, value)
+
+    def control_bindings_snapshot(self, screen: str) -> list[dict[str, Any]]:
+        with self._midi_control_lock:
+            result = self._midi_control_state.serialize_bindings(screen)
+        for entry in result:
+            target = entry.get("target")
+            if isinstance(target, dict):
+                target.pop("id", None)
+        return result
+
+    def replace_control_bindings(self, screen: str, data: Any) -> None:
+        entries: list[tuple[tuple[int, int], dict[str, Any]]] = []
+        if isinstance(data, list):
+            for raw in data:
+                if not isinstance(raw, dict):
+                    continue
+                target_data = raw.get("target")
+                if not isinstance(target_data, dict):
+                    continue
+                target_data = dict(target_data)
+                target_data["screen"] = str(screen)
+                target = self._normalize_control_target(target_data)
+                if target is None:
+                    continue
+                try:
+                    key = (
+                        int(raw.get("channel", 0)),
+                        int(raw.get("controller", -1)),
+                    )
+                except (TypeError, ValueError):
+                    continue
+                if not 1 <= key[0] <= 16 or not 0 <= key[1] <= 127:
+                    continue
+                entries.append((key, target))
+        with self._midi_control_lock:
+            self._midi_control_state.replace_screen_bindings(
+                str(screen),
+                entries,
+            )
+        self._sync_blue_timer()
+        self._bump_binding_state()
+        self._write_cc_test_log(
+            {
+                "event": "load-bindings",
+                "screen": str(screen),
+                "count": len(entries),
+            }
+        )
 
     def _emit_state(self) -> None:
         self._state_version += 1
@@ -867,7 +1272,7 @@ class MidiPlayerBackend(QObject):
     def commonControls(self, row: int) -> list[dict[str, Any]]:
         if int(row) == -1:
             with self._midi_control_lock:
-                return [dict(item) for item in self._midi_controls]
+                return self._midi_control_state.visible_model()
         if not self._valid_row(row):
             return []
         return self._runtime(row).control_model("common")
@@ -1003,6 +1408,7 @@ class MidiPlayerBackend(QObject):
                 "reverb_damping": self._reverb_damping,
                 "reverb_drums": self._reverb_drums,
             },
+            "midi_control_bindings": self.control_bindings_snapshot("midi"),
         }
 
     def _apply_data(self, data: dict[str, Any]) -> None:
@@ -1074,6 +1480,10 @@ class MidiPlayerBackend(QObject):
             self._reverb_drums = bool(
                 effects.get("reverb_drums", False)
             )
+        self.replace_control_bindings(
+            "midi",
+            data.get("midi_control_bindings", []),
+        )
 
     def _load_preset(self, number: int, *, emit: bool) -> None:
         path = self._preset_path(number)

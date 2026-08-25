@@ -76,6 +76,9 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
                 os.close(amy_slave)
 
             self.assertNotIn("TypeError", output)
+            self.assertNotIn("QQmlApplicationEngine failed", output)
+            self.assertNotIn("Cannot assign to non-existent property", output)
+            self.assertNotIn("Required property", output)
             self.assertTrue(log.is_file(), output)
             records = [
                 json.loads(line)
@@ -83,7 +86,11 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
             ]
             layouts = [item for item in records if item["event"] == "layout"]
             changes = [item for item in records if item["event"] == "change"]
+            indicator_states = [
+                item for item in records if item["event"] == "indicator-state"
+            ]
             self.assertTrue(layouts)
+            self.assertTrue(indicator_states)
             full = max(layouts, key=lambda item: item["count"])
             self.assertLessEqual(full["count"], full["capacity"], full)
             self.assertLessEqual(
@@ -92,6 +99,13 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
                 full,
             )
             self.assertTrue(any(item["evicted"] is not None for item in changes))
+            self.assertTrue(
+                any(
+                    item["evicting"]
+                    for record in indicator_states
+                    for item in record["items"]
+                )
+            )
             last = changes[-1]
             self.assertEqual(last["controller"], 99)
             capacity = last["capacity"]

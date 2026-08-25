@@ -22,8 +22,11 @@ inputs. A channel-status byte by itself creates no indicator. The first value
 seen for each channel/controller pair establishes a baseline; only a later,
 different value counts as control movement. This prevents controller-state
 snapshots sent during a VMPK channel switch from creating indicators. Actual
-CC changes drive the left-to-right, capacity-aware indicators and no musical
-mapping.
+CC changes drive the left-to-right, capacity-aware indicators.
+Changed Control Change values also enter the explicit MIDI-learn system defined
+in `midi_control.md`. Unbound controls remain display-only. Bound controls map
+to one numeric target and still apply through the target's normal backend/AMY
+wire path.
 Channel 0 in a row means omni/all incoming channels.
 
 ALSA Sequencer-only applications such as VMPK do not create a raw-MIDI device.

@@ -268,6 +268,13 @@ Item {
                         fillColor: root.accentColor
                         handleColor: "#ffffff"
                         borderColor: Qt.darker(root.accentColor, 1.2)
+                        midiControlRouter: root.controller
+                        midiTarget: ({
+                            "screen": "midi",
+                            "kind": "synth_control",
+                            "row": root.rowIndex,
+                            "control": modelData.key
+                        })
 
                         onActivated: root.markInteraction()
                         onEdited: (key, value) => {
@@ -311,6 +318,13 @@ Item {
                         fillColor: root.accentColor
                         handleColor: "#ffffff"
                         borderColor: Qt.darker(root.accentColor, 1.2)
+                        midiControlRouter: root.controller
+                        midiTarget: ({
+                            "screen": "midi",
+                            "kind": "synth_control",
+                            "row": root.rowIndex,
+                            "control": modelData.key
+                        })
 
                         onActivated: root.markInteraction()
                         onEdited: (key, value) => {
@@ -340,6 +354,12 @@ Item {
         panelBorderColor: root.borderColor
         fillColor: root.accentColor
         textColor: root.textColor
+        midiControlRouter: root.controller
+        midiTarget: ({
+            "screen": "midi",
+            "kind": "volume",
+            "row": root.rowIndex
+        })
 
         onEdited: (value) => {
             root.controller.setVolume(root.rowIndex, value)

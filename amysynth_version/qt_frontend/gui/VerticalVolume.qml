@@ -10,6 +10,16 @@ Frame {
     property color panelBorderColor: "#8e8150"
     property color fillColor: "#2474b8"
     property color textColor: "#302b18"
+    property var midiControlRouter: null
+    property var midiTarget: ({})
+    property bool midiBindingGesture: false
+
+    readonly property bool midiBound: {
+        if (root.midiControlRouter === null)
+            return false
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.isControlTargetBound(root.midiTarget)
+    }
 
     // A tap changes volume by five percentage points. After a short hold,
     // it auto-repeats in smaller, fast increments.
@@ -21,6 +31,7 @@ Frame {
     property int repeatDirection: 0
 
     signal edited(real value)
+    signal activated()
 
     padding: 4
 
@@ -57,6 +68,17 @@ Frame {
         )
 
         holdDelay.restart()
+    }
+
+    function beginMidiInteraction() {
+        if (root.midiControlRouter === null)
+            return false
+        const learned = root.midiControlRouter.activateControlTarget(
+            root.midiTarget
+        )
+        if (!learned)
+            root.midiControlRouter.controlTargetTapped(root.midiTarget)
+        return learned
     }
 
     function endPress() {
@@ -117,7 +139,7 @@ Frame {
         width: 23
         height: 14
         radius: 6
-        color: "#ffffff"
+        color: root.midiBound ? "#35b85a" : "#ffffff"
         border.color: root.fillColor
         border.width: 2
     }
@@ -214,13 +236,21 @@ Frame {
             }
         ]
 
-        onPressed:
-            root.beginPress(volumePoint.y)
+        onPressed: {
+            root.midiBindingGesture = root.beginMidiInteraction()
+            root.activated()
+            if (!root.midiBindingGesture)
+                root.beginPress(volumePoint.y)
+        }
 
-        onReleased:
+        onReleased: {
             root.endPress()
+            root.midiBindingGesture = false
+        }
 
-        onCanceled:
+        onCanceled: {
             root.endPress()
+            root.midiBindingGesture = false
+        }
     }
 }

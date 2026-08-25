@@ -161,6 +161,91 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(list(app.action("midiExtraControls", 0)), [])
             self.assertEqual(list(app.action("midiCommonControls", 0)), [])
 
+    def test_midi_control_learn_routes_hidden_midi_and_omni_instruments(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            midi_index = int(app.action("midiSynthIndex", 0))
+            midi_controls = list(app.action("midiExtraControls", 0)) + list(
+                app.action("midiCommonControls", 0)
+            )
+            midi_control = midi_controls[0]
+            midi_target = {
+                "screen": "midi",
+                "kind": "synth_control",
+                "row": 0,
+                "control": midi_control["key"],
+            }
+            app.action("injectMidiControl", 1, 74, 0)
+            app.action("injectMidiControl", 1, 74, 1)
+            app.action("selectMidiControlIndicator", 1, 74)
+            self.assertTrue(app.action("activateMidiControlTarget", midi_target))
+
+            other_midi = 1 if midi_index != 1 else 2
+            app.action("setMidiSynthIndex", 0, other_midi)
+            self.assertNotEqual(int(app.action("midiSynthIndex", 0)), midi_index)
+            app.action("injectMidiControl", 1, 74, 127)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.action("midiSynthIndex", 0)), midi_index)
+            restored = list(app.action("midiExtraControls", 0)) + list(
+                app.action("midiCommonControls", 0)
+            )
+            mapped = next(
+                item for item in restored if item["key"] == midi_control["key"]
+            )
+            self.assertAlmostEqual(
+                float(mapped["value"]),
+                float(mapped["maximum"]),
+            )
+
+            app.action("tapMidiControlTarget", midi_target)
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(1, 74)], "bound")
+            app.action("tapMidiControlTarget", midi_target)
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(1, 74)], "blue")
+
+            omni_index = int(app.query("selectedChordSynthIndex"))
+            omni_controls = list(app.query("chordExtraControls")) + list(
+                app.query("chordCommonControls")
+            )
+            omni_control = omni_controls[0]
+            omni_target = {
+                "screen": "omni",
+                "kind": "synth_control",
+                "role": "chord",
+                "control": omni_control["key"],
+            }
+            app.action("injectMidiControl", 2, 75, 0)
+            app.action("injectMidiControl", 2, 75, 1)
+            app.action("selectMidiControlIndicator", 2, 75)
+            self.assertTrue(app.action("activateMidiControlTarget", omni_target))
+
+            other_omni = 1 if omni_index != 1 else 2
+            app.action("setChordSynthIndex", other_omni)
+            self.assertNotEqual(int(app.query("selectedChordSynthIndex")), omni_index)
+            app.action("injectMidiControl", 2, 75, 127)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("selectedChordSynthIndex")), omni_index)
+            restored_omni = list(app.query("chordExtraControls")) + list(
+                app.query("chordCommonControls")
+            )
+            mapped_omni = next(
+                item
+                for item in restored_omni
+                if item["key"] == omni_control["key"]
+            )
+            self.assertAlmostEqual(
+                float(mapped_omni["value"]),
+                float(mapped_omni["maximum"]),
+            )
+
     def test_midi_presets_select_and_configure_their_rows(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)

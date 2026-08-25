@@ -325,6 +325,14 @@ Item {
                             root.extraHandleColor
                         borderColor:
                             root.extraBorderColor
+                        midiControlRouter:
+                            root.controller.midiPlayer
+                        midiTarget: ({
+                            "screen": "omni",
+                            "kind": "synth_control",
+                            "role": root.role,
+                            "control": modelData.key
+                        })
 
                         onEdited: (key, value) =>
                             root.setControl(key, value)
@@ -370,6 +378,14 @@ Item {
                             root.commonHandleColor
                         borderColor:
                             root.commonBorderColor
+                        midiControlRouter:
+                            root.controller.midiPlayer
+                        midiTarget: ({
+                            "screen": "omni",
+                            "kind": "synth_control",
+                            "role": root.role,
+                            "control": modelData.key
+                        })
 
                         onEdited: (key, value) =>
                             root.setControl(key, value)

@@ -12,6 +12,7 @@ class InstrumentBackend(OmniInstrumentBackend):
     """Narrow integration seam between Omnichord and independent MIDI player."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._pending_omni_control_bindings: Any = []
         super().__init__(*args, **kwargs)
         self._syncing_tuning = False
         self._midi_player = MidiPlayerBackend(
@@ -27,6 +28,31 @@ class InstrumentBackend(OmniInstrumentBackend):
         self.tuningChanged.connect(self._sync_midi_tuning_when_coupled)
         self._midi_player.presetChanged.connect(self.midiPresetChanged)
         self._midi_player.presetStored.connect(self.midiPresetStored)
+        self._midi_player.replace_control_bindings(
+            "omni",
+            self._pending_omni_control_bindings,
+        )
+
+    def _apply_preset_data(self, data: dict[str, Any]) -> None:
+        bindings = data.get("midi_control_bindings", [])
+        self._pending_omni_control_bindings = bindings if isinstance(bindings, list) else []
+        super()._apply_preset_data(data)
+        player = getattr(self, "_midi_player", None)
+        if player is not None:
+            player.replace_control_bindings(
+                "omni",
+                self._pending_omni_control_bindings,
+            )
+
+    def _preset_snapshot(self) -> dict[str, Any]:
+        snapshot = super()._preset_snapshot()
+        player = getattr(self, "_midi_player", None)
+        if player is None:
+            bindings = self._pending_omni_control_bindings
+        else:
+            bindings = player.control_bindings_snapshot("omni")
+        snapshot["midi_control_bindings"] = bindings
+        return snapshot
 
     @Property(QObject, constant=True)
     def midiPlayer(self) -> QObject:
@@ -66,6 +92,35 @@ class InstrumentBackend(OmniInstrumentBackend):
     @Slot(int, result="QVariantList")
     def midiExtraControls(self, row: int) -> list[dict[str, Any]]:
         return self._midi_player.extraControls(row)
+
+    @Slot(result="QVariantList")
+    def midiControlIndicators(self) -> list[dict[str, Any]]:
+        return self._midi_player.commonControls(-1)
+
+    @Slot(int, int, int)
+    def injectMidiControl(
+        self,
+        channel: int,
+        controller: int,
+        value: int,
+    ) -> None:
+        self._midi_player.injectControl(channel, controller, value)
+
+    @Slot(int, int)
+    def selectMidiControlIndicator(self, channel: int, controller: int) -> None:
+        self._midi_player.selectControlIndicator(channel, controller)
+
+    @Slot("QVariantMap", result=bool)
+    def activateMidiControlTarget(self, target: dict[str, Any]) -> bool:
+        return self._midi_player.activateControlTarget(target)
+
+    @Slot("QVariantMap")
+    def tapMidiControlTarget(self, target: dict[str, Any]) -> None:
+        self._midi_player.controlTargetTapped(target)
+
+    @Slot("QVariantMap")
+    def moveMidiControlTarget(self, target: dict[str, Any]) -> None:
+        self._midi_player.controlTargetMoved(target)
 
     @Slot(int, int)
     def setMidiSynthIndex(self, row: int, index: int) -> None:

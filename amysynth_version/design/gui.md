@@ -41,11 +41,12 @@ No watermark is shown on the MIDI screen.
 The OMNI strum header has an APG/LDR switch. APG plays chord tones; LDR plays
 the chord-family ladder defined in `sound_balance.md`.
 
-The unused lower MIDI area fills from left to right with as many read-only,
-radio-style MIDI CC activity knobs as fit at the current width. Each channel
-and controller-number pair owns one indicator. Only after the bar is full does
-a previously unseen pair replace the least recently active indicator; that
-replacement flashes twice. The knobs indicate activity only.
+The unused lower MIDI area fills from left to right with as many radio-style
+MIDI CC knobs as fit at the current width. Each channel/controller pair owns
+one activity identity. The knobs also provide the explicit MIDI-learn selection
+and LED states defined in `midi_control.md`; an unbound knob remains display-only.
+When the bar is full, eligible indicators follow genuine-change LRU replacement
+and the outgoing knob flashes red twice.
 
 ## UI state versus audio state
 

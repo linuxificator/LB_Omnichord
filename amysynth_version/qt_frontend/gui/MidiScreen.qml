@@ -42,6 +42,9 @@ Item {
                 + midiControlBar.horizontalPadding
                 + midiControlRow.implicitWidth
             )
+            backend.midiPlayer.testLogControlIndicatorState(
+                root.midiControlModel
+            )
         }
     }
 
@@ -136,6 +139,8 @@ Item {
             width: 520
             height: parent.height
             controller: backend.midiPlayer
+            midiControlRouter: backend.midiPlayer
+            controlScreen: "midi"
         }
 
         Text {
@@ -323,15 +328,46 @@ Item {
                     height: 68
 
                     Rectangle {
+                        id: controlLed
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 0
+                        width: 10
+                        height: 10
+                        radius: 5
+                        color: {
+                            if (modelData.evicting)
+                                return "#9b3030"
+                            if (modelData.state === "learn")
+                                return "#f22b2b"
+                            if (modelData.state === "bound")
+                                return "#35b85a"
+                            if (modelData.state === "blue")
+                                return "#3186d7"
+                            return "#a5a5a0"
+                        }
+
+                        SequentialAnimation on opacity {
+                            running:
+                                modelData.state === "learn"
+                                && !modelData.evicting
+                            loops: Animation.Infinite
+                            NumberAnimation { from: 1.0; to: 0.2; duration: 240 }
+                            NumberAnimation { from: 0.2; to: 1.0; duration: 240 }
+                        }
+                    }
+
+                    Rectangle {
                         id: radioKnob
                         anchors.horizontalCenter: parent.horizontalCenter
-                        width: 46
-                        height: 46
-                        radius: 23
-                        color: "#686864"
+                        y: 12
+                        width: 40
+                        height: 40
+                        radius: 20
+                        color: modelData.evicting ? "#d62f2f" : "#686864"
                         border.color: "#e8e8df"
                         border.width: 2
-                        rotation: Number(modelData.value) * 270 / 127 - 135
+                        rotation:
+                            Number(modelData.displayValue) * 270 / 127 - 135
 
                         Rectangle {
                             x: parent.width / 2 - 2
@@ -350,16 +386,29 @@ Item {
                     Text {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: "CH" + modelData.channel + " CC" + modelData.controller
+                        text:
+                            "CH" + modelData.displayChannel
+                            + " CC" + modelData.displayController
                         color: "#292927"
                         font.pixelSize: 11
                     }
 
                     SequentialAnimation on opacity {
-                        running: Boolean(modelData.replaced)
+                        running: Boolean(modelData.evicting)
                         loops: 2
-                        NumberAnimation { to: 0.2; duration: 90 }
-                        NumberAnimation { to: 1.0; duration: 90 }
+                        NumberAnimation { from: 1.0; to: 0.2; duration: 100 }
+                        NumberAnimation { from: 0.2; to: 1.0; duration: 100 }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: !modelData.evicting
+                        onClicked: {
+                            backend.midiPlayer.selectControlIndicator(
+                                modelData.channel,
+                                modelData.controller
+                            )
+                        }
                     }
                 }
             }

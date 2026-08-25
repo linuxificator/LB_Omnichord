@@ -28,5 +28,7 @@ Core rules:
   scenarios live in `../qt_frontend/tests/USE_CASES.md`.
 - `sound_balance.md` defines user storage/config overrides, strum modes, MIDI
   control indicators and the instrument-balance measurement contract.
+- `midi_control.md` is the authoritative MIDI CC learn, binding, LRU/LED and
+  preset-persistence contract.
 
 When implementation and design differ, the difference must be documented before changing behavior.

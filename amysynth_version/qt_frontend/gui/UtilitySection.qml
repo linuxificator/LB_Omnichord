@@ -221,6 +221,11 @@ Item {
         panelBorderColor: "#a75d0a"
         fillColor: "#cc6f0c"
         textColor: "#492606"
+        midiControlRouter: root.controller.midiPlayer
+        midiTarget: ({
+            "screen": "omni",
+            "kind": "tuning_reference"
+        })
 
         onEdited:
             root.controller
