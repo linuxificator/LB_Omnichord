@@ -1,0 +1,28 @@
+Gedrag van de midi controls:
+
+1) als er een midi control signaal binnen komt, dan verschijnt er een knop op de grijze balk met kantaal en control info, het maakt niet uit via welk kanaal het control signaal binnen komt. Dit is al geimplementeert
+2) De grijze balk wordt van links naar rechts gevuld met knoppen, de knoppen bewegen als er midi control voor die knop binnen komt. Dat is al geimplementeert
+3) Als de grijze balk vol is, en er komt data van een nieuwe control binnen dan wordt de knop die het langst niet gebruikt is vervangen door de nieuwe. De verdwijnende knop moet dan even rood worden en verdwijnen, waarna deze vervangen wordt door de nieuwe knop. Het vervangen is geimplementeerd, het knipperen en van kleur veranderen bij verwijderen nog niet. Controleer of inderdaad de knop wordt vervangen die het langst niet gebruikt is. "gebruiken" betekent hier dat er op die control midi data binnen komt.
+4) Boven elke knop zit een "led" die standaard uit (beetje donkerder grijs dan achtergrond) staat, maar als de knop op het scherm aangeraakt wordt, of er wordt met de muis op geklikt dan gaat de led rood knipperen.
+5) Een control met knipperende led wordt nooit verwijderd   
+6) als er een andere control knop in de grijze balk wordt aangeklikt terwijl er al een led knippert dan gaat daar de rode led knipperen en gaat de andere weer uit.
+7) Als er een slider wordt aangeraakt terwijl er een rode led knippert, en dat kan ook volume of galm zijn of tuning, elke slider kan, dan wordt die slider gekoppeld aan de knipperende midi control en is vanaf dat moment door die midi control te besturen, de knop op de slider wordt dan groen en de led boven de knop in de grijze balk ook. (groene led knippert niet)
+8) bij de besturing van sliders door binnenkomende midi control data wordt de range naar de beschikbare range ge-mapped zodat de ranges die in de omnichord instrumenten data staat leidend is 
+9) Door een slider toch met muis of touch te gaan bewegen wordt deze weer ontkoppelt  (minimaal twee keer klikken of echt schuiven, enkele klik is niet genoeg). De led van de bijbehorende knop in de grijze balk wordt dan blauw, mocht de knop op dat moment niet in de grijze balk staan, dan wordt hij in de grijze balk gezet volgens dezelfde logica als een nieuwe knop
+10) Als een knop met blauwe led wordt aangeklikt gaat hij weer rood knipperen en kan dan opniew aan een slider worden gekoppeld
+11) Net als een knop met rode knipperende led wordt een knop met blauw brandende led niet van de grijze balk verstoten door nieuwe knoppen
+12) Als een knop de blauwe led 30 seconden of langer aan heeft staan, dan wordt de knop verwijderd
+13) Als de grijze balk vol is kunnen er dus knoppen zijn die niet zichtbaar zijn maar wel gekoppeld, maar zodra er mee gewerkt wordt (er kom midi data binnen) worden ze zichtbaar. 
+14) Als er in een van de synths een slider is gekoppeld aan een midi control en er wordt een ander instrument gekozen, dan blijft de slider gekoppeld aan het op dat moment onzichtbare instrument voor die synth.
+15) Als een instrument van een synth een slider gekoppeld heeft, maar er is een ander instrument actief en het is dus niet te zien en niet te horen welke slider er bediend wordt, dan schakelt die synth bij binnnekomende midi control data van de gekoppelde slider over op het instrument wat gekoppeld is. Dus stel release slider van de "piano" een synth is gekoppeld  aan een midi control, maar de synth staat op "Chimes", dan schakelt de synth naar piano als er op die control een verandering binnenkomt.
+16) er wordt alleen gereageerd op veranderingen van midi control data, dus echt als er extern aan een knop gedraaid wordt. Als een midi controller control data produceert bij het overschakelen naar een ander kanaal waarbij er niet aan een control gedraaid wordt, dan wordt daar niet op gereageerd (zit al in de implementatie)
+17) bij oplsaan van preset worden de midi control koppelingen ook opgeslagen, als er een preset wordt geladen waar al control koppelingen in zitten, dan verschijnen de knoppen die er bij horen op de grijze balk, voor zover dat kan, als de balk meteen vol is dan zullen niet alle knoppen zichtbaar zijn.
+18) punt 1 t/m 15 gaan allemaal over het MIDI scherm, de punten hier na gaan over het OMNI scherm
+19) In het OMNI scherm tussen de tweede chord rij van boven en de strum (dus net onder de knop die strum synth settings naar chord synth settings kopieert) zit ook een "led" die standaard uit staat, zelfde grijze kleur als led uit in het midi scherm
+20) Als er een led rood knippert in het midi scherm dan knippert de led in omni scherm ook rood
+21) het toewijzen van een slider aan de dan knipperende control werkt in het omni scherm het zelfde als in het midi scherm, alleen is er buiten de knipperende led in het omni scherm niets zichtbaar van de controls
+22) ontkoppelen werkt ook het zelfde, en dan wordt ook in het omni scherm de led blauw. m.a.w. als er een blauwe led in het midi scherm is, dan is de led in het omni scherm ook blauw
+23) de midi koppelingen in het omni scherm worden bij een store opdracht opgeslagen in de omni presets, en als er een preset waar al koppelingen in zitten wordt opgeroepen dan komen de knoppen in de grijze balk van het midi scherm, maar dat is op dat moment niet te zien.
+24) maak van alle bovenstaande regels duidelijke documentatie die ook door codex weer te lezen is, inclusief exacte gedrag. 
+25) maak van alle punten test cases die het gedrag en functionaliteit verifieren aan de hand van logging output bij tests en gesimuleerde user input, inclusief gesimuleerd midi control input
+

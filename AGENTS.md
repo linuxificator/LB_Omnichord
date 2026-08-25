@@ -149,3 +149,9 @@ When a known working reference implementation exists in the repository, compare 
 ## Scope
 
 These are project defaults, not permission to modify every subsystem. The current user request and the checked-out branch/task always determine the immediate scope. If a task conflicts with a design constraint above, call out the conflict rather than silently changing the architecture.
+
+## Codex session handoff
+
+If `CODEX_HANDOFF.md` exists at the repository root, read it before resuming an
+unfinished task. It records operational state and commands, but does not
+override this file or the current user's request.
