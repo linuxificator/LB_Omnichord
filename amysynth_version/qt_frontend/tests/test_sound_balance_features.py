@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import sys
 import tempfile
-import threading
 import unittest
 from pathlib import Path
 
@@ -13,6 +12,7 @@ sys.path.insert(0, str(ROOT / "code"))
 
 import app_core  # noqa: E402
 import midi_player  # noqa: E402
+from midi_control import MidiControlState  # noqa: E402
 import user_data  # noqa: E402
 import instrument_balance  # noqa: E402
 
@@ -81,64 +81,49 @@ class SoundBalanceFeatureTests(unittest.TestCase):
         self.assertEqual(controls, [])
 
     def test_midi_indicators_fill_capacity_before_lru_replacement(self) -> None:
-        backend = midi_player.MidiPlayerBackend.__new__(midi_player.MidiPlayerBackend)
-        backend._midi_controls = []
-        backend._midi_control_values = {}
-        backend._midi_control_clock = 0
-        backend._midi_control_capacity = 17
-        backend._midi_control_lock = threading.Lock()
+        state = MidiControlState(capacity=17)
         for controller in range(17):
-            backend.process_midi_control(1, controller, controller)
-            backend.process_midi_control(1, controller, controller + 1)
-        self.assertEqual(len(backend._midi_controls), 17)
-        self.assertTrue(all(item["replaced"] == 0 for item in backend._midi_controls))
+            state.observe(1, controller, controller)
+            state.observe(1, controller, controller + 1)
+        self.assertEqual(len(state.controls), 17)
+        self.assertTrue(all(item["replaced"] == 0 for item in state.controls))
 
-        backend.process_midi_control(2, 99, 64)
-        self.assertEqual(len(backend._midi_controls), 17)
-        backend.process_midi_control(2, 99, 65)
-        self.assertEqual(len(backend._midi_controls), 17)
-        self.assertEqual(backend._midi_controls[0]["channel"], 2)
-        self.assertEqual(backend._midi_controls[0]["controller"], 99)
-        self.assertEqual(backend._midi_controls[0]["replaced"], 1)
+        state.observe(2, 99, 64)
+        self.assertEqual(len(state.controls), 17)
+        state.observe(2, 99, 65)
+        self.assertEqual(len(state.controls), 17)
+        self.assertEqual(state.controls[0]["channel"], 2)
+        self.assertEqual(state.controls[0]["controller"], 99)
+        self.assertGreater(state.controls[0]["replaced"], 0)
 
     def test_midi_cc_snapshot_needs_a_value_change_before_indicator(self) -> None:
-        backend = midi_player.MidiPlayerBackend.__new__(midi_player.MidiPlayerBackend)
-        backend._midi_controls = []
-        backend._midi_control_values = {}
-        backend._midi_control_clock = 0
-        backend._midi_control_capacity = 4
-        backend._midi_control_lock = threading.Lock()
+        state = MidiControlState(capacity=4)
 
-        backend.process_midi_control(1, 7, 80)
-        backend.process_midi_control(1, 10, 64)
-        backend.process_midi_control(2, 7, 80)
-        backend.process_midi_control(2, 10, 64)
-        self.assertEqual(backend._midi_controls, [])
+        state.observe(1, 7, 80)
+        state.observe(1, 10, 64)
+        state.observe(2, 7, 80)
+        state.observe(2, 10, 64)
+        self.assertEqual(state.controls, [])
 
-        backend.process_midi_control(2, 7, 81)
+        state.observe(2, 7, 81)
         self.assertEqual(
-            [(item["channel"], item["controller"]) for item in backend._midi_controls],
+            [(item["channel"], item["controller"]) for item in state.controls],
             [(2, 7)],
         )
 
     def test_midi_lru_replaces_exactly_the_oldest_changed_control(self) -> None:
-        backend = midi_player.MidiPlayerBackend.__new__(midi_player.MidiPlayerBackend)
-        backend._midi_controls = []
-        backend._midi_control_values = {}
-        backend._midi_control_clock = 0
-        backend._midi_control_capacity = 3
-        backend._midi_control_lock = threading.Lock()
+        state = MidiControlState(capacity=3)
 
         for controller in (10, 11, 12):
-            backend.process_midi_control(1, controller, 0)
-            backend.process_midi_control(1, controller, 1)
-        backend.process_midi_control(1, 10, 2)
-        backend.process_midi_control(1, 13, 0)
-        backend.process_midi_control(1, 13, 1)
+            state.observe(1, controller, 0)
+            state.observe(1, controller, 1)
+        state.observe(1, 10, 2)
+        state.observe(1, 13, 0)
+        state.observe(1, 13, 1)
 
         keys = {
             (item["channel"], item["controller"])
-            for item in backend._midi_controls
+            for item in state.controls
         }
         self.assertEqual(keys, {(1, 10), (1, 12), (1, 13)})
 

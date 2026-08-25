@@ -23,10 +23,12 @@ the same tuning and AMY wire-note path.
 
 ## MIDI control activity
 
-Raw MIDI Control Change messages are observed but do not alter musical state.
-The MIDI screen shows at most six grey radio-style knobs identified by channel
-and controller. Values rotate the knob. A previously unseen controller replaces
-the least recently active knob when full, and the replacement flashes twice.
+Raw MIDI Control Change messages establish baselines and show grey radio-style
+activity knobs identified by channel and controller. Unbound controls do not
+alter musical state. Explicit one-to-one MIDI-learn bindings may route later
+genuine changes to numeric controls as specified in `midi_control.md`. Capacity
+is calculated from the available width; eligible indicators use genuine-change
+LRU replacement and the outgoing knob flashes red twice.
 
 ## Physical strings
 

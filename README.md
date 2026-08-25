@@ -1,31 +1,44 @@
-# LB_Omnichord
+# LB Omnichord
 
-**Luciel's Birthday Omnichord** is a touchscreen chord instrument built around Sonic Pi, a Qt Quick/PySide6 user interface and OSC.
+**LB Omnichord** is a touch-first electronic chord instrument inspired by the
+classic Omnichord idea: select chords with one hand, then play or strum them
+with the other. It is not a software copy of a particular Suzuki instrument;
+it expands the concept with independent synth voices, bass, rhythms, presets,
+tuning systems, effects and MIDI control.
 
-![plot](./screenshots/lb_omnichord.png)
+The actively maintained version uses a Qt Quick/PySide6 interface and the
+[LB Omnichord AMY fork](https://github.com/linuxificator/amy), derived from the
+[AMY (amysynth)](https://github.com/shorepine/amy) sound engine. The supported
+fork is pinned for builds and native tests. The interface sends AMY wire
+commands to either a separate local synth service or an ESP32-P4 hardware
+target.
 
-It started from the basic Omnichord idea: one hand selects chords, the other hand plays or strums over them. I did not try to make an exact software copy of a particular Suzuki Omnichord. The useful part of the concept is the separation between chord selection and the strum surface, and from there the instrument grew into something with its own synths, bass, rhythm section, presets and tuning systems.
+Originally created as a birthday gift for Luciel.
 
-This version was made as a birthday gift for Luciel.
+## OMNI performance screen
 
-The design is deliberately split in two:
+![LB Omnichord OMNI performance screen](./amysynth_version/qt_frontend/screenshots/omni.png)
 
-```text
-Qt Quick / Python
-    touch UI
-    chord and preset state
-    synth/rhythm configuration
-    tuning calculations
-           |
-           | OSC, normally localhost:4560
-           v
-Sonic Pi
-    synths
-    samples
-    timing
-    sustained/manual chord voices
-    rhythm + chord + bass scheduling
-```
+The OMNI screen is the self-contained instrument: choose and voice chords,
+play the strum surface, build rhythms, and shape the independent bass, strum
+and chord synths. Performance controls include instrument presets, percussion,
+reverb, tuning and per-part volume.
 
-Above is for the sonic pi version, you can find the original sonic pi version [here](./rpi_sonic_pi_version) 
-Sonic pi works with supercollider as a synth, it can be a bit resource intensive, so I'm working on an amysynth version.
+## MIDI performance screen
+
+![LB Omnichord MIDI performance screen](./amysynth_version/qt_frontend/screenshots/midi.png)
+
+The MIDI screen provides six configurable parts with their own instrument,
+synthesis controls and volume. Incoming MIDI can play the AMY instruments and
+MIDI CC learn can bind physical controls directly to continuous parameters on
+both the MIDI and OMNI screens.
+
+## Get started
+
+- [Install and run the Qt/AMY application](./amysynth_version/qt_frontend/INSTALL.md)
+- [Read the active AMY implementation overview](./amysynth_version/README.md)
+- [Browse the design documentation](./amysynth_version/design/README.md)
+- [Download packaged releases](https://github.com/linuxificator/LB_Omnichord/releases)
+
+The original Sonic Pi implementation is retained as
+[historical code](./rpi_sonic_pi_version) and is no longer the active version.

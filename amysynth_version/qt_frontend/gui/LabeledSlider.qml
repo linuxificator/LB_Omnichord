@@ -16,8 +16,32 @@ Item {
     property color fillColor: "#c59518"
     property color handleColor: "#fffbea"
     property color borderColor: "#8a6810"
+    property var midiControlRouter: null
+    property var midiTarget: ({})
+    property bool midiBindingGesture: false
+    property int midiMoveCount: 0
+    property double midiPressStarted: 0
+
+    readonly property bool midiBound: {
+        if (root.midiControlRouter === null)
+            return false
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.isControlTargetBound(root.midiTarget)
+    }
 
     signal edited(real value)
+    signal activated()
+
+    function beginMidiInteraction() {
+        if (root.midiControlRouter === null)
+            return false
+        const learned = root.midiControlRouter.activateControlTarget(
+            root.midiTarget
+        )
+        if (!learned)
+            root.midiControlRouter.controlTargetTapped(root.midiTarget)
+        return learned
+    }
 
     Text {
         anchors.left: parent.left
@@ -52,8 +76,32 @@ Item {
         live: true
         snapMode: Slider.SnapAlways
 
-        onMoved:
+        onPressedChanged: {
+            if (pressed) {
+                root.midiMoveCount = 0
+                root.midiPressStarted = Date.now()
+                root.midiBindingGesture = root.beginMidiInteraction()
+                root.activated()
+            } else {
+                root.midiBindingGesture = false
+            }
+        }
+
+        onMoved: {
+            if (root.midiBindingGesture)
+                return
+            root.midiMoveCount += 1
+            if (
+                root.midiControlRouter !== null
+                && (
+                    root.midiMoveCount >= 2
+                    || Date.now() - root.midiPressStarted >= 180
+                )
+            ) {
+                root.midiControlRouter.controlTargetMoved(root.midiTarget)
+            }
             root.edited(value)
+        }
 
         background: Rectangle {
             x: slider.leftPadding
@@ -91,7 +139,7 @@ Item {
             width: 19
             height: 19
             radius: 10
-            color: root.handleColor
+            color: root.midiBound ? "#35b85a" : root.handleColor
             border.color: root.borderColor
             border.width: 2
         }

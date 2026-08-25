@@ -118,6 +118,11 @@ Item {
             toValue: 200
             stepValue: 1
             decimals: 0
+            midiControlRouter: root.controller.midiPlayer
+            midiTarget: ({
+                "screen": "omni",
+                "kind": "rhythm_tempo"
+            })
 
             onEdited: (value) =>
                 root.controller.setRhythmTempo(value)
@@ -215,6 +220,11 @@ Item {
                 fillColor: "#c59518"
                 handleColor: "#fffbea"
                 borderColor: "#8a6810"
+                midiControlRouter: root.controller.midiPlayer
+                midiTarget: ({
+                    "screen": "omni",
+                    "kind": "bass_voicing"
+                })
 
                 onEdited: (value) =>
                     root.controller

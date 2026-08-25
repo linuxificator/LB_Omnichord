@@ -258,6 +258,8 @@ ApplicationWindow {
                     width: 520
                     height: parent.height
                     controller: backend
+                    midiControlRouter: backend.midiPlayer
+                    controlScreen: "omni"
                 }
 
                 Text {
@@ -627,6 +629,12 @@ ApplicationWindow {
                 panelBorderColor: "#aa8719"
                 fillColor: "#d69b10"
                 textColor: "#4c3505"
+                midiControlRouter: backend.midiPlayer
+                midiTarget: ({
+                    "screen": "omni",
+                    "kind": "volume",
+                    "role": "percussion"
+                })
 
                 onEdited: (value) =>
                     backend.setPercussionVolume(
@@ -646,6 +654,12 @@ ApplicationWindow {
                 panelBorderColor: "#6d6d68"
                 fillColor: "#686864"
                 textColor: "#242422"
+                midiControlRouter: backend.midiPlayer
+                midiTarget: ({
+                    "screen": "omni",
+                    "kind": "volume",
+                    "role": "bass"
+                })
 
                 onEdited: (value) =>
                     backend.setBassVolume(value)
@@ -663,6 +677,12 @@ ApplicationWindow {
                 panelBorderColor: "#4b95c4"
                 fillColor: "#18a8e0"
                 textColor: "#08243d"
+                midiControlRouter: backend.midiPlayer
+                midiTarget: ({
+                    "screen": "omni",
+                    "kind": "volume",
+                    "role": "strum"
+                })
 
                 onEdited: (value) =>
                     backend.setStrumVolume(value)
@@ -680,6 +700,12 @@ ApplicationWindow {
                 panelBorderColor: "#58855b"
                 fillColor: "#3d9348"
                 textColor: "#14321a"
+                midiControlRouter: backend.midiPlayer
+                midiTarget: ({
+                    "screen": "omni",
+                    "kind": "volume",
+                    "role": "chord"
+                })
 
                 onEdited: (value) =>
                     backend.setChordVolume(value)
@@ -1341,6 +1367,51 @@ ApplicationWindow {
                                 backend.copyStrumToChord()
                         }
                     }
+                }
+            }
+
+            Rectangle {
+                id: omniMidiControlLed
+
+                readonly property string controlState:
+                    backend.midiPlayer.omniControlLedState
+                readonly property real gapLeft:
+                    window.contentX
+                    + window.rowIndent
+                    + window.chordRowContentWidth
+                readonly property real gapRight:
+                    window.strumX
+
+                x:
+                    gapLeft
+                    + (
+                        gapRight
+                        - gapLeft
+                        - width
+                    ) / 2
+                y:
+                    window.chordRowsY
+                    + window.rowHeight
+                    + window.rowSpacing
+                    + (window.rowHeight - height) / 2
+                width: 16
+                height: 16
+                radius: 8
+                color: {
+                    if (controlState === "learn")
+                        return "#f22b2b"
+                    if (controlState === "blue")
+                        return "#3186d7"
+                    return "#a5a5a0"
+                }
+                border.color: "#696965"
+                border.width: 1
+
+                SequentialAnimation on opacity {
+                    running: omniMidiControlLed.controlState === "learn"
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 1.0; to: 0.2; duration: 240 }
+                    NumberAnimation { from: 0.2; to: 1.0; duration: 240 }
                 }
             }
 

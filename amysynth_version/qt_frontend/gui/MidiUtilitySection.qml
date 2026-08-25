@@ -177,6 +177,11 @@ Item {
         panelBorderColor: "#a75d0a"
         fillColor: "#cc6f0c"
         textColor: "#492606"
+        midiControlRouter: root.controller
+        midiTarget: ({
+            "screen": "midi",
+            "kind": "tuning_reference"
+        })
 
         onEdited: (value) => root.controller.setTuningReference(value)
     }

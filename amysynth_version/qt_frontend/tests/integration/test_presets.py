@@ -8,6 +8,81 @@ from harness import HeadlessApp
 
 
 class PresetIntegrationTests(unittest.TestCase):
+    def test_midi_control_bindings_are_owned_by_their_screen_presets(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            midi_target = {
+                "screen": "midi",
+                "kind": "volume",
+                "row": 0,
+            }
+            omni_target = {
+                "screen": "omni",
+                "kind": "volume",
+                "role": "chord",
+            }
+
+            for channel, controller, target in (
+                (1, 20, midi_target),
+                (2, 21, omni_target),
+            ):
+                app.action("injectMidiControl", channel, controller, 0)
+                app.action("injectMidiControl", channel, controller, 1)
+                app.action(
+                    "selectMidiControlIndicator",
+                    channel,
+                    controller,
+                )
+                self.assertTrue(
+                    app.action("activateMidiControlTarget", target)
+                )
+
+            app.action("storeSelectedMidiPreset")
+            app.action("storeSelectedPreset")
+            midi_data = json.loads(
+                (
+                    app.home
+                    / ".omnichord"
+                    / "midi_presets"
+                    / "m1.json"
+                ).read_text(encoding="utf-8")
+            )
+            omni_data = json.loads(
+                (
+                    app.home
+                    / ".omnichord"
+                    / "omni_presets"
+                    / "p1.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                midi_data["midi_control_bindings"][0]["controller"],
+                20,
+            )
+            self.assertEqual(
+                midi_data["midi_control_bindings"][0]["target"]["screen"],
+                "midi",
+            )
+            self.assertEqual(
+                omni_data["midi_control_bindings"][0]["controller"],
+                21,
+            )
+            self.assertEqual(
+                omni_data["midi_control_bindings"][0]["target"]["screen"],
+                "omni",
+            )
+
+            app.action("selectMidiPreset", 2)
+            app.action("selectPreset", 2)
+            app.action("selectMidiPreset", 1)
+            app.action("selectPreset", 1)
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(1, 20)], "bound")
+            self.assertEqual(states[(2, 21)], "bound")
+
     def test_store_persists_all_modified_instruments_sparse(self) -> None:
         labels = [
             "Repeater",

@@ -142,6 +142,86 @@ The serial regression requires the factory patch to remain authoritative for nat
 - `midiPlayer` is exposed to QML as a `QObject`, so all four reverb slots are
   callable rather than opaque QVariant/Python attributes.
 
+**MIDI-CC-01 — only genuine CC movement creates activity**
+
+- Controller identity is `(channel, controller)`.
+- The first value is a baseline and produces no indicator or mapped edit.
+- Repeated identical values produce no activity.
+- A later changed value creates/updates the indicator and its LRU timestamp.
+- Raw running-status CC bytes must satisfy the same behavior.
+
+**MIDI-CC-02 — visible capacity, LRU and outgoing animation**
+
+- Indicators fill the calculated bar capacity from left to right.
+- Refreshing an existing controller makes that controller newest.
+- A new changed controller replaces the oldest eligible controller when full.
+- The outgoing channel/controller remains visible in red for two flashes before
+  the incoming identity is displayed.
+- Red learn controls are never evicted. Blue controls are protected unless all
+  slots are protected, in which case the oldest blue control leaves early.
+- Green bindings may become invisible without losing their mapping; activity
+  makes a hidden binding visible again when an eligible slot exists.
+
+**MIDI-CC-03 — one red learn selection and LED state**
+
+- Clicking an idle, green or blue indicator selects exactly one blinking red
+  learn controller.
+- Clicking another transfers red selection.
+- Clicking the red controller again cancels learn and turns it off.
+- The OMNI status LED mirrors red learn state without exposing controller
+  details.
+- The OMNI LED is vertically centered on chord row two and horizontally
+  centered in the free gap between that indented row and the strum surface.
+
+**MIDI-CC-04 — one-to-one binding and complete numeric target coverage**
+
+- Touching a numeric target while red binds it and consumes that gesture.
+- Instrument parameters, volumes, both reverb sections, both tuning references,
+  tempo and bass voicing are bindable; switches/selectors are not.
+- One CC owns at most one target and one target owns at most one CC.
+- Reassigning an occupied target turns the displaced controller blue.
+- The target handle and bound controller LED are steady green.
+
+**MIDI-CC-05 — range mapping and normal backend convergence**
+
+- CC 0 and 127 reach the target minimum and maximum.
+- Linear targets map linearly and logarithmic targets map across logarithmic
+  visual slider travel, then round/clamp to catalogue range and step.
+- Binding alone does not jump the value; the next genuine CC change applies it.
+- Updates use existing setters and emit the same AMY wire state as manual edits.
+
+**MIDI-CC-06 — deliberate manual unlink and blue expiry**
+
+- The learning touch cannot unlink the new binding in the same gesture.
+- One click on a bound target does not unlink.
+- A real drag unlinks immediately; a second press within 550 ms also unlinks.
+- The controller becomes blue and visible when capacity permits.
+- Blue state expires and removes the indicator after 30 seconds; later genuine
+  activity may create an ordinary indicator again.
+
+**MIDI-CC-07 — hidden instrument targets reactivate on MIDI and OMNI**
+
+- A synth-parameter target retains its row/role, instrument key and control key.
+- Switching that row/role to another instrument does not delete the binding.
+- Later mapped CC movement switches the MIDI row or OMNI role back to the bound
+  instrument before applying its parameter.
+- Tests inspect frontend state and delivered AMY commands after the switch.
+
+**MIDI-CC-08 — screen-owned preset persistence**
+
+- MIDI targets serialize only into the MIDI preset; OMNI targets only into the
+  OMNI preset.
+- Loading replaces only the selected screen's bindings and admits their
+  indicators as capacity permits.
+- Old presets without `midi_control_bindings` load normally with no bindings.
+- Red/blue/visible-LRU state and current CC values are not serialized.
+
+Unit tests cover the state machine and mapping math. Headless frontend tests use
+simulated user actions plus simulated MIDI CC input and inspect state, preset
+JSON and AMY output. The offscreen Qt test feeds real raw-MIDI bytes, records
+JSONL indicator/layout state and verifies the replacement transition fits the
+actual bar.
+
 ### INSTRUMENT — selected patch identity
 
 **INST-01 — selecting an instrument changes the manual chord synth**

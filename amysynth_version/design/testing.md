@@ -148,5 +148,12 @@ Important regression tests:
 - APG and chord-family LDR strum note sets remain deterministic
 - MIDI CC running status updates indicators without changing musical state;
   indicators fill the available width before least-recently-used replacement
+- MIDI CC learn permits one red controller, binds every continuous numeric
+  control family one-to-one, maps logarithmic sliders over visual travel,
+  protects red/blue indicators, preserves hidden instrument-specific bindings,
+  unlinks on drag/double-tap, expires blue state and persists bindings in the
+  owning MIDI or OMNI preset
+- the OMNI MIDI-control LED remains centered in the available horizontal gap
+  between chord row two and the strum surface
 - instrument balance captures cover low/middle/high registers and report RMS,
   peak, crest factor and clipping

@@ -1,0 +1,173 @@
+# MIDI Control Learn and Binding
+
+This document is the behavioral contract for MIDI Control Change indicators,
+MIDI-learn slider bindings, preset ownership and the corresponding OMNI status
+LED. It resolves the implementation notes in `midi_control.txt`.
+
+## Controller identity and genuine movement
+
+A controller is identified by the pair `(MIDI channel, controller number)`.
+Channels 1–16 and controllers 0–127 are independent identities, even when the
+controller numbers match.
+
+The first received value establishes a baseline. A repeated identical value is
+ignored. Only a later different value is genuine controller movement. This
+prevents controller snapshots sent during a channel or preset switch from
+creating indicators, selecting instruments or changing audio state.
+
+## Indicator bar and LRU behavior
+
+The grey MIDI bar fills from left to right to the capacity calculated from its
+current width. Every visible indicator shows its channel, controller number and
+latest value. The radio knob rotates across 270 degrees for MIDI values 0–127.
+
+When the bar is full, a genuinely moving controller which is not visible takes
+the slot of the least recently moved eligible controller. Pointer interaction
+does not update LRU age; only genuine incoming CC movement does. Before the new
+controller is displayed, the outgoing knob becomes red and flashes twice.
+
+Visibility and binding are separate state:
+
+- idle and green/bound indicators are normally eligible for LRU replacement;
+- a red/learn indicator is never replaced;
+- blue/unbound indicators are protected for up to 30 seconds;
+- if every available slot is red or blue, the oldest blue indicator may be
+  removed before 30 seconds so new activity can be shown;
+- an invisible green binding remains active;
+- genuine activity from an invisible bound controller tries to make it visible
+  using the same LRU rules.
+
+## LED states and selection
+
+Each MIDI indicator has one LED:
+
+| State | LED | Meaning |
+| --- | --- | --- |
+| `idle` | dark grey | visible activity indicator, not selected or bound |
+| `learn` | blinking red | the one controller waiting for a slider target |
+| `bound` | steady green | controller has a persistent slider binding |
+| `blue` | steady blue | binding was manually removed |
+| `evicting` | red outgoing knob | old indicator is flashing before replacement |
+
+Clicking an idle, green or blue indicator makes it the single red learn
+controller. Selecting another indicator transfers the red learn state. Clicking
+the already-red indicator cancels learn and turns it off. Starting relearn from
+a green indicator removes its old binding without creating an intermediate blue
+state.
+
+## Binding and manual unlink
+
+While one indicator is red, touching any supported numeric control binds that
+controller to the touched target. The binding gesture is consumed: it does not
+also edit or unlink the target. The slider handle and MIDI indicator LED become
+green.
+
+Bindings are globally one-to-one:
+
+- one channel/controller pair controls at most one target;
+- one target is controlled by at most one channel/controller pair;
+- assigning an occupied target to another controller unbinds the old controller
+  and makes that old indicator blue.
+
+A confirmed drag of a bound draggable slider unbinds it and applies the manual
+edit. The QML control confirms dragging from repeated move callbacks or movement
+held for at least 180 ms, so a single track click does not unlink. Two presses
+of the same bound target within 550 ms form the current double-tap gesture and unlink it. This also works
+for click-only numeric controls such as volume and tuning. Unlinking makes the
+controller LED blue and ensures that controller is visible when capacity allows.
+After 30 seconds the blue state and its indicator are removed. A later genuine
+CC change can create an ordinary indicator again.
+
+## Supported targets and range mapping
+
+Every continuous numeric control is bindable:
+
+- MIDI and OMNI instrument parameters;
+- all MIDI and OMNI role volumes, including percussion;
+- OMNI and MIDI reverb level, liveness and damping;
+- OMNI and MIDI tuning reference;
+- rhythm tempo;
+- bass voicing.
+
+Buttons, switches, activity selectors, instrument tumblers and tuning-mode
+selectors are not slider targets.
+
+MIDI 0–127 maps over the complete visible slider travel. Linear sliders map
+linearly. Logarithmic controls such as frequency map logarithmically, matching
+the QML slider path. The result is rounded to the control's declared step and
+clamped to its current catalogue/application range. Instrument catalogue ranges
+are authoritative.
+
+Binding does not immediately jump the slider to the controller's remembered
+value. The next genuine incoming CC movement applies the mapped value through
+the same backend setter used by manual UI editing.
+
+## Instrument-specific targets
+
+An instrument parameter binding stores the stable instrument key as part of its
+target, in addition to its MIDI row or OMNI role and control key. Selecting
+another instrument does not move or delete that binding. When its controller
+moves, the relevant MIDI row or OMNI role first switches back to the bound
+instrument and then applies the mapped parameter through the normal
+`SynthState`/AMY-wire convergence path.
+
+## Presets
+
+Only green bindings are persisted. Red learn selection, blue timers, indicator
+LRU age and current CC values are runtime state.
+
+- MIDI-target bindings are stored in the selected MIDI preset.
+- OMNI-target bindings are stored in the selected OMNI preset.
+- the optional JSON field is `midi_control_bindings`;
+- presets without the field load with no bindings for that screen;
+- loading a preset replaces only that screen's bindings;
+- valid loaded bindings are admitted to the indicator bar as capacity permits;
+- global one-to-one ownership still applies if separately stored presets assign
+  the same controller to different screens.
+
+## OMNI status LED
+
+The OMNI screen shows one status LED vertically centered on the second chord
+row. Horizontally it is centered in the complete free gap between the right
+edge of that indented chord row and the left edge of the strum surface. It must
+not be centered under the first-row strum-to-chord copy button or left touching
+the second chord row.
+
+The LED is dark grey normally, blinks red while any controller is in learn
+state and is blue while at least one controller is in the temporary unbound
+state. MIDI indicator details remain visible only on the MIDI screen. Switching
+screens does not change learn, binding or musical state.
+
+## Thread and AMY boundaries
+
+Raw MIDI bytes are parsed on the existing background reader. Genuine CC changes
+are queued onto the Qt object thread before they mutate application state.
+Mapped updates call the existing MIDI/OMNI setters; they do not introduce a
+second synth-state path, call AMY directly or change the socket/serial wire
+boundary.
+
+## Implementation map
+
+The behavior is intentionally split along existing responsibilities:
+
+- `../qt_frontend/code/midi_control.py` contains the transport-independent
+  `MidiControlState` state machine for controller identity, genuine movement,
+  LRU visibility, LED states, one-to-one bindings and serialization.
+- `../qt_frontend/code/midi_player.py` owns that state, queues raw CC changes
+  onto the Qt object thread, resolves target ranges and calls the existing
+  MIDI/OMNI setters.
+- `../qt_frontend/code/midi_integration.py` connects OMNI preset ownership and
+  exposes the narrow integration-test actions. It does not create a second
+  binding state.
+- `../qt_frontend/gui/MidiScreen.qml` renders the MIDI indicator bar;
+  `Main.qml` renders the OMNI status LED. `ParameterSlider.qml`,
+  `LabeledSlider.qml`, `VerticalVolume.qml` and `TapNumber.qml` implement the
+  shared bind/unlink gestures used by their owning sections.
+- `../qt_frontend/tests/test_midi_control_bindings.py` tests the pure state
+  machine; `test_midi_engine.py` tests mapping; `test_midi_cc_qt.py` tests real
+  Qt/raw-MIDI indicator behavior; `test_static_contracts.py` protects QML
+  wiring and layout; integration tests in `tests/integration/test_frontend.py`
+  and `test_presets.py` cover AMY convergence and screen-owned persistence.
+
+Executable user scenarios are `MIDI-CC-01` through `MIDI-CC-08` in
+`../qt_frontend/tests/USE_CASES.md`.

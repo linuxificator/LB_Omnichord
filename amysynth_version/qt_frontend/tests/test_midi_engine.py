@@ -9,7 +9,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
-from midi_player import MidiAmyEngine  # noqa: E402
+from midi_player import MidiAmyEngine, MidiPlayerBackend  # noqa: E402
 from synth_state import SynthState  # noqa: E402
 
 
@@ -51,6 +51,40 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_cc_mapping_follows_logarithmic_visual_slider_travel(self) -> None:
+        class Control:
+            key = "filter_hz"
+            minimum = 20.0
+            maximum = 20000.0
+            step = 1.0
+            scale = "log"
+
+        class Definition:
+            key = "filter_patch"
+            controls = (Control(),)
+
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.definitions = (Definition(),)
+        backend.owner = type("Owner", (), {"_synths": ()})()
+        target = {
+            "id": "midi:synth_control:0:filter_patch:filter_hz",
+            "screen": "midi",
+            "kind": "synth_control",
+            "row": 0,
+            "instrument": "filter_patch",
+            "control": "filter_hz",
+        }
+
+        middle = backend._mapped_target_value(target, 64)
+
+        self.assertIsNotNone(middle)
+        assert middle is not None
+        expected = round(
+            20.0 * (20000.0 / 20.0) ** (64.0 / 127.0)
+        )
+        self.assertEqual(middle, expected)
+        self.assertNotAlmostEqual(middle, (20.0 + 20000.0) / 2.0)
+
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
         client = _Client()
         client.config["instrument_levels"] = {"dx7_215": 0.4}

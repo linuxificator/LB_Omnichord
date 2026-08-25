@@ -11,9 +11,37 @@ Item {
     property color fillColor: "#426f4c"
     property color handleColor: "#f4fff5"
     property color borderColor: "#315b39"
+    property var midiControlRouter: null
+    property var midiTarget: ({})
+    property bool midiBindingGesture: false
+    property int midiMoveCount: 0
+    property double midiPressStarted: 0
+
+    readonly property bool midiBound: {
+        if (root.midiControlRouter === null)
+            return false
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.isControlTargetBound(root.midiTarget)
+    }
 
     signal edited(string key, real value)
     signal activated()
+
+    function beginMidiInteraction() {
+        if (root.midiControlRouter === null)
+            return false
+        const learned = root.midiControlRouter.activateControlTarget(
+            root.midiTarget
+        )
+        if (!learned)
+            root.midiControlRouter.controlTargetTapped(root.midiTarget)
+        return learned
+    }
+
+    function moveMidiInteraction() {
+        if (root.midiControlRouter !== null)
+            root.midiControlRouter.controlTargetMoved(root.midiTarget)
+    }
 
     function isLogScale() {
         return String(root.control.scale || "linear") === "log"
@@ -97,15 +125,31 @@ Item {
             root.syncSliderValue()
 
         onPressedChanged: {
-            if (pressed)
+            if (pressed) {
+                root.midiMoveCount = 0
+                root.midiPressStarted = Date.now()
+                root.midiBindingGesture = root.beginMidiInteraction()
                 root.activated()
+            } else {
+                root.midiBindingGesture = false
+            }
         }
 
-        onMoved:
+        onMoved: {
+            if (root.midiBindingGesture)
+                return
+            root.midiMoveCount += 1
+            if (
+                root.midiMoveCount >= 2
+                || Date.now() - root.midiPressStarted >= 180
+            ) {
+                root.moveMidiInteraction()
+            }
             root.edited(
                 root.control.key,
                 root.sliderToControl(value)
             )
+        }
 
         background: Rectangle {
             x: slider.leftPadding
@@ -143,7 +187,7 @@ Item {
             width: 18
             height: 18
             radius: 9
-            color: root.handleColor
+            color: root.midiBound ? "#35b85a" : root.handleColor
             border.color: root.borderColor
             border.width: 2
         }
