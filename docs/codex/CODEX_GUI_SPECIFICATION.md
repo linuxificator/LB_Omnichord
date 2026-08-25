@@ -1,52 +1,86 @@
-# LB Omnichord - GUI specification
+# LB Omnichord GUI Specification
 
-## Status
+## Purpose
+This document is the GUI authority for Codex. It describes the intended user experience and the boundary between UI and synthesis. Missing information must be resolved from confirmed project history; Codex must not invent a new UI design.
 
-This document contains verified GUI decisions. It must be extended with the complete extraction from the ChatGPT export before being considered complete.
+## Architecture boundary
 
-## Current confirmed decisions
+The Qt frontend is a user interface and controller only.
 
-### Framework
+Responsibilities:
+- display the instrument;
+- process mouse and touch input;
+- maintain UI state;
+- create AMY wire protocol commands.
 
-- Qt frontend is the active implementation.
-- Sonic Pi UI is historical only.
-- The UI communicates with AMY; it is not the synthesizer.
+Non-responsibilities:
+- running AMY internally;
+- importing the AMY Python library as a shortcut;
+- replacing the AMY service architecture.
 
-### Input
+## Interaction model
 
-Supported input:
-- Touch screens.
-- Mouse for desktop development/testing.
+The design is based on the Omnichord concept:
 
-### Core interaction model
+- one area selects chords;
+- another area provides continuous strumming interaction;
+- rhythm and instrument controls are available without breaking the playing flow.
 
-The Omnichord interaction model consists of:
+## Confirmed controls
 
-- chord selection;
-- strum area;
-- rhythm controls;
-- instrument/patch selection.
+The UI contains or is intended to contain:
 
-### Debugging rule
+- chord buttons/selection area;
+- strum interaction surface;
+- rhythm/drum controls;
+- instrument and patch selection;
+- tuning related controls where implemented.
 
-If a UI control does not work:
+## Input requirements
 
-1. Verify the input event.
-2. Verify generated AMY commands.
-3. Verify transport.
-4. Only then investigate AMY.
+Both are required:
 
-## Missing details to complete
+- touch input for the final instrument;
+- mouse input for development and desktop testing.
 
-The following must be extracted from historical chats and screenshots:
+A touch problem must not be diagnosed as an AMY problem without checking the UI event path.
 
-- exact colors;
-- dimensions and placement;
-- background assets;
-- button styling;
-- chord layout;
-- strum visual behavior;
-- rhythm UI behavior;
-- patch selection behavior.
+Debug order:
 
-Do not invent these values.
+1. input event received;
+2. UI state changed;
+3. AMY wire command generated;
+4. socket/serial transport;
+5. AMY parsing;
+6. audio output.
+
+## Visual rules
+
+Confirmed:
+
+- Preserve existing design language and assets.
+- The tuba watermark/background is a deliberate design element in the AMY Qt version history.
+- Technical names must not leak into the user interface. For example, do not display PATCH suffixes merely because AMY internally uses patches.
+
+## Historical implementation notes
+
+Known UI issues and lessons:
+
+- Strum failure was investigated by adding command logging instead of changing the synth architecture.
+- Chord command generation worked while strum input did not, proving that UI event paths must be debugged separately.
+
+## Details still requiring extraction from historical conversations
+
+The full export still needs to populate:
+
+- exact color palette;
+- exact dimensions;
+- widget locations;
+- font choices;
+- screenshots as visual references;
+- animations;
+- final chord layout;
+- final rhythm UI behavior;
+- final patch browser behavior.
+
+Until these are confirmed, Codex must preserve existing implementation and avoid redesign.
