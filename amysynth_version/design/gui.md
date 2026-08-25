@@ -48,6 +48,10 @@ and LED states defined in `midi_control.md`; an unbound knob remains display-onl
 When the bar is full, eligible indicators follow genuine-change LRU replacement
 and the outgoing knob flashes red twice.
 
+The OMNI MIDI-control status LED is vertically centered on the second chord
+row and horizontally centered in the free gap from that row's right edge to
+the strum surface. Its color behavior is defined in `midi_control.md`.
+
 ## UI state versus audio state
 
 UI changes must first update application state and then generate AMY wire commands. The GUI never directly manipulates AMY internals.

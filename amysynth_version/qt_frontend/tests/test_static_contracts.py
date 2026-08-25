@@ -9,6 +9,65 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StaticContractTests(unittest.TestCase):
+    def test_codex_startup_reading_routes_existing_design_contracts(self) -> None:
+        repository = ROOT.parents[1]
+        agents_path = repository / "AGENTS.md"
+        design_root = ROOT.parent / "design"
+        design_index_path = design_root / "README.md"
+
+        agents = agents_path.read_text(encoding="utf-8")
+        design_index = design_index_path.read_text(encoding="utf-8")
+        self.assertIn("## Required Codex startup reading", agents)
+        self.assertIn("amysynth_version/README.md", agents)
+        self.assertIn("amysynth_version/design/README.md", agents)
+        self.assertIn("task-routing table", agents)
+
+        required_design_files = (
+            "principles.md",
+            "architecture.md",
+            "behavior.md",
+            "testing.md",
+            "gui.md",
+            "ui_behavior_reference.md",
+            "midi.md",
+            "midi_control.md",
+            "presets.md",
+            "sound_balance.md",
+            "rhythm_bahavior.md",
+            "tuning.md",
+            "use_cases.md",
+            "amy_interface.md",
+            "unclear.md",
+        )
+        for name in required_design_files:
+            self.assertTrue((design_root / name).is_file(), name)
+            self.assertIn(name, design_index)
+
+        required_frontend_contracts = (
+            ROOT.parent / "README.md",
+            ROOT / "docs" / "CONTROL_SAFETY.md",
+            ROOT / "docs" / "SEQUENCER_TAGS.md",
+            ROOT / "tests" / "USE_CASES.md",
+            ROOT / "instruments" / "README_defaults.md",
+            ROOT.parent / "esp32p4" / "README.md",
+            ROOT.parent / "esp32p4" / "CI_FLASH.md",
+        )
+        for path in required_frontend_contracts:
+            self.assertTrue(path.is_file(), str(path))
+
+    def test_public_readme_uses_current_amy_and_qt_screenshots(self) -> None:
+        repository = ROOT.parents[1]
+        public_readme = (repository / "README.md").read_text(encoding="utf-8")
+        frontend_readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("https://github.com/linuxificator/amy", public_readme)
+        self.assertIn("https://github.com/shorepine/amy", public_readme)
+        self.assertIn("`screenshots/`", frontend_readme)
+        for name in ("omni.png", "midi.png"):
+            relative = f"amysynth_version/qt_frontend/screenshots/{name}"
+            self.assertIn(relative, public_readme)
+            self.assertTrue((repository / relative).is_file(), relative)
+
     def test_midi_qml_uses_its_own_bindable_metaobject(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
         self.assertIn("PySide6>=6.6", requirements)
@@ -102,6 +161,34 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("selectControlIndicator", midi)
         self.assertIn("id: omniMidiControlLed", omni)
         self.assertIn("backend.midiPlayer.omniControlLedState", omni)
+
+    def test_omni_control_led_is_centered_in_the_second_row_gap(self) -> None:
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        start = qml.index("id: omniMidiControlLed")
+        end = qml.index("// Moved left and up", start)
+        led = qml[start:end]
+
+        self.assertRegex(
+            led,
+            r"readonly property real gapLeft:\s*"
+            r"window\.contentX\s*\+\s*window\.rowIndent\s*\+\s*"
+            r"window\.chordRowContentWidth",
+        )
+        self.assertRegex(
+            led,
+            r"readonly property real gapRight:\s*window\.strumX",
+        )
+        self.assertRegex(
+            led,
+            r"x:\s*gapLeft\s*\+\s*\(\s*gapRight\s*-\s*gapLeft\s*"
+            r"-\s*width\s*\)\s*/\s*2",
+        )
+        self.assertRegex(
+            led,
+            r"y:\s*window\.chordRowsY\s*\+\s*window\.rowHeight\s*"
+            r"\+\s*window\.rowSpacing\s*\+\s*"
+            r"\(window\.rowHeight\s*-\s*height\)\s*/\s*2",
+        )
 
     def test_frontend_tree_contains_no_symlinks(self) -> None:
         generated_roots = {"build", "dist", "test-artifacts"}

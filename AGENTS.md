@@ -15,6 +15,26 @@ Do not silently reinterpret an implementation task as an architecture redesign.
 - Keep AMY-related code, instrument definitions, GUI components, tests, and platform-specific code logically separated.
 - When moving files, update and verify all paths rather than duplicating files as a workaround.
 
+## Required Codex startup reading
+
+For every session whose scope may touch the active AMY implementation, Codex
+must complete this reading sequence before planning, diagnosing or editing:
+
+1. Read `amysynth_version/README.md` in full.
+2. Read `amysynth_version/design/README.md` in full.
+3. Read the four baseline contracts selected there: `principles.md`,
+   `architecture.md`, `behavior.md` and `testing.md`.
+4. Use the task-routing table in `design/README.md` and read every document
+   selected for the current subsystem in full, including referenced frontend
+   contracts outside the design directory.
+5. If `CODEX_HANDOFF.md` exists, read it before resuming unfinished work.
+
+Do not treat a previous session summary, the root public README, source-code
+comments or historical notes as a substitute for this startup reading. If the
+task expands into another subsystem, perform the corresponding routed reading
+before changing that subsystem. The current user request remains authoritative
+for immediate scope.
+
 ## Current application architecture
 
 The Omnichord UI and the AMY synthesizer service are separate components/processes where applicable and communicate through the AMY wire protocol over a socket or serial transport.

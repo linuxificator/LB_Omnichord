@@ -7,9 +7,11 @@ it expands the concept with independent synth voices, bass, rhythms, presets,
 tuning systems, effects and MIDI control.
 
 The actively maintained version uses a Qt Quick/PySide6 interface and the
-[AMY (amysynth)](https://github.com/shorepine/amy) sound engine. The interface
-sends AMY wire commands to either a separate local synth service or an
-ESP32-P4 hardware target.
+[LB Omnichord AMY fork](https://github.com/linuxificator/amy), derived from the
+[AMY (amysynth)](https://github.com/shorepine/amy) sound engine. The supported
+fork is pinned for builds and native tests. The interface sends AMY wire
+commands to either a separate local synth service or an ESP32-P4 hardware
+target.
 
 Originally created as a birthday gift for Luciel.
 

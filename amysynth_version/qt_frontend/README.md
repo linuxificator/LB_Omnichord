@@ -10,11 +10,12 @@ AMY work.
 
 ## Layout
 
-- `code/` — Python application/backend (`main.py`, `synth_state.py`, `amy_serial.py`)
+- `code/` — Python application/backend, including synth, transport and MIDI-control state
 - `gui/` — QML interface components and GUI assets
 - `config/` — serial/application defaults
 - `instruments/` — curated AMY Juno/DX7 catalogue and 18 factory presets
 - `music/` — chord, rhythm and intonation definitions
+- `screenshots/` — current public OMNI and MIDI screen images used by the root README
 - `tests/` — unit, headless, serial and native-AMY regression tests plus fixtures
 - `rpi/` — Raspberry Pi startup/autostart helpers
 - `docs/` — ESP32-P4 notes, screenshots and historical implementation notes

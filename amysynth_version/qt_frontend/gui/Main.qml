@@ -1375,13 +1375,18 @@ ApplicationWindow {
 
                 readonly property string controlState:
                     backend.midiPlayer.omniControlLedState
+                readonly property real gapLeft:
+                    window.contentX
+                    + window.rowIndent
+                    + window.chordRowContentWidth
+                readonly property real gapRight:
+                    window.strumX
 
                 x:
-                    (
-                        window.contentX
-                        + window.rowIndent
-                        + window.chordRowContentWidth
-                        + window.strumX
+                    gapLeft
+                    + (
+                        gapRight
+                        - gapLeft
                         - width
                     ) / 2
                 y:

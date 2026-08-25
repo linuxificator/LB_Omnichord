@@ -153,5 +153,7 @@ Important regression tests:
   protects red/blue indicators, preserves hidden instrument-specific bindings,
   unlinks on drag/double-tap, expires blue state and persists bindings in the
   owning MIDI or OMNI preset
+- the OMNI MIDI-control LED remains centered in the available horizontal gap
+  between chord row two and the strum surface
 - instrument balance captures cover low/middle/high registers and report RMS,
   peak, crest factor and clipping

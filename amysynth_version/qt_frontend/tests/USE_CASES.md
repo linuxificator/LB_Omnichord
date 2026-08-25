@@ -170,6 +170,8 @@ The serial regression requires the factory patch to remain authoritative for nat
 - Clicking the red controller again cancels learn and turns it off.
 - The OMNI status LED mirrors red learn state without exposing controller
   details.
+- The OMNI LED is vertically centered on chord row two and horizontally
+  centered in the free gap between that indented row and the strum surface.
 
 **MIDI-CC-04 — one-to-one binding and complete numeric target coverage**
 

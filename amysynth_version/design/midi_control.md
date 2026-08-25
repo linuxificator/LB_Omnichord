@@ -127,11 +127,16 @@ LRU age and current CC values are runtime state.
 
 ## OMNI status LED
 
-The OMNI screen shows one status LED below the strum-to-chord copy button. It is
-dark grey normally, blinks red while any controller is in learn state and is
-blue while at least one controller is in the temporary unbound state. MIDI
-indicator details remain visible only on the MIDI screen. Switching screens
-does not change learn, binding or musical state.
+The OMNI screen shows one status LED vertically centered on the second chord
+row. Horizontally it is centered in the complete free gap between the right
+edge of that indented chord row and the left edge of the strum surface. It must
+not be centered under the first-row strum-to-chord copy button or left touching
+the second chord row.
+
+The LED is dark grey normally, blinks red while any controller is in learn
+state and is blue while at least one controller is in the temporary unbound
+state. MIDI indicator details remain visible only on the MIDI screen. Switching
+screens does not change learn, binding or musical state.
 
 ## Thread and AMY boundaries
 
@@ -140,3 +145,29 @@ are queued onto the Qt object thread before they mutate application state.
 Mapped updates call the existing MIDI/OMNI setters; they do not introduce a
 second synth-state path, call AMY directly or change the socket/serial wire
 boundary.
+
+## Implementation map
+
+The behavior is intentionally split along existing responsibilities:
+
+- `../qt_frontend/code/midi_control.py` contains the transport-independent
+  `MidiControlState` state machine for controller identity, genuine movement,
+  LRU visibility, LED states, one-to-one bindings and serialization.
+- `../qt_frontend/code/midi_player.py` owns that state, queues raw CC changes
+  onto the Qt object thread, resolves target ranges and calls the existing
+  MIDI/OMNI setters.
+- `../qt_frontend/code/midi_integration.py` connects OMNI preset ownership and
+  exposes the narrow integration-test actions. It does not create a second
+  binding state.
+- `../qt_frontend/gui/MidiScreen.qml` renders the MIDI indicator bar;
+  `Main.qml` renders the OMNI status LED. `ParameterSlider.qml`,
+  `LabeledSlider.qml`, `VerticalVolume.qml` and `TapNumber.qml` implement the
+  shared bind/unlink gestures used by their owning sections.
+- `../qt_frontend/tests/test_midi_control_bindings.py` tests the pure state
+  machine; `test_midi_engine.py` tests mapping; `test_midi_cc_qt.py` tests real
+  Qt/raw-MIDI indicator behavior; `test_static_contracts.py` protects QML
+  wiring and layout; integration tests in `tests/integration/test_frontend.py`
+  and `test_presets.py` cover AMY convergence and screen-owned persistence.
+
+Executable user scenarios are `MIDI-CC-01` through `MIDI-CC-08` in
+`../qt_frontend/tests/USE_CASES.md`.
