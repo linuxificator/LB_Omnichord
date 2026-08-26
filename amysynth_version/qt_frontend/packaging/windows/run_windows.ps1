@@ -12,11 +12,14 @@ New-Item -ItemType Directory -Force -Path $socketDir | Out-Null
 $serviceArguments = @("--socket", $socket)
 $serviceOutput = $null
 $serviceError = $null
+$smokeStatus = $null
 if ($SmokeTest) {
     $serviceArguments += @("--no-audio", "--once")
     $serviceOutput = Join-Path $env:TEMP "lb-omnichord-amy-smoke.out"
     $serviceError = Join-Path $env:TEMP "lb-omnichord-amy-smoke.err"
-    Remove-Item -Force -ErrorAction SilentlyContinue $serviceOutput, $serviceError
+    $smokeStatus = Join-Path $env:TEMP "lb-omnichord-frontend-smoke.status"
+    Remove-Item -Force -ErrorAction SilentlyContinue `
+        $serviceOutput, $serviceError, $smokeStatus
     $service = Start-Process -FilePath (Join-Path $root "amy_service.exe") `
         -ArgumentList $serviceArguments -PassThru -NoNewWindow `
         -RedirectStandardOutput $serviceOutput -RedirectStandardError $serviceError
@@ -39,16 +42,34 @@ try {
         $arguments += "--package-smoke-test"
         $env:QT_QPA_PLATFORM = "offscreen"
         $env:QT_QUICK_BACKEND = "software"
+        $env:OMNICHORD_PACKAGE_SMOKE_STATUS = $smokeStatus
         $frontend = Start-Process -FilePath (Join-Path $root "LB_Omnichord.exe") `
             -ArgumentList $arguments -PassThru
         if (-not $frontend.WaitForExit(30000)) {
+            $commandLine = (Get-CimInstance Win32_Process `
+                -Filter "ProcessId = $($frontend.Id)").CommandLine
+            $status = if (Test-Path $smokeStatus) {
+                Get-Content -Raw $smokeStatus
+            } else { "<no frontend checkpoints>" }
+            $serviceLog = if (Test-Path $serviceOutput) {
+                Get-Content -Raw $serviceOutput
+            } else { "<no service output>" }
             Stop-Process -Id $frontend.Id -Force
             $frontend.WaitForExit()
-            throw "Packaged frontend smoke test exceeded its 30 second deadline"
+            throw (
+                "Packaged frontend smoke test exceeded its 30 second deadline`n" +
+                "Command: $commandLine`nCheckpoints:`n$status`nService:`n$serviceLog"
+            )
         }
         $frontend.WaitForExit()
         if ($frontend.ExitCode -ne 0) {
             throw "Packaged frontend smoke test failed with status $($frontend.ExitCode)"
+        }
+        $status = if (Test-Path $smokeStatus) {
+            Get-Content -Raw $smokeStatus
+        } else { "" }
+        if ($status -notmatch "event-loop-exited") {
+            throw "Packaged frontend did not report a clean Qt event-loop exit"
         }
         if (-not $service.WaitForExit(10000)) {
             throw "AMY smoke service did not exit after the frontend disconnected"
@@ -82,6 +103,7 @@ finally {
     }
     Remove-Item -Force -ErrorAction SilentlyContinue $socket
     if ($SmokeTest) {
-        Remove-Item -Force -ErrorAction SilentlyContinue $serviceOutput, $serviceError
+        Remove-Item -Force -ErrorAction SilentlyContinue `
+            $serviceOutput, $serviceError, $smokeStatus
     }
 }

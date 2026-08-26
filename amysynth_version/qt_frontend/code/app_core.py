@@ -4038,6 +4038,19 @@ def parse_arguments() -> argparse.Namespace:
 def main() -> int:
     args = parse_arguments()
 
+    smoke_status_value = os.environ.get("OMNICHORD_PACKAGE_SMOKE_STATUS")
+    smoke_status = Path(smoke_status_value) if smoke_status_value else None
+
+    def smoke_checkpoint(label: str) -> None:
+        if not args.package_smoke_test or smoke_status is None:
+            return
+        smoke_status.parent.mkdir(parents=True, exist_ok=True)
+        with smoke_status.open("a", encoding="utf-8") as handle:
+            handle.write(f"{label}\n")
+            handle.flush()
+
+    smoke_checkpoint("frontend-entered")
+
     migrate_user_layout()
     user_config_dir = ensure_user_configs(CONFIG_DIR)
 
@@ -4122,6 +4135,7 @@ def main() -> int:
 
     app = QGuiApplication(sys.argv)
     app.setApplicationName("Qt Omnichord")
+    smoke_checkpoint("qgui-created")
 
     print(
         "Qt Omnichord display diagnostics:",
@@ -4206,6 +4220,7 @@ def main() -> int:
             addresses=address_map,
             socket_path=str(Path(args.amy_socket).expanduser()),
         )
+        smoke_checkpoint("amy-socket-connected")
     else:
         print(
             "AMY serial backend: "
@@ -4331,12 +4346,15 @@ def main() -> int:
     engine.load(
         QUrl.fromLocalFile(str(GUI_DIR / "Main.qml"))
     )
+    smoke_checkpoint("qml-load-returned")
 
     if not engine.rootObjects():
         amy_client.close()
         return 1
+    smoke_checkpoint("qml-root-ready")
 
     backend.send_initial_state()
+    smoke_checkpoint("initial-state-sent")
 
     if args.package_smoke_test:
         if not args.amy_socket:
@@ -4352,14 +4370,27 @@ def main() -> int:
         # transport and actual note generation.  The Windows CI service renders
         # these wire commands offline, so this remains deterministic without an
         # audio device while production continues to use native miniaudio.
-        QTimer.singleShot(0, lambda: backend.pressChord(0, 0))
-        QTimer.singleShot(250, lambda: backend.releaseChord(0, 0))
-        QTimer.singleShot(750, app.quit)
+        def smoke_press() -> None:
+            backend.pressChord(0, 0)
+            smoke_checkpoint("test-chord-pressed")
+
+        def smoke_release() -> None:
+            backend.releaseChord(0, 0)
+            smoke_checkpoint("test-chord-released")
+
+        def smoke_quit() -> None:
+            smoke_checkpoint("quit-requested")
+            app.quit()
+
+        QTimer.singleShot(0, smoke_press)
+        QTimer.singleShot(250, smoke_release)
+        QTimer.singleShot(750, smoke_quit)
 
     # Make teardown order explicit. QML must be destroyed while the Python
     # backend QObject is still alive; otherwise its context property becomes
     # null and dozens of bindings log TypeErrors during application shutdown.
     exit_code = app.exec()
+    smoke_checkpoint("event-loop-exited")
 
     # Destroy the QML engine/root objects first.
     del engine

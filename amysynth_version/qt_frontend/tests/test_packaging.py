@@ -101,6 +101,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("--package-smoke-test", launcher)
         self.assertIn("QT_QPA_PLATFORM", launcher)
         self.assertIn("WaitForExit(30000)", launcher)
+        self.assertIn("OMNICHORD_PACKAGE_SMOKE_STATUS", launcher)
+        self.assertIn("event-loop-exited", launcher)
         self.assertIn("if sys.stdout is None:", main)
         self.assertIn("if sys.stderr is None:", main)
         self.assertIn("AF_UNIX", service)
