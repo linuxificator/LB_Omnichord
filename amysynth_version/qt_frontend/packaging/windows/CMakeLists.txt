@@ -16,6 +16,7 @@ list(TRANSFORM AMY_SOURCES PREPEND "${AMY_SRC}/")
 
 add_executable(amy_service amy_service.c ${AMY_SOURCES})
 target_include_directories(amy_service PRIVATE "${AMY_SRC}")
-target_compile_definitions(amy_service PRIVATE AMY_WAVETABLE _CRT_SECURE_NO_WARNINGS)
+target_compile_definitions(amy_service PRIVATE
+    AMY_WAVETABLE _CRT_SECURE_NO_WARNINGS _USE_MATH_DEFINES)
 target_compile_options(amy_service PRIVATE /O2 /W3 /std:c11)
 target_link_libraries(amy_service PRIVATE ws2_32 winmm ole32)
