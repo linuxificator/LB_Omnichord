@@ -138,14 +138,29 @@ class StaticContractTests(unittest.TestCase):
         for component in (parameter, labeled, volume, tuning):
             self.assertIn("activateControlTarget", component)
             self.assertIn("controlTargetTapped", component)
+            self.assertIn("controlTargetVisualState", component)
             self.assertIn("midiBound", component)
             self.assertIn('"#35b85a"', component)
+            self.assertIn('"#f22b2b"', component)
+            self.assertIn('"#3186d7"', component)
             self.assertIn("midiBindingGesture", component)
+            self.assertIn('"preset-displaced"', component)
+            self.assertIn('"preset-incoming"', component)
+            self.assertIn("running: root.midiPresetFeedback", component)
+            self.assertEqual(component.count("duration: 110"), 2)
+            self.assertIn("const wasBound = root.midiBound", component)
+            self.assertIn(
+                "return learned || wasBound || root.midiPresetFeedback",
+                component,
+            )
 
         self.assertIn("controlTargetMoved", parameter)
         self.assertIn("controlTargetMoved", labeled)
         self.assertIn("if (root.midiBindingGesture)", parameter)
         self.assertIn("if (root.midiBindingGesture)", labeled)
+        self.assertIn("root.syncSliderValue()", parameter)
+        self.assertIn("slider.value = Qt.binding", labeled)
+        self.assertIn("return root.currentValue", labeled)
 
         combined = "\n".join(
             (ROOT / "gui" / name).read_text(encoding="utf-8")
@@ -389,10 +404,31 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("horizontalAlignment: Text.AlignHCenter", qml)
         self.assertIn("verticalAlignment: Text.AlignVCenter", qml)
 
-    def test_rhythm_transport_icon_is_bound_directly_to_backend_state(self) -> None:
+    def test_rhythm_transport_uses_the_centered_bass_arrow_geometry(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
-        self.assertIn('text: root.controller.rhythmRunning ? "■" : "▶"', qml)
-        self.assertNotIn("Canvas {", qml)
+        self.assertIn("contentItem: Canvas {", qml)
+        self.assertIn("c.moveTo(width / 2 - 9, height / 2 - 14)", qml)
+        self.assertIn("c.lineTo(width / 2 + 15, height / 2)", qml)
+        self.assertIn("c.lineTo(width / 2 - 9, height / 2 + 14)", qml)
+        self.assertIn("function onRhythmStateChanged()", qml)
+        self.assertIn("rhythmTransportSymbol.requestPaint()", qml)
+
+    def test_midi_owned_tempo_and_tuning_nudges_are_grey_and_disabled(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        button = (ROOT / "gui" / "PresetResetButton.qml").read_text(
+            encoding="utf-8"
+        )
+        compact_button = " ".join(button.split())
+        self.assertEqual(main.count("enabled: !window.omniTuningLocked"), 2)
+        self.assertEqual(main.count("enabled: !window.rhythmTempoMidiBound"), 2)
+        self.assertEqual(midi.count("enabled: !root.tuningMidiLocked"), 2)
+        self.assertIn('enabled ? root.textColor : "#686864"', button)
+        self.assertIn(
+            '? (root.pressed ? Qt.darker(root.panelColor, 1.08) : root.panelColor) : "#bdbdb8"',
+            compact_button,
+        )
+        self.assertIn('enabled ? root.borderColor : "#85857f"', button)
 
     def test_each_musical_role_has_a_distinct_amy_bus(self) -> None:
         config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))

@@ -32,6 +32,12 @@ reverb level is 0–3, reverb liveness/damping are 0–1, tuning reference is
 415–466 Hz, rhythm tempo is 40–200 BPM, and activity selectors are restricted
 to their discrete UI ranges.
 
+A live MIDI CC binding is also an ownership boundary. Shared QML controls
+consume bound edit gestures, while the backend setters independently reject
+manual, reset, copy, preset and nudge writes to bound numeric targets. Mapped CC
+updates enter those same setters under a narrowly scoped MIDI-authority flag;
+there is no parallel state or AMY command path.
+
 ## Runtime boundary guards
 
 A first-time AMY `K...iv...` synth allocation is executed at an audio-block boundary. The host therefore inserts a configurable allocation guard (default 10 ms) before sending synth-tier commands such as bus routing, synth level, compatibility corrections or slider overrides. This prevents cold-start commands from reaching an instrument number before AMY has created it; the regression suite checks synth 4 specifically because that was observed on the ESP32-P4 as repeated `synth 4 not defined` warnings.

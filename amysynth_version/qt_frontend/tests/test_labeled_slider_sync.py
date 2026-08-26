@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_QUICK_BACKEND", "software")
 
 from PySide6.QtCore import QCoreApplication, QObject, QPoint, Qt, QUrl  # noqa: E402
-from PySide6.QtGui import QGuiApplication  # noqa: E402
+from PySide6.QtGui import QColor, QGuiApplication  # noqa: E402
 from PySide6.QtQml import QQmlComponent, QQmlEngine  # noqa: E402
 from PySide6.QtTest import QTest  # noqa: E402
 
@@ -39,6 +39,18 @@ Window {
     height: 90
     visible: true
 
+    QtObject {
+        id: midiRouter
+        objectName: "midiRouter"
+        property int bindingVersion: 0
+        property bool targetBound: false
+        property string targetVisualState: "idle"
+        function isControlTargetBound(target) { return targetBound }
+        function controlTargetVisualState(target) { return targetVisualState }
+        function activateControlTarget(target) { return true }
+        function controlTargetTapped(target) {}
+    }
+
     LabeledSlider {
         objectName: "reverbSlider"
         width: 145
@@ -46,6 +58,8 @@ Window {
         fromValue: 0
         toValue: 3
         currentValue: 0.25
+        midiControlRouter: midiRouter
+        midiTarget: ({"screen": "omni", "kind": "rhythm_tempo"})
     }
 }
 """,
@@ -83,13 +97,47 @@ Window {
             QPoint(125, 55),
         )
         QCoreApplication.processEvents()
-        self.assertNotAlmostEqual(float(slider.property("value")), 0.25)
+        self.assertAlmostEqual(float(slider.property("value")), 0.25)
 
         # The next backend notify must remain authoritative after that touch.
         root.setProperty("currentValue", 0.5)
         QCoreApplication.processEvents()
 
         self.assertAlmostEqual(float(slider.property("value")), 0.5)
+
+        router = window.findChild(QObject, "midiRouter")
+        self.assertIsNotNone(router)
+        assert router is not None
+        handles = [
+            child
+            for child in root.findChildren(QObject)
+            if child.property("width") == 19
+            and child.property("height") == 19
+            and child.metaObject().indexOfProperty("color") >= 0
+        ]
+        self.assertEqual(len(handles), 1)
+        handle = handles[0]
+
+        for state, expected in (
+            ("preset-displaced", "#f22b2b"),
+            ("preset-incoming", "#3186d7"),
+        ):
+            router.setProperty("targetVisualState", state)
+            router.setProperty(
+                "bindingVersion",
+                int(router.property("bindingVersion")) + 1,
+            )
+            QCoreApplication.processEvents()
+            self.assertEqual(QColor(handle.property("color")).name(), expected)
+
+        router.setProperty("targetVisualState", "bound")
+        router.setProperty("targetBound", True)
+        router.setProperty(
+            "bindingVersion",
+            int(router.property("bindingVersion")) + 1,
+        )
+        QCoreApplication.processEvents()
+        self.assertEqual(QColor(handle.property("color")).name(), "#35b85a")
         window.deleteLater()
         engine.deleteLater()
 

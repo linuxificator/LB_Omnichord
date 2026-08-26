@@ -8,6 +8,12 @@ Item {
     property bool tuningCoupled: true
     property int activeMidiRow: 0
     property var midiControlModel: []
+    readonly property bool tuningMidiLocked:
+        root.hostWindow.midiTuningMidiBound
+        || (
+            root.tuningCoupled
+            && root.hostWindow.omniTuningMidiBound
+        )
 
     signal showOmniRequested()
     signal toggleTuningCouplingRequested()
@@ -191,6 +197,7 @@ Item {
         width: 42
         height: 42
         text: "UP"
+        enabled: !root.tuningMidiLocked
         panelColor: "#efb05c"
         borderColor: "#a75d0a"
         textColor: "#492606"
@@ -215,6 +222,7 @@ Item {
         width: 42
         height: 42
         text: "DWN"
+        enabled: !root.tuningMidiLocked
         panelColor: "#efb05c"
         borderColor: "#a75d0a"
         textColor: "#492606"

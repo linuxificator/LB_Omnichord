@@ -299,6 +299,11 @@ runningTempo = newTempo
 
 This new live value must subsequently survive live preset and rhythm changes.
 
+If rhythm tempo has a green MIDI CC binding, MIDI has exclusive write
+authority instead: manual tempo setters and UP/DOWN holds have no effect, and
+both buttons are disabled and grey. Genuine movement of the bound controller
+still changes the effective live tempo through the normal backend path.
+
 Example:
 
 ```text

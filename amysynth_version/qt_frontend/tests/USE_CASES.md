@@ -194,7 +194,9 @@ The serial regression requires the factory patch to remain authoritative for nat
 
 - The learning touch cannot unlink the new binding in the same gesture.
 - One click on a bound target does not unlink.
-- A real drag unlinks immediately; a second press within 550 ms also unlinks.
+- Drag/edit gestures on a bound target are consumed and do not move or unlink
+  it. A second press within 550 ms is the explicit unlink gesture, but that
+  second gesture still cannot edit the numeric value.
 - The controller becomes blue and visible when capacity permits.
 - The next genuine CC movement changes a blue controller immediately into an
   ordinary grey unbound indicator. Without movement, blue expires and removes
@@ -228,6 +230,42 @@ The serial regression requires the factory patch to remain authoritative for nat
 - Startup loading may initialize all stored values normally.
 - After reset or switching, genuine CC movement remains authoritative through
   the normal setter and AMY convergence path.
+
+**MIDI-CC-10 — green binding has exclusive numeric authority**
+
+- Manual slider/tap gestures and direct frontend setter actions cannot change
+  any bound instrument control, volume, reverb parameter, tuning reference,
+  rhythm tempo or bass voicing value.
+- Copy actions, RST and runtime preset selection preserve bound values while
+  still applying their normal changes to unbound state.
+- Bound rhythm tempo disables and greys both rhythm UP/DWN buttons.
+- Bound effective tuning disables and greys both tuning UP/DWN buttons on the
+  affected screen, or both screens while coupled.
+- Recoupling uses a bound side as source and refuses two divergent,
+  independently bound references.
+
+**MIDI-CC-11 — rhythm transport symbol matches bass**
+
+- The stopped rhythm button draws the same centered triangle geometry as the
+  stopped bass button rather than a font glyph.
+- A rhythm state change repaints the Canvas so play/stop state cannot become
+  visually stale.
+
+**MIDI-CC-12 — preset binding conflict has an explicit handoff**
+
+- Given a CC bound to target A, when the destination preset assigns that same
+  channel/controller pair to a different target B, the destination preset wins
+  the one-to-one mapping immediately.
+- The destination preset's stored numeric value for B, and for A when A belongs
+  to the same preset screen, is authoritative; live bound-value preservation
+  does not override those values for this conflict. The other preset screen's
+  numeric state is not changed.
+- For approximately two seconds A's handle flashes red and B's handle flashes
+  blue using 110 ms fade halves. Both reject manual edits during this handoff.
+- After expiry A is free with its normal handle color, B is steady green and
+  bound, and genuine movement of the CC changes only B.
+- An unchanged preset binding does not trigger the handoff and retains normal
+  live-value preservation.
 
 Unit tests cover the state machine and mapping math. Headless frontend tests use
 simulated user actions plus simulated MIDI CC input and inspect state, preset

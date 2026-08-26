@@ -200,6 +200,38 @@ class MidiControlStateTests(unittest.TestCase):
             [{"channel": 2, "controller": 8, "target": omni_target}],
         )
 
+    def test_preset_binding_conflict_prefers_incoming_and_expires_feedback(self) -> None:
+        state = MidiControlState(capacity=4, preset_feedback_duration=2.0)
+        displaced = target("old", screen="omni")
+        incoming = target("new", screen="omni")
+        state.replace_screen_bindings(
+            "omni",
+            [((1, 7), displaced)],
+            now=1.0,
+        )
+
+        entries = [((1, 7), incoming)]
+        self.assertEqual(
+            state.preset_conflict_target_ids(entries),
+            {displaced["id"], incoming["id"]},
+        )
+        state.replace_screen_bindings("omni", entries, now=10.0)
+
+        self.assertFalse(state.is_target_bound(displaced))
+        self.assertTrue(state.is_target_bound(incoming))
+        self.assertEqual(
+            state.target_visual_state(displaced, now=11.99),
+            "preset-displaced",
+        )
+        self.assertEqual(
+            state.target_visual_state(incoming, now=11.99),
+            "preset-incoming",
+        )
+        self.assertFalse(state.expire_preset_feedback(now=11.99))
+        self.assertTrue(state.expire_preset_feedback(now=12.0))
+        self.assertEqual(state.target_visual_state(displaced, now=12.0), "idle")
+        self.assertEqual(state.target_visual_state(incoming, now=12.0), "bound")
+
 
 if __name__ == "__main__":
     unittest.main()

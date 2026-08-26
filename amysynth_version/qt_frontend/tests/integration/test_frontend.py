@@ -1,11 +1,174 @@
 from __future__ import annotations
 
 import unittest
+import time
 
 from harness import HeadlessApp
 
 
+def bind_control(
+    app: HeadlessApp,
+    channel: int,
+    controller: int,
+    target: dict[str, object],
+) -> None:
+    app.action("injectMidiControl", channel, controller, 0)
+    app.action("injectMidiControl", channel, controller, 1)
+    app.action("selectMidiControlIndicator", channel, controller)
+    if not app.action("activateMidiControlTarget", target):
+        raise AssertionError(f"could not bind MIDI target {target}")
+
+
 class FrontendIntegrationTests(unittest.TestCase):
+    def test_bound_numeric_targets_reject_manual_changes(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            chord_controls = list(app.query("chordCommonControls")) + list(
+                app.query("chordExtraControls")
+            )
+            chord_control = chord_controls[0]
+            chord_target = {
+                "screen": "omni",
+                "kind": "synth_control",
+                "role": "chord",
+                "control": str(chord_control["key"]),
+            }
+            bind_control(app, 1, 80, chord_target)
+            app.action("injectMidiControl", 1, 80, 127)
+            app.action(
+                "setChordSynthControl",
+                str(chord_control["key"]),
+                float(chord_control["minimum"]),
+            )
+            current = list(app.query("chordCommonControls")) + list(
+                app.query("chordExtraControls")
+            )
+            protected = next(
+                item for item in current
+                if item["key"] == chord_control["key"]
+            )
+            self.assertAlmostEqual(
+                float(protected["value"]),
+                float(protected["maximum"]),
+            )
+
+            volume_target = {
+                "screen": "omni",
+                "kind": "volume",
+                "role": "chord",
+            }
+            bind_control(app, 2, 81, volume_target)
+            app.action("injectMidiControl", 2, 81, 127)
+            app.action("setChordVolume", 0.1)
+            self.assertAlmostEqual(float(app.query("chordVolume")), 1.0)
+
+            reverb_target = {"screen": "omni", "kind": "reverb_level"}
+            bind_control(app, 3, 82, reverb_target)
+            app.action("injectMidiControl", 3, 82, 127)
+            app.action("setReverbLevel", 0.0)
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
+
+            voicing_target = {"screen": "omni", "kind": "bass_voicing"}
+            bind_control(app, 4, 83, voicing_target)
+            app.action("injectMidiControl", 4, 83, 127)
+            app.action("setBassVoicingShift", -6.0)
+            self.assertEqual(int(app.query("bassVoicingShift")), 6)
+
+            tempo_target = {"screen": "omni", "kind": "rhythm_tempo"}
+            bind_control(app, 5, 84, tempo_target)
+            app.action("injectMidiControl", 5, 84, 64)
+            protected_tempo = float(app.query("rhythmTempo"))
+            app.action("setRhythmTempo", 40.0)
+            app.action("beginTempoNudge", 1)
+            time.sleep(0.25)
+            app.action("endTempoNudge")
+            self.assertAlmostEqual(
+                float(app.query("rhythmTempo")),
+                protected_tempo,
+            )
+
+            tuning_target = {
+                "screen": "omni",
+                "kind": "tuning_reference",
+            }
+            bind_control(app, 6, 85, tuning_target)
+            app.action("injectMidiControl", 6, 85, 64)
+            protected_tuning = int(app.query("tuningReference"))
+            app.action("setTuningReference", 415)
+            app.action("beginPitchBend", 1)
+            time.sleep(0.25)
+            app.action("endPitchBend")
+            self.assertEqual(
+                int(app.query("tuningReference")),
+                protected_tuning,
+            )
+
+            # Recoupling must take its value from the bound side, even
+            # when the user clicks the link on the other screen.  Two
+            # independently bound, divergent references cannot be coupled
+            # without overwriting one of their MIDI-owned values.
+            app.action("setMidiTuningCoupled", False)
+            app.action("setMidiTuningReference", 415)
+            self.assertTrue(bool(app.action("coupleTuningFromMidi")))
+            self.assertEqual(
+                int(app.query("tuningReference")),
+                protected_tuning,
+            )
+            app.action("setMidiTuningCoupled", False)
+            midi_tuning_target = {
+                "screen": "midi",
+                "kind": "tuning_reference",
+            }
+            bind_control(app, 9, 88, midi_tuning_target)
+            app.action("injectMidiControl", 9, 88, 127)
+            app.action("syncMidiTuningFromOmni")
+            self.assertFalse(bool(app.action("coupleTuningFromOmni")))
+            self.assertEqual(
+                int(app.query("tuningReference")),
+                protected_tuning,
+            )
+
+            midi_controls = list(app.action("midiCommonControls", 0)) + list(
+                app.action("midiExtraControls", 0)
+            )
+            midi_control = midi_controls[0]
+            midi_target = {
+                "screen": "midi",
+                "kind": "synth_control",
+                "row": 0,
+                "control": str(midi_control["key"]),
+            }
+            bind_control(app, 7, 86, midi_target)
+            app.action("injectMidiControl", 7, 86, 127)
+            app.action(
+                "setMidiSynthControl",
+                0,
+                str(midi_control["key"]),
+                float(midi_control["minimum"]),
+            )
+            midi_current = list(app.action("midiCommonControls", 0)) + list(
+                app.action("midiExtraControls", 0)
+            )
+            midi_protected = next(
+                item for item in midi_current
+                if item["key"] == midi_control["key"]
+            )
+            self.assertAlmostEqual(
+                float(midi_protected["value"]),
+                float(midi_protected["maximum"]),
+            )
+
+            midi_volume_target = {
+                "screen": "midi",
+                "kind": "volume",
+                "row": 0,
+            }
+            bind_control(app, 8, 87, midi_volume_target)
+            app.action("injectMidiControl", 8, 87, 127)
+            app.action("setMidiVolume", 0, 0.1)
+            self.assertAlmostEqual(float(app.action("midiVolume", 0)), 1.0)
+
     def test_startup_and_representative_chord_actions(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)

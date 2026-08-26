@@ -184,6 +184,10 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Slot(float)
     def setBassVoicingShift(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "bass_voicing"}
+        ):
+            return
         shifted = clamp_bass_voicing_shift(
             value,
             limit=BASS_VOICING_LIMIT,
@@ -198,6 +202,10 @@ class InstrumentBackend(app_core.InstrumentBackend):
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
         """Expose AMY reverb wet-return gain through 3.0."""
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "reverb_level"}
+        ):
+            return
         clamped = max(0.0, min(REVERB_LEVEL_MAX, float(value)))
         if abs(clamped - self._reverb_level) < 0.0001:
             return

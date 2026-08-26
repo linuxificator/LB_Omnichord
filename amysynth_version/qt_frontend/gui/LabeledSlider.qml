@@ -28,6 +28,15 @@ Item {
         root.midiControlRouter.bindingVersion
         return root.midiControlRouter.isControlTargetBound(root.midiTarget)
     }
+    readonly property string midiVisualState: {
+        if (root.midiControlRouter === null)
+            return "idle"
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.controlTargetVisualState(root.midiTarget)
+    }
+    readonly property bool midiPresetFeedback:
+        root.midiVisualState === "preset-displaced"
+        || root.midiVisualState === "preset-incoming"
 
     signal edited(real value)
     signal activated()
@@ -35,12 +44,21 @@ Item {
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
             return false
+        const wasBound = root.midiBound
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
         if (!learned)
             root.midiControlRouter.controlTargetTapped(root.midiTarget)
-        return learned
+        // A green binding owns the value.  Its first/second tap may form the
+        // explicit unlink gesture, but that same gesture never edits it.
+        return learned || wasBound || root.midiPresetFeedback
+    }
+
+    function restoreCurrentValueBinding() {
+        slider.value = Qt.binding(function() {
+            return root.currentValue
+        })
     }
 
     Text {
@@ -88,8 +106,10 @@ Item {
         }
 
         onMoved: {
-            if (root.midiBindingGesture)
+            if (root.midiBindingGesture) {
+                root.restoreCurrentValueBinding()
                 return
+            }
             root.midiMoveCount += 1
             if (
                 root.midiControlRouter !== null
@@ -139,9 +159,22 @@ Item {
             width: 19
             height: 19
             radius: 10
-            color: root.midiBound ? "#35b85a" : root.handleColor
+            color: {
+                if (root.midiVisualState === "preset-displaced")
+                    return "#f22b2b"
+                if (root.midiVisualState === "preset-incoming")
+                    return "#3186d7"
+                return root.midiBound ? "#35b85a" : root.handleColor
+            }
             border.color: root.borderColor
             border.width: 2
+
+            SequentialAnimation on opacity {
+                running: root.midiPresetFeedback
+                loops: Animation.Infinite
+                NumberAnimation { from: 1.0; to: 0.2; duration: 110 }
+                NumberAnimation { from: 0.2; to: 1.0; duration: 110 }
+            }
         }
     }
 }

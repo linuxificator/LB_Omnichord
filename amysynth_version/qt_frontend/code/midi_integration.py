@@ -53,6 +53,24 @@ class InstrumentBackend(OmniInstrumentBackend):
                 self._pending_omni_control_bindings,
             )
 
+    def _midi_control_blocks(self, target: dict[str, Any]) -> bool:
+        player = getattr(self, "_midi_player", None)
+        return bool(
+            player is not None
+            and player.manual_change_blocked(target)
+        )
+
+    def _copy_strum_to_chord_state(self) -> None:
+        player = getattr(self, "_midi_player", None)
+        protected = (
+            player.capture_bound_control_values("omni", role="chord")
+            if player is not None
+            else []
+        )
+        super()._copy_strum_to_chord_state()
+        if player is not None:
+            player.restore_control_values(protected)
+
     def _reset_synth_role_to_preset(self, role: str) -> None:
         player = getattr(self, "_midi_player", None)
         protected = (
@@ -119,6 +137,14 @@ class InstrumentBackend(OmniInstrumentBackend):
     @Slot(int, result=float)
     def midiVolume(self, row: int) -> float:
         return self._midi_player.volume(row)
+
+    @Slot(result=int)
+    def midiTuningReference(self) -> int:
+        return self._midi_player.tuningReference
+
+    @Slot("QVariantMap", result=str)
+    def midiControlTargetVisualState(self, target: dict[str, Any]) -> str:
+        return self._midi_player.controlTargetVisualState(target)
 
     @Slot(int, result="QVariantList")
     def midiCommonControls(self, row: int) -> list[dict[str, Any]]:
@@ -225,15 +251,37 @@ class InstrumentBackend(OmniInstrumentBackend):
         finally:
             self._syncing_tuning = False
 
-    @Slot()
-    def coupleTuningFromOmni(self) -> None:
-        self._midi_player.syncFromOmni()
-        self._midi_player.setTuningCoupled(True)
+    def _couple_tuning(self, preferred_screen: str) -> bool:
+        omni_target = {"screen": "omni", "kind": "tuning_reference"}
+        midi_target = {"screen": "midi", "kind": "tuning_reference"}
+        omni_bound = self._midi_player.isControlTargetBound(omni_target)
+        midi_bound = self._midi_player.isControlTargetBound(midi_target)
 
-    @Slot()
-    def coupleTuningFromMidi(self) -> None:
-        self.syncOmniTuningFromMidi()
+        if omni_bound and midi_bound:
+            # Coupling may not choose between two independently MIDI-owned
+            # values.  It is safe only when their references already agree.
+            if self.tuningReference != self._midi_player.tuningReference:
+                return False
+            source = preferred_screen
+        elif midi_bound:
+            source = "midi"
+        else:
+            source = "omni"
+
+        if source == "midi":
+            self.syncOmniTuningFromMidi()
+        else:
+            self._midi_player.syncFromOmni()
         self._midi_player.setTuningCoupled(True)
+        return True
+
+    @Slot(result=bool)
+    def coupleTuningFromOmni(self) -> bool:
+        return self._couple_tuning("omni")
+
+    @Slot(result=bool)
+    def coupleTuningFromMidi(self) -> bool:
+        return self._couple_tuning("midi")
 
     @Slot(int)
     def setMidiTuningModeIndex(self, index: int) -> None:

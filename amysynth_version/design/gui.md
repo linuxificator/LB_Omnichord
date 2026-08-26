@@ -53,6 +53,21 @@ The OMNI MIDI-control status LED is vertically centered on the second chord
 row and horizontally centered in the free gap from that row's right edge to
 the strum surface. Its color behavior is defined in `midi_control.md`.
 
+While MIDI owns rhythm tempo, both rhythm UP/DWN buttons are disabled and grey.
+While MIDI owns the effective tuning reference, both tuning UP/DWN buttons on
+each affected screen are disabled and grey; coupled tuning applies this lock to
+both screens when either reference is bound.
+
+If a preset moves one channel/controller binding from one numeric target to
+another, both affected handles show the two-second handoff defined in
+`midi_control.md`: outgoing flashes red and incoming flashes blue, then outgoing
+returns to its normal free color and incoming becomes steady green.
+
+The rhythm start symbol uses the same geometrically centered Canvas triangle as
+the bass start symbol. It must not use a font glyph whose visual side bearings
+make it appear off-center. Both transport canvases repaint when their backend
+running state changes.
+
 ## UI state versus audio state
 
 UI changes must first update application state and then generate AMY wire commands. The GUI never directly manipulates AMY internals.

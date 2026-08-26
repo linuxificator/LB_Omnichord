@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 import unittest
 
 from catalog import control_default, entry_for_index, synth_index
@@ -28,6 +29,108 @@ def changed_control_value(control: dict[str, object]) -> float:
 
 
 class PresetIntegrationTests(unittest.TestCase):
+    def test_preset_cc_conflict_uses_preset_values_and_visual_handoff(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            old_target = {
+                "screen": "omni",
+                "kind": "volume",
+                "role": "chord",
+            }
+            new_target = {
+                "screen": "omni",
+                "kind": "volume",
+                "role": "strum",
+            }
+            bind_control(app, 12, 92, old_target)
+            app.action("injectMidiControl", 12, 92, 127)
+            self.assertAlmostEqual(float(app.query("chordVolume")), 1.0)
+
+            preset_path = app.home / ".omnichord" / "omni_presets" / "p2.json"
+            preset = json.loads(preset_path.read_text(encoding="utf-8"))
+            preset["volumes"]["chord"] = 0.23
+            preset["volumes"]["strum"] = 0.37
+            preset["midi_control_bindings"] = [
+                {
+                    "channel": 12,
+                    "controller": 92,
+                    "target": new_target,
+                }
+            ]
+            preset_path.write_text(
+                json.dumps(preset, indent=2) + "\n",
+                encoding="utf-8",
+            )
+
+            app.action("selectPreset", 2)
+            self.assertAlmostEqual(float(app.query("chordVolume")), 0.23)
+            self.assertAlmostEqual(float(app.query("strumVolume")), 0.37)
+            self.assertEqual(
+                app.action("midiControlTargetVisualState", old_target),
+                "preset-displaced",
+            )
+            self.assertEqual(
+                app.action("midiControlTargetVisualState", new_target),
+                "preset-incoming",
+            )
+
+            # The outgoing target remains protected during the visual handoff.
+            app.action("setChordVolume", 0.8)
+            self.assertAlmostEqual(float(app.query("chordVolume")), 0.23)
+
+            time.sleep(2.25)
+            self.assertEqual(
+                app.action("midiControlTargetVisualState", old_target),
+                "idle",
+            )
+            self.assertEqual(
+                app.action("midiControlTargetVisualState", new_target),
+                "bound",
+            )
+            app.action("setChordVolume", 0.8)
+            app.action("setStrumVolume", 0.8)
+            self.assertAlmostEqual(float(app.query("chordVolume")), 0.8)
+            self.assertAlmostEqual(float(app.query("strumVolume")), 0.37)
+
+            app.action("injectMidiControl", 12, 92, 0)
+            self.assertAlmostEqual(float(app.query("strumVolume")), 0.0)
+
+    def test_coupled_tuning_binding_survives_other_screen_preset(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            midi_target = {"screen": "midi", "kind": "tuning_reference"}
+            bind_control(app, 10, 90, midi_target)
+            app.action("injectMidiControl", 10, 90, 127)
+            self.assertEqual(int(app.query("tuningReference")), 466)
+            self.assertEqual(int(app.action("midiTuningReference")), 466)
+
+            omni_path = app.home / ".omnichord" / "omni_presets" / "p2.json"
+            omni_data = json.loads(omni_path.read_text(encoding="utf-8"))
+            omni_data["tuning"]["reference_hz"] = 415
+            omni_path.write_text(
+                json.dumps(omni_data, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            app.action("selectPreset", 2)
+            self.assertEqual(int(app.query("tuningReference")), 466)
+            self.assertEqual(int(app.action("midiTuningReference")), 466)
+
+            app.action("moveMidiControlTarget", midi_target)
+            omni_target = {"screen": "omni", "kind": "tuning_reference"}
+            bind_control(app, 11, 91, omni_target)
+            app.action("injectMidiControl", 11, 91, 127)
+
+            midi_path = app.home / ".omnichord" / "midi_presets" / "m2.json"
+            midi_data = json.loads(midi_path.read_text(encoding="utf-8"))
+            midi_data["tuning"]["reference_hz"] = 415
+            midi_path.write_text(
+                json.dumps(midi_data, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            app.action("selectMidiPreset", 2)
+            self.assertEqual(int(app.query("tuningReference")), 466)
+            self.assertEqual(int(app.action("midiTuningReference")), 466)
+
     def test_midi_control_bindings_are_owned_by_their_screen_presets(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
@@ -250,18 +353,18 @@ class PresetIntegrationTests(unittest.TestCase):
                 {"screen": "omni", "kind": "volume", "role": "chord"},
             )
 
-            protected_attack = changed_control_value(bound_control)
+            protected_attack = float(bound_control["maximum"])
             changed_release = changed_control_value(unbound_control)
-            app.action("setChordSynthControl", "attack_ms", protected_attack)
+            app.action("injectMidiControl", 1, 70, 127)
             app.action("setChordSynthControl", "release_ms", changed_release)
-            app.action("setChordVolume", 0.91)
+            app.action("injectMidiControl", 2, 71, 127)
             app.action("resetChordSynthToPreset")
 
             self.assertEqual(
                 int(app.query("selectedChordSynthIndex")),
                 stored_index,
             )
-            self.assertAlmostEqual(float(app.query("chordVolume")), 0.91)
+            self.assertAlmostEqual(float(app.query("chordVolume")), 1.0)
             app.action("setChordSynthIndex", bound_index)
             reset_controls = list(app.query("chordCommonControls")) + list(
                 app.query("chordExtraControls")
@@ -299,7 +402,7 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setStrumVolume", 0.77)
             app.action("selectPreset", 2)
 
-            self.assertAlmostEqual(float(app.query("chordVolume")), 0.91)
+            self.assertAlmostEqual(float(app.query("chordVolume")), 1.0)
             self.assertAlmostEqual(float(app.query("strumVolume")), 0.77)
             app.action("setChordSynthIndex", bound_index)
             switched_controls = list(app.query("chordCommonControls")) + list(
@@ -325,7 +428,7 @@ class PresetIntegrationTests(unittest.TestCase):
             bound_control = next(c for c in controls if c["key"] == "attack_ms")
             unbound_control = next(c for c in controls if c["key"] == "release_ms")
             original_unbound = float(unbound_control["value"])
-            protected_attack = changed_control_value(bound_control)
+            protected_attack = float(bound_control["maximum"])
 
             bind_control(
                 app,
@@ -345,14 +448,14 @@ class PresetIntegrationTests(unittest.TestCase):
                 74,
                 {"screen": "midi", "kind": "volume", "row": row},
             )
-            app.action("setMidiSynthControl", row, "attack_ms", protected_attack)
+            app.action("injectMidiControl", 4, 73, 127)
             app.action(
                 "setMidiSynthControl",
                 row,
                 "release_ms",
                 changed_control_value(unbound_control),
             )
-            app.action("setMidiVolume", row, 0.91)
+            app.action("injectMidiControl", 5, 74, 127)
             app.action("resetMidiSynthRow", row)
 
             reset_controls = list(app.action("midiCommonControls", row)) + list(
@@ -367,7 +470,7 @@ class PresetIntegrationTests(unittest.TestCase):
                 float(reset_by_key["release_ms"]["value"]),
                 original_unbound,
             )
-            self.assertAlmostEqual(float(app.action("midiVolume", row)), 0.91)
+            self.assertAlmostEqual(float(app.action("midiVolume", row)), 1.0)
 
             preset_two_path = (
                 app.home / ".omnichord" / "midi_presets" / "m2.json"
@@ -388,7 +491,7 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setMidiVolume", 1, 0.83)
             app.action("selectMidiPreset", 2)
 
-            self.assertAlmostEqual(float(app.action("midiVolume", row)), 0.91)
+            self.assertAlmostEqual(float(app.action("midiVolume", row)), 1.0)
             self.assertAlmostEqual(float(app.action("midiVolume", 1)), 0.83)
             app.action("setMidiSynthIndex", row, selected_index)
             switched_controls = list(app.action("midiCommonControls", row)) + list(

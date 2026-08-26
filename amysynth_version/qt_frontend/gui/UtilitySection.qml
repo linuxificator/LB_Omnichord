@@ -74,10 +74,11 @@ Item {
         onClicked: {
             if (root.tuningCoupled) {
                 root.controller.setMidiTuningCoupled(false)
+                root.toggleTuningCouplingRequested()
             } else {
-                root.controller.coupleTuningFromOmni()
+                if (root.controller.coupleTuningFromOmni())
+                    root.toggleTuningCouplingRequested()
             }
-            root.toggleTuningCouplingRequested()
         }
     }
 

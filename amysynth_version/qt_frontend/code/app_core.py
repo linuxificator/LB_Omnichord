@@ -1163,8 +1163,26 @@ class InstrumentBackend(QObject):
     def _selected_rhythm(self) -> RhythmDefinition:
         return self._rhythms[self._rhythm.selected_index]
 
+    def _midi_control_blocks(self, target: dict[str, Any]) -> bool:
+        """Return whether a live MIDI binding owns this numeric target.
+
+        The base backend is usable without the MIDI integration layer.  The
+        integrated backend overrides this hook and keeps the normal setters as
+        the single state/transport convergence path for both UI and MIDI.
+        """
+        return False
+
+    def _copy_strum_to_chord_state(self) -> None:
+        """Copy logical state before the public operation emits/sends it."""
+        self._chord_synth.copy_from(self._strum_synth)
+        self._chord_volume = self._strum_volume
+
     @Slot(float)
     def setChordVolume(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "volume", "role": "chord"}
+        ):
+            return
         clamped = max(0.0, min(1.0, float(value)))
 
         if abs(clamped - self._chord_volume) < 0.0001:
@@ -1179,6 +1197,10 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setStrumVolume(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "volume", "role": "strum"}
+        ):
+            return
         clamped = max(0.0, min(1.0, float(value)))
 
         if abs(clamped - self._strum_volume) < 0.0001:
@@ -1193,6 +1215,10 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setBassVolume(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "volume", "role": "bass"}
+        ):
+            return
         clamped = max(0.0, min(1.0, float(value)))
 
         if abs(clamped - self._bass_volume) < 0.0001:
@@ -1216,6 +1242,10 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setPercussionVolume(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "volume", "role": "percussion"}
+        ):
+            return
         clamped = max(0.0, min(1.0, float(value)))
 
         if abs(clamped - self._percussion_volume) < 0.0001:
@@ -1241,6 +1271,10 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "reverb_level"}
+        ):
+            return
         clamped = max(0.0, min(REVERB_LEVEL_MAX, float(value)))
         if abs(clamped - self._reverb_level) < 0.0001:
             return
@@ -1250,6 +1284,10 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setReverbLiveness(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "reverb_liveness"}
+        ):
+            return
         clamped = max(0.0, min(1.0, float(value)))
         if abs(clamped - self._reverb_liveness) < 0.0001:
             return
@@ -1259,6 +1297,10 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setReverbDamping(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "reverb_damping"}
+        ):
+            return
         clamped = max(0.0, min(1.0, float(value)))
         if abs(clamped - self._reverb_damping) < 0.0001:
             return
@@ -1293,8 +1335,7 @@ class InstrumentBackend(QObject):
 
     @Slot()
     def copyStrumToChord(self) -> None:
-        self._chord_synth.copy_from(self._strum_synth)
-        self._chord_volume = self._strum_volume
+        self._copy_strum_to_chord_state()
 
         self._emit_synth_change("chord", selection_changed=True)
         self.chordVolumeChanged.emit()
@@ -1359,6 +1400,16 @@ class InstrumentBackend(QObject):
         value: float,
     ) -> None:
         runtime = self._runtime(role)
+        if self._midi_control_blocks(
+            {
+                "screen": "omni",
+                "kind": "synth_control",
+                "role": role,
+                "instrument": str(runtime.selected_definition.key),
+                "control": str(key),
+            }
+        ):
+            return
         if not runtime.set_control(key, value):
             return
 
@@ -1525,6 +1576,12 @@ class InstrumentBackend(QObject):
 
     @Slot(int)
     def beginPitchBend(self, direction: int) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "tuning_reference"}
+        ):
+            self._stop_pitch_bend()
+            self._pitch_bend_offset_hz = 0.0
+            return
         direction = 1 if int(direction) > 0 else -1
         self._pitch_bend_direction = direction
         self._pitch_bend_returning = False
@@ -1533,6 +1590,12 @@ class InstrumentBackend(QObject):
 
     @Slot()
     def endPitchBend(self) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "tuning_reference"}
+        ):
+            self._stop_pitch_bend()
+            self._pitch_bend_offset_hz = 0.0
+            return
         self._pitch_bend_direction = 0
         if math.isclose(self._pitch_bend_offset_hz, 0.0, abs_tol=1e-9):
             self._stop_pitch_bend()
@@ -1543,6 +1606,10 @@ class InstrumentBackend(QObject):
 
     @Slot(int)
     def setTuningReference(self, value: int) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "tuning_reference"}
+        ):
+            return
         clamped = max(415, min(466, int(value)))
         self._stop_pitch_bend()
         self._pitch_bend_offset_hz = 0.0
@@ -2567,6 +2634,10 @@ class InstrumentBackend(QObject):
         self._send_rhythm_config()
 
     def _set_rhythm_tempo_value(self, value: float) -> bool:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "rhythm_tempo"}
+        ):
+            return False
         clamped = max(40.0, min(200.0, float(value)))
         index = self._rhythm.selected_index
         if abs(clamped - self.rhythmTempo) < 0.0001:
@@ -2595,6 +2666,10 @@ class InstrumentBackend(QObject):
     @Slot(int)
     def beginTempoNudge(self, direction: int) -> None:
         self._stop_tempo_nudge()
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "rhythm_tempo"}
+        ):
+            return
         self._tempo_nudge_direction = 1 if int(direction) > 0 else -1
         self._tempo_nudge_origin = self.rhythmTempo
         self._tempo_nudge_pressed = True

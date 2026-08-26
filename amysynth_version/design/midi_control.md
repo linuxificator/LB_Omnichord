@@ -69,12 +69,14 @@ Bindings are globally one-to-one:
 - assigning an occupied target to another controller unbinds the old controller
   and makes that old indicator blue.
 
-A confirmed drag of a bound draggable slider unbinds it and applies the manual
-edit. The QML control confirms dragging from repeated move callbacks or movement
-held for at least 180 ms, so a single track click does not unlink. Two presses
-of the same bound target within 550 ms form the current double-tap gesture and unlink it. This also works
-for click-only numeric controls such as volume and tuning. Unlinking makes the
-controller LED blue and ensures that controller is visible when capacity allows.
+A green target consumes every normal edit gesture, including slider movement,
+and remains visually synchronized to its MIDI-owned value. Two presses of the
+same bound target within 550 ms form the explicit double-tap unlink gesture.
+The second press may unlink, but that same gesture is still consumed and cannot
+edit the value; a later gesture may edit after ownership has been released.
+This also works for click-only numeric controls such as volume and tuning.
+Unlinking makes the controller LED blue and ensures that controller is visible
+when capacity allows.
 The blue state is an inactivity notice, not a latch: the next genuine CC
 movement ends it immediately and leaves the controller visible as an ordinary
 unbound grey indicator. Without new movement, the blue state and its indicator
@@ -106,13 +108,16 @@ the same backend setter used by manual UI editing. Backend notify signals must
 also resynchronize the visible QML control after the binding touch, including
 the three OMNI and MIDI reverb sliders.
 
-## Controller authority during reset and preset changes
+## Controller authority
 
-A green binding makes its numeric value live controller state. A section
-`RST` may restore the preset's instrument selection and every unbound value,
-but it must preserve bound parameters and the bound section volume. A hidden
-instrument-specific parameter remains protected without selecting that
-instrument.
+A green binding gives MIDI exclusive write authority over its numeric value.
+Manual sliders/tap controls, direct frontend setter calls, tempo/tuning
+UP/DOWN holds, copy operations and any other non-MIDI edit must leave that
+value unchanged. Tempo and tuning UP/DOWN buttons are disabled and grey while
+their effective value is bound. A section `RST` may restore the preset's
+instrument selection and every unbound value, but it must preserve bound
+parameters and the bound section volume. A hidden instrument-specific
+parameter remains protected without selecting that instrument.
 
 A runtime preset switch preserves the current value of every target bound
 immediately before the switch and every target declared by the destination
@@ -121,6 +126,23 @@ specified below; only the protected numeric values survive the transition.
 Initial application startup may load all stored values because it is not a
 live preset switch. After either operation, the next genuine CC movement
 continues through the normal mapped setter path.
+
+There is one deliberate exception. If the same channel/controller pair is
+currently bound to target A and the destination preset assigns it to a
+different target B, the destination preset owns the handoff. Its stored value
+for B is applied instead of B's pre-switch value. If A belongs to that same
+preset screen, A also takes its destination-preset value instead of retaining
+its previous live value; state on the other preset screen is never loaded or
+numerically changed as a side effect. This exception applies only to an actual
+same-controller/different-target conflict. An unchanged binding retains the
+normal live-value protection above.
+
+Coupled OMNI/MIDI tuning treats a binding on either reference as ownership of
+the effective shared reference, so both screens' UP/DOWN controls are locked.
+When recoupling, a bound side is the synchronization source even if the link
+was pressed on the other screen. Two independently bound references that have
+diverged cannot be coupled, because doing so would overwrite one MIDI-owned
+value.
 
 ## Instrument-specific targets
 
@@ -142,10 +164,27 @@ LRU age and current CC values are runtime state.
 - presets without the field load with no bindings for that screen;
 - loading a preset replaces only that screen's bindings;
 - runtime loading preserves bound numeric values according to the controller
-  authority rule above;
+  authority rule above, except for the explicit preset-conflict handoff;
 - valid loaded bindings are admitted to the indicator bar as capacity permits;
 - global one-to-one ownership still applies if separately stored presets assign
   the same controller to different screens.
+
+### Preset-conflict handoff feedback
+
+When a destination preset assigns an already-bound channel/controller pair to
+a different slider, its new assignment becomes effective immediately and wins
+the global one-to-one conflict. For approximately two seconds both affected
+slider handles flash rapidly: the displaced target flashes red and the incoming
+preset target flashes blue. The blue incoming handle is already actively bound;
+blue is only a temporary handoff color here, not the normal unbound-controller
+state. During the handoff neither target accepts a manual edit.
+
+After the handoff expires, the displaced target becomes an ordinary free
+control with its normal handle color. The incoming target becomes steady green
+and remains bound to the controller. The animation uses 110 ms fade-out and
+110 ms fade-in halves, giving roughly nine rapid flashes in two seconds. A
+preset load without a same-controller/different-target conflict does not show
+this feedback.
 
 ## OMNI status LED
 
@@ -164,9 +203,10 @@ screens does not change learn, binding or musical state.
 
 Raw MIDI bytes are parsed on the existing background reader. Genuine CC changes
 are queued onto the Qt object thread before they mutate application state.
-Mapped updates call the existing MIDI/OMNI setters; they do not introduce a
-second synth-state path, call AMY directly or change the socket/serial wire
-boundary.
+Mapped updates call the existing MIDI/OMNI setters under a narrow in-call MIDI
+authority flag; they do not introduce a second synth-state path, call AMY
+directly or change the socket/serial wire boundary. The same setters reject
+non-MIDI writes while their target is bound.
 
 ## Implementation map
 
@@ -192,5 +232,5 @@ The behavior is intentionally split along existing responsibilities:
   wiring and layout; integration tests in `tests/integration/test_frontend.py`
   and `test_presets.py` cover AMY convergence and screen-owned persistence.
 
-Executable user scenarios are `MIDI-CC-01` through `MIDI-CC-08` in
+Executable user scenarios are `MIDI-CC-01` through `MIDI-CC-12` in
 `../qt_frontend/tests/USE_CASES.md`.

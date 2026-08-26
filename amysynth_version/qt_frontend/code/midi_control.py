@@ -24,11 +24,13 @@ class MidiControlState:
         blue_timeout: float = 30.0,
         double_tap_window: float = 0.55,
         replacement_duration: float = 0.42,
+        preset_feedback_duration: float = 2.0,
     ) -> None:
         self.capacity = max(1, int(capacity))
         self.blue_timeout = float(blue_timeout)
         self.double_tap_window = float(double_tap_window)
         self.replacement_duration = float(replacement_duration)
+        self.preset_feedback_duration = float(preset_feedback_duration)
 
         self.controls: list[dict[str, Any]] = []
         self.values: dict[ControlKey, int] = {}
@@ -38,6 +40,7 @@ class MidiControlState:
         self.learn_key: ControlKey | None = None
         self.blue_since: dict[ControlKey, float] = {}
         self._target_taps: dict[str, float] = {}
+        self._preset_target_feedback: dict[str, tuple[str, float]] = {}
 
     @staticmethod
     def key(channel: int, controller: int) -> ControlKey:
@@ -277,6 +280,53 @@ class MidiControlState:
     def is_target_bound(self, target: dict[str, Any]) -> bool:
         return self.target_id(target) in self._target_to_control
 
+    def target_visual_state(
+        self,
+        target: dict[str, Any],
+        *,
+        now: float | None = None,
+    ) -> str:
+        now = time.monotonic() if now is None else float(now)
+        target_id = self.target_id(target)
+        feedback = self._preset_target_feedback.get(target_id)
+        if feedback is not None and feedback[1] > now:
+            return feedback[0]
+        return "bound" if target_id in self._target_to_control else "idle"
+
+    def expire_preset_feedback(self, *, now: float | None = None) -> bool:
+        now = time.monotonic() if now is None else float(now)
+        expired = [
+            target_id
+            for target_id, (_, until) in self._preset_target_feedback.items()
+            if until <= now
+        ]
+        for target_id in expired:
+            self._preset_target_feedback.pop(target_id, None)
+        return bool(expired)
+
+    def has_preset_feedback(self, *, now: float | None = None) -> bool:
+        now = time.monotonic() if now is None else float(now)
+        return any(
+            until > now
+            for _, until in self._preset_target_feedback.values()
+        )
+
+    def preset_conflict_target_ids(
+        self,
+        entries: Iterable[tuple[ControlKey, dict[str, Any]]],
+    ) -> set[str]:
+        conflicts: set[str] = set()
+        for raw_key, target in entries:
+            key = self.key(*raw_key)
+            old_target = self.bindings.get(key)
+            if old_target is None:
+                continue
+            old_id = self.target_id(old_target)
+            new_id = self.target_id(target)
+            if old_id != new_id:
+                conflicts.update((old_id, new_id))
+        return conflicts
+
     def _unbind_target(self, target: dict[str, Any], now: float) -> bool:
         target_id = self.target_id(target)
         key = self._target_to_control.pop(target_id, None)
@@ -357,6 +407,12 @@ class MidiControlState:
     ) -> bool:
         now = time.monotonic() if now is None else float(now)
         screen = str(screen)
+        entries = list(entries)
+        previous_bindings = {
+            key: copy.deepcopy(target)
+            for key, target in self.bindings.items()
+        }
+        self._preset_target_feedback.clear()
         removed = [
             key
             for key, target in self.bindings.items()
@@ -369,6 +425,19 @@ class MidiControlState:
         for raw_key, target in entries:
             key = self.key(*raw_key)
             target_id = self.target_id(target)
+            previous_target = previous_bindings.get(key)
+            if (
+                previous_target is not None
+                and self.target_id(previous_target) != target_id
+            ):
+                until = now + self.preset_feedback_duration
+                self._preset_target_feedback[
+                    self.target_id(previous_target)
+                ] = ("preset-displaced", until)
+                self._preset_target_feedback[target_id] = (
+                    "preset-incoming",
+                    until,
+                )
 
             old_target = self.bindings.pop(key, None)
             if old_target is not None:

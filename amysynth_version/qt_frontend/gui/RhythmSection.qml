@@ -74,22 +74,39 @@ Item {
     Button {
         id: runButton
         x: wheelFrame.width + 7; y: (parent.height - height) / 2; width: 62; height: 62
-        contentItem: Item {
+        contentItem: Canvas {
+            id: rhythmTransportSymbol
             anchors.fill: parent
 
-            // Bind the glyph directly to the Qt property.  The previous Canvas
-            // depended on an imperative repaint after the backend call; if that
-            // call raised, the transport really stopped but the old STOP glyph
-            // remained painted.  This declaration always follows rhythmRunning.
-            Text {
-                anchors.centerIn: parent
-                anchors.horizontalCenterOffset: root.controller.rhythmRunning ? 0 : 2
-                text: root.controller.rhythmRunning ? "■" : "▶"
-                color: root.controller.rhythmRunning ? "#fff8d5" : "#3e3006"
-                font.pixelSize: root.controller.rhythmRunning ? 25 : 32
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
+            onPaint: {
+                const c = getContext("2d")
+                c.reset()
+                c.fillStyle = root.controller.rhythmRunning
+                    ? "#fff8d5" : "#3e3006"
+                if (root.controller.rhythmRunning) {
+                    const side = 19
+                    c.fillRect(
+                        (width - side) / 2,
+                        (height - side) / 2,
+                        side,
+                        side
+                    )
+                } else {
+                    // Match the geometrically centered bass transport arrow.
+                    c.beginPath()
+                    c.moveTo(width / 2 - 9, height / 2 - 14)
+                    c.lineTo(width / 2 + 15, height / 2)
+                    c.lineTo(width / 2 - 9, height / 2 + 14)
+                    c.closePath()
+                    c.fill()
+                }
+            }
+
+            Connections {
+                target: root.controller
+                function onRhythmStateChanged() {
+                    rhythmTransportSymbol.requestPaint()
+                }
             }
         }
         background: Rectangle {

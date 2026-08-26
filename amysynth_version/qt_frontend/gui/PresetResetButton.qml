@@ -16,7 +16,7 @@ Button {
 
     contentItem: Text {
         text: root.text
-        color: root.textColor
+        color: root.enabled ? root.textColor : "#686864"
         font: root.font
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
@@ -24,8 +24,10 @@ Button {
 
     background: Rectangle {
         radius: width / 2
-        color: root.pressed ? Qt.darker(root.panelColor, 1.08) : root.panelColor
-        border.color: root.borderColor
+        color: root.enabled
+            ? (root.pressed ? Qt.darker(root.panelColor, 1.08) : root.panelColor)
+            : "#bdbdb8"
+        border.color: root.enabled ? root.borderColor : "#85857f"
         border.width: 2
     }
 }

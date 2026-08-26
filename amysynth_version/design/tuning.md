@@ -22,11 +22,21 @@ A change from either screen must update:
 - displayed tuning value in both screens
 - generated note frequencies
 
+If either coupled reference has a green MIDI CC binding, MIDI owns the shared
+numeric reference. Both screens' UP/DOWN controls are disabled and grey, and
+manual setters/bend holds cannot change it. When coupling is re-enabled, a
+bound side is authoritative regardless of which screen's link was pressed. If
+both independently bound references differ, coupling is refused rather than
+overwriting either MIDI-owned value.
+
 ## Decoupled mode
 
 OMNI and MIDI have separate tuning states.
 
 Changing one does not affect the other.
+
+In decoupled mode only the screen whose reference is bound locks its tuning
+UP/DOWN controls. The other screen remains independently editable.
 
 ## MIDI conversion
 

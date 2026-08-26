@@ -154,9 +154,13 @@ Important regression tests:
 - APG and chord-family LDR strum note sets remain deterministic
 - APG/LDR mode stores and reloads with OMNI presets, with APG as the legacy
   fallback
-- MIDI-bound parameter and volume values survive section RST and runtime
-  preset selection on both screens, including hidden instrument targets and
-  bindings introduced by the destination preset
+- every MIDI-bound numeric value rejects manual/tap/drag/setter/nudge/copy
+  writes and survives section RST and runtime preset selection on both screens,
+  including hidden instrument targets and bindings introduced by the
+  destination preset
+- MIDI-bound tempo and effective tuning disable and grey their UP/DOWN buttons;
+  tuning recoupling takes authority from a bound side and refuses divergent
+  dual-bound references
 - OMNI and MIDI reverb level reaches 3.0 through UI/backend clamping, MIDI CC
   mapping and the owned AMY bus commands
 - MIDI CC running status updates indicators without changing musical state;
@@ -164,8 +168,14 @@ Important regression tests:
 - MIDI CC learn permits one red controller, binds every continuous numeric
   control family one-to-one, maps logarithmic sliders over visual travel,
   protects red/blue indicators, preserves hidden instrument-specific bindings,
-  unlinks on drag/double-tap, expires blue state and persists bindings in the
-  owning MIDI or OMNI preset
+  consumes bound drag/edit gestures, unlinks only on an explicit double-tap,
+  expires blue state and persists bindings in the owning MIDI or OMNI preset
+- the rhythm start arrow uses the same centered triangle geometry as bass and
+  repaints on backend transport changes
+- a preset that reuses an already-bound channel/controller for another target
+  wins the mapping and its destination-owned numeric values;
+  outgoing/incoming handles report red/blue feedback for two seconds and then
+  settle free/green
 - the OMNI MIDI-control LED remains centered in the available horizontal gap
   between chord row two and the strum surface
 - instrument balance captures cover low/middle/high registers and report RMS,

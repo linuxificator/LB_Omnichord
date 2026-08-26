@@ -103,6 +103,30 @@ ApplicationWindow {
     property bool midiScreen: backend.midiPlayer.testCcLogging
     property bool tuningCoupled: true
     property bool strumLadderMode: backend.strumLadderMode
+    readonly property bool omniTuningMidiBound: {
+        backend.midiPlayer.bindingVersion
+        return backend.midiPlayer.isControlTargetBound({
+            "screen": "omni",
+            "kind": "tuning_reference"
+        })
+    }
+    readonly property bool midiTuningMidiBound: {
+        backend.midiPlayer.bindingVersion
+        return backend.midiPlayer.isControlTargetBound({
+            "screen": "midi",
+            "kind": "tuning_reference"
+        })
+    }
+    readonly property bool omniTuningLocked:
+        window.omniTuningMidiBound
+        || (window.tuningCoupled && window.midiTuningMidiBound)
+    readonly property bool rhythmTempoMidiBound: {
+        backend.midiPlayer.bindingVersion
+        return backend.midiPlayer.isControlTargetBound({
+            "screen": "omni",
+            "kind": "rhythm_tempo"
+        })
+    }
 
     function setFullscreenMode(fullscreen) {
         if (fullscreen) {
@@ -344,6 +368,7 @@ ApplicationWindow {
                 width: 42
                 height: 42
                 text: "UP"
+                enabled: !window.omniTuningLocked
                 panelColor: "#efb05c"
                 borderColor: "#a75d0a"
                 textColor: "#492606"
@@ -359,6 +384,7 @@ ApplicationWindow {
                 width: 42
                 height: 42
                 text: "DWN"
+                enabled: !window.omniTuningLocked
                 panelColor: "#efb05c"
                 borderColor: "#a75d0a"
                 textColor: "#492606"
@@ -394,6 +420,7 @@ ApplicationWindow {
                 width: 42
                 height: 42
                 text: "UP"
+                enabled: !window.rhythmTempoMidiBound
                 panelColor: "#f4dc78"
                 borderColor: "#aa8719"
                 textColor: "#4c3505"
@@ -409,6 +436,7 @@ ApplicationWindow {
                 width: 42
                 height: 42
                 text: "DWN"
+                enabled: !window.rhythmTempoMidiBound
                 panelColor: "#f4dc78"
                 borderColor: "#aa8719"
                 textColor: "#4c3505"

@@ -668,12 +668,18 @@ class MidiPlayerBackend(QObject):
         self._midi_control_state = MidiControlState(capacity=17)
         self._binding_version = 0
         self._midi_control_lock = threading.Lock()
+        self._applying_midi_control = 0
         raw_cc_log = os.environ.get("OMNICHORD_TEST_MIDI_CC_LOG", "")
         self._midi_cc_test_log = Path(raw_cc_log) if raw_cc_log else None
         self._queuedControlChange.connect(self.process_midi_control)
         self._blue_expiry_timer = QTimer(self)
         self._blue_expiry_timer.setInterval(250)
         self._blue_expiry_timer.timeout.connect(self._expire_blue_controls)
+        self._preset_feedback_timer = QTimer(self)
+        self._preset_feedback_timer.setInterval(100)
+        self._preset_feedback_timer.timeout.connect(
+            self._expire_preset_feedback
+        )
 
         self.engine = MidiAmyEngine(client)
         self._preview_row = -1
@@ -892,6 +898,22 @@ class MidiPlayerBackend(QObject):
             self._write_cc_test_log({"event": "blue-expired"})
             self._bump_binding_state()
 
+    def _sync_preset_feedback_timer(self) -> None:
+        with self._midi_control_lock:
+            active = self._midi_control_state.has_preset_feedback()
+        if active and not self._preset_feedback_timer.isActive():
+            self._preset_feedback_timer.start()
+        elif not active:
+            self._preset_feedback_timer.stop()
+
+    def _expire_preset_feedback(self) -> None:
+        with self._midi_control_lock:
+            changed = self._midi_control_state.expire_preset_feedback()
+        self._sync_preset_feedback_timer()
+        if changed:
+            self._write_cc_test_log({"event": "preset-feedback-expired"})
+            self._bump_binding_state()
+
     def _definition_for_target(
         self,
         screen: str,
@@ -1054,6 +1076,41 @@ class MidiPlayerBackend(QObject):
             value = minimum + round((value - minimum) / step) * step
         return max(minimum, min(maximum, value))
 
+    def manual_change_blocked(self, raw: dict[str, Any]) -> bool:
+        """Whether a user/API edit must yield to a live MIDI binding."""
+        if self._applying_midi_control:
+            return False
+        target = self._normalize_control_target(raw)
+        if target is None:
+            return False
+        targets = [target]
+        if (
+            str(target.get("kind", "")) == "tuning_reference"
+            and self._tuning_coupled
+        ):
+            other_screen = (
+                "omni" if str(target.get("screen", "")) == "midi" else "midi"
+            )
+            other = self._normalize_control_target(
+                {"screen": other_screen, "kind": "tuning_reference"}
+            )
+            if other is not None:
+                targets.append(other)
+        with self._midi_control_lock:
+            return any(
+                self._midi_control_state.is_target_bound(item)
+                or self._midi_control_state.target_visual_state(item)
+                == "preset-displaced"
+                for item in targets
+            )
+
+    def _apply_midi_setter(self, setter: Any, *args: Any) -> None:
+        self._applying_midi_control += 1
+        try:
+            setter(*args)
+        finally:
+            self._applying_midi_control -= 1
+
     def _apply_control_target(
         self,
         target: dict[str, Any],
@@ -1087,22 +1144,43 @@ class MidiPlayerBackend(QObject):
                 return
             if screen == "midi":
                 row = int(target["row"])
-                self.setSynthIndex(row, index)
-                self.setControl(row, str(target["control"]), value)
+                self._apply_midi_setter(self.setSynthIndex, row, index)
+                self._apply_midi_setter(
+                    self.setControl,
+                    row,
+                    str(target["control"]),
+                    value,
+                )
             else:
                 role = str(target["role"])
                 if role == "chord":
-                    self.owner.setChordSynthIndex(index)
-                    self.owner.setChordSynthControl(str(target["control"]), value)
+                    self._apply_midi_setter(self.owner.setChordSynthIndex, index)
+                    self._apply_midi_setter(
+                        self.owner.setChordSynthControl,
+                        str(target["control"]),
+                        value,
+                    )
                 elif role == "strum":
-                    self.owner.setStrumSynthIndex(index)
-                    self.owner.setStrumSynthControl(str(target["control"]), value)
+                    self._apply_midi_setter(self.owner.setStrumSynthIndex, index)
+                    self._apply_midi_setter(
+                        self.owner.setStrumSynthControl,
+                        str(target["control"]),
+                        value,
+                    )
                 else:
-                    self.owner.setBassSynthIndex(index)
-                    self.owner.setBassSynthControl(str(target["control"]), value)
+                    self._apply_midi_setter(self.owner.setBassSynthIndex, index)
+                    self._apply_midi_setter(
+                        self.owner.setBassSynthControl,
+                        str(target["control"]),
+                        value,
+                    )
         elif kind == "volume":
             if screen == "midi":
-                self.setVolume(int(target["row"]), value)
+                self._apply_midi_setter(
+                    self.setVolume,
+                    int(target["row"]),
+                    value,
+                )
             else:
                 setter = {
                     "chord": self.owner.setChordVolume,
@@ -1110,7 +1188,7 @@ class MidiPlayerBackend(QObject):
                     "bass": self.owner.setBassVolume,
                     "percussion": self.owner.setPercussionVolume,
                 }[str(target["role"])]
-                setter(value)
+                self._apply_midi_setter(setter, value)
         elif kind.startswith("reverb_"):
             controller = self if screen == "midi" else self.owner
             setter = {
@@ -1118,16 +1196,22 @@ class MidiPlayerBackend(QObject):
                 "reverb_liveness": controller.setReverbLiveness,
                 "reverb_damping": controller.setReverbDamping,
             }[kind]
-            setter(value)
+            self._apply_midi_setter(setter, value)
         elif kind == "tuning_reference":
             if screen == "midi":
-                self.setTuningReference(round(value))
+                self._apply_midi_setter(
+                    self.setTuningReference,
+                    round(value),
+                )
             else:
-                self.owner.setTuningReference(round(value))
+                self._apply_midi_setter(
+                    self.owner.setTuningReference,
+                    round(value),
+                )
         elif kind == "rhythm_tempo":
-            self.owner.setRhythmTempo(value)
+            self._apply_midi_setter(self.owner.setRhythmTempo, value)
         elif kind == "bass_voicing":
-            self.owner.setBassVoicingShift(value)
+            self._apply_midi_setter(self.owner.setBassVoicingShift, value)
 
         self._write_cc_test_log(
             {
@@ -1167,6 +1251,14 @@ class MidiPlayerBackend(QObject):
             return False
         with self._midi_control_lock:
             return self._midi_control_state.is_target_bound(target)
+
+    @Slot("QVariantMap", result=str)
+    def controlTargetVisualState(self, raw: dict[str, Any]) -> str:
+        target = self._normalize_control_target(raw)
+        if target is None:
+            return "idle"
+        with self._midi_control_lock:
+            return self._midi_control_state.target_visual_state(target)
 
     @Slot("QVariantMap")
     def controlTargetTapped(self, raw: dict[str, Any]) -> None:
@@ -1248,24 +1340,54 @@ class MidiPlayerBackend(QObject):
         row: int | None = None,
     ) -> list[tuple[dict[str, Any], float]]:
         screen = str(screen)
+        incoming_entries = (
+            self._normalized_binding_entries(screen, incoming_bindings)
+            if incoming_bindings is not None
+            else []
+        )
         with self._midi_control_lock:
             targets = [
                 dict(target)
                 for target in self._midi_control_state.bindings.values()
                 if str(target.get("screen", "")) == screen
             ]
-        if incoming_bindings is not None:
-            targets.extend(
-                dict(target)
-                for _, target in self._normalized_binding_entries(
-                    screen,
-                    incoming_bindings,
+            coupled_tuning_bound = (
+                self._tuning_coupled
+                and any(
+                    str(target.get("kind", "")) == "tuning_reference"
+                    for target in self._midi_control_state.bindings.values()
                 )
             )
+            preset_conflicts = (
+                self._midi_control_state.preset_conflict_target_ids(
+                    incoming_entries
+                )
+                if incoming_entries
+                else set()
+            )
+        if incoming_entries:
+            targets.extend(
+                dict(target)
+                for _, target in incoming_entries
+            )
+        if self._tuning_coupled and (
+            coupled_tuning_bound
+            or any(
+                str(target.get("kind", "")) == "tuning_reference"
+                for target in targets
+            )
+        ):
+            tuning_target = self._normalize_control_target(
+                {"screen": screen, "kind": "tuning_reference"}
+            )
+            if tuning_target is not None:
+                targets.append(tuning_target)
 
         unique = {str(target["id"]): target for target in targets}
         captured: list[tuple[dict[str, Any], float]] = []
         for target in unique.values():
+            if str(target["id"]) in preset_conflicts:
+                continue
             if role is not None and str(target.get("role", "")) != str(role):
                 continue
             if row is not None and int(target.get("row", -1)) != int(row):
@@ -1372,6 +1494,7 @@ class MidiPlayerBackend(QObject):
                 entries,
             )
         self._sync_blue_timer()
+        self._sync_preset_feedback_timer()
         self._bump_binding_state()
         self._write_cc_test_log(
             {
@@ -1459,7 +1582,18 @@ class MidiPlayerBackend(QObject):
     def setControl(self, row: int, key: str, value: float) -> None:
         if not self._valid_row(row):
             return
-        if self._runtime(row).set_control(key, value):
+        runtime = self._runtime(row)
+        if self.manual_change_blocked(
+            {
+                "screen": "midi",
+                "kind": "synth_control",
+                "row": int(row),
+                "instrument": str(runtime.selected_definition.key),
+                "control": str(key),
+            }
+        ):
+            return
+        if runtime.set_control(key, value):
             self._configure_row(int(row))
             self._emit_state()
 
@@ -1468,6 +1602,10 @@ class MidiPlayerBackend(QObject):
         if not self._valid_row(row):
             return
         row = int(row)
+        if self.manual_change_blocked(
+            {"screen": "midi", "kind": "volume", "row": row}
+        ):
+            return
         value = max(0.0, min(1.0, float(value)))
         if math.isclose(value, self.volumes[row], abs_tol=1e-4):
             return
@@ -1724,19 +1862,32 @@ class MidiPlayerBackend(QObject):
     def syncFromOmni(self) -> None:
         mode_index = int(self.owner.selectedTuningModeIndex)
         reference = float(self.owner.tuningReference)
+        reference_blocked = self.manual_change_blocked(
+            {"screen": "midi", "kind": "tuning_reference"}
+        )
         changed = (
             mode_index != self._tuning_mode_index
-            or not math.isclose(
-                reference,
-                self._tuning_reference,
-                abs_tol=1e-9,
+            or (
+                not reference_blocked
+                and (
+                    not math.isclose(
+                        reference,
+                        self._tuning_reference,
+                        abs_tol=1e-9,
+                    )
+                    or not math.isclose(
+                        self._bend_offset,
+                        0.0,
+                        abs_tol=1e-9,
+                    )
+                )
             )
-            or not math.isclose(self._bend_offset, 0.0, abs_tol=1e-9)
         )
         self._tuning_mode_index = mode_index
-        self._tuning_reference = reference
-        self._stop_bend()
-        self._bend_offset = 0.0
+        if not reference_blocked:
+            self._tuning_reference = reference
+            self._stop_bend()
+            self._bend_offset = 0.0
         if changed:
             self.tuningChanged.emit()
 
@@ -1752,6 +1903,10 @@ class MidiPlayerBackend(QObject):
 
     @Slot(int)
     def setTuningReference(self, value: int) -> None:
+        if self.manual_change_blocked(
+            {"screen": "midi", "kind": "tuning_reference"}
+        ):
+            return
         value = max(415, min(466, int(value)))
         self._stop_bend()
         self._bend_offset = 0.0
@@ -1798,6 +1953,12 @@ class MidiPlayerBackend(QObject):
         if self._tuning_coupled:
             self.owner.beginPitchBend(direction)
             return
+        if self.manual_change_blocked(
+            {"screen": "midi", "kind": "tuning_reference"}
+        ):
+            self._stop_bend()
+            self._bend_offset = 0.0
+            return
         self._bend_direction = 1 if int(direction) > 0 else -1
         self._bend_returning = False
         if not self._bend_timer.isActive():
@@ -1807,6 +1968,12 @@ class MidiPlayerBackend(QObject):
     def endPitchBend(self) -> None:
         if self._tuning_coupled:
             self.owner.endPitchBend()
+            return
+        if self.manual_change_blocked(
+            {"screen": "midi", "kind": "tuning_reference"}
+        ):
+            self._stop_bend()
+            self._bend_offset = 0.0
             return
         self._bend_direction = 0
         if math.isclose(self._bend_offset, 0.0, abs_tol=1e-9):
@@ -2001,6 +2168,10 @@ class MidiPlayerBackend(QObject):
 
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
+        if self.manual_change_blocked(
+            {"screen": "midi", "kind": "reverb_level"}
+        ):
+            return
         value = max(0.0, min(MIDI_REVERB_MAX, float(value)))
         if math.isclose(value, self._reverb_level, abs_tol=1e-4):
             return
@@ -2010,6 +2181,10 @@ class MidiPlayerBackend(QObject):
 
     @Slot(float)
     def setReverbLiveness(self, value: float) -> None:
+        if self.manual_change_blocked(
+            {"screen": "midi", "kind": "reverb_liveness"}
+        ):
+            return
         value = max(0.0, min(1.0, float(value)))
         if math.isclose(value, self._reverb_liveness, abs_tol=1e-4):
             return
@@ -2019,6 +2194,10 @@ class MidiPlayerBackend(QObject):
 
     @Slot(float)
     def setReverbDamping(self, value: float) -> None:
+        if self.manual_change_blocked(
+            {"screen": "midi", "kind": "reverb_damping"}
+        ):
+            return
         value = max(0.0, min(1.0, float(value)))
         if math.isclose(value, self._reverb_damping, abs_tol=1e-4):
             return
