@@ -14,7 +14,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -246,6 +246,29 @@ class SerialAmyBridge:
                     raise AssertionError(
                         "missing serial commands "
                         f"{expected}; commands after checkpoint were:\n"
+                        + "\n".join(latest)
+                    )
+                self._line_condition.wait(timeout=min(0.05, remaining))
+
+    def wait_for_line_match(
+        self,
+        predicate: Callable[[str], bool],
+        description: str,
+        *,
+        start: int = 0,
+        timeout: float = 5.0,
+    ) -> list[str]:
+        deadline = time.monotonic() + timeout
+        with self._line_condition:
+            while True:
+                latest = list(self.lines[start:])
+                if any(predicate(line) for line in latest):
+                    return latest
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise AssertionError(
+                        f"missing serial command {description}; "
+                        "commands after checkpoint were:\n"
                         + "\n".join(latest)
                     )
                 self._line_condition.wait(timeout=min(0.05, remaining))

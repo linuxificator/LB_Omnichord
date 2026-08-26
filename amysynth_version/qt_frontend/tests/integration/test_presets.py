@@ -669,6 +669,20 @@ class PresetIntegrationTests(unittest.TestCase):
             checkpoint = app.bridge.count()
 
             app.action("selectPreset", 2)
+            # The HTTP action completes before the dedicated AMY writer drains
+            # a preset's synth setup queue.  wait_idle() alone can therefore
+            # observe the old idle period and return before the first new
+            # serial line.  Wait for the musical continuation contract first.
+            app.bridge.wait_for_line_match(
+                lambda line: (
+                    line.startswith("H")
+                    and "n52" in line
+                    and "i4Z" in line
+                ),
+                "continuing C-major rhythm chord",
+                start=checkpoint,
+                timeout=3.0,
+            )
             app.bridge.wait_idle(timeout=8.0)
 
             self.assertTrue(bool(app.query("rhythmRunning")))
