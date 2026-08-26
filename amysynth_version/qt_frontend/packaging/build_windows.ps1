@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $true
 
 $frontend = Split-Path -Parent $PSScriptRoot
 $buildRoot = Join-Path $frontend "build\windows"
@@ -10,7 +11,7 @@ Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $buildRoot, $dist
 New-Item -ItemType Directory -Force -Path $buildRoot, $dist | Out-Null
 
 cmake -S (Join-Path $frontend "packaging\windows") -B (Join-Path $buildRoot "amy-build") `
-    -G "Visual Studio 17 2022" -A x64 -DAMY_ROOT=$amyRoot
+    -G "Visual Studio 17 2022" -A x64 "-DAMY_ROOT=$amyRoot"
 cmake --build (Join-Path $buildRoot "amy-build") --config Release
 
 $pyDist = Join-Path $buildRoot "pyinstaller"
