@@ -24,6 +24,9 @@ void delay_ms(uint32_t milliseconds) {
 }
 
 static volatile LONG g_running = 1;
+static int g_offline_render = 0;
+static uint64_t g_wire_records = 0;
+static uint64_t g_nonzero_samples = 0;
 
 static BOOL WINAPI console_handler(DWORD type) {
     if (type == CTRL_C_EVENT || type == CTRL_BREAK_EVENT ||
@@ -35,7 +38,46 @@ static BOOL WINAPI console_handler(DWORD type) {
 }
 
 static void usage(void) {
-    printf("amy_service.exe --socket PATH [--self-test]\n");
+    printf(
+        "amy_service.exe --socket PATH [--no-audio] [--once] | --self-test\n"
+    );
+}
+
+static uint64_t render_offline_block(void) {
+    int16_t *block = amy_simple_fill_buffer();
+    uint64_t nonzero = 0;
+    for (size_t i = 0; i < (size_t)AMY_BLOCK_SIZE * AMY_NCHANS; ++i) {
+        if (block[i] != 0) ++nonzero;
+    }
+    return nonzero;
+}
+
+static int run_self_test(void) {
+    amy_config_t config = amy_default_config();
+    config.audio = AMY_AUDIO_IS_NONE;
+    config.features.default_synths = 0;
+    config.max_buses = 11;
+    config.max_oscs = 336;
+
+    amy_start(config);
+    amy_add_message("v0w0f440a1n69l1Z");
+
+    uint64_t nonzero = 0;
+    for (int i = 0; i < 12; ++i) nonzero += render_offline_block();
+
+    amy_add_message("v0l0Z");
+    for (int i = 0; i < 4; ++i) render_offline_block();
+    amy_stop();
+
+    if (nonzero == 0) {
+        fprintf(stderr, "AMY offline render self-test produced silent PCM\n");
+        return 1;
+    }
+    printf(
+        "AMY offline render self-test passed: %llu nonzero PCM samples\n",
+        (unsigned long long)nonzero
+    );
+    return 0;
 }
 
 static int remove_socket_if_safe(const char *path) {
@@ -62,6 +104,10 @@ static int send_wire_line(char *line, size_t length) {
     if (length >= MAX_MESSAGE_LEN || line[length - 1] != 'Z') return -1;
     line[length] = '\0';
     amy_add_message(line);
+    ++g_wire_records;
+    if (g_offline_render) {
+        g_nonzero_samples += render_offline_block();
+    }
     return 0;
 }
 
@@ -94,7 +140,7 @@ static int serve_client(SOCKET client) {
     return 0;
 }
 
-static int run_service(const char *path) {
+static int run_service(const char *path, int no_audio, int once) {
     if (strlen(path) >= sizeof(((struct sockaddr_un *)0)->sun_path)) {
         fprintf(stderr, "socket path is too long for Windows AF_UNIX\n");
         return 2;
@@ -107,10 +153,13 @@ static int run_service(const char *path) {
     SOCKET client = INVALID_SOCKET;
     int result = 1;
     amy_config_t config = amy_default_config();
-    config.audio = AMY_AUDIO_IS_MINIAUDIO;
+    config.audio = no_audio ? AMY_AUDIO_IS_NONE : AMY_AUDIO_IS_MINIAUDIO;
     config.features.default_synths = 0;
     config.max_buses = 11;
     config.max_oscs = 336;
+    g_offline_render = no_audio;
+    g_wire_records = 0;
+    g_nonzero_samples = 0;
 
     server = socket(AF_UNIX, SOCK_STREAM, 0);
     if (server == INVALID_SOCKET) goto cleanup;
@@ -150,11 +199,33 @@ static int run_service(const char *path) {
             setsockopt(client, SOL_SOCKET, SO_RCVTIMEO,
                        (const char *)&timeout_ms, sizeof(timeout_ms));
         }
-        serve_client(client);
+        int client_result = serve_client(client);
         closesocket(client);
         client = INVALID_SOCKET;
+        if (once) {
+            if (client_result < 0) {
+                fprintf(stderr, "AMY smoke client sent an invalid wire record\n");
+                result = 1;
+            } else if (g_wire_records == 0) {
+                fprintf(stderr, "AMY smoke client sent no wire records\n");
+                result = 1;
+            } else if (no_audio && g_nonzero_samples == 0) {
+                fprintf(stderr, "AMY smoke client produced silent PCM\n");
+                result = 1;
+            } else {
+                printf(
+                    "AMY service smoke passed: %llu wire commands, "
+                    "%llu nonzero PCM samples\n",
+                    (unsigned long long)g_wire_records,
+                    (unsigned long long)g_nonzero_samples
+                );
+                fflush(stdout);
+                result = 0;
+            }
+            break;
+        }
     }
-    result = 0;
+    if (!once) result = 0;
     amy_stop();
     SetConsoleCtrlHandler(console_handler, FALSE);
 
@@ -169,12 +240,16 @@ cleanup:
 int main(int argc, char **argv) {
     const char *path = NULL;
     int self_test = 0;
+    int no_audio = 0;
+    int once = 0;
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--socket") == 0 && i + 1 < argc) path = argv[++i];
         else if (strcmp(argv[i], "--self-test") == 0) self_test = 1;
+        else if (strcmp(argv[i], "--no-audio") == 0) no_audio = 1;
+        else if (strcmp(argv[i], "--once") == 0) once = 1;
         else { usage(); return 2; }
     }
-    if (self_test) return 0;
+    if (self_test) return run_self_test();
     if (path == NULL) { usage(); return 2; }
-    return run_service(path);
+    return run_service(path, no_audio, once);
 }

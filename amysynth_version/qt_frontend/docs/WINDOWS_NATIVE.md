@@ -58,7 +58,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Android | `origin/upstream/android-oboe` contains the separate `:amy` service, private socket and transport-only Java client, but it is not merged with active `feature/bus-mixer`. |
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
 | Native Windows frontend transport | The client now selects LF-framed `AF_UNIX/SOCK_STREAM` on `win32`. |
-| Windows package/release | CI now builds an experimental self-contained zip with separate service/frontend executables; no physical validation yet. |
+| Windows package/release | CI builds an experimental self-contained zip with separate service/frontend executables. It performs an offline native AMY render test and starts the unpacked launcher, offscreen Qt/QML frontend and socket service end to end; no physical validation yet for audio/MIDI. |
 | Windows MIDI input | Not implemented; the current reader is Linux ALSA raw MIDI only. |
 
 The current Windows AMY example is not yet a low-latency baseline: the fork's
@@ -74,11 +74,36 @@ settings must not be copied without measuring Windows device behavior.
    bus/runtime work and the service/queue principles proven by Android.
 2. Measure a native WASAPI low-latency profile, including drop-outs and
    command-to-audio latency under heavy patches and reverb.
-3. Validate the Windows package launcher supervising the native service and frozen
-   PySide6 frontend as separate processes.
-4. Add a native Windows MIDI adapter behind the existing MIDI callbacks.
-5. Extend native Windows CI beyond file/self-tests to audio startup and package
-   smoke tests, followed by physical audio/MIDI validation.
+3. Add a native Windows MIDI adapter behind the existing MIDI callbacks.
+4. Validate physical audio/MIDI and measure latency on real Windows hardware;
+   GitHub's hosted runner covers offline PCM rendering and packaged process/
+   socket/QML startup, but is not evidence of audible device output.
+
+## Windows package smoke test
+
+The desktop release workflow has a dedicated `testing/windows_smoke` push path.
+On that branch it runs the shared regressions and Windows package job only;
+Linux, Raspberry Pi, macOS and release publication remain disabled. On `main`,
+the exact same Windows validation participates in the complete release as
+before.
+
+Validation uses only files extracted from the final zip:
+
+1. `amy_service.exe --self-test` initializes native AMY without an audio device,
+   sends real wire note-on/off commands, renders PCM blocks and requires
+   non-silent output.
+2. `run_windows.ps1 -SmokeTest` starts the separate service with offline
+   rendering and one-client lifetime, then starts the frozen Qt executable with
+   its offscreen/software renderer.
+3. The frontend must load the packaged QML/assets, connect through Windows
+   `AF_UNIX/SOCK_STREAM`, publish initial state, play/release a test chord and
+   exit successfully.
+4. The service must report both received wire commands and nonzero rendered PCM,
+   exit after disconnect, and leave no process or socket behind.
+
+This smoke path deliberately does not substitute a mock transport or import AMY
+into the frontend. It verifies the packaged two-process boundary while avoiding
+an unreliable dependency on audio hardware in a hosted CI runner.
 
 `WSL_APPIMAGE_TESTING.md` remains only an optional experiment for the Linux
 artifact, not the Windows implementation plan or release gate.

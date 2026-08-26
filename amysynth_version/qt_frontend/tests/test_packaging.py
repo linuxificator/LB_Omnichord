@@ -28,6 +28,11 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("hdiutil attach", release)
         self.assertIn("AMY backend: external socket", release)
+        self.assertIn("branches: [main, testing/windows_smoke]", release)
+        self.assertGreaterEqual(
+            release.count("if: github.ref == 'refs/heads/main'"),
+            3,
+        )
         self.assertIn("workflow_call:", regression)
         self.assertIn("ALSA_CONFIG_PATH:", regression)
         self.assertTrue((FRONTEND / "tests" / "alsa-null.conf").is_file())
@@ -86,8 +91,18 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("--name LB_Omnichord", build)
         self.assertIn("Start-Process", launcher)
         self.assertIn("--amy-socket", launcher)
+        self.assertIn("$SmokeTest", launcher)
+        self.assertIn("--package-smoke-test", launcher)
+        self.assertIn("QT_QPA_PLATFORM", launcher)
         self.assertIn("AF_UNIX", service)
         self.assertIn("amy_add_message", service)
+        self.assertIn("run_self_test", service)
+        self.assertIn("amy_simple_fill_buffer", service)
+        self.assertIn("AMY service smoke passed:", service)
+        self.assertIn(
+            '& "$root\\run_windows.ps1" -Windowed -SmokeTest',
+            workflow,
+        )
 
     def test_appimage_launcher_preserves_the_process_boundary(self) -> None:
         entry = (FRONTEND / "packaging" / "appimage_entry.py").read_text(

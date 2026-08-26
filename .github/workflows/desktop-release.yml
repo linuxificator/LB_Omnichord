@@ -2,7 +2,7 @@ name: Test and release desktop packages
 
 on:
   push:
-    branches: [main]
+    branches: [main, testing/windows_smoke]
   workflow_dispatch:
 
 concurrency:
@@ -31,6 +31,7 @@ jobs:
           echo "stamp=R${instant/T/}" >> "$GITHUB_OUTPUT"
 
   linux-appimages:
+    if: github.ref == 'refs/heads/main'
     needs: [tests, release-metadata]
     strategy:
       fail-fast: false
@@ -151,6 +152,7 @@ jobs:
           retention-days: 2
 
   macos-dmg:
+    if: github.ref == 'refs/heads/main'
     needs: [tests, release-metadata]
     runs-on: macos-15
     timeout-minutes: 40
@@ -302,6 +304,12 @@ jobs:
           if (-not (Test-Path "$root\LB_Omnichord.exe")) { throw "Frontend executable missing" }
           if (-not (Test-Path "$root\run_windows.ps1")) { throw "Launcher missing" }
           if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked during self-test" }
+          $smokeUser = "$env:RUNNER_TEMP\lb-omnichord-smoke-user"
+          New-Item -ItemType Directory -Force -Path $smokeUser | Out-Null
+          $env:USERPROFILE = $smokeUser
+          $env:LOCALAPPDATA = $smokeUser
+          & "$root\run_windows.ps1" -Windowed -SmokeTest
+          if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked during package smoke test" }
 
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
@@ -314,6 +322,7 @@ jobs:
           retention-days: 2
 
   publish-release:
+    if: github.ref == 'refs/heads/main'
     needs: [release-metadata, linux-appimages, macos-dmg, windows-native]
     runs-on: ubuntu-24.04
     permissions:

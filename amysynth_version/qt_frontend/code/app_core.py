@@ -3880,6 +3880,14 @@ def parse_arguments() -> argparse.Namespace:
             "(packet or LF-framed stream, depending on the platform)."
         ),
     )
+    parser.add_argument(
+        "--package-smoke-test",
+        action="store_true",
+        help=(
+            "Load the complete packaged UI, exercise one chord over the "
+            "configured AMY transport, and exit automatically."
+        ),
+    )
 
     window_group = parser.add_mutually_exclusive_group()
     window_group.add_argument(
@@ -4329,6 +4337,24 @@ def main() -> int:
         return 1
 
     backend.send_initial_state()
+
+    if args.package_smoke_test:
+        if not args.amy_socket:
+            print(
+                "--package-smoke-test requires --amy-socket",
+                file=sys.stderr,
+                flush=True,
+            )
+            amy_client.close()
+            return 2
+
+        # Exercise QML startup, backend state publication, the packaged socket
+        # transport and actual note generation.  The Windows CI service renders
+        # these wire commands offline, so this remains deterministic without an
+        # audio device while production continues to use native miniaudio.
+        QTimer.singleShot(0, lambda: backend.pressChord(0, 0))
+        QTimer.singleShot(250, lambda: backend.releaseChord(0, 0))
+        QTimer.singleShot(750, app.quit)
 
     # Make teardown order explicit. QML must be destroyed while the Python
     # backend QObject is still alive; otherwise its context property becomes
