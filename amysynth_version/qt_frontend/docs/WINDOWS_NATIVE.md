@@ -82,9 +82,11 @@ settings must not be copied without measuring Windows device behavior.
 ## Windows package smoke test
 
 The desktop release workflow has a dedicated `testing/windows_smoke` push path.
-On that branch it runs the shared regressions and Windows package job only;
-Linux, Raspberry Pi, macOS and release publication remain disabled. On `main`,
-the exact same Windows validation participates in the complete release as
+On that branch it runs the Windows package job independently; the shared Linux
+regression matrix, Linux, Raspberry Pi, macOS and release publication remain
+disabled. The complete regression suite must still pass locally before pushing
+that branch. On `main`, the shared regression matrix is again mandatory and the
+exact same Windows validation participates in the complete gated release as
 before.
 
 Validation uses only files extracted from the final zip:

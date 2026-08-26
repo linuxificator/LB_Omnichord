@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   tests:
+    if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/amy-regression.yml
 
   release-metadata:
@@ -256,6 +257,11 @@ jobs:
           retention-days: 2
 
   windows-native:
+    if: >-
+      always() &&
+      needs.release-metadata.result == 'success' &&
+      (github.ref == 'refs/heads/testing/windows_smoke' ||
+       needs.tests.result == 'success')
     needs: [tests, release-metadata]
     runs-on: windows-2022
     timeout-minutes: 45

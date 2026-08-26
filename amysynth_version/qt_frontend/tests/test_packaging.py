@@ -31,7 +31,12 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("branches: [main, testing/windows_smoke]", release)
         self.assertGreaterEqual(
             release.count("if: github.ref == 'refs/heads/main'"),
-            3,
+            4,
+        )
+        self.assertIn("needs.tests.result == 'success'", release)
+        self.assertIn(
+            "github.ref == 'refs/heads/testing/windows_smoke'",
+            release,
         )
         self.assertIn("workflow_call:", regression)
         self.assertIn("ALSA_CONFIG_PATH:", regression)
