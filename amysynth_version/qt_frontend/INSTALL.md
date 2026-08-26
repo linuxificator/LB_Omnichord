@@ -219,11 +219,21 @@ The upstream AMY Python build links the macOS CoreAudio/CoreMIDI frameworks itse
 
 ## Windows
 
-### Current upstream limitation
+### Native Windows status
 
-The Omnichord local mode requires AMY's Python extension (`amy` plus `c_amy`). Current upstream AMY explicitly supports a native Windows **C** build, but its current Python `setup.py` still assumes a Unix-like Python environment (`os.uname()`) and explicitly selects `gcc`/`g++`. For that reason the native-Windows Python installation is not presented here as a known-working path.
+The Qt frontend itself does not require AMY's Python extension (`amy` or
+`c_amy`). It produces only AMY wire requests. The current `local_amy_service.py`
+is a Unix desktop convenience service implemented in Python, so it does need
+that extension; this is a service limitation, not a frontend limitation.
 
-The practical Windows development route is currently **WSL2 + WSLg** on Windows 11. This provides a Linux Python/compiler environment while WSLg supplies GUI and audio integration.
+The intended Windows path is a native PySide6 frontend connected to a separate
+native `amy_service.exe` over LF-framed Windows `AF_UNIX/SOCK_STREAM`. The AMY
+fork currently provides only a native C/miniaudio example, not that service or
+package yet. See [WINDOWS_NATIVE.md](docs/WINDOWS_NATIVE.md) for the contract,
+status and remaining work.
+
+WSL2 + WSLg may still be used to experiment with the Linux artifact, but it is
+not the Windows architecture or a supported low-latency release path.
 
 Install WSL/Ubuntu from an elevated PowerShell if it is not already present:
 
@@ -238,7 +248,7 @@ sudo apt update
 sudo apt install git python3-venv python3-pip python3-dev build-essential
 ```
 
-Keep the repositories in the WSL Linux filesystem (for example under `~/src`) rather than under `/mnt/c` for better build performance. Then install both the frontend and AMY in one virtual environment exactly as in the Linux section and run:
+Keep the repositories in the WSL Linux filesystem (for example under `~/src`) rather than under `/mnt/c` for better build performance. For this optional Linux experiment, install both the frontend and AMY in one virtual environment exactly as in the Linux section and run:
 
 ```bash
 ./run_local.sh --windowed
@@ -251,10 +261,10 @@ follow the [WSL2/WSLg AppImage testing guide](docs/WSL_APPIMAGE_TESTING.md).
 The guide includes FUSE fallback, audio routing, optional USB MIDI and a
 feedback template; successful reports are requested as well as failures.
 
-For reference, upstream AMY's native Windows C example instead requires Visual
-Studio Build Tools 2022 with the C++ workload and can be built from
-`amy/windows`; that native C executable is not the separate Python-backed AMY
-service used by `run_local.sh`.
+For reference, upstream AMY's native Windows C example requires Visual Studio
+Build Tools 2022 with the C++ workload and can be built from `amy/windows`.
+That example proves native AMY compilation but is not the separate wire service
+required by LB Omnichord.
 
 ---
 
@@ -351,7 +361,7 @@ DMG.
 
 # Troubleshooting
 
-## No local AMY module
+## No local AMY module (Unix convenience service)
 
 If local mode reports that `amy` or `c_amy` cannot be imported, verify the package in the frontend virtual environment:
 

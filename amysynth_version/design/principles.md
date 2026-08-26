@@ -22,6 +22,12 @@ Changing screens must not change musical state. UI navigation and audio state ar
 
 Moving from host AMY to ESP32 AMY must not change musical behavior.
 
+Desktop portability follows the same rule. Linux, macOS and native Windows may
+use different local socket framing and native audio backends, but the Qt
+frontend remains the same wire-only client. A platform-specific AMY Python
+extension is an implementation choice for a service, never a frontend
+dependency.
+
 ## Simplicity
 
 New abstractions are added only when they reduce coupling or prevent regressions.

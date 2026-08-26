@@ -1,4 +1,8 @@
-# Test the Linux AppImage on Windows with WSL2 and WSLg
+# Optional legacy experiment: Linux AppImage on Windows with WSL2/WSLg
+
+This document is retained for testing the Linux artifact only. It is not the
+native Windows implementation, release target or realtime-audio validation
+path. See [WINDOWS_NATIVE.md](WINDOWS_NATIVE.md) for the intended architecture.
 
 > **Testers wanted:** the Linux x86_64 AppImage may run on Windows through
 > WSL2/WSLg, but this is not yet a validated or supported release target. If

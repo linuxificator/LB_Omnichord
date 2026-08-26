@@ -74,7 +74,76 @@ was exercised for these changes.
 
 ## Deliberately untouched local notes
 
-`amysynth_version/qt_frontend/docs/regressions.txt` is an untracked user task
-list and `.regressions.txt.swp` is an active Vim swap file. Do not delete,
-rewrite, stage or commit either file without explicit user direction. Points
-4, 5, 6, 7, 8 and 10 in that list remain outside the work completed here.
+`amysynth_version/qt_frontend/docs/regressions.txt` is a user-owned task list
+and `.regressions.txt.swp` is an active Vim swap file. Do not delete, rewrite
+or commit either file without explicit user direction. Points 4, 5, 6, 7, 8
+and 10 in that list remain outside the work completed here.
+
+## Native Windows audit (2026-08-26)
+
+The user requested point 4 to be reassessed against the Android service
+architecture. The audit found:
+
+- The Qt production code is wire-only. Only `local_amy_service.py` and the
+  packaging/service entry path import AMY; the frontend does not load `amy`,
+  `c_amy`, AMY headers or AMY APIs.
+- Linux and macOS already run AMY separately from Qt. Linux uses
+  `AF_UNIX/SOCK_SEQPACKET`; macOS uses LF-framed `AF_UNIX/SOCK_STREAM`.
+- The AMY fork's `origin/upstream/android-oboe` branch contains the intended
+  separate Android `:amy` process, private `amy.sock`, service-only JNI and
+  transport-only Java client. That branch is not an ancestor of the active
+  `feature/bus-mixer` branch, so the Android service work is not yet unified
+  with the desktop fork used by LB Omnichord.
+- The active AMY fork's Windows tree contains only the native C/miniaudio
+  `amy_sine.exe` example. It has no AMY wire-socket service or Windows package.
+- Native Windows AF_UNIX is stream-only, so the Qt writer now selects LF-framed
+  stream mode on `win32`, matching macOS. The transport regression covers both
+  platforms through a patched platform test.
+- The existing Windows AMY audio settings are not yet a realtime release
+  profile: host AMY defaults are 44.1 kHz/256 samples, DirectSound is tried
+  before WASAPI, and the current request is 20 ms × 4 periods. This needs
+  measured native tuning; the ESP32 48 kHz/64-sample baseline must not be
+  copied blindly.
+- The current MIDI reader is ALSA raw-MIDI only, so native Windows MIDI remains
+  an explicit future adapter task.
+
+New/updated documentation and contracts:
+
+- `amysynth_version/qt_frontend/docs/WINDOWS_NATIVE.md` is the native-Windows
+  architecture, status and acceptance handout.
+- `design/architecture.md`, `design/principles.md` and `design/README.md` now
+  state the Windows stream contract and route the native-Windows document.
+- `INSTALL.md`, frontend README, root README, release notes and testing docs no
+  longer present WSL as the Windows route. The WSL guide remains an optional
+  Linux-artifact experiment.
+- A static contract test rejects direct `amy`/`c_amy` imports in frontend code
+  (apart from the separate local service) and packaging tests require the
+  native-Windows contract to remain explicitly not-ready until implemented.
+
+No native Windows service, package or physical Windows audio/MIDI test was
+claimed or performed. Before claiming Windows support, implement the service
+in the AMY fork, merge the needed Android queue principles with the active
+bus-mixer branch, establish a measured WASAPI profile, add a separate package
+launcher and Windows MIDI adapter, then add native CI and hardware validation.
+
+## Windows package continuation (2026-08-26)
+
+The requested build work has since added an experimental native Windows
+package path in this repository:
+
+- `packaging/windows/amy_service.c` is a separate native C wire service using
+  Windows `AF_UNIX/SOCK_STREAM`, AMY's C API and miniaudio; it configures 11
+  buses, 336 oscillators and no default synths.
+- `packaging/windows/CMakeLists.txt` builds that service against the pinned AMY
+  fork. `packaging/build_windows.ps1` builds the service, freezes the Qt
+  frontend independently with PyInstaller and emits a self-contained zip.
+- `packaging/windows/run_windows.ps1` starts the service, waits for its socket,
+  starts the frontend with `--amy-socket`, and cleans up the service.
+- `.github/workflows/desktop-release.yml` now has a Windows 2022 job that
+  builds/self-tests the zip and publishes it as an experimental release asset.
+
+This is a buildable design on the native Windows runner, but it has not been
+executed in this Linux session. The Windows job must be the source of truth for
+first compile validation. Physical Windows audio/MIDI validation is still
+required; the current AMY Windows audio profile is not yet a low-latency
+release baseline, and Windows MIDI input still needs a native adapter.

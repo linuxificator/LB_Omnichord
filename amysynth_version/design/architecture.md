@@ -20,9 +20,11 @@ The Qt application must not import AMY, call AMY synthesis APIs, or manage the
 AMY service lifetime. It only produces AMY wire messages. On Linux those
 messages cross an `AF_UNIX` `SOCK_SEQPACKET` socket; on macOS, which does not
 provide Unix-domain `SOCK_SEQPACKET`, they use a Unix `SOCK_STREAM` with one
-newline-framed AMY request per record. Android uses the app-private `amy.sock`;
-ESP32-P4 uses serial. Framing is a transport concern and does not expose the AMY
-Python API to Qt.
+newline-framed AMY request per record. Native Windows uses the same LF-framed
+`AF_UNIX` `SOCK_STREAM` contract with a native C AMY service; Windows does not
+support `SOCK_SEQPACKET`. Android uses the app-private `amy.sock`; ESP32-P4
+uses serial. Framing is a transport concern and does not expose the AMY Python
+or C API to Qt.
 
 The Linux convenience launcher owns both child processes only as a development
 shell wrapper. Released Linux and Raspberry Pi AppImages and the macOS app
@@ -31,6 +33,14 @@ executable as a separate child, waits for its private socket and then starts
 Qt. The Qt process itself neither imports AMY nor starts or stops its service.
 Each socket packet contains one complete logical AMY wire request, matching the
 `upstream/android-oboe` service and decoupled hello-world reference.
+
+The native Windows service/package is now built by the Windows packaging
+script as an experimental zip: `amy_service.exe` is compiled against the
+checked-out AMY fork and the PySide6 frontend is a separate executable. Native
+audio/MIDI validation and a final low-latency profile remain outstanding.
+WSL2/WSLg is an optional way to experiment with the Linux artifact and is not
+the Windows architecture. See `../qt_frontend/docs/WINDOWS_NATIVE.md` for the
+verified status and acceptance criteria.
 
 ## Transport independence
 

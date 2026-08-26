@@ -55,7 +55,8 @@ Then add every row that matches the task:
 | Tuning, pitch or note conversion | `tuning.md`, `use_cases.md`, `../qt_frontend/tests/USE_CASES.md` |
 | AMY commands, sockets, serial or buses | `amy_interface.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |
 | Instrument catalogue, defaults or balance | `sound_balance.md`, `presets.md`, `../qt_frontend/instruments/README_defaults.md` |
-| Desktop packages, releases or Windows/WSL | `../qt_frontend/README.md`, `../qt_frontend/INSTALL.md`, `../qt_frontend/docs/WSL_APPIMAGE_TESTING.md`, `../../.github/workflows/desktop-release.yml` |
+| Desktop packages, releases or native Windows | `../qt_frontend/README.md`, `../qt_frontend/INSTALL.md`, `../qt_frontend/docs/WINDOWS_NATIVE.md`, `../../.github/workflows/desktop-release.yml` |
+| Optional historical WSL experiment | `../qt_frontend/docs/WSL_APPIMAGE_TESTING.md`, plus the desktop documents above |
 | ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |
 

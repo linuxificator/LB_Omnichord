@@ -39,7 +39,7 @@ both the MIDI and OMNI screens.
 - [Read the active AMY implementation overview](./amysynth_version/README.md)
 - [Browse the design documentation](./amysynth_version/design/README.md)
 - [Download packaged releases](https://github.com/linuxificator/LB_Omnichord/releases)
-- [Help test the Linux AppImage on Windows through WSL2/WSLg](./amysynth_version/qt_frontend/docs/WSL_APPIMAGE_TESTING.md)
+- [Read the native Windows architecture and status](./amysynth_version/qt_frontend/docs/WINDOWS_NATIVE.md)
 
 The original Sonic Pi implementation is retained as
 [historical code](./rpi_sonic_pi_version) and is no longer the active version.

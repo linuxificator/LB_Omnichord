@@ -441,7 +441,10 @@ class _UnixSocketWriter(_SerialWriter):
         from collections import deque
 
         self.debug_log = debug_log
-        self._stream_transport = sys.platform == "darwin"
+        # Linux supports packet-preserving SOCK_SEQPACKET.  macOS and
+        # Windows AF_UNIX expose stream sockets, so delimit each wire request
+        # with LF at this transport boundary.
+        self._stream_transport = sys.platform in {"darwin", "win32"}
         socket_type = (
             socket.SOCK_STREAM
             if self._stream_transport

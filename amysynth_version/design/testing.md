@@ -53,9 +53,8 @@ Four repository workflows are maintained:
   One timestamped tag/release contains all three packages and their SHA-256
   files. Manual dispatch is available for an explicitly requested release
   candidate from another branch; ordinary feature-branch pushes never publish
-  releases. Every generated release page also links, using that release's tag,
-  to `qt_frontend/docs/WSL_APPIMAGE_TESTING.md` and asks Windows/WSL testers to
-  report both successful and unsuccessful results.
+  releases. Native Windows is a separate future package target; it is not
+  represented by the Linux AppImage or WSL.
 - `ESP32-P4 firmware build` builds and validates the firmware package when the
   ESP32-P4 project changes. It is a build/package check, not part of the Python
   frontend suite.
@@ -125,10 +124,10 @@ and macOS packages still require their first physical-device/audio test.
 Future releases are not automatically considered physically tested merely
 because the pipeline succeeded.
 
-Windows through WSL2/WSLg remains an experimental community-test path rather
-than a validated platform. The reproducible prerequisites, AppImage/FUSE
-fallback, ALSA-to-PulseAudio audio check, optional USB-MIDI route and feedback
-template are maintained in `../qt_frontend/docs/WSL_APPIMAGE_TESTING.md`.
+Native Windows support is not claimed until the native service, audio profile,
+package startup and physical MIDI/audio checks in
+`../qt_frontend/docs/WINDOWS_NATIVE.md` pass. The WSL AppImage guide is only an
+optional experiment with the Linux artifact.
 
 Each test should verify:
 

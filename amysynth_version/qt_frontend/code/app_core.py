@@ -3800,7 +3800,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--amy-socket",
         default=None,
-        help="Connect to an external AMY AF_UNIX SOCK_SEQPACKET socket.",
+        help=(
+            "Connect to an external AMY local socket "
+            "(packet or LF-framed stream, depending on the platform)."
+        ),
     )
 
     window_group = parser.add_mutually_exclusive_group()

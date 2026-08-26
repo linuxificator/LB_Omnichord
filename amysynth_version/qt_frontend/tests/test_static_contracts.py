@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import unittest
 from pathlib import Path
@@ -9,6 +10,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StaticContractTests(unittest.TestCase):
+    def test_frontend_code_has_no_amy_library_imports(self) -> None:
+        """Only the separately managed local service may load AMY."""
+        allowed = {"local_amy_service.py"}
+        imported: list[str] = []
+        for path in (ROOT / "code").glob("*.py"):
+            if path.name in allowed:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"), str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    imported.extend(alias.name for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    imported.append(node.module)
+        forbidden = [name for name in imported if name in {"amy", "c_amy"}]
+        self.assertEqual(forbidden, [])
+
     def test_codex_startup_reading_routes_existing_design_contracts(self) -> None:
         repository = ROOT.parents[1]
         agents_path = repository / "AGENTS.md"
@@ -47,7 +64,7 @@ class StaticContractTests(unittest.TestCase):
             ROOT.parent / "README.md",
             ROOT / "docs" / "CONTROL_SAFETY.md",
             ROOT / "docs" / "SEQUENCER_TAGS.md",
-            ROOT / "docs" / "WSL_APPIMAGE_TESTING.md",
+            ROOT / "docs" / "WINDOWS_NATIVE.md",
             ROOT / "tests" / "USE_CASES.md",
             ROOT / "instruments" / "README_defaults.md",
             ROOT.parent / "esp32p4" / "README.md",
@@ -55,7 +72,7 @@ class StaticContractTests(unittest.TestCase):
         )
         for path in required_frontend_contracts:
             self.assertTrue(path.is_file(), str(path))
-        self.assertIn("WSL_APPIMAGE_TESTING.md", design_index)
+        self.assertIn("WINDOWS_NATIVE.md", design_index)
 
     def test_public_readme_uses_current_amy_and_qt_screenshots(self) -> None:
         repository = ROOT.parents[1]

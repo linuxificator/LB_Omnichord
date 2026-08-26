@@ -46,7 +46,12 @@ class AmySocketWriterTests(unittest.TestCase):
 
             self.assertEqual(packets, [b"K215i5Z", b"n60l1i5Z"])
 
-    def test_macos_stream_transport_frames_each_wire_request(self) -> None:
+    def test_stream_platforms_frame_each_wire_request(self) -> None:
+        for platform in ("darwin", "win32"):
+            with self.subTest(platform=platform):
+                self._assert_stream_framing(platform)
+
+    def _assert_stream_framing(self, platform: str) -> None:
         with tempfile.TemporaryDirectory(prefix="amy-stream-test-") as tmp:
             path = Path(tmp) / "amy.sock"
             server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -64,7 +69,7 @@ class AmySocketWriterTests(unittest.TestCase):
 
             thread = threading.Thread(target=receive, daemon=True)
             thread.start()
-            with patch("amy_transport.sys.platform", "darwin"):
+            with patch("amy_transport.sys.platform", platform):
                 writer = _UnixSocketWriter(str(path))
             try:
                 writer.high("K215i5Z")

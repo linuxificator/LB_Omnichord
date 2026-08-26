@@ -253,8 +253,68 @@ jobs:
           if-no-files-found: error
           retention-days: 2
 
+  windows-native:
+    needs: [tests, release-metadata]
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: amysynth_version/qt_frontend/requirements.txt
+
+      - name: Install frontend and packaging dependencies
+        shell: pwsh
+        run: |
+          python -m pip install -r amysynth_version/qt_frontend/requirements.txt pyinstaller==6.22.2
+
+      - name: Checkout pinned AMY fork
+        shell: pwsh
+        run: |
+          git clone https://github.com/linuxificator/amy.git "$env:RUNNER_TEMP\amy-lb"
+          git -C "$env:RUNNER_TEMP\amy-lb" checkout 25213785696dd40e6cce59ab428e560a410d240f
+
+      - name: Build native service and self-contained package
+        shell: pwsh
+        env:
+          OMNICHORD_RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+          OMNICHORD_AMY_ROOT: ${{ runner.temp }}\amy-lb
+        working-directory: amysynth_version/qt_frontend
+        run: ./packaging/build_windows.ps1
+
+      - name: Validate separate native service and frontend
+        shell: pwsh
+        working-directory: amysynth_version/qt_frontend
+        run: |
+          $package = "dist\LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.Windows-x86_64.zip"
+          Expand-Archive -Path $package -DestinationPath "$env:RUNNER_TEMP\lb-package"
+          $root = "$env:RUNNER_TEMP\lb-package"
+          & "$root\amy_service.exe" --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Native AMY service self-test failed" }
+          if (-not (Test-Path "$root\LB_Omnichord.exe")) { throw "Frontend executable missing" }
+          if (-not (Test-Path "$root\run_windows.ps1")) { throw "Launcher missing" }
+          if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked during self-test" }
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-Windows-x86_64
+          path: |
+            amysynth_version/qt_frontend/dist/*.zip
+            amysynth_version/qt_frontend/dist/*.zip.sha256
+          if-no-files-found: error
+          retention-days: 2
+
   publish-release:
-    needs: [release-metadata, linux-appimages, macos-dmg]
+    needs: [release-metadata, linux-appimages, macos-dmg, windows-native]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -276,15 +336,11 @@ jobs:
           linux_file="LB_Omnichord.${RELEASE_STAMP}.Linux-x86_64.AppImage"
           pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
           mac_file="LB_Omnichord.${RELEASE_STAMP}.macOS-arm64.dmg"
-          wsl_guide_url="https://github.com/${GITHUB_REPOSITORY}/blob/${RELEASE_TAG}/amysynth_version/qt_frontend/docs/WSL_APPIMAGE_TESTING.md"
+          windows_file="LB_Omnichord.${RELEASE_STAMP}.Windows-x86_64.zip"
           {
             echo '## Linux x64'
             echo
             echo "Download \`$linux_file\` and its SHA-256 file."
-            echo
-            echo '## Windows via WSL2 / WSLg — testers wanted'
-            echo
-            echo "The Linux x64 AppImage may work through WSL2/WSLg, but this path is not validated yet. [Follow the WSL AppImage testing guide and report successful or unsuccessful results]($wsl_guide_url)."
             echo
             echo '## Raspberry Pi 4 / 5 (64-bit Raspberry Pi OS)'
             echo
@@ -293,6 +349,10 @@ jobs:
             echo '## macOS Apple Silicon'
             echo
             echo "Download \`$mac_file\` and its SHA-256 file. This build is ad-hoc signed but not Apple-notarized."
+            echo
+            echo '## Windows native (experimental)'
+            echo
+            echo "Download \`$windows_file\` and its SHA-256 file. The zip contains separate native AMY and Qt frontend executables plus a launcher. Native Windows audio/MIDI still needs physical validation."
           } > release-notes.md
           gh release create "$RELEASE_TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \

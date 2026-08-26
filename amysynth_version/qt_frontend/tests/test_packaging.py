@@ -22,7 +22,10 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("linux-appimages:", release)
         self.assertIn("macos-dmg:", release)
         self.assertIn("needs: [tests, release-metadata]", release)
-        self.assertIn("needs: [release-metadata, linux-appimages, macos-dmg]", release)
+        self.assertIn(
+            "needs: [release-metadata, linux-appimages, macos-dmg, windows-native]",
+            release,
+        )
         self.assertIn("hdiutil attach", release)
         self.assertIn("AMY backend: external socket", release)
         self.assertIn("workflow_call:", regression)
@@ -53,26 +56,38 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("## Linux x64", release)
         self.assertIn("## Raspberry Pi 4 / 5", release)
         self.assertIn("## macOS Apple Silicon", release)
-        self.assertIn("## Windows via WSL2 / WSLg", release)
+        self.assertNotIn("Windows via WSL2 / WSLg", release)
 
-    def test_release_links_to_tagged_wsl_test_and_feedback_guide(self) -> None:
-        release = (
+    def test_native_windows_contract_is_explicit_and_not_claimed_ready(self) -> None:
+        contract = (FRONTEND / "docs" / "WINDOWS_NATIVE.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("amy_service.exe", contract)
+        self.assertIn("AF_UNIX / SOCK_STREAM", contract)
+        self.assertIn("no physical validation yet", contract)
+        self.assertIn("WSL_APPIMAGE_TESTING.md", contract)
+
+    def test_windows_release_build_keeps_service_and_frontend_separate(self) -> None:
+        workflow = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
         ).read_text(encoding="utf-8")
-        guide = FRONTEND / "docs" / "WSL_APPIMAGE_TESTING.md"
-        guide_text = guide.read_text(encoding="utf-8")
-
-        tagged_guide = (
-            "https://github.com/${GITHUB_REPOSITORY}/blob/${RELEASE_TAG}/"
-            "amysynth_version/qt_frontend/docs/WSL_APPIMAGE_TESTING.md"
+        build = (FRONTEND / "packaging" / "build_windows.ps1").read_text(
+            encoding="utf-8"
         )
-        self.assertIn(tagged_guide, release)
-        self.assertIn("report successful or unsuccessful results", release)
-        self.assertIn("Testers wanted", guide_text)
-        self.assertIn("--appimage-extract-and-run", guide_text)
-        self.assertIn("speaker-test -D pulse", guide_text)
-        self.assertIn("usbipd attach --wsl", guide_text)
-        self.assertIn("/issues/new", guide_text)
+        launcher = (
+            FRONTEND / "packaging" / "windows" / "run_windows.ps1"
+        ).read_text(encoding="utf-8")
+        service = (
+            FRONTEND / "packaging" / "windows" / "amy_service.c"
+        ).read_text(encoding="utf-8")
+        self.assertIn("windows-native:", workflow)
+        self.assertIn("windows-native]", workflow)
+        self.assertIn("amy_service.exe", build)
+        self.assertIn("--name LB_Omnichord", build)
+        self.assertIn("Start-Process", launcher)
+        self.assertIn("--amy-socket", launcher)
+        self.assertIn("AF_UNIX", service)
+        self.assertIn("amy_add_message", service)
 
     def test_appimage_launcher_preserves_the_process_boundary(self) -> None:
         entry = (FRONTEND / "packaging" / "appimage_entry.py").read_text(

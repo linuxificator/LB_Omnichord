@@ -128,8 +128,10 @@ Pi and macOS still need physical-device/audio validation. Use the repository's
 GitHub Releases page for the current artifacts rather than treating either tag
 as a hard-coded update channel.
 
-Windows through WSL2/WSLg is an unvalidated community-test target, not a native
-Windows package. Every new release links to the
-[WSL AppImage testing and feedback guide](docs/WSL_APPIMAGE_TESTING.md).
+Native Windows is the intended future desktop target: a native PySide6
+frontend talks to a separate native AMY service over the wire boundary. It is
+not packaged or validated yet; see [the native Windows status and contract](docs/WINDOWS_NATIVE.md).
+The Linux AppImage through WSL2/WSLg remains an optional diagnostic experiment,
+not a Windows release target.
 
 [Open GitHub Releases](https://github.com/linuxificator/LB_Omnichord/releases)
