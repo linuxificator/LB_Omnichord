@@ -47,6 +47,7 @@ class StaticContractTests(unittest.TestCase):
             ROOT.parent / "README.md",
             ROOT / "docs" / "CONTROL_SAFETY.md",
             ROOT / "docs" / "SEQUENCER_TAGS.md",
+            ROOT / "docs" / "WSL_APPIMAGE_TESTING.md",
             ROOT / "tests" / "USE_CASES.md",
             ROOT / "instruments" / "README_defaults.md",
             ROOT.parent / "esp32p4" / "README.md",
@@ -54,6 +55,7 @@ class StaticContractTests(unittest.TestCase):
         )
         for path in required_frontend_contracts:
             self.assertTrue(path.is_file(), str(path))
+        self.assertIn("WSL_APPIMAGE_TESTING.md", design_index)
 
     def test_public_readme_uses_current_amy_and_qt_screenshots(self) -> None:
         repository = ROOT.parents[1]

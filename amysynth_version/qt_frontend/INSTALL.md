@@ -246,6 +246,11 @@ Keep the repositories in the WSL Linux filesystem (for example under `~/src`) ra
 
 On a normal Windows 11 WSLg installation the Qt window and AMY audio should be forwarded to the Windows desktop. This project has not yet validated that path.
 
+To test the packaged Linux x86_64 AppImage instead of building from source,
+follow the [WSL2/WSLg AppImage testing guide](docs/WSL_APPIMAGE_TESTING.md).
+The guide includes FUSE fallback, audio routing, optional USB MIDI and a
+feedback template; successful reports are requested as well as failures.
+
 For reference, upstream AMY's native Windows C example instead requires Visual
 Studio Build Tools 2022 with the C++ workload and can be built from
 `amy/windows`; that native C executable is not the separate Python-backed AMY

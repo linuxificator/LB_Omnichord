@@ -53,6 +53,26 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("## Linux x64", release)
         self.assertIn("## Raspberry Pi 4 / 5", release)
         self.assertIn("## macOS Apple Silicon", release)
+        self.assertIn("## Windows via WSL2 / WSLg", release)
+
+    def test_release_links_to_tagged_wsl_test_and_feedback_guide(self) -> None:
+        release = (
+            REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+        guide = FRONTEND / "docs" / "WSL_APPIMAGE_TESTING.md"
+        guide_text = guide.read_text(encoding="utf-8")
+
+        tagged_guide = (
+            "https://github.com/${GITHUB_REPOSITORY}/blob/${RELEASE_TAG}/"
+            "amysynth_version/qt_frontend/docs/WSL_APPIMAGE_TESTING.md"
+        )
+        self.assertIn(tagged_guide, release)
+        self.assertIn("report successful or unsuccessful results", release)
+        self.assertIn("Testers wanted", guide_text)
+        self.assertIn("--appimage-extract-and-run", guide_text)
+        self.assertIn("speaker-test -D pulse", guide_text)
+        self.assertIn("usbipd attach --wsl", guide_text)
+        self.assertIn("/issues/new", guide_text)
 
     def test_appimage_launcher_preserves_the_process_boundary(self) -> None:
         entry = (FRONTEND / "packaging" / "appimage_entry.py").read_text(

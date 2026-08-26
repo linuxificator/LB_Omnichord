@@ -246,6 +246,39 @@ class FrontendIntegrationTests(unittest.TestCase):
                 float(mapped_omni["maximum"]),
             )
 
+    def test_midi_control_updates_omni_reverb_and_blue_returns_idle(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            target = {"screen": "omni", "kind": "reverb_level"}
+
+            app.action("injectMidiControl", 3, 76, 0)
+            app.action("injectMidiControl", 3, 76, 1)
+            app.action("selectMidiControlIndicator", 3, 76)
+            self.assertTrue(app.action("activateMidiControlTarget", target))
+
+            checkpoint = app.bridge.count()
+            app.action("injectMidiControl", 3, 76, 127)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
+            mapped_lines = app.bridge.lines_since(checkpoint)
+            for bus in (1, 2, 3):
+                self.assertIn(f"y{bus}h2,0.5,0.5Z", mapped_lines)
+
+            app.action("moveMidiControlTarget", target)
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(3, 76)], "blue")
+
+            app.action("injectMidiControl", 3, 76, 64)
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(3, 76)], "idle")
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
+
     def test_midi_presets_select_and_configure_their_rows(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)

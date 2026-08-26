@@ -31,6 +31,29 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
             config_dir.joinpath("amy_config.json").write_text(
                 json.dumps(config), encoding="utf-8"
             )
+            preset_dir = temp / ".omnichord" / "omni_presets"
+            preset_dir.mkdir(parents=True)
+            preset = json.loads(
+                (
+                    ROOT
+                    / "instruments"
+                    / "default_presets"
+                    / "p1.json"
+                ).read_text(encoding="utf-8")
+            )
+            preset["midi_control_bindings"] = [
+                {
+                    "channel": 1,
+                    "controller": 74,
+                    "target": {
+                        "screen": "omni",
+                        "kind": "reverb_level",
+                    },
+                }
+            ]
+            preset_dir.joinpath("p1.json").write_text(
+                json.dumps(preset), encoding="utf-8"
+            )
             log = temp / "midi-cc.jsonl"
             env = dict(
                 os.environ,
@@ -61,6 +84,7 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
                         bytes((0xB0, controller, start, 0xB0, controller, start + 1)),
                     )
 
+                change(74, 0)
                 for controller in range(32):
                     change(controller)
                 time.sleep(0.5)
@@ -110,6 +134,10 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
             self.assertEqual(last["controller"], 99)
             capacity = last["capacity"]
             self.assertEqual(last["evicted"], [1, 33 - capacity])
+            applied = [item for item in records if item["event"] == "apply"]
+            self.assertTrue(applied)
+            self.assertEqual(applied[-1]["target"], "omni:reverb_level")
+            self.assertAlmostEqual(float(applied[-1]["mappedValue"]), 0.02)
 
 
 if __name__ == "__main__":

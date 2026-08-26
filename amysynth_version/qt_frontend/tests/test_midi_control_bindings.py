@@ -149,6 +149,33 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertNotIn((1, 1), state.blue_since)
         self.assertEqual(state.status((1, 2)), "blue")
 
+    def test_genuine_movement_returns_blue_control_to_idle(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = target("volume")
+        change(state, 1, now=1.0)
+        state.select_control((1, 1), now=2.0)
+        state.bind_learned_target(binding, now=2.1)
+        self.assertTrue(state.target_moved(binding, now=3.0))
+        self.assertEqual(state.status((1, 1)), "blue")
+
+        changed, mapped, key = state.observe(1, 1, 1, now=3.5)
+        self.assertFalse(changed)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+        self.assertEqual(state.status((1, 1)), "blue")
+
+        changed, mapped, key = state.observe(1, 1, 2, now=4.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(key, (1, 1))
+        self.assertIsNone(mapped)
+        self.assertEqual(state.status((1, 1)), "idle")
+        self.assertEqual(state.omni_led_state(), "idle")
+        visible = state._visible((1, 1))
+        self.assertIsNotNone(visible)
+        assert visible is not None
+        self.assertEqual(visible["value"], 2)
+
     def test_screen_specific_bindings_round_trip(self) -> None:
         state = MidiControlState(capacity=4)
         midi_target = target("midi")

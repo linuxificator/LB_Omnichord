@@ -172,6 +172,9 @@ class MidiControlState:
         if previous is None or previous == value:
             return False, None, None
 
+        # Blue marks a recently unbound control.  Its next genuine movement
+        # makes it an ordinary unbound control again; repeated packets do not.
+        self.blue_since.pop(key, None)
         self.clock += 1
         item = self._visible(key)
         if item is None:

@@ -196,8 +196,9 @@ The serial regression requires the factory patch to remain authoritative for nat
 - One click on a bound target does not unlink.
 - A real drag unlinks immediately; a second press within 550 ms also unlinks.
 - The controller becomes blue and visible when capacity permits.
-- Blue state expires and removes the indicator after 30 seconds; later genuine
-  activity may create an ordinary indicator again.
+- The next genuine CC movement changes a blue controller immediately into an
+  ordinary grey unbound indicator. Without movement, blue expires and removes
+  the indicator after 30 seconds.
 
 **MIDI-CC-07 — hidden instrument targets reactivate on MIDI and OMNI**
 

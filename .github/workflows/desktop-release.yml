@@ -276,10 +276,15 @@ jobs:
           linux_file="LB_Omnichord.${RELEASE_STAMP}.Linux-x86_64.AppImage"
           pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
           mac_file="LB_Omnichord.${RELEASE_STAMP}.macOS-arm64.dmg"
+          wsl_guide_url="https://github.com/${GITHUB_REPOSITORY}/blob/${RELEASE_TAG}/amysynth_version/qt_frontend/docs/WSL_APPIMAGE_TESTING.md"
           {
             echo '## Linux x64'
             echo
             echo "Download \`$linux_file\` and its SHA-256 file."
+            echo
+            echo '## Windows via WSL2 / WSLg — testers wanted'
+            echo
+            echo "The Linux x64 AppImage may work through WSL2/WSLg, but this path is not validated yet. [Follow the WSL AppImage testing guide and report successful or unsuccessful results]($wsl_guide_url)."
             echo
             echo '## Raspberry Pi 4 / 5 (64-bit Raspberry Pi OS)'
             echo

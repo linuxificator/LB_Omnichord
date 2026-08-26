@@ -75,8 +75,10 @@ held for at least 180 ms, so a single track click does not unlink. Two presses
 of the same bound target within 550 ms form the current double-tap gesture and unlink it. This also works
 for click-only numeric controls such as volume and tuning. Unlinking makes the
 controller LED blue and ensures that controller is visible when capacity allows.
-After 30 seconds the blue state and its indicator are removed. A later genuine
-CC change can create an ordinary indicator again.
+The blue state is an inactivity notice, not a latch: the next genuine CC
+movement ends it immediately and leaves the controller visible as an ordinary
+unbound grey indicator. Without new movement, the blue state and its indicator
+are removed after 30 seconds.
 
 ## Supported targets and range mapping
 
@@ -100,7 +102,9 @@ are authoritative.
 
 Binding does not immediately jump the slider to the controller's remembered
 value. The next genuine incoming CC movement applies the mapped value through
-the same backend setter used by manual UI editing.
+the same backend setter used by manual UI editing. Backend notify signals must
+also resynchronize the visible QML control after the binding touch, including
+the three OMNI and MIDI reverb sliders.
 
 ## Instrument-specific targets
 

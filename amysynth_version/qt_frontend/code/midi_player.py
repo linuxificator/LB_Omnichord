@@ -767,7 +767,9 @@ class MidiPlayerBackend(QObject):
 
     @Slot(int, int, int)
     def process_midi_control(self, channel: int, controller: int, value: int) -> None:
+        control_key = self._midi_control_state.key(channel, controller)
         with self._midi_control_lock:
+            was_blue = control_key in self._midi_control_state.blue_since
             before = {
                 (item["channel"], item["controller"])
                 for item in self._midi_control_state.controls
@@ -795,6 +797,13 @@ class MidiPlayerBackend(QObject):
                 "evicted": list(evicted) if evicted else None,
                 "mapped": target is not None,
             })
+            blue_cleared = (
+                was_blue
+                and control_key not in self._midi_control_state.blue_since
+            )
+        if blue_cleared:
+            self._sync_blue_timer()
+            self._bump_binding_state()
         if target is not None:
             self._apply_control_target(target, int(value))
 
