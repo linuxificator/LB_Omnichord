@@ -110,6 +110,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("if sys.stderr is None:", main)
         self.assertIn('getattr(sys, "_MEIPASS", CODE_DIR.parent)', core)
         self.assertIn("AF_UNIX", service)
+        self.assertIn("sizeof(address)", service)
         self.assertIn("amy_add_message", service)
         self.assertIn("run_self_test", service)
         self.assertIn("amy_simple_fill_buffer", service)

@@ -9,7 +9,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -167,8 +166,11 @@ static int run_service(const char *path, int no_audio, int once) {
     memset(&address, 0, sizeof(address));
     address.sun_family = AF_UNIX;
     strcpy(address.sun_path, path);
-    int address_length = (int)(offsetof(struct sockaddr_un, sun_path) +
-                               strlen(path) + 1);
+    // Winsock identifies AF_UNIX endpoints using the complete sockaddr_un.
+    // Python's Windows socket implementation connects with that same size;
+    // a POSIX-style shortened length creates the node but does not match the
+    // client endpoint reliably.
+    int address_length = (int)sizeof(address);
     if (bind(server, (const struct sockaddr *)&address, address_length) == SOCKET_ERROR)
         goto cleanup;
     if (listen(server, 1) == SOCKET_ERROR) goto cleanup;
