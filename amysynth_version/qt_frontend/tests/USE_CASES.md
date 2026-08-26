@@ -217,6 +217,18 @@ The serial regression requires the factory patch to remain authoritative for nat
 - Old presets without `midi_control_bindings` load normally with no bindings.
 - Red/blue/visible-LRU state and current CC values are not serialized.
 
+**MIDI-CC-09 — bound values survive RST and runtime preset switches**
+
+- A section RST restores its preset instrument, unbound parameters and unbound
+  volume, but preserves every bound parameter and bound volume value.
+- Hidden instrument-specific bound values remain protected without selecting
+  their instrument.
+- Runtime preset selection protects the union of targets bound before the
+  switch and targets stored in the destination preset.
+- Startup loading may initialize all stored values normally.
+- After reset or switching, genuine CC movement remains authoritative through
+  the normal setter and AMY convergence path.
+
 Unit tests cover the state machine and mapping math. Headless frontend tests use
 simulated user actions plus simulated MIDI CC input and inspect state, preset
 JSON and AMY output. The offscreen Qt test feeds real raw-MIDI bytes, records
@@ -365,6 +377,19 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
   the preset load may not turn that release into an ignored/stale event.
 - Runtime preset selection uses the live convergence path even while rhythm is
   stopped; the startup/recovery reset path is not a preset-switch operation.
+
+**PRESET-05 — APG/LDR is OMNI preset state**
+
+- Store writes the backend-owned strum traversal mode as `strum_mode`.
+- Selecting another preset updates both strum behavior and the APG/LDR button.
+- A legacy preset without the field loads as APG.
+
+**PRESET-06 — reverb level range is 0–3**
+
+- Both OMNI and MIDI sliders, backend clamps and MIDI CC mapping expose the
+  complete `0.00..3.00` range.
+- Setting or mapping the maximum sends reverb level 3 to each owned melodic
+  bus; drum inclusion keeps its existing independent behavior.
 
 ### RHYTHM — sequencer invariants
 

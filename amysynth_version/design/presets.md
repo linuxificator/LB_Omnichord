@@ -6,8 +6,10 @@ OMNI and MIDI presets are separate files and separate code paths.
 
 OMNI presets own chord rows, selected chord/strum/bass instruments, sparse
 instrument overrides, volumes, rhythm configuration and tempo, tuning mode and
-reference, and OMNI reverb state. `rhythmRunning` is live transport state and is
-never stored or restored. See `rhythm_bahavior.md` for live-switch semantics.
+reference, OMNI reverb state, and the strum traversal mode (`APG` or `LDR`).
+Older presets without `strum_mode` load as `APG`. `rhythmRunning` is live
+transport state and is never stored or restored. See `rhythm_bahavior.md` for
+live-switch semantics.
 
 The active chord identity, chord gate and physical chord-button hold state are
 also live performance state. Selecting an OMNI preset preserves them. The same
@@ -34,6 +36,16 @@ MIDI CC bindings follow target ownership: MIDI targets are stored in MIDI
 presets and OMNI targets in OMNI presets under the optional
 `midi_control_bindings` field. Learn selection, blue unlink timers and visible
 indicator LRU state are never preset state. See `midi_control.md`.
+
+During a runtime preset switch, a numeric target controlled by MIDI keeps its
+current live value instead of accepting the destination preset value. The
+protected set is the union of bindings active before the switch and bindings
+declared by the destination preset. Startup preset loading is not a live switch
+and may initialize every value normally. Section `RST` applies the same rule:
+it restores the preset instrument, volume and unbound parameters, while bound
+parameter and volume values remain under MIDI authority. Hidden
+instrument-specific target values are protected without forcing that
+instrument to become selected.
 
 ## Factory presets
 

@@ -28,7 +28,7 @@ Current hard ranges:
 | DX7 feedback | 0–0.5 |
 
 Other user controls are independently bounded in the backend: volumes are 0–1,
-reverb level is 0–2, reverb liveness/damping are 0–1, tuning reference is
+reverb level is 0–3, reverb liveness/damping are 0–1, tuning reference is
 415–466 Hz, rhythm tempo is 40–200 BPM, and activity selectors are restricted
 to their discrete UI ranges.
 

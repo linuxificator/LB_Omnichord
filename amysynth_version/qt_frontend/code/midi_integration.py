@@ -36,13 +36,48 @@ class InstrumentBackend(OmniInstrumentBackend):
     def _apply_preset_data(self, data: dict[str, Any]) -> None:
         bindings = data.get("midi_control_bindings", [])
         self._pending_omni_control_bindings = bindings if isinstance(bindings, list) else []
-        super()._apply_preset_data(data)
         player = getattr(self, "_midi_player", None)
+        protected = (
+            player.capture_bound_control_values(
+                "omni",
+                incoming_bindings=self._pending_omni_control_bindings,
+            )
+            if player is not None
+            else []
+        )
+        super()._apply_preset_data(data)
         if player is not None:
+            player.restore_control_values(protected)
             player.replace_control_bindings(
                 "omni",
                 self._pending_omni_control_bindings,
             )
+
+    def _reset_synth_role_to_preset(self, role: str) -> None:
+        player = getattr(self, "_midi_player", None)
+        protected = (
+            player.capture_bound_control_values("omni", role=role)
+            if player is not None
+            else []
+        )
+        controls = {
+            (str(target["instrument"]), str(target["control"])): value
+            for target, value in protected
+            if str(target["kind"]) == "synth_control"
+        }
+        volume = next(
+            (
+                value
+                for target, value in protected
+                if str(target["kind"]) == "volume"
+            ),
+            None,
+        )
+        super()._reset_synth_role_to_preset(
+            role,
+            preserved_controls=controls,
+            preserved_volume=volume,
+        )
 
     def _preset_snapshot(self) -> dict[str, Any]:
         snapshot = super()._preset_snapshot()

@@ -106,6 +106,22 @@ the same backend setter used by manual UI editing. Backend notify signals must
 also resynchronize the visible QML control after the binding touch, including
 the three OMNI and MIDI reverb sliders.
 
+## Controller authority during reset and preset changes
+
+A green binding makes its numeric value live controller state. A section
+`RST` may restore the preset's instrument selection and every unbound value,
+but it must preserve bound parameters and the bound section volume. A hidden
+instrument-specific parameter remains protected without selecting that
+instrument.
+
+A runtime preset switch preserves the current value of every target bound
+immediately before the switch and every target declared by the destination
+preset. The destination preset still replaces that screen's binding set as
+specified below; only the protected numeric values survive the transition.
+Initial application startup may load all stored values because it is not a
+live preset switch. After either operation, the next genuine CC movement
+continues through the normal mapped setter path.
+
 ## Instrument-specific targets
 
 An instrument parameter binding stores the stable instrument key as part of its
@@ -125,6 +141,8 @@ LRU age and current CC values are runtime state.
 - the optional JSON field is `midi_control_bindings`;
 - presets without the field load with no bindings for that screen;
 - loading a preset replaces only that screen's bindings;
+- runtime loading preserves bound numeric values according to the controller
+  authority rule above;
 - valid loaded bindings are admitted to the indicator bar as capacity permits;
 - global one-to-one ownership still applies if separately stored presets assign
   the same controller to different screens.
@@ -158,8 +176,9 @@ The behavior is intentionally split along existing responsibilities:
   `MidiControlState` state machine for controller identity, genuine movement,
   LRU visibility, LED states, one-to-one bindings and serialization.
 - `../qt_frontend/code/midi_player.py` owns that state, queues raw CC changes
-  onto the Qt object thread, resolves target ranges and calls the existing
-  MIDI/OMNI setters.
+  onto the Qt object thread, resolves target ranges, calls the existing
+  MIDI/OMNI setters and captures/restores bound numeric values around live
+  preset and RST operations.
 - `../qt_frontend/code/midi_integration.py` connects OMNI preset ownership and
   exposes the narrow integration-test actions. It does not create a second
   binding state.

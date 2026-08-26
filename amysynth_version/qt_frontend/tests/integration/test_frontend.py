@@ -116,25 +116,25 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertGreaterEqual(float(sustain["value"]), 0.0)
             self.assertLessEqual(float(sustain["value"]), 1.0)
 
-    def test_reverb_level_reaches_two_and_is_clamped_there(self) -> None:
+    def test_reverb_level_reaches_three_and_is_clamped_there(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
             start = app.bridge.count()
 
-            app.action("setReverbLevel", 2.0)
+            app.action("setReverbLevel", 3.0)
             app.bridge.wait_idle(timeout=3.0)
 
-            self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
             lines = app.bridge.lines_since(start)
             for bus in (1, 2, 3):
                 self.assertIn(
-                    f"y{bus}h2,0.5,0.5Z",
+                    f"y{bus}h3,0.5,0.5Z",
                     lines,
-                    f"reverb level 2.0 did not reach AMY bus {bus}",
+                    f"reverb level 3.0 did not reach AMY bus {bus}",
                 )
 
             app.action("setReverbLevel", 9.0)
-            self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
 
     def test_midi_rows_use_real_catalog_controls_and_channels_one_to_six(self) -> None:
         with HeadlessApp(native_amy=False) as app:
@@ -259,10 +259,10 @@ class FrontendIntegrationTests(unittest.TestCase):
             checkpoint = app.bridge.count()
             app.action("injectMidiControl", 3, 76, 127)
             app.bridge.wait_idle(timeout=3.0)
-            self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
             mapped_lines = app.bridge.lines_since(checkpoint)
             for bus in (1, 2, 3):
-                self.assertIn(f"y{bus}h2,0.5,0.5Z", mapped_lines)
+                self.assertIn(f"y{bus}h3,0.5,0.5Z", mapped_lines)
 
             app.action("moveMidiControlTarget", target)
             states = {
@@ -277,7 +277,23 @@ class FrontendIntegrationTests(unittest.TestCase):
                 for item in app.action("midiControlIndicators")
             }
             self.assertEqual(states[(3, 76)], "idle")
-            self.assertAlmostEqual(float(app.query("reverbLevel")), 2.0)
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
+
+    def test_midi_control_maps_midi_reverb_to_three(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            target = {"screen": "midi", "kind": "reverb_level"}
+            app.action("injectMidiControl", 4, 77, 0)
+            app.action("injectMidiControl", 4, 77, 1)
+            app.action("selectMidiControlIndicator", 4, 77)
+            self.assertTrue(app.action("activateMidiControlTarget", target))
+
+            checkpoint = app.bridge.count()
+            app.action("injectMidiControl", 4, 77, 127)
+            app.bridge.wait_idle(timeout=3.0)
+            lines = app.bridge.lines_since(checkpoint)
+            for bus in range(4, 10):
+                self.assertIn(f"y{bus}h3,0.58,0.52Z", lines)
 
     def test_midi_presets_select_and_configure_their_rows(self) -> None:
         with HeadlessApp(native_amy=False) as app:

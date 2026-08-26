@@ -28,7 +28,7 @@ Item {
             label: "LEV"
             currentValue: root.controller.reverbLevel
             fromValue: 0
-            toValue: 2
+            toValue: 3
             stepValue: 0.01
             decimals: 2
             textColor: "#6b3048"

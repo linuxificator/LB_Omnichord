@@ -9,7 +9,7 @@ from synth_programs import SynthProgram, resolve_program
 
 KS_WAVE = 6
 KS_DECAY_CONTROL = "ks_feedback"
-REVERB_LEVEL_MAX = 2.0
+REVERB_LEVEL_MAX = 3.0
 DRUM_PREVIEW_SAMPLES = (
     "drum_bass_hard",
     "drum_tom_lo_soft",
@@ -60,7 +60,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
         )
 
     def _set_reverb(self, value: Any) -> None:
-        """Accept the Omnichord's extended 0..2 wet-return gain range."""
+        """Accept the Omnichord's extended 0..3 wet-return gain range."""
         if not isinstance(value, dict):
             return
         updated = {

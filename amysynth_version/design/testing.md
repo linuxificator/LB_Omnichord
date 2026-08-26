@@ -153,6 +153,13 @@ Important regression tests:
 - legacy user data migrates to separate OMNI/MIDI preset directories
 - editable user configuration is seeded once and has startup priority
 - APG and chord-family LDR strum note sets remain deterministic
+- APG/LDR mode stores and reloads with OMNI presets, with APG as the legacy
+  fallback
+- MIDI-bound parameter and volume values survive section RST and runtime
+  preset selection on both screens, including hidden instrument targets and
+  bindings introduced by the destination preset
+- OMNI and MIDI reverb level reaches 3.0 through UI/backend clamping, MIDI CC
+  mapping and the owned AMY bus commands
 - MIDI CC running status updates indicators without changing musical state;
   indicators fill the available width before least-recently-used replacement
 - MIDI CC learn permits one red controller, binds every continuous numeric

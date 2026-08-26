@@ -78,6 +78,7 @@ ROW_COUNT = 4
 TUNING_MODE_NAMES = ("HARM", "EQ", "JV")
 DEFAULT_TUNING_MODE_INDEX = 1
 DEFAULT_TUNING_REFERENCE = 440
+REVERB_LEVEL_MAX = 3.0
 
 PRESET_COUNT = 18
 PRESET_DIRECTORY = OMNI_PRESET_DIR
@@ -564,6 +565,7 @@ class InstrumentBackend(QObject):
     reverbLivenessChanged = Signal()
     reverbDampingChanged = Signal()
     reverbDrumsIncludedChanged = Signal()
+    strumModeChanged = Signal()
     bassRunningChanged = Signal()
 
     chordSynthStateChanged = Signal()
@@ -769,7 +771,8 @@ class InstrumentBackend(QObject):
         )
         effects = defaults.get("effects", {})
         self._reverb_level = max(
-            0.0, min(1.0, float(effects.get("reverb_level", 0.0)))
+            0.0,
+            min(REVERB_LEVEL_MAX, float(effects.get("reverb_level", 0.0))),
         )
         self._reverb_liveness = max(
             0.0, min(1.0, float(effects.get("reverb_liveness", 0.5)))
@@ -1046,6 +1049,10 @@ class InstrumentBackend(QObject):
     def reverbDrumsIncluded(self) -> bool:
         return self._reverb_drums
 
+    @Property(bool, notify=strumModeChanged)
+    def strumLadderMode(self) -> bool:
+        return self._strum_ladder_mode
+
     @Property(int, notify=chordSynthStateChanged)
     def selectedChordSynthIndex(self) -> int:
         return self._chord_synth.selected_index
@@ -1234,7 +1241,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
-        clamped = max(0.0, min(1.0, float(value)))
+        clamped = max(0.0, min(REVERB_LEVEL_MAX, float(value)))
         if abs(clamped - self._reverb_level) < 0.0001:
             return
         self._reverb_level = clamped
@@ -1613,6 +1620,7 @@ class InstrumentBackend(QObject):
 
         snapshot: dict[str, Any] = {
             "version": 1,
+            "strum_mode": "LDR" if self._strum_ladder_mode else "APG",
             "chord_rows": [
                 {
                     "chord": self._chords[
@@ -1933,7 +1941,10 @@ class InstrumentBackend(QObject):
         )
 
         effects = self._defaults.get("effects", {})
-        self._reverb_level = max(0.0, min(1.0, float(effects.get("reverb_level", 0.0))))
+        self._reverb_level = max(
+            0.0,
+            min(REVERB_LEVEL_MAX, float(effects.get("reverb_level", 0.0))),
+        )
         self._reverb_liveness = max(0.0, min(1.0, float(effects.get("reverb_liveness", 0.5))))
         self._reverb_damping = max(0.0, min(1.0, float(effects.get("reverb_damping", 0.5))))
         self._reverb_drums = bool(effects.get("reverb_drums", False))
@@ -1979,6 +1990,7 @@ class InstrumentBackend(QObject):
         self._stop_pitch_bend()
         self._pitch_bend_offset_hz = 0.0
         self._stop_tempo_nudge()
+        self._strum_ladder_mode = False
 
     def _apply_preset_data(
         self,
@@ -1987,6 +1999,9 @@ class InstrumentBackend(QObject):
         rhythm_was_running = self._rhythm_running
         live_tempo = self.rhythmTempo if rhythm_was_running else None
         self._reset_presettable_state_to_defaults()
+        self._strum_ladder_mode = (
+            str(data.get("strum_mode", "APG")).upper() == "LDR"
+        )
 
         suffix_to_index = {
             chord.suffix: index
@@ -2126,7 +2141,13 @@ class InstrumentBackend(QObject):
         default_effects = self._defaults.get("effects", {})
         legacy_main = effects.get("main_reverb", default_effects.get("reverb_level", 0.0))
         legacy_drum = effects.get("percussion_reverb", 0.0)
-        self._reverb_level = max(0.0, min(1.0, float(effects.get("reverb_level", legacy_main))))
+        self._reverb_level = max(
+            0.0,
+            min(
+                REVERB_LEVEL_MAX,
+                float(effects.get("reverb_level", legacy_main)),
+            ),
+        )
         self._reverb_liveness = max(0.0, min(1.0, float(effects.get("reverb_liveness", default_effects.get("reverb_liveness", 0.5)))))
         self._reverb_damping = max(0.0, min(1.0, float(effects.get("reverb_damping", default_effects.get("reverb_damping", 0.5)))))
         self._reverb_drums = bool(effects.get("reverb_drums", float(legacy_drum) > 0.0))
@@ -2315,6 +2336,7 @@ class InstrumentBackend(QObject):
         self.reverbLivenessChanged.emit()
         self.reverbDampingChanged.emit()
         self.reverbDrumsIncludedChanged.emit()
+        self.strumModeChanged.emit()
         self.bassRunningChanged.emit()
 
         self.chordSynthStateChanged.emit()
@@ -2406,10 +2428,22 @@ class InstrumentBackend(QObject):
         default = float(self._defaults["volumes"][role])
         return max(0.0, min(1.0, float(volumes.get(role, default))))
 
-    def _reset_synth_role_to_preset(self, role: SynthRole) -> None:
+    def _reset_synth_role_to_preset(
+        self,
+        role: SynthRole,
+        *,
+        preserved_controls: dict[tuple[str, str], float] | None = None,
+        preserved_volume: float | None = None,
+    ) -> None:
         runtime = self._runtime(role)
         runtime.reset_selected_from_preset(self._preset_role_data(role))
-        volume = self._preset_volume_for_role(role)
+        for (instrument, control), value in (preserved_controls or {}).items():
+            runtime.set_instrument_control(instrument, control, value)
+        volume = (
+            self._preset_volume_for_role(role)
+            if preserved_volume is None
+            else max(0.0, min(1.0, float(preserved_volume)))
+        )
         if role == "chord":
             self._chord_volume = volume
             self.chordVolumeChanged.emit()
@@ -3465,8 +3499,23 @@ class InstrumentBackend(QObject):
 
     def _decode_strum_position(self, value: float) -> float:
         value = float(value)
-        self._strum_ladder_mode = value >= 2.0
+        self._set_strum_ladder_mode(value >= 2.0)
         return value - 2.0 if self._strum_ladder_mode else value
+
+    def _set_strum_ladder_mode(self, enabled: bool) -> None:
+        enabled = bool(enabled)
+        if enabled == self._strum_ladder_mode:
+            return
+        self._strum_ladder_mode = enabled
+        self.strumModeChanged.emit()
+
+    @Slot(bool)
+    def setStrumLadderMode(self, enabled: bool) -> None:
+        self._set_strum_ladder_mode(enabled)
+
+    @Slot()
+    def toggleStrumLadderMode(self) -> None:
+        self._set_strum_ladder_mode(not self._strum_ladder_mode)
 
     @Slot(float)
     def strumStart(self, normalized_y: float) -> None:

@@ -44,7 +44,7 @@ Window {
         width: 145
         height: 70
         fromValue: 0
-        toValue: 2
+        toValue: 3
         currentValue: 0.25
     }
 }

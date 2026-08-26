@@ -326,10 +326,19 @@ class StaticContractTests(unittest.TestCase):
     def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
         panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi_backend = (ROOT / "code" / "midi_player.py").read_text(
+            encoding="utf-8"
+        )
+        omni_backend = (ROOT / "code" / "app_core.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("id: controlsRow", panel)
         self.assertEqual(panel.count("LabeledSlider {"), 3)
         self.assertNotIn("VerticalVolume {", panel)
         self.assertGreaterEqual(panel.count("width: 145"), 3)
+        self.assertIn("toValue: 3", panel)
+        self.assertIn("MIDI_REVERB_MAX = app_core.REVERB_LEVEL_MAX", midi_backend)
+        self.assertIn("REVERB_LEVEL_MAX = 3.0", omni_backend)
         self.assertIn('label: "LEV"', panel)
         self.assertIn('label: "LIVE"', panel)
         self.assertIn('label: "DAMP"', panel)
@@ -339,6 +348,17 @@ class StaticContractTests(unittest.TestCase):
             ROOT / "code" / "midi_integration.py"
         ).read_text(encoding="utf-8")
         self.assertIn("@Property(QObject, constant=True)", midi_integration)
+
+    def test_apg_ldr_button_uses_backend_preset_state(self) -> None:
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        self.assertIn(
+            "property bool strumLadderMode: backend.strumLadderMode",
+            qml,
+        )
+        self.assertIn("backend.toggleStrumLadderMode()", qml)
+        self.assertIn('"strum_mode": "LDR"', backend)
+        self.assertIn('data.get("strum_mode", "APG")', backend)
 
     def test_rainbow_mode_button_text_is_large_and_centered(self) -> None:
         qml = (ROOT / "gui" / "RainbowModeButton.qml").read_text(

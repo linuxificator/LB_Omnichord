@@ -17,7 +17,7 @@ CHORD_GATE_NONE = 0
 CHORD_GATE_ON = 1
 CHORD_GATE_OFF = 2
 BASS_VOICING_LIMIT = 6
-REVERB_LEVEL_MAX = 2.0
+REVERB_LEVEL_MAX = app_core.REVERB_LEVEL_MAX
 
 
 class InstrumentBackend(app_core.InstrumentBackend):
@@ -39,7 +39,13 @@ class InstrumentBackend(app_core.InstrumentBackend):
         self._bass_voicing_shift = 0
         super().__init__(*args, **kwargs)
 
-    def _reset_synth_role_to_preset(self, role: app_core.SynthRole) -> None:
+    def _reset_synth_role_to_preset(
+        self,
+        role: app_core.SynthRole,
+        *,
+        preserved_controls: dict[tuple[str, str], float] | None = None,
+        preserved_volume: float | None = None,
+    ) -> None:
         """Restore a synth role's preset instrument, parameters and volume.
 
         The stable core's reset helper intentionally restores only parameters
@@ -50,7 +56,11 @@ class InstrumentBackend(app_core.InstrumentBackend):
         runtime = self._runtime(role)
         previous_index = runtime.selected_index
         runtime.load_preset(self._preset_role_data(role))
-        super()._reset_synth_role_to_preset(role)
+        super()._reset_synth_role_to_preset(
+            role,
+            preserved_controls=preserved_controls,
+            preserved_volume=preserved_volume,
+        )
         if runtime.selected_index != previous_index:
             if role == "chord":
                 self.chordSynthStateChanged.emit()
@@ -187,7 +197,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
-        """Expose AMY reverb wet-return gain through 2.0 (about +6 dB)."""
+        """Expose AMY reverb wet-return gain through 3.0."""
         clamped = max(0.0, min(REVERB_LEVEL_MAX, float(value)))
         if abs(clamped - self._reverb_level) < 0.0001:
             return

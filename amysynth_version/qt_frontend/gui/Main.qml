@@ -102,7 +102,7 @@ ApplicationWindow {
     // transport, note, patch or effect command to AMY.
     property bool midiScreen: backend.midiPlayer.testCcLogging
     property bool tuningCoupled: true
-    property bool strumLadderMode: false
+    property bool strumLadderMode: backend.strumLadderMode
 
     function setFullscreenMode(fullscreen) {
         if (fullscreen) {
@@ -307,7 +307,7 @@ ApplicationWindow {
                         borderColor: "#2f648c"
                         textColor: "#071c2c"
                         onClicked: {
-                            window.strumLadderMode = !window.strumLadderMode
+                            backend.toggleStrumLadderMode()
                         }
                     }
                 }

@@ -19,7 +19,14 @@ seven-octave chord arpeggio. LDR uses a consonant scale selected by chord
 family: major or suspended pentatonic, minor pentatonic, Mixolydian for
 dominants, octatonic for diminished/flat-five chords, and whole-tone for
 augmented/sharp-five chords. Power chords use major pentatonic. Both modes use
-the same tuning and AMY wire-note path.
+the same tuning and AMY wire-note path. The backend owns the selected mode and
+OMNI presets store it as `strum_mode`; missing legacy values mean `APG`.
+
+## Reverb range
+
+The OMNI and MIDI reverb level sliders cover `0.00..3.00`. This is the wet
+return gain sent unchanged to the owned AMY buses. Liveness and damping remain
+`0.00..1.00`, and both screens keep independent reverb state.
 
 ## MIDI control activity
 

@@ -7,6 +7,26 @@ from catalog import control_default, entry_for_index, synth_index
 from harness import HeadlessApp
 
 
+def bind_control(
+    app: HeadlessApp,
+    channel: int,
+    controller: int,
+    target: dict[str, object],
+) -> None:
+    app.action("injectMidiControl", channel, controller, 0)
+    app.action("injectMidiControl", channel, controller, 1)
+    app.action("selectMidiControlIndicator", channel, controller)
+    if not app.action("activateMidiControlTarget", target):
+        raise AssertionError(f"could not bind MIDI target {target}")
+
+
+def changed_control_value(control: dict[str, object]) -> float:
+    current = float(control["value"])
+    minimum = float(control["minimum"])
+    maximum = float(control["maximum"])
+    return maximum if abs(current - maximum) > 1e-6 else minimum
+
+
 class PresetIntegrationTests(unittest.TestCase):
     def test_midi_control_bindings_are_owned_by_their_screen_presets(self) -> None:
         with HeadlessApp(native_amy=False) as app:
@@ -167,6 +187,219 @@ class PresetIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(
                 int(app.query("selectedBassSynthIndex")), stored["bass"]
+            )
+
+    def test_apg_ldr_mode_is_owned_by_omni_preset(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertFalse(bool(app.query("strumLadderMode")))
+
+            app.action("setStrumLadderMode", True)
+            app.action("storeSelectedPreset")
+            preset_path = app.home / ".omnichord" / "omni_presets" / "p1.json"
+            stored = json.loads(preset_path.read_text(encoding="utf-8"))
+            self.assertEqual(stored["strum_mode"], "LDR")
+
+            app.action("selectPreset", 2)
+            self.assertFalse(bool(app.query("strumLadderMode")))
+            app.action("selectPreset", 1)
+            self.assertTrue(bool(app.query("strumLadderMode")))
+
+            stored.pop("strum_mode")
+            preset_path.write_text(
+                json.dumps(stored, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            app.action("selectPreset", 2)
+            app.action("selectPreset", 1)
+            self.assertFalse(bool(app.query("strumLadderMode")))
+
+    def test_omni_bound_values_survive_rst_and_preset_switch(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            stored_index = int(app.query("selectedChordSynthIndex"))
+            bound_index = synth_index("Harpsichord 1")
+            app.action("setChordSynthIndex", bound_index)
+            controls = list(app.query("chordCommonControls")) + list(
+                app.query("chordExtraControls")
+            )
+            bound_control = next(c for c in controls if c["key"] == "attack_ms")
+            unbound_control = next(c for c in controls if c["key"] == "release_ms")
+            original_unbound = float(unbound_control["value"])
+            instrument = str(entry_for_index(bound_index)["key"])
+
+            app.action("setChordSynthIndex", stored_index)
+            app.action("storeSelectedPreset")
+            app.action("setChordSynthIndex", bound_index)
+            bind_control(
+                app,
+                1,
+                70,
+                {
+                    "screen": "omni",
+                    "kind": "synth_control",
+                    "role": "chord",
+                    "instrument": instrument,
+                    "control": "attack_ms",
+                },
+            )
+            bind_control(
+                app,
+                2,
+                71,
+                {"screen": "omni", "kind": "volume", "role": "chord"},
+            )
+
+            protected_attack = changed_control_value(bound_control)
+            changed_release = changed_control_value(unbound_control)
+            app.action("setChordSynthControl", "attack_ms", protected_attack)
+            app.action("setChordSynthControl", "release_ms", changed_release)
+            app.action("setChordVolume", 0.91)
+            app.action("resetChordSynthToPreset")
+
+            self.assertEqual(
+                int(app.query("selectedChordSynthIndex")),
+                stored_index,
+            )
+            self.assertAlmostEqual(float(app.query("chordVolume")), 0.91)
+            app.action("setChordSynthIndex", bound_index)
+            reset_controls = list(app.query("chordCommonControls")) + list(
+                app.query("chordExtraControls")
+            )
+            reset_by_key = {str(item["key"]): item for item in reset_controls}
+            self.assertAlmostEqual(
+                float(reset_by_key["attack_ms"]["value"]),
+                protected_attack,
+            )
+            self.assertAlmostEqual(
+                float(reset_by_key["release_ms"]["value"]),
+                original_unbound,
+            )
+
+            preset_two_path = (
+                app.home / ".omnichord" / "omni_presets" / "p2.json"
+            )
+            preset_two = json.loads(preset_two_path.read_text(encoding="utf-8"))
+            preset_two["volumes"]["strum"] = 0.11
+            preset_two["midi_control_bindings"] = [
+                {
+                    "channel": 3,
+                    "controller": 72,
+                    "target": {
+                        "screen": "omni",
+                        "kind": "volume",
+                        "role": "strum",
+                    },
+                }
+            ]
+            preset_two_path.write_text(
+                json.dumps(preset_two, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            app.action("setStrumVolume", 0.77)
+            app.action("selectPreset", 2)
+
+            self.assertAlmostEqual(float(app.query("chordVolume")), 0.91)
+            self.assertAlmostEqual(float(app.query("strumVolume")), 0.77)
+            app.action("setChordSynthIndex", bound_index)
+            switched_controls = list(app.query("chordCommonControls")) + list(
+                app.query("chordExtraControls")
+            )
+            switched_attack = next(
+                item for item in switched_controls if item["key"] == "attack_ms"
+            )
+            self.assertAlmostEqual(
+                float(switched_attack["value"]),
+                protected_attack,
+            )
+
+    def test_midi_bound_values_survive_rst_and_preset_switch(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            row = 0
+            selected_index = int(app.action("midiSynthIndex", row))
+            instrument = str(entry_for_index(selected_index)["key"])
+            controls = list(app.action("midiCommonControls", row)) + list(
+                app.action("midiExtraControls", row)
+            )
+            bound_control = next(c for c in controls if c["key"] == "attack_ms")
+            unbound_control = next(c for c in controls if c["key"] == "release_ms")
+            original_unbound = float(unbound_control["value"])
+            protected_attack = changed_control_value(bound_control)
+
+            bind_control(
+                app,
+                4,
+                73,
+                {
+                    "screen": "midi",
+                    "kind": "synth_control",
+                    "row": row,
+                    "instrument": instrument,
+                    "control": "attack_ms",
+                },
+            )
+            bind_control(
+                app,
+                5,
+                74,
+                {"screen": "midi", "kind": "volume", "row": row},
+            )
+            app.action("setMidiSynthControl", row, "attack_ms", protected_attack)
+            app.action(
+                "setMidiSynthControl",
+                row,
+                "release_ms",
+                changed_control_value(unbound_control),
+            )
+            app.action("setMidiVolume", row, 0.91)
+            app.action("resetMidiSynthRow", row)
+
+            reset_controls = list(app.action("midiCommonControls", row)) + list(
+                app.action("midiExtraControls", row)
+            )
+            reset_by_key = {str(item["key"]): item for item in reset_controls}
+            self.assertAlmostEqual(
+                float(reset_by_key["attack_ms"]["value"]),
+                protected_attack,
+            )
+            self.assertAlmostEqual(
+                float(reset_by_key["release_ms"]["value"]),
+                original_unbound,
+            )
+            self.assertAlmostEqual(float(app.action("midiVolume", row)), 0.91)
+
+            preset_two_path = (
+                app.home / ".omnichord" / "midi_presets" / "m2.json"
+            )
+            preset_two = json.loads(preset_two_path.read_text(encoding="utf-8"))
+            preset_two["rows"][1]["volume"] = 0.12
+            preset_two["midi_control_bindings"] = [
+                {
+                    "channel": 6,
+                    "controller": 75,
+                    "target": {"screen": "midi", "kind": "volume", "row": 1},
+                }
+            ]
+            preset_two_path.write_text(
+                json.dumps(preset_two, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            app.action("setMidiVolume", 1, 0.83)
+            app.action("selectMidiPreset", 2)
+
+            self.assertAlmostEqual(float(app.action("midiVolume", row)), 0.91)
+            self.assertAlmostEqual(float(app.action("midiVolume", 1)), 0.83)
+            app.action("setMidiSynthIndex", row, selected_index)
+            switched_controls = list(app.action("midiCommonControls", row)) + list(
+                app.action("midiExtraControls", row)
+            )
+            switched_attack = next(
+                item for item in switched_controls if item["key"] == "attack_ms"
+            )
+            self.assertAlmostEqual(
+                float(switched_attack["value"]),
+                protected_attack,
             )
 
     def test_rhythm_running_is_live_state_not_preset_state(self) -> None:

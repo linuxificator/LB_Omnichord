@@ -38,7 +38,8 @@ The MIDI view contains:
 
 No watermark is shown on the MIDI screen.
 
-The OMNI strum header has an APG/LDR switch. APG plays chord tones; LDR plays
+The OMNI strum header has an APG/LDR switch owned by the backend and stored in
+the selected OMNI preset. APG plays chord tones; LDR plays
 the chord-family ladder defined in `sound_balance.md`.
 
 The unused lower MIDI area fills from left to right with as many radio-style

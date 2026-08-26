@@ -92,7 +92,32 @@ class SynthState:
         self._values_by_synth = copy.deepcopy(other._values_by_synth)
 
     def set_control(self, key: str, value: float) -> bool:
-        definition = self.selected_definition
+        return self.set_instrument_control(
+            str(self.selected_definition.key),
+            key,
+            value,
+        )
+
+    def control_value(self, instrument: str, key: str) -> float | None:
+        index = self._key_to_index.get(str(instrument))
+        if index is None:
+            return None
+        definition = self._definitions[index]
+        control = self._control_for(definition, str(key))
+        if control is None:
+            return None
+        return float(self._values_by_synth[index][control.key])
+
+    def set_instrument_control(
+        self,
+        instrument: str,
+        key: str,
+        value: float,
+    ) -> bool:
+        index = self._key_to_index.get(str(instrument))
+        if index is None:
+            return False
+        definition = self._definitions[index]
         control = self._control_for(definition, str(key))
         if control is None:
             return False
@@ -101,7 +126,7 @@ class SynthState:
             float(control.minimum),
             min(float(control.maximum), clamped),
         )
-        values = self.selected_values
+        values = self._values_by_synth[index]
         if math.isclose(
             clamped,
             float(values[control.key]),

@@ -27,7 +27,7 @@ MIDI_FACTORY_DIR = app_core.INSTRUMENT_DIR / "midi_default_presets"
 MIDI_LAST_PRESET_FILE = "last_preset.json"
 MIDI_PREVIEW_LOW = app_core.STRUM_LOW_MIDI
 MIDI_PREVIEW_HIGH = app_core.STRUM_HIGH_MIDI
-MIDI_REVERB_MAX = 2.0
+MIDI_REVERB_MAX = app_core.REVERB_LEVEL_MAX
 
 GM_DRUM_SAMPLE = {
     35: "bd_haus",
@@ -1209,7 +1209,11 @@ class MidiPlayerBackend(QObject):
                 target.pop("id", None)
         return result
 
-    def replace_control_bindings(self, screen: str, data: Any) -> None:
+    def _normalized_binding_entries(
+        self,
+        screen: str,
+        data: Any,
+    ) -> list[tuple[tuple[int, int], dict[str, Any]]]:
         entries: list[tuple[tuple[int, int], dict[str, Any]]] = []
         if isinstance(data, list):
             for raw in data:
@@ -1233,6 +1237,135 @@ class MidiPlayerBackend(QObject):
                 if not 1 <= key[0] <= 16 or not 0 <= key[1] <= 127:
                     continue
                 entries.append((key, target))
+        return entries
+
+    def capture_bound_control_values(
+        self,
+        screen: str,
+        *,
+        incoming_bindings: Any = None,
+        role: str | None = None,
+        row: int | None = None,
+    ) -> list[tuple[dict[str, Any], float]]:
+        screen = str(screen)
+        with self._midi_control_lock:
+            targets = [
+                dict(target)
+                for target in self._midi_control_state.bindings.values()
+                if str(target.get("screen", "")) == screen
+            ]
+        if incoming_bindings is not None:
+            targets.extend(
+                dict(target)
+                for _, target in self._normalized_binding_entries(
+                    screen,
+                    incoming_bindings,
+                )
+            )
+
+        unique = {str(target["id"]): target for target in targets}
+        captured: list[tuple[dict[str, Any], float]] = []
+        for target in unique.values():
+            if role is not None and str(target.get("role", "")) != str(role):
+                continue
+            if row is not None and int(target.get("row", -1)) != int(row):
+                continue
+            value = self._control_target_value(target)
+            if value is not None:
+                captured.append((target, value))
+        return captured
+
+    def _control_target_value(self, target: dict[str, Any]) -> float | None:
+        screen = str(target["screen"])
+        kind = str(target["kind"])
+        if kind == "synth_control":
+            runtime = (
+                self._runtime(int(target["row"]))
+                if screen == "midi"
+                else self.owner._runtime(str(target["role"]))
+            )
+            return runtime.control_value(
+                str(target["instrument"]),
+                str(target["control"]),
+            )
+        if kind == "volume":
+            if screen == "midi":
+                return float(self.volumes[int(target["row"])])
+            return float(
+                {
+                    "chord": self.owner._chord_volume,
+                    "strum": self.owner._strum_volume,
+                    "bass": self.owner._bass_volume,
+                    "percussion": self.owner._percussion_volume,
+                }[str(target["role"])]
+            )
+        controller = self if screen == "midi" else self.owner
+        if kind == "reverb_level":
+            return float(controller._reverb_level)
+        if kind == "reverb_liveness":
+            return float(controller._reverb_liveness)
+        if kind == "reverb_damping":
+            return float(controller._reverb_damping)
+        if kind == "tuning_reference":
+            return float(controller._tuning_reference)
+        if kind == "rhythm_tempo":
+            return float(self.owner.rhythmTempo)
+        if kind == "bass_voicing":
+            return float(self.owner._bass_voicing_shift)
+        return None
+
+    def restore_control_values(
+        self,
+        captured: list[tuple[dict[str, Any], float]],
+    ) -> None:
+        for target, value in captured:
+            screen = str(target["screen"])
+            kind = str(target["kind"])
+            if kind == "synth_control":
+                runtime = (
+                    self._runtime(int(target["row"]))
+                    if screen == "midi"
+                    else self.owner._runtime(str(target["role"]))
+                )
+                runtime.set_instrument_control(
+                    str(target["instrument"]),
+                    str(target["control"]),
+                    value,
+                )
+            elif kind == "volume":
+                if screen == "midi":
+                    self.volumes[int(target["row"])] = value
+                else:
+                    setattr(
+                        self.owner,
+                        {
+                            "chord": "_chord_volume",
+                            "strum": "_strum_volume",
+                            "bass": "_bass_volume",
+                            "percussion": "_percussion_volume",
+                        }[str(target["role"])],
+                        value,
+                    )
+            else:
+                controller = self if screen == "midi" else self.owner
+                if kind == "reverb_level":
+                    controller._reverb_level = value
+                elif kind == "reverb_liveness":
+                    controller._reverb_liveness = value
+                elif kind == "reverb_damping":
+                    controller._reverb_damping = value
+                elif kind == "tuning_reference":
+                    controller._tuning_reference = value
+                elif kind == "rhythm_tempo":
+                    rhythm = self.owner._rhythm
+                    rhythm.tempo_by_rhythm[rhythm.selected_index] = value
+                    if self.owner._rhythm_running:
+                        self.owner._running_tempo = value
+                elif kind == "bass_voicing":
+                    self.owner._bass_voicing_shift = int(round(value))
+
+    def replace_control_bindings(self, screen: str, data: Any) -> None:
+        entries = self._normalized_binding_entries(screen, data)
         with self._midi_control_lock:
             self._midi_control_state.replace_screen_bindings(
                 str(screen),
@@ -1497,8 +1630,17 @@ class MidiPlayerBackend(QObject):
     def _load_preset(self, number: int, *, emit: bool) -> None:
         path = self._preset_path(number)
         data = json.loads(path.read_text(encoding="utf-8"))
+        protected = (
+            self.capture_bound_control_values(
+                "midi",
+                incoming_bindings=data.get("midi_control_bindings", []),
+            )
+            if emit
+            else []
+        )
         self.engine.all_notes_off()
         self._apply_data(data)
+        self.restore_control_values(protected)
         self._selected_preset = int(number)
         self._preset_reference = json.loads(json.dumps(data))
         _write_json_atomic(
@@ -1532,6 +1674,7 @@ class MidiPlayerBackend(QObject):
         if not self._valid_row(row):
             return
         row = int(row)
+        protected = self.capture_bound_control_values("midi", row=row)
         rows = self._preset_reference.get("rows", [])
         if not isinstance(rows, list) or len(rows) != MIDI_ROW_COUNT:
             return
@@ -1564,6 +1707,7 @@ class MidiPlayerBackend(QObject):
             0.0,
             min(1.0, float(stored.get("volume", 0.5))),
         )
+        self.restore_control_values(protected)
         self._configure_row(row)
         self._emit_state()
 
