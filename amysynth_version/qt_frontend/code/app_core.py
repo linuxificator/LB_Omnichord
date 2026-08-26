@@ -4052,7 +4052,9 @@ def main() -> int:
     smoke_checkpoint("frontend-entered")
 
     migrate_user_layout()
+    smoke_checkpoint("user-layout-migrated")
     user_config_dir = ensure_user_configs(CONFIG_DIR)
+    smoke_checkpoint("user-config-ready")
 
     # These Qt choices must be made before the first application/window is
     # constructed.
@@ -4071,28 +4073,37 @@ def main() -> int:
     # QSG_INFO prints the actual scene-graph backend chosen by Qt. It is kept
     # on for this diagnostic build; the output is only a few startup lines.
     os.environ.setdefault("QSG_INFO", "1")
+    smoke_checkpoint("renderer-environment-ready")
 
     defaults = load_defaults(user_config_dir / "defaults.json")
+    smoke_checkpoint("defaults-loaded")
     chords = load_chords(MUSIC_DIR / "chords.csv")
+    smoke_checkpoint("chords-loaded")
     (
         synths,
         legacy_chord_synth_index,
         legacy_strum_synth_index,
         legacy_bass_synth_index,
     ) = load_synth_catalog(INSTRUMENT_DIR / "synths.json")
+    smoke_checkpoint("synth-catalog-loaded")
     rhythms = load_rhythm_catalog(MUSIC_DIR / "rhythms.json")
+    smoke_checkpoint("rhythm-catalog-loaded")
     title_config = load_title_config(
         user_config_dir / "title.json"
     )
+    smoke_checkpoint("title-config-loaded")
     intonation_eq = load_intonation_table(
         MUSIC_DIR / "intonation_eq.json"
     )
+    smoke_checkpoint("equal-intonation-loaded")
     intonation_harm = load_intonation_table(
         MUSIC_DIR / "intonation_harm.json"
     )
+    smoke_checkpoint("harmonic-intonation-loaded")
     intonation_jv = load_intonation_table(
         MUSIC_DIR / "intonation_jv.json"
     )
+    smoke_checkpoint("just-intonation-loaded")
 
     # Startup synth selections are controlled by defaults.json.
     # Unknown keys fall back to the catalogue defaults.
@@ -4130,8 +4141,10 @@ def main() -> int:
     default_bass_synth_index = startup_synth_index(
         "bass", legacy_bass_synth_index
     )
+    smoke_checkpoint("startup-synths-selected")
 
     QQuickStyle.setStyle("Basic")
+    smoke_checkpoint("quick-style-selected")
 
     app = QGuiApplication(sys.argv)
     app.setApplicationName("Qt Omnichord")
