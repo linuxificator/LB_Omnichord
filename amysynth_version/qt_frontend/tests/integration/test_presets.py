@@ -203,6 +203,38 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("selectPreset", 2)
             self.assertTrue(bool(app.query("rhythmRunning")))
 
+    def test_held_chord_survives_preset_switch_with_new_chord_type(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            # Factory P1 row 0 is C minor in HARM tuning. P2 changes the same
+            # row/root identity to equal-tempered C major.
+            app.action("selectPreset", 1)
+            app.action("pressChord", 0, 0)
+            app.bridge.wait_idle(timeout=8.0)
+            checkpoint = app.bridge.count()
+
+            app.action("selectPreset", 2)
+            app.bridge.wait_idle(timeout=8.0)
+
+            self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertEqual(int(app.query("activeRowIndex")), 0)
+            self.assertEqual(int(app.query("activeRootSemitone")), 0)
+            switched = app.bridge.lines_since(checkpoint)
+            for note in (48, 52, 55):
+                self.assertIn(
+                    f"n{note}l1i3Z",
+                    switched,
+                    "preset switch did not continue with the new C-major chord",
+                )
+            self.assertNotIn("zY0Z", switched)
+            self.assertNotIn("S16384Z", switched)
+
+            # The original physical button-up must still own the live voice.
+            checkpoint = app.bridge.count()
+            app.action("releaseChord", 0, 0)
+            app.bridge.wait_for_lines(["l0i3Z"], start=checkpoint, timeout=3.0)
+
     def test_running_rhythm_switch_keeps_tempo_and_clock_running(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
@@ -285,6 +317,8 @@ class PresetIntegrationTests(unittest.TestCase):
 
             app.action("selectPreset", 1)
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
+            app.action("pressChord", 0, 0)
+            app.action("releaseChord", 0, 0)
             app.action("toggleRhythm")
             app.action("setRhythmTempo", 107.0)
             app.bridge.wait_idle(timeout=8.0)
@@ -295,10 +329,20 @@ class PresetIntegrationTests(unittest.TestCase):
 
             self.assertTrue(bool(app.query("rhythmRunning")))
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 107.0)
+            self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertEqual(int(app.query("activeRowIndex")), 0)
+            self.assertEqual(int(app.query("activeRootSemitone")), 0)
             switched = app.bridge.lines_since(checkpoint)
             self.assertNotIn("zY0Z", switched)
             self.assertNotIn("zY1Z", switched)
             self.assertNotIn("S16384Z", switched)
+            self.assertTrue(
+                any(
+                    line.startswith("H") and "n52" in line and "i4Z" in line
+                    for line in switched
+                ),
+                "running preset switch did not continue the new C-major chord",
+            )
 
             # STR stores the effective live tempo, not the dormant preset
             # tempo that was deliberately ignored during the live switch.

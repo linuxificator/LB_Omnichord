@@ -2298,16 +2298,11 @@ class InstrumentBackend(QObject):
         self._rhythm_running = rhythm_was_running
         self._running_tempo = live_tempo
 
-        # Performance-state notes are deliberately never part of a preset.
-        self._clear_touch_dropout_state()
-
-        self._active_row = -1
-        self._active_root_semitone = -1
+        # The active chord and its touch lifecycle are live performance state,
+        # not preset data.  Preserve their row/root identity so the destination
+        # preset can change the sounding chord type without silencing it, and
+        # so the matching button-up still releases a physically held chord.
         self._strum_last_index = None
-        self._pressed_chords.clear()
-        self._pressed_chord_order.clear()
-        self._promoted_chords.clear()
-        self._chord_activity_hold_override = False
 
     def _emit_full_preset_state(self) -> None:
         self._emit_state_changed()
@@ -2376,10 +2371,10 @@ class InstrumentBackend(QObject):
         self._emit_full_preset_state()
         self.presetChanged.emit()
 
-        if self._rhythm_running:
-            self._send_live_preset_state()
-        else:
-            self.send_initial_state()
+        # Runtime preset selection is always a live state transition.  The
+        # startup/recovery reset path silences manual notes and clears chord
+        # identity, which is incorrect even when rhythm transport is stopped.
+        self._send_live_preset_state()
 
     @Slot()
     def storeSelectedPreset(self) -> None:
@@ -3635,6 +3630,15 @@ class InstrumentBackend(QObject):
             1 if self._bass_running else 0,
         )
         self._send_rhythm_chord_enabled()
+        if self._active_row >= 0 and self._active_root_semitone >= 0:
+            self._send_chord_state(play_now=False)
+            active_key = (self._active_row, self._active_root_semitone)
+            if active_key in self._pressed_chords:
+                self._send_manual_chord(
+                    "update",
+                    key=active_key,
+                    notes=self._current_notes(),
+                )
 
     def send_initial_state(self) -> None:
         self._debug(

@@ -353,6 +353,18 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 - Loading constructs current catalogue defaults first and overlays saved values through `SynthState.load_preset()`.
 - Legacy negative `-1` values are treated only as "unspecified/default" and may not re-enter the current UI range.
 
+**PRESET-04 — a sounding chord survives an OMNI preset switch**
+
+- Active row/root identity, chord-gate state and physical button-hold tracking
+  are live performance state rather than preset state.
+- Selecting another OMNI preset preserves that state and republishes the
+  sounding chord using the destination preset's chord type, octave, inversion,
+  tuning and chord instrument.
+- A chord held across the switch remains releasable by the original button-up;
+  the preset load may not turn that release into an ignored/stale event.
+- Runtime preset selection uses the live convergence path even while rhythm is
+  stopped; the startup/recovery reset path is not a preset-switch operation.
+
 ### RHYTHM — sequencer invariants
 
 **RHYTHM-00 — drums, bass and automatic chords use independent AMY tag ranges**

@@ -266,7 +266,9 @@ class InstrumentBackend(app_core.InstrumentBackend):
                 float(effects.get("reverb_level", legacy_main)),
             ),
         )
-        self._chord_gate_state = CHORD_GATE_NONE
+        # Chord-gate state is live performance state. Keeping it lets an
+        # active row/root converge to the destination preset's chord voicing
+        # instead of muting the accompaniment on every preset selection.
 
     def _preset_snapshot(self) -> dict[str, Any]:
         snapshot = super()._preset_snapshot()

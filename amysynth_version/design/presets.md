@@ -9,6 +9,14 @@ instrument overrides, volumes, rhythm configuration and tempo, tuning mode and
 reference, and OMNI reverb state. `rhythmRunning` is live transport state and is
 never stored or restored. See `rhythm_bahavior.md` for live-switch semantics.
 
+The active chord identity, chord gate and physical chord-button hold state are
+also live performance state. Selecting an OMNI preset preserves them. The same
+row/root therefore remains active across the switch, while its sounding notes
+are recalculated from the destination preset's chord type, octave, inversion
+and tuning. A held or rhythm-driven chord may change voicing during that
+transition, but it must not be left silent and its later button release must
+still release the active manual voice.
+
 ## MIDI preset contents
 
 A MIDI preset stores:
