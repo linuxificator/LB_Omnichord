@@ -5,7 +5,8 @@ if(NOT DEFINED AMY_ROOT)
     message(FATAL_ERROR "AMY_ROOT must point to the checked-out AMY fork")
 endif()
 
-set(AMY_SRC "${AMY_ROOT}/src")
+file(TO_CMAKE_PATH "${AMY_ROOT}" AMY_ROOT_CMAKE)
+set(AMY_SRC "${AMY_ROOT_CMAKE}/src")
 set(AMY_SOURCES
     algorithms.c amy.c bus_mixer.c envelope.c examples.c parse.c filters.c
     oscillators.c pcm.c interp_partials.c custom.c delay.c log2_exp2.c
