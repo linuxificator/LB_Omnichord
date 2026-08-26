@@ -1,0 +1,23 @@
+2) De APG/LDR knop wordt niet meegenomen in de presets, dat moet wel.
+3) Bij het indrukken van een RST knop bij een synth gaan alle sliders terug naar preset/default zoals het hoort, maar we moeten dat aanpassen: een slider die onder controle is van een midi controller mag niet veranderen door een RST knop, en ook niet door een preset wissel
+4)
+In INSTALL.md staat:
+The Omnichord local mode requires AMY's Python extension (amy plus c_amy). Current upstream AMY explicitly supports a native Windows C build, but its current Python setup.py still assumes a Unix-like Python environment (os.uname()) and explicitly selects gcc/g++. For that reason the native-Windows Python installation is not presented here as a known-working path.
+
+Terwijl een van de design principes is: gebruik amy wire commands over een seriele port of een socket, juist om elke amy te kunnen gebruiken die men zou willen. Er zou aan de amy kant dus geen python extension nodig hoeven te zijn. ZO min mogelijk relatie tussen amy en LB_Omnichord, juist om platform onafhankelijk te blijven.
+Dus "The Omnichord local mode requires AMY's Python extension" zou niet waar moeten zijn, tenzij er misschien alleen een kleine python wrapper gebruikt wordt op een socket te kunnen luisteren? 
+
+de "gescheiden processen met enkel socket of seriele verbinding nogmaals controleren".
+
+5) master volume
+6) master mute
+7) afstand bovenste balk
+8) pnc en fsc button naar boven/anders
+9) reverb max level naar 3
+10) hele ritme sectie niet mee met preset wissel als ritme aan staat, octaaf knoppen van de akkoord-rij die op dat moment speelt als het ritme aan is ook niet mee met preset wissel
+11) midi CC's die anders zijn (14 bits pitch bend ipv 8 bts positie bijvoorbeeld) ook anders laten zien. op het ogenblik wordt pitch bend genegeerd
+12) amy wire response with control point and range
+13) tijdens akkoorden spelen vanuit ritme zorgt het spelen van een handmatig akkoord er voor dat chord-activity naar nul gaat, echter, als er op dat moment een spelend akkoord is vanuit het ritme dan krijgt die geen directe note-off waardoor er twee akkoorden tegelijk klinken. De note-off komt ook niet. De rtime-akkoorden worden bestuurd vanuit de sequencer, op het moment van het indrukken van een akkoord in het omni scherm terwijl het ritme speelt moet de sequencer dus niet alleen het signaal krijgen op de chord activity naar nul te zetten, maar ook een op dat moment eventueel spelend akkoord vanuit de sequencer een direct note-off geven. Mogelijk is dat iets wat de sequencer zelf kan zodat we niet daar extra amy commands voor aparte noten voor hoeven te sturen. 
+14) bij het ritme moeten up/down knoppen geen effect hebben als tempo onder controle is van een midi signaal, die knoppen zouden dan grijs moeten worden.
+15) bij tuning moeten up/down knoppen ook geen effect hebben als tuning onder control is van een midi controller, die mogen op dat moment ook grijs worden.
+16) eigenlijk elke variabele die overgenomen wordt door een midi controller moet niet meer te controleren of te ressetten zijn via rest knoppen, patch change, up/down knoppen of op welke manier dan ook

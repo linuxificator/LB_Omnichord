@@ -11,10 +11,17 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "amy.h"
 
 #define SERVICE_MAX_LINE (MAX_MESSAGE_LEN * 2)
+
+// AMY's example helpers reference this platform hook.  The native service
+// supplies it here rather than linking the standalone amy-example program.
+void delay_ms(uint32_t milliseconds) {
+    Sleep((DWORD)milliseconds);
+}
 
 static volatile LONG g_running = 1;
 
