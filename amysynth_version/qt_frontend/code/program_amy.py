@@ -276,22 +276,20 @@ class ProgramAmySocketClient(ProgramAmySerialClient):
         )
 
 
-class ProgramAmyTcpClient(ProgramAmySerialClient):
-    """Program-aware client for the native Windows loopback service."""
+class ProgramAmyLocalClient(ProgramAmySerialClient):
+    """Program-aware client for Qt's native local IPC transport."""
 
     def __init__(
         self,
         config: dict[str, Any],
         addresses: dict[str, str],
-        host: str,
-        port: int,
+        server_name: str,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
-            writer_factory=lambda debug_log: base._TcpSocketWriter(
-                host,
-                port,
+            writer_factory=lambda debug_log: base._QtLocalSocketWriter(
+                server_name,
                 debug_log,
             ),
         )

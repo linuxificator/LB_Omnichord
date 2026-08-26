@@ -441,10 +441,9 @@ class _UnixSocketWriter(_SerialWriter):
         from collections import deque
 
         self.debug_log = debug_log
-        # Linux supports packet-preserving SOCK_SEQPACKET.  macOS and
-        # Windows AF_UNIX expose stream sockets, so delimit each wire request
-        # with LF at this transport boundary.
-        self._stream_transport = sys.platform in {"darwin", "win32"}
+        # Linux supports packet-preserving SOCK_SEQPACKET. macOS exposes a
+        # stream socket, so delimit each wire request with LF there.
+        self._stream_transport = sys.platform == "darwin"
         socket_type = (
             socket.SOCK_STREAM
             if self._stream_transport
@@ -487,39 +486,100 @@ class _UnixSocketWriter(_SerialWriter):
         super().close()
 
 
-class _TcpSocketWriter(_UnixSocketWriter):
-    """LF-framed writer for the native Windows loopback service."""
+class _QtLocalSocketWriter(_SerialWriter):
+    """LF-framed Qt local IPC writer used by the native Windows package.
+
+    QLocalSocket maps this name to a Windows named pipe.  The object is
+    created, connected, written and closed on the existing dedicated writer
+    thread so its QObject thread affinity is never crossed.
+    """
 
     def __init__(
         self,
-        host: str,
-        port: int,
+        server_name: str,
         debug_log: _DebugLog | None = None,
     ) -> None:
         from collections import deque
 
         self.debug_log = debug_log
-        self._stream_transport = True
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            self.socket.settimeout(5.0)
-            self.socket.connect((str(host), int(port)))
-            self.socket.settimeout(None)
-        except BaseException:
-            self.socket.close()
-            raise
-        self.serial = self.socket
+        self.server_name = str(server_name)
         self._high = deque()
         self._low = deque()
         self._lane_generation: dict[str, int] = {}
         self._closed = False
         self._condition = threading.Condition()
+        self._connect_complete = threading.Event()
+        self._connect_error: BaseException | None = None
+        self._local_socket: Any | None = None
         self._thread = threading.Thread(
             target=self._run,
-            name="amy-tcp-writer",
+            name="amy-local-writer",
             daemon=True,
         )
         self._thread.start()
+
+        if not self._connect_complete.wait(5.5):
+            with self._condition:
+                self._closed = True
+                self._condition.notify_all()
+            self._thread.join(timeout=1.0)
+            raise TimeoutError(
+                f"timed out connecting to local AMY service {self.server_name!r}"
+            )
+        if self._connect_error is not None:
+            raise ConnectionError(str(self._connect_error)) from self._connect_error
+
+    def _run(self) -> None:
+        from PySide6.QtNetwork import QLocalSocket
+
+        local_socket = QLocalSocket()
+        self._local_socket = local_socket
+        try:
+            local_socket.connectToServer(self.server_name)
+            if not local_socket.waitForConnected(5000):
+                raise ConnectionError(local_socket.errorString())
+            self._connect_complete.set()
+            super()._run()
+        except BaseException as exc:
+            self._connect_error = exc
+            with self._condition:
+                self._closed = True
+                self._high.clear()
+                self._low.clear()
+                self._condition.notify_all()
+        finally:
+            local_socket.close()
+            self._connect_complete.set()
+
+    def _write(self, command: str, lane: str) -> None:
+        command = command.strip()
+        if not command.endswith("Z"):
+            command += "Z"
+        if self.debug_log is not None:
+            self.debug_log.write(f"TX-{lane}", command)
+        payload = (command + "\n").encode("ascii")
+        local_socket = self._local_socket
+        if local_socket is None:
+            raise ConnectionError("local AMY socket is not connected")
+        if local_socket.write(payload) != len(payload):
+            raise OSError(local_socket.errorString())
+        deadline = time.monotonic() + 5.0
+        while local_socket.bytesToWrite() > 0:
+            remaining_ms = max(1, int((deadline - time.monotonic()) * 1000))
+            if time.monotonic() >= deadline or not local_socket.waitForBytesWritten(
+                remaining_ms
+            ):
+                raise TimeoutError(local_socket.errorString())
+
+    def close(self) -> None:
+        with self._condition:
+            if not self._closed:
+                for lane in list(self._lane_generation):
+                    self._lane_generation[lane] += 1
+                self._low.clear()
+                self._closed = True
+                self._condition.notify_all()
+        self._thread.join(timeout=1.0)
 
 
 class _TaggedSequencerLane:
@@ -1796,22 +1856,20 @@ class AmySocketClient(AmySerialClient):
         )
 
 
-class AmyTcpClient(AmySerialClient):
-    """Send LF-framed wire requests to a loopback AMY service."""
+class AmyLocalClient(AmySerialClient):
+    """Send LF-framed wire requests through Qt's native local IPC."""
 
     def __init__(
         self,
         config: dict[str, Any],
         addresses: dict[str, str],
-        host: str,
-        port: int,
+        server_name: str,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
-            writer_factory=lambda debug_log: _TcpSocketWriter(
-                host,
-                port,
+            writer_factory=lambda debug_log: _QtLocalSocketWriter(
+                server_name,
                 debug_log,
             ),
         )

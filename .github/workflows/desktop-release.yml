@@ -263,7 +263,7 @@ jobs:
       (github.ref == 'refs/heads/testing/windows_smoke' ||
        needs.tests.result == 'success')
     needs: [tests, release-metadata]
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 45
 
     steps:

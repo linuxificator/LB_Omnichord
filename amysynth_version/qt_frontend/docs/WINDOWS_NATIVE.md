@@ -13,7 +13,7 @@ native Python/PySide6 frontend
         |
         | ordinary AMY wire requests
         v
-private loopback TCP / SOCK_STREAM socket
+private Windows named pipe (`QLocalSocket`)
         |
         v
 native amy_service.exe -> AMY C engine -> native Windows audio
@@ -28,26 +28,37 @@ Qt for Python supports native Windows deployment. The inability of AMY's
 Python `setup.py` to build on Windows is a service limitation, not a frontend
 limitation and not a reason to run the frontend under WSL.
 
-## Windows socket contract
+## Windows local IPC contract
 
-The official CPython 3.12 Windows distribution used by the packaged frontend
-does not expose `socket.AF_UNIX`. The native Windows service therefore listens
-only on `127.0.0.1` using a dynamically allocated TCP port. It uses the same
-stream framing as macOS:
+Windows itself supports native Winsock `AF_UNIX/SOCK_STREAM` on sufficiently
+recent releases (initially build 17063). The GitHub package job runs on Windows
+Server 2025 build 26100, so the OS is not the limitation. The official CPython
+Windows build still does not expose `socket.AF_UNIX`; its upstream enablement
+issue remains open. Reimplementing Winsock through `ctypes` or adding a custom
+Python extension would add an unnecessary second socket layer.
+
+The packaged frontend therefore uses Qt's supported local IPC API:
+`QLocalSocket` maps a server name to a Windows named pipe. The native C service
+owns the other end with `CreateNamedPipeA` and explicitly sets
+`PIPE_REJECT_REMOTE_CLIENTS`. This is local IPC, not a network listener. It
+uses the same stream framing as macOS:
 
 - one complete AMY wire request per record;
 - every wire request ends in `Z`;
 - one LF byte terminates each stream record;
-- partial or multiple `recv()` results are buffered and split on LF;
+- partial or multiple `ReadFile()` results are buffered and split on LF;
 - no AMY-specific Python or C API crosses the process boundary.
 
-The service binds port zero so Winsock selects a free port, then publishes that
-port through a short-lived ready file below the per-user application directory
-only after native audio is ready. The launcher reads and removes that file and
-passes the port to the frontend. The C service never listens on a non-loopback
-interface.
+The launcher creates a unique pipe name for each run. The service creates the
+pipe and publishes that name through a short-lived ready file below the
+per-user application directory only after AMY is ready. The launcher verifies
+and removes the file, then passes the name to the frontend. The `QLocalSocket`
+object lives entirely on the existing dedicated command-writer thread, keeping
+blocking pipe writes away from the Qt UI thread.
 
-References: [Python socket constants](https://docs.python.org/3/library/socket.html#socket.AF_UNIX)
+References: [Microsoft's Windows AF_UNIX announcement](https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/),
+[CPython Windows AF_UNIX issue](https://github.com/python/cpython/issues/77589),
+[Qt for Python QLocalSocket](https://doc.qt.io/qtforpython-6/PySide6/QtNetwork/QLocalSocket.html)
 and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.html).
 
 ## Verified repository state (2026-08-27)
@@ -60,7 +71,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Raspberry Pi + ESP32-P4 | Qt sends LF-delimited wire requests over UART to an independent AMY target. |
 | Android | `origin/upstream/android-oboe` contains the separate `:amy` service, private socket and transport-only Java client, but it is not merged with active `feature/bus-mixer`. |
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
-| Native Windows frontend transport | The launcher supplies the service's dynamic loopback TCP port; requests remain LF-framed. |
+| Native Windows frontend transport | The launcher supplies a unique Windows named-pipe name; `QLocalSocket` sends LF-framed requests without opening a network port. |
 | Windows package/release | CI builds an experimental self-contained zip with separate service/frontend executables. It performs an offline native AMY render test and starts the unpacked launcher, offscreen Qt/QML frontend and socket service end to end; no physical validation yet for audio/MIDI. |
 | Windows MIDI input | Not implemented; the current reader is Linux ALSA raw MIDI only. |
 
@@ -101,7 +112,7 @@ Validation uses only files extracted from the final zip:
    rendering and one-client lifetime, then starts the frozen Qt executable with
    its offscreen/software renderer.
 3. The frontend must load the packaged QML/assets, connect through Windows
-   loopback TCP stream, publish initial state, play/release a test chord and
+   native Windows named pipe, publish initial state, play/release a test chord and
    exit successfully.
 4. The service must report both received wire commands and nonzero rendered PCM,
    exit after disconnect, and leave no process or ready file behind.

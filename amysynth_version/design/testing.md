@@ -53,8 +53,9 @@ Four repository workflows are maintained:
   Windows x86_64 packages. One timestamped tag/release contains all four
   packages and their SHA-256 files. The dedicated `testing/windows_smoke`
   branch builds only the Windows job without publishing; `main` retains the
-  complete gated release. Windows is not represented by the Linux AppImage or
-  WSL.
+  complete gated release. The native package/smoke job runs on the current
+  Windows Server 2025 image and verifies the Qt named-pipe boundary; Windows is
+  not represented by the Linux AppImage or WSL.
 - `ESP32-P4 firmware build` builds and validates the firmware package when the
   ESP32-P4 project changes. It is a build/package check, not part of the Python
   frontend suite.

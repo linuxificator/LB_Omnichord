@@ -75,7 +75,8 @@ class PackagingContracts(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("amy_service.exe", contract)
-        self.assertIn("loopback TCP / SOCK_STREAM", contract)
+        self.assertIn("Windows named pipe", contract)
+        self.assertIn("QLocalSocket", contract)
         self.assertIn("no physical validation yet", contract)
         self.assertIn("WSL_APPIMAGE_TESTING.md", contract)
 
@@ -101,11 +102,14 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("amy_service.exe", build)
         self.assertIn("--name LB_Omnichord", build)
         self.assertIn("Start-Process", launcher)
-        self.assertIn("--tcp-port", launcher)
+        self.assertIn("--pipe-name", launcher)
         self.assertIn("--ready-file", launcher)
-        self.assertIn("--amy-tcp-port", launcher)
-        self.assertIn("127.0.0.1", service)
-        self.assertIn("INADDR_LOOPBACK", service)
+        self.assertIn("--amy-local-name", launcher)
+        self.assertIn("CreateNamedPipeA", service)
+        self.assertIn("PIPE_REJECT_REMOTE_CLIENTS", service)
+        self.assertIn("ReadFile", service)
+        self.assertNotIn("AF_INET", service)
+        self.assertNotIn("--tcp-port", launcher)
         self.assertNotIn("--amy-socket", launcher)
         self.assertIn("$SmokeTest", launcher)
         self.assertIn("--package-smoke-test", launcher)
@@ -121,11 +125,10 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("amy_add_message", service)
         self.assertIn("run_self_test", service)
         self.assertIn("amy_simple_fill_buffer", service)
-        self.assertIn("AMY service accept failed:", service)
-        self.assertIn("error == WSAETIMEDOUT", service)
-        self.assertIn("error == WSAEWOULDBLOCK", service)
-        self.assertIn("AMY service receive failed:", service)
+        self.assertIn("AMY named-pipe connect failed:", service)
+        self.assertIn("AMY named-pipe read failed:", service)
         self.assertIn("AMY service smoke passed:", service)
+        self.assertIn("runs-on: windows-2025", workflow)
         self.assertIn(
             '& "$root\\run_windows.ps1" -Windowed -SmokeTest',
             workflow,

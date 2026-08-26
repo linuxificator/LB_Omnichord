@@ -18,9 +18,9 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 from amy_serial import (
+    AmyLocalClient,
     AmySerialClient,
     AmySocketClient,
-    AmyTcpClient,
     load_amy_config,
 )
 from control_limits import bounded_control_range, clamp_control_value
@@ -3884,12 +3884,11 @@ def parse_arguments() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
-        "--amy-tcp-port",
-        type=int,
+        "--amy-local-name",
         default=None,
         help=(
-            "Connect to an external AMY service over LF-framed TCP on "
-            "127.0.0.1 (native Windows package transport)."
+            "Connect to an external AMY service through Qt local IPC "
+            "(a named pipe in the native Windows package)."
         ),
     )
     parser.add_argument(
@@ -4238,25 +4237,22 @@ def main() -> int:
         "panic": args.panic_address,
     }
 
-    if args.amy_socket and args.amy_tcp_port is not None:
-        raise ValueError("select either --amy-socket or --amy-tcp-port")
+    if args.amy_socket and args.amy_local_name:
+        raise ValueError("select either --amy-socket or --amy-local-name")
 
-    if args.amy_tcp_port is not None:
-        if not 1 <= args.amy_tcp_port <= 65535:
-            raise ValueError("--amy-tcp-port must be between 1 and 65535")
+    if args.amy_local_name:
         print(
-            f"AMY backend: external TCP 127.0.0.1:{args.amy_tcp_port}",
+            f"AMY backend: Qt local IPC {args.amy_local_name}",
             file=sys.stderr,
             flush=True,
         )
-        smoke_checkpoint("amy-tcp-connect-started")
-        amy_client = AmyTcpClient(
+        smoke_checkpoint("amy-local-connect-started")
+        amy_client = AmyLocalClient(
             config=amy_config,
             addresses=address_map,
-            host="127.0.0.1",
-            port=args.amy_tcp_port,
+            server_name=args.amy_local_name,
         )
-        smoke_checkpoint("amy-tcp-connected")
+        smoke_checkpoint("amy-local-connected")
     elif args.amy_socket:
         print(
             f"AMY backend: external socket {args.amy_socket}",
@@ -4406,7 +4402,7 @@ def main() -> int:
     smoke_checkpoint("initial-state-sent")
 
     if args.package_smoke_test:
-        if not args.amy_socket and args.amy_tcp_port is None:
+        if not args.amy_socket and not args.amy_local_name:
             print(
                 "--package-smoke-test requires an external AMY transport",
                 file=sys.stderr,

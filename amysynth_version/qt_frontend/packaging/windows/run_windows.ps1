@@ -6,12 +6,15 @@ $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runtimeDir = Join-Path $env:LOCALAPPDATA "LB_Omnichord"
-$readyFile = Join-Path $runtimeDir "amy.port"
+$readyFile = Join-Path $runtimeDir "amy.pipe"
+$pipeName = "LB_Omnichord_AMY_" + [guid]::NewGuid().ToString("N")
 New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
 Remove-Item -Force -ErrorAction SilentlyContinue $readyFile
 
 $quotedReadyFile = '"' + $readyFile + '"'
-$serviceArguments = @("--tcp-port", "0", "--ready-file", $quotedReadyFile)
+$serviceArguments = @(
+    "--pipe-name", $pipeName, "--ready-file", $quotedReadyFile
+)
 $serviceOutput = $null
 $serviceError = $null
 $smokeStatus = $null
@@ -36,17 +39,15 @@ try {
         if (Test-Path $readyFile) { break }
         Start-Sleep -Milliseconds 50
     }
-    if (-not (Test-Path $readyFile)) { throw "AMY service did not publish its port" }
+    if (-not (Test-Path $readyFile)) { throw "AMY service did not publish its pipe" }
 
-    $port = 0
-    $portText = (Get-Content -Raw $readyFile).Trim()
-    if (-not [int]::TryParse($portText, [ref]$port) -or
-        $port -lt 1 -or $port -gt 65535) {
-        throw "AMY service published invalid port: $portText"
+    $publishedPipeName = (Get-Content -Raw $readyFile).Trim()
+    if ($publishedPipeName -ne $pipeName) {
+        throw "AMY service published invalid pipe name: $publishedPipeName"
     }
     Remove-Item -Force $readyFile
 
-    $arguments = @("--amy-tcp-port", "$port")
+    $arguments = @("--amy-local-name", $pipeName)
     if ($Windowed) { $arguments += "--windowed" }
     if ($SmokeTest) {
         $arguments += "--package-smoke-test"

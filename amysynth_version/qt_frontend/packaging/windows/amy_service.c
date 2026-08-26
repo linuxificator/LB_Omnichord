@@ -1,9 +1,8 @@
 // Native Windows AMY wire service for LB Omnichord.
 // AMY remains a separate process; this executable only owns AMY/audio and
-// forwards complete LF-framed loopback TCP records into the AMY C API.
+// forwards complete LF-framed named-pipe records into the AMY C API.
 
 #define WIN32_LEAN_AND_MEAN
-#include <winsock2.h>
 #include <windows.h>
 
 #include <stdio.h>
@@ -14,6 +13,7 @@
 #include "amy.h"
 
 #define SERVICE_MAX_LINE (MAX_MESSAGE_LEN * 2)
+#define SERVICE_PIPE_PATH 256
 
 // AMY's example helpers reference this platform hook.  The native service
 // supplies it here rather than linking the standalone amy-example program.
@@ -37,7 +37,7 @@ static BOOL WINAPI console_handler(DWORD type) {
 
 static void usage(void) {
     printf(
-        "amy_service.exe --tcp-port PORT --ready-file PATH "
+        "amy_service.exe --pipe-name NAME --ready-file PATH "
         "[--no-audio] [--once] | --self-test\n"
     );
 }
@@ -79,13 +79,13 @@ static int run_self_test(void) {
     return 0;
 }
 
-static int publish_ready_file(const char *path, unsigned short port) {
+static int publish_ready_file(const char *path, const char *pipe_name) {
     FILE *file = fopen(path, "w");
     if (file == NULL) {
-        fprintf(stderr, "cannot publish AMY service port: %s\n", path);
+        fprintf(stderr, "cannot publish AMY service pipe: %s\n", path);
         return -1;
     }
-    fprintf(file, "%u\n", (unsigned int)port);
+    fprintf(file, "%s\n", pipe_name);
     if (fclose(file) != 0) {
         fprintf(stderr, "cannot close AMY service ready file: %s\n", path);
         return -1;
@@ -107,27 +107,28 @@ static int send_wire_line(char *line, size_t length) {
     return 0;
 }
 
-static int serve_client(SOCKET client) {
+static int serve_client(HANDLE pipe) {
     char input[4096];
     char line[SERVICE_MAX_LINE];
     size_t used = 0;
     while (InterlockedCompareExchange(&g_running, 1, 1)) {
-        int received = recv(client, input, (int)sizeof(input), 0);
-        if (received == 0) return 0;
-        if (received == SOCKET_ERROR) {
-            int error = WSAGetLastError();
-            // Windows may report an expired SO_RCVTIMEO as either
-            // WSAETIMEDOUT or WSAEWOULDBLOCK.  Both mean that the client is
-            // merely quiet; keep the connection alive while Qt starts and
-            // between UI-generated wire commands.
-            if (error == WSAEINTR || error == WSAETIMEDOUT ||
-                error == WSAEWOULDBLOCK) {
-                continue;
+        DWORD received = 0;
+        if (!ReadFile(pipe, input, sizeof(input), &received, NULL)) {
+            DWORD error = GetLastError();
+            if (error == ERROR_BROKEN_PIPE) return used == 0 ? 0 : -1;
+            if (error == ERROR_OPERATION_ABORTED &&
+                !InterlockedCompareExchange(&g_running, 1, 1)) {
+                return 0;
             }
-            fprintf(stderr, "AMY service receive failed: %d\n", error);
+            fprintf(
+                stderr,
+                "AMY named-pipe read failed: %lu\n",
+                (unsigned long)error
+            );
             return -1;
         }
-        for (int i = 0; i < received; ++i) {
+        if (received == 0) continue;
+        for (DWORD i = 0; i < received; ++i) {
             unsigned char byte = (unsigned char)input[i];
             if (byte == '\n') {
                 if (send_wire_line(line, used) < 0) return -1;
@@ -145,16 +146,14 @@ static int serve_client(SOCKET client) {
 }
 
 static int run_service(
-    unsigned short requested_port,
+    const char *pipe_name,
     const char *ready_file,
     int no_audio,
     int once
 ) {
     DeleteFileA(ready_file);
-    WSADATA wsa;
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return 2;
-    SOCKET server = INVALID_SOCKET;
-    SOCKET client = INVALID_SOCKET;
+    char pipe_path[SERVICE_PIPE_PATH];
+    HANDLE pipe = INVALID_HANDLE_VALUE;
     int result = 1;
     amy_config_t config = amy_default_config();
     config.audio = no_audio ? AMY_AUDIO_IS_NONE : AMY_AUDIO_IS_MINIAUDIO;
@@ -165,116 +164,105 @@ static int run_service(
     g_wire_records = 0;
     g_nonzero_samples = 0;
 
-    server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (server == INVALID_SOCKET) goto cleanup;
-    struct sockaddr_in address;
-    memset(&address, 0, sizeof(address));
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    address.sin_port = htons(requested_port);
-    if (bind(server, (const struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
+    int pipe_path_length = snprintf(
+            pipe_path,
+            sizeof(pipe_path),
+            "\\\\.\\pipe\\%s",
+            pipe_name
+        );
+    if (pipe_name[0] == '\0' || pipe_path_length < 0 ||
+        (size_t)pipe_path_length >= sizeof(pipe_path)) {
+        fprintf(stderr, "invalid AMY named-pipe name\n");
         goto cleanup;
-    if (listen(server, 1) == SOCKET_ERROR) goto cleanup;
-    {
-        int address_length = (int)sizeof(address);
-        if (getsockname(
-                server,
-                (struct sockaddr *)&address,
-                &address_length
-            ) == SOCKET_ERROR) {
-            goto cleanup;
-        }
     }
-    {
-        u_long nonblocking = 1;
-        if (ioctlsocket(server, FIONBIO, &nonblocking) == SOCKET_ERROR)
-            goto cleanup;
+    pipe = CreateNamedPipeA(
+        pipe_path,
+        PIPE_ACCESS_DUPLEX,
+        PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT |
+            PIPE_REJECT_REMOTE_CLIENTS,
+        1,
+        4096,
+        4096,
+        0,
+        NULL
+    );
+    if (pipe == INVALID_HANDLE_VALUE) {
+        fprintf(
+            stderr,
+            "cannot create AMY named pipe: %lu\n",
+            (unsigned long)GetLastError()
+        );
+        goto cleanup;
     }
     if (!SetConsoleCtrlHandler(console_handler, TRUE)) goto cleanup;
 
-    // Publish the selected loopback port only after AMY is ready.
+    // Publish readiness only after both the local pipe and AMY exist.
     amy_start(config);
-    unsigned short port = ntohs(address.sin_port);
-    if (publish_ready_file(ready_file, port) < 0) {
+    if (publish_ready_file(ready_file, pipe_name) < 0) {
         amy_stop();
         SetConsoleCtrlHandler(console_handler, FALSE);
         goto cleanup;
     }
-    printf("AMY service ready: 127.0.0.1:%u\n", (unsigned int)port);
+    printf("AMY service ready: named pipe %s\n", pipe_name);
     fflush(stdout);
 
-    while (InterlockedCompareExchange(&g_running, 1, 1)) {
-        client = accept(server, NULL, NULL);
-        if (client == INVALID_SOCKET) {
-            if (!InterlockedCompareExchange(&g_running, 1, 1)) break;
-            int error = WSAGetLastError();
-            if (error == WSAEWOULDBLOCK) {
-                Sleep(50);
-                continue;
-            }
-            fprintf(stderr, "AMY service accept failed: %d\n", error);
-            break;
-        }
-        {
-            DWORD timeout_ms = 250;
-            setsockopt(client, SOL_SOCKET, SO_RCVTIMEO,
-                       (const char *)&timeout_ms, sizeof(timeout_ms));
-        }
-        int client_result = serve_client(client);
-        closesocket(client);
-        client = INVALID_SOCKET;
-        if (once) {
-            if (client_result < 0) {
-                fprintf(stderr, "AMY smoke client sent an invalid wire record\n");
-                result = 1;
-            } else if (g_wire_records == 0) {
-                fprintf(stderr, "AMY smoke client sent no wire records\n");
-                result = 1;
-            } else if (no_audio && g_nonzero_samples == 0) {
-                fprintf(stderr, "AMY smoke client produced silent PCM\n");
-                result = 1;
-            } else {
-                printf(
-                    "AMY service smoke passed: %llu wire commands, "
-                    "%llu nonzero PCM samples\n",
-                    (unsigned long long)g_wire_records,
-                    (unsigned long long)g_nonzero_samples
-                );
-                fflush(stdout);
-                result = 0;
-            }
-            break;
+    {
+        BOOL connected = ConnectNamedPipe(pipe, NULL);
+        if (!connected && GetLastError() != ERROR_PIPE_CONNECTED) {
+            fprintf(
+                stderr,
+                "AMY named-pipe connect failed: %lu\n",
+                (unsigned long)GetLastError()
+            );
+            goto service_cleanup;
         }
     }
-    if (!once) result = 0;
+    {
+        int client_result = serve_client(pipe);
+        if (client_result < 0) {
+            fprintf(stderr, "AMY smoke client sent an invalid wire record\n");
+            result = 1;
+        } else if (once && g_wire_records == 0) {
+            fprintf(stderr, "AMY smoke client sent no wire records\n");
+            result = 1;
+        } else if (once && no_audio && g_nonzero_samples == 0) {
+            fprintf(stderr, "AMY smoke client produced silent PCM\n");
+            result = 1;
+        } else if (once) {
+            printf(
+                "AMY service smoke passed: %llu wire commands, "
+                "%llu nonzero PCM samples\n",
+                (unsigned long long)g_wire_records,
+                (unsigned long long)g_nonzero_samples
+            );
+            fflush(stdout);
+            result = 0;
+        } else {
+            result = 0;
+        }
+    }
+
+service_cleanup:
+    FlushFileBuffers(pipe);
+    DisconnectNamedPipe(pipe);
     amy_stop();
     SetConsoleCtrlHandler(console_handler, FALSE);
 
 cleanup:
-    if (client != INVALID_SOCKET) closesocket(client);
-    if (server != INVALID_SOCKET) closesocket(server);
+    if (pipe != INVALID_HANDLE_VALUE) CloseHandle(pipe);
     DeleteFileA(ready_file);
-    WSACleanup();
     return result;
 }
 
 int main(int argc, char **argv) {
-    unsigned long tcp_port = 0;
-    int tcp_port_set = 0;
+    const char *pipe_name = NULL;
     const char *ready_file = NULL;
     int self_test = 0;
     int no_audio = 0;
     int once = 0;
     for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--tcp-port") == 0 && i + 1 < argc) {
-            char *end = NULL;
-            tcp_port = strtoul(argv[++i], &end, 10);
-            if (end == argv[i] || *end != '\0' || tcp_port > 65535) {
-                usage();
-                return 2;
-            }
-            tcp_port_set = 1;
-        }
+        if (strcmp(argv[i], "--pipe-name") == 0 && i + 1 < argc)
+            pipe_name = argv[++i];
         else if (strcmp(argv[i], "--ready-file") == 0 && i + 1 < argc)
             ready_file = argv[++i];
         else if (strcmp(argv[i], "--self-test") == 0) self_test = 1;
@@ -283,6 +271,6 @@ int main(int argc, char **argv) {
         else { usage(); return 2; }
     }
     if (self_test) return run_self_test();
-    if (!tcp_port_set || ready_file == NULL) { usage(); return 2; }
-    return run_service((unsigned short)tcp_port, ready_file, no_audio, once);
+    if (pipe_name == NULL || ready_file == NULL) { usage(); return 2; }
+    return run_service(pipe_name, ready_file, no_audio, once);
 }
