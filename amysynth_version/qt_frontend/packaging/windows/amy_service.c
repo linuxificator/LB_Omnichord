@@ -189,10 +189,13 @@ static int run_service(const char *path, int no_audio, int once) {
         client = accept(server, NULL, NULL);
         if (client == INVALID_SOCKET) {
             if (!InterlockedCompareExchange(&g_running, 1, 1)) break;
-            if (WSAGetLastError() == WSAEWOULDBLOCK) {
+            int error = WSAGetLastError();
+            if (error == WSAEWOULDBLOCK) {
                 Sleep(50);
+                continue;
             }
-            continue;
+            fprintf(stderr, "AMY service accept failed: %d\n", error);
+            break;
         }
         {
             DWORD timeout_ms = 250;

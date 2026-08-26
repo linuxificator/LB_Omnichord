@@ -45,4 +45,19 @@ _core.InstrumentBackend = InstrumentBackend
 
 
 if __name__ == "__main__":
+    if os.environ.get("OMNICHORD_PACKAGE_SMOKE_STATUS"):
+        try:
+            _exit_code = _core.main()
+        except Exception as _exc:
+            # A --windowed PyInstaller executable otherwise displays an error
+            # dialog that cannot be dismissed on a headless CI runner.
+            from pathlib import Path
+
+            _status = Path(os.environ["OMNICHORD_PACKAGE_SMOKE_STATUS"])
+            with _status.open("a", encoding="utf-8") as _handle:
+                _handle.write(
+                    f"fatal-error {type(_exc).__name__}: {_exc}\n"
+                )
+            _exit_code = 1
+        raise SystemExit(_exit_code)
     raise SystemExit(_core.main())

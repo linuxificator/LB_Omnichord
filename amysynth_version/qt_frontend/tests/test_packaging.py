@@ -105,14 +105,17 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("QT_QPA_PLATFORM", launcher)
         self.assertIn("WaitForExit(30000)", launcher)
         self.assertIn("OMNICHORD_PACKAGE_SMOKE_STATUS", launcher)
+        self.assertIn("Service errors:", launcher)
         self.assertIn("event-loop-exited", launcher)
         self.assertIn("if sys.stdout is None:", main)
         self.assertIn("if sys.stderr is None:", main)
+        self.assertIn("fatal-error", main)
         self.assertIn('getattr(sys, "_MEIPASS", CODE_DIR.parent)', core)
         self.assertIn("AF_UNIX", service)
         self.assertIn("amy_add_message", service)
         self.assertIn("run_self_test", service)
         self.assertIn("amy_simple_fill_buffer", service)
+        self.assertIn("AMY service accept failed:", service)
         self.assertIn("AMY service smoke passed:", service)
         self.assertIn(
             '& "$root\\run_windows.ps1" -Windowed -SmokeTest',

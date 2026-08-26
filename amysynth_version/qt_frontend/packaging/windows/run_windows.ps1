@@ -54,11 +54,15 @@ try {
             $serviceLog = if (Test-Path $serviceOutput) {
                 Get-Content -Raw $serviceOutput
             } else { "<no service output>" }
+            $serviceErrors = if (Test-Path $serviceError) {
+                Get-Content -Raw $serviceError
+            } else { "<no service errors>" }
             Stop-Process -Id $frontend.Id -Force
             $frontend.WaitForExit()
             throw (
                 "Packaged frontend smoke test exceeded its 30 second deadline`n" +
-                "Command: $commandLine`nCheckpoints:`n$status`nService:`n$serviceLog"
+                "Command: $commandLine`nCheckpoints:`n$status`n" +
+                "Service:`n$serviceLog`nService errors:`n$serviceErrors"
             )
         }
         $frontend.WaitForExit()

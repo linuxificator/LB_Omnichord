@@ -452,7 +452,12 @@ class _UnixSocketWriter(_SerialWriter):
         )
         self.socket = socket.socket(socket.AF_UNIX, socket_type)
         try:
+            # A missing or incompatible local service must not freeze the UI
+            # process indefinitely.  Restore blocking mode after connecting;
+            # normal AMY command delivery remains synchronous at the writer.
+            self.socket.settimeout(5.0)
             self.socket.connect(str(socket_path))
+            self.socket.settimeout(None)
         except BaseException:
             self.socket.close()
             raise
