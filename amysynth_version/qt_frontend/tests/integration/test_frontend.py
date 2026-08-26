@@ -290,10 +290,10 @@ class FrontendIntegrationTests(unittest.TestCase):
 
             checkpoint = app.bridge.count()
             app.action("injectMidiControl", 4, 77, 127)
-            app.bridge.wait_idle(timeout=3.0)
-            lines = app.bridge.lines_since(checkpoint)
-            for bus in range(4, 10):
-                self.assertIn(f"y{bus}h3,0.58,0.52Z", lines)
+            expected = [f"y{bus}h3,0.58,0.52Z" for bus in range(4, 10)]
+            lines = app.bridge.wait_for(expected, start=checkpoint, timeout=3.0)
+            for command in expected:
+                self.assertIn(command, lines)
 
     def test_midi_presets_select_and_configure_their_rows(self) -> None:
         with HeadlessApp(native_amy=False) as app:
