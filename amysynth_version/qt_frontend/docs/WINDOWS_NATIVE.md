@@ -103,6 +103,11 @@ Validation uses only files extracted from the final zip:
 4. The service must report both received wire commands and nonzero rendered PCM,
    exit after disconnect, and leave no process or socket behind.
 
+Frozen frontend assets are resolved from PyInstaller's bundle root
+(`sys._MEIPASS`). Deriving their location from the source-tree parent of
+`app_core.py` is incorrect for the Windows `--onedir` layout, where that would
+skip the packaged `config`, `gui`, `instruments` and `music` directories.
+
 This smoke path deliberately does not substitute a mock transport or import AMY
 into the frontend. It verifies the packaged two-process boundary while avoiding
 an unreliable dependency on audio hardware in a hosted CI runner.

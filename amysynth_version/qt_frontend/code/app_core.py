@@ -28,7 +28,9 @@ from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
 
 CODE_DIR = Path(__file__).resolve().parent
-FRONTEND_DIR = CODE_DIR.parent
+# PyInstaller keeps bundled data under ``sys._MEIPASS``.  In source runs the
+# existing repository-relative root remains authoritative.
+FRONTEND_DIR = Path(getattr(sys, "_MEIPASS", CODE_DIR.parent))
 GUI_DIR = FRONTEND_DIR / "gui"
 CONFIG_DIR = FRONTEND_DIR / "config"
 INSTRUMENT_DIR = FRONTEND_DIR / "instruments"

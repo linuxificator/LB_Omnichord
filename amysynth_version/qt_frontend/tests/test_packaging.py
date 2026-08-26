@@ -88,6 +88,9 @@ class PackagingContracts(unittest.TestCase):
             FRONTEND / "packaging" / "windows" / "run_windows.ps1"
         ).read_text(encoding="utf-8")
         main = (FRONTEND / "code" / "main.py").read_text(encoding="utf-8")
+        core = (FRONTEND / "code" / "app_core.py").read_text(
+            encoding="utf-8"
+        )
         service = (
             FRONTEND / "packaging" / "windows" / "amy_service.c"
         ).read_text(encoding="utf-8")
@@ -105,6 +108,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("event-loop-exited", launcher)
         self.assertIn("if sys.stdout is None:", main)
         self.assertIn("if sys.stderr is None:", main)
+        self.assertIn('getattr(sys, "_MEIPASS", CODE_DIR.parent)', core)
         self.assertIn("AF_UNIX", service)
         self.assertIn("amy_add_message", service)
         self.assertIn("run_self_test", service)
