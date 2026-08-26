@@ -29,7 +29,7 @@ $packageRoot = Join-Path $buildRoot "LB_Omnichord"
 New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 Copy-Item -Recurse -Force (Join-Path $pyDist "LB_Omnichord\*") $packageRoot
 Copy-Item -Force (Join-Path $buildRoot "amy-build\Release\amy_service.exe") $packageRoot
-Copy-Item -Force (Join-Path $PSScriptRoot "run_windows.ps1") $packageRoot
+Copy-Item -Force (Join-Path $PSScriptRoot "windows\run_windows.ps1") $packageRoot
 $zip = Join-Path $dist "LB_Omnichord.$stamp.Windows-x86_64.zip"
 Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $zip
 Get-FileHash $zip -Algorithm SHA256 | ForEach-Object {
