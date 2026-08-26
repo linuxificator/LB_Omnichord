@@ -40,10 +40,6 @@ same framing as macOS:
 - partial or multiple `recv()` results are buffered and split on LF;
 - no AMY-specific Python or C API crosses the process boundary.
 
-The native service passes the complete `sockaddr_un` size to Winsock `bind`,
-matching the address representation used by Python's Windows `AF_UNIX`
-client. A shortened POSIX-style address length is not used on Windows.
-
 The socket belongs below a per-user private application directory. The service
 publishes it only after native audio is ready; the client retries the
 connection instead of relying on a fixed startup delay.

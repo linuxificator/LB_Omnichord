@@ -4192,11 +4192,15 @@ def main() -> int:
         file=sys.stderr,
         flush=True,
     )
+    smoke_checkpoint("display-diagnostics-written")
 
     amy_config_path = args.amy_config.expanduser().resolve()
+    smoke_checkpoint("amy-config-path-resolved")
     if amy_config_path == (CONFIG_DIR / "amy_config.json").resolve():
         amy_config_path = user_config_dir / "amy_config.json"
+    smoke_checkpoint("amy-config-path-selected")
     amy_config = load_amy_config(amy_config_path)
+    smoke_checkpoint("amy-config-loaded")
     if args.serial_port is not None:
         amy_config["serial"]["port"] = args.serial_port
     if args.serial_baud is not None:
@@ -4230,6 +4234,7 @@ def main() -> int:
             file=sys.stderr,
             flush=True,
         )
+        smoke_checkpoint("amy-socket-connect-started")
         amy_client = AmySocketClient(
             config=amy_config,
             addresses=address_map,
