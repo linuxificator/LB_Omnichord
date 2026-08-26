@@ -1,5 +1,17 @@
 from __future__ import annotations
 
+import os
+import sys
+
+# PyInstaller's Windows ``--windowed`` bootloader deliberately supplies no
+# console streams.  The application and Qt diagnostics still write to them;
+# install harmless sinks before importing the frontend so a native packaged
+# launch cannot fail on ``None.write``.
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 # Keep the historical `main` import surface stable while new architecture is
 # layered around the already-large application core.
 import app_core as _core

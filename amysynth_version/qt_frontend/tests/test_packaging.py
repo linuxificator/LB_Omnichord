@@ -87,6 +87,7 @@ class PackagingContracts(unittest.TestCase):
         launcher = (
             FRONTEND / "packaging" / "windows" / "run_windows.ps1"
         ).read_text(encoding="utf-8")
+        main = (FRONTEND / "code" / "main.py").read_text(encoding="utf-8")
         service = (
             FRONTEND / "packaging" / "windows" / "amy_service.c"
         ).read_text(encoding="utf-8")
@@ -99,6 +100,9 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("$SmokeTest", launcher)
         self.assertIn("--package-smoke-test", launcher)
         self.assertIn("QT_QPA_PLATFORM", launcher)
+        self.assertIn("WaitForExit(30000)", launcher)
+        self.assertIn("if sys.stdout is None:", main)
+        self.assertIn("if sys.stderr is None:", main)
         self.assertIn("AF_UNIX", service)
         self.assertIn("amy_add_message", service)
         self.assertIn("run_self_test", service)

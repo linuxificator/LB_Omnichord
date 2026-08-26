@@ -40,7 +40,13 @@ try {
         $env:QT_QPA_PLATFORM = "offscreen"
         $env:QT_QUICK_BACKEND = "software"
         $frontend = Start-Process -FilePath (Join-Path $root "LB_Omnichord.exe") `
-            -ArgumentList $arguments -PassThru -Wait
+            -ArgumentList $arguments -PassThru
+        if (-not $frontend.WaitForExit(30000)) {
+            Stop-Process -Id $frontend.Id -Force
+            $frontend.WaitForExit()
+            throw "Packaged frontend smoke test exceeded its 30 second deadline"
+        }
+        $frontend.WaitForExit()
         if ($frontend.ExitCode -ne 0) {
             throw "Packaged frontend smoke test failed with status $($frontend.ExitCode)"
         }
