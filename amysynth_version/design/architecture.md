@@ -58,6 +58,15 @@ Linux AMY is built with `AMY_PCM_BANK=tiny`, matching ESP32-P4. Gamma9001 uses a
 different meaning for PCM presets 0–18 and must not be selected for this
 application unless the wire-level sample map changes for every target.
 
+The native Windows CMake build reaches the same result through AMY's C
+preprocessor contract rather than its Python `setup.py` option. It deliberately
+does not define `GAMMA9001` and does not link the optional generated
+`drums_bin.c`; at the pinned AMY revision, `amy.c` therefore includes
+`pcm_tiny.h`, and patch 258 also selects its `pcm_tiny` mapping. The OMNI rhythm
+engine sends the direct tiny-bank preset/native-note pairs from
+`config/amy_config.json`, so enabling Gamma9001 on only one platform would be a
+wire-level compatibility bug, not merely a packaging choice.
+
 ## Audio ownership
 
 OMNI owns:

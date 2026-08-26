@@ -39,6 +39,32 @@ for immediate scope.
 
 The Omnichord UI and the AMY synthesizer service are separate components/processes where applicable and communicate through the AMY wire protocol over a socket or serial transport.
 
+### Native Windows boundary
+
+The native Windows package preserves that separation. The frozen PySide6
+frontend connects with `QLocalSocket` to a private Windows named pipe; the
+separate native `amy_service.exe` owns the other end through
+`CreateNamedPipeA`. The pipe rejects remote clients and carries one complete,
+LF-framed AMY wire request at a time. Every request still ends in `Z`.
+
+- Do not replace this transport with TCP/UDP or collapse AMY into the frontend
+  merely to simplify packaging or testing.
+- Do not reintroduce the earlier Windows `AF_UNIX` approach without a concrete
+  requirement. Supported Windows versions and the Windows Server 2025 CI host
+  provide OS-level AF_UNIX, but official CPython for Windows does not expose
+  `socket.AF_UNIX`; Qt local IPC avoids a custom Python Winsock layer.
+- A package launcher may start and supervise both executables. The Qt
+  application itself must not import AMY or manage the service lifetime.
+- Windows AMY must use the built-in `pcm_tiny` bank, with the same preset
+  numbering as Linux and ESP32-P4. The Windows CMake target must not define
+  `GAMMA9001` or link the optional Gamma9001 `drums_bin.c` data.
+- Windows CI proves native compilation, offline PCM rendering and the packaged
+  Qt/named-pipe/AMY process boundary. It does not prove physical audio, MIDI,
+  low latency or absence of drop-outs. State those limitations explicitly.
+
+Read `amysynth_version/qt_frontend/docs/WINDOWS_NATIVE.md` before modifying
+the native Windows build, launcher, service, transport or smoke test.
+
 A particularly important rule for the Android/Godot proof of concept:
 
 - The AMY service and Godot application are **separate processes**.

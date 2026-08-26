@@ -24,8 +24,8 @@ Core rules:
 - Shared state is explicit; tuning is shared only when coupling is enabled.
 - `rhythm_bahavior.md` is the authoritative rhythm transport/tempo contract.
 - `testing.md` defines the maintained local suites and CI responsibilities;
-  it also defines Linux release packaging and validation. Detailed executable
-  scenarios live in `../qt_frontend/tests/USE_CASES.md`.
+  it also defines four-platform desktop release packaging and validation.
+  Detailed executable scenarios live in `../qt_frontend/tests/USE_CASES.md`.
 - `sound_balance.md` defines user storage/config overrides, strum modes, MIDI
   control indicators and the instrument-balance measurement contract.
 - `midi_control.md` is the authoritative MIDI CC learn, binding, LRU/LED and

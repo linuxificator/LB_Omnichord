@@ -68,9 +68,11 @@ ref. Main-branch releases are serialized and never cancelled, so two closely
 spaced merges cannot overwrite or skip one another. Regression CI uses Ubuntu
 24.04. The x86_64 and Raspberry Pi AppImages are built natively on Ubuntu 22.04
 x86_64/aarch64 runners; the DMG is built natively on a macOS 15 arm64 runner.
-Diagnostics are retained for 14 days where a workflow produces artifacts.
+The Windows zip is built and exercised on Windows Server 2025 build 26100 with
+the newest supported installed Visual Studio generator. Diagnostics are
+retained for 14 days where a workflow produces artifacts.
 
-## Linux release naming and contents
+## Desktop release naming and contents
 
 Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 
@@ -78,6 +80,7 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 - Linux asset: `LB_Omnichord.R20260824223000.Linux-x86_64.AppImage`
 - Raspberry Pi asset: `LB_Omnichord.R20260824223000.RaspberryPi-aarch64.AppImage`
 - macOS asset: `LB_Omnichord.R20260824223000.macOS-arm64.dmg`
+- Windows asset: `LB_Omnichord.R20260824223000.Windows-x86_64.zip`
 - one matching `.sha256` file for each package
 
 The AppImages bundle PySide6, the frontend assets and the pinned AMY bus-mixer
@@ -86,6 +89,13 @@ as a separate child process. Linux uses the existing Unix `SOCK_SEQPACKET`
 wire-protocol boundary. macOS uses newline-framed Unix `SOCK_STREAM`, because
 Darwin does not support Unix-domain `SOCK_SEQPACKET`. Packaging therefore does
 not collapse the application and synthesizer architectures into one process.
+
+The Windows zip also preserves two processes: frozen `LB_Omnichord.exe`
+connects through `QLocalSocket` to a private named pipe owned by native
+`amy_service.exe`. The package launcher supplies a unique pipe name and owns
+process cleanup. Windows CMake builds pinned AMY without `GAMMA9001` or the
+optional `drums_bin.c`, so it selects the same built-in tiny PCM preset map as
+Linux, macOS and ESP32-P4.
 
 `packaging/build_appimage.sh` builds either Linux AppImage;
 `packaging/build_macos_dmg.sh` builds the Apple Silicon application/DMG. The
@@ -125,10 +135,19 @@ and macOS packages still require their first physical-device/audio test.
 Future releases are not automatically considered physically tested merely
 because the pipeline succeeded.
 
-Native Windows support is not claimed until the native service, audio profile,
-package startup and physical MIDI/audio checks in
-`../qt_frontend/docs/WINDOWS_NATIVE.md` pass. The WSL AppImage guide is only an
-optional experiment with the Linux artifact.
+The first complete four-platform release, `R20260826T230234`, was built from
+main commit `3345502` by GitHub Actions run `33021825480`. All six frontend
+suites and all four package jobs passed before publication. The Windows job
+validated native compilation, a non-silent offline AMY self-test, and the
+extracted frozen frontend communicating real wire commands with the separate
+service through the named pipe. It observed 209 wire commands and 13,138
+nonzero rendered samples in that end-to-end smoke.
+
+This establishes an experimental native Windows package/runtime baseline, not
+physical Windows support. Real audio output, MIDI input, latency and drop-out
+behavior remain unverified; native Windows MIDI is not yet implemented. The
+acceptance boundary is maintained in `../qt_frontend/docs/WINDOWS_NATIVE.md`.
+The WSL AppImage guide is only an optional experiment with the Linux artifact.
 
 Each test should verify:
 

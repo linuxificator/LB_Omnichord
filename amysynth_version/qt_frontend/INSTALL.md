@@ -1,9 +1,14 @@
 # Installation
 
-This document covers the two supported runtime layouts for the AMY version of LB Omnichord:
+This document covers the three runtime layouts for the AMY version of LB
+Omnichord:
 
-1. **Raspberry Pi frontend + ESP32-P4 AMY over UART** — the hardware layout used for the instrument.
-2. **Local desktop AMY** — the Qt frontend and the supported AMY bus-mixer fork run on the same computer. This path is useful for development and does not need the ESP32-P4.
+1. **Raspberry Pi frontend + ESP32-P4 AMY over UART** — the hardware layout
+   used for the instrument.
+2. **Local Unix desktop AMY** — the Qt frontend and the supported AMY bus-mixer
+   fork run as separate processes on Linux or macOS.
+3. **Native Windows package** — separate frozen Qt and native AMY executables
+   communicate through a private Windows named pipe.
 
 The Raspberry Pi/UART path has been exercised on the project hardware. The
 Linux two-process socket path has also been exercised with working audio,
@@ -11,8 +16,10 @@ multibus routing and the ESP32-compatible tiny drum bank. The published x86_64
 AppImage was downloaded from GitHub Releases and physically validated with
 working UI and audio on Linux on 2026-08-24. Release `R20260824T212125` also
 passed native packaged-runtime validation for Linux x64, Linux aarch64 and
-macOS arm64. Raspberry Pi and macOS still require physical-device/audio tests;
-WSL remains development guidance rather than a validated release recipe.
+macOS arm64. Release `R20260826T230234` additionally passed native Windows x64
+compilation, offline PCM rendering and packaged Qt/named-pipe/service startup.
+Raspberry Pi, macOS and Windows still require physical-device/audio tests; WSL
+is an optional Linux-artifact experiment rather than the Windows runtime.
 
 ## Repository layout
 
@@ -121,12 +128,14 @@ The default directory is `$HOME/LB_Omnichord/amysynth_version/qt_frontend`, the 
 
 ---
 
-# 2. Local desktop AMY
+# 2. Local Linux/macOS AMY
 
-Local mode consists of two processes. `local_amy_service.py` owns AMY and the
-desktop audio device. The Qt application only sends AMY wire packets over a
+Unix local mode consists of two processes. `local_amy_service.py` owns AMY and
+the desktop audio device. The Qt application only sends AMY wire packets over a
 filesystem `AF_UNIX` `SOCK_SEQPACKET` socket. It does not import AMY or call an
-AMY API. This deliberately matches the Android AMY-service boundary.
+AMY API. macOS uses an LF-framed `AF_UNIX` stream because Darwin does not
+provide `SOCK_SEQPACKET`. This deliberately matches the Android AMY-service
+boundary.
 
 Start both processes with:
 
@@ -219,52 +228,73 @@ The upstream AMY Python build links the macOS CoreAudio/CoreMIDI frameworks itse
 
 ## Windows
 
-### Native Windows status
+### Install the native package
 
-The Qt frontend itself does not require AMY's Python extension (`amy` or
-`c_amy`). It produces only AMY wire requests. The current `local_amy_service.py`
-is a Unix desktop convenience service implemented in Python, so it does need
-that extension; this is a service limitation, not a frontend limitation.
-
-The intended Windows path is a native PySide6 frontend connected to a separate
-native `amy_service.exe` over LF-framed Windows `AF_UNIX/SOCK_STREAM`. The AMY
-fork currently provides only a native C/miniaudio example, not that service or
-package yet. See [WINDOWS_NATIVE.md](docs/WINDOWS_NATIVE.md) for the contract,
-status and remaining work.
-
-WSL2 + WSLg may still be used to experiment with the Linux artifact, but it is
-not the Windows architecture or a supported low-latency release path.
-
-Install WSL/Ubuntu from an elevated PowerShell if it is not already present:
+Download `LB_Omnichord.R<date><time>.Windows-x86_64.zip` and its
+`.zip.sha256` file from GitHub Releases. Verify and extract them in PowerShell:
 
 ```powershell
-wsl --install -d Ubuntu
+$zip = Get-Item .\LB_Omnichord.R*.Windows-x86_64.zip
+$checksum = "$($zip.FullName).sha256"
+$expected = ((Get-Content $checksum) -split '\s+')[0].ToLowerInvariant()
+$actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw "Checksum mismatch" }
+Expand-Archive -LiteralPath $zip.FullName -DestinationPath .\LB_Omnichord
 ```
 
-After reboot/setup, open the Ubuntu terminal and use the Linux instructions above:
+Start the package with its launcher:
 
-```bash
-sudo apt update
-sudo apt install git python3-venv python3-pip python3-dev build-essential
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\LB_Omnichord\run_windows.ps1 -Windowed
 ```
 
-Keep the repositories in the WSL Linux filesystem (for example under `~/src`) rather than under `/mnt/c` for better build performance. For this optional Linux experiment, install both the frontend and AMY in one virtual environment exactly as in the Linux section and run:
+Omit `-Windowed` for the normal fullscreen application. The zip is
+self-contained: `LB_Omnichord.exe` is the frozen PySide6 frontend,
+`amy_service.exe` is the independent native AMY/miniaudio process, and
+`run_windows.ps1` starts and cleans up both. The launcher gives each run a
+unique private pipe name. Qt connects with `QLocalSocket`; the service accepts
+LF-framed AMY wire commands with `CreateNamedPipeA` and rejects remote clients.
+No TCP port is opened and AMY is not linked into the frontend.
 
-```bash
-./run_local.sh --windowed
+The Windows service is built with AMY's built-in tiny PCM bank, matching Linux,
+macOS and ESP32-P4 drum preset numbering. Do not substitute a Gamma9001 AMY
+build: presets 0–18 then name different samples and the rhythm section changes
+sound for the same commands.
+
+The package is currently experimental. GitHub's Windows Server 2025 job proves
+native compilation, offline non-silent PCM rendering, frozen QML/assets,
+named-pipe command delivery and clean process shutdown. Physical Windows audio,
+MIDI and low-latency/drop-out behavior have not yet been validated. The current
+MIDI reader is ALSA-only, so native Windows MIDI input is not implemented.
+
+### Build the native package
+
+Install Python 3.12, CMake and either Visual Studio 2026 or Visual Studio 2022
+with the C++ build workload. Install the frontend requirements and PyInstaller,
+check out the pinned compatible AMY fork, then run from this directory:
+
+```powershell
+python -m pip install -r requirements.txt pyinstaller==6.22.2
+$env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
+.\packaging\build_windows.ps1
 ```
 
-On a normal Windows 11 WSLg installation the Qt window and AMY audio should be forwarded to the Windows desktop. This project has not yet validated that path.
+The zip and checksum are written below `dist`. The release workflow pins AMY
+revision `25213785696dd40e6cce59ab428e560a410d240f`; local release candidates
+must use the same revision unless the pin and its compatibility tests are
+deliberately updated together.
 
-To test the packaged Linux x86_64 AppImage instead of building from source,
-follow the [WSL2/WSLg AppImage testing guide](docs/WSL_APPIMAGE_TESTING.md).
-The guide includes FUSE fallback, audio routing, optional USB MIDI and a
-feedback template; successful reports are requested as well as failures.
+See [WINDOWS_NATIVE.md](docs/WINDOWS_NATIVE.md) for the full transport,
+packaging, smoke-test and remaining-hardware-validation contract.
 
-For reference, upstream AMY's native Windows C example requires Visual Studio
-Build Tools 2022 with the C++ workload and can be built from `amy/windows`.
-That example proves native AMY compilation but is not the separate wire service
-required by LB Omnichord.
+### Optional WSL experiment
+
+WSL2/WSLg may still run the Linux artifact for diagnostic experiments, but it
+is not the Windows architecture or the native release path. Follow
+[WSL_APPIMAGE_TESTING.md](docs/WSL_APPIMAGE_TESTING.md) when that experiment is
+specifically useful; do not use its results as evidence for native Windows
+audio, MIDI or named-pipe behavior.
 
 ---
 

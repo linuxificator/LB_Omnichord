@@ -56,6 +56,21 @@ and removes the file, then passes the name to the frontend. The `QLocalSocket`
 object lives entirely on the existing dedicated command-writer thread, keeping
 blocking pipe writes away from the Qt UI thread.
 
+The implementation is intentionally small and direct:
+
+- `code/amy_transport.py` contains the `QLocalSocket` writer selected by
+  `--amy-local-name`;
+- `packaging/windows/amy_service.c` owns AMY, miniaudio, the named-pipe server
+  and LF record assembly;
+- `packaging/windows/run_windows.ps1` creates a unique name, starts the service,
+  validates its ready file, launches Qt and cleans up both processes;
+- `packaging/build_windows.ps1` independently builds `amy_service.exe`, freezes
+  `LB_Omnichord.exe`, and places both beside the launcher in the final zip.
+
+The ready file contains only the generated pipe name. It is written below the
+per-user application directory after both AMY and the pipe exist, consumed and
+deleted by the launcher, and is not the command transport.
+
 References: [Microsoft's Windows AF_UNIX announcement](https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/),
 [CPython Windows AF_UNIX issue](https://github.com/python/cpython/issues/77589),
 [Qt for Python QLocalSocket](https://doc.qt.io/qtforpython-6/PySide6/QtNetwork/QLocalSocket.html)
@@ -72,7 +87,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Android | `origin/upstream/android-oboe` contains the separate `:amy` service, private socket and transport-only Java client, but it is not merged with active `feature/bus-mixer`. |
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
 | Native Windows frontend transport | The launcher supplies a unique Windows named-pipe name; `QLocalSocket` sends LF-framed requests without opening a network port. |
-| Windows package/release | CI builds an experimental self-contained zip with separate service/frontend executables. It performs an offline native AMY render test and starts the unpacked launcher, offscreen Qt/QML frontend and socket service end to end; no physical validation yet for audio/MIDI. |
+| Windows package/release | CI builds an experimental self-contained zip with separate service/frontend executables. It performs an offline native AMY render test and starts the unpacked launcher, offscreen Qt/QML frontend and named-pipe service end to end; no physical validation yet for audio/MIDI. |
 | Windows MIDI input | Not implemented; the current reader is Linux ALSA raw MIDI only. |
 
 The Windows build script selects the newest supported Visual Studio CMake
@@ -80,8 +95,30 @@ generator installed on the host (currently Visual Studio 2026 in the Windows
 Server 2025 CI image, with Visual Studio 2022 retained for local builds). It
 does not pin the current runner to an absent older toolchain.
 
-The current Windows AMY example is not yet a low-latency baseline: the fork's
-host defaults are 44.1 kHz and 256 samples, its Windows backend tries
+The first complete four-platform release containing this implementation is
+`R20260826T230234`, built from main commit `3345502`. GitHub Actions run
+`33021825480` passed all frontend suites and the Linux x64, Raspberry Pi
+aarch64, macOS arm64 and Windows x64 package jobs before publishing. That is
+native-runner package validation, not a physical Windows audio/MIDI test.
+
+## PCM/drum compatibility
+
+All supported targets must give PCM preset numbers 0–18 the same meaning. The
+Windows service is built from pinned AMY revision
+`25213785696dd40e6cce59ab428e560a410d240f`. Its CMake target compiles `amy.c`
+and `pcm.c` without defining `GAMMA9001` and without linking the optional
+Gamma9001 `drums_bin.c`. The pinned source consequently includes
+`pcm_tiny.h`, including the tiny-bank mapping for MIDI drum patch 258.
+
+This is equivalent to the explicit `AMY_PCM_BANK=tiny` used by the Linux and
+macOS Python-extension builds. That environment variable belongs to AMY's
+`setup.py` path and is not required by the native Windows CMake path. Defining
+`GAMMA9001` or adding `drums_bin.c` on Windows would change the meaning of the
+direct rhythm presets in `config/amy_config.json` and produce different drum
+sounds for the same wire commands.
+
+The current Windows AMY service profile is not yet a low-latency baseline: the
+fork's host defaults are 44.1 kHz and 256 samples, its Windows backend tries
 DirectSound before WASAPI, and requests 20 ms periods with four periods.
 Native Windows removes WSL's forwarding layer, but this audio profile still
 needs measurement and tuning before release. The ESP32-P4 48 kHz/64-sample
@@ -116,9 +153,9 @@ Validation uses only files extracted from the final zip:
 2. `run_windows.ps1 -SmokeTest` starts the separate service with offline
    rendering and one-client lifetime, then starts the frozen Qt executable with
    its offscreen/software renderer.
-3. The frontend must load the packaged QML/assets, connect through Windows
-   native Windows named pipe, publish initial state, play/release a test chord and
-   exit successfully.
+3. The frontend must load the packaged QML/assets, connect through the native
+   Windows named pipe, publish initial state, play/release a test chord and exit
+   successfully.
 4. The service must report both received wire commands and nonzero rendered PCM,
    exit after disconnect, and leave no process or ready file behind.
 
@@ -130,6 +167,13 @@ skip the packaged `config`, `gui`, `instruments` and `music` directories.
 This smoke path deliberately does not substitute a mock transport or import AMY
 into the frontend. It verifies the packaged two-process boundary while avoiding
 an unreliable dependency on audio hardware in a hosted CI runner.
+
+The successful four-platform run above observed 6,140 nonzero samples in the
+service's standalone offline self-test. Its packaged end-to-end smoke delivered
+209 real wire commands through the named pipe and observed 13,138 nonzero
+rendered samples. These counts are evidence for that run, not fixed golden
+values. The current smoke proves that PCM rendering is non-silent; it does not
+yet identify every tiny-bank drum sample acoustically.
 
 `WSL_APPIMAGE_TESTING.md` remains only an optional experiment for the Linux
 artifact, not the Windows implementation plan or release gate.

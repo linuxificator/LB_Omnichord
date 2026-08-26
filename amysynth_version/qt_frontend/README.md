@@ -2,7 +2,9 @@
 
 This directory contains the actively developed Qt frontend for the AMY-based
 Omnichord. It sends native AMY wire commands either over UART to AMY on the
-ESP32-P4 or over a Unix packet socket to a separate local AMY service.
+ESP32-P4 or over local IPC to a separate desktop AMY service. Linux uses a Unix
+packet socket, macOS an LF-framed Unix stream socket, and native Windows a
+private named pipe through Qt's `QLocalSocket`.
 
 The Sonic Pi version elsewhere in the repository is frozen legacy material. It
 is not a backend option for this frontend and must not be changed as part of
@@ -103,35 +105,35 @@ the host log. See `../design/testing.md` for the complete local/CI inventory.
 ## Desktop releases
 
 Every successful complete test run after an update to `main` publishes one
-three-platform GitHub Release. Tags use `RYYYYMMDDTHHMMSS`; asset timestamps
+four-platform GitHub Release. Tags use `RYYYYMMDDTHHMMSS`; asset timestamps
 omit the `T`. The release page has separate sections and downloads for:
 
 - Linux x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Linux-x86_64.AppImage`
 - Raspberry Pi 4/5: `LB_Omnichord.RYYYYMMDDHHMMSS.RaspberryPi-aarch64.AppImage`
 - macOS Apple Silicon: `LB_Omnichord.RYYYYMMDDHHMMSS.macOS-arm64.dmg`
+- Windows x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Windows-x86_64.zip`
 
 Each package has a matching `.sha256` asset. All timestamps are UTC.
 
 Every package contains the Qt frontend and supported AMY fork with the tiny PCM
-drum bank. At runtime they remain separate processes connected through the same
-Unix wire-protocol socket as `run_local.sh`. The Pi build requires 64-bit
-Raspberry Pi OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG
-is Apple Silicon-only, ad-hoc signed and not Apple-notarized.
+drum bank. At runtime they remain separate processes connected by the
+platform's private local transport. The Pi build requires 64-bit Raspberry Pi
+OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG is Apple
+Silicon-only, ad-hoc signed and not Apple-notarized. The Windows zip contains
+separate `LB_Omnichord.exe` and `amy_service.exe` binaries plus
+`run_windows.ps1`; it uses a private Windows named pipe rather than WSL or a
+network listener.
 
-The three-platform release pipeline was validated end to end on 2026-08-24.
-Release `R20260824T212125` passed all 80 tests. CI then started both AppImages
-on native x64/aarch64 Linux runners and started the app from the mounted DMG on
-a native Apple-Silicon runner, requiring the AMY-service and frontend socket
-markers before publication. The earlier x64 release `R20260824T204611` was also
-downloaded and physically tested on Linux with working UI and audio. Raspberry
-Pi and macOS still need physical-device/audio validation. Use the repository's
-GitHub Releases page for the current artifacts rather than treating either tag
-as a hard-coded update channel.
-
-Native Windows is the intended future desktop target: a native PySide6
-frontend talks to a separate native AMY service over the wire boundary. It is
-not packaged or validated yet; see [the native Windows status and contract](docs/WINDOWS_NATIVE.md).
+The first complete four-platform release, `R20260826T230234`, passed every
+frontend suite and package job on native GitHub runners. Windows validation
+included an offline native-AMY render and an end-to-end start of the extracted
+Qt frontend and AMY service over the named pipe. The earlier x64 release
+`R20260824T204611` was downloaded and physically tested on Linux with working
+UI and audio. Raspberry Pi, macOS and Windows still need physical-device/audio
+validation. Windows MIDI input and measured low-latency audio tuning are also
+outstanding. See [the native Windows status and contract](docs/WINDOWS_NATIVE.md).
 The Linux AppImage through WSL2/WSLg remains an optional diagnostic experiment,
-not a Windows release target.
+not a Windows release target. Use GitHub Releases for current artifacts rather
+than treating a baseline tag as a hard-coded update channel.
 
 [Open GitHub Releases](https://github.com/linuxificator/LB_Omnichord/releases)
