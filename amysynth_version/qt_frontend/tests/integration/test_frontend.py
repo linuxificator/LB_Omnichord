@@ -291,7 +291,11 @@ class FrontendIntegrationTests(unittest.TestCase):
             checkpoint = app.bridge.count()
             app.action("injectMidiControl", 4, 77, 127)
             expected = [f"y{bus}h3,0.58,0.52Z" for bus in range(4, 10)]
-            lines = app.bridge.wait_for(expected, start=checkpoint, timeout=3.0)
+            lines = app.bridge.wait_for_lines(
+                expected,
+                start=checkpoint,
+                timeout=3.0,
+            )
             for command in expected:
                 self.assertIn(command, lines)
 

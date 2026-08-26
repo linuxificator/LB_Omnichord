@@ -444,16 +444,24 @@ class PresetIntegrationTests(unittest.TestCase):
             # row/root identity to equal-tempered C major.
             app.action("selectPreset", 1)
             app.action("pressChord", 0, 0)
-            app.bridge.wait_idle(timeout=8.0)
+            app.bridge.wait_for_lines(
+                ["n48l1i3Z"],
+                start=0,
+                timeout=3.0,
+            )
             checkpoint = app.bridge.count()
 
             app.action("selectPreset", 2)
-            app.bridge.wait_idle(timeout=8.0)
+            expected = [f"n{note}l1i3Z" for note in (48, 52, 55)]
+            switched = app.bridge.wait_for_lines(
+                expected,
+                start=checkpoint,
+                timeout=3.0,
+            )
 
             self.assertEqual(int(app.query("chordGateState")), 1)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
-            switched = app.bridge.lines_since(checkpoint)
             for note in (48, 52, 55):
                 self.assertIn(
                     f"n{note}l1i3Z",
