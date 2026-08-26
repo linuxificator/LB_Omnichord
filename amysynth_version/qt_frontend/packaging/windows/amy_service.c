@@ -116,7 +116,15 @@ static int serve_client(SOCKET client) {
         if (received == 0) return 0;
         if (received == SOCKET_ERROR) {
             int error = WSAGetLastError();
-            if (error == WSAEINTR || error == WSAETIMEDOUT) continue;
+            // Windows may report an expired SO_RCVTIMEO as either
+            // WSAETIMEDOUT or WSAEWOULDBLOCK.  Both mean that the client is
+            // merely quiet; keep the connection alive while Qt starts and
+            // between UI-generated wire commands.
+            if (error == WSAEINTR || error == WSAETIMEDOUT ||
+                error == WSAEWOULDBLOCK) {
+                continue;
+            }
+            fprintf(stderr, "AMY service receive failed: %d\n", error);
             return -1;
         }
         for (int i = 0; i < received; ++i) {

@@ -122,6 +122,9 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("run_self_test", service)
         self.assertIn("amy_simple_fill_buffer", service)
         self.assertIn("AMY service accept failed:", service)
+        self.assertIn("error == WSAETIMEDOUT", service)
+        self.assertIn("error == WSAEWOULDBLOCK", service)
+        self.assertIn("AMY service receive failed:", service)
         self.assertIn("AMY service smoke passed:", service)
         self.assertIn(
             '& "$root\\run_windows.ps1" -Windowed -SmokeTest',
