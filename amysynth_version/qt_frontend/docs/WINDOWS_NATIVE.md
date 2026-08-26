@@ -75,6 +75,11 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Windows package/release | CI builds an experimental self-contained zip with separate service/frontend executables. It performs an offline native AMY render test and starts the unpacked launcher, offscreen Qt/QML frontend and socket service end to end; no physical validation yet for audio/MIDI. |
 | Windows MIDI input | Not implemented; the current reader is Linux ALSA raw MIDI only. |
 
+The Windows build script selects the newest supported Visual Studio CMake
+generator installed on the host (currently Visual Studio 2026 in the Windows
+Server 2025 CI image, with Visual Studio 2022 retained for local builds). It
+does not pin the current runner to an absent older toolchain.
+
 The current Windows AMY example is not yet a low-latency baseline: the fork's
 host defaults are 44.1 kHz and 256 samples, its Windows backend tries
 DirectSound before WASAPI, and requests 20 ms periods with four periods.

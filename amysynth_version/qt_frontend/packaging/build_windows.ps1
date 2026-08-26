@@ -10,8 +10,16 @@ $amyRoot = if ($env:OMNICHORD_AMY_ROOT) { $env:OMNICHORD_AMY_ROOT } else { Join-
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $buildRoot, $dist
 New-Item -ItemType Directory -Force -Path $buildRoot, $dist | Out-Null
 
+$cmakeHelp = cmake --help
+$generator = @("Visual Studio 18 2026", "Visual Studio 17 2022") |
+    Where-Object { $cmakeHelp -match [regex]::Escape($_) } |
+    Select-Object -First 1
+if (-not $generator) {
+    throw "No supported Visual Studio CMake generator is installed"
+}
+
 cmake -S (Join-Path $frontend "packaging\windows") -B (Join-Path $buildRoot "amy-build") `
-    -G "Visual Studio 17 2022" -A x64 "-DAMY_ROOT=$amyRoot"
+    -G $generator -A x64 "-DAMY_ROOT=$amyRoot"
 cmake --build (Join-Path $buildRoot "amy-build") --config Release
 
 $pyDist = Join-Path $buildRoot "pyinstaller"
