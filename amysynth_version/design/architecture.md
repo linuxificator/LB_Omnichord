@@ -20,11 +20,11 @@ The Qt application must not import AMY, call AMY synthesis APIs, or manage the
 AMY service lifetime. It only produces AMY wire messages. On Linux those
 messages cross an `AF_UNIX` `SOCK_SEQPACKET` socket; on macOS, which does not
 provide Unix-domain `SOCK_SEQPACKET`, they use a Unix `SOCK_STREAM` with one
-newline-framed AMY request per record. Native Windows uses the same LF-framed
-`AF_UNIX` `SOCK_STREAM` contract with a native C AMY service; Windows does not
-support `SOCK_SEQPACKET`. Android uses the app-private `amy.sock`; ESP32-P4
-uses serial. Framing is a transport concern and does not expose the AMY Python
-or C API to Qt.
+newline-framed AMY request per record. Native Windows uses LF-framed loopback
+TCP with a native C AMY service because the packaged CPython distribution does
+not expose `AF_UNIX`; its service binds only `127.0.0.1` on a dynamic port.
+Android uses the app-private `amy.sock`; ESP32-P4 uses serial. Framing is a
+transport concern and does not expose the AMY Python or C API to Qt.
 
 The Linux convenience launcher owns both child processes only as a development
 shell wrapper. Released Linux and Raspberry Pi AppImages and the macOS app
@@ -47,6 +47,7 @@ verified status and acceptance criteria.
 Supported transports:
 
 - external local AMY service over a Unix-domain socket
+- external native Windows AMY service over loopback TCP
 - serial transport to ESP32-P4
 
 The same user action must result in the same AMY wire command stream regardless of transport.

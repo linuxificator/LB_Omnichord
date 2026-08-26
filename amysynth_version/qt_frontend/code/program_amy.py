@@ -274,3 +274,24 @@ class ProgramAmySocketClient(ProgramAmySerialClient):
                 debug_log,
             ),
         )
+
+
+class ProgramAmyTcpClient(ProgramAmySerialClient):
+    """Program-aware client for the native Windows loopback service."""
+
+    def __init__(
+        self,
+        config: dict[str, Any],
+        addresses: dict[str, str],
+        host: str,
+        port: int,
+    ) -> None:
+        super().__init__(
+            config=config,
+            addresses=addresses,
+            writer_factory=lambda debug_log: base._TcpSocketWriter(
+                host,
+                port,
+                debug_log,
+            ),
+        )

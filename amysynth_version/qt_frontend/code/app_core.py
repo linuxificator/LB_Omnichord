@@ -20,6 +20,7 @@ from PySide6.QtQuickControls2 import QQuickStyle
 from amy_serial import (
     AmySerialClient,
     AmySocketClient,
+    AmyTcpClient,
     load_amy_config,
 )
 from control_limits import bounded_control_range, clamp_control_value
@@ -3883,6 +3884,15 @@ def parse_arguments() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--amy-tcp-port",
+        type=int,
+        default=None,
+        help=(
+            "Connect to an external AMY service over LF-framed TCP on "
+            "127.0.0.1 (native Windows package transport)."
+        ),
+    )
+    parser.add_argument(
         "--package-smoke-test",
         action="store_true",
         help=(
@@ -4228,7 +4238,26 @@ def main() -> int:
         "panic": args.panic_address,
     }
 
-    if args.amy_socket:
+    if args.amy_socket and args.amy_tcp_port is not None:
+        raise ValueError("select either --amy-socket or --amy-tcp-port")
+
+    if args.amy_tcp_port is not None:
+        if not 1 <= args.amy_tcp_port <= 65535:
+            raise ValueError("--amy-tcp-port must be between 1 and 65535")
+        print(
+            f"AMY backend: external TCP 127.0.0.1:{args.amy_tcp_port}",
+            file=sys.stderr,
+            flush=True,
+        )
+        smoke_checkpoint("amy-tcp-connect-started")
+        amy_client = AmyTcpClient(
+            config=amy_config,
+            addresses=address_map,
+            host="127.0.0.1",
+            port=args.amy_tcp_port,
+        )
+        smoke_checkpoint("amy-tcp-connected")
+    elif args.amy_socket:
         print(
             f"AMY backend: external socket {args.amy_socket}",
             file=sys.stderr,
@@ -4377,9 +4406,9 @@ def main() -> int:
     smoke_checkpoint("initial-state-sent")
 
     if args.package_smoke_test:
-        if not args.amy_socket:
+        if not args.amy_socket and args.amy_tcp_port is None:
             print(
-                "--package-smoke-test requires --amy-socket",
+                "--package-smoke-test requires an external AMY transport",
                 file=sys.stderr,
                 flush=True,
             )

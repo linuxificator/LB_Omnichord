@@ -23,6 +23,7 @@ from midi_integration import InstrumentBackend
 from program_amy import (
     ProgramAmySerialClient,
     ProgramAmySocketClient,
+    ProgramAmyTcpClient,
 )
 
 
@@ -41,6 +42,7 @@ _core.load_synth_catalog = load_synth_catalog
 _core.load_amy_config = load_amy_config
 _core.AmySerialClient = ProgramAmySerialClient
 _core.AmySocketClient = ProgramAmySocketClient
+_core.AmyTcpClient = ProgramAmyTcpClient
 _core.InstrumentBackend = InstrumentBackend
 
 

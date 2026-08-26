@@ -13,7 +13,7 @@ native Python/PySide6 frontend
         |
         | ordinary AMY wire requests
         v
-private AF_UNIX / SOCK_STREAM socket
+private loopback TCP / SOCK_STREAM socket
         |
         v
 native amy_service.exe -> AMY C engine -> native Windows audio
@@ -30,9 +30,10 @@ limitation and not a reason to run the frontend under WSL.
 
 ## Windows socket contract
 
-Windows pathname `AF_UNIX` supports `SOCK_STREAM`, but not the Linux
-`SOCK_SEQPACKET` mode used by the Linux service. Windows therefore uses the
-same framing as macOS:
+The official CPython 3.12 Windows distribution used by the packaged frontend
+does not expose `socket.AF_UNIX`. The native Windows service therefore listens
+only on `127.0.0.1` using a dynamically allocated TCP port. It uses the same
+stream framing as macOS:
 
 - one complete AMY wire request per record;
 - every wire request ends in `Z`;
@@ -40,14 +41,16 @@ same framing as macOS:
 - partial or multiple `recv()` results are buffered and split on LF;
 - no AMY-specific Python or C API crosses the process boundary.
 
-The socket belongs below a per-user private application directory. The service
-publishes it only after native audio is ready; the client retries the
-connection instead of relying on a fixed startup delay.
+The service binds port zero so Winsock selects a free port, then publishes that
+port through a short-lived ready file below the per-user application directory
+only after native audio is ready. The launcher reads and removes that file and
+passes the port to the frontend. The C service never listens on a non-loopback
+interface.
 
-References: [Microsoft AF_UNIX](https://devblogs.microsoft.com/commandline/af_unix-comes-to-windows/)
+References: [Python socket constants](https://docs.python.org/3/library/socket.html#socket.AF_UNIX)
 and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.html).
 
-## Verified repository state (2026-08-26)
+## Verified repository state (2026-08-27)
 
 | Area | Current state |
 | --- | --- |
@@ -57,7 +60,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Raspberry Pi + ESP32-P4 | Qt sends LF-delimited wire requests over UART to an independent AMY target. |
 | Android | `origin/upstream/android-oboe` contains the separate `:amy` service, private socket and transport-only Java client, but it is not merged with active `feature/bus-mixer`. |
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
-| Native Windows frontend transport | The client now selects LF-framed `AF_UNIX/SOCK_STREAM` on `win32`. |
+| Native Windows frontend transport | The launcher supplies the service's dynamic loopback TCP port; requests remain LF-framed. |
 | Windows package/release | CI builds an experimental self-contained zip with separate service/frontend executables. It performs an offline native AMY render test and starts the unpacked launcher, offscreen Qt/QML frontend and socket service end to end; no physical validation yet for audio/MIDI. |
 | Windows MIDI input | Not implemented; the current reader is Linux ALSA raw MIDI only. |
 
@@ -98,10 +101,10 @@ Validation uses only files extracted from the final zip:
    rendering and one-client lifetime, then starts the frozen Qt executable with
    its offscreen/software renderer.
 3. The frontend must load the packaged QML/assets, connect through Windows
-   `AF_UNIX/SOCK_STREAM`, publish initial state, play/release a test chord and
+   loopback TCP stream, publish initial state, play/release a test chord and
    exit successfully.
 4. The service must report both received wire commands and nonzero rendered PCM,
-   exit after disconnect, and leave no process or socket behind.
+   exit after disconnect, and leave no process or ready file behind.
 
 Frozen frontend assets are resolved from PyInstaller's bundle root
 (`sys._MEIPASS`). Deriving their location from the source-tree parent of

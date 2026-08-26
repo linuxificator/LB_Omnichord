@@ -49,12 +49,12 @@ Four repository workflows are maintained:
   in their artifacts.
 - `Test and release desktop packages` runs after every update of `main`. It
   calls the complete regression matrix and, only after all suites pass, builds
-  and validates Linux x86_64, Raspberry Pi aarch64 and macOS arm64 packages.
-  One timestamped tag/release contains all three packages and their SHA-256
-  files. Manual dispatch is available for an explicitly requested release
-  candidate from another branch; ordinary feature-branch pushes never publish
-  releases. Native Windows is a separate future package target; it is not
-  represented by the Linux AppImage or WSL.
+  and validates Linux x86_64, Raspberry Pi aarch64, macOS arm64 and native
+  Windows x86_64 packages. One timestamped tag/release contains all four
+  packages and their SHA-256 files. The dedicated `testing/windows_smoke`
+  branch builds only the Windows job without publishing; `main` retains the
+  complete gated release. Windows is not represented by the Linux AppImage or
+  WSL.
 - `ESP32-P4 firmware build` builds and validates the firmware package when the
   ESP32-P4 project changes. It is a build/package check, not part of the Python
   frontend suite.

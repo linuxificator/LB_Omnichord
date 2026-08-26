@@ -1,15 +1,13 @@
 // Native Windows AMY wire service for LB Omnichord.
 // AMY remains a separate process; this executable only owns AMY/audio and
-// forwards complete LF-framed wire records into the AMY C API.
+// forwards complete LF-framed loopback TCP records into the AMY C API.
 
 #define WIN32_LEAN_AND_MEAN
 #include <winsock2.h>
-#include <afunix.h>
 #include <windows.h>
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stddef.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -39,7 +37,8 @@ static BOOL WINAPI console_handler(DWORD type) {
 
 static void usage(void) {
     printf(
-        "amy_service.exe --socket PATH [--no-audio] [--once] | --self-test\n"
+        "amy_service.exe --tcp-port PORT --ready-file PATH "
+        "[--no-audio] [--once] | --self-test\n"
     );
 }
 
@@ -80,21 +79,18 @@ static int run_self_test(void) {
     return 0;
 }
 
-static int remove_socket_if_safe(const char *path) {
-    DWORD attrs = GetFileAttributesA(path);
-    if (attrs == INVALID_FILE_ATTRIBUTES) return 0;
-    if (attrs & FILE_ATTRIBUTE_DIRECTORY) {
-        fprintf(stderr, "refusing to remove directory socket path: %s\n", path);
+static int publish_ready_file(const char *path, unsigned short port) {
+    FILE *file = fopen(path, "w");
+    if (file == NULL) {
+        fprintf(stderr, "cannot publish AMY service port: %s\n", path);
         return -1;
     }
-    // Windows AF_UNIX creates a filesystem reparse point. DeleteFile is the
-    // documented cleanup operation for that node; never overwrite a regular
-    // file accidentally.
-    if (!(attrs & FILE_ATTRIBUTE_REPARSE_POINT)) {
-        fprintf(stderr, "refusing to remove non-socket path: %s\n", path);
+    fprintf(file, "%u\n", (unsigned int)port);
+    if (fclose(file) != 0) {
+        fprintf(stderr, "cannot close AMY service ready file: %s\n", path);
         return -1;
     }
-    return DeleteFileA(path) ? 0 : -1;
+    return 0;
 }
 
 static int send_wire_line(char *line, size_t length) {
@@ -140,13 +136,13 @@ static int serve_client(SOCKET client) {
     return 0;
 }
 
-static int run_service(const char *path, int no_audio, int once) {
-    if (strlen(path) >= sizeof(((struct sockaddr_un *)0)->sun_path)) {
-        fprintf(stderr, "socket path is too long for Windows AF_UNIX\n");
-        return 2;
-    }
-    if (remove_socket_if_safe(path) < 0) return 2;
-
+static int run_service(
+    unsigned short requested_port,
+    const char *ready_file,
+    int no_audio,
+    int once
+) {
+    DeleteFileA(ready_file);
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return 2;
     SOCKET server = INVALID_SOCKET;
@@ -161,17 +157,26 @@ static int run_service(const char *path, int no_audio, int once) {
     g_wire_records = 0;
     g_nonzero_samples = 0;
 
-    server = socket(AF_UNIX, SOCK_STREAM, 0);
+    server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (server == INVALID_SOCKET) goto cleanup;
-    struct sockaddr_un address;
+    struct sockaddr_in address;
     memset(&address, 0, sizeof(address));
-    address.sun_family = AF_UNIX;
-    strcpy(address.sun_path, path);
-    int address_length = (int)(offsetof(struct sockaddr_un, sun_path) +
-                               strlen(path) + 1);
-    if (bind(server, (const struct sockaddr *)&address, address_length) == SOCKET_ERROR)
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    address.sin_port = htons(requested_port);
+    if (bind(server, (const struct sockaddr *)&address, sizeof(address)) == SOCKET_ERROR)
         goto cleanup;
     if (listen(server, 1) == SOCKET_ERROR) goto cleanup;
+    {
+        int address_length = (int)sizeof(address);
+        if (getsockname(
+                server,
+                (struct sockaddr *)&address,
+                &address_length
+            ) == SOCKET_ERROR) {
+            goto cleanup;
+        }
+    }
     {
         u_long nonblocking = 1;
         if (ioctlsocket(server, FIONBIO, &nonblocking) == SOCKET_ERROR)
@@ -179,10 +184,15 @@ static int run_service(const char *path, int no_audio, int once) {
     }
     if (!SetConsoleCtrlHandler(console_handler, TRUE)) goto cleanup;
 
-    // Starting audio before publishing the socket makes connect() the
-    // readiness boundary for the frontend.
+    // Publish the selected loopback port only after AMY is ready.
     amy_start(config);
-    printf("AMY service ready: %s\n", path);
+    unsigned short port = ntohs(address.sin_port);
+    if (publish_ready_file(ready_file, port) < 0) {
+        amy_stop();
+        SetConsoleCtrlHandler(console_handler, FALSE);
+        goto cleanup;
+    }
+    printf("AMY service ready: 127.0.0.1:%u\n", (unsigned int)port);
     fflush(stdout);
 
     while (InterlockedCompareExchange(&g_running, 1, 1)) {
@@ -235,24 +245,36 @@ static int run_service(const char *path, int no_audio, int once) {
 cleanup:
     if (client != INVALID_SOCKET) closesocket(client);
     if (server != INVALID_SOCKET) closesocket(server);
-    remove_socket_if_safe(path);
+    DeleteFileA(ready_file);
     WSACleanup();
     return result;
 }
 
 int main(int argc, char **argv) {
-    const char *path = NULL;
+    unsigned long tcp_port = 0;
+    int tcp_port_set = 0;
+    const char *ready_file = NULL;
     int self_test = 0;
     int no_audio = 0;
     int once = 0;
     for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--socket") == 0 && i + 1 < argc) path = argv[++i];
+        if (strcmp(argv[i], "--tcp-port") == 0 && i + 1 < argc) {
+            char *end = NULL;
+            tcp_port = strtoul(argv[++i], &end, 10);
+            if (end == argv[i] || *end != '\0' || tcp_port > 65535) {
+                usage();
+                return 2;
+            }
+            tcp_port_set = 1;
+        }
+        else if (strcmp(argv[i], "--ready-file") == 0 && i + 1 < argc)
+            ready_file = argv[++i];
         else if (strcmp(argv[i], "--self-test") == 0) self_test = 1;
         else if (strcmp(argv[i], "--no-audio") == 0) no_audio = 1;
         else if (strcmp(argv[i], "--once") == 0) once = 1;
         else { usage(); return 2; }
     }
     if (self_test) return run_self_test();
-    if (path == NULL) { usage(); return 2; }
-    return run_service(path, no_audio, once);
+    if (!tcp_port_set || ready_file == NULL) { usage(); return 2; }
+    return run_service((unsigned short)tcp_port, ready_file, no_audio, once);
 }

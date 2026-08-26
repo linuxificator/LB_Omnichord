@@ -487,6 +487,41 @@ class _UnixSocketWriter(_SerialWriter):
         super().close()
 
 
+class _TcpSocketWriter(_UnixSocketWriter):
+    """LF-framed writer for the native Windows loopback service."""
+
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        debug_log: _DebugLog | None = None,
+    ) -> None:
+        from collections import deque
+
+        self.debug_log = debug_log
+        self._stream_transport = True
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self.socket.settimeout(5.0)
+            self.socket.connect((str(host), int(port)))
+            self.socket.settimeout(None)
+        except BaseException:
+            self.socket.close()
+            raise
+        self.serial = self.socket
+        self._high = deque()
+        self._low = deque()
+        self._lane_generation: dict[str, int] = {}
+        self._closed = False
+        self._condition = threading.Condition()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="amy-tcp-writer",
+            daemon=True,
+        )
+        self._thread.start()
+
+
 class _TaggedSequencerLane:
     """One logical AMY sequencer lane backed by a reserved user-tag range.
 
@@ -1756,6 +1791,27 @@ class AmySocketClient(AmySerialClient):
             addresses=addresses,
             writer_factory=lambda debug_log: _UnixSocketWriter(
                 socket_path,
+                debug_log,
+            ),
+        )
+
+
+class AmyTcpClient(AmySerialClient):
+    """Send LF-framed wire requests to a loopback AMY service."""
+
+    def __init__(
+        self,
+        config: dict[str, Any],
+        addresses: dict[str, str],
+        host: str,
+        port: int,
+    ) -> None:
+        super().__init__(
+            config=config,
+            addresses=addresses,
+            writer_factory=lambda debug_log: _TcpSocketWriter(
+                host,
+                port,
                 debug_log,
             ),
         )

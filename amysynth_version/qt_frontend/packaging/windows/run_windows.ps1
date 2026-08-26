@@ -5,11 +5,13 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$socketDir = Join-Path $env:LOCALAPPDATA "LB_Omnichord"
-$socket = Join-Path $socketDir "amy.sock"
-New-Item -ItemType Directory -Force -Path $socketDir | Out-Null
+$runtimeDir = Join-Path $env:LOCALAPPDATA "LB_Omnichord"
+$readyFile = Join-Path $runtimeDir "amy.port"
+New-Item -ItemType Directory -Force -Path $runtimeDir | Out-Null
+Remove-Item -Force -ErrorAction SilentlyContinue $readyFile
 
-$serviceArguments = @("--socket", $socket)
+$quotedReadyFile = '"' + $readyFile + '"'
+$serviceArguments = @("--tcp-port", "0", "--ready-file", $quotedReadyFile)
 $serviceOutput = $null
 $serviceError = $null
 $smokeStatus = $null
@@ -31,12 +33,20 @@ else {
 try {
     for ($i = 0; $i -lt 160; $i++) {
         if ($service.HasExited) { throw "AMY service stopped during startup" }
-        if (Test-Path $socket) { break }
+        if (Test-Path $readyFile) { break }
         Start-Sleep -Milliseconds 50
     }
-    if (-not (Test-Path $socket)) { throw "AMY service did not publish its socket" }
+    if (-not (Test-Path $readyFile)) { throw "AMY service did not publish its port" }
 
-    $arguments = @("--amy-socket", $socket)
+    $port = 0
+    $portText = (Get-Content -Raw $readyFile).Trim()
+    if (-not [int]::TryParse($portText, [ref]$port) -or
+        $port -lt 1 -or $port -gt 65535) {
+        throw "AMY service published invalid port: $portText"
+    }
+    Remove-Item -Force $readyFile
+
+    $arguments = @("--amy-tcp-port", "$port")
     if ($Windowed) { $arguments += "--windowed" }
     if ($SmokeTest) {
         $arguments += "--package-smoke-test"
@@ -118,7 +128,7 @@ finally {
         Stop-Process -Id $service.Id -Force
         $service.WaitForExit()
     }
-    Remove-Item -Force -ErrorAction SilentlyContinue $socket
+    Remove-Item -Force -ErrorAction SilentlyContinue $readyFile
     if ($SmokeTest) {
         Remove-Item -Force -ErrorAction SilentlyContinue `
             $serviceOutput, $serviceError, $smokeStatus

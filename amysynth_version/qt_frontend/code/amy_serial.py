@@ -23,9 +23,10 @@ for _name, _value in vars(_transport).items():
 
 del _name, _value
 
-# Override only the two client classes with the generalized program layer.
+# Override only the client classes with the generalized program layer.
 # program_amy imports amy_transport directly, so this does not form a cycle.
 from program_amy import (  # noqa: E402
     ProgramAmySerialClient as AmySerialClient,
     ProgramAmySocketClient as AmySocketClient,
+    ProgramAmyTcpClient as AmyTcpClient,
 )
