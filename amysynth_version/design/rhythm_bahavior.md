@@ -470,6 +470,21 @@ If the user manually changes the tempo while running, that tempo must remain eff
 
 Starting rhythm playback must use the currently selected rhythm and current displayed tempo without first reloading preset defaults.
 
+### RHYTHM-016 — manual chord takeover releases the automatic chord normally
+
+Pressing a manual chord while automatic rhythm chords are enabled must close
+the automatic-chord gate before starting the manual chord. Clearing future
+sequencer events is insufficient because it also removes the pending note-off
+of a synth-4 chord which may already be sounding.
+
+The gate transition must therefore send an immediate velocity-zero note-off to
+all active voices of automatic-chord synth 4 before sending the manual synth-3
+note-ons. This is an ordinary AMY note-off and must follow the selected patch's
+normal release envelope; it must not reset oscillators, patches, effects, the
+sequencer or its timebase. Drums and bass continue. A finite release tail may
+overlap the manual chord, but the old automatic chord may not sustain after its
+release has completed.
+
 ## 16. Summary rule
 
 The complete behavior can be reduced to this rule:

@@ -1338,6 +1338,27 @@ class AmySerialClient:
         elif action == "stop_all":
             self._stop_all_manual()
 
+    def _set_rhythm_chord_enabled(self, enabled: bool) -> bool:
+        """Apply an automatic-chord gate transition and its audio edge."""
+        enabled = bool(enabled)
+        if self.rhythm_chord_enabled == enabled:
+            return False
+
+        self.rhythm_chord_enabled = enabled
+        if not enabled:
+            # Clearing tagged events removes their future note-offs too.  A
+            # velocity-zero event without a note releases every active voice
+            # of synth 4 through the patch's normal envelope; it is not an
+            # oscillator reset and deliberately leaves the rhythm transport,
+            # drums, bass and effect tails alone.
+            self._wire(f"l0i{self.synth_id['rhythm_chord']}Z")
+        else:
+            self._sync_synth_params(
+                "chord",
+                (self.synth_id["rhythm_chord"],),
+            )
+        return True
+
     def _chord_state(self, payload_text: str) -> None:
         try:
             payload = json.loads(payload_text)
@@ -1346,7 +1367,7 @@ class AmySerialClient:
         self.chord_notes = [float(x) for x in payload.get("notes", [])]
         self.bass_notes = [float(x) for x in payload.get("bass_notes", [])]
         if "rhythm_chord_enabled" in payload:
-            self.rhythm_chord_enabled = bool(
+            self._set_rhythm_chord_enabled(
                 payload.get("rhythm_chord_enabled")
             )
 
@@ -1692,16 +1713,8 @@ class AmySerialClient:
             self._set_rhythm_config(str(value))
         elif address == a["rhythm_chord_enabled"]:
             enabled = bool(int(value))
-            if self.rhythm_chord_enabled == enabled:
+            if not self._set_rhythm_chord_enabled(enabled):
                 return
-            self.rhythm_chord_enabled = enabled
-            if not enabled:
-                self._wire(f"l0i{self.synth_id['rhythm_chord']}Z")
-            else:
-                self._sync_synth_params(
-                    "chord",
-                    (self.synth_id["rhythm_chord"],),
-                )
             self._replace_lane("chords")
         elif address == a["rhythm_running"]:
             new_state = bool(int(value))

@@ -304,7 +304,16 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("ProgramAmySerialClient as AmySerialClient", public_amy_py)
         self.assertIn("def _apply_synth_state(", transport_py)
         self.assertIn("self._apply_synth_state(\n            role,", transport_py)
-        self.assertIn('self._sync_synth_params(\n                    "chord",', transport_py)
+        self.assertIn("def _set_rhythm_chord_enabled(", transport_py)
+        self.assertIn('self._sync_synth_params(\n                "chord",', transport_py)
+        self.assertIn(
+            'self._wire(f"l0i{self.synth_id[\'rhythm_chord\']}Z")',
+            transport_py,
+        )
+        self.assertIn(
+            "if not self._set_rhythm_chord_enabled(enabled):",
+            transport_py,
+        )
 
         # Rhythm is now independent tagged lanes. Reintroducing the previous
         # whole-sequencer rebuild helpers would again make lane-local edits able

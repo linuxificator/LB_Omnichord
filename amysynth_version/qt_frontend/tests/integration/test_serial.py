@@ -464,9 +464,26 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=8.0)
             delta = app.bridge.lines_since(start)
 
+            # Finger-down closes the automatic-chord gate before synth 3 is
+            # triggered.  l0 is AMY's ordinary velocity-zero note-off for all
+            # active voices of synth 4, so the selected patch keeps its normal
+            # release instead of an orphaned sequencer chord sustaining.
+            self.assertIn("l0i4Z", delta)
+            manual_note_pattern = re.compile(
+                rf"^n{_NOTE}l(?P<vel>{_NOTE})i3Z$"
+            )
+            manual_note_indexes: list[int] = []
+            for index, line in enumerate(delta):
+                match = manual_note_pattern.match(line)
+                if match and float(match.group("vel")) > 0.0:
+                    manual_note_indexes.append(index)
+            self.assertTrue(manual_note_indexes, delta)
+            self.assertLess(delta.index("l0i4Z"), min(manual_note_indexes))
             self.assertNotIn("zY0Z", delta)
-            self.assertNotIn("S4096Z", delta)
+            self.assertFalse(any(line.startswith("S") for line in delta), delta)
             self.assertNotIn("zY1Z", delta)
+            self.assertNotIn("l0i0Z", delta)
+            self.assertNotIn("l0i1Z", delta)
             cancellations = [line for line in delta if line.startswith("H0,0,")]
             self.assertTrue(cancellations, delta)
             cancel_tags = {int(line.split(",", 2)[2][:-1]) for line in cancellations}

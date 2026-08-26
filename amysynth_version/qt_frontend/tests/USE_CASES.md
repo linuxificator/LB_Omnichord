@@ -470,6 +470,23 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **Failure history:** stopping while an automatic chord was sounding froze transport before its tagged note-off fired, leaving a hanging chord. The same stop path called a missing `_silence_accompaniment()` method after sending `zY0`, raising `AttributeError`; as a result the actual transport stopped but `rhythmStateChanged` was never emitted and the button remained visually stuck on STOP.
 
+**RHYTHM-06 — manual chord input releases the current automatic chord**
+
+- Finger-down immediately closes the automatic-chord gate and sends `l0i4`
+  before any manual synth-3 note-on.
+- In AMY, `l0i4` is a velocity-zero note-off for all active voices belonging
+  to automatic-chord synth 4. It must use the instrument's normal release; no
+  oscillator reset, patch reload or effects reset is allowed.
+- Only automatic-chord tags 112..251 are cleared. Drums, bass, transport and
+  sequencer timebase continue without a stop/restart.
+- A short musical release overlap is valid; a rhythm chord that sustains
+  because its removed future note-off can no longer fire is not.
+
+**Failure history:** manual chord input set chord activity to zero and cleared
+the tagged chord lane, including the scheduled note-off for a chord which was
+already sounding. The old synth-4 chord could then remain audible indefinitely
+under the new manual chord.
+
 ### TUNING — all note-producing paths follow the selected tuning
 
 **TUNING-01 — live EQ/HARM/JV changes propagate everywhere**
