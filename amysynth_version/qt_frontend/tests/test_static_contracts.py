@@ -354,6 +354,25 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("backend.rollChordRows(-1)", qml)
         self.assertIn("backend.rollChordRows(1)", qml)
 
+    def test_chord_left_controls_span_two_rows_with_equal_spacing(self) -> None:
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        panel_start = qml.index("id: chordControlPanel")
+        panel_end = qml.index("PresetResetButton {", panel_start)
+        panel = qml[panel_start:panel_end]
+
+        self.assertRegex(
+            panel,
+            r"height:\s*2 \* window\.rowHeight\s*"
+            r"\+ window\.rowSpacing",
+        )
+        self.assertRegex(
+            panel,
+            r"readonly property real controlGap:\s*"
+            r"\(\s*height\s*- 3 \* 42\s*\) / 4",
+        )
+        self.assertIn("y: chordControlPanel.controlGap", panel)
+        self.assertIn("spacing: chordControlPanel.controlGap", panel)
+
     def test_bass_activity_has_adjacent_voicing_slider(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
         self.assertIn('label: "bass activity"', qml)
@@ -376,19 +395,87 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("id: controlsRow", panel)
         self.assertEqual(panel.count("LabeledSlider {"), 3)
         self.assertNotIn("VerticalVolume {", panel)
-        self.assertGreaterEqual(panel.count("width: 145"), 3)
+        self.assertIn("readonly property real controlSliderWidth", panel)
+        self.assertEqual(panel.count("width: root.controlSliderWidth"), 3)
         self.assertIn("toValue: 3", panel)
         self.assertIn("MIDI_REVERB_MAX = app_core.REVERB_LEVEL_MAX", midi_backend)
         self.assertIn("REVERB_LEVEL_MAX = 3.0", omni_backend)
         self.assertIn('label: "LEV"', panel)
         self.assertIn('label: "LIVE"', panel)
         self.assertIn('label: "DAMP"', panel)
-        self.assertIn("width: 520", main)
+        self.assertIn("property int reverbPanelWidth: 572", main)
 
         midi_integration = (
             ROOT / "code" / "midi_integration.py"
         ).read_text(encoding="utf-8")
         self.assertIn("@Property(QObject, constant=True)", midi_integration)
+
+    def test_utility_header_uses_two_aligned_visual_rows(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        utilities = tuple(
+            (ROOT / "gui" / name).read_text(encoding="utf-8")
+            for name in ("UtilitySection.qml", "MidiUtilitySection.qml")
+        )
+
+        self.assertIn("property int presetRowHeight: 64", main)
+        self.assertRegex(main, r"property int utilityY:\s*0")
+        self.assertRegex(
+            main,
+            r"property int presetY:\s*utilityY\s*"
+            r"\+ sectionHeight\s*\+ sectionGap",
+        )
+        self.assertRegex(
+            main,
+            r"property int rhythmY:\s*presetY\s*"
+            r"\+ presetRowHeight\s*\+ sectionGap",
+        )
+        self.assertIn("y: window.presetY", main)
+        self.assertIn("width: window.reverbPanelWidth", main)
+        self.assertIn("height: window.presetRowHeight", main)
+        self.assertIn("y: root.hostWindow.presetY", midi)
+        self.assertIn("width: root.hostWindow.reverbPanelWidth", midi)
+        self.assertIn("height: root.hostWindow.presetRowHeight", midi)
+
+        for utility in utilities:
+            self.assertIn("property int tuningRowHeight", utility)
+            self.assertIn("property int presetRowY", utility)
+            self.assertIn("property int presetRowHeight", utility)
+            store_start = utility.index("id: storeButton")
+            preset_start = utility.index("id: presetButtons", store_start)
+            store = utility[store_start:preset_start]
+            self.assertIn("width: 48", store)
+            self.assertIn("height: 48", store)
+            self.assertIn('text: "STR"', store)
+            self.assertIn('color: "#ffffff"', store)
+            self.assertIn('"#6f3599"', store)
+            self.assertRegex(store, r"x:\s*8")
+            self.assertRegex(
+                utility,
+                r"x:\s*storeButton\.x\s*"
+                r"\+ storeButton\.width\s*\+ 6",
+            )
+
+        self.assertIn("anchors.bottom: parent.bottom", main)
+        mode_panel_start = main.index("id: strumModePanel")
+        mode_panel_end = main.index("ReverbPanel {", mode_panel_start)
+        mode_panel = main[mode_panel_start:mode_panel_end]
+        self.assertIn("height: window.presetRowHeight", mode_panel)
+        self.assertIn("anchors.verticalCenter:", mode_panel)
+        self.assertIn("width: 48", mode_panel)
+        self.assertIn("height: 48", mode_panel)
+        self.assertNotIn("toggleStrumLadderMode", midi)
+
+    def test_midi_title_uses_the_omni_title_geometry(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+
+        self.assertIn("readonly property int omniTitleX", main)
+        self.assertIn("readonly property int omniTitleWidth", main)
+        self.assertIn("x: window.omniTitleX", main)
+        self.assertIn("width: window.omniTitleWidth", main)
+        self.assertIn("x: root.hostWindow.omniTitleX", midi)
+        self.assertIn("width: root.hostWindow.omniTitleWidth", midi)
 
     def test_apg_ldr_button_uses_backend_preset_state(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")

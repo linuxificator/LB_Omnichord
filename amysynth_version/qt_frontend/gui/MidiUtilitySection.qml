@@ -11,6 +11,9 @@ Item {
     required property bool fullScreen
     property int leftExtension: 0
     property bool tuningCoupled: true
+    property int tuningRowHeight: height
+    property int presetRowY: 0
+    property int presetRowHeight: height
     signal toggleFullscreenRequested()
     signal toggleTuningCouplingRequested()
 
@@ -25,7 +28,7 @@ Item {
         tuningX + tuningWidth + utilityGap
     readonly property int escapeX:
         panicX + panicWidth + utilityGap
-    readonly property int presetX:
+    property int presetX:
         escapeX + escapeWidth + utilityGap
 
     function synchronizeTuningWheel() {
@@ -56,7 +59,7 @@ Item {
         x: -root.leftExtension
         y: 0
         width: root.leftExtension + root.tuningX + root.tuningWidth
-        height: parent.height
+        height: root.tuningRowHeight
         radius: 12
         color: "#f4c77f"
         border.color: "#bd7517"
@@ -67,7 +70,7 @@ Item {
         x: root.wheelWidth + 7
         y: 8
         width: root.tuningX - root.wheelWidth - 14
-        height: parent.height - 16
+        height: root.tuningRowHeight - 16
         coupled: root.tuningCoupled
         onClicked: {
             if (root.tuningCoupled) {
@@ -85,7 +88,7 @@ Item {
         x: 0
         y: 0
         width: root.wheelWidth
-        height: parent.height
+        height: root.tuningRowHeight
         padding: 0
 
         background: Rectangle {
@@ -169,7 +172,7 @@ Item {
         x: root.tuningX
         y: 0
         width: root.tuningWidth
-        height: parent.height
+        height: root.tuningRowHeight
         currentValue: root.controller.tuningReference
         fromValue: 415
         toValue: 466
@@ -192,7 +195,7 @@ Item {
         x: root.panicX
         y: 8
         width: root.panicWidth
-        height: parent.height - 16
+        height: root.tuningRowHeight - 16
         text: "PNC!"
         font.pixelSize: 18
         font.bold: true
@@ -220,7 +223,7 @@ Item {
         x: root.escapeX
         y: 8
         width: root.escapeWidth
-        height: parent.height - 16
+        height: root.tuningRowHeight - 16
         text: root.fullScreen ? "ESC" : "FSC"
         font.pixelSize: 17
         font.bold: true
@@ -246,9 +249,9 @@ Item {
     Rectangle {
         id: presetPanel
         x: root.presetX
-        y: 0
+        y: root.presetRowY
         width: parent.width - x
-        height: parent.height
+        height: root.presetRowHeight
         radius: 12
         color: "#e8dcf5"
         border.color: "#9270b6"
@@ -256,10 +259,10 @@ Item {
 
         Button {
             id: storeButton
-            x: 9
+            x: 8
             anchors.verticalCenter: parent.verticalCenter
-            width: 76
-            height: 76
+            width: 48
+            height: 48
             text: "STR"
             font.pixelSize: 18
             font.bold: true
@@ -285,7 +288,7 @@ Item {
 
         Row {
             id: presetButtons
-            x: storeButton.x + storeButton.width + 10
+            x: storeButton.x + storeButton.width + 6
             anchors.verticalCenter: parent.verticalCenter
             spacing: 6
 

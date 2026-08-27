@@ -46,6 +46,8 @@ ApplicationWindow {
 
     property int sectionHeight: 104
     property int sectionGap: 10
+    property int presetRowHeight: 64
+    property int reverbPanelWidth: 572
     property int synthToChordGap: 16
     property int volumeWidth: 52
     property int volumeGap: 8
@@ -53,10 +55,14 @@ ApplicationWindow {
     property int strumGap: 12
 
     property int utilityY:
-        titleHeight
-    property int rhythmY:
+        0
+    property int presetY:
         utilityY
         + sectionHeight
+        + sectionGap
+    property int rhythmY:
+        presetY
+        + presetRowHeight
         + sectionGap
     property int bassSynthY:
         rhythmY
@@ -92,6 +98,16 @@ ApplicationWindow {
     property int strumX:
         maximumChordRowWidth
         + strumGap
+
+    readonly property int omniTitleX:
+        reverbPanelWidth + 12
+    readonly property int omniTitleWidth:
+        Math.max(
+            0,
+            strumX
+            - omniTitleX
+            - 86
+        )
 
     property color chordPanelColor: "#ddd2a9"
     property color chordPanelBorderColor: "#a69a6e"
@@ -271,25 +287,14 @@ ApplicationWindow {
                 x: 0
                 y: 0
                 width: contentArea.implicitWidth
-                height: window.titleHeight
+                height: window.sectionHeight
                 visible:
                     window.titleHeight > 0
 
-                ReverbPanel {
-                    id: reverbPanel
-                    x: 0
-                    y: 0
-                    width: 520
-                    height: parent.height
-                    controller: backend
-                    midiControlRouter: backend.midiPlayer
-                    controlScreen: "omni"
-                }
-
                 Text {
-                    x: reverbPanel.width + 12
+                    x: window.omniTitleX
                     y: 0
-                    width: Math.max(0, window.strumX - x - 86)
+                    width: window.omniTitleWidth
                     height: parent.height
 
                     text: headerTitleText
@@ -299,7 +304,7 @@ ApplicationWindow {
                     font.pixelSize:
                         Math.max(
                             14,
-                            birthdayTitle.height * 0.62
+                            window.titleHeight * 0.62
                         )
                     font.weight: Font.Medium
 
@@ -313,19 +318,31 @@ ApplicationWindow {
                 }
 
                 Rectangle {
-                    x: window.strumX - 74
-                    width: 74 + window.strumWidth
-                    height: parent.height
+                    id: strumModePanel
+
+                    x:
+                        window.strumX
+                        - window.presetRowHeight
+                    anchors.bottom: parent.bottom
+                    width:
+                        window.presetRowHeight
+                        + window.strumWidth
+                    height: window.presetRowHeight
                     color: "#dcecf7"
                     radius: 12
                     border.color: "#8bb9d8"
 
                     PresetResetButton {
                         anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 54
-                        height: Math.min(52, parent.height - 8)
+                        anchors.leftMargin:
+                            (
+                                window.presetRowHeight
+                                - width
+                            ) / 2
+                        anchors.verticalCenter:
+                            parent.verticalCenter
+                        width: 48
+                        height: 48
                         text: window.strumLadderMode ? "LDR" : "APG"
                         panelColor: "#5d9fd0"
                         borderColor: "#2f648c"
@@ -337,6 +354,17 @@ ApplicationWindow {
                 }
             }
 
+            ReverbPanel {
+                id: reverbPanel
+                x: 0
+                y: window.presetY
+                width: window.reverbPanelWidth
+                height: window.presetRowHeight
+                controller: backend
+                midiControlRouter: backend.midiPlayer
+                controlScreen: "omni"
+            }
+
             UtilitySection {
                 x: window.contentX
                 y: window.utilityY
@@ -346,6 +374,8 @@ ApplicationWindow {
                     - window.contentX
                 height:
                     window.sectionHeight
+                    + window.sectionGap
+                    + window.presetRowHeight
 
                 controller: backend
                 tuningModeModel: tuningModeNames
@@ -354,6 +384,15 @@ ApplicationWindow {
                     === Window.FullScreen
                 leftExtension: window.leftRailWidth
                 tuningCoupled: window.tuningCoupled
+                tuningRowHeight: window.sectionHeight
+                presetRowY:
+                    window.sectionHeight
+                    + window.sectionGap
+                presetRowHeight: window.presetRowHeight
+                presetX:
+                    reverbPanel.width
+                    + window.sectionGap
+                    - window.contentX
 
                 onToggleFullscreenRequested:
                     window.toggleFullscreenMode()
@@ -761,22 +800,32 @@ ApplicationWindow {
                         height: window.rowHeight
 
                         Rectangle {
+                            id: chordControlPanel
+
                             visible: rowItem.rowIndex === 0
                             x: -window.contentX
                             y: 0
                             width: window.contentX
-                            height: 148
+                            height:
+                                2 * window.rowHeight
+                                + window.rowSpacing
                             radius: 10
                             color: window.chordPanelColor
                             border.color: window.chordPanelBorderColor
                             border.width: 1
+
+                            readonly property real controlGap:
+                                (
+                                    height
+                                    - 3 * 42
+                                ) / 4
                         }
 
                         Column {
                             visible: rowItem.rowIndex === 0
                             x: -window.contentX + (window.contentX - 42) / 2
-                            y: 7
-                            spacing: 4
+                            y: chordControlPanel.controlGap
+                            spacing: chordControlPanel.controlGap
 
                             PresetResetButton {
                                 width: 42

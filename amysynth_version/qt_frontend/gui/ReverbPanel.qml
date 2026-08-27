@@ -7,6 +7,15 @@ Item {
     required property var controller
     required property var midiControlRouter
     property string controlScreen: "omni"
+    readonly property real controlSliderWidth:
+        Math.max(
+            0,
+            (
+                controlsRow.width
+                - drumButton.width
+                - 3 * controlsRow.spacing
+            ) / 3
+        )
 
     Rectangle {
         anchors.fill: parent
@@ -23,7 +32,7 @@ Item {
         spacing: 6
 
         LabeledSlider {
-            width: 145
+            width: root.controlSliderWidth
             height: parent.height
             label: "LEV"
             currentValue: root.controller.reverbLevel
@@ -45,7 +54,7 @@ Item {
         }
 
         LabeledSlider {
-            width: 145
+            width: root.controlSliderWidth
             height: parent.height
             label: "LIVE"
             currentValue: root.controller.reverbLiveness
@@ -67,7 +76,7 @@ Item {
         }
 
         LabeledSlider {
-            width: 145
+            width: root.controlSliderWidth
             height: parent.height
             label: "DAMP"
             currentValue: root.controller.reverbDamping
@@ -91,7 +100,7 @@ Item {
         Button {
             id: drumButton
             width: 50
-            height: 50
+            height: Math.min(50, parent.height)
             anchors.verticalCenter: parent.verticalCenter
             text: "DRM"
             font.pixelSize: 12

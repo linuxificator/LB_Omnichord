@@ -135,35 +135,39 @@ Item {
         x: 0
         y: 0
         width: root.width
-        height: root.hostWindow.titleHeight
+        height: root.hostWindow.sectionHeight
         visible: root.hostWindow.titleHeight > 0
 
-        ReverbPanel {
-            id: reverbPanel
-            x: 0
-            y: 0
-            width: 520
-            height: parent.height
-            controller: backend.midiPlayer
-            midiControlRouter: backend.midiPlayer
-            controlScreen: "midi"
-        }
-
         Text {
-            x: reverbPanel.width + 12
+            x: root.hostWindow.omniTitleX
             y: 0
-            width: Math.max(0, root.hostWindow.strumX - x - 12)
+            width: root.hostWindow.omniTitleWidth
             height: parent.height
             text: headerTitleText
             color: "#493a38"
             font.family: headerTitleFont
-            font.pixelSize: Math.max(14, midiTitle.height * 0.62)
+            font.pixelSize:
+                Math.max(
+                    14,
+                    root.hostWindow.titleHeight * 0.62
+                )
             font.weight: Font.Medium
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
             maximumLineCount: 1
         }
+    }
+
+    ReverbPanel {
+        id: reverbPanel
+        x: 0
+        y: root.hostWindow.presetY
+        width: root.hostWindow.reverbPanelWidth
+        height: root.hostWindow.presetRowHeight
+        controller: backend.midiPlayer
+        midiControlRouter: backend.midiPlayer
+        controlScreen: "midi"
     }
 
     MidiUtilitySection {
@@ -173,7 +177,10 @@ Item {
             root.hostWindow.volumeX
             + root.hostWindow.volumeWidth
             - root.hostWindow.contentX
-        height: root.hostWindow.sectionHeight
+        height:
+            root.hostWindow.sectionHeight
+            + root.hostWindow.sectionGap
+            + root.hostWindow.presetRowHeight
 
         controller: backend.midiPlayer
         omniController: backend
@@ -183,6 +190,15 @@ Item {
             === Window.FullScreen
         leftExtension: root.hostWindow.leftRailWidth
         tuningCoupled: root.tuningCoupled
+        tuningRowHeight: root.hostWindow.sectionHeight
+        presetRowY:
+            root.hostWindow.sectionHeight
+            + root.hostWindow.sectionGap
+        presetRowHeight: root.hostWindow.presetRowHeight
+        presetX:
+            reverbPanel.width
+            + root.hostWindow.sectionGap
+            - root.hostWindow.contentX
 
         onToggleFullscreenRequested:
             root.hostWindow.toggleFullscreenMode()
