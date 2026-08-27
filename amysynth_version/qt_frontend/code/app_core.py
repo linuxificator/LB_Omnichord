@@ -57,6 +57,63 @@ NOTE_NAMES_BY_SEMITONE = {
     for item in NOTE_DEFINITIONS
 }
 
+SHARP_NOTE_NAMES = (
+    "C",
+    "C♯",
+    "D",
+    "D♯",
+    "E",
+    "F",
+    "F♯",
+    "G",
+    "G♯",
+    "A",
+    "A♯",
+    "B",
+)
+FLAT_NOTE_NAMES = (
+    "C",
+    "D♭",
+    "D",
+    "E♭",
+    "E",
+    "F",
+    "G♭",
+    "G",
+    "A♭",
+    "A",
+    "B♭",
+    "B",
+)
+NATURAL_NOTE_LETTERS = ("C", "D", "E", "F", "G", "A", "B")
+NATURAL_NOTE_SEMITONES = (0, 2, 4, 5, 7, 9, 11)
+
+# The diatonic function of every interval used by music/chords.csv. Keeping
+# the function as well as the pitch is what lets C minor display E-flat rather
+# than the enharmonic but musically misleading D-sharp.
+CHORD_DEGREE_BY_INTERVAL = {
+    0: 0,
+    1: 1,
+    2: 1,
+    3: 2,
+    4: 2,
+    5: 3,
+    6: 4,
+    7: 4,
+    8: 4,
+    9: 5,
+    10: 6,
+    11: 6,
+    12: 0,
+    13: 1,
+    14: 1,
+    15: 1,
+    17: 3,
+    18: 3,
+    20: 5,
+    21: 5,
+}
+
 # Stable ASCII identifiers used by the intonation JSON files.
 INTONATION_NOTE_IDS = (
     "c",
@@ -200,6 +257,97 @@ def display_label(suffix: str) -> str:
         abbreviations.get(word, word)
         for word in text.split()
     )
+
+
+def ladder_pattern(
+    chord_suffix: str,
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """Return ladder semitones and their diatonic scale-degree offsets."""
+    if "diminished" in chord_suffix or "flat5" in chord_suffix:
+        # Whole-half octatonic. The repeated sixth letter is intentional:
+        # C D Eb F Gb Ab A B is the readable spelling of this unusual scale.
+        return (
+            (0, 2, 3, 5, 6, 8, 9, 11),
+            (0, 1, 2, 3, 4, 5, 5, 6),
+        )
+    if "augmented" in chord_suffix or "sharp5" in chord_suffix:
+        return ((0, 2, 4, 6, 8, 10), (0, 1, 2, 3, 4, 5))
+    if chord_suffix == "5":
+        return ((0, 2, 4, 7, 9), (0, 1, 2, 4, 5))
+    if chord_suffix.startswith("minor"):
+        return ((0, 3, 5, 7, 10), (0, 2, 3, 4, 6))
+    if "dominant" in chord_suffix or chord_suffix == "7_sus4":
+        return ((0, 2, 4, 5, 7, 9, 10), (0, 1, 2, 3, 4, 5, 6))
+    if chord_suffix.startswith("sus"):
+        return ((0, 2, 5, 7, 9), (0, 1, 3, 4, 5))
+    return ((0, 2, 4, 7, 9), (0, 1, 2, 4, 5))
+
+
+def _fallback_prefers_flats(root_label: str, chord_suffix: str) -> bool:
+    """Choose a readable single-accidental fallback for rare double notes."""
+    if "♭" in root_label:
+        return True
+    if "♯" in root_label:
+        return False
+    if "flat" in chord_suffix or "diminished" in chord_suffix:
+        return True
+    if "sharp" in chord_suffix or "augmented" in chord_suffix:
+        return False
+
+    root_semitone = NATURAL_NOTE_SEMITONES[
+        NATURAL_NOTE_LETTERS.index(root_label)
+    ]
+    if chord_suffix.startswith("minor"):
+        return root_semitone in {0, 2, 5, 7}
+    if "dominant" in chord_suffix or chord_suffix == "7_sus4":
+        return root_semitone in {0, 5}
+    return root_semitone == 5
+
+
+def spell_strum_note_names(
+    root_semitone: int,
+    chord_suffix: str,
+    intervals: tuple[int, ...],
+    degree_offsets: tuple[int, ...],
+) -> list[str]:
+    """Spell root-relative pitch classes using their musical note function."""
+    root_label = NOTE_NAMES_BY_SEMITONE[int(root_semitone) % 12]
+    root_letter_index = NATURAL_NOTE_LETTERS.index(root_label[0])
+    fallback_names = (
+        FLAT_NOTE_NAMES
+        if _fallback_prefers_flats(root_label, chord_suffix)
+        else SHARP_NOTE_NAMES
+    )
+
+    names: list[str] = []
+    seen_pitch_classes: set[int] = set()
+    for interval, degree_offset in zip(intervals, degree_offsets):
+        pitch_class = (int(root_semitone) + interval) % 12
+        if pitch_class in seen_pitch_classes:
+            continue
+        seen_pitch_classes.add(pitch_class)
+
+        letter_index = (root_letter_index + degree_offset) % 7
+        letter = NATURAL_NOTE_LETTERS[letter_index]
+        accidental = (
+            pitch_class - NATURAL_NOTE_SEMITONES[letter_index]
+        ) % 12
+        if accidental > 6:
+            accidental -= 12
+
+        if accidental == -1:
+            names.append(f"{letter}♭")
+        elif accidental == 0:
+            names.append(letter)
+        elif accidental == 1:
+            names.append(f"{letter}♯")
+        else:
+            # Double accidentals are hard to scan in a 34-pixel marker. They
+            # occur only in unusual altered/octatonic keys, where an explicit
+            # readable enharmonic mix is preferable to an illegible glyph.
+            names.append(fallback_names[pitch_class])
+
+    return names
 
 
 def inverted_intervals(
@@ -569,6 +717,7 @@ class InstrumentBackend(QObject):
     reverbDampingChanged = Signal()
     reverbDrumsIncludedChanged = Signal()
     strumModeChanged = Signal()
+    strumNoteNamesChanged = Signal()
     bassRunningChanged = Signal()
 
     chordSynthStateChanged = Signal()
@@ -999,6 +1148,7 @@ class InstrumentBackend(QObject):
     def _emit_state_changed(self) -> None:
         self._state_version += 1
         self.stateChanged.emit()
+        self.strumNoteNamesChanged.emit()
 
     @Property(int, notify=stateChanged)
     def stateVersion(self) -> int:
@@ -1055,6 +1205,10 @@ class InstrumentBackend(QObject):
     @Property(bool, notify=strumModeChanged)
     def strumLadderMode(self) -> bool:
         return self._strum_ladder_mode
+
+    @Property("QVariantList", notify=strumNoteNamesChanged)
+    def strumNoteNames(self) -> list[str]:
+        return self._strum_note_names()
 
     @Property(int, notify=chordSynthStateChanged)
     def selectedChordSynthIndex(self) -> int:
@@ -3516,25 +3670,47 @@ class InstrumentBackend(QObject):
             if midi_note % 12 in pitch_classes
         ]
 
+    def _active_strum_pattern(
+        self,
+    ) -> tuple[ChordType, tuple[int, ...], tuple[int, ...]] | None:
+        if self._active_row < 0 or self._active_root_semitone < 0:
+            return None
+
+        chord = self._chords[
+            self._row_chord_indexes[self._active_row]
+        ]
+        if self._strum_ladder_mode:
+            intervals, degree_offsets = ladder_pattern(chord.suffix)
+        else:
+            intervals = chord.intervals
+            degree_offsets = tuple(
+                CHORD_DEGREE_BY_INTERVAL.get(
+                    interval,
+                    CHORD_DEGREE_BY_INTERVAL[interval % 12],
+                )
+                for interval in intervals
+            )
+        return chord, intervals, degree_offsets
+
+    def _strum_note_names(self) -> list[str]:
+        pattern = self._active_strum_pattern()
+        if pattern is None:
+            return []
+        chord, intervals, degree_offsets = pattern
+        return spell_strum_note_names(
+            self._active_root_semitone,
+            chord.suffix,
+            intervals,
+            degree_offsets,
+        )
+
     def _ladder_notes(self) -> list[int]:
         if self._active_row < 0 or self._active_root_semitone < 0:
             return []
-        chord = self._chords[self._row_chord_indexes[self._active_row]]
-        suffix = chord.suffix
-        if "diminished" in suffix or "flat5" in suffix:
-            intervals = (0, 2, 3, 5, 6, 8, 9, 11)
-        elif "augmented" in suffix or "sharp5" in suffix:
-            intervals = (0, 2, 4, 6, 8, 10)
-        elif suffix == "5":
-            intervals = (0, 2, 4, 7, 9)
-        elif suffix.startswith("minor"):
-            intervals = (0, 3, 5, 7, 10)
-        elif "dominant" in suffix or suffix == "7_sus4":
-            intervals = (0, 2, 4, 5, 7, 9, 10)
-        elif suffix.startswith("sus"):
-            intervals = (0, 2, 5, 7, 9)
-        else:
-            intervals = (0, 2, 4, 7, 9)
+        chord = self._chords[
+            self._row_chord_indexes[self._active_row]
+        ]
+        intervals, _ = ladder_pattern(chord.suffix)
         pitch_classes = {
             (self._active_root_semitone + interval) % 12
             for interval in intervals
@@ -3586,6 +3762,7 @@ class InstrumentBackend(QObject):
             return
         self._strum_ladder_mode = enabled
         self.strumModeChanged.emit()
+        self.strumNoteNamesChanged.emit()
 
     @Slot(bool)
     def setStrumLadderMode(self, enabled: bool) -> None:

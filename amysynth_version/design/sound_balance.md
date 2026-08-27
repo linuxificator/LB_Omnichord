@@ -22,6 +22,17 @@ augmented/sharp-five chords. Power chords use major pentatonic. Both modes use
 the same tuning and AMY wire-note path. The backend owns the selected mode and
 OMNI presets store it as `strum_mode`; missing legacy values mean `APG`.
 
+The narrow OMNI gap between the rhythm/bass sections and the strum pad shows
+the pitch classes available to the current strum gesture. One light-blue round
+marker is shown per pitch class, distributed vertically between the APG/LDR
+header and the strum-synth section. APG shows the active chord tones and LDR
+shows the selected scale tones; no markers are shown while no chord is active.
+Note letters are uppercase and use the chord root and interval function for
+musical enharmonic spelling (`C`, `E♭`, `G` for C minor, not `C`, `D♯`,
+`G`). Scale spellings keep a consistent accidental direction where the scale
+permits it; structurally unusual scales may mix accidentals when that is the
+musically meaningful spelling.
+
 ## Reverb range
 
 The OMNI and MIDI reverb level sliders cover `0.00..3.00`. This is the wet

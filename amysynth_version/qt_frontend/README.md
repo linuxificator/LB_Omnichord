@@ -119,10 +119,21 @@ Every package contains the Qt frontend and supported AMY fork with the tiny PCM
 drum bank. At runtime they remain separate processes connected by the
 platform's private local transport. The Pi build requires 64-bit Raspberry Pi
 OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG is Apple
-Silicon-only, ad-hoc signed and not Apple-notarized. The Windows zip contains
-separate `LB_Omnichord.exe` and `amy_service.exe` binaries plus
+Silicon-only and ad-hoc signed, but it is not signed with an Apple Developer ID
+and is not Apple-notarized. The Windows zip contains separate
+`LB_Omnichord.exe` and `amy_service.exe` binaries plus
 `run_windows.ps1`; it uses a private Windows named pipe rather than WSL or a
 network listener.
+
+To install the macOS build, open the DMG, drag `LB_Omnichord.app` to
+`Applications`, eject the DMG and try to open the app once. After macOS blocks
+that first launch, open Apple menu > `System Settings` > `Privacy & Security`,
+scroll down to `Security`, click `Open Anyway` beside the LB Omnichord message,
+authenticate if requested, then click `Open` in the repeated warning. `Open
+Anyway` is available for about one hour after the blocked launch attempt. This
+adds an exception for LB Omnichord only; disabling Gatekeeper or globally
+weakening `Allow applications downloaded from` is neither necessary nor
+recommended. See [Apple's current instructions](https://support.apple.com/en-gb/guide/mac-help/mh40616/mac).
 
 The first complete four-platform release, `R20260826T230234`, passed every
 frontend suite and package job on native GitHub runners. Windows validation

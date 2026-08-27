@@ -363,7 +363,20 @@ jobs:
             echo
             echo '## macOS Apple Silicon'
             echo
-            echo "Download \`$mac_file\` and its SHA-256 file. This build is ad-hoc signed but not Apple-notarized."
+            echo "Download \`$mac_file\` and its SHA-256 file. This build is ad-hoc signed, but it is not signed with an Apple Developer ID and is not Apple-notarized. macOS therefore blocks the first normal launch by default."
+            echo
+            echo 'Installation:'
+            echo
+            echo '1. Open the DMG, drag `LB_Omnichord.app` to `Applications`, then eject the DMG.'
+            echo '2. Open `Applications` in Finder and double-click `LB_Omnichord`. macOS shows a warning and blocks this first launch; dismiss the warning.'
+            echo '3. Open the Apple menu, choose `System Settings`, select `Privacy & Security` in the sidebar, and scroll down to `Security`.'
+            echo '4. Find the message about `LB_Omnichord` and click `Open Anyway`. This button is available for about one hour after the blocked launch attempt.'
+            echo '5. Enter your Mac login password or use Touch ID if macOS asks for confirmation.'
+            echo '6. When the warning appears again, click `Open`. macOS saves an exception for this app, so later launches work normally.'
+            echo
+            echo 'This app-specific exception is sufficient; do not disable Gatekeeper or globally weaken `Allow applications downloaded from`.'
+            echo
+            echo '[Apple: Open a Mac app from an unknown developer](https://support.apple.com/en-gb/guide/mac-help/mh40616/mac)'
             echo
             echo '## Windows native (experimental)'
             echo

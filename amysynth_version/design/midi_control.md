@@ -189,6 +189,15 @@ lookup because unsaved in-memory binding changes are authoritative for selected
 presets. If several inactive presets contain the same controller identity, all
 of those valid locations are reported.
 
+Screen routing is deliberately independent of preset status. As soon as either
+the active binding set or the inactive-preset index locates the controller on
+the other screen, the visible `MIDI`/`OMNI` mode button flashes. The mode button
+therefore does not distinguish between a binding in that screen's selected
+preset and one in any of its non-selected presets; its purpose is to say
+"look on the other screen". Only after that screen is visible does preset
+status affect the indication: a non-selected destination preset flashes its
+own round button, while the selected preset needs no preset LED.
+
 The preset LED sits between the label and the top edge of the round button. The
 mode-button LED sits to the left of its label in the red part of the rainbow
 button and is vertically centered. A location indication flashes for about two

@@ -68,6 +68,14 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("## Linux x64", release)
         self.assertIn("## Raspberry Pi 4 / 5", release)
         self.assertIn("## macOS Apple Silicon", release)
+        self.assertIn("not signed with an Apple Developer ID", release)
+        self.assertIn("drag `LB_Omnichord.app` to `Applications`", release)
+        self.assertIn("`System Settings`", release)
+        self.assertIn("`Privacy & Security`", release)
+        self.assertIn("`Open Anyway`", release)
+        self.assertIn("available for about one hour", release)
+        self.assertIn("do not disable Gatekeeper", release)
+        self.assertIn("support.apple.com/en-gb/guide/mac-help/mh40616/mac", release)
         self.assertNotIn("Windows via WSL2 / WSLg", release)
 
     def test_native_windows_contract_is_explicit_and_not_claimed_ready(self) -> None:

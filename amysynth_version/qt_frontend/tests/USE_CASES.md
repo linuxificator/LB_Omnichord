@@ -109,6 +109,17 @@ The serial regression requires the factory patch to remain authoritative for nat
 
 **Failure history:** the strum area visibly accepted mouse/touch input but emitted no AMY commands/sound in an earlier AMY build.
 
+**STRUM-02 — the OMNI note guide names the available strum tones**
+
+- With an active chord, the narrow gap immediately left of the strum pad shows
+  one vertically distributed light-blue round marker per available pitch
+  class; with no active chord it shows none.
+- APG uses the active chord intervals and LDR uses the ladder intervals that
+  actually feed the strum gesture.
+- Labels use uppercase note letters and musical enharmonic spelling. In
+  particular, C minor is shown as `C`, `E♭`, `G`, not `C`, `D♯`, `G`;
+  ordinary scales do not arbitrarily mix sharps and flats.
+
 ### MIDI — input, tuning, preview and effects
 
 **MIDI-01 — Linux raw-MIDI input reaches matching rows**
@@ -267,17 +278,20 @@ The serial regression requires the factory patch to remain authoritative for nat
 - An unchanged preset binding does not trigger the handoff and retains normal
   live-value preservation.
 
-**MIDI-CC-13 — hidden preset bindings advertise their location**
+**MIDI-CC-13 — hidden bindings advertise their screen and preset location**
 
 - Only genuine changed CC input can start location feedback; the first value
   and repeated-identical packets remain silent.
-- Movement of an active binding on the other screen flashes a green LED in the
-  visible `MIDI`/`OMNI` mode button, left of its label in the red button area.
+- The visible `MIDI`/`OMNI` mode button flashes whenever the binding is located
+  on the other screen, whether it belongs to that screen's selected preset or
+  to a non-selected preset. The mode button deliberately ignores preset status
+  and means only "look on the other screen". Its green LED is left of the label
+  in the red button area.
 - If no active binding owns the controller, every valid non-selected preset
   containing its channel/controller identity is located without loading it.
   Its round preset button flashes a small green LED between the label and top
-  edge when that screen is visible; a location on the other screen flashes the
-  visible mode button instead.
+  edge when that screen is visible. Once the destination screen is visible, its
+  selected preset needs no preset LED; an inactive destination preset does.
 - Selected preset files are excluded from inactive lookup so unsaved live
   binding changes remain authoritative. If multiple inactive presets contain
   the identity, all matching locations are indicated.

@@ -18,6 +18,31 @@ import instrument_balance  # noqa: E402
 
 
 class SoundBalanceFeatureTests(unittest.TestCase):
+    @staticmethod
+    def _strum_backend(
+        suffix: str,
+        intervals: tuple[int, ...],
+        *,
+        root: int = 0,
+        ladder: bool = False,
+    ) -> app_core.InstrumentBackend:
+        backend = app_core.InstrumentBackend.__new__(
+            app_core.InstrumentBackend
+        )
+        backend._active_row = 0
+        backend._active_root_semitone = root
+        backend._row_chord_indexes = [0]
+        backend._strum_ladder_mode = ladder
+        backend._chords = (
+            app_core.ChordType(
+                suffix,
+                suffix,
+                intervals,
+                (intervals,),
+            ),
+        )
+        return backend
+
     def test_balance_plan_covers_every_omni_instrument_and_register(self) -> None:
         plan = instrument_balance.build_plan()
         self.assertEqual(len(plan), 124)
@@ -128,17 +153,67 @@ class SoundBalanceFeatureTests(unittest.TestCase):
         self.assertEqual(keys, {(1, 10), (1, 12), (1, 13)})
 
     def test_ladder_mode_uses_expected_consonant_scale_families(self) -> None:
-        backend = app_core.InstrumentBackend.__new__(app_core.InstrumentBackend)
-        backend._active_row = 0
-        backend._active_root_semitone = 0
-        backend._row_chord_indexes = [0]
-        backend._chords = (
-            app_core.ChordType("5", "5", (0, 7), ((0, 7),)),
-        )
+        backend = self._strum_backend("5", (0, 7), ladder=True)
         self.assertEqual(
             {note % 12 for note in backend._ladder_notes()},
             {0, 2, 4, 7, 9},
         )
+
+    def test_apg_note_guide_uses_musical_chord_spelling(self) -> None:
+        major = self._strum_backend("major", (0, 4, 7))
+        minor = self._strum_backend("minor", (0, 3, 7))
+        sharp_dominant = self._strum_backend(
+            "dominant7",
+            (0, 4, 7, 10),
+            root=6,
+        )
+
+        self.assertEqual(major._strum_note_names(), ["C", "E", "G"])
+        self.assertEqual(minor._strum_note_names(), ["C", "E♭", "G"])
+        self.assertEqual(
+            sharp_dominant._strum_note_names(),
+            ["F♯", "A♯", "C♯", "E"],
+        )
+
+    def test_ldr_note_guide_keeps_scale_accidentals_consistent(self) -> None:
+        d_major = self._strum_backend(
+            "major",
+            (0, 4, 7),
+            root=2,
+            ladder=True,
+        )
+        eb_minor = self._strum_backend(
+            "minor",
+            (0, 3, 7),
+            root=3,
+            ladder=True,
+        )
+
+        self.assertEqual(
+            d_major._strum_note_names(),
+            ["D", "E", "F♯", "A", "B"],
+        )
+        self.assertEqual(
+            eb_minor._strum_note_names(),
+            ["E♭", "G♭", "A♭", "B♭", "D♭"],
+        )
+
+    def test_octatonic_note_guide_uses_its_musical_mixed_spelling(self) -> None:
+        diminished = self._strum_backend(
+            "diminished",
+            (0, 3, 6),
+            ladder=True,
+        )
+        self.assertEqual(
+            diminished._strum_note_names(),
+            ["C", "D", "E♭", "F", "G♭", "A♭", "A", "B"],
+        )
+
+    def test_note_guide_is_empty_without_an_active_chord(self) -> None:
+        backend = self._strum_backend("major", (0, 4, 7))
+        backend._active_row = -1
+        backend._active_root_semitone = -1
+        self.assertEqual(backend._strum_note_names(), [])
 
 
 if __name__ == "__main__":

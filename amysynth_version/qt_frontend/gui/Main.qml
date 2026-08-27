@@ -545,6 +545,76 @@ ApplicationWindow {
                 }
             }
 
+            Item {
+                id: strumNoteGuide
+
+                x:
+                    window.volumeX
+                    + window.volumeWidth
+                y: window.sectionHeight
+                width:
+                    window.strumX
+                    - x
+                height:
+                    window.strumSynthY
+                    - y
+
+                readonly property real markerSize:
+                    Math.min(34, width - 4)
+                readonly property real verticalMargin: 5
+
+                Repeater {
+                    id: strumNoteRepeater
+                    model: backend.strumNoteNames
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+
+                        width: strumNoteGuide.markerSize
+                        height: width
+                        radius: width / 2
+                        x:
+                            (
+                                strumNoteGuide.width
+                                - width
+                            ) / 2
+                        y: {
+                            const availableHeight =
+                                strumNoteGuide.height
+                                - 2
+                                    * strumNoteGuide.verticalMargin
+                                - height
+                            if (strumNoteRepeater.count <= 1)
+                                return (
+                                    strumNoteGuide.height
+                                    - height
+                                ) / 2
+                            return strumNoteGuide.verticalMargin
+                                + index
+                                    * availableHeight
+                                    / (strumNoteRepeater.count - 1)
+                        }
+
+                        color: "#dcecf7"
+                        border.color: "#8bb9d8"
+                        border.width: 1
+
+                        Text {
+                            anchors.fill: parent
+                            text: String(modelData)
+                            color: "#08243d"
+                            font.pixelSize: 15
+                            font.bold: true
+                            horizontalAlignment:
+                                Text.AlignHCenter
+                            verticalAlignment:
+                                Text.AlignVCenter
+                        }
+                    }
+                }
+            }
+
             PresetResetButton {
                 x: (window.leftRailWidth - width) / 2
                 y: window.bassSynthY + (window.sectionHeight - height) / 2

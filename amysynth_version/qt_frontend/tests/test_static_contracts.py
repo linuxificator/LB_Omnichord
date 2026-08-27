@@ -511,6 +511,20 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('"strum_mode": "LDR"', backend)
         self.assertIn('data.get("strum_mode", "APG")', backend)
 
+    def test_strum_note_guide_occupies_the_omni_side_gap(self) -> None:
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        guide_start = qml.index("id: strumNoteGuide")
+        guide_end = qml.index("PresetResetButton {", guide_start)
+        guide = qml[guide_start:guide_end]
+
+        self.assertIn("window.volumeX", guide)
+        self.assertIn("+ window.volumeWidth", guide)
+        self.assertIn("window.strumX", guide)
+        self.assertIn("window.strumSynthY", guide)
+        self.assertIn("model: backend.strumNoteNames", guide)
+        self.assertIn('color: "#dcecf7"', guide)
+        self.assertIn("Math.min(34, width - 4)", guide)
+
     def test_rainbow_mode_button_text_is_large_and_centered(self) -> None:
         qml = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
             encoding="utf-8"
@@ -539,6 +553,8 @@ class StaticContractTests(unittest.TestCase):
 
         self.assertIn("onBindingLocationRequested", led)
         self.assertIn('color: "#31d158"', led)
+        self.assertIn("property int targetPreset: 0", led)
+        self.assertIn("root.targetPreset <= 0", led)
         self.assertIn("loops: 5", led)
         self.assertEqual(led.count("PauseAnimation { duration: 110 }"), 2)
         for utility, screen in zip(utilities, ("omni", "midi")):
@@ -552,6 +568,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("anchors.verticalCenter: parent.verticalCenter", rainbow)
         self.assertIn("x: 9", rainbow)
         self.assertIn("width: 10", rainbow)
+        self.assertNotIn("targetPreset:", rainbow)
         self.assertIn('bindingLocationScreen: "midi"', main)
         self.assertIn('bindingLocationScreen: "omni"', midi)
 
