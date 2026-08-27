@@ -482,8 +482,9 @@ Starting rhythm playback must use the currently selected rhythm and current disp
 
 ### RHYTHM-016 — manual chord takeover preserves the sequenced gate
 
-Pressing a manual chord while automatic rhythm chords are enabled must close
-the automatic-chord gate before starting the manual chord. It must remove the
+Pressing a manual chord while automatic rhythm chords are enabled must
+temporarily close the effective automatic-chord lane before starting the manual
+chord, without changing the independent `CHORD ON/OFF` state. It must remove the
 repeating positive-velocity synth-4 note-on tags, but retain the already
 scheduled synth-4 `l0` tags. Retained note-offs are explicitly reinstalled so
 their delivery does not depend on an older queued lane update. A rhythm chord
@@ -515,6 +516,21 @@ note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
 chord identity. Neither action may start, retrigger, release or otherwise
 control a manual synth-3 chord. A physically held chord remains owned by its
 chord-button press/release lifecycle.
+
+The gate is a binary live-performance state, initially OFF, and can be toggled
+before any chord identity exists. Selecting, pressing or releasing a chord may
+change the pitches supplied to the sequencer but must never change that gate
+state. When the gate is ON, manual hold temporarily suppresses its sequencer
+lane and release restores it without toggling the control.
+
+### RHYTHM-019 — activity controls expose four aligned levels
+
+Percussion, chord and bass activity each expose levels 1 through 4. Chord
+activity 0 is not a selectable or stored state; `CHORD OFF` owns that meaning.
+During manual chord takeover the effective chord activity may temporarily be 0
+so the sequencer lane remains closed. In that interval the interface shows no
+selected chord-activity button and restores the unchanged stored 1–4 selection
+on release. Legacy presets containing chord activity 0 load as level 1.
 
 ## 16. Summary rule
 

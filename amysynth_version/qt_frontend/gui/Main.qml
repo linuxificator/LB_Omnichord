@@ -1536,18 +1536,13 @@ ApplicationWindow {
                     - window.controlSpacing
                 height: window.rowHeight
                 text: backend.chordGateButtonText
-                enabled: backend.chordGateState !== 0
-                opacity: enabled ? 1.0 : 0.35
-
-                property bool selected:
-                    backend.chordGateState === 2
 
                 font.pixelSize: 14
                 font.bold: true
 
                 contentItem: Text {
                     text: chordGateButton.text
-                    color: "#fff7e8"
+                    color: "#4c3505"
                     font: chordGateButton.font
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -1556,19 +1551,15 @@ ApplicationWindow {
                 background: Rectangle {
                     radius: 9
                     color:
-                        chordGateButton.selected
-                        ? "#704323"
+                        chordGateButton.pressed
+                        ? "#e0c14e"
                         : (
                             chordGateButton.hovered
-                            ? "#8a5a34"
-                            : "#7b5030"
+                            ? "#f4dc78"
+                            : "#fbf0bd"
                         )
-                    border.color:
-                        chordGateButton.selected
-                        ? "#d6aa7f"
-                        : "#9d714b"
-                    border.width:
-                        chordGateButton.selected ? 3 : 1
+                    border.color: "#d2b650"
+                    border.width: 1
                 }
 
                 onClicked:

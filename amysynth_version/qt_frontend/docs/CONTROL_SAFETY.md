@@ -30,7 +30,9 @@ Current hard ranges:
 Other user controls are independently bounded in the backend: volumes are 0–1,
 reverb level is 0–3, reverb liveness/damping are 0–1, tuning reference is
 415–466 Hz, rhythm tempo is 40–200 BPM, and activity selectors are restricted
-to their discrete UI ranges.
+to the discrete UI range 1–4. The transient effective chord-activity value 0
+during manual chord takeover is not editable or persisted; `CHORD ON/OFF`
+owns the automatic-chord gate.
 
 A live MIDI CC binding is also an ownership boundary. Shared QML controls
 consume bound edit gestures, while the backend setters independently reject
@@ -46,7 +48,8 @@ The ESP32-P4 also exhibited low-frequency rumble when an exact `h0` reverb comma
 
 Manual chord hold is another timing-sensitive path. Suppressing automatic
 rhythm chords must not stop percussion or bass. Finger-down publishes the new
-chord/bass state and automatic-chord gate as one accompaniment transaction.
+chord/bass state and temporarily suppresses the automatic-chord lane as one
+accompaniment transaction without changing the `CHORD ON/OFF` control state.
 That transaction clears future synth-4 note-ons but retains the sequencer's
 existing synth-4 all-off tags, so a chord already sounding completes its normal
 rhythmic gate. The serial regression holds a chord for one second and requires
@@ -56,4 +59,5 @@ scheduled during the hold.
 The `CHORD ON/OFF` control belongs exclusively to automatic rhythm synth 4.
 It may use the remembered chord identity to construct sequencer events, but it
 must never emit a manual synth-3 note-on or release a physically held synth-3
-voice. Manual voice lifetime remains owned by chord-button press/release.
+voice. Manual voice lifetime remains owned by chord-button press/release, and
+chord selection must never turn the control on or off.

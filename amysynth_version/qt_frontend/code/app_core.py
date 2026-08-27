@@ -2486,7 +2486,7 @@ class InstrumentBackend(QObject):
                     self._rhythm.chord_activity_by_rhythm[
                         index
                     ] = max(
-                        0,
+                        1,
                         min(
                             4,
                             int(
@@ -2898,7 +2898,7 @@ class InstrumentBackend(QObject):
             )
             return
 
-        level = max(0, min(4, int(round(float(value)))))
+        level = max(1, min(4, int(round(float(value)))))
         index = self._rhythm.selected_index
 
         if level == self._rhythm.chord_activity_by_rhythm[index]:
@@ -2907,8 +2907,8 @@ class InstrumentBackend(QObject):
         self._rhythm.chord_activity_by_rhythm[index] = level
         self.rhythmControlsChanged.emit()
 
-        # Disabling automatic chords should take effect immediately,
-        # including inside the currently playing bar.
+        # Replace the automatic chord pattern immediately, including inside
+        # the currently playing bar. CHORD ON/OFF owns the actual gate.
         self._send_rhythm_chord_enabled()
         self._send_rhythm_config()
 
@@ -3427,8 +3427,9 @@ class InstrumentBackend(QObject):
         )
 
         # Manual chord input takes precedence immediately on finger-down.
-        # This emits chord activity 0 and closes the automatic chord gate
-        # before sending the manual note-on.
+        # This emits effective chord activity 0 and temporarily suppresses
+        # the automatic lane without changing the independent CHORD ON/OFF
+        # state, before sending the manual note-on.
         self._promoted_chords.add(key)
         self._update_hold_override(publish=False)
 

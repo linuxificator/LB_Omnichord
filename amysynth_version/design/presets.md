@@ -17,6 +17,10 @@ It also preserves the octave of the active chord row. The destination preset
 still supplies the octaves of every non-active row. With transport stopped,
 all of these values load normally from the destination preset.
 
+All three stored activity values use the visible range 1 through 4. A legacy
+preset containing chord activity 0 loads as level 1; disabling automatic
+chords is live `CHORD ON/OFF` state, not a preset activity value.
+
 The active chord identity, chord gate and physical chord-button hold state are
 also live performance state. Selecting an OMNI preset preserves them. The same
 row/root therefore remains active across the switch, while its sounding notes

@@ -13,7 +13,6 @@ from performance_logic import (
 )
 
 
-CHORD_GATE_NONE = 0
 CHORD_GATE_ON = 1
 CHORD_GATE_OFF = 2
 BASS_VOICING_LIMIT = 6
@@ -35,7 +34,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         # Base construction loads a preset through virtual methods, so these
         # fields must exist before super().__init__() starts.
-        self._chord_gate_state = CHORD_GATE_NONE
+        self._chord_gate_state = CHORD_GATE_OFF
         self._bass_voicing_shift = 0
         super().__init__(*args, **kwargs)
 
@@ -70,7 +69,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
                 self.bassSynthStateChanged.emit()
 
     def _set_chord_gate_state(self, state: int, *, emit: bool = True) -> bool:
-        state = max(CHORD_GATE_NONE, min(CHORD_GATE_OFF, int(state)))
+        state = max(CHORD_GATE_ON, min(CHORD_GATE_OFF, int(state)))
         if state == self._chord_gate_state:
             return False
         self._chord_gate_state = state
@@ -87,9 +86,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
     def chordGateButtonText(self) -> str:
         if self._chord_gate_state == CHORD_GATE_ON:
             return "CHORD\nOFF"
-        if self._chord_gate_state == CHORD_GATE_OFF:
-            return "CHORD\nON"
-        return ""
+        return "CHORD\nON"
 
     @Property(bool, notify=chordGateChanged)
     def isOff(self) -> bool:
@@ -106,10 +103,6 @@ class InstrumentBackend(app_core.InstrumentBackend):
             and self._active_root_semitone >= 0
             and self._effective_chord_activity() > 0
         )
-
-    def _set_active_chord(self, row_index: int, root_semitone: int) -> None:
-        self._set_chord_gate_state(CHORD_GATE_ON)
-        super()._set_active_chord(row_index, root_semitone)
 
     def _send_rhythm_chord_enabled(self) -> None:
         enabled = self._chord_gate_enabled()
@@ -156,8 +149,6 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Slot()
     def toggleChordGate(self) -> None:
-        if self._chord_gate_state == CHORD_GATE_NONE:
-            return
         if self._chord_gate_state == CHORD_GATE_ON:
             self.turnOff()
             return
@@ -166,17 +157,16 @@ class InstrumentBackend(app_core.InstrumentBackend):
         # CHORD ON controls only the automatic synth-4 sequencer lane. The
         # remembered chord identity supplies its pitch, but must not trigger a
         # one-shot manual synth-3 chord.
-        self._send_chord_state(play_now=False)
+        if self._active_row >= 0 and self._active_root_semitone >= 0:
+            self._send_chord_state(play_now=False)
 
     @Slot()
     def turnOff(self) -> None:
-        if self._active_row < 0 or self._active_root_semitone < 0:
-            self._set_chord_gate_state(CHORD_GATE_NONE)
-        else:
-            self._set_chord_gate_state(CHORD_GATE_OFF)
+        self._set_chord_gate_state(CHORD_GATE_OFF)
         self._strum_last_index = None
         self._send_rhythm_chord_enabled()
-        self._send_chord_state(play_now=False)
+        if self._active_row >= 0 and self._active_root_semitone >= 0:
+            self._send_chord_state(play_now=False)
 
     def _current_bass_notes(self) -> list[int]:
         return roll_bass_voicing(
@@ -312,13 +302,13 @@ class InstrumentBackend(app_core.InstrumentBackend):
         self.chordGateChanged.emit()
 
     def send_initial_state(self) -> None:
-        self._chord_gate_state = CHORD_GATE_NONE
+        self._chord_gate_state = CHORD_GATE_OFF
         super().send_initial_state()
         self.chordGateChanged.emit()
         self.bassVoicingChanged.emit()
 
     @Slot()
     def panic(self) -> None:
-        self._chord_gate_state = CHORD_GATE_NONE
+        self._chord_gate_state = CHORD_GATE_OFF
         super().panic()
         self.chordGateChanged.emit()

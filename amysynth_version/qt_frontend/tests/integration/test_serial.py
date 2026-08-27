@@ -87,6 +87,7 @@ class SerialIntegrationTests(unittest.TestCase):
 
             app.action("pressChord", 0, 0)
             app.action("releaseChord", 0, 0)
+            app.action("toggleChordGate")
             app.bridge.wait_idle(timeout=8.0)
 
             start = app.bridge.count()
@@ -131,6 +132,7 @@ class SerialIntegrationTests(unittest.TestCase):
             if not bool(app.query("bassRunning")):
                 app.action("toggleBassRunning")
             app.action("selectChord", 0, 0)  # C major becomes the active chord
+            app.action("toggleChordGate")
             app.bridge.wait_idle(timeout=8.0)
 
             eq_start = app.bridge.count()
@@ -426,6 +428,7 @@ class SerialIntegrationTests(unittest.TestCase):
             # assertion below is meaningful only for tags that were installed.
             seed = app.bridge.count()
             app.action("selectChord", 0, 0)
+            app.action("toggleChordGate")
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 seeded = app.bridge.lines_since(seed)
@@ -562,6 +565,7 @@ class SerialIntegrationTests(unittest.TestCase):
             # Establish an active pitch state and let any one-shot manual chord
             # release drain before the stop checkpoint.
             app.action("selectChord", 0, 0)
+            app.action("toggleChordGate")
             time.sleep(0.75)
             app.bridge.wait_idle(timeout=8.0)
 
@@ -604,6 +608,7 @@ class SerialIntegrationTests(unittest.TestCase):
 
             seed = app.bridge.count()
             app.action("selectChord", 0, 0)
+            app.action("toggleChordGate")
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 seeded = app.bridge.lines_since(seed)
@@ -646,10 +651,12 @@ class SerialIntegrationTests(unittest.TestCase):
                 self.assertNotIn("zY0Z", lines)
                 self.assertNotIn("S4096Z", lines)
 
-            app.action("setRhythmChordActivity", 0.0)
+            self.assertEqual(int(app.query("chordGateState")), 1)
+            app.action("toggleChordGate")
             app.bridge.wait_idle(timeout=8.0)
+            self.assertEqual(int(app.query("chordGateState")), 2)
             start = app.bridge.count()
-            app.action("setRhythmChordActivity", 3.0)
+            app.action("toggleChordGate")
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 lines = app.bridge.lines_since(start)
@@ -658,6 +665,7 @@ class SerialIntegrationTests(unittest.TestCase):
                 time.sleep(0.01)
             else:
                 self.fail("chord lane was not reinstalled")
+            self.assertEqual(int(app.query("chordGateState")), 1)
             chord_tags = []
             for line in lines:
                 if not line.startswith("H") or "i4Z" not in line:

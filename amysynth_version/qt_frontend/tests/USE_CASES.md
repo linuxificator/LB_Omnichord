@@ -504,8 +504,9 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **RHYTHM-06 — manual chord input lets the current automatic chord finish**
 
-- Finger-down immediately closes the automatic-chord gate, but does not send
-  an immediate `l0i4` before the manual synth-3 note-on.
+- Finger-down immediately suppresses the effective automatic-chord lane, but
+  does not change the `CHORD ON/OFF` state or send an immediate `l0i4` before
+  the manual synth-3 note-on.
 - Positive-velocity synth-4 note-on tags are cleared. Existing synth-4 `l0`
   tags remain installed, so the currently sounding chord receives its original
   sequencer note-off and completes the configured rhythmic gate.
@@ -536,12 +537,24 @@ that prevented hanging but audibly shortened the accompaniment gate.
 
 **RHYTHM-08 — CHORD ON/OFF controls only sequencer chords**
 
+- The control starts OFF, is usable before a chord is selected and retains its
+  own state when any chord button is pressed or released.
 - `CHORD OFF` removes future automatic synth-4 onsets while preserving the
   sequenced release of a currently sounding automatic chord.
 - `CHORD ON` reinstalls automatic synth-4 events without playing the remembered
   chord once on manual synth 3.
 - Neither action releases a chord which is physically held on a chord-button
   row. That manual synth-3 voice ends only through its normal button release.
+
+**RHYTHM-09 — activity controls share one four-level layout**
+
+- Percussion, chord and bass activity are top-aligned, equal-width groups with
+  four equal buttons numbered 1 through 4.
+- Chord activity has no zero button. `CHORD OFF` is the only user-facing way
+  to disable automatic sequencer chords.
+- While a manual chord suppresses the automatic lane, no chord-activity button
+  is selected. Releasing it restores the unchanged 1–4 selection.
+- A legacy preset containing chord activity 0 loads as level 1.
 
 ### TUNING — all note-producing paths follow the selected tuning
 

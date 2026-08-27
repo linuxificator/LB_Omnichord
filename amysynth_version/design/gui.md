@@ -69,6 +69,17 @@ the bass start symbol. It must not use a font glyph whose visual side bearings
 make it appear off-center. Both transport canvases repaint when their backend
 running state changes.
 
+The percussion, chord and bass activity groups form one top-aligned row. Each
+group has the same width and four equal buttons numbered 1 through 4. Chord activity
+has no zero button: `CHORD ON/OFF` is the sole user-facing automatic-chord gate.
+While a manual chord temporarily suppresses sequencer chords, none of the four
+chord-activity buttons is selected; the stored level remains unchanged.
+
+The `CHORD ON/OFF` button uses the yellow rhythm-section palette. Its binary
+state exists independently of the active chord and is available before a chord
+has been selected. Selecting, pressing or releasing a chord must never change
+that state.
+
 ## UI state versus audio state
 
 UI changes must first update application state and then generate AMY wire commands. The GUI never directly manipulates AMY internals.

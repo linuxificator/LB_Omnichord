@@ -562,7 +562,7 @@ class PresetIntegrationTests(unittest.TestCase):
                 timeout=3.0,
             )
 
-            self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertEqual(int(app.query("chordGateState")), 2)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
             for note in (48, 52, 55):
@@ -655,7 +655,7 @@ class PresetIntegrationTests(unittest.TestCase):
             target_settings.update({
                 "tempo": 75.0,
                 "percussion_activity": 1,
-                "chord_activity": 0,
+                "chord_activity": 1,
                 "bass_activity": 1,
             })
             preset_two["rhythm"]["bass_voicing_shift"] = 5
@@ -673,6 +673,7 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
             app.action("pressChord", 0, 0)
             app.action("releaseChord", 0, 0)
+            app.action("toggleChordGate")
             app.action("setRowOctave", 0, 2)
             app.action("setRhythmBusyness", 4.0)
             app.action("setRhythmChordActivity", 3.0)
@@ -776,7 +777,9 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("selectPreset", 2)
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 75.0)
             self.assertEqual(int(app.query("rhythmBusyness")), 1)
-            self.assertEqual(int(app.query("rhythmChordActivity")), 0)
+            # Legacy presets could store the former visible zero level. It
+            # now migrates to the lowest selectable activity.
+            self.assertEqual(int(app.query("rhythmChordActivity")), 1)
             self.assertEqual(int(app.query("rhythmBassActivity")), 1)
             self.assertEqual(int(app.query("bassVoicingShift")), 5)
             self.assertEqual(

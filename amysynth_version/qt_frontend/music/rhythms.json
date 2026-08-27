@@ -60,7 +60,6 @@
       4
     ],
     "chord": [
-      0,
       1,
       2,
       3,
@@ -72,7 +71,6 @@
       3,
       4
     ],
-    "chord_zero": "Disable automatic chord events. Manual chord taps and held chords remain active.",
     "catalogue_mapping_for_levels_1_to_4": [
       0,
       1,

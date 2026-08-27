@@ -215,19 +215,31 @@ class FrontendIntegrationTests(unittest.TestCase):
     def test_chord_gate_only_controls_sequencer_and_strum_stays_live(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
-            self.assertEqual(int(app.query("chordGateState")), 0)
+            self.assertEqual(int(app.query("chordGateState")), 2)
+
+            # Activity zero is no longer user-selectable. It is reserved as
+            # the transient effective value while a manual chord takes over.
+            app.action("setRhythmChordActivity", 0.0)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 1)
+            app.action("setRhythmChordActivity", 3.0)
+
+            # The binary gate can be operated before a chord is known and
+            # remains independent of subsequent chord selection.
+            app.action("toggleChordGate")
+            self.assertEqual(int(app.query("chordGateState")), 1)
+            app.action("toggleChordGate")
+            self.assertEqual(int(app.query("chordGateState")), 2)
 
             app.action("pressChord", 0, 0)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 0)
             app.action("releaseChord", 0, 0)
             app.bridge.wait_idle(timeout=3.0)
-            self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            self.assertEqual(int(app.query("chordGateState")), 2)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
 
-            app.action("toggleChordGate")
-            app.bridge.wait_idle(timeout=3.0)
-            self.assertEqual(int(app.query("chordGateState")), 2)
-            # Gating the chord must not erase the remembered chord identity.
+            # Keeping the gate off must not erase the remembered identity.
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
 
@@ -259,6 +271,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             # must remain alive until the matching button release.
             app.action("pressChord", 0, 0)
             app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("chordGateState")), 1)
             start = app.bridge.count()
             app.action("toggleChordGate")
             app.bridge.wait_idle(timeout=3.0)

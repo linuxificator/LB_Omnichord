@@ -119,6 +119,7 @@ class NativeRhythmTests(unittest.TestCase):
 
             if not bool(app.query("rhythmRunning")):
                 app.action("toggleRhythm")
+            app.action("toggleChordGate")
             app.action("pressChord", 0, 0)
             app.action("releaseChord", 0, 0)
             time.sleep(0.35)

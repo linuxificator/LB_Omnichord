@@ -334,8 +334,15 @@ class StaticContractTests(unittest.TestCase):
     def test_chord_gate_and_grouped_row_roll_controls_are_present(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         self.assertIn("text: backend.chordGateButtonText", qml)
-        self.assertIn("enabled: backend.chordGateState !== 0", qml)
+        self.assertNotIn("enabled: backend.chordGateState !== 0", qml)
         self.assertIn("backend.toggleChordGate()", qml)
+        gate_start = qml.index("id: chordGateButton")
+        gate_end = qml.index("RainbowModeButton {", gate_start)
+        gate = qml[gate_start:gate_end]
+        self.assertIn('color: "#4c3505"', gate)
+        self.assertIn(': "#fbf0bd"', gate)
+        self.assertIn('border.color: "#d2b650"', gate)
+        self.assertNotIn("chordGateButton.selected", gate)
         self.assertIn("backend.rollChordRows(-1)", qml)
         self.assertIn("backend.rollChordRows(1)", qml)
 
@@ -360,6 +367,27 @@ class StaticContractTests(unittest.TestCase):
 
     def test_bass_activity_has_adjacent_voicing_slider(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
+        self.assertEqual(qml.count("ActivitySelector {"), 3)
+        selector_labels = (
+            'label: "percussion activity"',
+            'label: "chord activity"',
+            'label: "bass activity"',
+        )
+        for index, label in enumerate(selector_labels):
+            start = qml.rfind("ActivitySelector {", 0, qml.index(label))
+            if index + 1 < len(selector_labels):
+                end = qml.index("ActivitySelector {", start + 1)
+            else:
+                end = qml.index("LabeledSlider {", start)
+            selector = qml[start:end]
+            self.assertIn("y: 0", selector)
+            self.assertIn("width: activityArea.width * 0.32", selector)
+        self.assertNotIn("levels: [0, 1, 2, 3, 4]", qml)
+        activity_selector = (
+            ROOT / "gui" / "ActivitySelector.qml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("property var levels: [1, 2, 3, 4]", activity_selector)
+        self.assertIn("height: 29", activity_selector)
         self.assertIn('label: "bass activity"', qml)
         self.assertIn('label: "bass voicing"', qml)
         self.assertIn("fromValue: -6", qml)
