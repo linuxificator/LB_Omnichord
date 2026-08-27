@@ -2222,6 +2222,20 @@ class InstrumentBackend(QObject):
     ) -> None:
         rhythm_was_running = self._rhythm_running
         live_tempo = self.rhythmTempo if rhythm_was_running else None
+        live_rhythm_controls: tuple[int, int, int] | None = None
+        live_active_row_octave: tuple[int, int] | None = None
+        if rhythm_was_running:
+            rhythm_index = self._rhythm.selected_index
+            live_rhythm_controls = (
+                self._rhythm.busyness_by_rhythm[rhythm_index],
+                self._rhythm.chord_activity_by_rhythm[rhythm_index],
+                self._rhythm.bass_activity_by_rhythm[rhythm_index],
+            )
+            if 0 <= self._active_row < ROW_COUNT:
+                live_active_row_octave = (
+                    self._active_row,
+                    self._row_octave_indexes[self._active_row],
+                )
         self._reset_presettable_state_to_defaults()
         self._strum_ladder_mode = (
             str(data.get("strum_mode", "APG")).upper() == "LDR"
@@ -2538,8 +2552,19 @@ class InstrumentBackend(QObject):
         self._stop_tempo_nudge()
 
         # Presets may provide rhythm configuration, but never transport state.
-        # While running, their stored tempo remains stored and the independent
-        # live tempo continues to drive both the UI and AMY sequencer.
+        # While running, live performance controls continue to drive the UI
+        # and AMY sequencer. Apply them to the destination rhythm selected by
+        # the preset, and preserve only the octave of the active chord row.
+        if live_rhythm_controls is not None:
+            rhythm_index = self._rhythm.selected_index
+            (
+                self._rhythm.busyness_by_rhythm[rhythm_index],
+                self._rhythm.chord_activity_by_rhythm[rhythm_index],
+                self._rhythm.bass_activity_by_rhythm[rhythm_index],
+            ) = live_rhythm_controls
+        if live_active_row_octave is not None:
+            row_index, octave_index = live_active_row_octave
+            self._row_octave_indexes[row_index] = octave_index
         self._rhythm_running = rhythm_was_running
         self._running_tempo = live_tempo
 

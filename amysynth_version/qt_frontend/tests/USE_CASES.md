@@ -522,6 +522,18 @@ already sounding. The old synth-4 chord could then remain audible indefinitely
 under the new manual chord. The first correction added an immediate `l0i4`;
 that prevented hanging but audibly shortened the accompaniment gate.
 
+**RHYTHM-07 — live preset changes preserve beat-shaping controls**
+
+- With rhythm stopped, preset selection loads stored tempo, percussion
+  activity, chord activity, bass activity, bass voicing and all chord-row
+  octaves.
+- With rhythm running, preset selection preserves the effective values of the
+  tempo, all three activities and bass voicing.
+- The octave of the active chord row is also preserved. Every non-active row
+  loads its octave from the destination preset.
+- The destination rhythm pattern may change, but transport and sequencer
+  timebase remain continuous.
+
 ### TUNING — all note-producing paths follow the selected tuning
 
 **TUNING-01 — live EQ/HARM/JV changes propagate everywhere**

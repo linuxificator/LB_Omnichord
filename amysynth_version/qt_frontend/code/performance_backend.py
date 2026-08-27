@@ -260,13 +260,20 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     def _apply_preset_data(self, data: dict[str, Any]) -> None:
         rhythm_was_running = bool(getattr(self, "_rhythm_running", False))
+        live_bass_voicing = (
+            self._bass_voicing_shift
+            if rhythm_was_running
+            else None
+        )
         super()._apply_preset_data(data)
         self._rhythm_running = rhythm_was_running
         rhythm = data.get("rhythm", {})
         if not isinstance(rhythm, dict):
             rhythm = {}
         self._bass_voicing_shift = clamp_bass_voicing_shift(
-            rhythm.get("bass_voicing_shift", self._bass_voicing_shift),
+            live_bass_voicing
+            if live_bass_voicing is not None
+            else rhythm.get("bass_voicing_shift", self._bass_voicing_shift),
             limit=BASS_VOICING_LIMIT,
         )
         effects = data.get("effects", {})

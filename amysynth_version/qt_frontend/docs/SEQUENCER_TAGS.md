@@ -27,7 +27,9 @@ Lane-local operations do not reset the sequencer:
 - bass on/off changes only the bass range;
 - tuning/chord-pitch changes replace bass and automatic-chord ranges but do not touch percussion;
 - chord timbre changes repatch synths 3/4 without replacing their sequencer events;
-- normal activity/config changes replace the affected tagged patterns while transport continues.
+- normal activity/config changes replace the affected tagged patterns while transport continues;
+- a live preset switch carries the current percussion/chord/bass activity into
+  the destination pattern instead of substituting the preset's stored activity.
 
 A live rhythm-style or preset change replaces tagged events without stopping
 transport or resetting the timebase. The new meter enters at the current

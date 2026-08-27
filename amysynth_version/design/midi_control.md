@@ -137,6 +137,12 @@ numerically changed as a side effect. This exception applies only to an actual
 same-controller/different-target conflict. An unchanged binding retains the
 normal live-value protection above.
 
+Live rhythm continuity has higher priority for the rhythm controls it protects.
+While rhythm transport is running, neither rhythm tempo nor bass voicing takes
+a destination-preset numeric value, including during a binding-conflict
+handoff. The binding handoff and its visual feedback still occur; only the
+currently effective musical value survives until genuine controller movement.
+
 Coupled OMNI/MIDI tuning treats a binding on either reference as ownership of
 the effective shared reference, so both screens' UP/DOWN controls are locked.
 When recoupling, a bound side is the synchronization source even if the link

@@ -640,7 +640,7 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setRhythmIndex", 2)
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 73.0)
 
-    def test_running_preset_switch_preserves_live_tempo_and_transport(self) -> None:
+    def test_running_preset_switch_preserves_live_rhythm_controls(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
 
@@ -651,7 +651,17 @@ class PresetIntegrationTests(unittest.TestCase):
             rhythm_one = str(preset_one["rhythm"]["selected"])
             rhythm_two = str(preset_two["rhythm"]["selected"])
             preset_one["rhythm"]["settings"][rhythm_one]["tempo"] = 100.0
-            preset_two["rhythm"]["settings"][rhythm_two]["tempo"] = 75.0
+            target_settings = preset_two["rhythm"]["settings"][rhythm_two]
+            target_settings.update({
+                "tempo": 75.0,
+                "percussion_activity": 1,
+                "chord_activity": 0,
+                "bass_activity": 1,
+            })
+            preset_two["rhythm"]["bass_voicing_shift"] = 5
+            target_octaves = ("O5", "O1", "O2", "O6")
+            for row, octave in zip(preset_two["chord_rows"], target_octaves):
+                row["octave"] = octave
             preset_one_path.write_text(
                 json.dumps(preset_one), encoding="utf-8"
             )
@@ -663,6 +673,11 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
             app.action("pressChord", 0, 0)
             app.action("releaseChord", 0, 0)
+            app.action("setRowOctave", 0, 2)
+            app.action("setRhythmBusyness", 4.0)
+            app.action("setRhythmChordActivity", 3.0)
+            app.action("setRhythmBassActivity", 4.0)
+            app.action("setBassVoicingShift", -2.0)
             app.action("toggleRhythm")
             app.action("setRhythmTempo", 107.0)
             app.bridge.wait_idle(timeout=8.0)
@@ -687,9 +702,17 @@ class PresetIntegrationTests(unittest.TestCase):
 
             self.assertTrue(bool(app.query("rhythmRunning")))
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 107.0)
+            self.assertEqual(int(app.query("rhythmBusyness")), 4)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            self.assertEqual(int(app.query("rhythmBassActivity")), 4)
+            self.assertEqual(int(app.query("bassVoicingShift")), -2)
             self.assertEqual(int(app.query("chordGateState")), 1)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
+            self.assertEqual(int(app.action("octaveIndexForRow", 0)), 2)
+            self.assertEqual(int(app.action("octaveIndexForRow", 1)), 0)
+            self.assertEqual(int(app.action("octaveIndexForRow", 2)), 1)
+            self.assertEqual(int(app.action("octaveIndexForRow", 3)), 5)
             switched = app.bridge.lines_since(checkpoint)
             self.assertNotIn("zY0Z", switched)
             self.assertNotIn("zY1Z", switched)
@@ -710,6 +733,55 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertAlmostEqual(
                 float(stored["rhythm"]["settings"][selected]["tempo"]),
                 107.0,
+            )
+            stored_settings = stored["rhythm"]["settings"][selected]
+            self.assertEqual(int(stored_settings["percussion_activity"]), 4)
+            self.assertEqual(int(stored_settings["chord_activity"]), 3)
+            self.assertEqual(int(stored_settings["bass_activity"]), 4)
+            self.assertEqual(int(stored["rhythm"]["bass_voicing_shift"]), -2)
+            self.assertEqual(
+                tuple(row["octave"] for row in stored["chord_rows"]),
+                ("O3", "O1", "O2", "O6"),
+            )
+
+    def test_stopped_preset_switch_loads_all_rhythm_controls(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            preset_two_path = app.home / ".omnichord" / "omni_presets" / "p2.json"
+            preset_two = json.loads(preset_two_path.read_text(encoding="utf-8"))
+            rhythm_two = str(preset_two["rhythm"]["selected"])
+            preset_two["rhythm"]["settings"][rhythm_two].update({
+                "tempo": 75.0,
+                "percussion_activity": 1,
+                "chord_activity": 0,
+                "bass_activity": 1,
+            })
+            preset_two["rhythm"]["bass_voicing_shift"] = 5
+            target_octaves = ("O1", "O2", "O5", "O6")
+            for row, octave in zip(preset_two["chord_rows"], target_octaves):
+                row["octave"] = octave
+            preset_two_path.write_text(
+                json.dumps(preset_two), encoding="utf-8"
+            )
+
+            app.action("selectPreset", 1)
+            app.action("pressChord", 0, 0)
+            app.action("releaseChord", 0, 0)
+            app.action("setRhythmBusyness", 4.0)
+            app.action("setRhythmChordActivity", 3.0)
+            app.action("setRhythmBassActivity", 4.0)
+            app.action("setBassVoicingShift", -2.0)
+            self.assertFalse(bool(app.query("rhythmRunning")))
+
+            app.action("selectPreset", 2)
+            self.assertAlmostEqual(float(app.query("rhythmTempo")), 75.0)
+            self.assertEqual(int(app.query("rhythmBusyness")), 1)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 0)
+            self.assertEqual(int(app.query("rhythmBassActivity")), 1)
+            self.assertEqual(int(app.query("bassVoicingShift")), 5)
+            self.assertEqual(
+                tuple(app.action("octaveIndexForRow", row) for row in range(4)),
+                (0, 1, 4, 5),
             )
 
 

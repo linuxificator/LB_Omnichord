@@ -11,13 +11,21 @@ Older presets without `strum_mode` load as `APG`. `rhythmRunning` is live
 transport state and is never stored or restored. See `rhythm_bahavior.md` for
 live-switch semantics.
 
+While rhythm transport is running, an OMNI preset switch preserves the live
+tempo, percussion activity, chord activity, bass activity and bass voicing.
+It also preserves the octave of the active chord row. The destination preset
+still supplies the octaves of every non-active row. With transport stopped,
+all of these values load normally from the destination preset.
+
 The active chord identity, chord gate and physical chord-button hold state are
 also live performance state. Selecting an OMNI preset preserves them. The same
 row/root therefore remains active across the switch, while its sounding notes
-are recalculated from the destination preset's chord type, octave, inversion
-and tuning. A held or rhythm-driven chord may change voicing during that
-transition, but it must not be left silent and its later button release must
-still release the active manual voice.
+are recalculated from the destination preset's chord type, inversion and
+tuning. Its row octave also comes from the destination preset while transport
+is stopped, but remains live performance state while transport runs. A held or
+rhythm-driven chord may change voicing during that transition, but it must not
+be left silent and its later button release must still release the active
+manual voice.
 
 ## MIDI preset contents
 

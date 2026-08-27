@@ -8,6 +8,11 @@ The central rule is:
 
 A preset or rhythm selection may change the pattern and other stored rhythm parameters, but it must not unexpectedly start or stop the rhythm, change the currently running tempo, reset the sequencer timebase, or interrupt the beat.
 
+For preset selection, playback continuity also includes the current
+percussion/chord/bass activity, bass voicing and active chord-row octave. These
+controls shape the accompaniment that is already in progress and therefore
+remain live while transport runs.
+
 ## 1. State model
 
 The implementation must keep the following concepts separate.
@@ -129,12 +134,17 @@ When another preset is selected:
 
 1. `rhythmRunning` remains `true`.
 2. The effective live tempo remains exactly `T`.
-3. The new preset may change the rhythm/pattern.
-4. Other rhythm parameters from the new preset may be applied if they do not require stopping or resetting the running rhythm transport.
-5. The tempo stored in the newly selected preset must **not** replace the effective live tempo during this live transition.
-6. The AMY sequencer must remain running.
-7. The AMY sequencer timebase must not be reset.
-8. No artificial pause, restart, dropped beat, or transport pulse may be inserted.
+3. Live percussion activity, chord activity, bass activity and bass voicing
+   remain unchanged.
+4. The octave of the active chord row remains unchanged. Octaves belonging to
+   non-active chord rows may load from the destination preset.
+5. The new preset may change the rhythm/pattern.
+6. Other rhythm parameters from the new preset may be applied if they do not require stopping or resetting the running rhythm transport.
+7. Stored values for the protected live controls must **not** replace their
+   effective values during this live transition.
+8. The AMY sequencer must remain running.
+9. The AMY sequencer timebase must not be reset.
+10. No artificial pause, restart, dropped beat, or transport pulse may be inserted.
 
 Example:
 
@@ -392,7 +402,7 @@ This is true whether the rhythm happens to be running or stopped when `STR` is u
 
 | User action | Rhythm stopped | Rhythm running |
 |---|---|---|
-| Select preset | Load preset rhythm and preset tempo; stay stopped | Load preset rhythm; preserve current live tempo; stay running |
+| Select preset | Load all preset rhythm controls and row octaves; stay stopped | Load preset rhythm; preserve live tempo, three activities, bass voicing and active-row octave; load non-active-row octaves; stay running |
 | Select rhythm type | Load rhythm and its stored/default tempo; stay stopped | Change rhythm; preserve current live tempo; stay running |
 | Preset says rhythm ON | Ignore | Ignore |
 | Preset says rhythm OFF | Ignore | Ignore |
@@ -490,8 +500,16 @@ the lane is enabled, restarted or reset. Manual synth-3 note-ons may begin
 immediately and overlap the remainder of the automatic chord's normal gate and
 release. Drums, bass, transport, effects and sequencer timebase continue.
 
+### RHYTHM-017 — running preset selection preserves live performance controls
+
+When `rhythmRunning == true`, preset selection must preserve percussion
+activity, chord activity, bass activity, bass voicing and the octave of the
+active chord row, in addition to live tempo. Octaves of non-active chord rows
+load from the destination preset. When `rhythmRunning == false`, the complete
+stored set loads normally.
+
 ## 16. Summary rule
 
 The complete behavior can be reduced to this rule:
 
-> **When stopped, configuration changes may load stored tempo values. When running, pattern changes must preserve the current tempo and continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
+> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, bass voicing, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
