@@ -145,6 +145,14 @@ class InstrumentBackend(OmniInstrumentBackend):
     def midiTuningReference(self) -> int:
         return self._midi_player.tuningReference
 
+    @Slot(result=float)
+    def midiMasterVolume(self) -> float:
+        return self._midi_player.masterVolume
+
+    @Slot(result=bool)
+    def midiMasterMuted(self) -> bool:
+        return self._midi_player.masterMuted
+
     @Slot("QVariantMap", result=str)
     def midiControlTargetVisualState(self, target: dict[str, Any]) -> str:
         return self._midi_player.controlTargetVisualState(target)
@@ -197,6 +205,14 @@ class InstrumentBackend(OmniInstrumentBackend):
     @Slot(int, float)
     def setMidiVolume(self, row: int, value: float) -> None:
         self._midi_player.setVolume(row, value)
+
+    @Slot(float)
+    def setMidiMasterVolume(self, value: float) -> None:
+        self._midi_player.setMasterVolume(value)
+
+    @Slot()
+    def toggleMidiMasterMuted(self) -> None:
+        self._midi_player.toggleMasterMuted()
 
     @Slot(int)
     def cycleMidiChannel(self, row: int) -> None:

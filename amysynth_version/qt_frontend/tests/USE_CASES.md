@@ -153,6 +153,18 @@ The serial regression requires the factory patch to remain authoritative for nat
 - `midiPlayer` is exposed to QML as a `QObject`, so all four reverb slots are
   callable rather than opaque QVariant/Python attributes.
 
+**MIDI-05 — screen masters are independent, bus-scoped and reversible**
+
+- OMNI master writes final gain only to buses 0–3; MIDI master writes only to
+  buses 4–10.
+- `MUT` applies zero to the owned buses without changing the displayed master
+  value; `UMT` restores that retained value.
+- Changing a muted slider updates the value that will be restored on unmute.
+- OMNI and MIDI master volume/mute state survive their own preset switches and
+  cannot mutate one another.
+- Reconfiguring a synth or rebuilding after panic reapplies the owning master
+  gain so a patch cannot bypass it.
+
 **MIDI-CC-01 — only genuine CC movement creates activity**
 
 - Controller identity is `(channel, controller)`.
@@ -187,8 +199,9 @@ The serial regression requires the factory patch to remain authoritative for nat
 **MIDI-CC-04 — one-to-one binding and complete numeric target coverage**
 
 - Touching a numeric target while red binds it and consumes that gesture.
-- Instrument parameters, volumes, both reverb sections, both tuning references,
-  tempo and bass voicing are bindable; switches/selectors are not.
+- Instrument parameters, role/row and master volumes, both reverb sections,
+  both tuning references, tempo and bass voicing are bindable;
+  switches/selectors, including `MUT`/`UMT`, are not.
 - One CC owns at most one target and one target owns at most one CC.
 - Reassigning an occupied target turns the displaced controller blue.
 - The target handle and bound controller LED are steady green.
@@ -245,8 +258,8 @@ The serial regression requires the factory patch to remain authoritative for nat
 **MIDI-CC-10 — green binding has exclusive numeric authority**
 
 - Manual slider/tap gestures and direct frontend setter actions cannot change
-  any bound instrument control, volume, reverb parameter, tuning reference,
-  rhythm tempo or bass voicing value.
+  any bound instrument control, role/row volume, master volume, reverb
+  parameter, tuning reference, rhythm tempo or bass voicing value.
 - Copy actions, RST and runtime preset selection preserve bound values while
   still applying their normal changes to unbound state.
 - Bound rhythm tempo disables and greys both rhythm UP/DWN buttons.

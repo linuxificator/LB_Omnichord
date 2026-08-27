@@ -34,6 +34,7 @@ Elements:
 - instrument selection;
 - octave controls;
 - tuning controls;
+- independent OMNI master volume and mute;
 - transport and mode controls.
 
 The layout should resemble the original Omnichord concept: large playable areas, minimal precision tapping requirements, and immediate visual feedback.
@@ -48,6 +49,8 @@ Rules:
 - MIDI and OMNI tuning can be coupled or independent;
 - switching screens must not silently modify musical parameters;
 - selecting an instrument must fully initialize the selected patch.
+- MIDI master volume and mute control only MIDI buses and remain independent
+  of the OMNI master.
 
 ## Tuning behavior
 
@@ -125,6 +128,10 @@ Colors are used to communicate function:
 - green elements indicate active/playable performance areas;
 - different functional groups should remain visually distinguishable;
 - visual changes should not replace actual state feedback.
+
+The master-volume family uses the brown functional palette. Its center mute
+panel is white with black `MUT` text while output is enabled, and black with
+white `UMT` text while muted.
 
 ### Typography
 

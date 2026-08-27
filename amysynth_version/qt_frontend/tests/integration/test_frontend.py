@@ -20,6 +20,75 @@ def bind_control(
 
 
 class FrontendIntegrationTests(unittest.TestCase):
+    def test_independent_master_volume_and_mute_are_bus_scoped(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 1.0)
+            self.assertFalse(bool(app.query("masterMuted")))
+            self.assertAlmostEqual(float(app.action("midiMasterVolume")), 1.0)
+            self.assertFalse(bool(app.action("midiMasterMuted")))
+
+            checkpoint = app.bridge.count()
+            app.action("setMasterVolume", 0.42)
+            lines = app.bridge.wait_for_lines(
+                [f"y{bus}V0.42Z" for bus in range(4)],
+                start=checkpoint,
+                timeout=3.0,
+            )
+            self.assertFalse(any(line.startswith("y4V") for line in lines))
+
+            checkpoint = app.bridge.count()
+            app.action("toggleMasterMuted")
+            app.bridge.wait_for_lines(
+                [f"y{bus}V0Z" for bus in range(4)],
+                start=checkpoint,
+                timeout=3.0,
+            )
+            self.assertTrue(bool(app.query("masterMuted")))
+            app.action("setMasterVolume", 0.73)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 0.73)
+            checkpoint = app.bridge.count()
+            app.action("toggleMasterMuted")
+            app.bridge.wait_for_lines(
+                [f"y{bus}V0.73Z" for bus in range(4)],
+                start=checkpoint,
+                timeout=3.0,
+            )
+
+            checkpoint = app.bridge.count()
+            app.action("setMidiMasterVolume", 0.35)
+            lines = app.bridge.wait_for_lines(
+                [f"y{bus}V0.35Z" for bus in range(4, 11)],
+                start=checkpoint,
+                timeout=3.0,
+            )
+            self.assertFalse(any(line.startswith("y0V") for line in lines))
+            app.action("toggleMidiMasterMuted")
+            self.assertTrue(bool(app.action("midiMasterMuted")))
+
+            app.action("selectPreset", 2)
+            app.action("selectMidiPreset", 2)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 0.73)
+            self.assertFalse(bool(app.query("masterMuted")))
+            self.assertAlmostEqual(float(app.action("midiMasterVolume")), 0.35)
+            self.assertTrue(bool(app.action("midiMasterMuted")))
+
+            omni_target = {"screen": "omni", "kind": "master_volume"}
+            bind_control(app, 12, 90, omni_target)
+            app.action("injectMidiControl", 12, 90, 127)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 1.0)
+            app.action("setMasterVolume", 0.2)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 1.0)
+            app.action("toggleMasterMuted")
+            self.assertTrue(bool(app.query("masterMuted")))
+
+            midi_target = {"screen": "midi", "kind": "master_volume"}
+            bind_control(app, 13, 91, midi_target)
+            app.action("injectMidiControl", 13, 91, 127)
+            self.assertAlmostEqual(float(app.action("midiMasterVolume")), 1.0)
+            app.action("setMidiMasterVolume", 0.2)
+            self.assertAlmostEqual(float(app.action("midiMasterVolume")), 1.0)
+
     def test_bound_numeric_targets_reject_manual_changes(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)

@@ -795,6 +795,7 @@ class AmySerialClient:
             raise ValueError(
                 "drums, bass, strum and chord must use four distinct AMY buses 0..3"
             )
+        self.master_volume = 1.0
         self.reverb = {
             "level": 0.0,
             "liveness": 0.5,
@@ -991,6 +992,20 @@ class AmySerialClient:
     def _route_synth_bus(self, synth: int) -> None:
         self._wire(f"i{synth}iy{self._bus_for_synth(synth)}Z")
 
+    def _apply_master_bus(self, bus: int) -> None:
+        self._wire(f"y{int(bus)}V{self._f(self.master_volume)}Z")
+
+    def _apply_master_buses(self) -> None:
+        for bus in self.bus_id.values():
+            self._apply_master_bus(bus)
+
+    def _set_master_volume(self, value: Any) -> None:
+        updated = max(0.0, min(1.0, float(value)))
+        if math.isclose(updated, self.master_volume, abs_tol=1e-4):
+            return
+        self.master_volume = updated
+        self._apply_master_buses()
+
     def _reverb_command(self, bus: int, *, enabled: bool) -> str:
         level = self.reverb["level"] if enabled else 0.0
         return (
@@ -1072,6 +1087,7 @@ class AmySerialClient:
         # this role's room after the patch is loaded. Other role buses are not
         # touched.
         self._apply_reverb_bus(bus)
+        self._apply_master_bus(bus)
 
         if already_configured:
             # A ROM repatch is not a cheap parameter edit in AMY: it releases,
@@ -1114,6 +1130,7 @@ class AmySerialClient:
         self._configure_synth("strum")
         self._configure_synth("chord")
         self._apply_reverb_buses()
+        self._apply_master_buses()
 
     @staticmethod
     def _params_from_list(values: Any) -> dict[str, float]:
@@ -1858,6 +1875,8 @@ class AmySerialClient:
             self._set_volume("drums", value)
         elif address == a["reverb"]:
             self._set_reverb(value)
+        elif address == a["master_volume"]:
+            self._set_master_volume(value)
         elif address == a["chord_synth"]:
             if isinstance(value, dict):
                 self._set_synth_state("chord", value)

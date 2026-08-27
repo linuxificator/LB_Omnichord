@@ -181,6 +181,7 @@ class StaticContractTests(unittest.TestCase):
             "reverb_liveness",
             "reverb_damping",
             "tuning_reference",
+            "master_volume",
             "rhythm_tempo",
             "bass_voicing",
         ):
@@ -501,6 +502,47 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("width: 48", mode_panel)
         self.assertIn("height: 48", mode_panel)
         self.assertNotIn("toggleStrumLadderMode", midi)
+
+    def test_brown_master_controls_are_independent_and_right_aligned(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        tap_number = (ROOT / "gui" / "TapNumber.qml").read_text(
+            encoding="utf-8"
+        )
+        utilities = tuple(
+            (ROOT / "gui" / name).read_text(encoding="utf-8")
+            for name in ("UtilitySection.qml", "MidiUtilitySection.qml")
+        )
+
+        self.assertIn("property bool centerButtonEnabled: false", tap_number)
+        self.assertIn("signal centerClicked()", tap_number)
+        self.assertIn("root.centerHit(numberPoint.y)", tap_number)
+        self.assertIn("root.centerClicked()", tap_number)
+        for screen in (main, midi):
+            self.assertIn("utilityRightEdge:", screen)
+            self.assertIn("reverbPanel.width", screen)
+        for screen_name, utility in zip(("omni", "midi"), utilities):
+            self.assertIn("property int utilityRightEdge: width", utility)
+            self.assertRegex(
+                utility,
+                r"readonly property int escapeX:\s*"
+                r"utilityRightEdge - escapeWidth",
+            )
+            self.assertRegex(
+                utility,
+                r"readonly property int masterX:\s*"
+                r"panicX - utilityGap - masterWidth",
+            )
+            self.assertGreaterEqual(utility.count("TapNumber {"), 2)
+            self.assertIn('panelColor: "#b58a63"', utility)
+            self.assertIn('fillColor: "#704323"', utility)
+            self.assertIn('? "UMT" : "MUT"', utility)
+            self.assertIn('centerPanelColor:', utility)
+            self.assertIn('root.controller.masterMuted ? "#111111" : "#ffffff"', utility)
+            self.assertIn(f'"screen": "{screen_name}"', utility)
+            self.assertIn('"kind": "master_volume"', utility)
+            self.assertIn("setMasterVolume(value / 100)", utility)
+            self.assertIn("toggleMasterMuted()", utility)
 
     def test_midi_title_uses_the_omni_title_geometry(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")

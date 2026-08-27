@@ -716,6 +716,8 @@ class InstrumentBackend(QObject):
     reverbLivenessChanged = Signal()
     reverbDampingChanged = Signal()
     reverbDrumsIncludedChanged = Signal()
+    masterVolumeChanged = Signal()
+    masterMutedChanged = Signal()
     strumModeChanged = Signal()
     strumNoteNamesChanged = Signal()
     bassRunningChanged = Signal()
@@ -762,6 +764,7 @@ class InstrumentBackend(QObject):
         bass_amp_address: str,
         percussion_amp_address: str,
         reverb_address: str,
+        master_volume_address: str,
         chord_synth_address: str,
         chord_params_address: str,
         strum_synth_address: str,
@@ -796,6 +799,7 @@ class InstrumentBackend(QObject):
         self._bass_amp_address = bass_amp_address
         self._percussion_amp_address = percussion_amp_address
         self._reverb_address = reverb_address
+        self._master_volume_address = master_volume_address
         self._chord_synth_address = chord_synth_address
         self._chord_params_address = chord_params_address
         self._strum_synth_address = strum_synth_address
@@ -933,6 +937,9 @@ class InstrumentBackend(QObject):
             0.0, min(1.0, float(effects.get("reverb_damping", 0.5)))
         )
         self._reverb_drums = bool(effects.get("reverb_drums", False))
+        # Screen masters are live output state, independent of presets.
+        self._master_volume = 1.0
+        self._master_muted = False
         self._bass_running = bool(
             transport["bass_running"]
         )
@@ -1202,6 +1209,14 @@ class InstrumentBackend(QObject):
     def reverbDrumsIncluded(self) -> bool:
         return self._reverb_drums
 
+    @Property(float, notify=masterVolumeChanged)
+    def masterVolume(self) -> float:
+        return self._master_volume
+
+    @Property(bool, notify=masterMutedChanged)
+    def masterMuted(self) -> bool:
+        return self._master_muted
+
     @Property(bool, notify=strumModeChanged)
     def strumLadderMode(self) -> bool:
         return self._strum_ladder_mode
@@ -1425,6 +1440,29 @@ class InstrumentBackend(QObject):
 
     def _send_reverb_state(self) -> None:
         self._client.send_message(self._reverb_address, self._reverb_payload())
+
+    def _send_master_volume(self) -> None:
+        effective = 0.0 if self._master_muted else self._master_volume
+        self._client.send_message(self._master_volume_address, effective)
+
+    @Slot(float)
+    def setMasterVolume(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "master_volume"}
+        ):
+            return
+        clamped = max(0.0, min(1.0, float(value)))
+        if math.isclose(clamped, self._master_volume, abs_tol=1e-4):
+            return
+        self._master_volume = clamped
+        self.masterVolumeChanged.emit()
+        self._send_master_volume()
+
+    @Slot()
+    def toggleMasterMuted(self) -> None:
+        self._master_muted = not self._master_muted
+        self.masterMutedChanged.emit()
+        self._send_master_volume()
 
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
@@ -3954,6 +3992,7 @@ class InstrumentBackend(QObject):
         self._send_synth_state("chord")
         self._send_synth_state("strum")
         self._send_synth_state("bass")
+        self._send_master_volume()
         self._send_rhythm_config()
         self._client.send_message(
             self._bass_running_address,
@@ -4022,6 +4061,7 @@ class InstrumentBackend(QObject):
         self._send_synth_state("chord")
         self._send_synth_state("strum")
         self._send_synth_state("bass")
+        self._send_master_volume()
         self._send_rhythm_config()
 
         self._client.send_message(
@@ -4181,6 +4221,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--reverb-address",
         default="/effects/reverb",
+    )
+    parser.add_argument(
+        "--master-volume-address",
+        default="/master/volume",
     )
     parser.add_argument(
         "--chord-synth-address",
@@ -4426,6 +4470,7 @@ def main() -> int:
         "bass_amp": args.bass_amp_address,
         "percussion_amp": args.percussion_amp_address,
         "reverb": args.reverb_address,
+        "master_volume": args.master_volume_address,
         "chord_synth": args.chord_synth_address,
         "chord_params": args.chord_params_address,
         "strum_synth": args.strum_synth_address,
@@ -4507,6 +4552,7 @@ def main() -> int:
         bass_amp_address=args.bass_amp_address,
         percussion_amp_address=args.percussion_amp_address,
         reverb_address=args.reverb_address,
+        master_volume_address=args.master_volume_address,
         chord_synth_address=args.chord_synth_address,
         chord_params_address=args.chord_params_address,
         strum_synth_address=args.strum_synth_address,

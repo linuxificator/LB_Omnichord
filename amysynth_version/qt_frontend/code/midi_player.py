@@ -228,6 +228,7 @@ class MidiAmyEngine:
             row: [] for row in range(MIDI_ROW_COUNT)
         }
         self._preview_tail_tokens = [0] * MIDI_ROW_COUNT
+        self.master_volume = 1.0
         self.configure_drum_synth()
 
     def _wire(self, command: str) -> None:
@@ -275,7 +276,16 @@ class MidiAmyEngine:
         )
         self._wire(f"v0w7i{synth}Z")
         self._route(synth, self.drum_bus)
+        self._apply_master_bus(self.drum_bus)
         self._drum_configured = True
+
+    def _apply_master_bus(self, bus: int) -> None:
+        self._wire(f"y{int(bus)}V{self._f(self.master_volume)}Z")
+
+    def set_master_volume(self, volume: float) -> None:
+        self.master_volume = max(0.0, min(1.0, float(volume)))
+        for bus in (*self.row_buses, self.drum_bus):
+            self._apply_master_bus(bus)
 
     def _compat_commands(self, patch: int, synth: int) -> list[str]:
         helper = getattr(self.client, "_patch_compatibility_commands", None)
@@ -456,6 +466,7 @@ class MidiAmyEngine:
         self._configured_rows.add(row)
         self._route(synth, bus)
         self.set_row_volume(row, self.balanced_volume(key, volume))
+        self._apply_master_bus(bus)
 
     def set_row_volume(self, row: int, volume: float) -> None:
         value = max(0.0, min(1.0, float(volume)))
@@ -623,6 +634,8 @@ class MidiPlayerBackend(QObject):
     reverbLivenessChanged = Signal()
     reverbDampingChanged = Signal()
     reverbDrumsIncludedChanged = Signal()
+    masterVolumeChanged = Signal()
+    masterMutedChanged = Signal()
     bindingStateChanged = Signal()
     bindingLocationRequested = Signal(str, int)
     _queuedControlChange = Signal(int, int, int)
@@ -666,6 +679,9 @@ class MidiPlayerBackend(QObject):
         self._reverb_liveness = 0.5
         self._reverb_damping = 0.5
         self._reverb_drums = False
+        # MIDI master output is live state and is not replaced by presets.
+        self._master_volume = 1.0
+        self._master_muted = False
         self._midi_control_state = MidiControlState(capacity=17)
         self._preset_binding_locations: dict[
             tuple[int, int], tuple[tuple[str, int], ...]
@@ -767,6 +783,14 @@ class MidiPlayerBackend(QObject):
     @Property(bool, notify=reverbDrumsIncludedChanged)
     def reverbDrumsIncluded(self) -> bool:
         return self._reverb_drums
+
+    @Property(float, notify=masterVolumeChanged)
+    def masterVolume(self) -> float:
+        return self._master_volume
+
+    @Property(bool, notify=masterMutedChanged)
+    def masterMuted(self) -> bool:
+        return self._master_muted
 
     def _queue_midi_control(self, channel: int, controller: int, value: int) -> None:
         """Move raw-MIDI thread callbacks onto this QObject's Qt thread."""
@@ -1009,6 +1033,7 @@ class MidiPlayerBackend(QObject):
             "reverb_liveness",
             "reverb_damping",
             "tuning_reference",
+            "master_volume",
         ):
             target["id"] = f"{screen}:{kind}"
             return target
@@ -1048,6 +1073,8 @@ class MidiPlayerBackend(QObject):
                 str(getattr(control, "scale", "linear")),
             )
         if kind == "volume":
+            return 0.0, 1.0, 0.01, "linear"
+        if kind == "master_volume":
             return 0.0, 1.0, 0.01, "linear"
         if kind == "reverb_level":
             return 0.0, MIDI_REVERB_MAX, 0.01, "linear"
@@ -1195,6 +1222,9 @@ class MidiPlayerBackend(QObject):
                     "percussion": self.owner.setPercussionVolume,
                 }[str(target["role"])]
                 self._apply_midi_setter(setter, value)
+        elif kind == "master_volume":
+            controller = self if screen == "midi" else self.owner
+            self._apply_midi_setter(controller.setMasterVolume, value)
         elif kind.startswith("reverb_"):
             controller = self if screen == "midi" else self.owner
             setter = {
@@ -1515,6 +1545,8 @@ class MidiPlayerBackend(QObject):
                 }[str(target["role"])]
             )
         controller = self if screen == "midi" else self.owner
+        if kind == "master_volume":
+            return float(controller._master_volume)
         if kind == "reverb_level":
             return float(controller._reverb_level)
         if kind == "reverb_liveness":
@@ -1565,6 +1597,8 @@ class MidiPlayerBackend(QObject):
                 controller = self if screen == "midi" else self.owner
                 if kind == "reverb_level":
                     controller._reverb_level = value
+                elif kind == "master_volume":
+                    controller._master_volume = value
                 elif kind == "reverb_liveness":
                     controller._reverb_liveness = value
                 elif kind == "reverb_damping":
@@ -2305,10 +2339,35 @@ class MidiPlayerBackend(QObject):
         self.reverbDrumsIncludedChanged.emit()
         self._apply_reverb()
 
+    def _effective_master_volume(self) -> float:
+        return 0.0 if self._master_muted else self._master_volume
+
+    @Slot(float)
+    def setMasterVolume(self, value: float) -> None:
+        if self.manual_change_blocked(
+            {"screen": "midi", "kind": "master_volume"}
+        ):
+            return
+        value = max(0.0, min(1.0, float(value)))
+        if math.isclose(value, self._master_volume, abs_tol=1e-4):
+            return
+        self._master_volume = value
+        self.masterVolumeChanged.emit()
+        self.engine.set_master_volume(self._effective_master_volume())
+        self._emit_state()
+
+    @Slot()
+    def toggleMasterMuted(self) -> None:
+        self._master_muted = not self._master_muted
+        self.masterMutedChanged.emit()
+        self.engine.set_master_volume(self._effective_master_volume())
+        self._emit_state()
+
     def _apply_all_to_engine(self) -> None:
         for row in range(MIDI_ROW_COUNT):
             self._configure_row(row)
         self._apply_reverb()
+        self.engine.set_master_volume(self._effective_master_volume())
 
     def send_initial_state(self) -> None:
         self._apply_all_to_engine()

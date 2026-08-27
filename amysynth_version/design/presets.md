@@ -31,6 +31,9 @@ rhythm-driven chord may change voicing during that transition, but it must not
 be left silent and its later button release must still release the active
 manual voice.
 
+OMNI master volume and mute are live output state, not preset state. They
+survive OMNI preset switches and are not serialized.
+
 ## MIDI preset contents
 
 A MIDI preset stores:
@@ -43,6 +46,8 @@ A MIDI preset stores:
 - MIDI tuning mode/reference
 
 The tuning link/coupling state is runtime-only and is not stored.
+MIDI master volume and mute are also runtime-only and survive MIDI preset
+switches.
 
 MIDI CC bindings follow target ownership: MIDI targets are stored in MIDI
 presets and OMNI targets in OMNI presets under the optional

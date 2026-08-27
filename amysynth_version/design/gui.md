@@ -21,7 +21,14 @@ The following remain available in both screens:
 - Panic button: stops active notes.
 - Fullscreen toggle.
 - Tuning controls.
+- A brown master-volume tap slider for that screen's complete audio section.
 - Mode switch.
+
+The master slider sits between tuning and `PNC!`. `PNC!` and `FSC`/`ESC` are
+shifted right so the fullscreen button's right edge aligns with the right edge
+of the pink reverb panel. The slider's center is a mute switch: unmuted shows a
+white `MUT` panel with black text; muted shows a black `UMT` panel with white
+text. OMNI and MIDI master volume and mute state are independent.
 
 ## MIDI view
 
@@ -35,6 +42,7 @@ The MIDI view contains:
 - Volume controls.
 - MIDI preview strum.
 - Independent MIDI reverb controls for level, liveness, damping and drum send.
+- Independent MIDI master volume and mute.
 
 No watermark is shown on the MIDI screen.
 

@@ -113,8 +113,25 @@ class MidiAmyEngineTests(unittest.TestCase):
                 ("wire", "v0o7i5Z"),
                 ("wire", "i5iy4Z"),
                 ("wire", "i5iV0.28Z"),
+                ("wire", "y4V1Z"),
             ],
         )
+
+    def test_master_volume_is_scoped_to_all_midi_buses(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        engine.set_master_volume(0.35)
+
+        self.assertEqual(
+            [value for kind, value in client.events if kind == "wire"],
+            [f"y{bus}V0.35Z" for bus in range(4, 11)],
+        )
+
+        client.events.clear()
+        engine.configure_row(0, "dx7_215", {}, 0.5)
+        self.assertIn(("wire", "y4V0.35Z"), client.events)
 
     def test_only_reconfiguration_silences_an_existing_synth(self) -> None:
         client = _Client()

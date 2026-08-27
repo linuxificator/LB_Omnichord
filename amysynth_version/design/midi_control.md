@@ -88,13 +88,14 @@ Every continuous numeric control is bindable:
 
 - MIDI and OMNI instrument parameters;
 - all MIDI and OMNI role volumes, including percussion;
+- the independent OMNI and MIDI master-volume sliders;
 - OMNI and MIDI reverb level, liveness and damping;
 - OMNI and MIDI tuning reference;
 - rhythm tempo;
 - bass voicing.
 
-Buttons, switches, activity selectors, instrument tumblers and tuning-mode
-selectors are not slider targets.
+Buttons, switches (including `MUT`/`UMT`), activity selectors, instrument
+tumblers and tuning-mode selectors are not slider targets.
 
 MIDI 0–127 maps over the complete visible slider travel. Linear sliders map
 linearly. Logarithmic controls such as frequency map logarithmically, matching

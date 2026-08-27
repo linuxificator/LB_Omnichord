@@ -39,6 +39,16 @@ The OMNI and MIDI reverb level sliders cover `0.00..3.00`. This is the wet
 return gain sent unchanged to the owned AMY buses. Liveness and damping remain
 `0.00..1.00`, and both screens keep independent reverb state.
 
+## Master volume
+
+The brown OMNI and MIDI master sliders cover `0.00..1.00` and control the final
+gain of their owned AMY buses: OMNI buses 0–3 and MIDI buses 4–10. Their values
+and mute states are independent live state and are not preset contents. Mute
+writes zero to the owned buses while retaining the slider value; changing the
+slider while muted changes that retained value, and unmute reapplies it.
+Per-role and per-row volumes remain unchanged, so muting never destroys the
+instrument balance selected by the user or preset.
+
 ## MIDI control activity
 
 Raw MIDI Control Change messages establish baselines and show grey radio-style

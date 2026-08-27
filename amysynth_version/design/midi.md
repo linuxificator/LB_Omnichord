@@ -51,6 +51,12 @@ MIDI drums use bus 10. The pink MIDI reverb section programs all six MIDI row
 buses with one shared user setting and includes bus 10 only when DRM is enabled.
 The similarly shaped OMNI reverb control is independent.
 
+MIDI master volume is likewise independent: it writes the same final bus gain
+to MIDI buses 4 through 10. OMNI master volume writes only buses 0 through 3.
+Mute applies zero to the owned buses without discarding the selected master
+value; unmute restores that value. Neither master may alter the other screen's
+state or buses.
+
 Each pitched MIDI synth has four voices. Both external MIDI and preview notes
 are tracked by source note. The preview strum explicitly releases its oldest
 live preview note before exceeding four notes; it must not rely on AMY voice

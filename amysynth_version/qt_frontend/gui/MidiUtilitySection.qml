@@ -14,6 +14,7 @@ Item {
     property int tuningRowHeight: height
     property int presetRowY: 0
     property int presetRowHeight: height
+    property int utilityRightEdge: width
     signal toggleFullscreenRequested()
     signal toggleTuningCouplingRequested()
 
@@ -21,13 +22,16 @@ Item {
     readonly property int tuningX: 231
     readonly property int tuningWidth: 52
     readonly property int utilityGap: 8
+    readonly property int masterWidth: tuningWidth
     readonly property int panicWidth: 76
     readonly property int escapeWidth: 72
 
-    readonly property int panicX:
-        tuningX + tuningWidth + utilityGap
     readonly property int escapeX:
-        panicX + panicWidth + utilityGap
+        utilityRightEdge - escapeWidth
+    readonly property int panicX:
+        escapeX - utilityGap - panicWidth
+    readonly property int masterX:
+        panicX - utilityGap - masterWidth
     property int presetX:
         escapeX + escapeWidth + utilityGap
 
@@ -188,6 +192,36 @@ Item {
         })
 
         onEdited: (value) => root.controller.setTuningReference(value)
+    }
+
+    TapNumber {
+        x: root.masterX
+        y: 0
+        width: root.masterWidth
+        height: root.tuningRowHeight
+        currentValue: Math.round(root.controller.masterVolume * 100)
+        fromValue: 0
+        toValue: 100
+        stepValue: 1
+        panelColor: "#b58a63"
+        panelBorderColor: "#6d492c"
+        fillColor: "#704323"
+        textColor: "#2d190d"
+        centerButtonEnabled: true
+        centerText: root.controller.masterMuted ? "UMT" : "MUT"
+        centerPanelColor:
+            root.controller.masterMuted ? "#111111" : "#ffffff"
+        centerPanelTextColor:
+            root.controller.masterMuted ? "#ffffff" : "#111111"
+        centerPanelBorderColor: "#6d492c"
+        midiControlRouter: root.controller
+        midiTarget: ({
+            "screen": "midi",
+            "kind": "master_volume"
+        })
+
+        onEdited: (value) => root.controller.setMasterVolume(value / 100)
+        onCenterClicked: root.controller.toggleMasterMuted()
     }
 
     Button {

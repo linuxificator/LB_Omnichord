@@ -27,12 +27,14 @@ Current hard ranges:
 | DX7 algorithm | 1–32 |
 | DX7 feedback | 0–0.5 |
 
-Other user controls are independently bounded in the backend: volumes are 0–1,
-reverb level is 0–3, reverb liveness/damping are 0–1, tuning reference is
-415–466 Hz, rhythm tempo is 40–200 BPM, and activity selectors are restricted
-to the discrete UI range 1–4. The transient effective chord-activity value 0
-during manual chord takeover is not editable or persisted; `CHORD ON/OFF`
-owns the automatic-chord gate.
+Other user controls are independently bounded in the backend: role/row and
+master volumes are 0–1, reverb level is 0–3, reverb liveness/damping are 0–1,
+tuning reference is 415–466 Hz, rhythm tempo is 40–200 BPM, and activity
+selectors are restricted to the discrete UI range 1–4. Master mute never
+overwrites its retained 0–1 value: it applies an effective bus gain of zero and
+unmute restores the retained value. The transient effective chord-activity
+value 0 during manual chord takeover is not editable or persisted; `CHORD
+ON/OFF` owns the automatic-chord gate.
 
 A live MIDI CC binding is also an ownership boundary. Shared QML controls
 consume bound edit gestures, while the backend setters independently reject

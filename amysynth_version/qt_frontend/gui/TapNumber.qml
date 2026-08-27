@@ -13,6 +13,12 @@ Frame {
     property color panelBorderColor: "#a76512"
     property color fillColor: "#cf7411"
     property color textColor: "#4b2804"
+    property bool centerButtonEnabled: false
+    property string centerText: String(root.currentValue)
+    property color centerPanelColor: root.panelColor
+    property color centerPanelTextColor: root.textColor
+    property color centerPanelBorderColor: root.panelBorderColor
+    property bool centerPressActive: false
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
@@ -39,6 +45,7 @@ Frame {
 
     signal edited(int value)
     signal activated()
+    signal centerClicked()
 
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
@@ -82,6 +89,11 @@ Frame {
 
         root.step(root.repeatDirection)
         holdDelay.restart()
+    }
+
+    function centerHit(yPosition) {
+        return root.centerButtonEnabled
+            && Math.abs(yPosition - root.height / 2) <= 13.5
     }
 
     function endPress() {
@@ -143,19 +155,21 @@ Frame {
     }
 
     Rectangle {
+        id: centerPanel
+
         anchors.centerIn: parent
         width: parent.width - 8
         height: 27
         radius: 7
-        color: root.panelColor
+        color: root.centerPanelColor
         opacity: 0.96
-        border.color: root.panelBorderColor
+        border.color: root.centerPanelBorderColor
         border.width: 1
 
         Text {
             anchors.centerIn: parent
-            text: root.currentValue
-            color: root.textColor
+            text: root.centerText
+            color: root.centerPanelTextColor
             font.pixelSize: 14
             font.bold: true
         }
@@ -222,6 +236,12 @@ Frame {
         ]
 
         onPressed: {
+            root.centerPressActive = root.centerHit(numberPoint.y)
+            if (root.centerPressActive) {
+                root.endPress()
+                root.midiBindingGesture = false
+                return
+            }
             root.midiBindingGesture = root.beginMidiInteraction()
             root.activated()
             if (!root.midiBindingGesture)
@@ -229,13 +249,19 @@ Frame {
         }
 
         onReleased: {
+            const activateCenter = root.centerPressActive
+                && root.centerHit(numberPoint.y)
             root.endPress()
             root.midiBindingGesture = false
+            root.centerPressActive = false
+            if (activateCenter)
+                root.centerClicked()
         }
 
         onCanceled: {
             root.endPress()
             root.midiBindingGesture = false
+            root.centerPressActive = false
         }
     }
 }

@@ -195,6 +195,9 @@ Item {
             root.hostWindow.sectionHeight
             + root.hostWindow.sectionGap
         presetRowHeight: root.hostWindow.presetRowHeight
+        utilityRightEdge:
+            reverbPanel.width
+            - root.hostWindow.contentX
         presetX:
             reverbPanel.width
             + root.hostWindow.sectionGap

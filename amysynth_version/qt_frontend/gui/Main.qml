@@ -389,6 +389,9 @@ ApplicationWindow {
                     window.sectionHeight
                     + window.sectionGap
                 presetRowHeight: window.presetRowHeight
+                utilityRightEdge:
+                    reverbPanel.width
+                    - window.contentX
                 presetX:
                     reverbPanel.width
                     + window.sectionGap
