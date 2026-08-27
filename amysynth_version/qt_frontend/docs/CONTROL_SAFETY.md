@@ -52,3 +52,8 @@ existing synth-4 all-off tags, so a chord already sounding completes its normal
 rhythmic gate. The serial regression holds a chord for one second and requires
 rhythm transport to stay logically running with percussion events still
 scheduled during the hold.
+
+The `CHORD ON/OFF` control belongs exclusively to automatic rhythm synth 4.
+It may use the remembered chord identity to construct sequencer events, but it
+must never emit a manual synth-3 note-on or release a physically held synth-3
+voice. Manual voice lifetime remains owned by chord-button press/release.

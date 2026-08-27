@@ -212,7 +212,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             )
             app.action("releaseChord", 1, 9)
 
-    def test_chord_gate_remembers_last_chord_and_strum_stays_live(self) -> None:
+    def test_chord_gate_only_controls_sequencer_and_strum_stays_live(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
             self.assertEqual(int(app.query("chordGateState")), 0)
@@ -246,13 +246,28 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("toggleChordGate")
             app.bridge.wait_idle(timeout=3.0)
             self.assertEqual(int(app.query("chordGateState")), 1)
-            self.assertTrue(
+            self.assertFalse(
                 any(
                     "i3" in line and "n" in line and "l1" in line
                     for line in app.bridge.lines_since(start)
                 ),
-                "CHORD ON did not retrigger the remembered manual chord",
+                "CHORD ON retriggered the remembered manual chord",
             )
+
+            # Even while the same chord button is physically held, CHORD OFF
+            # owns only the automatic synth-4 lane. The manual synth-3 voice
+            # must remain alive until the matching button release.
+            app.action("pressChord", 0, 0)
+            app.bridge.wait_idle(timeout=3.0)
+            start = app.bridge.count()
+            app.action("toggleChordGate")
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("chordGateState")), 2)
+            self.assertNotIn("l0i3Z", app.bridge.lines_since(start))
+
+            start = app.bridge.count()
+            app.action("releaseChord", 0, 0)
+            app.bridge.wait_for_lines(["l0i3Z"], start=start, timeout=3.0)
 
     def test_bass_voicing_property_is_centered_and_stepwise(self) -> None:
         with HeadlessApp(native_amy=False) as app:

@@ -229,18 +229,18 @@ and remains bound to the controller. The animation uses 110 ms fade-out and
 preset load without a same-controller/different-target conflict does not show
 this feedback.
 
-## OMNI status LED
+## OMNI learn LED
 
-The OMNI screen shows one status LED vertically centered on the second chord
-row. Horizontally it is centered in the complete free gap between the right
-edge of that indented chord row and the left edge of the strum surface. It must
-not be centered under the first-row strum-to-chord copy button or left touching
-the second chord row.
+On the OMNI screen, a blinking red learn LED appears inside the large `MIDI`
+mode button, immediately to the right of the `MIDI` label so it does not sit on
+the red end of the rainbow background. It is completely invisible whenever no
+controller is in learn state. The existing green binding-location LED remains
+on the left side of the button and follows its independent location-feedback
+rules.
 
-The LED is dark grey normally, blinks red while any controller is in learn
-state and is blue while at least one controller is in the temporary unbound
-state. MIDI indicator details remain visible only on the MIDI screen. Switching
-screens does not change learn, binding or musical state.
+Blue/unbound state remains visible on the detailed MIDI-screen controller
+indicator; it does not create a separate OMNI status LED. Switching screens
+does not change learn, binding or musical state.
 
 ## Thread and AMY boundaries
 
@@ -266,9 +266,9 @@ The behavior is intentionally split along existing responsibilities:
   exposes the narrow integration-test actions. It does not create a second
   binding state.
 - `../qt_frontend/gui/MidiScreen.qml` renders the MIDI indicator bar;
-  `Main.qml` renders the OMNI status LED. `UtilitySection.qml`,
-  `MidiUtilitySection.qml` and `RainbowModeButton.qml` render binding-location
-  feedback. `ParameterSlider.qml`,
+  `Main.qml` supplies OMNI learn state to the red LED in
+  `RainbowModeButton.qml`. `UtilitySection.qml`, `MidiUtilitySection.qml` and
+  the same rainbow button render binding-location feedback. `ParameterSlider.qml`,
   `LabeledSlider.qml`, `VerticalVolume.qml` and `TapNumber.qml` implement the
   shared bind/unlink gestures used by their owning sections.
 - `../qt_frontend/tests/test_midi_control_bindings.py` tests the pure state

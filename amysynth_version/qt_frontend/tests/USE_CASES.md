@@ -179,10 +179,10 @@ The serial regression requires the factory patch to remain authoritative for nat
   learn controller.
 - Clicking another transfers red selection.
 - Clicking the red controller again cancels learn and turns it off.
-- The OMNI status LED mirrors red learn state without exposing controller
-  details.
-- The OMNI LED is vertically centered on chord row two and horizontally
-  centered in the free gap between that indented row and the strum surface.
+- The OMNI screen mirrors red learn state without exposing controller details.
+- Its red LED blinks to the right of the label inside the large `MIDI` button
+  and is completely invisible when learn is inactive.
+- The independent green binding-location LED remains left of the button label.
 
 **MIDI-CC-04 — one-to-one binding and complete numeric target coverage**
 
@@ -533,6 +533,15 @@ that prevented hanging but audibly shortened the accompaniment gate.
   loads its octave from the destination preset.
 - The destination rhythm pattern may change, but transport and sequencer
   timebase remain continuous.
+
+**RHYTHM-08 — CHORD ON/OFF controls only sequencer chords**
+
+- `CHORD OFF` removes future automatic synth-4 onsets while preserving the
+  sequenced release of a currently sounding automatic chord.
+- `CHORD ON` reinstalls automatic synth-4 events without playing the remembered
+  chord once on manual synth 3.
+- Neither action releases a chord which is physically held on a chord-button
+  row. That manual synth-3 voice ends only through its normal button release.
 
 ### TUNING — all note-producing paths follow the selected tuning
 

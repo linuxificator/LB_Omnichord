@@ -49,9 +49,10 @@ and LED states defined in `midi_control.md`; an unbound knob remains display-onl
 When the bar is full, eligible indicators follow genuine-change LRU replacement
 and the outgoing knob flashes red twice.
 
-The OMNI MIDI-control status LED is vertically centered on the second chord
-row and horizontally centered in the free gap from that row's right edge to
-the strum surface. Its color behavior is defined in `midi_control.md`.
+On the OMNI screen, MIDI learn is shown by a blinking red LED inside the large
+`MIDI` mode button, immediately to the right of its label. It is absent rather
+than grey when learn is inactive. The green binding-location LED remains on
+the left side of the same button. Details are defined in `midi_control.md`.
 
 While MIDI owns rhythm tempo, both rhythm UP/DWN buttons are disabled and grey.
 While MIDI owns the effective tuning reference, both tuning UP/DWN buttons on

@@ -163,11 +163,13 @@ class InstrumentBackend(app_core.InstrumentBackend):
             return
         self._set_chord_gate_state(CHORD_GATE_ON)
         self._send_rhythm_chord_enabled()
-        self._send_chord_state(play_now=True)
+        # CHORD ON controls only the automatic synth-4 sequencer lane. The
+        # remembered chord identity supplies its pitch, but must not trigger a
+        # one-shot manual synth-3 chord.
+        self._send_chord_state(play_now=False)
 
     @Slot()
     def turnOff(self) -> None:
-        self._release_all_pressed_chords()
         if self._active_row < 0 or self._active_root_semitone < 0:
             self._set_chord_gate_state(CHORD_GATE_NONE)
         else:

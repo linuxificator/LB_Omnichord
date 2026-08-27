@@ -24,6 +24,8 @@ Each lane assigns deterministic consecutive tags to its current events. When a n
 Lane-local operations do not reset the sequencer:
 
 - manual chord hold/release changes only the automatic-chord tag range (and may update bass pitches because the active chord changed). On hold, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
+- `CHORD OFF` performs the same synth-4 drain and `CHORD ON` reinstalls that
+  lane. These controls never trigger or release manual synth-3 voices;
 - bass on/off changes only the bass range;
 - tuning/chord-pitch changes replace bass and automatic-chord ranges but do not touch percussion;
 - chord timbre changes repatch synths 3/4 without replacing their sequencer events;

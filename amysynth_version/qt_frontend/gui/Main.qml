@@ -1517,51 +1517,6 @@ ApplicationWindow {
                 }
             }
 
-            Rectangle {
-                id: omniMidiControlLed
-
-                readonly property string controlState:
-                    backend.midiPlayer.omniControlLedState
-                readonly property real gapLeft:
-                    window.contentX
-                    + window.rowIndent
-                    + window.chordRowContentWidth
-                readonly property real gapRight:
-                    window.strumX
-
-                x:
-                    gapLeft
-                    + (
-                        gapRight
-                        - gapLeft
-                        - width
-                    ) / 2
-                y:
-                    window.chordRowsY
-                    + window.rowHeight
-                    + window.rowSpacing
-                    + (window.rowHeight - height) / 2
-                width: 16
-                height: 16
-                radius: 8
-                color: {
-                    if (controlState === "learn")
-                        return "#f22b2b"
-                    if (controlState === "blue")
-                        return "#3186d7"
-                    return "#a5a5a0"
-                }
-                border.color: "#696965"
-                border.width: 1
-
-                SequentialAnimation on opacity {
-                    running: omniMidiControlLed.controlState === "learn"
-                    loops: Animation.Infinite
-                    NumberAnimation { from: 1.0; to: 0.2; duration: 240 }
-                    NumberAnimation { from: 0.2; to: 1.0; duration: 240 }
-                }
-            }
-
             // Moved left and up: aligned with the third chord row and with the
             // left edge of the section backgrounds.
             Button {
@@ -1637,6 +1592,8 @@ ApplicationWindow {
                 text: "MIDI"
                 midiControlRouter: backend.midiPlayer
                 bindingLocationScreen: "midi"
+                midiLearnActive:
+                    backend.midiPlayer.omniControlLedState === "learn"
                 onClicked:
                     window.midiScreen = true
             }

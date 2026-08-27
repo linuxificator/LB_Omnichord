@@ -508,6 +508,14 @@ active chord row, in addition to live tempo. Octaves of non-active chord rows
 load from the destination preset. When `rhythmRunning == false`, the complete
 stored set loads normally.
 
+### RHYTHM-018 — CHORD ON/OFF owns only automatic sequencer chords
+
+`CHORD OFF` drains future synth-4 note-ons while preserving their sequenced
+note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
+chord identity. Neither action may start, retrigger, release or otherwise
+control a manual synth-3 chord. A physically held chord remains owned by its
+chord-button press/release lifecycle.
+
 ## 16. Summary rule
 
 The complete behavior can be reduced to this rule:

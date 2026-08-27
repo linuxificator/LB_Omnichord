@@ -186,43 +186,26 @@ class StaticContractTests(unittest.TestCase):
         ):
             self.assertIn(f'"kind": "{kind}"', combined)
 
-    def test_midi_and_omni_control_led_states_are_rendered(self) -> None:
+    def test_midi_control_states_and_omni_learn_led_are_rendered(self) -> None:
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
         omni = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
+            encoding="utf-8"
+        )
         for state in ("learn", "bound", "blue"):
             self.assertIn(f'modelData.state === "{state}"', midi)
         self.assertIn("modelData.evicting", midi)
         self.assertIn("selectControlIndicator", midi)
-        self.assertIn("id: omniMidiControlLed", omni)
+        self.assertNotIn("id: omniMidiControlLed", omni)
         self.assertIn("backend.midiPlayer.omniControlLedState", omni)
-
-    def test_omni_control_led_is_centered_in_the_second_row_gap(self) -> None:
-        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
-        start = qml.index("id: omniMidiControlLed")
-        end = qml.index("// Moved left and up", start)
-        led = qml[start:end]
-
-        self.assertRegex(
-            led,
-            r"readonly property real gapLeft:\s*"
-            r"window\.contentX\s*\+\s*window\.rowIndent\s*\+\s*"
-            r"window\.chordRowContentWidth",
-        )
-        self.assertRegex(
-            led,
-            r"readonly property real gapRight:\s*window\.strumX",
-        )
-        self.assertRegex(
-            led,
-            r"x:\s*gapLeft\s*\+\s*\(\s*gapRight\s*-\s*gapLeft\s*"
-            r"-\s*width\s*\)\s*/\s*2",
-        )
-        self.assertRegex(
-            led,
-            r"y:\s*window\.chordRowsY\s*\+\s*window\.rowHeight\s*"
-            r"\+\s*window\.rowSpacing\s*\+\s*"
-            r"\(window\.rowHeight\s*-\s*height\)\s*/\s*2",
-        )
+        self.assertIn('=== "learn"', omni)
+        self.assertIn("id: midiLearnLed", rainbow)
+        self.assertIn("visible: root.midiLearnActive", rainbow)
+        self.assertIn("modeLabel.contentWidth", rainbow)
+        self.assertIn("+ root.extensionWidth", rainbow)
+        self.assertIn("width: 12", rainbow)
+        self.assertIn('color: "#f22b2b"', rainbow)
+        self.assertIn("running: root.midiLearnActive", rainbow)
 
     def test_frontend_tree_contains_no_symlinks(self) -> None:
         generated_roots = {"build", "dist", "test-artifacts"}
