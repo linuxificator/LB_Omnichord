@@ -391,6 +391,12 @@ Item {
 
                     width: 48
                     height: 48
+                    padding: 0
+                    leftInset: 0
+                    rightInset: 0
+                    topInset: 0
+                    bottomInset: 0
+                    scale: 1.0
 
                     text:
                         "P" + presetNumber
@@ -411,7 +417,11 @@ Item {
                     }
 
                     background: Rectangle {
-                        radius: width / 2
+                        x: 0
+                        y: 0
+                        width: presetButton.width
+                        height: presetButton.height
+                        radius: Math.min(width, height) / 2
                         color:
                             presetButton.storeFlash
                             ? "#d78cff"
@@ -429,15 +439,23 @@ Item {
                             ? "#ffffff"
                             : (
                                 presetButton.selected
-                                ? "#f0ddff"
+                                ? "#ffffff"
                                 : "#8e6bab"
                             )
-                        border.width:
-                            (
-                                presetButton.selected
-                                || presetButton.storeFlash
-                            )
-                            ? 3 : 1
+                        border.width: 1
+                    }
+
+                    MidiBindingLocationLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 4
+                        width: 7
+                        height: 7
+                        radius: width / 2
+                        z: 2
+                        midiControlRouter: root.controller.midiPlayer
+                        targetScreen: "omni"
+                        targetPreset: presetButton.presetNumber
+                        locationEnabled: !presetButton.selected
                     }
 
                     Timer {

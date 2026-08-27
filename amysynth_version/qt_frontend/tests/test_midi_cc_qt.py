@@ -54,6 +54,27 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
             preset_dir.joinpath("p1.json").write_text(
                 json.dumps(preset), encoding="utf-8"
             )
+            inactive_preset = json.loads(
+                (
+                    ROOT
+                    / "instruments"
+                    / "default_presets"
+                    / "p2.json"
+                ).read_text(encoding="utf-8")
+            )
+            inactive_preset["midi_control_bindings"] = [
+                {
+                    "channel": 1,
+                    "controller": 75,
+                    "target": {
+                        "screen": "omni",
+                        "kind": "reverb_liveness",
+                    },
+                }
+            ]
+            preset_dir.joinpath("p2.json").write_text(
+                json.dumps(inactive_preset), encoding="utf-8"
+            )
             log = temp / "midi-cc.jsonl"
             env = dict(
                 os.environ,
@@ -85,6 +106,7 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
                     )
 
                 change(74, 0)
+                change(75, 0)
                 for controller in range(32):
                     change(controller)
                 time.sleep(0.5)
@@ -136,8 +158,47 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
             self.assertEqual(last["evicted"], [1, 33 - capacity])
             applied = [item for item in records if item["event"] == "apply"]
             self.assertTrue(applied)
-            self.assertEqual(applied[-1]["target"], "omni:reverb_level")
+            self.assertEqual(
+                applied[-1]["target"],
+                "omni:reverb_level",
+            )
             self.assertAlmostEqual(float(applied[-1]["mappedValue"]), 0.02)
+            self.assertNotIn(
+                "omni:reverb_liveness",
+                {item["target"] for item in applied},
+            )
+            locations = [
+                item for item in records if item["event"] == "binding-location"
+            ]
+            self.assertTrue(
+                any(
+                    item["screen"] == "omni"
+                    and item["preset"] == 1
+                    and item["active"]
+                    for item in locations
+                )
+            )
+            self.assertEqual(
+                [
+                    item
+                    for item in locations
+                    if (
+                        item["screen"] == "omni"
+                        and item["preset"] == 2
+                        and not item["active"]
+                    )
+                ],
+                [
+                    {
+                        "event": "binding-location",
+                        "channel": 1,
+                        "controller": 75,
+                        "screen": "omni",
+                        "preset": 2,
+                        "active": False,
+                    }
+                ],
+            )
 
 
 if __name__ == "__main__":

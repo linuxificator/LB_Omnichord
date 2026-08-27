@@ -308,6 +308,8 @@ Item {
             - root.hostWindow.controlSpacing
         height: root.hostWindow.rowHeight
         text: "OMNI"
+        midiControlRouter: backend.midiPlayer
+        bindingLocationScreen: "omni"
         onClicked: {
             backend.finishMidiPreview()
             root.showOmniRequested()

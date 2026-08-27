@@ -7,6 +7,8 @@ Button {
     // The mode switch intentionally projects one chord-row indent farther to
     // the right than the CHORD ON/OFF button below the chord-type rail.
     property int extensionWidth: 30
+    property var midiControlRouter: null
+    property string bindingLocationScreen: ""
 
     padding: 0
     leftPadding: 0
@@ -34,6 +36,18 @@ Button {
             verticalAlignment: Text.AlignVCenter
             style: Text.Outline
             styleColor: "#402a36"
+        }
+
+        MidiBindingLocationLed {
+            x: 9
+            anchors.verticalCenter: parent.verticalCenter
+            width: 10
+            height: 10
+            radius: width / 2
+            z: 2
+            midiControlRouter: root.midiControlRouter
+            targetScreen: root.bindingLocationScreen
+            locationEnabled: root.bindingLocationScreen.length > 0
         }
     }
 

@@ -624,6 +624,7 @@ class MidiPlayerBackend(QObject):
     reverbDampingChanged = Signal()
     reverbDrumsIncludedChanged = Signal()
     bindingStateChanged = Signal()
+    bindingLocationRequested = Signal(str, int)
     _queuedControlChange = Signal(int, int, int)
 
     def __init__(
@@ -666,6 +667,9 @@ class MidiPlayerBackend(QObject):
         self._reverb_damping = 0.5
         self._reverb_drums = False
         self._midi_control_state = MidiControlState(capacity=17)
+        self._preset_binding_locations: dict[
+            tuple[int, int], tuple[tuple[str, int], ...]
+        ] = {}
         self._binding_version = 0
         self._midi_control_lock = threading.Lock()
         self._applying_midi_control = 0
@@ -687,6 +691,7 @@ class MidiPlayerBackend(QObject):
 
         self._ensure_preset_storage()
         self._load_startup_preset()
+        self._refresh_preset_binding_locations()
         self.syncFromOmni()
         self._apply_all_to_engine()
 
@@ -812,6 +817,7 @@ class MidiPlayerBackend(QObject):
             self._bump_binding_state()
         if target is not None:
             self._apply_control_target(target, int(value))
+        self._emit_binding_location_feedback(key, target)
 
     def _write_cc_test_log(self, record: dict[str, Any]) -> None:
         if getattr(self, "_midi_cc_test_log", None) is None:
@@ -1300,6 +1306,93 @@ class MidiPlayerBackend(QObject):
             if isinstance(target, dict):
                 target.pop("id", None)
         return result
+
+    def _selected_preset_for_screen(self, screen: str) -> int:
+        if str(screen) == "midi":
+            return int(self._selected_preset)
+        return int(self.owner.selectedPreset)
+
+    def _binding_feedback_locations(
+        self,
+        key: tuple[int, int],
+        active_target: dict[str, Any] | None,
+    ) -> tuple[tuple[str, int], ...]:
+        if active_target is not None:
+            screen = str(active_target.get("screen", ""))
+            if screen in ("omni", "midi"):
+                return ((screen, self._selected_preset_for_screen(screen)),)
+            return ()
+
+        return tuple(
+            (screen, preset_number)
+            for screen, preset_number in self._preset_binding_locations.get(
+                self._midi_control_state.key(*key),
+                (),
+            )
+            if preset_number != self._selected_preset_for_screen(screen)
+        )
+
+    def _emit_binding_location_feedback(
+        self,
+        key: tuple[int, int],
+        active_target: dict[str, Any] | None,
+    ) -> None:
+        for screen, preset_number in self._binding_feedback_locations(
+            key,
+            active_target,
+        ):
+            self._write_cc_test_log(
+                {
+                    "event": "binding-location",
+                    "channel": int(key[0]),
+                    "controller": int(key[1]),
+                    "screen": screen,
+                    "preset": preset_number,
+                    "active": active_target is not None,
+                }
+            )
+            self.bindingLocationRequested.emit(screen, preset_number)
+
+    def _refresh_preset_binding_locations(self) -> None:
+        locations: dict[tuple[int, int], set[tuple[str, int]]] = {}
+        banks = (
+            ("omni", app_core.PRESET_COUNT, self.owner._preset_path),
+            ("midi", MIDI_PRESET_COUNT, self._preset_path),
+        )
+        for screen, count, path_for_number in banks:
+            for preset_number in range(1, count + 1):
+                try:
+                    data = json.loads(
+                        path_for_number(preset_number).read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    if not isinstance(data, dict):
+                        continue
+                    entries = self._normalized_binding_entries(
+                        screen,
+                        data.get("midi_control_bindings", []),
+                    )
+                except (
+                    OSError,
+                    TypeError,
+                    ValueError,
+                    KeyError,
+                    json.JSONDecodeError,
+                ):
+                    continue
+                for key, _target in entries:
+                    locations.setdefault(key, set()).add(
+                        (screen, preset_number)
+                    )
+        self._preset_binding_locations = {
+            key: tuple(sorted(values))
+            for key, values in locations.items()
+        }
+
+    @Slot(int)
+    def refreshPresetBindingLocations(self, _preset_number: int) -> None:
+        self._refresh_preset_binding_locations()
 
     def _normalized_binding_entries(
         self,
@@ -1805,6 +1898,7 @@ class MidiPlayerBackend(QObject):
             snapshot,
         )
         self._preset_reference = json.loads(json.dumps(snapshot))
+        self._refresh_preset_binding_locations()
         self.presetStored.emit(self._selected_preset)
 
     @Slot(int)

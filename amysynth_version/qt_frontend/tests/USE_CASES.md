@@ -267,6 +267,24 @@ The serial regression requires the factory patch to remain authoritative for nat
 - An unchanged preset binding does not trigger the handoff and retains normal
   live-value preservation.
 
+**MIDI-CC-13 — hidden preset bindings advertise their location**
+
+- Only genuine changed CC input can start location feedback; the first value
+  and repeated-identical packets remain silent.
+- Movement of an active binding on the other screen flashes a green LED in the
+  visible `MIDI`/`OMNI` mode button, left of its label in the red button area.
+- If no active binding owns the controller, every valid non-selected preset
+  containing its channel/controller identity is located without loading it.
+  Its round preset button flashes a small green LED between the label and top
+  edge when that screen is visible; a location on the other screen flashes the
+  visible mode button instead.
+- Selected preset files are excluded from inactive lookup so unsaved live
+  binding changes remain authoritative. If multiple inactive presets contain
+  the identity, all matching locations are indicated.
+- Feedback lasts approximately two seconds and restarts on fresh movement. It
+  never selects a preset, changes screen, applies the inactive preset's value,
+  or changes musical state.
+
 Unit tests cover the state machine and mapping math. Headless frontend tests use
 simulated user actions plus simulated MIDI CC input and inspect state, preset
 JSON and AMY output. The offscreen Qt test feeds real raw-MIDI bytes, records

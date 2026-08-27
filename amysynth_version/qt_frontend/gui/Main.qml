@@ -1565,6 +1565,8 @@ ApplicationWindow {
                     - window.controlSpacing
                 height: window.rowHeight
                 text: "MIDI"
+                midiControlRouter: backend.midiPlayer
+                bindingLocationScreen: "midi"
                 onClicked:
                     window.midiScreen = true
             }

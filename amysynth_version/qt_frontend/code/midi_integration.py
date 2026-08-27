@@ -28,6 +28,9 @@ class InstrumentBackend(OmniInstrumentBackend):
         self.tuningChanged.connect(self._sync_midi_tuning_when_coupled)
         self._midi_player.presetChanged.connect(self.midiPresetChanged)
         self._midi_player.presetStored.connect(self.midiPresetStored)
+        self.presetStored.connect(
+            self._midi_player.refreshPresetBindingLocations
+        )
         self._midi_player.replace_control_bindings(
             "omni",
             self._pending_omni_control_bindings,

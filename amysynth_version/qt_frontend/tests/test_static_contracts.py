@@ -456,6 +456,29 @@ class StaticContractTests(unittest.TestCase):
                 r"\+ storeButton\.width\s*\+ 6",
             )
 
+            preset_start = utility.index("id: presetButton\n")
+            timer_start = utility.index("Timer {", preset_start)
+            preset = utility[preset_start:timer_start]
+            for fixed_geometry in (
+                "padding: 0",
+                "leftInset: 0",
+                "rightInset: 0",
+                "topInset: 0",
+                "bottomInset: 0",
+                "scale: 1.0",
+                "width: presetButton.width",
+                "height: presetButton.height",
+                "border.width: 1",
+            ):
+                self.assertIn(fixed_geometry, preset)
+            self.assertNotIn("visible: presetButton.pressed", preset)
+            self.assertNotIn("visible: presetButton.selected", preset)
+            self.assertRegex(
+                preset,
+                r"presetButton\.selected\s*\? \"#ffffff\"\s*"
+                r": \"#8e6bab\"",
+            )
+
         self.assertIn("anchors.bottom: parent.bottom", main)
         mode_panel_start = main.index("id: strumModePanel")
         mode_panel_end = main.index("ReverbPanel {", mode_panel_start)
@@ -499,6 +522,38 @@ class StaticContractTests(unittest.TestCase):
         )
         self.assertIn("horizontalAlignment: Text.AlignHCenter", qml)
         self.assertIn("verticalAlignment: Text.AlignVCenter", qml)
+
+    def test_hidden_preset_binding_leds_are_wired_to_location_feedback(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
+            encoding="utf-8"
+        )
+        led = (ROOT / "gui" / "MidiBindingLocationLed.qml").read_text(
+            encoding="utf-8"
+        )
+        utilities = tuple(
+            (ROOT / "gui" / name).read_text(encoding="utf-8")
+            for name in ("UtilitySection.qml", "MidiUtilitySection.qml")
+        )
+
+        self.assertIn("onBindingLocationRequested", led)
+        self.assertIn('color: "#31d158"', led)
+        self.assertIn("loops: 5", led)
+        self.assertEqual(led.count("PauseAnimation { duration: 110 }"), 2)
+        for utility, screen in zip(utilities, ("omni", "midi")):
+            self.assertIn("MidiBindingLocationLed {", utility)
+            self.assertIn("y: 4", utility)
+            self.assertIn("width: 7", utility)
+            self.assertIn(f'targetScreen: "{screen}"', utility)
+            self.assertIn("targetPreset: presetButton.presetNumber", utility)
+            self.assertIn("locationEnabled: !presetButton.selected", utility)
+
+        self.assertIn("anchors.verticalCenter: parent.verticalCenter", rainbow)
+        self.assertIn("x: 9", rainbow)
+        self.assertIn("width: 10", rainbow)
+        self.assertIn('bindingLocationScreen: "midi"', main)
+        self.assertIn('bindingLocationScreen: "omni"', midi)
 
     def test_rhythm_transport_uses_the_centered_bass_arrow_geometry(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")

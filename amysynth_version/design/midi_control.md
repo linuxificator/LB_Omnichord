@@ -169,6 +169,34 @@ LRU age and current CC values are runtime state.
 - global one-to-one ownership still applies if separately stored presets assign
   the same controller to different screens.
 
+### Binding-location feedback
+
+Genuine movement of a controller also helps the performer find a binding whose
+slider is not currently visible. An active in-memory binding remains
+authoritative: when its target belongs to the other screen, the visible
+`MIDI`/`OMNI` mode button flashes a green location LED. Movement of an active
+binding on the visible screen keeps the existing behavior: an
+instrument-specific target reselects its stored instrument, and no preset
+location LED is needed for the already-selected preset.
+
+If the moving controller has no active in-memory binding, the stored binding
+metadata of non-selected OMNI and MIDI presets is consulted without loading a
+preset. Every non-selected preset containing that controller identity flashes
+a small green LED in its round preset button when that screen is visible. If a
+matching preset belongs to the other screen, the visible mode button flashes
+instead. The selected preset of either screen is excluded from this stored
+lookup because unsaved in-memory binding changes are authoritative for selected
+presets. If several inactive presets contain the same controller identity, all
+of those valid locations are reported.
+
+The preset LED sits between the label and the top edge of the round button. The
+mode-button LED sits to the left of its label in the red part of the rainbow
+button and is vertically centered. A location indication flashes for about two
+seconds and fresh genuine movement restarts it. Baseline or repeated-identical
+CC packets never start it. Location feedback does not select or load a preset,
+switch screens, apply a value from an inactive preset, or otherwise change
+musical state.
+
 ### Preset-conflict handoff feedback
 
 When a destination preset assigns an already-bound channel/controller pair to
@@ -223,7 +251,9 @@ The behavior is intentionally split along existing responsibilities:
   exposes the narrow integration-test actions. It does not create a second
   binding state.
 - `../qt_frontend/gui/MidiScreen.qml` renders the MIDI indicator bar;
-  `Main.qml` renders the OMNI status LED. `ParameterSlider.qml`,
+  `Main.qml` renders the OMNI status LED. `UtilitySection.qml`,
+  `MidiUtilitySection.qml` and `RainbowModeButton.qml` render binding-location
+  feedback. `ParameterSlider.qml`,
   `LabeledSlider.qml`, `VerticalVolume.qml` and `TapNumber.qml` implement the
   shared bind/unlink gestures used by their owning sections.
 - `../qt_frontend/tests/test_midi_control_bindings.py` tests the pure state
@@ -232,5 +262,5 @@ The behavior is intentionally split along existing responsibilities:
   wiring and layout; integration tests in `tests/integration/test_frontend.py`
   and `test_presets.py` cover AMY convergence and screen-owned persistence.
 
-Executable user scenarios are `MIDI-CC-01` through `MIDI-CC-12` in
+Executable user scenarios are `MIDI-CC-01` through `MIDI-CC-13` in
 `../qt_frontend/tests/USE_CASES.md`.
