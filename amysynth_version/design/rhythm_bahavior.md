@@ -470,20 +470,25 @@ If the user manually changes the tempo while running, that tempo must remain eff
 
 Starting rhythm playback must use the currently selected rhythm and current displayed tempo without first reloading preset defaults.
 
-### RHYTHM-016 — manual chord takeover releases the automatic chord normally
+### RHYTHM-016 — manual chord takeover preserves the sequenced gate
 
 Pressing a manual chord while automatic rhythm chords are enabled must close
-the automatic-chord gate before starting the manual chord. Clearing future
-sequencer events is insufficient because it also removes the pending note-off
-of a synth-4 chord which may already be sounding.
+the automatic-chord gate before starting the manual chord. It must remove the
+repeating positive-velocity synth-4 note-on tags, but retain the already
+scheduled synth-4 `l0` tags. Retained note-offs are explicitly reinstalled so
+their delivery does not depend on an older queued lane update. A rhythm chord
+which is sounding at finger-down
+therefore reaches the note-off at its original sequencer gate instead of being
+cut off immediately or hanging because its future note-off was removed.
 
-The gate transition must therefore send an immediate velocity-zero note-off to
-all active voices of automatic-chord synth 4 before sending the manual synth-3
-note-ons. This is an ordinary AMY note-off and must follow the selected patch's
-normal release envelope; it must not reset oscillators, patches, effects, the
-sequencer or its timebase. Drums and bass continue. A finite release tail may
-overlap the manual chord, but the old automatic chord may not sustain after its
-release has completed.
+Current AMY has no deferred tag-removal command or wire callback which says
+that a repeating event has just fired. Its per-event user tags nevertheless
+provide the required behavior: note-on tags and note-off tags are addressed
+independently. While automatic chords are gated off, retained note-off tags may
+continue firing harmless synth-4 all-offs; they are replaced or cleared when
+the lane is enabled, restarted or reset. Manual synth-3 note-ons may begin
+immediately and overlap the remainder of the automatic chord's normal gate and
+release. Drums, bass, transport, effects and sequencer timebase continue.
 
 ## 16. Summary rule
 

@@ -502,22 +502,25 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **Failure history:** stopping while an automatic chord was sounding froze transport before its tagged note-off fired, leaving a hanging chord. The same stop path called a missing `_silence_accompaniment()` method after sending `zY0`, raising `AttributeError`; as a result the actual transport stopped but `rhythmStateChanged` was never emitted and the button remained visually stuck on STOP.
 
-**RHYTHM-06 — manual chord input releases the current automatic chord**
+**RHYTHM-06 — manual chord input lets the current automatic chord finish**
 
-- Finger-down immediately closes the automatic-chord gate and sends `l0i4`
-  before any manual synth-3 note-on.
-- In AMY, `l0i4` is a velocity-zero note-off for all active voices belonging
-  to automatic-chord synth 4. It must use the instrument's normal release; no
-  oscillator reset, patch reload or effects reset is allowed.
-- Only automatic-chord tags 112..251 are cleared. Drums, bass, transport and
-  sequencer timebase continue without a stop/restart.
-- A short musical release overlap is valid; a rhythm chord that sustains
-  because its removed future note-off can no longer fire is not.
+- Finger-down immediately closes the automatic-chord gate, but does not send
+  an immediate `l0i4` before the manual synth-3 note-on.
+- Positive-velocity synth-4 note-on tags are cleared. Existing synth-4 `l0`
+  tags remain installed, so the currently sounding chord receives its original
+  sequencer note-off and completes the configured rhythmic gate.
+- No later automatic-chord note-on may occur while the manual chord is held.
+  Repeating retained all-offs on isolated synth 4 are harmless and are
+  replaced when the lane is enabled or fully reinstalled.
+- Drums, bass, transport and sequencer timebase continue without a stop,
+  restart or reset. The manual synth-3 chord may overlap the remaining gate and
+  normal release of synth 4.
 
 **Failure history:** manual chord input set chord activity to zero and cleared
 the tagged chord lane, including the scheduled note-off for a chord which was
 already sounding. The old synth-4 chord could then remain audible indefinitely
-under the new manual chord.
+under the new manual chord. The first correction added an immediate `l0i4`;
+that prevented hanging but audibly shortened the accompaniment gate.
 
 ### TUNING — all note-producing paths follow the selected tuning
 

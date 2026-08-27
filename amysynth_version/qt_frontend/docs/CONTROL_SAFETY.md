@@ -44,4 +44,11 @@ A first-time AMY `K...iv...` synth allocation is executed at an audio-block boun
 
 The ESP32-P4 also exhibited low-frequency rumble when an exact `h0` reverb command was sent. A fresh dry bus is now left untouched when the logical reverb value is zero. If an already-active reverb is turned off, the UI/preset state remains exactly 0 while the wire uses a sub-audible nonzero coefficient (`0.001`) as a target-side workaround for the exact-zero edge case. The serial regression forbids `y0h0Z` and `y1h0Z` on cold startup.
 
-Manual chord hold is another timing-sensitive path. Suppressing automatic rhythm chords must not stop percussion or bass. Finger-down now publishes the new chord/bass state and automatic-chord gate as one accompaniment transaction, causing one sequencer rebuild rather than two consecutive stop/clear/restart cycles. The serial regression holds a chord for one second and requires rhythm transport to stay logically running with percussion events still scheduled during the hold.
+Manual chord hold is another timing-sensitive path. Suppressing automatic
+rhythm chords must not stop percussion or bass. Finger-down publishes the new
+chord/bass state and automatic-chord gate as one accompaniment transaction.
+That transaction clears future synth-4 note-ons but retains the sequencer's
+existing synth-4 all-off tags, so a chord already sounding completes its normal
+rhythmic gate. The serial regression holds a chord for one second and requires
+rhythm transport to stay logically running with percussion events still
+scheduled during the hold.
