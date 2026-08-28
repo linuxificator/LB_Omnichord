@@ -117,6 +117,31 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(commands[0], "H0,16,10n60l1i1Z")
         self.assertEqual(commands[1], "H0,16,11n64l1i1Z")
 
+    def test_lane_can_clear_onsets_while_retaining_existing_note_offs(self) -> None:
+        writer = _WriterProbe()
+        lane = _TaggedSequencerLane("chords", 112, 5, writer)
+        events = [
+            (0, 192, "n48l0.8i4"),
+            (0, 192, "n52l0.8i4"),
+            (35, 192, "l0i4"),
+            (96, 192, "n48l0.8i4"),
+            (227, 192, "l0i4"),
+        ]
+        lane.commands(events)
+
+        lane.retain_only(events, {2, 4})
+
+        self.assertEqual(
+            [command for _, _, command in writer.commands],
+            [
+                "H35,192,114l0i4Z",
+                "H35,192,116l0i4Z",
+                "H0,0,112Z",
+                "H0,0,113Z",
+                "H0,0,115Z",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -27,10 +27,14 @@ Current hard ranges:
 | DX7 algorithm | 1–32 |
 | DX7 feedback | 0–0.5 |
 
-Other user controls are independently bounded in the backend: volumes are 0–1,
-reverb level is 0–3, reverb liveness/damping are 0–1, tuning reference is
-415–466 Hz, rhythm tempo is 40–200 BPM, and activity selectors are restricted
-to their discrete UI ranges.
+Other user controls are independently bounded in the backend: role/row and
+master volumes are 0–1, reverb level is 0–3, reverb liveness/damping are 0–1,
+tuning reference is 415–466 Hz, rhythm tempo is 40–200 BPM, and activity
+selectors are restricted to the discrete UI range 1–4. Master mute never
+overwrites its retained 0–1 value: it applies an effective bus gain of zero and
+unmute restores the retained value. The transient effective chord-activity
+value 0 during manual chord takeover is not editable or persisted; `CHORD
+ON/OFF` owns the automatic-chord gate.
 
 A live MIDI CC binding is also an ownership boundary. Shared QML controls
 consume bound edit gestures, while the backend setters independently reject
@@ -44,4 +48,20 @@ A first-time AMY `K...iv...` synth allocation is executed at an audio-block boun
 
 The ESP32-P4 also exhibited low-frequency rumble when an exact `h0` reverb command was sent. A fresh dry bus is now left untouched when the logical reverb value is zero. If an already-active reverb is turned off, the UI/preset state remains exactly 0 while the wire uses a sub-audible nonzero coefficient (`0.001`) as a target-side workaround for the exact-zero edge case. The serial regression forbids `y0h0Z` and `y1h0Z` on cold startup.
 
-Manual chord hold is another timing-sensitive path. Suppressing automatic rhythm chords must not stop percussion or bass. Finger-down now publishes the new chord/bass state and automatic-chord gate as one accompaniment transaction, causing one sequencer rebuild rather than two consecutive stop/clear/restart cycles. The serial regression holds a chord for one second and requires rhythm transport to stay logically running with percussion events still scheduled during the hold.
+Manual chord hold is another timing-sensitive path. Finger-down immediately
+starts manual synth 3 and selects the chord for strum, bass and automatic-chord
+pitches. Finger-up inside the 160 ms quick-tap window stops that manual voice
+without closing or draining the automatic-chord lane. Only a contact which
+remains down past that window is promoted to takeover. Promotion must not stop
+percussion or bass and must not change the `CHORD ON/OFF` state: it clears
+future synth-4 note-ons but retains the sequencer's existing synth-4 all-off
+tags, so a chord already sounding completes its normal rhythmic gate. The
+serial regression holds a chord for one second and requires rhythm transport
+to stay logically running with percussion events still scheduled during the
+hold.
+
+The `CHORD ON/OFF` control belongs exclusively to automatic rhythm synth 4.
+It may use the remembered chord identity to construct sequencer events, but it
+must never emit a manual synth-3 note-on or release a physically held synth-3
+voice. Manual voice lifetime remains owned by chord-button press/release, and
+chord selection must never turn the control on or off.

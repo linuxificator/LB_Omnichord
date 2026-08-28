@@ -20,6 +20,75 @@ def bind_control(
 
 
 class FrontendIntegrationTests(unittest.TestCase):
+    def test_independent_master_volume_and_mute_are_bus_scoped(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 1.0)
+            self.assertFalse(bool(app.query("masterMuted")))
+            self.assertAlmostEqual(float(app.action("midiMasterVolume")), 1.0)
+            self.assertFalse(bool(app.action("midiMasterMuted")))
+
+            checkpoint = app.bridge.count()
+            app.action("setMasterVolume", 0.42)
+            lines = app.bridge.wait_for_lines(
+                [f"y{bus}V0.42Z" for bus in range(4)],
+                start=checkpoint,
+                timeout=3.0,
+            )
+            self.assertFalse(any(line.startswith("y4V") for line in lines))
+
+            checkpoint = app.bridge.count()
+            app.action("toggleMasterMuted")
+            app.bridge.wait_for_lines(
+                [f"y{bus}V0Z" for bus in range(4)],
+                start=checkpoint,
+                timeout=3.0,
+            )
+            self.assertTrue(bool(app.query("masterMuted")))
+            app.action("setMasterVolume", 0.73)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 0.73)
+            checkpoint = app.bridge.count()
+            app.action("toggleMasterMuted")
+            app.bridge.wait_for_lines(
+                [f"y{bus}V0.73Z" for bus in range(4)],
+                start=checkpoint,
+                timeout=3.0,
+            )
+
+            checkpoint = app.bridge.count()
+            app.action("setMidiMasterVolume", 0.35)
+            lines = app.bridge.wait_for_lines(
+                [f"y{bus}V0.35Z" for bus in range(4, 11)],
+                start=checkpoint,
+                timeout=3.0,
+            )
+            self.assertFalse(any(line.startswith("y0V") for line in lines))
+            app.action("toggleMidiMasterMuted")
+            self.assertTrue(bool(app.action("midiMasterMuted")))
+
+            app.action("selectPreset", 2)
+            app.action("selectMidiPreset", 2)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 0.73)
+            self.assertFalse(bool(app.query("masterMuted")))
+            self.assertAlmostEqual(float(app.action("midiMasterVolume")), 0.35)
+            self.assertTrue(bool(app.action("midiMasterMuted")))
+
+            omni_target = {"screen": "omni", "kind": "master_volume"}
+            bind_control(app, 12, 90, omni_target)
+            app.action("injectMidiControl", 12, 90, 127)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 1.0)
+            app.action("setMasterVolume", 0.2)
+            self.assertAlmostEqual(float(app.query("masterVolume")), 1.0)
+            app.action("toggleMasterMuted")
+            self.assertTrue(bool(app.query("masterMuted")))
+
+            midi_target = {"screen": "midi", "kind": "master_volume"}
+            bind_control(app, 13, 91, midi_target)
+            app.action("injectMidiControl", 13, 91, 127)
+            self.assertAlmostEqual(float(app.action("midiMasterVolume")), 1.0)
+            app.action("setMidiMasterVolume", 0.2)
+            self.assertAlmostEqual(float(app.action("midiMasterVolume")), 1.0)
+
     def test_bound_numeric_targets_reject_manual_changes(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
@@ -212,22 +281,48 @@ class FrontendIntegrationTests(unittest.TestCase):
             )
             app.action("releaseChord", 1, 9)
 
-    def test_chord_gate_remembers_last_chord_and_strum_stays_live(self) -> None:
+    def test_chord_gate_only_controls_sequencer_and_strum_stays_live(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
-            self.assertEqual(int(app.query("chordGateState")), 0)
+            self.assertEqual(int(app.query("chordGateState")), 2)
 
-            app.action("pressChord", 0, 0)
-            app.action("releaseChord", 0, 0)
-            app.bridge.wait_idle(timeout=3.0)
+            # Activity zero is no longer user-selectable. It is reserved as
+            # the transient effective value while a manual chord takes over.
+            app.action("setRhythmChordActivity", 0.0)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 1)
+            app.action("setRhythmChordActivity", 3.0)
+
+            # The binary gate can be operated before a chord is known and
+            # remains independent of subsequent chord selection.
+            app.action("toggleChordGate")
             self.assertEqual(int(app.query("chordGateState")), 1)
+            app.action("toggleChordGate")
+            self.assertEqual(int(app.query("chordGateState")), 2)
+
+            # A tap starts manual synth 3 and selects the chord for strum and
+            # accompaniment, but never enters the temporary hold override.
+            app.action("pressChord", 1, 9)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            app.action("releaseChord", 1, 9)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            self.assertEqual(int(app.query("chordGateState")), 2)
+            self.assertEqual(int(app.query("activeRowIndex")), 1)
+            self.assertEqual(int(app.query("activeRootSemitone")), 9)
+
+            # Keeping the same contact down promotes it to the established
+            # hold behavior after the quick-tap window.
+            app.action("pressChord", 0, 0)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            time.sleep(0.85)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 0)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
-
-            app.action("toggleChordGate")
+            app.action("releaseChord", 0, 0)
             app.bridge.wait_idle(timeout=3.0)
-            self.assertEqual(int(app.query("chordGateState")), 2)
-            # Gating the chord must not erase the remembered chord identity.
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+
+            # Keeping the gate off must not erase the remembered identity.
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
 
@@ -246,13 +341,30 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("toggleChordGate")
             app.bridge.wait_idle(timeout=3.0)
             self.assertEqual(int(app.query("chordGateState")), 1)
-            self.assertTrue(
+            self.assertFalse(
                 any(
                     "i3" in line and "n" in line and "l1" in line
                     for line in app.bridge.lines_since(start)
                 ),
-                "CHORD ON did not retrigger the remembered manual chord",
+                "CHORD ON retriggered the remembered manual chord",
             )
+
+            # Even while the same chord button is physically held, CHORD OFF
+            # owns only the automatic synth-4 lane. The manual synth-3 voice
+            # must remain alive until the matching button release.
+            app.action("pressChord", 0, 0)
+            time.sleep(0.85)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 0)
+            self.assertEqual(int(app.query("chordGateState")), 1)
+            start = app.bridge.count()
+            app.action("toggleChordGate")
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("chordGateState")), 2)
+            self.assertNotIn("l0i3Z", app.bridge.lines_since(start))
+
+            start = app.bridge.count()
+            app.action("releaseChord", 0, 0)
+            app.bridge.wait_for_lines(["l0i3Z"], start=start, timeout=3.0)
 
     def test_bass_voicing_property_is_centered_and_stepwise(self) -> None:
         with HeadlessApp(native_amy=False) as app:

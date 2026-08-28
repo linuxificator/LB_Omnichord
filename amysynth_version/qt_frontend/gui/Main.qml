@@ -46,6 +46,8 @@ ApplicationWindow {
 
     property int sectionHeight: 104
     property int sectionGap: 10
+    property int presetRowHeight: 64
+    property int reverbPanelWidth: 572
     property int synthToChordGap: 16
     property int volumeWidth: 52
     property int volumeGap: 8
@@ -53,10 +55,14 @@ ApplicationWindow {
     property int strumGap: 12
 
     property int utilityY:
-        titleHeight
-    property int rhythmY:
+        0
+    property int presetY:
         utilityY
         + sectionHeight
+        + sectionGap
+    property int rhythmY:
+        presetY
+        + presetRowHeight
         + sectionGap
     property int bassSynthY:
         rhythmY
@@ -92,6 +98,16 @@ ApplicationWindow {
     property int strumX:
         maximumChordRowWidth
         + strumGap
+
+    readonly property int omniTitleX:
+        reverbPanelWidth + 12
+    readonly property int omniTitleWidth:
+        Math.max(
+            0,
+            strumX
+            - omniTitleX
+            - 86
+        )
 
     property color chordPanelColor: "#ddd2a9"
     property color chordPanelBorderColor: "#a69a6e"
@@ -271,25 +287,14 @@ ApplicationWindow {
                 x: 0
                 y: 0
                 width: contentArea.implicitWidth
-                height: window.titleHeight
+                height: window.sectionHeight
                 visible:
                     window.titleHeight > 0
 
-                ReverbPanel {
-                    id: reverbPanel
-                    x: 0
-                    y: 0
-                    width: 520
-                    height: parent.height
-                    controller: backend
-                    midiControlRouter: backend.midiPlayer
-                    controlScreen: "omni"
-                }
-
                 Text {
-                    x: reverbPanel.width + 12
+                    x: window.omniTitleX
                     y: 0
-                    width: Math.max(0, window.strumX - x - 86)
+                    width: window.omniTitleWidth
                     height: parent.height
 
                     text: headerTitleText
@@ -299,7 +304,7 @@ ApplicationWindow {
                     font.pixelSize:
                         Math.max(
                             14,
-                            birthdayTitle.height * 0.62
+                            window.titleHeight * 0.62
                         )
                     font.weight: Font.Medium
 
@@ -313,19 +318,31 @@ ApplicationWindow {
                 }
 
                 Rectangle {
-                    x: window.strumX - 74
-                    width: 74 + window.strumWidth
-                    height: parent.height
+                    id: strumModePanel
+
+                    x:
+                        window.strumX
+                        - window.presetRowHeight
+                    anchors.bottom: parent.bottom
+                    width:
+                        window.presetRowHeight
+                        + window.strumWidth
+                    height: window.presetRowHeight
                     color: "#dcecf7"
                     radius: 12
                     border.color: "#8bb9d8"
 
                     PresetResetButton {
                         anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 54
-                        height: Math.min(52, parent.height - 8)
+                        anchors.leftMargin:
+                            (
+                                window.presetRowHeight
+                                - width
+                            ) / 2
+                        anchors.verticalCenter:
+                            parent.verticalCenter
+                        width: 48
+                        height: 48
                         text: window.strumLadderMode ? "LDR" : "APG"
                         panelColor: "#5d9fd0"
                         borderColor: "#2f648c"
@@ -337,6 +354,17 @@ ApplicationWindow {
                 }
             }
 
+            ReverbPanel {
+                id: reverbPanel
+                x: 0
+                y: window.presetY
+                width: window.reverbPanelWidth
+                height: window.presetRowHeight
+                controller: backend
+                midiControlRouter: backend.midiPlayer
+                controlScreen: "omni"
+            }
+
             UtilitySection {
                 x: window.contentX
                 y: window.utilityY
@@ -346,6 +374,8 @@ ApplicationWindow {
                     - window.contentX
                 height:
                     window.sectionHeight
+                    + window.sectionGap
+                    + window.presetRowHeight
 
                 controller: backend
                 tuningModeModel: tuningModeNames
@@ -354,6 +384,18 @@ ApplicationWindow {
                     === Window.FullScreen
                 leftExtension: window.leftRailWidth
                 tuningCoupled: window.tuningCoupled
+                tuningRowHeight: window.sectionHeight
+                presetRowY:
+                    window.sectionHeight
+                    + window.sectionGap
+                presetRowHeight: window.presetRowHeight
+                utilityRightEdge:
+                    reverbPanel.width
+                    - window.contentX
+                presetX:
+                    reverbPanel.width
+                    + window.sectionGap
+                    - window.contentX
 
                 onToggleFullscreenRequested:
                     window.toggleFullscreenMode()
@@ -503,6 +545,76 @@ ApplicationWindow {
                     anchors.fill: parent
                     family: "strum"
                     ink: "#6fa8cd"
+                }
+            }
+
+            Item {
+                id: strumNoteGuide
+
+                x:
+                    window.volumeX
+                    + window.volumeWidth
+                y: window.sectionHeight
+                width:
+                    window.strumX
+                    - x
+                height:
+                    window.strumSynthY
+                    - y
+
+                readonly property real markerSize:
+                    Math.min(34, width - 4)
+                readonly property real verticalMargin: 5
+
+                Repeater {
+                    id: strumNoteRepeater
+                    model: backend.strumNoteNames
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        required property int index
+
+                        width: strumNoteGuide.markerSize
+                        height: width
+                        radius: width / 2
+                        x:
+                            (
+                                strumNoteGuide.width
+                                - width
+                            ) / 2
+                        y: {
+                            const availableHeight =
+                                strumNoteGuide.height
+                                - 2
+                                    * strumNoteGuide.verticalMargin
+                                - height
+                            if (strumNoteRepeater.count <= 1)
+                                return (
+                                    strumNoteGuide.height
+                                    - height
+                                ) / 2
+                            return strumNoteGuide.verticalMargin
+                                + index
+                                    * availableHeight
+                                    / (strumNoteRepeater.count - 1)
+                        }
+
+                        color: "#dcecf7"
+                        border.color: "#8bb9d8"
+                        border.width: 1
+
+                        Text {
+                            anchors.fill: parent
+                            text: String(modelData)
+                            color: "#08243d"
+                            font.pixelSize: 15
+                            font.bold: true
+                            horizontalAlignment:
+                                Text.AlignHCenter
+                            verticalAlignment:
+                                Text.AlignVCenter
+                        }
+                    }
                 }
             }
 
@@ -761,22 +873,32 @@ ApplicationWindow {
                         height: window.rowHeight
 
                         Rectangle {
+                            id: chordControlPanel
+
                             visible: rowItem.rowIndex === 0
                             x: -window.contentX
                             y: 0
                             width: window.contentX
-                            height: 148
+                            height:
+                                2 * window.rowHeight
+                                + window.rowSpacing
                             radius: 10
                             color: window.chordPanelColor
                             border.color: window.chordPanelBorderColor
                             border.width: 1
+
+                            readonly property real controlGap:
+                                (
+                                    height
+                                    - 3 * 42
+                                ) / 4
                         }
 
                         Column {
                             visible: rowItem.rowIndex === 0
                             x: -window.contentX + (window.contentX - 42) / 2
-                            y: 7
-                            spacing: 4
+                            y: chordControlPanel.controlGap
+                            spacing: chordControlPanel.controlGap
 
                             PresetResetButton {
                                 width: 42
@@ -1398,51 +1520,6 @@ ApplicationWindow {
                 }
             }
 
-            Rectangle {
-                id: omniMidiControlLed
-
-                readonly property string controlState:
-                    backend.midiPlayer.omniControlLedState
-                readonly property real gapLeft:
-                    window.contentX
-                    + window.rowIndent
-                    + window.chordRowContentWidth
-                readonly property real gapRight:
-                    window.strumX
-
-                x:
-                    gapLeft
-                    + (
-                        gapRight
-                        - gapLeft
-                        - width
-                    ) / 2
-                y:
-                    window.chordRowsY
-                    + window.rowHeight
-                    + window.rowSpacing
-                    + (window.rowHeight - height) / 2
-                width: 16
-                height: 16
-                radius: 8
-                color: {
-                    if (controlState === "learn")
-                        return "#f22b2b"
-                    if (controlState === "blue")
-                        return "#3186d7"
-                    return "#a5a5a0"
-                }
-                border.color: "#696965"
-                border.width: 1
-
-                SequentialAnimation on opacity {
-                    running: omniMidiControlLed.controlState === "learn"
-                    loops: Animation.Infinite
-                    NumberAnimation { from: 1.0; to: 0.2; duration: 240 }
-                    NumberAnimation { from: 0.2; to: 1.0; duration: 240 }
-                }
-            }
-
             // Moved left and up: aligned with the third chord row and with the
             // left edge of the section backgrounds.
             Button {
@@ -1462,18 +1539,13 @@ ApplicationWindow {
                     - window.controlSpacing
                 height: window.rowHeight
                 text: backend.chordGateButtonText
-                enabled: backend.chordGateState !== 0
-                opacity: enabled ? 1.0 : 0.35
-
-                property bool selected:
-                    backend.chordGateState === 2
 
                 font.pixelSize: 14
                 font.bold: true
 
                 contentItem: Text {
                     text: chordGateButton.text
-                    color: "#fff7e8"
+                    color: "#4c3505"
                     font: chordGateButton.font
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -1482,19 +1554,15 @@ ApplicationWindow {
                 background: Rectangle {
                     radius: 9
                     color:
-                        chordGateButton.selected
-                        ? "#704323"
+                        chordGateButton.pressed
+                        ? "#e0c14e"
                         : (
                             chordGateButton.hovered
-                            ? "#8a5a34"
-                            : "#7b5030"
+                            ? "#f4dc78"
+                            : "#fbf0bd"
                         )
-                    border.color:
-                        chordGateButton.selected
-                        ? "#d6aa7f"
-                        : "#9d714b"
-                    border.width:
-                        chordGateButton.selected ? 3 : 1
+                    border.color: "#d2b650"
+                    border.width: 1
                 }
 
                 onClicked:
@@ -1516,6 +1584,10 @@ ApplicationWindow {
                     - window.controlSpacing
                 height: window.rowHeight
                 text: "MIDI"
+                midiControlRouter: backend.midiPlayer
+                bindingLocationScreen: "midi"
+                midiLearnActive:
+                    backend.midiPlayer.omniControlLedState === "learn"
                 onClicked:
                     window.midiScreen = true
             }

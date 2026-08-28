@@ -34,6 +34,7 @@ Elements:
 - instrument selection;
 - octave controls;
 - tuning controls;
+- independent OMNI master volume and mute;
 - transport and mode controls.
 
 The layout should resemble the original Omnichord concept: large playable areas, minimal precision tapping requirements, and immediate visual feedback.
@@ -48,6 +49,8 @@ Rules:
 - MIDI and OMNI tuning can be coupled or independent;
 - switching screens must not silently modify musical parameters;
 - selecting an instrument must fully initialize the selected patch.
+- MIDI master volume and mute control only MIDI buses and remain independent
+  of the OMNI master.
 
 ## Tuning behavior
 
@@ -76,13 +79,19 @@ The implementation must not use hidden "effective tuning" values selected by the
 
 Tap actions should trigger immediately and must not require a second interaction to initialize state.
 
+A chord tap immediately starts the selected notes on the manual chord synth and
+releases them on finger-up. It also selects that chord as the active chord for
+strum and accompaniment. The accompaniment pitches may update, but the tap does
+not temporarily suppress or stop the automatic-chord lane.
+
 ### Press and hold
 
 Long presses are used where continuous musical interaction is required.
 
 Examples:
 
-- holding a chord keeps the chord active;
+- holding a chord past the tap window selects it for accompaniment and keeps it
+  active while temporarily suppressing future automatic-chord onsets;
 - holding performance controls must not repeatedly reset state;
 - accidental short releases should not create unwanted retriggers.
 
@@ -118,6 +127,12 @@ Buttons used for mode switching must have:
 - consistent spacing;
 - clear active/inactive indication.
 
+Round preset buttons keep exactly the same diameter during pointer-down and
+after selection. Selection is indicated by replacing the ordinary single
+border color with white; it does not add an inner/outer ring. The Store button
+shares that diameter but uses a visibly darker purple fill. OMNI and MIDI use
+the same preset geometry.
+
 ### Colors
 
 Colors are used to communicate function:
@@ -125,6 +140,10 @@ Colors are used to communicate function:
 - green elements indicate active/playable performance areas;
 - different functional groups should remain visually distinguishable;
 - visual changes should not replace actual state feedback.
+
+The master-volume family uses the brown functional palette. Its center mute
+panel is white with black `MUT` text while output is enabled, and black with
+white `UMT` text while muted.
 
 ### Typography
 
@@ -155,11 +174,6 @@ The following behaviors must be regression tested:
 9. Switch screens without unintended parameter changes.
 10. Verify local AMY and remote AMY produce identical wire command streams.
 
-## Open questions
-
-Items requiring future decisions:
-
-- exact persistence rules for tuning values;
-- final MIDI drum/percussion architecture;
-- additional AMY bus allocation rules;
-- factory versus user preset storage model.
+The current exact persistence, MIDI drum, bus-allocation and factory/user
+preset rules are no longer open UI questions; their authoritative contracts
+are `presets.md`, `midi.md`, `architecture.md` and `sound_balance.md`.

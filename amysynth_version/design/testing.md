@@ -171,7 +171,9 @@ Important regression tests:
 - live preset/rhythm changes preserve tempo without transport/timebase reset
 - legacy user data migrates to separate OMNI/MIDI preset directories
 - editable user configuration is seeded once and has startup priority
-- APG and chord-family LDR strum note sets remain deterministic
+- APG and every explicitly mapped chord-suffix LDR pitch set remain
+  deterministic, contain all chord tones and preserve musical enharmonic
+  spelling
 - APG/LDR mode stores and reloads with OMNI presets, with APG as the legacy
   fallback
 - every MIDI-bound numeric value rejects manual/tap/drag/setter/nudge/copy
@@ -196,7 +198,9 @@ Important regression tests:
   wins the mapping and its destination-owned numeric values;
   outgoing/incoming handles report red/blue feedback for two seconds and then
   settle free/green
-- the OMNI MIDI-control LED remains centered in the available horizontal gap
-  between chord row two and the strum surface
+- the red MIDI-learn LED is visible only while blinking to the right of `MIDI`;
+  the separate green binding-location LED flashes to the left of `MIDI`/`OMNI`
+- the public OMNI/MIDI screenshots are captured from the real production QML;
+  the MIDI image contains representative controller knobs in the grey CC bar
 - instrument balance captures cover low/middle/high registers and report RMS,
   peak, crest factor and clipping

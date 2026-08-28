@@ -18,6 +18,7 @@ AMY work.
 - `instruments/` — curated AMY Juno/DX7 catalogue and 18 factory presets
 - `music/` — chord, rhythm and intonation definitions
 - `screenshots/` — current public OMNI and MIDI screen images used by the root README
+- `capture_screenshots.py` — deterministic offscreen capture of those real QML screens
 - `tests/` — unit, headless, serial and native-AMY regression tests plus fixtures
 - `rpi/` — Raspberry Pi startup/autostart helpers
 - `docs/` — ESP32-P4 notes, screenshots and historical implementation notes
@@ -42,6 +43,22 @@ From this directory after creating the virtual environment described in `README_
 ```
 
 `main.py` addresses the canonical `gui/`, `config/`, `instruments/` and `music/` directories directly. There are no compatibility symlinks or duplicate runtime data files in `code/`.
+
+## Public screenshots
+
+Refresh the two screenshots used by the repository README with the same Python
+environment as the frontend:
+
+```bash
+python capture_screenshots.py
+```
+
+The helper runs the real frontend and QML scene through Qt's offscreen software
+renderer, uses an isolated temporary home and a pseudo-serial endpoint, selects
+C minor for the OMNI strum-note guide, and injects three representative MIDI CC
+movements for the grey MIDI controller bar. It overwrites only
+`screenshots/omni.png` and `screenshots/midi.png`; it does not read or alter the
+user's presets or connect to AMY hardware.
 
 ## Synth-state architecture
 
@@ -119,10 +136,21 @@ Every package contains the Qt frontend and supported AMY fork with the tiny PCM
 drum bank. At runtime they remain separate processes connected by the
 platform's private local transport. The Pi build requires 64-bit Raspberry Pi
 OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG is Apple
-Silicon-only, ad-hoc signed and not Apple-notarized. The Windows zip contains
-separate `LB_Omnichord.exe` and `amy_service.exe` binaries plus
+Silicon-only and ad-hoc signed, but it is not signed with an Apple Developer ID
+and is not Apple-notarized. The Windows zip contains separate
+`LB_Omnichord.exe` and `amy_service.exe` binaries plus
 `run_windows.ps1`; it uses a private Windows named pipe rather than WSL or a
 network listener.
+
+To install the macOS build, open the DMG, drag `LB_Omnichord.app` to
+`Applications`, eject the DMG and try to open the app once. After macOS blocks
+that first launch, open Apple menu > `System Settings` > `Privacy & Security`,
+scroll down to `Security`, click `Open Anyway` beside the LB Omnichord message,
+authenticate if requested, then click `Open` in the repeated warning. `Open
+Anyway` is available for about one hour after the blocked launch attempt. This
+adds an exception for LB Omnichord only; disabling Gatekeeper or globally
+weakening `Allow applications downloaded from` is neither necessary nor
+recommended. See [Apple's current instructions](https://support.apple.com/en-gb/guide/mac-help/mh40616/mac).
 
 The first complete four-platform release, `R20260826T230234`, passed every
 frontend suite and package job on native GitHub runners. Windows validation

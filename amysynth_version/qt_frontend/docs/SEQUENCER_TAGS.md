@@ -23,11 +23,19 @@ Each lane assigns deterministic consecutive tags to its current events. When a n
 
 Lane-local operations do not reset the sequencer:
 
-- manual chord hold/release changes only the automatic-chord tag range (and may update bass pitches because the active chord changed). On hold, the gate transition also sends `l0i4`: AMY's ordinary velocity-zero note-off for every currently active voice of automatic-chord synth 4. This starts the selected patch's normal release envelope before the manual synth-3 note-ons; it is not an oscillator reset and does not truncate effect tails;
+- a quick chord tap starts/stops manual synth 3 and selects the active chord for
+  strum, bass and automatic chords. The corresponding bass/chord pitch schedules
+  are replaced while transport and the automatic-chord lane remain enabled; it
+  does not perform the hold-specific drain of synth-4 note-on tags;
+- promotion to a manual chord hold and its eventual release change only the automatic-chord tag range (and may update bass pitches because the active chord changed). On hold promotion, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
+- `CHORD OFF` performs the same synth-4 drain and `CHORD ON` reinstalls that
+  lane. These controls never trigger or release manual synth-3 voices;
 - bass on/off changes only the bass range;
 - tuning/chord-pitch changes replace bass and automatic-chord ranges but do not touch percussion;
 - chord timbre changes repatch synths 3/4 without replacing their sequencer events;
-- normal activity/config changes replace the affected tagged patterns while transport continues.
+- normal activity/config changes replace the affected tagged patterns while transport continues;
+- a live preset switch carries the current percussion/chord/bass activity into
+  the destination pattern instead of substituting the preset's stored activity.
 
 A live rhythm-style or preset change replaces tagged events without stopping
 transport or resetting the timebase. The new meter enters at the current
@@ -40,12 +48,18 @@ Starting transport installs the complete current drum, bass and automatic-chord 
 
 Stopping transport is different from clearing a lane. `zY0` prevents future sequencer events from firing, so a note that is currently sounding cannot rely on its later tagged note-off. Stop therefore performs an explicit all-off immediately after `zY0` for the rhythm-owned synths: percussion synth 0, bass synth 1 and automatic-chord synth 4. Manual chord synth 3 and strum synth 2 are deliberately left alone because they are controlled directly by the player rather than by rhythm transport.
 
-The same lost-future-note-off rule applies when a manual chord temporarily
-closes the automatic-chord lane while transport keeps running. The receiver
-must release synth 4 before the manual synth-3 note-ons and then clear only the
-automatic-chord tags. Drums, bass, transport/timebase and effects remain
-untouched. A patch's normal release tail may overlap briefly with the new
-manual chord; an indefinitely sustained old rhythm chord may not.
+The same lost-future-note-off rule applies when a promoted manual chord hold
+temporarily closes the automatic-chord lane while transport keeps running. A
+quick tap may replace that lane's pitches but never closes or drains it. Current AMY has
+no deferred tag-clear operation and the wire protocol has no callback when a
+repeating event fires. Because every onset and all-off has its own tag, the
+receiver instead clears only positive-velocity chord onsets and keeps the
+existing `l0i4` tags. It explicitly reinstalls those note-offs before clearing
+the onsets, so a superseded, partially transmitted lane update cannot lose the
+required release. The retained tags may repeat harmlessly against the
+isolated synth 4 while the lane is disabled. Re-enabling or fully reinstalling
+the lane replaces them with the authoritative schedule. Drums, bass,
+transport/timebase and effects remain untouched.
 
 The real-serial regression tests this ordering and also requires the frontend `rhythmRunning` state to become false after Stop. This guards both against hanging accompaniment notes and against a transport button that remains visually stuck on STOP even though the AMY sequencer has stopped.
 

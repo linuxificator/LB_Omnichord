@@ -10,6 +10,10 @@ Item {
     required property bool fullScreen
     property int leftExtension: 0
     property bool tuningCoupled: true
+    property int tuningRowHeight: height
+    property int presetRowY: 0
+    property int presetRowHeight: height
+    property int utilityRightEdge: width
 
     signal toggleFullscreenRequested()
     signal toggleTuningCouplingRequested()
@@ -18,14 +22,17 @@ Item {
     readonly property int tuningX: 231
     readonly property int tuningWidth: 52
     readonly property int utilityGap: 8
+    readonly property int masterWidth: tuningWidth
     readonly property int panicWidth: 76
     readonly property int escapeWidth: 72
 
-    readonly property int panicX:
-        tuningX + tuningWidth + utilityGap
     readonly property int escapeX:
-        panicX + panicWidth + utilityGap
-    readonly property int presetX:
+        utilityRightEdge - escapeWidth
+    readonly property int panicX:
+        escapeX - utilityGap - panicWidth
+    readonly property int masterX:
+        panicX - utilityGap - masterWidth
+    property int presetX:
         escapeX + escapeWidth + utilityGap
 
     function synchronizeTuningWheel() {
@@ -55,7 +62,7 @@ Item {
         x: -root.leftExtension
         y: 0
         width: root.leftExtension + root.tuningX + root.tuningWidth
-        height: parent.height
+        height: root.tuningRowHeight
         radius: 12
         color: "#f4c77f"
         border.color: "#bd7517"
@@ -69,7 +76,7 @@ Item {
             root.tuningX
             - root.wheelWidth
             - 14
-        height: parent.height - 16
+        height: root.tuningRowHeight - 16
         coupled: root.tuningCoupled
         onClicked: {
             if (root.tuningCoupled) {
@@ -88,7 +95,7 @@ Item {
         x: 0
         y: 0
         width: root.wheelWidth
-        height: parent.height
+        height: root.tuningRowHeight
         padding: 0
 
         background: Rectangle {
@@ -210,7 +217,7 @@ Item {
         x: root.tuningX
         y: 0
         width: root.tuningWidth
-        height: parent.height
+        height: root.tuningRowHeight
 
         currentValue:
             root.controller.tuningReference
@@ -233,13 +240,49 @@ Item {
                 .setTuningReference(value)
     }
 
+    TapNumber {
+        x: root.masterX
+        y: 0
+        width: root.masterWidth
+        height: root.tuningRowHeight
+
+        currentValue:
+            Math.round(root.controller.masterVolume * 100)
+        fromValue: 0
+        toValue: 100
+        stepValue: 1
+
+        panelColor: "#b58a63"
+        panelBorderColor: "#6d492c"
+        fillColor: "#704323"
+        textColor: "#2d190d"
+        centerButtonEnabled: true
+        centerText:
+            root.controller.masterMuted ? "UMT" : "MUT"
+        centerPanelColor:
+            root.controller.masterMuted ? "#111111" : "#ffffff"
+        centerPanelTextColor:
+            root.controller.masterMuted ? "#ffffff" : "#111111"
+        centerPanelBorderColor: "#6d492c"
+        midiControlRouter: root.controller.midiPlayer
+        midiTarget: ({
+            "screen": "omni",
+            "kind": "master_volume"
+        })
+
+        onEdited: (value) =>
+            root.controller.setMasterVolume(value / 100)
+        onCenterClicked:
+            root.controller.toggleMasterMuted()
+    }
+
     Button {
         id: panicButton
 
         x: root.panicX
         y: 8
         width: root.panicWidth
-        height: parent.height - 16
+        height: root.tuningRowHeight - 16
 
         text: "PNC!"
         font.pixelSize: 18
@@ -275,7 +318,7 @@ Item {
         x: root.escapeX
         y: 8
         width: root.escapeWidth
-        height: parent.height - 16
+        height: root.tuningRowHeight - 16
 
         text:
             root.fullScreen
@@ -312,9 +355,9 @@ Item {
         id: presetPanel
 
         x: root.presetX
-        y: 0
+        y: root.presetRowY
         width: parent.width - x
-        height: parent.height
+        height: root.presetRowHeight
         radius: 12
         color: "#e8dcf5"
         border.color: "#9270b6"
@@ -323,11 +366,11 @@ Item {
         Button {
             id: storeButton
 
-            x: 9
+            x: 8
             anchors.verticalCenter:
                 parent.verticalCenter
-            width: 76
-            height: 76
+            width: 48
+            height: 48
 
             text: "STR"
             font.pixelSize: 18
@@ -363,7 +406,7 @@ Item {
 
             x: storeButton.x
                + storeButton.width
-               + 10
+               + 6
             anchors.verticalCenter:
                 parent.verticalCenter
             spacing: 6
@@ -388,6 +431,12 @@ Item {
 
                     width: 48
                     height: 48
+                    padding: 0
+                    leftInset: 0
+                    rightInset: 0
+                    topInset: 0
+                    bottomInset: 0
+                    scale: 1.0
 
                     text:
                         "P" + presetNumber
@@ -408,7 +457,11 @@ Item {
                     }
 
                     background: Rectangle {
-                        radius: width / 2
+                        x: 0
+                        y: 0
+                        width: presetButton.width
+                        height: presetButton.height
+                        radius: Math.min(width, height) / 2
                         color:
                             presetButton.storeFlash
                             ? "#d78cff"
@@ -426,15 +479,23 @@ Item {
                             ? "#ffffff"
                             : (
                                 presetButton.selected
-                                ? "#f0ddff"
+                                ? "#ffffff"
                                 : "#8e6bab"
                             )
-                        border.width:
-                            (
-                                presetButton.selected
-                                || presetButton.storeFlash
-                            )
-                            ? 3 : 1
+                        border.width: 1
+                    }
+
+                    MidiBindingLocationLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 4
+                        width: 7
+                        height: 7
+                        radius: width / 2
+                        z: 2
+                        midiControlRouter: root.controller.midiPlayer
+                        targetScreen: "omni"
+                        targetPreset: presetButton.presetNumber
+                        locationEnabled: !presetButton.selected
                     }
 
                     Timer {

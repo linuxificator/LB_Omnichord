@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import struct
 import unittest
 from pathlib import Path
 
@@ -78,14 +79,30 @@ class StaticContractTests(unittest.TestCase):
         repository = ROOT.parents[1]
         public_readme = (repository / "README.md").read_text(encoding="utf-8")
         frontend_readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        capture = (ROOT / "capture_screenshots.py").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("https://github.com/linuxificator/amy", public_readme)
         self.assertIn("https://github.com/shorepine/amy", public_readme)
         self.assertIn("`screenshots/`", frontend_readme)
+        self.assertIn("python capture_screenshots.py", frontend_readme)
+        self.assertIn('"QT_QPA_PLATFORM": "offscreen"', capture)
+        self.assertIn('"--capture-screenshots-dir"', capture)
         for name in ("omni.png", "midi.png"):
             relative = f"amysynth_version/qt_frontend/screenshots/{name}"
             self.assertIn(relative, public_readme)
-            self.assertTrue((repository / relative).is_file(), relative)
+            path = repository / relative
+            self.assertTrue(path.is_file(), relative)
+            png = path.read_bytes()
+            self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n", relative)
+            width, height = struct.unpack(">II", png[16:24])
+            self.assertEqual((width, height), (1920, 850), relative)
+
+        app_core = (ROOT / "code" / "app_core.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("(2, 7, 104)", app_core)
 
     def test_midi_qml_uses_its_own_bindable_metaobject(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
@@ -181,48 +198,32 @@ class StaticContractTests(unittest.TestCase):
             "reverb_liveness",
             "reverb_damping",
             "tuning_reference",
+            "master_volume",
             "rhythm_tempo",
             "bass_voicing",
         ):
             self.assertIn(f'"kind": "{kind}"', combined)
 
-    def test_midi_and_omni_control_led_states_are_rendered(self) -> None:
+    def test_midi_control_states_and_omni_learn_led_are_rendered(self) -> None:
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
         omni = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
+            encoding="utf-8"
+        )
         for state in ("learn", "bound", "blue"):
             self.assertIn(f'modelData.state === "{state}"', midi)
         self.assertIn("modelData.evicting", midi)
         self.assertIn("selectControlIndicator", midi)
-        self.assertIn("id: omniMidiControlLed", omni)
+        self.assertNotIn("id: omniMidiControlLed", omni)
         self.assertIn("backend.midiPlayer.omniControlLedState", omni)
-
-    def test_omni_control_led_is_centered_in_the_second_row_gap(self) -> None:
-        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
-        start = qml.index("id: omniMidiControlLed")
-        end = qml.index("// Moved left and up", start)
-        led = qml[start:end]
-
-        self.assertRegex(
-            led,
-            r"readonly property real gapLeft:\s*"
-            r"window\.contentX\s*\+\s*window\.rowIndent\s*\+\s*"
-            r"window\.chordRowContentWidth",
-        )
-        self.assertRegex(
-            led,
-            r"readonly property real gapRight:\s*window\.strumX",
-        )
-        self.assertRegex(
-            led,
-            r"x:\s*gapLeft\s*\+\s*\(\s*gapRight\s*-\s*gapLeft\s*"
-            r"-\s*width\s*\)\s*/\s*2",
-        )
-        self.assertRegex(
-            led,
-            r"y:\s*window\.chordRowsY\s*\+\s*window\.rowHeight\s*"
-            r"\+\s*window\.rowSpacing\s*\+\s*"
-            r"\(window\.rowHeight\s*-\s*height\)\s*/\s*2",
-        )
+        self.assertIn('=== "learn"', omni)
+        self.assertIn("id: midiLearnLed", rainbow)
+        self.assertIn("visible: root.midiLearnActive", rainbow)
+        self.assertIn("modeLabel.contentWidth", rainbow)
+        self.assertIn("+ root.extensionWidth", rainbow)
+        self.assertIn("width: 12", rainbow)
+        self.assertIn('color: "#f22b2b"', rainbow)
+        self.assertIn("running: root.midiLearnActive", rainbow)
 
     def test_frontend_tree_contains_no_symlinks(self) -> None:
         generated_roots = {"build", "dist", "test-artifacts"}
@@ -306,10 +307,11 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("self._apply_synth_state(\n            role,", transport_py)
         self.assertIn("def _set_rhythm_chord_enabled(", transport_py)
         self.assertIn('self._sync_synth_params(\n                "chord",', transport_py)
-        self.assertIn(
-            'self._wire(f"l0i{self.synth_id[\'rhythm_chord\']}Z")',
-            transport_py,
-        )
+        gate_start = transport_py.index("def _set_rhythm_chord_enabled(")
+        gate_end = transport_py.index("def _chord_state(", gate_start)
+        gate_transition = transport_py[gate_start:gate_end]
+        self.assertIn("self._begin_rhythm_chord_drain(", gate_transition)
+        self.assertNotIn("self._wire(", gate_transition)
         self.assertIn(
             "if not self._set_rhythm_chord_enabled(enabled):",
             transport_py,
@@ -319,6 +321,7 @@ class StaticContractTests(unittest.TestCase):
         # whole-sequencer rebuild helpers would again make lane-local edits able
         # to interrupt drums/bass/chords together.
         self.assertIn("class _TaggedSequencerLane:", transport_py)
+        self.assertIn("def retain_only(", transport_py)
         self.assertIn("def _replace_lane(", transport_py)
         self.assertIn('self._replace_lane("bass")', transport_py)
         self.assertIn('self._replace_lane("chords")', transport_py)
@@ -349,13 +352,60 @@ class StaticContractTests(unittest.TestCase):
     def test_chord_gate_and_grouped_row_roll_controls_are_present(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         self.assertIn("text: backend.chordGateButtonText", qml)
-        self.assertIn("enabled: backend.chordGateState !== 0", qml)
+        self.assertNotIn("enabled: backend.chordGateState !== 0", qml)
         self.assertIn("backend.toggleChordGate()", qml)
+        gate_start = qml.index("id: chordGateButton")
+        gate_end = qml.index("RainbowModeButton {", gate_start)
+        gate = qml[gate_start:gate_end]
+        self.assertIn('color: "#4c3505"', gate)
+        self.assertIn(': "#fbf0bd"', gate)
+        self.assertIn('border.color: "#d2b650"', gate)
+        self.assertNotIn("chordGateButton.selected", gate)
         self.assertIn("backend.rollChordRows(-1)", qml)
         self.assertIn("backend.rollChordRows(1)", qml)
 
+    def test_chord_left_controls_span_two_rows_with_equal_spacing(self) -> None:
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        panel_start = qml.index("id: chordControlPanel")
+        panel_end = qml.index("PresetResetButton {", panel_start)
+        panel = qml[panel_start:panel_end]
+
+        self.assertRegex(
+            panel,
+            r"height:\s*2 \* window\.rowHeight\s*"
+            r"\+ window\.rowSpacing",
+        )
+        self.assertRegex(
+            panel,
+            r"readonly property real controlGap:\s*"
+            r"\(\s*height\s*- 3 \* 42\s*\) / 4",
+        )
+        self.assertIn("y: chordControlPanel.controlGap", panel)
+        self.assertIn("spacing: chordControlPanel.controlGap", panel)
+
     def test_bass_activity_has_adjacent_voicing_slider(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
+        self.assertEqual(qml.count("ActivitySelector {"), 3)
+        selector_labels = (
+            'label: "percussion activity"',
+            'label: "chord activity"',
+            'label: "bass activity"',
+        )
+        for index, label in enumerate(selector_labels):
+            start = qml.rfind("ActivitySelector {", 0, qml.index(label))
+            if index + 1 < len(selector_labels):
+                end = qml.index("ActivitySelector {", start + 1)
+            else:
+                end = qml.index("LabeledSlider {", start)
+            selector = qml[start:end]
+            self.assertIn("y: 0", selector)
+            self.assertIn("width: activityArea.width * 0.32", selector)
+        self.assertNotIn("levels: [0, 1, 2, 3, 4]", qml)
+        activity_selector = (
+            ROOT / "gui" / "ActivitySelector.qml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("property var levels: [1, 2, 3, 4]", activity_selector)
+        self.assertIn("height: 29", activity_selector)
         self.assertIn('label: "bass activity"', qml)
         self.assertIn('label: "bass voicing"', qml)
         self.assertIn("fromValue: -6", qml)
@@ -376,19 +426,173 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("id: controlsRow", panel)
         self.assertEqual(panel.count("LabeledSlider {"), 3)
         self.assertNotIn("VerticalVolume {", panel)
-        self.assertGreaterEqual(panel.count("width: 145"), 3)
+        self.assertIn("readonly property real controlSliderWidth", panel)
+        self.assertEqual(panel.count("width: root.controlSliderWidth"), 3)
         self.assertIn("toValue: 3", panel)
         self.assertIn("MIDI_REVERB_MAX = app_core.REVERB_LEVEL_MAX", midi_backend)
         self.assertIn("REVERB_LEVEL_MAX = 3.0", omni_backend)
         self.assertIn('label: "LEV"', panel)
         self.assertIn('label: "LIVE"', panel)
         self.assertIn('label: "DAMP"', panel)
-        self.assertIn("width: 520", main)
+        self.assertIn("property int reverbPanelWidth: 572", main)
 
         midi_integration = (
             ROOT / "code" / "midi_integration.py"
         ).read_text(encoding="utf-8")
         self.assertIn("@Property(QObject, constant=True)", midi_integration)
+
+    def test_utility_header_uses_two_aligned_visual_rows(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        utilities = tuple(
+            (ROOT / "gui" / name).read_text(encoding="utf-8")
+            for name in ("UtilitySection.qml", "MidiUtilitySection.qml")
+        )
+
+        self.assertIn("property int presetRowHeight: 64", main)
+        self.assertRegex(main, r"property int utilityY:\s*0")
+        self.assertRegex(
+            main,
+            r"property int presetY:\s*utilityY\s*"
+            r"\+ sectionHeight\s*\+ sectionGap",
+        )
+        self.assertRegex(
+            main,
+            r"property int rhythmY:\s*presetY\s*"
+            r"\+ presetRowHeight\s*\+ sectionGap",
+        )
+        self.assertIn("y: window.presetY", main)
+        self.assertIn("width: window.reverbPanelWidth", main)
+        self.assertIn("height: window.presetRowHeight", main)
+        self.assertIn("y: root.hostWindow.presetY", midi)
+        self.assertIn("width: root.hostWindow.reverbPanelWidth", midi)
+        self.assertIn("height: root.hostWindow.presetRowHeight", midi)
+
+        for utility in utilities:
+            self.assertIn("property int tuningRowHeight", utility)
+            self.assertIn("property int presetRowY", utility)
+            self.assertIn("property int presetRowHeight", utility)
+            store_start = utility.index("id: storeButton")
+            preset_start = utility.index("id: presetButtons", store_start)
+            store = utility[store_start:preset_start]
+            self.assertIn("width: 48", store)
+            self.assertIn("height: 48", store)
+            self.assertIn('text: "STR"', store)
+            self.assertIn('color: "#ffffff"', store)
+            self.assertIn('"#6f3599"', store)
+            self.assertRegex(store, r"x:\s*8")
+            self.assertRegex(
+                utility,
+                r"x:\s*storeButton\.x\s*"
+                r"\+ storeButton\.width\s*\+ 6",
+            )
+
+            preset_start = utility.index("id: presetButton\n")
+            timer_start = utility.index("Timer {", preset_start)
+            preset = utility[preset_start:timer_start]
+            for fixed_geometry in (
+                "padding: 0",
+                "leftInset: 0",
+                "rightInset: 0",
+                "topInset: 0",
+                "bottomInset: 0",
+                "scale: 1.0",
+                "width: presetButton.width",
+                "height: presetButton.height",
+                "border.width: 1",
+            ):
+                self.assertIn(fixed_geometry, preset)
+            self.assertNotIn("visible: presetButton.pressed", preset)
+            self.assertNotIn("visible: presetButton.selected", preset)
+            self.assertRegex(
+                preset,
+                r"presetButton\.selected\s*\? \"#ffffff\"\s*"
+                r": \"#8e6bab\"",
+            )
+
+        self.assertIn("anchors.bottom: parent.bottom", main)
+        mode_panel_start = main.index("id: strumModePanel")
+        mode_panel_end = main.index("ReverbPanel {", mode_panel_start)
+        mode_panel = main[mode_panel_start:mode_panel_end]
+        self.assertIn("height: window.presetRowHeight", mode_panel)
+        self.assertIn("anchors.verticalCenter:", mode_panel)
+        self.assertIn("width: 48", mode_panel)
+        self.assertIn("height: 48", mode_panel)
+        self.assertNotIn("toggleStrumLadderMode", midi)
+
+    def test_brown_master_controls_are_independent_and_right_aligned(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        tap_number = (ROOT / "gui" / "TapNumber.qml").read_text(
+            encoding="utf-8"
+        )
+        utilities = tuple(
+            (ROOT / "gui" / name).read_text(encoding="utf-8")
+            for name in ("UtilitySection.qml", "MidiUtilitySection.qml")
+        )
+
+        self.assertIn("property bool centerButtonEnabled: false", tap_number)
+        self.assertIn("signal centerClicked()", tap_number)
+        self.assertIn("root.centerHit(numberPoint.y)", tap_number)
+        self.assertIn("root.centerClicked()", tap_number)
+        for screen in (main, midi):
+            self.assertIn("utilityRightEdge:", screen)
+            self.assertIn("reverbPanel.width", screen)
+        for screen_name, utility in zip(("omni", "midi"), utilities):
+            self.assertIn("property int utilityRightEdge: width", utility)
+            self.assertRegex(
+                utility,
+                r"readonly property int escapeX:\s*"
+                r"utilityRightEdge - escapeWidth",
+            )
+            self.assertRegex(
+                utility,
+                r"readonly property int masterX:\s*"
+                r"panicX - utilityGap - masterWidth",
+            )
+            self.assertGreaterEqual(utility.count("TapNumber {"), 2)
+            self.assertIn('panelColor: "#b58a63"', utility)
+            self.assertIn('fillColor: "#704323"', utility)
+            self.assertIn('? "UMT" : "MUT"', utility)
+            self.assertIn('centerPanelColor:', utility)
+            self.assertIn('root.controller.masterMuted ? "#111111" : "#ffffff"', utility)
+            self.assertIn(f'"screen": "{screen_name}"', utility)
+            self.assertIn('"kind": "master_volume"', utility)
+            self.assertIn("setMasterVolume(value / 100)", utility)
+            self.assertIn("toggleMasterMuted()", utility)
+
+    def test_midi_title_uses_the_omni_title_geometry(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+
+        self.assertIn("readonly property int omniTitleX", main)
+        self.assertIn("readonly property int omniTitleWidth", main)
+        self.assertIn("x: window.omniTitleX", main)
+        self.assertIn("width: window.omniTitleWidth", main)
+        self.assertIn("x: root.hostWindow.omniTitleX", midi)
+        self.assertIn("width: root.hostWindow.omniTitleWidth", midi)
+
+    def test_chord_taps_are_promoted_to_holds_only_after_a_delay(self) -> None:
+        backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        self.assertIn("self._pending_chord_promotions", backend)
+        self.assertIn("timer.setInterval(CHORD_QUICK_TAP_MAX_MS)", backend)
+        self.assertIn("self._schedule_chord_hold_promotion(key)", backend)
+        self.assertIn("def promoteChordHold(", backend)
+        self.assertIn("self._promoted_chords.add(key)", backend)
+        press_start = backend.index("def pressChord(")
+        promote_start = backend.index("def promoteChordHold(", press_start)
+        press = backend[press_start:promote_start]
+        self.assertIn("self._send_chord_state(play_now=False)", press)
+        self.assertIn("self._set_active_chord(", press)
+        promote_end = backend.index("def releaseChord(", promote_start)
+        promote = backend[promote_start:promote_end]
+        self.assertNotIn("self._set_active_chord(", promote)
+        self.assertNotIn("self._send_chord_state(", promote)
+        self.assertIn("self._update_hold_override()", promote)
+        release_start = backend.index("def releaseChord(")
+        release_end = backend.index("def selectChord(", release_start)
+        release = backend[release_start:release_end]
+        self.assertIn("self._cancel_pending_chord_promotion(key)", release)
 
     def test_apg_ldr_button_uses_backend_preset_state(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
@@ -401,6 +605,20 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('"strum_mode": "LDR"', backend)
         self.assertIn('data.get("strum_mode", "APG")', backend)
 
+    def test_strum_note_guide_occupies_the_omni_side_gap(self) -> None:
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        guide_start = qml.index("id: strumNoteGuide")
+        guide_end = qml.index("PresetResetButton {", guide_start)
+        guide = qml[guide_start:guide_end]
+
+        self.assertIn("window.volumeX", guide)
+        self.assertIn("+ window.volumeWidth", guide)
+        self.assertIn("window.strumX", guide)
+        self.assertIn("window.strumSynthY", guide)
+        self.assertIn("model: backend.strumNoteNames", guide)
+        self.assertIn('color: "#dcecf7"', guide)
+        self.assertIn("Math.min(34, width - 4)", guide)
+
     def test_rainbow_mode_button_text_is_large_and_centered(self) -> None:
         qml = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
             encoding="utf-8"
@@ -412,6 +630,41 @@ class StaticContractTests(unittest.TestCase):
         )
         self.assertIn("horizontalAlignment: Text.AlignHCenter", qml)
         self.assertIn("verticalAlignment: Text.AlignVCenter", qml)
+
+    def test_hidden_preset_binding_leds_are_wired_to_location_feedback(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
+            encoding="utf-8"
+        )
+        led = (ROOT / "gui" / "MidiBindingLocationLed.qml").read_text(
+            encoding="utf-8"
+        )
+        utilities = tuple(
+            (ROOT / "gui" / name).read_text(encoding="utf-8")
+            for name in ("UtilitySection.qml", "MidiUtilitySection.qml")
+        )
+
+        self.assertIn("onBindingLocationRequested", led)
+        self.assertIn('color: "#31d158"', led)
+        self.assertIn("property int targetPreset: 0", led)
+        self.assertIn("root.targetPreset <= 0", led)
+        self.assertIn("loops: 5", led)
+        self.assertEqual(led.count("PauseAnimation { duration: 110 }"), 2)
+        for utility, screen in zip(utilities, ("omni", "midi")):
+            self.assertIn("MidiBindingLocationLed {", utility)
+            self.assertIn("y: 4", utility)
+            self.assertIn("width: 7", utility)
+            self.assertIn(f'targetScreen: "{screen}"', utility)
+            self.assertIn("targetPreset: presetButton.presetNumber", utility)
+            self.assertIn("locationEnabled: !presetButton.selected", utility)
+
+        self.assertIn("anchors.verticalCenter: parent.verticalCenter", rainbow)
+        self.assertIn("x: 9", rainbow)
+        self.assertIn("width: 10", rainbow)
+        self.assertNotIn("targetPreset:", rainbow)
+        self.assertIn('bindingLocationScreen: "midi"', main)
+        self.assertIn('bindingLocationScreen: "omni"', midi)
 
     def test_rhythm_transport_uses_the_centered_bass_arrow_geometry(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")

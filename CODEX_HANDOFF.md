@@ -1,14 +1,14 @@
 # Codex Session Handoff
 
-Updated 2026-08-27 on branch `main`. The implementation and four-platform
-release baseline described below was built from commit `3345502`; this handoff
-and its companion documentation were committed afterward. Inspect `git status`
-and the current branch before continuing.
+Updated 2026-08-28 for the merge of `refactoring/ui_changes` into `main`.
+Inspect `git status`, the current branch and the latest GitHub Actions run
+before continuing; the release build triggered by this merge may still be in
+progress when the next session begins.
 
-This file records operational state and completed work from the AMY/Qt bugfix,
-MIDI-control and native-Windows sessions. It supplements, but does not override,
-`AGENTS.md`, the current user request or the authoritative contracts under
-`amysynth_version/design/`.
+This file records operational state and completed work from the AMY/Qt UI,
+performance, MIDI-control and native-Windows sessions. It supplements, but does
+not override, `AGENTS.md`, the current user request or the authoritative
+contracts under `amysynth_version/design/`.
 
 ## Mandatory continuation route
 
@@ -22,6 +22,12 @@ all of:
 - `.github/workflows/desktop-release.yml`.
 
 Do not use this handoff as a replacement for those contracts.
+
+At the merge audit, `origin/main` contained no commit missing from
+`refactoring/ui_changes`. The only other remote branch not merged into main was
+`origin/codex_info`: it is an old, heavily diverged documentation line and was
+intentionally not merged. Current design contracts plus this automatically read
+handoff supersede it.
 
 ## Current architectural state
 
@@ -40,74 +46,97 @@ Do not use this handoff as a replacement for those contracts.
 - ESP32-P4 uses LF-delimited AMY wire requests over UART. Android's proven
   design likewise keeps the app and AMY service in separate processes.
 
-## Completed musical/UI work
+## Current musical/UI baseline
 
-### Live preset changes
+The 2026-08-28 merge contains the UI/performance series beginning at `6f006ee`
+and the subsequent LDR audit. Treat these details as current behavior, not a
+future plan.
 
-Commit `e52dbb2` (`Preserve live chords across preset changes`) fixed the
-original bug where selecting an OMNI preset stopped a held chord.
+### Shared visual layout
 
-- Physical chord-button ownership, active row/root and chord-gate state survive
-  the change.
-- Sound converges to the destination preset's chord type, inversion, octave,
-  tuning and chord instrument without requiring the player to release and press
-  the chord again.
-- A held chord may therefore change voicing/timbre during a preset switch, but
-  it must not become silent merely because the preset changed.
+- OMNI and MIDI use the same utility, reverb and preset header geometry. The
+  OMNI-centered title position is reused on MIDI so it never jumps on a screen
+  switch.
+- The pink reverb and purple preset bars share one height and a normal section
+  gap. The purple bar is fitted to Store plus P1–P18/M1–M18 with equal edge and
+  button spacing; the pink bar receives the freed width.
+- Store is the same size as every round preset button and is visibly darker
+  purple. Pointer-down never shrinks a preset. The active preset keeps the
+  normal single border and width, with only the border color changed to white.
+- The blue APG/LDR panel matches the reverb/preset height and bottom-aligns with
+  the utility area. MIDI intentionally has no APG/LDR button.
+- Tuning is at the top. Brown independent master controls sit between tuning and
+  `PNC!`; `PNC!` and `FSC`/`ESC` align to the reverb panel's right edge.
+- The chord-row RST/UP/DWN block ends at row two and distributes its controls
+  evenly. Percussion, chord and bass activity each show four equal, top-aligned
+  buttons; chord activity has no user-selectable zero.
 
-### MIDI control feedback and preset ownership
+The public images are real 1920x850 Qt renders at
+`amysynth_version/qt_frontend/screenshots/omni.png` and `midi.png`. The root
+README embeds them. Run `amysynth_version/qt_frontend/capture_screenshots.py`
+with the frontend Python environment to refresh both deterministically. It uses
+an isolated temporary home and pseudo-serial endpoint; the MIDI frame contains
+three representative CC knobs in the grey bar.
 
-Commits `f0ed4fd`, `8e66bbe` and `9e4ef0f` completed the MIDI-control regression
-work described during this session.
+### Strum modes and note guide
 
-- Real incoming CC movement updates the bound backend value and the visible QML
-  slider, including OMNI/MIDI reverb and rhythm tempo.
-- After explicit unlink, the temporary blue controller notice ends on the next
-  genuine CC movement; without movement it expires normally.
-- APG/LDR is backend-owned OMNI preset state. Presets store `strum_mode`; old
+- APG/LDR is backend-owned OMNI preset state stored as `strum_mode`; legacy
   presets default to APG.
-- A green MIDI binding has exclusive numeric authority. Manual clicks, drags,
-  tap controls, setters, nudge/UP/DOWN actions, copies and resets cannot change
-  its value. Double-tap is the explicit unlink gesture; the unlinking gesture
-  itself does not edit the number.
-- Section RST restores selection and unbound values while preserving bound
-  values and section volume. Hidden instrument targets are restored without
-  temporarily selecting/sending their patch.
-- Runtime preset selection preserves live values for source/destination
-  bindings, except for an explicit same-controller/different-target conflict.
-- In that conflict, the destination preset wins the global one-to-one mapping
-  and its stored target value is authoritative. The outgoing handle flashes red
-  and incoming handle flashes blue for about two seconds (110 ms fade halves),
-  then they settle free/green respectively.
-- MIDI-owned tempo disables/greys both rhythm UP/DWN buttons. MIDI-owned tuning
-  disables/greys the affected tuning controls; coupled tuning takes authority
-  from a bound side and refuses divergent independently bound references.
-- Rhythm and bass play symbols now share centered Canvas triangle geometry and
-  repaint from backend transport state.
+- The narrow gap beside the strum surface shows one blue round marker per
+  available pitch class. Labels use uppercase, chord-aware spelling such as
+  C/E-flat/G rather than C/D-sharp/G.
+- Every one of the 36 suffixes in `music/chords.csv` has an explicit LDR mapping
+  in `app_core.py`. The mapping must contain every chord tone; an unmapped new
+  suffix raises an error rather than falling through a family heuristic.
+- LDR uses consonant chord-scale subsets appropriate to a mechanical strum. It
+  omits avoid/opposite alterations unless named by the chord. In particular,
+  G minor-major 7 is `G A B-flat D E F-sharp` and never adds F natural.
+
+### Chords, sequencer and live presets
+
+- A quick chord tap starts/stops manual synth 3 and selects the new active chord
+  for manual play, strum, bass and automatic-chord pitches. It never closes or
+  drains the automatic synth-4 lane.
+- A contact held beyond the 160 ms tap window is promoted to manual takeover.
+  Promotion clears only future synth-4 note-ons while retaining the sequenced
+  synth-4 all-off tags, so the currently sounding accompaniment reaches its own
+  rhythmic note-off instead of hanging or being cut short. Drums, bass,
+  transport and timebase continue.
+- `CHORD ON/OFF` owns only automatic synth 4 and keeps state independent of
+  chord selection. OFF performs the same deferred-release drain; ON reinstalls
+  the lane and never triggers a one-shot manual chord.
+- While rhythm is running, preset switches preserve live tempo, percussion,
+  chord and bass activity, bass voicing, and the octave of the active chord row.
+  Inactive chord-row octaves may load from the preset. When rhythm is stopped,
+  all those stored values load normally.
+- Physical chord-button ownership, active row/root and chord-gate state survive
+  a preset switch. A held chord converges to the destination voicing/timbre but
+  remains held and releasable by its original button-up.
+
+### MIDI feedback and output ownership
+
+- Genuine incoming CC movement updates its bound numeric value and visible
+  slider. A green binding has exclusive numeric authority until explicit
+  double-tap unlink; reset/copy/nudge/preset/manual edits cannot override it.
+- Incoming activity for a binding on the other screen always flashes the green
+  LED left of `MIDI`/`OMNI`, whether that other-screen target is visible or
+  hidden under a preset. A same-screen inactive preset instead flashes its
+  small green LED above the preset label. This feedback never loads a preset or
+  switches screens.
+- The red MIDI-learn LED is larger and appears only while blinking, to the right
+  of `MIDI` in the rainbow button. It is not rendered when off.
+- Destination presets win same-controller/different-target conflicts; outgoing
+  and incoming handles show the documented red/blue two-second handoff.
+- OMNI master/mute owns buses 0–3; MIDI master/mute owns buses 4–10. Their live
+  values are independent and survive preset changes. `MUT` applies zero without
+  discarding the retained slider value; `UMT` restores it.
 - Reverb level is consistently 0.00–3.00 through QML, backend clamps, CC mapping
   and owned AMY bus commands.
 
-The authoritative details are in `amysynth_version/design/midi_control.md`,
-`amysynth_version/design/presets.md`, `amysynth_version/design/gui.md`,
-`amysynth_version/design/tuning.md`,
-`amysynth_version/design/rhythm_bahavior.md`,
-`amysynth_version/qt_frontend/docs/CONTROL_SAFETY.md` and
-`amysynth_version/qt_frontend/tests/USE_CASES.md`.
-
-### Manual takeover of rhythm chords
-
-Commit `53a67e4` (`Release rhythm chords on manual takeover`) fixed the former
-regression-list point 13.
-
-- Pressing a manual chord first closes the automatic-chord gate.
-- It sends `l0i4`, an ordinary velocity-zero note-off for all active voices of
-  automatic chord synth 4, before manual synth-3 note-ons.
-- The selected patch's normal release envelope and effect tail remain audible;
-  this is not an oscillator reset or hard kill.
-- Only future automatic-chord tags are cleared. Drums, bass, transport and the
-  sequencer timebase continue.
-- This prevents a currently sounding rhythm chord from hanging after its
-  scheduled future note-off was removed.
+The authoritative details are in `amysynth_version/design/gui.md`,
+`sound_balance.md`, `midi_control.md`, `presets.md`, `rhythm_bahavior.md`,
+`tuning.md`, `amysynth_version/qt_frontend/docs/CONTROL_SAFETY.md`,
+`SEQUENCER_TAGS.md` and `tests/USE_CASES.md`.
 
 ## Native Windows implementation
 
@@ -258,8 +287,16 @@ service/wire boundary when those lines are eventually reconciled.
 
 ## Verification already completed
 
-- The complete local regression matrix reached 127 passing tests after the
-  MIDI, rhythm and Windows-related fixes.
+- The complete 2026-08-28 local matrix passed 147 individual tests: 106 unit,
+  13 frontend, 10 serial/program, 13 preset, 3 native-control and 2
+  native-rhythm tests. This includes the exhaustive 36-chord LDR audit and the
+  screenshot/README contract.
+- The screenshot helper completed twice consecutively with byte-identical
+  1920x850 results. The final SHA-256 values at handoff were
+  `ab071b66e33e8cfd5f8e5105e85616f53df9b6bfac4916a8acc80e557a60c04c`
+  for OMNI and
+  `e792e63f5c223526179b9768ff27a4db24433ce5063b91bc82808e81d8048df1`
+  for MIDI.
 - `3345502` made the preset integration test wait deterministically for live
   preset continuation instead of racing the frontend.
 - GitHub Actions run `33021825480` independently passed each of the six suites

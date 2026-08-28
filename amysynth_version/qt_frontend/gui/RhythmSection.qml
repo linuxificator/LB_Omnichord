@@ -175,12 +175,11 @@ Item {
 
             ActivitySelector {
                 x: activityArea.width * 0.34
-                y: 18
+                y: 0
                 width: activityArea.width * 0.32
                 height: 58
 
                 label: "chord activity"
-                levels: [0, 1, 2, 3, 4]
                 currentLevel:
                     root.controller
                         .rhythmChordActivity

@@ -57,6 +57,63 @@ NOTE_NAMES_BY_SEMITONE = {
     for item in NOTE_DEFINITIONS
 }
 
+SHARP_NOTE_NAMES = (
+    "C",
+    "C♯",
+    "D",
+    "D♯",
+    "E",
+    "F",
+    "F♯",
+    "G",
+    "G♯",
+    "A",
+    "A♯",
+    "B",
+)
+FLAT_NOTE_NAMES = (
+    "C",
+    "D♭",
+    "D",
+    "E♭",
+    "E",
+    "F",
+    "G♭",
+    "G",
+    "A♭",
+    "A",
+    "B♭",
+    "B",
+)
+NATURAL_NOTE_LETTERS = ("C", "D", "E", "F", "G", "A", "B")
+NATURAL_NOTE_SEMITONES = (0, 2, 4, 5, 7, 9, 11)
+
+# The diatonic function of every interval used by music/chords.csv. Keeping
+# the function as well as the pitch is what lets C minor display E-flat rather
+# than the enharmonic but musically misleading D-sharp.
+CHORD_DEGREE_BY_INTERVAL = {
+    0: 0,
+    1: 1,
+    2: 1,
+    3: 2,
+    4: 2,
+    5: 3,
+    6: 4,
+    7: 4,
+    8: 4,
+    9: 5,
+    10: 6,
+    11: 6,
+    12: 0,
+    13: 1,
+    14: 1,
+    15: 1,
+    17: 3,
+    18: 3,
+    20: 5,
+    21: 5,
+}
+
 # Stable ASCII identifiers used by the intonation JSON files.
 INTONATION_NOTE_IDS = (
     "c",
@@ -200,6 +257,221 @@ def display_label(suffix: str) -> str:
         abbreviations.get(word, word)
         for word in text.split()
     )
+
+
+LadderPattern = tuple[tuple[int, ...], tuple[int, ...]]
+
+# LDR plays every listed pitch rather than letting an improviser de-emphasize
+# an avoid tone. These patterns therefore use common chord-scale relationships
+# but omit avoid tones and unspecified alternative alterations where useful.
+# Every pattern still contains every pitch class explicitly present in its
+# chord definition.
+_MAJOR_PENTATONIC: LadderPattern = (
+    (0, 2, 4, 7, 9),
+    (0, 1, 2, 4, 5),
+)
+_MINOR_PENTATONIC: LadderPattern = (
+    (0, 3, 5, 7, 10),
+    (0, 2, 3, 4, 6),
+)
+_SUSPENDED_PENTATONIC: LadderPattern = (
+    (0, 2, 5, 7, 9),
+    (0, 1, 3, 4, 5),
+)
+_MINOR_6_9_PENTATONIC: LadderPattern = (
+    (0, 2, 3, 7, 9),
+    (0, 1, 2, 4, 5),
+)
+_MINOR_ADD9_HEXATONIC: LadderPattern = (
+    (0, 2, 3, 5, 7, 10),
+    (0, 1, 2, 3, 4, 6),
+)
+_MAJOR7_HEXATONIC: LadderPattern = (
+    (0, 2, 4, 7, 9, 11),
+    (0, 1, 2, 4, 5, 6),
+)
+_DOMINANT_HEXATONIC: LadderPattern = (
+    (0, 2, 4, 7, 9, 10),
+    (0, 1, 2, 4, 5, 6),
+)
+_MELODIC_MINOR_HEXATONIC: LadderPattern = (
+    (0, 2, 3, 7, 9, 11),
+    (0, 1, 2, 4, 5, 6),
+)
+_DOMINANT_SUS_HEXATONIC: LadderPattern = (
+    (0, 2, 5, 7, 9, 10),
+    (0, 1, 3, 4, 5, 6),
+)
+_LOCRIAN_NATURAL2: LadderPattern = (
+    (0, 2, 3, 5, 6, 8, 10),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_WHOLE_HALF_DIMINISHED: LadderPattern = (
+    (0, 2, 3, 5, 6, 8, 9, 11),
+    # C D E-flat F G-flat A-flat A B is the conventional readable
+    # mixed spelling; the repeated sixth letter is intentional.
+    (0, 1, 2, 3, 4, 5, 5, 6),
+)
+_WHOLE_TONE: LadderPattern = (
+    (0, 2, 4, 6, 8, 10),
+    (0, 1, 2, 3, 4, 5),
+)
+_LYDIAN_AUGMENTED: LadderPattern = (
+    (0, 2, 4, 6, 8, 9, 11),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_MIXOLYDIAN: LadderPattern = (
+    (0, 2, 4, 5, 7, 9, 10),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_MAJOR: LadderPattern = (
+    (0, 2, 4, 5, 7, 9, 11),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_DORIAN: LadderPattern = (
+    (0, 2, 3, 5, 7, 9, 10),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_LYDIAN_DOMINANT: LadderPattern = (
+    (0, 2, 4, 6, 7, 9, 10),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_DOMINANT_FLAT5: LadderPattern = (
+    (0, 2, 4, 6, 10),
+    (0, 1, 2, 4, 6),
+)
+_DOMINANT_SHARP5: LadderPattern = (
+    (0, 2, 4, 8, 10),
+    (0, 1, 2, 4, 6),
+)
+_DOMINANT_FLAT9: LadderPattern = (
+    (0, 1, 4, 7, 10),
+    (0, 1, 2, 4, 6),
+)
+_DOMINANT_SHARP9: LadderPattern = (
+    (0, 3, 4, 7, 10),
+    (0, 1, 2, 4, 6),
+)
+_DOMINANT_FLAT13: LadderPattern = (
+    (0, 2, 4, 7, 8, 10),
+    (0, 1, 2, 4, 5, 6),
+)
+
+CHORD_LADDER_PATTERNS: dict[str, LadderPattern] = {
+    "major": _MAJOR_PENTATONIC,
+    "minor": _MINOR_PENTATONIC,
+    "diminished": _WHOLE_HALF_DIMINISHED,
+    "augmented": _WHOLE_TONE,
+    "sus2": _SUSPENDED_PENTATONIC,
+    "sus4": _SUSPENDED_PENTATONIC,
+    "5": _MAJOR_PENTATONIC,
+    "major6": _MAJOR_PENTATONIC,
+    "minor6": _MINOR_6_9_PENTATONIC,
+    "6_9": _MAJOR_PENTATONIC,
+    "add9": _MAJOR_PENTATONIC,
+    "minor_add9": _MINOR_ADD9_HEXATONIC,
+    "dominant7": _DOMINANT_HEXATONIC,
+    "major7": _MAJOR7_HEXATONIC,
+    "minor7": _MINOR_PENTATONIC,
+    "minor_major7": _MELODIC_MINOR_HEXATONIC,
+    "minor7_flat5": _LOCRIAN_NATURAL2,
+    "diminished7": _WHOLE_HALF_DIMINISHED,
+    "augmented7": _DOMINANT_SHARP5,
+    "augmented_major7": _LYDIAN_AUGMENTED,
+    "7_sus4": _DOMINANT_SUS_HEXATONIC,
+    "dominant9": _DOMINANT_HEXATONIC,
+    "major9": _MAJOR7_HEXATONIC,
+    "minor9": _MINOR_ADD9_HEXATONIC,
+    "dominant11": _MIXOLYDIAN,
+    "major11": _MAJOR,
+    "minor11": _MINOR_ADD9_HEXATONIC,
+    "dominant13": _MIXOLYDIAN,
+    "major13": _MAJOR,
+    "minor13": _DORIAN,
+    "dominant7_flat5": _DOMINANT_FLAT5,
+    "dominant7_sharp5": _DOMINANT_SHARP5,
+    "dominant7_flat9": _DOMINANT_FLAT9,
+    "dominant7_sharp9": _DOMINANT_SHARP9,
+    "dominant7_sharp11": _LYDIAN_DOMINANT,
+    "dominant7_flat13": _DOMINANT_FLAT13,
+}
+
+
+def ladder_pattern(chord_suffix: str) -> LadderPattern:
+    """Return the audited LDR pitches and musical scale-degree spellings."""
+    try:
+        return CHORD_LADDER_PATTERNS[chord_suffix]
+    except KeyError as exc:
+        raise ValueError(
+            f"No audited LDR pattern for chord {chord_suffix!r}"
+        ) from exc
+
+
+def _fallback_prefers_flats(root_label: str, chord_suffix: str) -> bool:
+    """Choose a readable single-accidental fallback for rare double notes."""
+    if "♭" in root_label:
+        return True
+    if "♯" in root_label:
+        return False
+    if "flat" in chord_suffix or "diminished" in chord_suffix:
+        return True
+    if "sharp" in chord_suffix or "augmented" in chord_suffix:
+        return False
+
+    root_semitone = NATURAL_NOTE_SEMITONES[
+        NATURAL_NOTE_LETTERS.index(root_label)
+    ]
+    if chord_suffix.startswith("minor"):
+        return root_semitone in {0, 2, 5, 7}
+    if "dominant" in chord_suffix or chord_suffix == "7_sus4":
+        return root_semitone in {0, 5}
+    return root_semitone == 5
+
+
+def spell_strum_note_names(
+    root_semitone: int,
+    chord_suffix: str,
+    intervals: tuple[int, ...],
+    degree_offsets: tuple[int, ...],
+) -> list[str]:
+    """Spell root-relative pitch classes using their musical note function."""
+    root_label = NOTE_NAMES_BY_SEMITONE[int(root_semitone) % 12]
+    root_letter_index = NATURAL_NOTE_LETTERS.index(root_label[0])
+    fallback_names = (
+        FLAT_NOTE_NAMES
+        if _fallback_prefers_flats(root_label, chord_suffix)
+        else SHARP_NOTE_NAMES
+    )
+
+    names: list[str] = []
+    seen_pitch_classes: set[int] = set()
+    for interval, degree_offset in zip(intervals, degree_offsets):
+        pitch_class = (int(root_semitone) + interval) % 12
+        if pitch_class in seen_pitch_classes:
+            continue
+        seen_pitch_classes.add(pitch_class)
+
+        letter_index = (root_letter_index + degree_offset) % 7
+        letter = NATURAL_NOTE_LETTERS[letter_index]
+        accidental = (
+            pitch_class - NATURAL_NOTE_SEMITONES[letter_index]
+        ) % 12
+        if accidental > 6:
+            accidental -= 12
+
+        if accidental == -1:
+            names.append(f"{letter}♭")
+        elif accidental == 0:
+            names.append(letter)
+        elif accidental == 1:
+            names.append(f"{letter}♯")
+        else:
+            # Double accidentals are hard to scan in a 34-pixel marker. They
+            # occur only in unusual altered/octatonic keys, where an explicit
+            # readable enharmonic mix is preferable to an illegible glyph.
+            names.append(fallback_names[pitch_class])
+
+    return names
 
 
 def inverted_intervals(
@@ -568,7 +840,10 @@ class InstrumentBackend(QObject):
     reverbLivenessChanged = Signal()
     reverbDampingChanged = Signal()
     reverbDrumsIncludedChanged = Signal()
+    masterVolumeChanged = Signal()
+    masterMutedChanged = Signal()
     strumModeChanged = Signal()
+    strumNoteNamesChanged = Signal()
     bassRunningChanged = Signal()
 
     chordSynthStateChanged = Signal()
@@ -613,6 +888,7 @@ class InstrumentBackend(QObject):
         bass_amp_address: str,
         percussion_amp_address: str,
         reverb_address: str,
+        master_volume_address: str,
         chord_synth_address: str,
         chord_params_address: str,
         strum_synth_address: str,
@@ -647,6 +923,7 @@ class InstrumentBackend(QObject):
         self._bass_amp_address = bass_amp_address
         self._percussion_amp_address = percussion_amp_address
         self._reverb_address = reverb_address
+        self._master_volume_address = master_volume_address
         self._chord_synth_address = chord_synth_address
         self._chord_params_address = chord_params_address
         self._strum_synth_address = strum_synth_address
@@ -784,6 +1061,9 @@ class InstrumentBackend(QObject):
             0.0, min(1.0, float(effects.get("reverb_damping", 0.5)))
         )
         self._reverb_drums = bool(effects.get("reverb_drums", False))
+        # Screen masters are live output state, independent of presets.
+        self._master_volume = 1.0
+        self._master_muted = False
         self._bass_running = bool(
             transport["bass_running"]
         )
@@ -872,6 +1152,10 @@ class InstrumentBackend(QObject):
             tuple[int, int],
             QTimer,
         ] = {}
+        self._pending_chord_promotions: dict[
+            tuple[int, int],
+            QTimer,
+        ] = {}
         self._chord_bounce_mode: set[
             tuple[int, int]
         ] = set()
@@ -956,6 +1240,12 @@ class InstrumentBackend(QObject):
                     self._pending_chord_releases
                 )
             ],
+            "pending_promotion": [
+                list(key)
+                for key in sorted(
+                    self._pending_chord_promotions
+                )
+            ],
             "bounce_mode": [
                 list(key)
                 for key in sorted(
@@ -999,6 +1289,7 @@ class InstrumentBackend(QObject):
     def _emit_state_changed(self) -> None:
         self._state_version += 1
         self.stateChanged.emit()
+        self.strumNoteNamesChanged.emit()
 
     @Property(int, notify=stateChanged)
     def stateVersion(self) -> int:
@@ -1052,9 +1343,21 @@ class InstrumentBackend(QObject):
     def reverbDrumsIncluded(self) -> bool:
         return self._reverb_drums
 
+    @Property(float, notify=masterVolumeChanged)
+    def masterVolume(self) -> float:
+        return self._master_volume
+
+    @Property(bool, notify=masterMutedChanged)
+    def masterMuted(self) -> bool:
+        return self._master_muted
+
     @Property(bool, notify=strumModeChanged)
     def strumLadderMode(self) -> bool:
         return self._strum_ladder_mode
+
+    @Property("QVariantList", notify=strumNoteNamesChanged)
+    def strumNoteNames(self) -> list[str]:
+        return self._strum_note_names()
 
     @Property(int, notify=chordSynthStateChanged)
     def selectedChordSynthIndex(self) -> int:
@@ -1271,6 +1574,29 @@ class InstrumentBackend(QObject):
 
     def _send_reverb_state(self) -> None:
         self._client.send_message(self._reverb_address, self._reverb_payload())
+
+    def _send_master_volume(self) -> None:
+        effective = 0.0 if self._master_muted else self._master_volume
+        self._client.send_message(self._master_volume_address, effective)
+
+    @Slot(float)
+    def setMasterVolume(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "master_volume"}
+        ):
+            return
+        clamped = max(0.0, min(1.0, float(value)))
+        if math.isclose(clamped, self._master_volume, abs_tol=1e-4):
+            return
+        self._master_volume = clamped
+        self.masterVolumeChanged.emit()
+        self._send_master_volume()
+
+    @Slot()
+    def toggleMasterMuted(self) -> None:
+        self._master_muted = not self._master_muted
+        self.masterMutedChanged.emit()
+        self._send_master_volume()
 
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
@@ -2068,6 +2394,20 @@ class InstrumentBackend(QObject):
     ) -> None:
         rhythm_was_running = self._rhythm_running
         live_tempo = self.rhythmTempo if rhythm_was_running else None
+        live_rhythm_controls: tuple[int, int, int] | None = None
+        live_active_row_octave: tuple[int, int] | None = None
+        if rhythm_was_running:
+            rhythm_index = self._rhythm.selected_index
+            live_rhythm_controls = (
+                self._rhythm.busyness_by_rhythm[rhythm_index],
+                self._rhythm.chord_activity_by_rhythm[rhythm_index],
+                self._rhythm.bass_activity_by_rhythm[rhythm_index],
+            )
+            if 0 <= self._active_row < ROW_COUNT:
+                live_active_row_octave = (
+                    self._active_row,
+                    self._row_octave_indexes[self._active_row],
+                )
         self._reset_presettable_state_to_defaults()
         self._strum_ladder_mode = (
             str(data.get("strum_mode", "APG")).upper() == "LDR"
@@ -2318,7 +2658,7 @@ class InstrumentBackend(QObject):
                     self._rhythm.chord_activity_by_rhythm[
                         index
                     ] = max(
-                        0,
+                        1,
                         min(
                             4,
                             int(
@@ -2384,8 +2724,19 @@ class InstrumentBackend(QObject):
         self._stop_tempo_nudge()
 
         # Presets may provide rhythm configuration, but never transport state.
-        # While running, their stored tempo remains stored and the independent
-        # live tempo continues to drive both the UI and AMY sequencer.
+        # While running, live performance controls continue to drive the UI
+        # and AMY sequencer. Apply them to the destination rhythm selected by
+        # the preset, and preserve only the octave of the active chord row.
+        if live_rhythm_controls is not None:
+            rhythm_index = self._rhythm.selected_index
+            (
+                self._rhythm.busyness_by_rhythm[rhythm_index],
+                self._rhythm.chord_activity_by_rhythm[rhythm_index],
+                self._rhythm.bass_activity_by_rhythm[rhythm_index],
+            ) = live_rhythm_controls
+        if live_active_row_octave is not None:
+            row_index, octave_index = live_active_row_octave
+            self._row_octave_indexes[row_index] = octave_index
         self._rhythm_running = rhythm_was_running
         self._running_tempo = live_tempo
 
@@ -2719,7 +3070,7 @@ class InstrumentBackend(QObject):
             )
             return
 
-        level = max(0, min(4, int(round(float(value)))))
+        level = max(1, min(4, int(round(float(value)))))
         index = self._rhythm.selected_index
 
         if level == self._rhythm.chord_activity_by_rhythm[index]:
@@ -2728,8 +3079,8 @@ class InstrumentBackend(QObject):
         self._rhythm.chord_activity_by_rhythm[index] = level
         self.rhythmControlsChanged.emit()
 
-        # Disabling automatic chords should take effect immediately,
-        # including inside the currently playing bar.
+        # Replace the automatic chord pattern immediately, including inside
+        # the currently playing bar. CHORD ON/OFF owns the actual gate.
         self._send_rhythm_chord_enabled()
         self._send_rhythm_config()
 
@@ -3018,14 +3369,57 @@ class InstrumentBackend(QObject):
 
     def _clear_touch_dropout_state(self) -> None:
         for timer in list(
+            self._pending_chord_promotions.values()
+        ):
+            timer.stop()
+            timer.deleteLater()
+
+        for timer in list(
             self._pending_chord_releases.values()
         ):
             timer.stop()
             timer.deleteLater()
 
+        self._pending_chord_promotions.clear()
         self._pending_chord_releases.clear()
         self._chord_press_started.clear()
         self._chord_bounce_mode.clear()
+
+    def _cancel_pending_chord_promotion(
+        self,
+        key: tuple[int, int],
+    ) -> None:
+        timer = self._pending_chord_promotions.pop(
+            key,
+            None,
+        )
+        if timer is None:
+            return
+        timer.stop()
+        timer.deleteLater()
+
+    def _schedule_chord_hold_promotion(
+        self,
+        key: tuple[int, int],
+    ) -> None:
+        self._cancel_pending_chord_promotion(key)
+        if key in self._promoted_chords:
+            return
+
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(CHORD_QUICK_TAP_MAX_MS)
+
+        def promote() -> None:
+            if self._pending_chord_promotions.get(key) is not timer:
+                return
+            self._pending_chord_promotions.pop(key, None)
+            timer.deleteLater()
+            self.promoteChordHold(key[0], key[1])
+
+        timer.timeout.connect(promote)
+        self._pending_chord_promotions[key] = timer
+        timer.start()
 
     def _cancel_pending_chord_release(
         self,
@@ -3087,6 +3481,7 @@ class InstrumentBackend(QObject):
             key=key,
         )
 
+        self._cancel_pending_chord_promotion(key)
         self._pressed_chords.discard(key)
         self._promoted_chords.discard(key)
         self._chord_press_started.pop(
@@ -3224,6 +3619,7 @@ class InstrumentBackend(QObject):
         if self._cancel_pending_chord_release(
             key
         ):
+            self._schedule_chord_hold_promotion(key)
             self._debug(
                 "pressChord_dropout_resume",
                 row=row_index,
@@ -3247,14 +3643,10 @@ class InstrumentBackend(QObject):
             time.monotonic()
         )
 
-        # Manual chord input takes precedence immediately on finger-down.
-        # This emits chord activity 0 and closes the automatic chord gate
-        # before sending the manual note-on.
-        self._promoted_chords.add(key)
-        self._update_hold_override(publish=False)
-
-        # Last pressed chord becomes the active chord used by strum/bass.
-        # Other simultaneously pressed chord voices continue independently.
+        # Every chord touch immediately selects the active chord used by the
+        # manual synth, strum, bass and automatic chord lane. A quick tap may
+        # therefore replace those lanes' pitches, but it never closes the
+        # automatic chord lane or drains its note-on tags.
         self._set_active_chord(
             row_index,
             root_semitone,
@@ -3266,6 +3658,10 @@ class InstrumentBackend(QObject):
             key=key,
             notes=self._current_notes(),
         )
+        # A quick tap belongs only to manual synth 3. If the contact remains
+        # down past the quick-tap window, promote it to the existing hold
+        # behavior which temporarily drains automatic synth-4 note-ons.
+        self._schedule_chord_hold_promotion(key)
 
         self._debug(
             "pressChord_exit",
@@ -3280,9 +3676,25 @@ class InstrumentBackend(QObject):
         row_index: int,
         root_semitone: int,
     ) -> None:
-        # Compatibility no-op for older QML. Current QML promotes directly
-        # inside pressChord(), so there is no delayed hold transition.
-        return
+        key = (row_index, root_semitone)
+        self._cancel_pending_chord_promotion(key)
+        if (
+            key not in self._pressed_chords
+            or key in self._promoted_chords
+        ):
+            return
+
+        # Promotion performs only the accompaniment takeover which a quick tap
+        # must avoid. The active chord and its replacement pitches were already
+        # published on finger-down.
+        self._promoted_chords.add(key)
+        self._debug(
+            "chord_hold_promoted",
+            row=row_index,
+            root=root_semitone,
+            **self._debug_chord_state(),
+        )
+        self._update_hold_override()
 
     @Slot(int, int)
     def releaseChord(
@@ -3307,6 +3719,10 @@ class InstrumentBackend(QObject):
                 **self._debug_chord_state(),
             )
             return
+
+        # Finger-up makes this a tap if promotion has not already fired. Do
+        # not let the dropout-release grace period promote it afterwards.
+        self._cancel_pending_chord_promotion(key)
 
         started = self._chord_press_started.get(
             key,
@@ -3516,25 +3932,47 @@ class InstrumentBackend(QObject):
             if midi_note % 12 in pitch_classes
         ]
 
+    def _active_strum_pattern(
+        self,
+    ) -> tuple[ChordType, tuple[int, ...], tuple[int, ...]] | None:
+        if self._active_row < 0 or self._active_root_semitone < 0:
+            return None
+
+        chord = self._chords[
+            self._row_chord_indexes[self._active_row]
+        ]
+        if self._strum_ladder_mode:
+            intervals, degree_offsets = ladder_pattern(chord.suffix)
+        else:
+            intervals = chord.intervals
+            degree_offsets = tuple(
+                CHORD_DEGREE_BY_INTERVAL.get(
+                    interval,
+                    CHORD_DEGREE_BY_INTERVAL[interval % 12],
+                )
+                for interval in intervals
+            )
+        return chord, intervals, degree_offsets
+
+    def _strum_note_names(self) -> list[str]:
+        pattern = self._active_strum_pattern()
+        if pattern is None:
+            return []
+        chord, intervals, degree_offsets = pattern
+        return spell_strum_note_names(
+            self._active_root_semitone,
+            chord.suffix,
+            intervals,
+            degree_offsets,
+        )
+
     def _ladder_notes(self) -> list[int]:
         if self._active_row < 0 or self._active_root_semitone < 0:
             return []
-        chord = self._chords[self._row_chord_indexes[self._active_row]]
-        suffix = chord.suffix
-        if "diminished" in suffix or "flat5" in suffix:
-            intervals = (0, 2, 3, 5, 6, 8, 9, 11)
-        elif "augmented" in suffix or "sharp5" in suffix:
-            intervals = (0, 2, 4, 6, 8, 10)
-        elif suffix == "5":
-            intervals = (0, 2, 4, 7, 9)
-        elif suffix.startswith("minor"):
-            intervals = (0, 3, 5, 7, 10)
-        elif "dominant" in suffix or suffix == "7_sus4":
-            intervals = (0, 2, 4, 5, 7, 9, 10)
-        elif suffix.startswith("sus"):
-            intervals = (0, 2, 5, 7, 9)
-        else:
-            intervals = (0, 2, 4, 7, 9)
+        chord = self._chords[
+            self._row_chord_indexes[self._active_row]
+        ]
+        intervals, _ = ladder_pattern(chord.suffix)
         pitch_classes = {
             (self._active_root_semitone + interval) % 12
             for interval in intervals
@@ -3586,6 +4024,7 @@ class InstrumentBackend(QObject):
             return
         self._strum_ladder_mode = enabled
         self.strumModeChanged.emit()
+        self.strumNoteNamesChanged.emit()
 
     @Slot(bool)
     def setStrumLadderMode(self, enabled: bool) -> None:
@@ -3751,6 +4190,7 @@ class InstrumentBackend(QObject):
         self._send_synth_state("chord")
         self._send_synth_state("strum")
         self._send_synth_state("bass")
+        self._send_master_volume()
         self._send_rhythm_config()
         self._client.send_message(
             self._bass_running_address,
@@ -3819,6 +4259,7 @@ class InstrumentBackend(QObject):
         self._send_synth_state("chord")
         self._send_synth_state("strum")
         self._send_synth_state("bass")
+        self._send_master_volume()
         self._send_rhythm_config()
 
         self._client.send_message(
@@ -3897,6 +4338,15 @@ def parse_arguments() -> argparse.Namespace:
         help=(
             "Load the complete packaged UI, exercise one chord over the "
             "configured AMY transport, and exit automatically."
+        ),
+    )
+    parser.add_argument(
+        "--capture-screenshots-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Render current OMNI and MIDI screens into this directory, "
+            "then exit. Intended for the repository screenshot helper."
         ),
     )
 
@@ -3980,6 +4430,10 @@ def parse_arguments() -> argparse.Namespace:
         default="/effects/reverb",
     )
     parser.add_argument(
+        "--master-volume-address",
+        default="/master/volume",
+    )
+    parser.add_argument(
         "--chord-synth-address",
         default="/chord/synth/name",
     )
@@ -4048,6 +4502,10 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_arguments()
+    if args.package_smoke_test and args.capture_screenshots_dir is not None:
+        raise ValueError(
+            "--package-smoke-test and --capture-screenshots-dir are exclusive"
+        )
 
     smoke_status_value = os.environ.get("OMNICHORD_PACKAGE_SMOKE_STATUS")
     smoke_status = Path(smoke_status_value) if smoke_status_value else None
@@ -4223,6 +4681,7 @@ def main() -> int:
         "bass_amp": args.bass_amp_address,
         "percussion_amp": args.percussion_amp_address,
         "reverb": args.reverb_address,
+        "master_volume": args.master_volume_address,
         "chord_synth": args.chord_synth_address,
         "chord_params": args.chord_params_address,
         "strum_synth": args.strum_synth_address,
@@ -4304,6 +4763,7 @@ def main() -> int:
         bass_amp_address=args.bass_amp_address,
         percussion_amp_address=args.percussion_amp_address,
         reverb_address=args.reverb_address,
+        master_volume_address=args.master_volume_address,
         chord_synth_address=args.chord_synth_address,
         chord_params_address=args.chord_params_address,
         strum_synth_address=args.strum_synth_address,
@@ -4400,6 +4860,60 @@ def main() -> int:
 
     backend.send_initial_state()
     smoke_checkpoint("initial-state-sent")
+
+    if args.capture_screenshots_dir is not None:
+        capture_dir = args.capture_screenshots_dir.expanduser().resolve()
+        capture_dir.mkdir(parents=True, exist_ok=True)
+        window = engine.rootObjects()[0]
+
+        # Populate the MIDI screen's grey controller bar with representative
+        # genuine CC movements. The first packet establishes the previous
+        # value; the second is the movement that makes the knob visible.
+        for channel, controller, value in (
+            (2, 7, 104),
+            (2, 11, 72),
+            (2, 92, 38),
+        ):
+            backend.injectMidiControl(channel, controller, 0)
+            backend.injectMidiControl(channel, controller, value)
+        # Select C minor from factory preset 1 so the OMNI capture also
+        # demonstrates the active chord and its correctly spelled C/E-flat/G
+        # strum-note guide.
+        backend.pressChord(0, 0)
+
+        def capture_screen(name: str) -> bool:
+            image = window.grabWindow()
+            path = capture_dir / f"{name}.png"
+            if image.isNull() or not image.save(str(path), "PNG"):
+                print(
+                    f"Could not capture Qt screen to {path}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return False
+            print(f"Captured {path}", file=sys.stderr, flush=True)
+            return True
+
+        def capture_omni() -> None:
+            window.setProperty("midiScreen", False)
+            if not capture_screen("omni"):
+                app.exit(3)
+                return
+            backend.releaseChord(0, 0)
+            window.setProperty("midiScreen", True)
+            # Allow MidiScreen's visible-state timer to publish the injected
+            # CC model before grabbing the second frame.
+            QTimer.singleShot(750, capture_midi)
+
+        def capture_midi() -> None:
+            if not capture_screen("midi"):
+                app.exit(3)
+                return
+            app.quit()
+
+        # Give the software scene graph a complete frame before the first
+        # grab. This works with QT_QPA_PLATFORM=offscreen as used by the helper.
+        QTimer.singleShot(1500, capture_omni)
 
     if args.package_smoke_test:
         if not args.amy_socket and not args.amy_local_name:

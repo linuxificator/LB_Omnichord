@@ -96,7 +96,14 @@ The serial regression requires the factory patch to remain authoritative for nat
 **CHORD-02 — release does not produce false re-triggers**
 
 - A held chord must not repeatedly drop to activity 0 and re-trigger because of touch-release bounce.
-- Quick intentional taps must remain responsive.
+- Quick intentional taps must start and stop manual synth 3 immediately without
+  changing effective chord activity or temporarily closing/draining the
+  automatic-chord lane. They do select the active chord and replace the
+  corresponding strum, bass and automatic-chord pitches while transport keeps
+  running.
+- A contact which remains down past the quick-tap window must enter the existing
+  manual-hold takeover: future automatic chord onsets drain, already scheduled
+  automatic note-offs remain, and release reinstalls the automatic chord lane.
 
 **Failure history:** earlier builds showed erratic repeated chord starts while a chord was held. Debugging introduced explicit chord-touch state and release filtering.
 
@@ -108,6 +115,25 @@ The serial regression requires the factory patch to remain authoritative for nat
 - A sweep must not exceed the configured live voice count and must eventually release the tail.
 
 **Failure history:** the strum area visibly accepted mouse/touch input but emitted no AMY commands/sound in an earlier AMY build.
+
+**STRUM-02 — the OMNI note guide names the available strum tones**
+
+- With an active chord, the narrow gap immediately left of the strum pad shows
+  one vertically distributed light-blue round marker per available pitch
+  class; with no active chord it shows none.
+- APG uses the active chord intervals and LDR uses the ladder intervals that
+  actually feed the strum gesture.
+- Labels use uppercase note letters and musical enharmonic spelling. In
+  particular, C minor is shown as `C`, `E♭`, `G`, not `C`, `D♯`, `G`;
+  ordinary scales do not arbitrarily mix sharps and flats.
+- Every chord suffix in `music/chords.csv` has an explicit audited LDR mapping,
+  and every chord pitch class must occur in that mapping. Adding a chord without
+  adding and testing its LDR mapping is an error rather than a silent fallback
+  to a broad family rule.
+- LDR may use a consonant subset of a conventional chord-scale because every
+  available note is sounded mechanically. It omits avoid tones and opposite
+  alterations unless the chord itself names them. G minor-major 7 therefore
+  uses `G A B♭ D E F♯`, never F natural beside the defining F♯.
 
 ### MIDI — input, tuning, preview and effects
 
@@ -142,6 +168,18 @@ The serial regression requires the factory patch to remain authoritative for nat
 - `midiPlayer` is exposed to QML as a `QObject`, so all four reverb slots are
   callable rather than opaque QVariant/Python attributes.
 
+**MIDI-05 — screen masters are independent, bus-scoped and reversible**
+
+- OMNI master writes final gain only to buses 0–3; MIDI master writes only to
+  buses 4–10.
+- `MUT` applies zero to the owned buses without changing the displayed master
+  value; `UMT` restores that retained value.
+- Changing a muted slider updates the value that will be restored on unmute.
+- OMNI and MIDI master volume/mute state survive their own preset switches and
+  cannot mutate one another.
+- Reconfiguring a synth or rebuilding after panic reapplies the owning master
+  gain so a patch cannot bypass it.
+
 **MIDI-CC-01 — only genuine CC movement creates activity**
 
 - Controller identity is `(channel, controller)`.
@@ -168,16 +206,17 @@ The serial regression requires the factory patch to remain authoritative for nat
   learn controller.
 - Clicking another transfers red selection.
 - Clicking the red controller again cancels learn and turns it off.
-- The OMNI status LED mirrors red learn state without exposing controller
-  details.
-- The OMNI LED is vertically centered on chord row two and horizontally
-  centered in the free gap between that indented row and the strum surface.
+- The OMNI screen mirrors red learn state without exposing controller details.
+- Its red LED blinks to the right of the label inside the large `MIDI` button
+  and is completely invisible when learn is inactive.
+- The independent green binding-location LED remains left of the button label.
 
 **MIDI-CC-04 — one-to-one binding and complete numeric target coverage**
 
 - Touching a numeric target while red binds it and consumes that gesture.
-- Instrument parameters, volumes, both reverb sections, both tuning references,
-  tempo and bass voicing are bindable; switches/selectors are not.
+- Instrument parameters, role/row and master volumes, both reverb sections,
+  both tuning references, tempo and bass voicing are bindable;
+  switches/selectors, including `MUT`/`UMT`, are not.
 - One CC owns at most one target and one target owns at most one CC.
 - Reassigning an occupied target turns the displaced controller blue.
 - The target handle and bound controller LED are steady green.
@@ -234,8 +273,8 @@ The serial regression requires the factory patch to remain authoritative for nat
 **MIDI-CC-10 — green binding has exclusive numeric authority**
 
 - Manual slider/tap gestures and direct frontend setter actions cannot change
-  any bound instrument control, volume, reverb parameter, tuning reference,
-  rhythm tempo or bass voicing value.
+  any bound instrument control, role/row volume, master volume, reverb
+  parameter, tuning reference, rhythm tempo or bass voicing value.
 - Copy actions, RST and runtime preset selection preserve bound values while
   still applying their normal changes to unbound state.
 - Bound rhythm tempo disables and greys both rhythm UP/DWN buttons.
@@ -266,6 +305,27 @@ The serial regression requires the factory patch to remain authoritative for nat
   bound, and genuine movement of the CC changes only B.
 - An unchanged preset binding does not trigger the handoff and retains normal
   live-value preservation.
+
+**MIDI-CC-13 — hidden bindings advertise their screen and preset location**
+
+- Only genuine changed CC input can start location feedback; the first value
+  and repeated-identical packets remain silent.
+- The visible `MIDI`/`OMNI` mode button flashes whenever the binding is located
+  on the other screen, whether it belongs to that screen's selected preset or
+  to a non-selected preset. The mode button deliberately ignores preset status
+  and means only "look on the other screen". Its green LED is left of the label
+  in the red button area.
+- If no active binding owns the controller, every valid non-selected preset
+  containing its channel/controller identity is located without loading it.
+  Its round preset button flashes a small green LED between the label and top
+  edge when that screen is visible. Once the destination screen is visible, its
+  selected preset needs no preset LED; an inactive destination preset does.
+- Selected preset files are excluded from inactive lookup so unsaved live
+  binding changes remain authoritative. If multiple inactive presets contain
+  the identity, all matching locations are indicated.
+- Feedback lasts approximately two seconds and restarts on fresh movement. It
+  never selects a preset, changes screen, applies the inactive preset's value,
+  or changes musical state.
 
 Unit tests cover the state machine and mapping math. Headless frontend tests use
 simulated user actions plus simulated MIDI CC input and inspect state, preset
@@ -470,22 +530,64 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **Failure history:** stopping while an automatic chord was sounding froze transport before its tagged note-off fired, leaving a hanging chord. The same stop path called a missing `_silence_accompaniment()` method after sending `zY0`, raising `AttributeError`; as a result the actual transport stopped but `rhythmStateChanged` was never emitted and the button remained visually stuck on STOP.
 
-**RHYTHM-06 — manual chord input releases the current automatic chord**
+**RHYTHM-06 — manual chord input lets the current automatic chord finish**
 
-- Finger-down immediately closes the automatic-chord gate and sends `l0i4`
-  before any manual synth-3 note-on.
-- In AMY, `l0i4` is a velocity-zero note-off for all active voices belonging
-  to automatic-chord synth 4. It must use the instrument's normal release; no
-  oscillator reset, patch reload or effects reset is allowed.
-- Only automatic-chord tags 112..251 are cleared. Drums, bass, transport and
-  sequencer timebase continue without a stop/restart.
-- A short musical release overlap is valid; a rhythm chord that sustains
-  because its removed future note-off can no longer fire is not.
+- Finger-down immediately starts manual synth 3 and selects the new active
+  chord for strum, bass and automatic accompaniment pitches.
+- Finger-up inside the quick-tap window stops only the manual synth-3 voice. It
+  must not change effective chord activity, close the automatic-chord lane or
+  drain its tags.
+- If the contact remains down past the quick-tap window, hold promotion
+  suppresses the effective automatic-chord lane without changing the `CHORD
+  ON/OFF` state or sending an immediate `l0i4`.
+- Positive-velocity synth-4 note-on tags are cleared. Existing synth-4 `l0`
+  tags remain installed, so the currently sounding chord receives its original
+  sequencer note-off and completes the configured rhythmic gate.
+- No later automatic-chord note-on may occur while the manual chord is held.
+  Repeating retained all-offs on isolated synth 4 are harmless and are
+  replaced when the lane is enabled or fully reinstalled.
+- Drums, bass, transport and sequencer timebase continue without a stop,
+  restart or reset. The manual synth-3 chord may overlap the remaining gate and
+  normal release of synth 4.
 
 **Failure history:** manual chord input set chord activity to zero and cleared
 the tagged chord lane, including the scheduled note-off for a chord which was
 already sounding. The old synth-4 chord could then remain audible indefinitely
-under the new manual chord.
+under the new manual chord. The first correction added an immediate `l0i4`;
+that prevented hanging but audibly shortened the accompaniment gate.
+
+**RHYTHM-07 — live preset changes preserve beat-shaping controls**
+
+- With rhythm stopped, preset selection loads stored tempo, percussion
+  activity, chord activity, bass activity, bass voicing and all chord-row
+  octaves.
+- With rhythm running, preset selection preserves the effective values of the
+  tempo, all three activities and bass voicing.
+- The octave of the active chord row is also preserved. Every non-active row
+  loads its octave from the destination preset.
+- The destination rhythm pattern may change, but transport and sequencer
+  timebase remain continuous.
+
+**RHYTHM-08 — CHORD ON/OFF controls only sequencer chords**
+
+- The control starts OFF, is usable before a chord is selected and retains its
+  own state when any chord button is pressed or released.
+- `CHORD OFF` removes future automatic synth-4 onsets while preserving the
+  sequenced release of a currently sounding automatic chord.
+- `CHORD ON` reinstalls automatic synth-4 events without playing the remembered
+  chord once on manual synth 3.
+- Neither action releases a chord which is physically held on a chord-button
+  row. That manual synth-3 voice ends only through its normal button release.
+
+**RHYTHM-09 — activity controls share one four-level layout**
+
+- Percussion, chord and bass activity are top-aligned, equal-width groups with
+  four equal buttons numbered 1 through 4.
+- Chord activity has no zero button. `CHORD OFF` is the only user-facing way
+  to disable automatic sequencer chords.
+- While a manual chord suppresses the automatic lane, no chord-activity button
+  is selected. Releasing it restores the unchanged 1–4 selection.
+- A legacy preset containing chord activity 0 loads as level 1.
 
 ### TUNING — all note-producing paths follow the selected tuning
 
@@ -511,7 +613,17 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 
 **Failure history:** after directory reorganization the PNG existed but the watermark disappeared because relative resolution occurred through a `code/` symlink. The repository now has no compatibility symlinks.
 
-**UI-02 — instrument names contain useful names only**
+**UI-02 — public screenshots render the current real interface**
+
+- `capture_screenshots.py` runs the production QML scene offscreen with an
+  isolated temporary home and writes `screenshots/omni.png` and
+  `screenshots/midi.png`.
+- The OMNI frame shows an active C-minor strum-note guide; the MIDI frame shows
+  three representative CC knobs in the grey lower bar.
+- The repository README embeds those exact two files. Screenshot refreshes may
+  not use a hand-drawn or generated substitute for the actual Qt interface.
+
+**UI-03 — instrument names contain useful names only**
 
 - Curated names must not acquire redundant `PATCH` suffixes or unwanted generic engine prefixes in the visible label.
 

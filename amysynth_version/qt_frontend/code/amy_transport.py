@@ -612,6 +612,20 @@ class _TaggedSequencerLane:
     def end(self) -> int:
         return self.start + self.count
 
+    def _event_command(
+        self,
+        index: int,
+        event: tuple[int, int, str],
+    ) -> str:
+        tick, period, body = event
+        tag = self.start + int(index)
+        period_value = max(1, int(period))
+        tick_value = max(0, int(tick)) % period_value
+        body = str(body)
+        if body.endswith("Z"):
+            body = body[:-1]
+        return f"H{tick_value},{period_value},{tag}{body}Z"
+
     def commands(
         self,
         events: list[tuple[int, int, str]],
@@ -626,16 +640,8 @@ class _TaggedSequencerLane:
         self.high_water = max(self.high_water, len(events))
         commands: list[str] = []
 
-        for index, (tick, period, body) in enumerate(events):
-            tag = self.start + index
-            period_value = max(1, int(period))
-            tick_value = max(0, int(tick)) % period_value
-            body = str(body)
-            if body.endswith("Z"):
-                body = body[:-1]
-            commands.append(
-                f"H{tick_value},{period_value},{tag}{body}Z"
-            )
+        for index, event in enumerate(events):
+            commands.append(self._event_command(index, event))
 
         # Clear tags no longer used by the new pattern. Keep using the maximum
         # ever occupied slot so an interrupted earlier update cannot leave a
@@ -649,6 +655,45 @@ class _TaggedSequencerLane:
         generation = self.writer.new_low_generation(self.name)
         for command in self.commands(events):
             self.writer.low(self.name, generation, command)
+
+    def retain_only(
+        self,
+        events: list[tuple[int, int, str]],
+        retained_indexes: set[int],
+    ) -> None:
+        """Reinstall selected events and clear every other occupied tag."""
+        retained = {int(index) for index in retained_indexes}
+        invalid = {
+            index
+            for index in retained
+            if index < 0
+            or index >= len(events)
+            or index >= self.high_water
+        }
+        if invalid:
+            raise ValueError(
+                f"sequencer lane {self.name} cannot retain indexes "
+                f"{sorted(invalid)} with high-water {self.high_water}"
+            )
+
+        generation = self.writer.new_low_generation(self.name)
+        # Starting a new lane generation invalidates commands from an update
+        # which may only have been partially transmitted. Reinstall retained
+        # events first so their delivery does not depend on that older queue.
+        for index in sorted(retained):
+            self.writer.low(
+                self.name,
+                generation,
+                self._event_command(index, events[index]),
+            )
+        for index in range(self.high_water):
+            if index in retained:
+                continue
+            self.writer.low(
+                self.name,
+                generation,
+                f"H0,0,{self.start + index}Z",
+            )
 
     def clear(self) -> None:
         self.enqueue([])
@@ -750,6 +795,7 @@ class AmySerialClient:
             raise ValueError(
                 "drums, bass, strum and chord must use four distinct AMY buses 0..3"
             )
+        self.master_volume = 1.0
         self.reverb = {
             "level": 0.0,
             "liveness": 0.5,
@@ -762,6 +808,7 @@ class AmySerialClient:
         self.rhythm_config: dict[str, Any] | None = None
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
+        self._rhythm_chord_draining = False
         self.bass_running = True
         self._scheduled_rhythm_id: str | None = None
 
@@ -945,6 +992,20 @@ class AmySerialClient:
     def _route_synth_bus(self, synth: int) -> None:
         self._wire(f"i{synth}iy{self._bus_for_synth(synth)}Z")
 
+    def _apply_master_bus(self, bus: int) -> None:
+        self._wire(f"y{int(bus)}V{self._f(self.master_volume)}Z")
+
+    def _apply_master_buses(self) -> None:
+        for bus in self.bus_id.values():
+            self._apply_master_bus(bus)
+
+    def _set_master_volume(self, value: Any) -> None:
+        updated = max(0.0, min(1.0, float(value)))
+        if math.isclose(updated, self.master_volume, abs_tol=1e-4):
+            return
+        self.master_volume = updated
+        self._apply_master_buses()
+
     def _reverb_command(self, bus: int, *, enabled: bool) -> str:
         level = self.reverb["level"] if enabled else 0.0
         return (
@@ -1026,6 +1087,7 @@ class AmySerialClient:
         # this role's room after the patch is loaded. Other role buses are not
         # touched.
         self._apply_reverb_bus(bus)
+        self._apply_master_bus(bus)
 
         if already_configured:
             # A ROM repatch is not a cheap parameter edit in AMY: it releases,
@@ -1068,6 +1130,7 @@ class AmySerialClient:
         self._configure_synth("strum")
         self._configure_synth("chord")
         self._apply_reverb_buses()
+        self._apply_master_buses()
 
     @staticmethod
     def _params_from_list(values: Any) -> dict[str, float]:
@@ -1438,20 +1501,51 @@ class AmySerialClient:
         elif action == "stop_all":
             self._stop_all_manual()
 
-    def _set_rhythm_chord_enabled(self, enabled: bool) -> bool:
-        """Apply an automatic-chord gate transition and its audio edge."""
+    def _begin_rhythm_chord_drain(
+        self,
+        existing_events: list[tuple[int, int, str]],
+    ) -> None:
+        """Suppress future onsets while preserving sequenced synth-4 offs."""
+        note_off = f"l0i{self.synth_id['rhythm_chord']}"
+        retained_indexes = {
+            index
+            for index, (_, _, body) in enumerate(existing_events)
+            if str(body).removesuffix("Z") == note_off
+        }
+        lane = self._sequencer_lanes["chords"]
+        retained_indexes = {
+            index
+            for index in retained_indexes
+            if index < lane.high_water
+        }
+        if not retained_indexes:
+            return
+
+        lane.retain_only(existing_events, retained_indexes)
+        self._rhythm_chord_draining = True
+
+    def _set_rhythm_chord_enabled(
+        self,
+        enabled: bool,
+        *,
+        existing_chord_events: list[tuple[int, int, str]] | None = None,
+    ) -> bool:
+        """Apply an automatic-chord gate transition without truncating it."""
         enabled = bool(enabled)
         if self.rhythm_chord_enabled == enabled:
             return False
 
+        if existing_chord_events is None:
+            existing_chord_events = self._lane_events("chords")
+
         self.rhythm_chord_enabled = enabled
+        self._rhythm_chord_draining = False
         if not enabled:
-            # Clearing tagged events removes their future note-offs too.  A
-            # velocity-zero event without a note releases every active voice
-            # of synth 4 through the patch's normal envelope; it is not an
-            # oscillator reset and deliberately leaves the rhythm transport,
-            # drums, bass and effect tails alone.
-            self._wire(f"l0i{self.synth_id['rhythm_chord']}Z")
+            # AMY has no deferred tag deletion. Clear only the scheduled
+            # positive-velocity onsets and leave the already-installed l0
+            # events to close a sounding chord at its original rhythmic gate.
+            if self.rhythm_running:
+                self._begin_rhythm_chord_drain(existing_chord_events)
         else:
             self._sync_synth_params(
                 "chord",
@@ -1464,11 +1558,13 @@ class AmySerialClient:
             payload = json.loads(payload_text)
         except json.JSONDecodeError:
             return
+        existing_chord_events = self._lane_events("chords")
         self.chord_notes = [float(x) for x in payload.get("notes", [])]
         self.bass_notes = [float(x) for x in payload.get("bass_notes", [])]
         if "rhythm_chord_enabled" in payload:
             self._set_rhythm_chord_enabled(
-                payload.get("rhythm_chord_enabled")
+                payload.get("rhythm_chord_enabled"),
+                existing_chord_events=existing_chord_events,
             )
 
         if payload.get("play_now") and self.chord_notes:
@@ -1583,6 +1679,8 @@ class AmySerialClient:
         raise KeyError(lane_name)
 
     def _replace_lane(self, lane_name: str) -> None:
+        if lane_name == "chords" and self._rhythm_chord_draining:
+            return
         lane = self._sequencer_lanes[lane_name]
         try:
             lane.enqueue(self._lane_events(lane_name))
@@ -1590,6 +1688,7 @@ class AmySerialClient:
             print(f"AMY rhythm warning: {exc}", flush=True)
 
     def _replace_all_lanes(self, *, resume_transport: bool) -> None:
+        self._rhythm_chord_draining = False
         for lane_name in self._sequencer_lanes:
             self.writer.new_low_generation(lane_name)
         generation = self.writer.new_low_generation("rhythm-full")
@@ -1666,6 +1765,7 @@ class AmySerialClient:
         if not self.rhythm_running:
             return
         self.rhythm_running = False
+        self._rhythm_chord_draining = False
         self._cancel_queued_rhythm_updates()
         self._wire("zY0Z")
         self._silence_accompaniment()
@@ -1737,6 +1837,7 @@ class AmySerialClient:
 
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
+        self._rhythm_chord_draining = False
         self.bass_running = False
         self._manual_active_id = None
         self._manual_active_notes = []
@@ -1774,6 +1875,8 @@ class AmySerialClient:
             self._set_volume("drums", value)
         elif address == a["reverb"]:
             self._set_reverb(value)
+        elif address == a["master_volume"]:
+            self._set_master_volume(value)
         elif address == a["chord_synth"]:
             if isinstance(value, dict):
                 self._set_synth_state("chord", value)

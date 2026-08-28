@@ -7,6 +7,9 @@ Button {
     // The mode switch intentionally projects one chord-row indent farther to
     // the right than the CHORD ON/OFF button below the chord-type rail.
     property int extensionWidth: 30
+    property var midiControlRouter: null
+    property string bindingLocationScreen: ""
+    property bool midiLearnActive: false
 
     padding: 0
     leftPadding: 0
@@ -23,6 +26,7 @@ Button {
         height: root.height
 
         Text {
+            id: modeLabel
             width: root.width
             height: root.height
             anchors.centerIn: parent
@@ -34,6 +38,47 @@ Button {
             verticalAlignment: Text.AlignVCenter
             style: Text.Outline
             styleColor: "#402a36"
+        }
+
+        Rectangle {
+            id: midiLearnLed
+            visible: root.midiLearnActive
+            x: Math.min(
+                root.width
+                + root.extensionWidth
+                - width
+                - 5,
+                modeLabel.x
+                + (modeLabel.width + modeLabel.contentWidth) / 2
+                + 6
+            )
+            anchors.verticalCenter: parent.verticalCenter
+            width: 12
+            height: 12
+            radius: width / 2
+            color: "#f22b2b"
+            border.color: "#7d1515"
+            border.width: 1
+            z: 2
+
+            SequentialAnimation on opacity {
+                running: root.midiLearnActive
+                loops: Animation.Infinite
+                NumberAnimation { from: 1.0; to: 0.2; duration: 240 }
+                NumberAnimation { from: 0.2; to: 1.0; duration: 240 }
+            }
+        }
+
+        MidiBindingLocationLed {
+            x: 9
+            anchors.verticalCenter: parent.verticalCenter
+            width: 10
+            height: 10
+            radius: width / 2
+            z: 2
+            midiControlRouter: root.midiControlRouter
+            targetScreen: root.bindingLocationScreen
+            locationEnabled: root.bindingLocationScreen.length > 0
         }
     }
 

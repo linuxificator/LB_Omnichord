@@ -8,6 +8,11 @@ The central rule is:
 
 A preset or rhythm selection may change the pattern and other stored rhythm parameters, but it must not unexpectedly start or stop the rhythm, change the currently running tempo, reset the sequencer timebase, or interrupt the beat.
 
+For preset selection, playback continuity also includes the current
+percussion/chord/bass activity, bass voicing and active chord-row octave. These
+controls shape the accompaniment that is already in progress and therefore
+remain live while transport runs.
+
 ## 1. State model
 
 The implementation must keep the following concepts separate.
@@ -129,12 +134,17 @@ When another preset is selected:
 
 1. `rhythmRunning` remains `true`.
 2. The effective live tempo remains exactly `T`.
-3. The new preset may change the rhythm/pattern.
-4. Other rhythm parameters from the new preset may be applied if they do not require stopping or resetting the running rhythm transport.
-5. The tempo stored in the newly selected preset must **not** replace the effective live tempo during this live transition.
-6. The AMY sequencer must remain running.
-7. The AMY sequencer timebase must not be reset.
-8. No artificial pause, restart, dropped beat, or transport pulse may be inserted.
+3. Live percussion activity, chord activity, bass activity and bass voicing
+   remain unchanged.
+4. The octave of the active chord row remains unchanged. Octaves belonging to
+   non-active chord rows may load from the destination preset.
+5. The new preset may change the rhythm/pattern.
+6. Other rhythm parameters from the new preset may be applied if they do not require stopping or resetting the running rhythm transport.
+7. Stored values for the protected live controls must **not** replace their
+   effective values during this live transition.
+8. The AMY sequencer must remain running.
+9. The AMY sequencer timebase must not be reset.
+10. No artificial pause, restart, dropped beat, or transport pulse may be inserted.
 
 Example:
 
@@ -392,7 +402,7 @@ This is true whether the rhythm happens to be running or stopped when `STR` is u
 
 | User action | Rhythm stopped | Rhythm running |
 |---|---|---|
-| Select preset | Load preset rhythm and preset tempo; stay stopped | Load preset rhythm; preserve current live tempo; stay running |
+| Select preset | Load all preset rhythm controls and row octaves; stay stopped | Load preset rhythm; preserve live tempo, three activities, bass voicing and active-row octave; load non-active-row octaves; stay running |
 | Select rhythm type | Load rhythm and its stored/default tempo; stay stopped | Change rhythm; preserve current live tempo; stay running |
 | Preset says rhythm ON | Ignore | Ignore |
 | Preset says rhythm OFF | Ignore | Ignore |
@@ -470,23 +480,69 @@ If the user manually changes the tempo while running, that tempo must remain eff
 
 Starting rhythm playback must use the currently selected rhythm and current displayed tempo without first reloading preset defaults.
 
-### RHYTHM-016 — manual chord takeover releases the automatic chord normally
+### RHYTHM-016 — manual chord takeover preserves the sequenced gate
 
-Pressing a manual chord while automatic rhythm chords are enabled must close
-the automatic-chord gate before starting the manual chord. Clearing future
-sequencer events is insufficient because it also removes the pending note-off
-of a synth-4 chord which may already be sounding.
+Chord finger-down must start the manual synth-3 chord immediately. A quick tap
+ends that manual voice on finger-up and immediately selects the chord for the
+strum, bass and automatic chord accompaniment. The affected bass/chord pitch
+schedules are replaced without stopping transport. A tap must not change
+effective chord activity, close the automatic-chord lane or perform the
+hold-specific draining of its note-on tags.
 
-The gate transition must therefore send an immediate velocity-zero note-off to
-all active voices of automatic-chord synth 4 before sending the manual synth-3
-note-ons. This is an ordinary AMY note-off and must follow the selected patch's
-normal release envelope; it must not reset oscillators, patches, effects, the
-sequencer or its timebase. Drums and bass continue. A finite release tail may
-overlap the manual chord, but the old automatic chord may not sustain after its
-release has completed.
+If the contact remains down past the quick-tap window, it is promoted to a
+manual hold. That promotion performs the established accompaniment takeover:
+while automatic rhythm chords are enabled it temporarily closes the effective
+automatic-chord lane without changing the independent `CHORD ON/OFF` state. It
+must remove the repeating positive-velocity synth-4 note-on tags, but retain the
+already scheduled synth-4 `l0` tags. Retained note-offs are explicitly
+reinstalled so their delivery does not depend on an older queued lane update. A
+rhythm chord which is sounding when the hold is promoted therefore reaches the
+note-off at its original sequencer gate instead of being cut off immediately or
+hanging because its future note-off was removed.
+
+Current AMY has no deferred tag-removal command or wire callback which says
+that a repeating event has just fired. Its per-event user tags nevertheless
+provide the required behavior: note-on tags and note-off tags are addressed
+independently. While automatic chords are gated off, retained note-off tags may
+continue firing harmless synth-4 all-offs; they are replaced or cleared when
+the lane is enabled, restarted or reset. Manual synth-3 note-ons begin at
+finger-down and may overlap the remainder of the automatic chord's normal gate
+and release. Drums, bass, transport, effects and sequencer timebase continue.
+
+### RHYTHM-017 — running preset selection preserves live performance controls
+
+When `rhythmRunning == true`, preset selection must preserve percussion
+activity, chord activity, bass activity, bass voicing and the octave of the
+active chord row, in addition to live tempo. Octaves of non-active chord rows
+load from the destination preset. When `rhythmRunning == false`, the complete
+stored set loads normally.
+
+### RHYTHM-018 — CHORD ON/OFF owns only automatic sequencer chords
+
+`CHORD OFF` drains future synth-4 note-ons while preserving their sequenced
+note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
+chord identity. Neither action may start, retrigger, release or otherwise
+control a manual synth-3 chord. A physically held chord remains owned by its
+chord-button press/release lifecycle.
+
+The gate is a binary live-performance state, initially OFF, and can be toggled
+before any chord identity exists. A chord tap selects the active chord and may
+therefore replace the bass and automatic-chord pitches, but it must never change
+that gate state or temporarily close the lane. When the gate is ON, only a
+manual hold temporarily suppresses its sequencer lane; release restores it
+without toggling the control.
+
+### RHYTHM-019 — activity controls expose four aligned levels
+
+Percussion, chord and bass activity each expose levels 1 through 4. Chord
+activity 0 is not a selectable or stored state; `CHORD OFF` owns that meaning.
+During manual chord takeover the effective chord activity may temporarily be 0
+so the sequencer lane remains closed. In that interval the interface shows no
+selected chord-activity button and restores the unchanged stored 1–4 selection
+on release. Legacy presets containing chord activity 0 load as level 1.
 
 ## 16. Summary rule
 
 The complete behavior can be reduced to this rule:
 
-> **When stopped, configuration changes may load stored tempo values. When running, pattern changes must preserve the current tempo and continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
+> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, bass voicing, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
