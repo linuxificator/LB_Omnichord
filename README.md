@@ -21,17 +21,19 @@ Originally created as a birthday gift for Luciel.
 
 The OMNI screen is the self-contained instrument: choose and voice chords,
 play the strum surface, build rhythms, and shape the independent bass, strum
-and chord synths. Performance controls include instrument presets, percussion,
-reverb, tuning and per-part volume.
+and chord synths. Its current header combines tuning, independent master
+volume, reverb and presets; the blue note markers beside the strum surface show
+the musically spelled tones available to the active chord.
 
 ## MIDI performance screen
 
 ![LB Omnichord MIDI performance screen](./amysynth_version/qt_frontend/screenshots/midi.png)
 
 The MIDI screen provides six configurable parts with their own instrument,
-synthesis controls and volume. Incoming MIDI can play the AMY instruments and
-MIDI CC learn can bind physical controls directly to continuous parameters on
-both the MIDI and OMNI screens.
+synthesis controls, volume, reverb and master output. Incoming MIDI can play
+the AMY instruments and MIDI CC learn can bind physical controls directly to
+continuous parameters on both screens. The grey lower bar shows live
+radio-style knobs for the MIDI channel/controller pairs being moved.
 
 ## Get started
 

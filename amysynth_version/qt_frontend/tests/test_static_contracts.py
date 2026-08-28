@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import struct
 import unittest
 from pathlib import Path
 
@@ -78,14 +79,30 @@ class StaticContractTests(unittest.TestCase):
         repository = ROOT.parents[1]
         public_readme = (repository / "README.md").read_text(encoding="utf-8")
         frontend_readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        capture = (ROOT / "capture_screenshots.py").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("https://github.com/linuxificator/amy", public_readme)
         self.assertIn("https://github.com/shorepine/amy", public_readme)
         self.assertIn("`screenshots/`", frontend_readme)
+        self.assertIn("python capture_screenshots.py", frontend_readme)
+        self.assertIn('"QT_QPA_PLATFORM": "offscreen"', capture)
+        self.assertIn('"--capture-screenshots-dir"', capture)
         for name in ("omni.png", "midi.png"):
             relative = f"amysynth_version/qt_frontend/screenshots/{name}"
             self.assertIn(relative, public_readme)
-            self.assertTrue((repository / relative).is_file(), relative)
+            path = repository / relative
+            self.assertTrue(path.is_file(), relative)
+            png = path.read_bytes()
+            self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n", relative)
+            width, height = struct.unpack(">II", png[16:24])
+            self.assertEqual((width, height), (1920, 850), relative)
+
+        app_core = (ROOT / "code" / "app_core.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("(2, 7, 104)", app_core)
 
     def test_midi_qml_uses_its_own_bindable_metaobject(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")

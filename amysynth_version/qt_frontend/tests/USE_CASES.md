@@ -126,6 +126,14 @@ The serial regression requires the factory patch to remain authoritative for nat
 - Labels use uppercase note letters and musical enharmonic spelling. In
   particular, C minor is shown as `C`, `E♭`, `G`, not `C`, `D♯`, `G`;
   ordinary scales do not arbitrarily mix sharps and flats.
+- Every chord suffix in `music/chords.csv` has an explicit audited LDR mapping,
+  and every chord pitch class must occur in that mapping. Adding a chord without
+  adding and testing its LDR mapping is an error rather than a silent fallback
+  to a broad family rule.
+- LDR may use a consonant subset of a conventional chord-scale because every
+  available note is sounded mechanically. It omits avoid tones and opposite
+  alterations unless the chord itself names them. G minor-major 7 therefore
+  uses `G A B♭ D E F♯`, never F natural beside the defining F♯.
 
 ### MIDI — input, tuning, preview and effects
 
@@ -524,9 +532,14 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **RHYTHM-06 — manual chord input lets the current automatic chord finish**
 
-- Finger-down immediately suppresses the effective automatic-chord lane, but
-  does not change the `CHORD ON/OFF` state or send an immediate `l0i4` before
-  the manual synth-3 note-on.
+- Finger-down immediately starts manual synth 3 and selects the new active
+  chord for strum, bass and automatic accompaniment pitches.
+- Finger-up inside the quick-tap window stops only the manual synth-3 voice. It
+  must not change effective chord activity, close the automatic-chord lane or
+  drain its tags.
+- If the contact remains down past the quick-tap window, hold promotion
+  suppresses the effective automatic-chord lane without changing the `CHORD
+  ON/OFF` state or sending an immediate `l0i4`.
 - Positive-velocity synth-4 note-on tags are cleared. Existing synth-4 `l0`
   tags remain installed, so the currently sounding chord receives its original
   sequencer note-off and completes the configured rhythmic gate.
@@ -600,7 +613,17 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 
 **Failure history:** after directory reorganization the PNG existed but the watermark disappeared because relative resolution occurred through a `code/` symlink. The repository now has no compatibility symlinks.
 
-**UI-02 — instrument names contain useful names only**
+**UI-02 — public screenshots render the current real interface**
+
+- `capture_screenshots.py` runs the production QML scene offscreen with an
+  isolated temporary home and writes `screenshots/omni.png` and
+  `screenshots/midi.png`.
+- The OMNI frame shows an active C-minor strum-note guide; the MIDI frame shows
+  three representative CC knobs in the grey lower bar.
+- The repository README embeds those exact two files. Screenshot refreshes may
+  not use a hand-drawn or generated substitute for the actual Qt interface.
+
+**UI-03 — instrument names contain useful names only**
 
 - Curated names must not acquire redundant `PATCH` suffixes or unwanted generic engine prefixes in the visible label.
 

@@ -259,28 +259,152 @@ def display_label(suffix: str) -> str:
     )
 
 
-def ladder_pattern(
-    chord_suffix: str,
-) -> tuple[tuple[int, ...], tuple[int, ...]]:
-    """Return ladder semitones and their diatonic scale-degree offsets."""
-    if "diminished" in chord_suffix or "flat5" in chord_suffix:
-        # Whole-half octatonic. The repeated sixth letter is intentional:
-        # C D Eb F Gb Ab A B is the readable spelling of this unusual scale.
-        return (
-            (0, 2, 3, 5, 6, 8, 9, 11),
-            (0, 1, 2, 3, 4, 5, 5, 6),
-        )
-    if "augmented" in chord_suffix or "sharp5" in chord_suffix:
-        return ((0, 2, 4, 6, 8, 10), (0, 1, 2, 3, 4, 5))
-    if chord_suffix == "5":
-        return ((0, 2, 4, 7, 9), (0, 1, 2, 4, 5))
-    if chord_suffix.startswith("minor"):
-        return ((0, 3, 5, 7, 10), (0, 2, 3, 4, 6))
-    if "dominant" in chord_suffix or chord_suffix == "7_sus4":
-        return ((0, 2, 4, 5, 7, 9, 10), (0, 1, 2, 3, 4, 5, 6))
-    if chord_suffix.startswith("sus"):
-        return ((0, 2, 5, 7, 9), (0, 1, 3, 4, 5))
-    return ((0, 2, 4, 7, 9), (0, 1, 2, 4, 5))
+LadderPattern = tuple[tuple[int, ...], tuple[int, ...]]
+
+# LDR plays every listed pitch rather than letting an improviser de-emphasize
+# an avoid tone. These patterns therefore use common chord-scale relationships
+# but omit avoid tones and unspecified alternative alterations where useful.
+# Every pattern still contains every pitch class explicitly present in its
+# chord definition.
+_MAJOR_PENTATONIC: LadderPattern = (
+    (0, 2, 4, 7, 9),
+    (0, 1, 2, 4, 5),
+)
+_MINOR_PENTATONIC: LadderPattern = (
+    (0, 3, 5, 7, 10),
+    (0, 2, 3, 4, 6),
+)
+_SUSPENDED_PENTATONIC: LadderPattern = (
+    (0, 2, 5, 7, 9),
+    (0, 1, 3, 4, 5),
+)
+_MINOR_6_9_PENTATONIC: LadderPattern = (
+    (0, 2, 3, 7, 9),
+    (0, 1, 2, 4, 5),
+)
+_MINOR_ADD9_HEXATONIC: LadderPattern = (
+    (0, 2, 3, 5, 7, 10),
+    (0, 1, 2, 3, 4, 6),
+)
+_MAJOR7_HEXATONIC: LadderPattern = (
+    (0, 2, 4, 7, 9, 11),
+    (0, 1, 2, 4, 5, 6),
+)
+_DOMINANT_HEXATONIC: LadderPattern = (
+    (0, 2, 4, 7, 9, 10),
+    (0, 1, 2, 4, 5, 6),
+)
+_MELODIC_MINOR_HEXATONIC: LadderPattern = (
+    (0, 2, 3, 7, 9, 11),
+    (0, 1, 2, 4, 5, 6),
+)
+_DOMINANT_SUS_HEXATONIC: LadderPattern = (
+    (0, 2, 5, 7, 9, 10),
+    (0, 1, 3, 4, 5, 6),
+)
+_LOCRIAN_NATURAL2: LadderPattern = (
+    (0, 2, 3, 5, 6, 8, 10),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_WHOLE_HALF_DIMINISHED: LadderPattern = (
+    (0, 2, 3, 5, 6, 8, 9, 11),
+    # C D E-flat F G-flat A-flat A B is the conventional readable
+    # mixed spelling; the repeated sixth letter is intentional.
+    (0, 1, 2, 3, 4, 5, 5, 6),
+)
+_WHOLE_TONE: LadderPattern = (
+    (0, 2, 4, 6, 8, 10),
+    (0, 1, 2, 3, 4, 5),
+)
+_LYDIAN_AUGMENTED: LadderPattern = (
+    (0, 2, 4, 6, 8, 9, 11),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_MIXOLYDIAN: LadderPattern = (
+    (0, 2, 4, 5, 7, 9, 10),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_MAJOR: LadderPattern = (
+    (0, 2, 4, 5, 7, 9, 11),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_DORIAN: LadderPattern = (
+    (0, 2, 3, 5, 7, 9, 10),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_LYDIAN_DOMINANT: LadderPattern = (
+    (0, 2, 4, 6, 7, 9, 10),
+    (0, 1, 2, 3, 4, 5, 6),
+)
+_DOMINANT_FLAT5: LadderPattern = (
+    (0, 2, 4, 6, 10),
+    (0, 1, 2, 4, 6),
+)
+_DOMINANT_SHARP5: LadderPattern = (
+    (0, 2, 4, 8, 10),
+    (0, 1, 2, 4, 6),
+)
+_DOMINANT_FLAT9: LadderPattern = (
+    (0, 1, 4, 7, 10),
+    (0, 1, 2, 4, 6),
+)
+_DOMINANT_SHARP9: LadderPattern = (
+    (0, 3, 4, 7, 10),
+    (0, 1, 2, 4, 6),
+)
+_DOMINANT_FLAT13: LadderPattern = (
+    (0, 2, 4, 7, 8, 10),
+    (0, 1, 2, 4, 5, 6),
+)
+
+CHORD_LADDER_PATTERNS: dict[str, LadderPattern] = {
+    "major": _MAJOR_PENTATONIC,
+    "minor": _MINOR_PENTATONIC,
+    "diminished": _WHOLE_HALF_DIMINISHED,
+    "augmented": _WHOLE_TONE,
+    "sus2": _SUSPENDED_PENTATONIC,
+    "sus4": _SUSPENDED_PENTATONIC,
+    "5": _MAJOR_PENTATONIC,
+    "major6": _MAJOR_PENTATONIC,
+    "minor6": _MINOR_6_9_PENTATONIC,
+    "6_9": _MAJOR_PENTATONIC,
+    "add9": _MAJOR_PENTATONIC,
+    "minor_add9": _MINOR_ADD9_HEXATONIC,
+    "dominant7": _DOMINANT_HEXATONIC,
+    "major7": _MAJOR7_HEXATONIC,
+    "minor7": _MINOR_PENTATONIC,
+    "minor_major7": _MELODIC_MINOR_HEXATONIC,
+    "minor7_flat5": _LOCRIAN_NATURAL2,
+    "diminished7": _WHOLE_HALF_DIMINISHED,
+    "augmented7": _DOMINANT_SHARP5,
+    "augmented_major7": _LYDIAN_AUGMENTED,
+    "7_sus4": _DOMINANT_SUS_HEXATONIC,
+    "dominant9": _DOMINANT_HEXATONIC,
+    "major9": _MAJOR7_HEXATONIC,
+    "minor9": _MINOR_ADD9_HEXATONIC,
+    "dominant11": _MIXOLYDIAN,
+    "major11": _MAJOR,
+    "minor11": _MINOR_ADD9_HEXATONIC,
+    "dominant13": _MIXOLYDIAN,
+    "major13": _MAJOR,
+    "minor13": _DORIAN,
+    "dominant7_flat5": _DOMINANT_FLAT5,
+    "dominant7_sharp5": _DOMINANT_SHARP5,
+    "dominant7_flat9": _DOMINANT_FLAT9,
+    "dominant7_sharp9": _DOMINANT_SHARP9,
+    "dominant7_sharp11": _LYDIAN_DOMINANT,
+    "dominant7_flat13": _DOMINANT_FLAT13,
+}
+
+
+def ladder_pattern(chord_suffix: str) -> LadderPattern:
+    """Return the audited LDR pitches and musical scale-degree spellings."""
+    try:
+        return CHORD_LADDER_PATTERNS[chord_suffix]
+    except KeyError as exc:
+        raise ValueError(
+            f"No audited LDR pattern for chord {chord_suffix!r}"
+        ) from exc
 
 
 def _fallback_prefers_flats(root_label: str, chord_suffix: str) -> bool:
@@ -4216,6 +4340,15 @@ def parse_arguments() -> argparse.Namespace:
             "configured AMY transport, and exit automatically."
         ),
     )
+    parser.add_argument(
+        "--capture-screenshots-dir",
+        type=Path,
+        default=None,
+        help=(
+            "Render current OMNI and MIDI screens into this directory, "
+            "then exit. Intended for the repository screenshot helper."
+        ),
+    )
 
     window_group = parser.add_mutually_exclusive_group()
     window_group.add_argument(
@@ -4369,6 +4502,10 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_arguments()
+    if args.package_smoke_test and args.capture_screenshots_dir is not None:
+        raise ValueError(
+            "--package-smoke-test and --capture-screenshots-dir are exclusive"
+        )
 
     smoke_status_value = os.environ.get("OMNICHORD_PACKAGE_SMOKE_STATUS")
     smoke_status = Path(smoke_status_value) if smoke_status_value else None
@@ -4723,6 +4860,60 @@ def main() -> int:
 
     backend.send_initial_state()
     smoke_checkpoint("initial-state-sent")
+
+    if args.capture_screenshots_dir is not None:
+        capture_dir = args.capture_screenshots_dir.expanduser().resolve()
+        capture_dir.mkdir(parents=True, exist_ok=True)
+        window = engine.rootObjects()[0]
+
+        # Populate the MIDI screen's grey controller bar with representative
+        # genuine CC movements. The first packet establishes the previous
+        # value; the second is the movement that makes the knob visible.
+        for channel, controller, value in (
+            (2, 7, 104),
+            (2, 11, 72),
+            (2, 92, 38),
+        ):
+            backend.injectMidiControl(channel, controller, 0)
+            backend.injectMidiControl(channel, controller, value)
+        # Select C minor from factory preset 1 so the OMNI capture also
+        # demonstrates the active chord and its correctly spelled C/E-flat/G
+        # strum-note guide.
+        backend.pressChord(0, 0)
+
+        def capture_screen(name: str) -> bool:
+            image = window.grabWindow()
+            path = capture_dir / f"{name}.png"
+            if image.isNull() or not image.save(str(path), "PNG"):
+                print(
+                    f"Could not capture Qt screen to {path}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return False
+            print(f"Captured {path}", file=sys.stderr, flush=True)
+            return True
+
+        def capture_omni() -> None:
+            window.setProperty("midiScreen", False)
+            if not capture_screen("omni"):
+                app.exit(3)
+                return
+            backend.releaseChord(0, 0)
+            window.setProperty("midiScreen", True)
+            # Allow MidiScreen's visible-state timer to publish the injected
+            # CC model before grabbing the second frame.
+            QTimer.singleShot(750, capture_midi)
+
+        def capture_midi() -> None:
+            if not capture_screen("midi"):
+                app.exit(3)
+                return
+            app.quit()
+
+        # Give the software scene graph a complete frame before the first
+        # grab. This works with QT_QPA_PLATFORM=offscreen as used by the helper.
+        QTimer.singleShot(1500, capture_omni)
 
     if args.package_smoke_test:
         if not args.amy_socket and not args.amy_local_name:

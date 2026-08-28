@@ -159,6 +159,92 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             {0, 2, 4, 7, 9},
         )
 
+    def test_every_chord_has_an_audited_ladder_with_all_chord_tones(self) -> None:
+        chords = app_core.load_chords(ROOT / "music" / "chords.csv")
+        expected_intervals = {
+            "major": (0, 2, 4, 7, 9),
+            "minor": (0, 3, 5, 7, 10),
+            "diminished": (0, 2, 3, 5, 6, 8, 9, 11),
+            "augmented": (0, 2, 4, 6, 8, 10),
+            "sus2": (0, 2, 5, 7, 9),
+            "sus4": (0, 2, 5, 7, 9),
+            "5": (0, 2, 4, 7, 9),
+            "major6": (0, 2, 4, 7, 9),
+            "minor6": (0, 2, 3, 7, 9),
+            "6_9": (0, 2, 4, 7, 9),
+            "add9": (0, 2, 4, 7, 9),
+            "minor_add9": (0, 2, 3, 5, 7, 10),
+            "dominant7": (0, 2, 4, 7, 9, 10),
+            "major7": (0, 2, 4, 7, 9, 11),
+            "minor7": (0, 3, 5, 7, 10),
+            "minor_major7": (0, 2, 3, 7, 9, 11),
+            "minor7_flat5": (0, 2, 3, 5, 6, 8, 10),
+            "diminished7": (0, 2, 3, 5, 6, 8, 9, 11),
+            "augmented7": (0, 2, 4, 8, 10),
+            "augmented_major7": (0, 2, 4, 6, 8, 9, 11),
+            "7_sus4": (0, 2, 5, 7, 9, 10),
+            "dominant9": (0, 2, 4, 7, 9, 10),
+            "major9": (0, 2, 4, 7, 9, 11),
+            "minor9": (0, 2, 3, 5, 7, 10),
+            "dominant11": (0, 2, 4, 5, 7, 9, 10),
+            "major11": (0, 2, 4, 5, 7, 9, 11),
+            "minor11": (0, 2, 3, 5, 7, 10),
+            "dominant13": (0, 2, 4, 5, 7, 9, 10),
+            "major13": (0, 2, 4, 5, 7, 9, 11),
+            "minor13": (0, 2, 3, 5, 7, 9, 10),
+            "dominant7_flat5": (0, 2, 4, 6, 10),
+            "dominant7_sharp5": (0, 2, 4, 8, 10),
+            "dominant7_flat9": (0, 1, 4, 7, 10),
+            "dominant7_sharp9": (0, 3, 4, 7, 10),
+            "dominant7_sharp11": (0, 2, 4, 6, 7, 9, 10),
+            "dominant7_flat13": (0, 2, 4, 7, 8, 10),
+        }
+
+        self.assertEqual(
+            set(expected_intervals),
+            {chord.suffix for chord in chords},
+        )
+        self.assertEqual(
+            set(app_core.CHORD_LADDER_PATTERNS),
+            set(expected_intervals),
+        )
+        for chord in chords:
+            ladder_intervals, degree_offsets = app_core.ladder_pattern(
+                chord.suffix
+            )
+            self.assertEqual(
+                ladder_intervals,
+                expected_intervals[chord.suffix],
+                chord.suffix,
+            )
+            self.assertEqual(
+                len(ladder_intervals),
+                len(degree_offsets),
+                chord.suffix,
+            )
+            self.assertTrue(
+                {interval % 12 for interval in chord.intervals}
+                <= {interval % 12 for interval in ladder_intervals},
+                chord.suffix,
+            )
+
+    def test_minor_major7_ladder_uses_melodic_minor_colours_without_flat7(self) -> None:
+        g_minor_major7 = self._strum_backend(
+            "minor_major7",
+            (0, 3, 7, 11),
+            root=7,
+            ladder=True,
+        )
+        self.assertEqual(
+            g_minor_major7._strum_note_names(),
+            ["G", "A", "B♭", "D", "E", "F♯"],
+        )
+        self.assertNotIn("F", g_minor_major7._strum_note_names())
+
+    def test_ladder_lookup_rejects_unaudited_new_chord_types(self) -> None:
+        with self.assertRaisesRegex(ValueError, "No audited LDR pattern"):
+            app_core.ladder_pattern("future_chord")
+
     def test_apg_note_guide_uses_musical_chord_spelling(self) -> None:
         major = self._strum_backend("major", (0, 4, 7))
         minor = self._strum_backend("minor", (0, 3, 7))

@@ -127,6 +127,12 @@ Buttons used for mode switching must have:
 - consistent spacing;
 - clear active/inactive indication.
 
+Round preset buttons keep exactly the same diameter during pointer-down and
+after selection. Selection is indicated by replacing the ordinary single
+border color with white; it does not add an inner/outer ring. The Store button
+shares that diameter but uses a visibly darker purple fill. OMNI and MIDI use
+the same preset geometry.
+
 ### Colors
 
 Colors are used to communicate function:
@@ -168,11 +174,6 @@ The following behaviors must be regression tested:
 9. Switch screens without unintended parameter changes.
 10. Verify local AMY and remote AMY produce identical wire command streams.
 
-## Open questions
-
-Items requiring future decisions:
-
-- exact persistence rules for tuning values;
-- final MIDI drum/percussion architecture;
-- additional AMY bus allocation rules;
-- factory versus user preset storage model.
+The current exact persistence, MIDI drum, bus-allocation and factory/user
+preset rules are no longer open UI questions; their authoritative contracts
+are `presets.md`, `midi.md`, `architecture.md` and `sound_balance.md`.

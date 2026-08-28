@@ -18,6 +18,7 @@ AMY work.
 - `instruments/` — curated AMY Juno/DX7 catalogue and 18 factory presets
 - `music/` — chord, rhythm and intonation definitions
 - `screenshots/` — current public OMNI and MIDI screen images used by the root README
+- `capture_screenshots.py` — deterministic offscreen capture of those real QML screens
 - `tests/` — unit, headless, serial and native-AMY regression tests plus fixtures
 - `rpi/` — Raspberry Pi startup/autostart helpers
 - `docs/` — ESP32-P4 notes, screenshots and historical implementation notes
@@ -42,6 +43,22 @@ From this directory after creating the virtual environment described in `README_
 ```
 
 `main.py` addresses the canonical `gui/`, `config/`, `instruments/` and `music/` directories directly. There are no compatibility symlinks or duplicate runtime data files in `code/`.
+
+## Public screenshots
+
+Refresh the two screenshots used by the repository README with the same Python
+environment as the frontend:
+
+```bash
+python capture_screenshots.py
+```
+
+The helper runs the real frontend and QML scene through Qt's offscreen software
+renderer, uses an isolated temporary home and a pseudo-serial endpoint, selects
+C minor for the OMNI strum-note guide, and injects three representative MIDI CC
+movements for the grey MIDI controller bar. It overwrites only
+`screenshots/omni.png` and `screenshots/midi.png`; it does not read or alter the
+user's presets or connect to AMY hardware.
 
 ## Synth-state architecture
 
