@@ -555,6 +555,28 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("x: root.hostWindow.omniTitleX", midi)
         self.assertIn("width: root.hostWindow.omniTitleWidth", midi)
 
+    def test_chord_taps_are_promoted_to_holds_only_after_a_delay(self) -> None:
+        backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        self.assertIn("self._pending_chord_promotions", backend)
+        self.assertIn("timer.setInterval(CHORD_QUICK_TAP_MAX_MS)", backend)
+        self.assertIn("self._schedule_chord_hold_promotion(key)", backend)
+        self.assertIn("def promoteChordHold(", backend)
+        self.assertIn("self._promoted_chords.add(key)", backend)
+        press_start = backend.index("def pressChord(")
+        promote_start = backend.index("def promoteChordHold(", press_start)
+        press = backend[press_start:promote_start]
+        self.assertIn("self._send_chord_state(play_now=False)", press)
+        self.assertIn("self._set_active_chord(", press)
+        promote_end = backend.index("def releaseChord(", promote_start)
+        promote = backend[promote_start:promote_end]
+        self.assertNotIn("self._set_active_chord(", promote)
+        self.assertNotIn("self._send_chord_state(", promote)
+        self.assertIn("self._update_hold_override()", promote)
+        release_start = backend.index("def releaseChord(")
+        release_end = backend.index("def selectChord(", release_start)
+        release = backend[release_start:release_end]
+        self.assertIn("self._cancel_pending_chord_promotion(key)", release)
+
     def test_apg_ldr_button_uses_backend_preset_state(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")

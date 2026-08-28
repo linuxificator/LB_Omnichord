@@ -482,24 +482,32 @@ Starting rhythm playback must use the currently selected rhythm and current disp
 
 ### RHYTHM-016 — manual chord takeover preserves the sequenced gate
 
-Pressing a manual chord while automatic rhythm chords are enabled must
-temporarily close the effective automatic-chord lane before starting the manual
-chord, without changing the independent `CHORD ON/OFF` state. It must remove the
-repeating positive-velocity synth-4 note-on tags, but retain the already
-scheduled synth-4 `l0` tags. Retained note-offs are explicitly reinstalled so
-their delivery does not depend on an older queued lane update. A rhythm chord
-which is sounding at finger-down
-therefore reaches the note-off at its original sequencer gate instead of being
-cut off immediately or hanging because its future note-off was removed.
+Chord finger-down must start the manual synth-3 chord immediately. A quick tap
+ends that manual voice on finger-up and immediately selects the chord for the
+strum, bass and automatic chord accompaniment. The affected bass/chord pitch
+schedules are replaced without stopping transport. A tap must not change
+effective chord activity, close the automatic-chord lane or perform the
+hold-specific draining of its note-on tags.
+
+If the contact remains down past the quick-tap window, it is promoted to a
+manual hold. That promotion performs the established accompaniment takeover:
+while automatic rhythm chords are enabled it temporarily closes the effective
+automatic-chord lane without changing the independent `CHORD ON/OFF` state. It
+must remove the repeating positive-velocity synth-4 note-on tags, but retain the
+already scheduled synth-4 `l0` tags. Retained note-offs are explicitly
+reinstalled so their delivery does not depend on an older queued lane update. A
+rhythm chord which is sounding when the hold is promoted therefore reaches the
+note-off at its original sequencer gate instead of being cut off immediately or
+hanging because its future note-off was removed.
 
 Current AMY has no deferred tag-removal command or wire callback which says
 that a repeating event has just fired. Its per-event user tags nevertheless
 provide the required behavior: note-on tags and note-off tags are addressed
 independently. While automatic chords are gated off, retained note-off tags may
 continue firing harmless synth-4 all-offs; they are replaced or cleared when
-the lane is enabled, restarted or reset. Manual synth-3 note-ons may begin
-immediately and overlap the remainder of the automatic chord's normal gate and
-release. Drums, bass, transport, effects and sequencer timebase continue.
+the lane is enabled, restarted or reset. Manual synth-3 note-ons begin at
+finger-down and may overlap the remainder of the automatic chord's normal gate
+and release. Drums, bass, transport, effects and sequencer timebase continue.
 
 ### RHYTHM-017 — running preset selection preserves live performance controls
 
@@ -518,10 +526,11 @@ control a manual synth-3 chord. A physically held chord remains owned by its
 chord-button press/release lifecycle.
 
 The gate is a binary live-performance state, initially OFF, and can be toggled
-before any chord identity exists. Selecting, pressing or releasing a chord may
-change the pitches supplied to the sequencer but must never change that gate
-state. When the gate is ON, manual hold temporarily suppresses its sequencer
-lane and release restores it without toggling the control.
+before any chord identity exists. A chord tap selects the active chord and may
+therefore replace the bass and automatic-chord pitches, but it must never change
+that gate state or temporarily close the lane. When the gate is ON, only a
+manual hold temporarily suppresses its sequencer lane; release restores it
+without toggling the control.
 
 ### RHYTHM-019 — activity controls expose four aligned levels
 

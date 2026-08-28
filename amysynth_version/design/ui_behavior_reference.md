@@ -79,13 +79,19 @@ The implementation must not use hidden "effective tuning" values selected by the
 
 Tap actions should trigger immediately and must not require a second interaction to initialize state.
 
+A chord tap immediately starts the selected notes on the manual chord synth and
+releases them on finger-up. It also selects that chord as the active chord for
+strum and accompaniment. The accompaniment pitches may update, but the tap does
+not temporarily suppress or stop the automatic-chord lane.
+
 ### Press and hold
 
 Long presses are used where continuous musical interaction is required.
 
 Examples:
 
-- holding a chord keeps the chord active;
+- holding a chord past the tap window selects it for accompaniment and keeps it
+  active while temporarily suppressing future automatic-chord onsets;
 - holding performance controls must not repeatedly reset state;
 - accidental short releases should not create unwanted retriggers.
 

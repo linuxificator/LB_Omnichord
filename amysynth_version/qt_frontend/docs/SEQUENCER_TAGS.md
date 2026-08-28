@@ -23,7 +23,11 @@ Each lane assigns deterministic consecutive tags to its current events. When a n
 
 Lane-local operations do not reset the sequencer:
 
-- manual chord hold/release changes only the automatic-chord tag range (and may update bass pitches because the active chord changed). On hold, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
+- a quick chord tap starts/stops manual synth 3 and selects the active chord for
+  strum, bass and automatic chords. The corresponding bass/chord pitch schedules
+  are replaced while transport and the automatic-chord lane remain enabled; it
+  does not perform the hold-specific drain of synth-4 note-on tags;
+- promotion to a manual chord hold and its eventual release change only the automatic-chord tag range (and may update bass pitches because the active chord changed). On hold promotion, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
 - `CHORD OFF` performs the same synth-4 drain and `CHORD ON` reinstalls that
   lane. These controls never trigger or release manual synth-3 voices;
 - bass on/off changes only the bass range;
@@ -44,8 +48,9 @@ Starting transport installs the complete current drum, bass and automatic-chord 
 
 Stopping transport is different from clearing a lane. `zY0` prevents future sequencer events from firing, so a note that is currently sounding cannot rely on its later tagged note-off. Stop therefore performs an explicit all-off immediately after `zY0` for the rhythm-owned synths: percussion synth 0, bass synth 1 and automatic-chord synth 4. Manual chord synth 3 and strum synth 2 are deliberately left alone because they are controlled directly by the player rather than by rhythm transport.
 
-The same lost-future-note-off rule applies when a manual chord temporarily
-closes the automatic-chord lane while transport keeps running. Current AMY has
+The same lost-future-note-off rule applies when a promoted manual chord hold
+temporarily closes the automatic-chord lane while transport keeps running. A
+quick tap may replace that lane's pitches but never closes or drains it. Current AMY has
 no deferred tag-clear operation and the wire protocol has no callback when a
 repeating event fires. Because every onset and all-off has its own tag, the
 receiver instead clears only positive-velocity chord onsets and keeps the

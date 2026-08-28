@@ -299,14 +299,28 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("toggleChordGate")
             self.assertEqual(int(app.query("chordGateState")), 2)
 
-            app.action("pressChord", 0, 0)
-            self.assertEqual(int(app.query("rhythmChordActivity")), 0)
-            app.action("releaseChord", 0, 0)
+            # A tap starts manual synth 3 and selects the chord for strum and
+            # accompaniment, but never enters the temporary hold override.
+            app.action("pressChord", 1, 9)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            app.action("releaseChord", 1, 9)
             app.bridge.wait_idle(timeout=3.0)
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
             self.assertEqual(int(app.query("chordGateState")), 2)
+            self.assertEqual(int(app.query("activeRowIndex")), 1)
+            self.assertEqual(int(app.query("activeRootSemitone")), 9)
+
+            # Keeping the same contact down promotes it to the established
+            # hold behavior after the quick-tap window.
+            app.action("pressChord", 0, 0)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            time.sleep(0.85)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 0)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
+            app.action("releaseChord", 0, 0)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
 
             # Keeping the gate off must not erase the remembered identity.
             self.assertEqual(int(app.query("activeRowIndex")), 0)
@@ -339,7 +353,8 @@ class FrontendIntegrationTests(unittest.TestCase):
             # owns only the automatic synth-4 lane. The manual synth-3 voice
             # must remain alive until the matching button release.
             app.action("pressChord", 0, 0)
-            app.bridge.wait_idle(timeout=3.0)
+            time.sleep(0.85)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 0)
             self.assertEqual(int(app.query("chordGateState")), 1)
             start = app.bridge.count()
             app.action("toggleChordGate")

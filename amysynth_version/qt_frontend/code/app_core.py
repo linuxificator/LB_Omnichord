@@ -1028,6 +1028,10 @@ class InstrumentBackend(QObject):
             tuple[int, int],
             QTimer,
         ] = {}
+        self._pending_chord_promotions: dict[
+            tuple[int, int],
+            QTimer,
+        ] = {}
         self._chord_bounce_mode: set[
             tuple[int, int]
         ] = set()
@@ -1110,6 +1114,12 @@ class InstrumentBackend(QObject):
                 list(key)
                 for key in sorted(
                     self._pending_chord_releases
+                )
+            ],
+            "pending_promotion": [
+                list(key)
+                for key in sorted(
+                    self._pending_chord_promotions
                 )
             ],
             "bounce_mode": [
@@ -3235,14 +3245,57 @@ class InstrumentBackend(QObject):
 
     def _clear_touch_dropout_state(self) -> None:
         for timer in list(
+            self._pending_chord_promotions.values()
+        ):
+            timer.stop()
+            timer.deleteLater()
+
+        for timer in list(
             self._pending_chord_releases.values()
         ):
             timer.stop()
             timer.deleteLater()
 
+        self._pending_chord_promotions.clear()
         self._pending_chord_releases.clear()
         self._chord_press_started.clear()
         self._chord_bounce_mode.clear()
+
+    def _cancel_pending_chord_promotion(
+        self,
+        key: tuple[int, int],
+    ) -> None:
+        timer = self._pending_chord_promotions.pop(
+            key,
+            None,
+        )
+        if timer is None:
+            return
+        timer.stop()
+        timer.deleteLater()
+
+    def _schedule_chord_hold_promotion(
+        self,
+        key: tuple[int, int],
+    ) -> None:
+        self._cancel_pending_chord_promotion(key)
+        if key in self._promoted_chords:
+            return
+
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(CHORD_QUICK_TAP_MAX_MS)
+
+        def promote() -> None:
+            if self._pending_chord_promotions.get(key) is not timer:
+                return
+            self._pending_chord_promotions.pop(key, None)
+            timer.deleteLater()
+            self.promoteChordHold(key[0], key[1])
+
+        timer.timeout.connect(promote)
+        self._pending_chord_promotions[key] = timer
+        timer.start()
 
     def _cancel_pending_chord_release(
         self,
@@ -3304,6 +3357,7 @@ class InstrumentBackend(QObject):
             key=key,
         )
 
+        self._cancel_pending_chord_promotion(key)
         self._pressed_chords.discard(key)
         self._promoted_chords.discard(key)
         self._chord_press_started.pop(
@@ -3441,6 +3495,7 @@ class InstrumentBackend(QObject):
         if self._cancel_pending_chord_release(
             key
         ):
+            self._schedule_chord_hold_promotion(key)
             self._debug(
                 "pressChord_dropout_resume",
                 row=row_index,
@@ -3464,15 +3519,10 @@ class InstrumentBackend(QObject):
             time.monotonic()
         )
 
-        # Manual chord input takes precedence immediately on finger-down.
-        # This emits effective chord activity 0 and temporarily suppresses
-        # the automatic lane without changing the independent CHORD ON/OFF
-        # state, before sending the manual note-on.
-        self._promoted_chords.add(key)
-        self._update_hold_override(publish=False)
-
-        # Last pressed chord becomes the active chord used by strum/bass.
-        # Other simultaneously pressed chord voices continue independently.
+        # Every chord touch immediately selects the active chord used by the
+        # manual synth, strum, bass and automatic chord lane. A quick tap may
+        # therefore replace those lanes' pitches, but it never closes the
+        # automatic chord lane or drains its note-on tags.
         self._set_active_chord(
             row_index,
             root_semitone,
@@ -3484,6 +3534,10 @@ class InstrumentBackend(QObject):
             key=key,
             notes=self._current_notes(),
         )
+        # A quick tap belongs only to manual synth 3. If the contact remains
+        # down past the quick-tap window, promote it to the existing hold
+        # behavior which temporarily drains automatic synth-4 note-ons.
+        self._schedule_chord_hold_promotion(key)
 
         self._debug(
             "pressChord_exit",
@@ -3498,9 +3552,25 @@ class InstrumentBackend(QObject):
         row_index: int,
         root_semitone: int,
     ) -> None:
-        # Compatibility no-op for older QML. Current QML promotes directly
-        # inside pressChord(), so there is no delayed hold transition.
-        return
+        key = (row_index, root_semitone)
+        self._cancel_pending_chord_promotion(key)
+        if (
+            key not in self._pressed_chords
+            or key in self._promoted_chords
+        ):
+            return
+
+        # Promotion performs only the accompaniment takeover which a quick tap
+        # must avoid. The active chord and its replacement pitches were already
+        # published on finger-down.
+        self._promoted_chords.add(key)
+        self._debug(
+            "chord_hold_promoted",
+            row=row_index,
+            root=root_semitone,
+            **self._debug_chord_state(),
+        )
+        self._update_hold_override()
 
     @Slot(int, int)
     def releaseChord(
@@ -3525,6 +3595,10 @@ class InstrumentBackend(QObject):
                 **self._debug_chord_state(),
             )
             return
+
+        # Finger-up makes this a tap if promotion has not already fired. Do
+        # not let the dropout-release grace period promote it afterwards.
+        self._cancel_pending_chord_promotion(key)
 
         started = self._chord_press_started.get(
             key,

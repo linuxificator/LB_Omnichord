@@ -553,6 +553,41 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertFalse(any("i1Z" in line for line in release_delta if line.startswith("H")))
             self.assertTrue(bool(app.query("rhythmRunning")))
 
+    def test_quick_chord_tap_never_drains_automatic_chord_lane(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("selectChord", 0, 0)
+            if int(app.query("chordGateState")) != 1:
+                app.action("toggleChordGate")
+            if not bool(app.query("rhythmRunning")):
+                app.action("toggleRhythm")
+            app.bridge.wait_idle(timeout=8.0)
+
+            start = app.bridge.count()
+            # Use a different chord from the seeded accompaniment: a tap must
+            # replace the pitches while leaving the lane continuously enabled.
+            app.action("pressChord", 1, 9)
+            app.action("releaseChord", 1, 9)
+            app.bridge.wait_idle(timeout=8.0)
+            delta = app.bridge.lines_since(start)
+
+            self.assertTrue(immediate_note_ons(delta, 3), delta)
+            self.assertGreaterEqual(delta.count("l0i3Z"), 2, delta)
+            self.assertTrue(any(line.startswith("H") for line in delta), delta)
+            cancelled_chord_tags = [
+                int(line.split(",", 2)[2][:-1])
+                for line in delta
+                if line.startswith("H0,0,")
+                and 112 <= int(line.split(",", 2)[2][:-1]) < 252
+            ]
+            self.assertEqual(cancelled_chord_tags, [], delta)
+            self.assertNotIn("zY0Z", delta)
+            self.assertNotIn("zY1Z", delta)
+            self.assertEqual(int(app.query("activeRowIndex")), 1)
+            self.assertEqual(int(app.query("activeRootSemitone")), 9)
+            self.assertGreater(int(app.query("rhythmChordActivity")), 0)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+
     def test_stopping_rhythm_releases_sounding_accompaniment(self) -> None:
         """Stopping mid-pattern must not strand a synth-4 chord or bass note."""
         with HeadlessApp(native_amy=False) as app:

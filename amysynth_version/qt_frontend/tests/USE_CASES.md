@@ -96,7 +96,14 @@ The serial regression requires the factory patch to remain authoritative for nat
 **CHORD-02 — release does not produce false re-triggers**
 
 - A held chord must not repeatedly drop to activity 0 and re-trigger because of touch-release bounce.
-- Quick intentional taps must remain responsive.
+- Quick intentional taps must start and stop manual synth 3 immediately without
+  changing effective chord activity or temporarily closing/draining the
+  automatic-chord lane. They do select the active chord and replace the
+  corresponding strum, bass and automatic-chord pitches while transport keeps
+  running.
+- A contact which remains down past the quick-tap window must enter the existing
+  manual-hold takeover: future automatic chord onsets drain, already scheduled
+  automatic note-offs remain, and release reinstalls the automatic chord lane.
 
 **Failure history:** earlier builds showed erratic repeated chord starts while a chord was held. Debugging introduced explicit chord-touch state and release filtering.
 
