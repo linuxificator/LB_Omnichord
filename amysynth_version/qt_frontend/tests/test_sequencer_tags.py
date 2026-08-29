@@ -11,7 +11,11 @@ FRONTEND = Path(__file__).resolve().parents[1]
 CODE = FRONTEND / "code"
 sys.path.insert(0, str(CODE))
 
-from amy_serial import _TaggedSequencerLane  # noqa: E402
+from amy_serial import (  # noqa: E402
+    AmySerialClient,
+    _TaggedSequencerLane,
+    _compact_repeating_events,
+)
 
 
 class _WriterProbe:
@@ -64,6 +68,7 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(ranges["bass"], {"start": 56, "count": 56})
         self.assertEqual(ranges["chords"], {"start": 112, "count": 140})
         self.assertEqual(len(occupied), 252)
+        self.assertEqual(int(self.config["voices"]["rhythm_chord"]), 7)
 
     def test_every_catalogue_pattern_fits_its_reserved_range(self) -> None:
         ranges = self.config["rhythm"]["tag_ranges"]
@@ -100,6 +105,42 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(worst["drums"], (56, "trance"))
         self.assertEqual(worst["bass"], (56, "seven_four_funk"))
         self.assertEqual(worst["chords"], (140, "seven_four_funk"))
+
+        chord_capacity = int(ranges["chords"]["count"])
+        chord_counts = (2, 3, 4, 5, 6, 7)
+        worst_arpeggio = (0, "")
+        for rhythm in self.rhythms:
+            period = round(float(rhythm["length_beats"]) * 48)
+            for source_level in (0, 1, 2, 4):
+                chord_events = rhythm["chord_levels"][source_level]
+                for note_count in chord_counts:
+                    for rate in range(1, 5):
+                        step = 48 // rate
+                        gate = max(1, round(0.72 * step))
+                        note_offs: list[tuple[int, str]] = []
+                        note_ons: list[tuple[int, str]] = []
+                        for event in chord_events:
+                            start = round(float(event["time"]) * 48)
+                            velocity = float(event.get("amp", 1.0))
+                            for note in range(note_count):
+                                tick = start + note * step
+                                note_offs.append((tick + gate, f"n{note}l0i4"))
+                                note_ons.append((
+                                    tick,
+                                    f"n{note}l{velocity:.9g}i4",
+                                ))
+                        required = len(
+                            _compact_repeating_events(note_offs, period)
+                        ) + len(_compact_repeating_events(note_ons, period))
+                        if required > worst_arpeggio[0]:
+                            worst_arpeggio = (required, str(rhythm["id"]))
+                        self.assertLessEqual(
+                            required,
+                            chord_capacity,
+                            f"{rhythm['id']} arpeggio needs {required} tags",
+                        )
+
+        self.assertEqual(worst_arpeggio, (84, "pop_16"))
 
         riff_tags = max(
             len(riff["timing"]["events"]) * 2
@@ -153,6 +194,59 @@ class SequencerTagTests(unittest.TestCase):
                 "H0,0,115Z",
             ],
         )
+
+    def test_arpeggio_uses_all_notes_wraps_and_reverses(self) -> None:
+        client = AmySerialClient.__new__(AmySerialClient)
+        client.config = {
+            "rhythm": {
+                "chord_gate_beats": 0.72,
+                "max_rhythm_chord_notes": 4,
+            }
+        }
+        client.synth_id = {"rhythm_chord": 4}
+        client.rhythm_chord_enabled = True
+        client.chord_notes = [60.0, 64.0, 67.0, 71.0, 74.0]
+        client.rhythm_config = {
+            "length_beats": 4.0,
+            "chord_events": [{"time": 0.0, "amp": 0.8}],
+            "chord_arpeggio": {
+                "enabled": True,
+                "notes_per_beat": 1,
+                "direction": "down",
+            },
+        }
+
+        events = client._lane_events("chords")
+        note_ons = [event for event in events if "l0.8i4" in event[2]]
+        self.assertEqual(
+            note_ons,
+            [
+                (0, 192, "n74l0.8i4"),
+                (48, 192, "n71l0.8i4"),
+                (96, 192, "n67l0.8i4"),
+                (144, 192, "n64l0.8i4"),
+                (0, 192, "n60l0.8i4"),
+            ],
+        )
+        self.assertEqual(len(events), 10)
+
+    def test_dense_arpeggio_is_compacted_without_changing_tick_set(self) -> None:
+        period = 192
+        occurrences = [
+            (start + offset, f"n{note}l1i4")
+            for start in range(0, period, 24)
+            for offset, note in enumerate((60, 64, 67, 71))
+        ]
+        compacted = _compact_repeating_events(occurrences, period)
+
+        expanded = {
+            (tick, body)
+            for start, repeat, body in compacted
+            for tick in range(start, period, repeat)
+        }
+        expected = {(tick % period, body) for tick, body in occurrences}
+        self.assertEqual(expanded, expected)
+        self.assertLess(len(compacted), len(expected))
 
 
 if __name__ == "__main__":

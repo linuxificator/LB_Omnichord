@@ -12,7 +12,7 @@ Current AMY defaults to 256 user-addressable tags. The complete `music/rhythms.j
 | --- | ---: | ---: | ---: |
 | Percussion | 0..55 | 56 | 56 events (`trance`) |
 | Bass | 56..111 | 56 | 28 hits × note-on/off (`seven_four_funk`) |
-| Automatic chords | 112..251 | 140 | 28 hits × up to 4 note-ons + all-off (`seven_four_funk`) |
+| Automatic chords/arpeggios | 112..251 | 140 | whole chords: 140 (`seven_four_funk`); compacted 2–7-note arpeggios: 84 |
 | Spare | 252..255 | 4 | unused |
 
 `tests/test_sequencer_tags.py` recalculates these maxima from the catalogue. Adding or editing a rhythm which no longer fits must fail CI rather than silently dropping events.
@@ -30,6 +30,9 @@ Lane-local operations do not reset the sequencer:
 - promotion to a manual chord hold and restoration after release change only the automatic-chord tag range (and may update bass pitches because the active chord changed). Pointer-up separately stops manual synth 3 immediately; that direct note lifetime has no sequencer delay. On hold promotion, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
 - `CHORD OFF` performs the same synth-4 drain and `CHORD ON` reinstalls that
   lane. These controls never trigger or release manual synth-3 voices;
+- chord-arpeggio `A`, `/1..4` and `U/D` changes replace only the automatic
+  chord range. With `A` off, rate and direction remain editable preset state
+  but have no musical effect and do not require a lane rewrite;
 - bass on/off changes only the bass range;
 - bass activity `R` replaces the simple `bass_levels` pattern with the selected
   riff's own PPQ phrase in the same bass range. A selector change replaces only
@@ -51,6 +54,23 @@ catalogue currently needs at most 34 bass tags (17 notes), below the existing
 pattern; its 96-PPQ ticks are converted to AMY's 48-PPQ sequencer units without
 deriving or quantizing them from `rhythms.json` `bass_levels`.
 
+Arpeggios expand every selected `chord_events` onset into every note of the
+active 2–7-note chord. `/1..4` maps to a 48, 24, 16 or 12-tick interval. Note
+gates use the normal `chord_gate_beats` value as the sounding fraction of that
+subdivision, and direction only reverses the current low-to-high chord voicing.
+Generated ticks are circular and each complete arpeggio continues across the
+end of the rhythm period.
+
+One AMY tag can safely encode several of these occurrences when an identical
+wire body has an exact shorter period which divides the full rhythm period.
+The frontend folds only complete residue classes: expanding every compacted tag
+over the full period yields exactly the original tick/body set. Coincident
+identical events are one audible retrigger and are stored once. The catalogue
+audit covers every rhythm, visible chord activity, rate and 2–7-note chord;
+the current worst case is 84 tags, below the existing 140-tag range. The
+rhythm-chord synth has seven voices so a circular overlap can sound every chord
+tone instead of truncating the set to the old four-voice whole-chord limit.
+
 ## Start and stop
 
 Starting transport installs the complete current drum, bass and automatic-chord tag ranges first and queues `zY1` last.
@@ -61,13 +81,21 @@ The same lost-future-note-off rule applies when a promoted manual chord hold
 temporarily closes the automatic-chord lane while transport keeps running. A
 quick tap may replace that lane's pitches but never closes or drains it. Current AMY has
 no deferred tag-clear operation and the wire protocol has no callback when a
-repeating event fires. Because every onset and all-off has its own tag, the
+repeating event fires. Because every onset and whole-chord or note-specific
+arpeggio off has its own tag, the
 receiver instead clears only positive-velocity chord onsets and keeps the
-existing `l0i4` tags. It explicitly reinstalls those note-offs before clearing
+existing bodies ending in `l0i4`. It explicitly reinstalls those note-offs before clearing
 the onsets, so a superseded, partially transmitted lane update cannot lose the
 required release. The retained tags may repeat harmlessly against the
-isolated synth 4 while the lane is disabled. Re-enabling or fully reinstalling
-the lane replaces them with the authoritative schedule. Drums, bass,
+isolated synth 4 while the lane is disabled. Note-specific arpeggio offs are
+then intentionally unmatched after their first effective release. Automatic
+synth 4 therefore owns AMY `SYNTH_FLAGS_NO_NOTE_WARNINGS` (`if8`), the engine
+policy intended for a sequencer joining or draining mid-bar. The flag suppresses
+only those expected synth-4 diagnostics; manual chord synth 3 and all other
+synths retain normal note-lifecycle warnings. It is included atomically in
+every ROM or physical-model chord allocation. Re-enabling or fully
+reinstalling the lane replaces the retained tags with the authoritative
+schedule. Drums, bass,
 transport/timebase and effects remain untouched.
 
 The real-serial regression tests this ordering and also requires the frontend `rhythmRunning` state to become false after Stop. This guards both against hanging accompaniment notes and against a transport button that remains visually stuck on STOP even though the AMY sequencer has stopped.

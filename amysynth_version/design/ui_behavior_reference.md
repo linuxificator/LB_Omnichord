@@ -123,6 +123,9 @@ Rules:
 
 - changing rhythm while playing must not create unrelated chord or note events;
 - activity levels represent musical layers, not arbitrary volume controls;
+- chord activity `1..4` selects automatic-chord/arpeggio start points, while
+  `A`, `/1..4` and `U/D` independently select whole-chord versus arpeggio mode,
+  arpeggio notes per beat and direction;
 - rhythm state changes must be deterministic and testable.
 
 ## Visual design

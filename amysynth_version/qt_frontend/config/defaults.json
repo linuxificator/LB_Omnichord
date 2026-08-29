@@ -39,7 +39,10 @@
   "rhythm": {
     "selected": "waltz",
     "bass_voicing_shift": 0,
-    "bass_riff_selector": 1
+    "bass_riff_selector": 1,
+    "chord_arpeggio_enabled": false,
+    "chord_arpeggio_rate": 1,
+    "chord_arpeggio_direction": "up"
   },
   "window": {
     "start_fullscreen": false,

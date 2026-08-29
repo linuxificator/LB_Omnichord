@@ -18,11 +18,11 @@ def parameter_signature(commands: list[str], prefix: str) -> list[str]:
 def normalized_chord_synth(commands: list[str]) -> list[str]:
     result: list[str] = []
     for command in commands:
-        # Manual chords intentionally have 7 voices while rhythm chords have 4.
-        # get_synth_commands() omits the synth number itself, so voice-pool size
-        # is the only allocation difference to remove. Everything describing
-        # the per-voice oscillator/timbre remains compared exactly.
-        result.append(re.sub(r"iv\d+", "iv#", command, count=1))
+        # Ignore voice-allocation metadata and the automatic lane's diagnostic
+        # flag when comparing timbre. Neither changes oscillator/program state.
+        normalized = re.sub(r"iv\d+", "iv#", command, count=1)
+        normalized = re.sub(r"if\d+", "", normalized)
+        result.append(normalized)
     return result
 
 
@@ -35,7 +35,7 @@ class NativeControlTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=10.0)
             app.action("setChordSynthIndex", repeater_index)
             app.bridge.wait_for_lines(
-                [f"K{patch}i3Z", f"K{patch}i4Z"],
+                [f"K{patch}i3Z", f"K{patch}i4if8Z"],
                 start=0,
                 timeout=8.0,
             )
@@ -103,6 +103,10 @@ class NativeControlTests(unittest.TestCase):
             for synth in range(5):
                 commands = app.bridge.synth_commands(synth)
                 self.assertTrue(commands, f"native AMY synth {synth} is undefined after cold start")
+            manual_chord = app.bridge.synth_commands(3)
+            automatic_chord = app.bridge.synth_commands(4)
+            self.assertFalse(any("if8" in command for command in manual_chord))
+            self.assertTrue(any("if8" in command for command in automatic_chord))
             app.bridge.checkpoint("cold-start-all-synths", synths=(0, 1, 2, 3, 4))
 
 

@@ -12,7 +12,8 @@ transport state and is never stored or restored. See `rhythm_bahavior.md` for
 live-switch semantics.
 
 While rhythm transport is running, an OMNI preset switch preserves the live
-tempo, percussion activity, chord activity, bass activity and bass voicing.
+tempo, percussion activity, chord activity, chord-arpeggio enabled state,
+arpeggio note density/direction, bass activity and bass voicing.
 When bass activity is `R`, a currently playing riff also survives if its stable
 ID is compatible with the destination rhythm/chord set; the selector follows
 that riff's position in the new set. Otherwise the destination preset's
@@ -27,6 +28,11 @@ activity uses 1 through 5, where stored value 5 is the visible `R` riff mode.
 no compatible riff is already playing; older presets default to the application
 value. A legacy preset containing chord activity 0 loads as level 1; disabling
 automatic chords is live `CHORD ON/OFF` state, not a preset activity value.
+`rhythm.chord_arpeggio_enabled`, `rhythm.chord_arpeggio_rate` (`1..4`) and
+`rhythm.chord_arpeggio_direction` (`up` or `down`) store the three independent
+arpeggio controls. Older presets load the application defaults: off, `/1`, up.
+With transport stopped these values load from the destination preset; while it
+runs they remain live along with the other accompaniment-shaping controls.
 
 The active chord identity, chord gate and physical chord-button hold state are
 also live performance state. Selecting an OMNI preset preserves them. The same

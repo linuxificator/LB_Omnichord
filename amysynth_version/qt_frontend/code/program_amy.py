@@ -105,6 +105,9 @@ class ProgramAmySerialClient(base.AmySerialClient):
         bass_only_changed = self._only_bass_config_changed(
             old_config, new_config
         )
+        chord_only_changed = self._only_chord_config_changed(
+            old_config, new_config
+        )
         old_id = (
             str(self.rhythm_config.get("id", ""))
             if isinstance(self.rhythm_config, dict)
@@ -121,6 +124,9 @@ class ProgramAmySerialClient(base.AmySerialClient):
 
         if bass_only_changed:
             self._replace_lane("bass")
+            return
+        if chord_only_changed:
+            self._replace_lane("chords")
             return
 
         if style_changed and self.rhythm_running:
@@ -144,7 +150,11 @@ class ProgramAmySerialClient(base.AmySerialClient):
         # Explicit voice geometry makes a physical model no different from a
         # ROM patch to AMY's synth allocator. Re-stating it is intentional:
         # the previous program may have been a 6-osc Juno or 8-osc DX7 voice.
-        self._wire(f"i{synth}iv{voices}in{program.oscs_per_voice}iy{bus}Z")
+        flag_fields = self._synth_flag_fields(synth)
+        self._wire(
+            f"i{synth}iv{voices}in{program.oscs_per_voice}"
+            f"iy{bus}{flag_fields}Z"
+        )
         self._configured_synths.add(synth)
         guard_ms = float(
             self.config.get("performance", {}).get(
@@ -152,7 +162,6 @@ class ProgramAmySerialClient(base.AmySerialClient):
             )
         )
         self.writer.delay(max(0.0, guard_ms) / 1000.0)
-
         if program.kind == "karplus_strong":
             wave = KS_WAVE if program.wave is None else int(program.wave)
             feedback = 0.985 if program.feedback is None else program.feedback

@@ -395,12 +395,12 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("y: chordControlPanel.controlGap", panel)
         self.assertIn("spacing: chordControlPanel.controlGap", panel)
 
-    def test_bass_activity_has_five_equal_buttons_and_dynamic_slider(self) -> None:
+    def test_rhythm_activity_groups_keep_equal_button_columns(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
-        self.assertEqual(qml.count("ActivitySelector {"), 3)
+        self.assertEqual(qml.count("\n            ActivitySelector {"), 2)
+        self.assertEqual(qml.count("\n            ChordActivitySelector {"), 1)
         selector_labels = (
             'label: "percussion activity"',
-            'label: "chord activity"',
             'label: "bass activity"',
         )
         for index, label in enumerate(selector_labels):
@@ -439,6 +439,21 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn(".setBassRiffSelector(value)", qml)
         self.assertIn("controlsArea.expandedActivityWidth", qml)
         self.assertIn("5 * activityButtonWidth", qml)
+
+        chord = (
+            ROOT / "gui" / "ChordActivitySelector.qml"
+        ).read_text(encoding="utf-8")
+        self.assertIn('text: "chord activity"', chord)
+        self.assertIn('text: index < 4 ? String(index + 1) : "A"', chord)
+        self.assertIn('? "/" + String(index + 1)', chord)
+        self.assertIn(': root.directionLabel', chord)
+        self.assertIn("model: 5", chord)
+        self.assertEqual(chord.count("Button {"), 2)
+        self.assertNotIn("MouseArea {", chord)
+        self.assertNotIn("Timer {", chord)
+        self.assertNotIn("TapHandler {", chord)
+        self.assertIn("height: parent.height", qml)
+        self.assertIn("width: controlsArea.bassActivityWidth", qml)
 
     def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
         panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")
@@ -823,7 +838,10 @@ class StaticContractTests(unittest.TestCase):
         )
         self.assertIn('self.bus_id["strum"]', transport_py)
         self.assertIn('self.bus_id["chord"]', transport_py)
-        self.assertIn('f"K{patch}i{synth}iv{voices}iy{bus}Z"', transport_py)
+        self.assertIn(
+            'f"K{patch}i{synth}iv{voices}iy{bus}{flag_fields}Z"',
+            transport_py,
+        )
         self.assertIn("self._apply_reverb_bus(bus)", transport_py)
 
     def test_silent_factory_juno_patches_get_explicit_excitation(self) -> None:

@@ -97,7 +97,7 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=8.0)
             lines = app.bridge.lines_since(start)
             self.assertNotIn(native_cutoff4, lines)
-            self.assertNotIn(f"K{chorus_patch}i4Z", lines)
+            self.assertNotIn(f"K{chorus_patch}i4if8Z", lines)
             self.assertTrue(
                 any(line.startswith("H") and "i4Z" in line for line in lines),
                 "no rhythm-chord events were scheduled",
@@ -114,7 +114,7 @@ class SerialIntegrationTests(unittest.TestCase):
                 [edited3, edited4], start=edit_start, timeout=8.0
             )
             self.assertNotIn(f"K{chorus_patch}i3Z", edit_lines)
-            self.assertNotIn(f"K{chorus_patch}i4Z", edit_lines)
+            self.assertNotIn(f"K{chorus_patch}i4if8Z", edit_lines)
 
     def test_every_note_path_follows_live_tuning_change(self) -> None:
         """EQ/HARM changes must reach manual, rhythm, bass and strum pitches."""
@@ -366,6 +366,105 @@ class SerialIntegrationTests(unittest.TestCase):
                 "riff_0004_pop_8_root_fifth",
             )
 
+    def test_chord_arpeggio_uses_all_notes_and_only_the_chord_lane(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            startup_lines = app.bridge.lines_since(0)
+            self.assertTrue(
+                any("i4iv7iy3if8Z" in line for line in startup_lines)
+            )
+            self.assertFalse(
+                any("i3" in line and "if8" in line for line in startup_lines)
+            )
+            app.action("setRhythmIndex", 0)  # pop_8
+            app.action("setTuningModeIndex", 1)  # EQ
+            app.action("setRowChordType", 0, 27)  # dominant13, seven notes
+            app.action("selectChord", 0, 0)  # C3
+            app.action("setRhythmChordActivity", 1.0)
+            if int(app.query("chordGateState")) != 1:
+                app.action("toggleChordGate")
+            app.bridge.wait_idle(timeout=8.0)
+
+            arpeggio_start = app.bridge.count()
+            app.action("toggleChordArpeggio")
+            app.bridge.wait_for_line_match(
+                lambda line: line.startswith("H") and "i4Z" in line,
+                "ascending arpeggio chord tags",
+                start=arpeggio_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            arpeggio_lines = app.bridge.lines_since(arpeggio_start)
+            self.assertEqual(
+                scheduled_note_ons(arpeggio_lines, 4),
+                [48.0, 52.0, 55.0, 58.0, 62.0, 65.0, 69.0],
+            )
+            for line in arpeggio_lines:
+                if not line.startswith("H"):
+                    continue
+                match = re.match(r"^H\d+,\d+,(\d+)", line)
+                self.assertIsNotNone(match)
+                assert match is not None
+                tag = int(match.group(1))
+                self.assertGreaterEqual(tag, 112)
+                self.assertLess(tag, 252)
+            self.assertFalse(
+                any(
+                    line.startswith("H")
+                    and ("i0Z" in line or "i1Z" in line)
+                    for line in arpeggio_lines
+                )
+            )
+            self.assertNotIn("zY0Z", arpeggio_lines)
+            self.assertNotIn("zY1Z", arpeggio_lines)
+            self.assertNotIn("S16384Z", arpeggio_lines)
+
+            direction_start = app.bridge.count()
+            app.action("toggleChordArpeggioDirection")
+            app.bridge.wait_for_line_match(
+                lambda line: (
+                    line.startswith("H")
+                    and "n69" in line
+                    and "i4Z" in line
+                ),
+                "descending arpeggio chord tags",
+                start=direction_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertEqual(
+                scheduled_note_ons(app.bridge.lines_since(direction_start), 4),
+                [69.0, 65.0, 62.0, 58.0, 55.0, 52.0, 48.0],
+            )
+
+            whole_chord_start = app.bridge.count()
+            app.action("toggleChordArpeggio")
+            app.bridge.wait_for_line_match(
+                lambda line: line.startswith("H") and "i4Z" in line,
+                "whole-chord tags after arpeggio off",
+                start=whole_chord_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertEqual(
+                sorted(set(scheduled_note_ons(
+                    app.bridge.lines_since(whole_chord_start), 4
+                ))),
+                [48.0, 52.0, 55.0, 58.0],
+            )
+
+            inactive_start = app.bridge.count()
+            app.action("setChordArpeggioRate", 2.0)
+            app.action("toggleChordArpeggioDirection")
+            time.sleep(0.05)
+            self.assertFalse(
+                any(
+                    line.startswith("H")
+                    for line in app.bridge.lines_since(inactive_start)
+                ),
+                "inactive lower-row controls changed the chord schedule",
+            )
+
     def test_strum_patch_change_is_bus_isolated_from_chords(self) -> None:
         meow = synth_index("Meow Brass")
         sustainer = synth_index("Sustainer")
@@ -378,7 +477,7 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=10.0)
             app.action("setChordSynthIndex", meow)
             app.bridge.wait_for_lines(
-                [f"K{meow_patch}i3Z", f"K{meow_patch}i4Z"],
+                [f"K{meow_patch}i3Z", f"K{meow_patch}i4if8Z"],
                 start=0,
                 timeout=8.0,
             )
@@ -414,7 +513,7 @@ class SerialIntegrationTests(unittest.TestCase):
 
             app.action("setChordSynthIndex", brass_index)
             app.bridge.wait_for_lines(
-                [f"K{brass_patch}i3Z", f"K{brass_patch}i4Z"],
+                [f"K{brass_patch}i3Z", f"K{brass_patch}i4if8Z"],
                 start=0,
             )
 
@@ -429,7 +528,7 @@ class SerialIntegrationTests(unittest.TestCase):
             switch_start = app.bridge.count()
             app.action("setChordSynthIndex", other_index)
             app.bridge.wait_for_lines(
-                [f"K{other_patch}i3Z", f"K{other_patch}i4Z"],
+                [f"K{other_patch}i3Z", f"K{other_patch}i4if8Z"],
                 start=switch_start,
                 timeout=8.0,
             )
@@ -441,13 +540,13 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertNotIn("zY1Z", lines)
             self.assertLess(
                 lines.index(f"K{other_patch}i3Z"),
-                lines.index(f"K{other_patch}i4Z"),
+                lines.index(f"K{other_patch}i4if8Z"),
             )
 
             # Once the new instrument switch begins, the old Brass patch may
             # not be reloaded into either chord synth by a stale host command.
             self.assertNotIn(f"K{brass_patch}i3Z", lines)
-            self.assertNotIn(f"K{brass_patch}i4Z", lines)
+            self.assertNotIn(f"K{brass_patch}i4if8Z", lines)
 
 
     def test_cold_start_guards_synth4_and_reverb_zero_is_exact(self) -> None:
@@ -465,7 +564,9 @@ class SerialIntegrationTests(unittest.TestCase):
 
             k4_index = next(
                 i for i, line in enumerate(lines)
-                if line.startswith("K") and "i4iv" in line and "iy3Z" in line
+                if line.startswith("K")
+                and "i4iv" in line
+                and "iy3if8Z" in line
             )
             next_synth4_index = next(
                 i for i in range(k4_index + 1, len(lines))

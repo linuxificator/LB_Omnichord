@@ -9,10 +9,13 @@ from harness import HeadlessApp
 
 
 def normalized_timbre(commands: list[str]) -> list[str]:
-    # Manual and rhythm chords intentionally use different voice-pool sizes
-    # (7 and 4). get_synth_commands() omits the synth number, so normalize only
-    # that allocation field and compare every per-voice timbre command exactly.
-    return [re.sub(r"iv\d+", "iv#", command, count=1) for command in commands]
+    # Voice-pool metadata and synth 4's intentional no-warning policy are not
+    # timbre. Normalize those and compare every oscillator command exactly.
+    normalized: list[str] = []
+    for command in commands:
+        command = re.sub(r"iv\d+", "iv#", command, count=1)
+        normalized.append(re.sub(r"if\d+", "", command))
+    return normalized
 
 
 def parameter_signature(commands: list[str], prefix: str) -> list[str]:
@@ -111,7 +114,7 @@ class NativeRhythmTests(unittest.TestCase):
 
             app.action("setChordSynthIndex", brass_index)
             app.bridge.wait_for_lines(
-                [f"K{brass_patch}i3Z", f"K{brass_patch}i4Z"],
+                [f"K{brass_patch}i3Z", f"K{brass_patch}i4if8Z"],
                 start=0,
                 timeout=8.0,
             )
@@ -137,7 +140,7 @@ class NativeRhythmTests(unittest.TestCase):
             switch_start = app.bridge.count()
             app.action("setChordSynthIndex", other_index)
             app.bridge.wait_for_lines(
-                [f"K{other_patch}i3Z", f"K{other_patch}i4Z"],
+                [f"K{other_patch}i3Z", f"K{other_patch}i4if8Z"],
                 start=switch_start,
                 timeout=8.0,
             )
@@ -183,7 +186,7 @@ class NativeRhythmTests(unittest.TestCase):
                 scheduled_chords,
                 "no post-switch sequencer chord events target rhythm synth 4",
             )
-            self.assertNotIn(f"K{brass_patch}i4Z", switched_lines)
+            self.assertNotIn(f"K{brass_patch}i4if8Z", switched_lines)
             app.bridge.checkpoint("after-live-instrument-switch")
 
 

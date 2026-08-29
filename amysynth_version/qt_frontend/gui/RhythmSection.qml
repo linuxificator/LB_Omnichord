@@ -121,9 +121,8 @@ Item {
         id: controlsArea
         x: runButton.x + runButton.width + 12; y: 0; width: parent.width - x; height: parent.height
 
-        // Preserve the original four-button activity width. The bass group
-        // adds one button with exactly that button width; only tempo yields
-        // the extra horizontal space.
+        // Preserve the original button width. Chord and bass each add a fifth
+        // column; only tempo yields the extra horizontal space.
         readonly property real formerActivityWidth:
             width * 0.57 - 14
         readonly property real standardActivityWidth:
@@ -135,8 +134,8 @@ Item {
         readonly property real bassActivityWidth:
             10 + 5 * activityButtonWidth + 4 * 4
         readonly property real expandedActivityWidth:
-            2 * standardActivityWidth
-            + bassActivityWidth
+            standardActivityWidth
+            + 2 * bassActivityWidth
             + 2 * activityGap
 
         LabeledSlider {
@@ -195,37 +194,55 @@ Item {
                     )
             }
 
-            ActivitySelector {
+            ChordActivitySelector {
                 x:
                     controlsArea.standardActivityWidth
                     + controlsArea.activityGap
                 y: 0
-                width: controlsArea.standardActivityWidth
-                height: 58
-
-                label: "chord activity"
+                width: controlsArea.bassActivityWidth
+                height: parent.height
                 currentLevel:
                     root.controller
                         .rhythmChordActivity
+                arpeggioEnabled:
+                    root.controller
+                        .chordArpeggioEnabled
+                arpeggioRate:
+                    root.controller
+                        .chordArpeggioRate
+                arpeggioDescending:
+                    root.controller
+                        .chordArpeggioDescending
+                directionLabel:
+                    root.controller
+                        .chordArpeggioDirectionLabel
 
                 groupColor: "#f8e9a1"
                 idleColor: "#faefbd"
                 selectedColor: "#cb981d"
 
-                onSelected: (level) =>
+                onActivitySelected: (level) =>
                     root.controller
                         .setRhythmChordActivity(
                             level
                         )
+                onArpeggioToggled:
+                    root.controller
+                        .toggleChordArpeggio()
+                onRateSelected: (rate) =>
+                    root.controller
+                        .setChordArpeggioRate(rate)
+                onDirectionToggled:
+                    root.controller
+                        .toggleChordArpeggioDirection()
             }
 
             ActivitySelector {
                 x:
-                    2
-                    * (
-                        controlsArea.standardActivityWidth
-                        + controlsArea.activityGap
-                    )
+                    controlsArea.standardActivityWidth
+                    + controlsArea.activityGap
+                    + controlsArea.bassActivityWidth
+                    + controlsArea.activityGap
                 y: 0
                 width: controlsArea.bassActivityWidth
                 height: 52
@@ -252,11 +269,10 @@ Item {
                 id: bassFunctionSlider
 
                 x:
-                    2
-                    * (
-                        controlsArea.standardActivityWidth
-                        + controlsArea.activityGap
-                    )
+                    controlsArea.standardActivityWidth
+                    + controlsArea.activityGap
+                    + controlsArea.bassActivityWidth
+                    + controlsArea.activityGap
                 y: 56
                 width: controlsArea.bassActivityWidth
                 height: 48

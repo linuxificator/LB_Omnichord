@@ -9,9 +9,10 @@ The central rule is:
 A preset or rhythm selection may change the pattern and other stored rhythm parameters, but it must not unexpectedly start or stop the rhythm, change the currently running tempo, reset the sequencer timebase, or interrupt the beat.
 
 For preset selection, playback continuity also includes the current
-percussion/chord/bass activity, bass voicing, compatible playing bass riff and
-active chord-row octave. These controls shape the accompaniment that is already
-in progress and therefore remain live while transport runs.
+percussion/chord/bass activity, chord-arpeggio mode/rate/direction, bass
+voicing, compatible playing bass riff and active chord-row octave. These
+controls shape the accompaniment that is already in progress and therefore
+remain live while transport runs.
 
 ## 1. State model
 
@@ -66,6 +67,36 @@ selector follows its possibly different one-based position. If it is not
 present, or no riff is playing, the selector uses the loaded preset's
 `bass_riff_selector`, clamped to the set, with the application default as the
 legacy fallback. Selector and mode changes replace only the bass tag range.
+
+### 1.5 Chord activity and independent arpeggio mode
+
+The upper chord-activity values 1 through 4 remain the existing exclusive
+selection of automatic-chord onset patterns. `A` is an independent binary
+mode. With `A` off, every onset plays the existing whole-chord event and the
+lower controls have no musical effect. With `A` on, a complete arpeggio of the
+active chord starts at every one of those same onsets; no whole chord is sent
+from the sequencer.
+
+The exclusive `/1`, `/2`, `/3` and `/4` values mean one, two, three or four
+arpeggio note-onsets per quarter-note beat. Every note in the current chord
+voicing participates, including extensions beyond four notes. `U` traverses
+the current voicing from low to high and `D` from high to low. These controls
+do not alter the manually played chord or strum path, and `CHORD ON/OFF`
+continues to gate the complete automatic synth-4 lane in either mode.
+
+Every chord onset launches its complete sequence. A later onset may therefore
+overlap a sequence that is still in progress. Time is circular: subdivision
+ticks which cross the end of the repeating rhythm cycle wrap to its beginning,
+so an arpeggio is never truncated at a measure/cycle boundary. For example,
+with one chord onset at beat 1, `/1` and a four-note major-seventh chord, its
+four notes begin on beats 1, 2, 3 and 4 and the pattern begins again on the next
+beat 1. Live root, chord type, inversion and tuning changes replace the chord
+lane with the same timing and newly calculated pitches.
+
+Arpeggio enabled state, rate and direction are preset configuration. A stopped
+preset switch loads them. A running preset switch preserves their current live
+values. Toggling `A` or changing an effective arpeggio control replaces only
+the automatic-chord tag range and never stops or resets transport.
 
 ## 2. Application startup
 
@@ -158,9 +189,10 @@ When another preset is selected:
 
 1. `rhythmRunning` remains `true`.
 2. The effective live tempo remains exactly `T`.
-3. Live percussion activity, chord activity, bass activity and bass voicing
-   remain unchanged. In riff mode, a compatible playing riff is retained by
-   ID; otherwise the destination preset/default riff selector is applied.
+3. Live percussion activity, chord activity, chord-arpeggio
+   mode/rate/direction, bass activity and bass voicing remain unchanged. In
+   riff mode, a compatible playing riff is retained by ID; otherwise the
+   destination preset/default riff selector is applied.
 4. The octave of the active chord row remains unchanged. Octaves belonging to
    non-active chord rows may load from the destination preset.
 5. The new preset may change the rhythm/pattern.
@@ -234,9 +266,10 @@ running = false
 ## 7. Rhythm-type selection while rhythm is running
 
 When playback is running, selecting a different rhythm must preserve the
-current live tempo, percussion activity, chord activity, bass activity, bass
-voicing and the octave of the active chord row. Those live values shape the
-performance independently from the destination pattern's remembered controls.
+current live tempo, percussion activity, chord activity, chord-arpeggio
+mode/rate/direction, bass activity, bass voicing and the octave of the active
+chord row. Those live values shape the performance independently from the
+destination pattern's remembered controls.
 The riff-retention rule from section 1.4 continues to apply when bass activity
 is `R`.
 
@@ -482,8 +515,9 @@ stored/default tempo and percussion, chord and bass activity.
 
 When `rhythmRunning == true`, selecting a rhythm type must preserve the
 currently effective live tempo, percussion activity, chord activity, bass
-activity, bass voicing and active-row octave. A compatible playing riff is
-retained by ID; otherwise the preset/default selector is used.
+activity, chord-arpeggio mode/rate/direction, bass voicing and active-row
+octave. A compatible playing riff is retained by ID; otherwise the
+preset/default selector is used.
 
 ### RHYTHM-007 — live changes do not stop the sequencer
 
@@ -548,8 +582,13 @@ Current AMY has no deferred tag-removal command or wire callback which says
 that a repeating event has just fired. Its per-event user tags nevertheless
 provide the required behavior: note-on tags and note-off tags are addressed
 independently. While automatic chords are gated off, retained note-off tags may
-continue firing harmless synth-4 all-offs; they are replaced or cleared when
-the lane is enabled, restarted or reset. Manual synth-3 note-ons begin at
+continue firing harmless synth-4 all-offs or note-specific arpeggio offs; they
+are replaced or cleared when the lane is enabled, restarted or reset. Because
+repeating arpeggio offs are intentionally unmatched after the first effective
+release, automatic synth 4 uses AMY's `SYNTH_FLAGS_NO_NOTE_WARNINGS` (`if8`).
+That policy is included atomically in every ROM or physical-model allocation
+and is not set on manual synth 3 or any other synth, so unrelated lifecycle
+errors remain observable. Manual synth-3 note-ons begin at
 finger-down and may overlap the remainder of the automatic chord's normal gate
 and release. Drums, bass, transport, effects and sequencer timebase continue.
 
@@ -557,7 +596,8 @@ and release. Drums, bass, transport, effects and sequencer timebase continue.
 
 When `rhythmRunning == true`, preset selection must preserve percussion
 activity, chord activity, bass activity, bass voicing, a compatible playing
-bass riff and the octave of the active chord row, in addition to live tempo.
+bass riff, chord-arpeggio mode/rate/direction and the octave of the active chord
+row, in addition to live tempo.
 The riff selector follows that riff's destination-set position; an incompatible
 or non-playing riff uses the destination preset/default selector. Octaves of
 non-active chord rows load from the destination preset. When
@@ -598,8 +638,28 @@ may stop/reset transport or edit percussion/automatic-chord tags. Every current
 rhythm/chord combination has at least three candidates and every selected riff
 fits the reserved bass tag range.
 
+### RHYTHM-021 — chord arpeggios use the chord lane and circular beat timing
+
+With `A` off, whole-chord scheduling remains unchanged and `/1..4` plus `U/D`
+have no musical effect. With `A` on, every selected chord-activity onset starts
+all notes of the active chord at `48 / rate` AMY-tick intervals, in low-to-high
+or high-to-low order. Each note gate is the configured chord-gate fraction of
+one arpeggio subdivision. Ticks wrap modulo the repeating rhythm period; no
+sequence is truncated at its end. Overlapping starts remain valid.
+
+Exact repeated tick/body sets may be represented by one AMY tag with a shorter
+period, but expanding those tags over the rhythm cycle must reproduce exactly
+the generated circular event set. Arpeggio changes replace only tags 112..251.
+Every catalogue rhythm, every activity selection, `/1..4` and every supported
+2–7-note chord must fit that existing range. Disabling automatic chords or
+promoting a manual hold retains both whole-chord all-offs and arpeggio
+note-specific offs until their scheduled gates have closed sounding notes.
+The automatic chord synth alone suppresses AMY's expected unmatched-note-off
+diagnostic during this retained-off drain; the events and audio behavior are
+unchanged.
+
 ## 16. Summary rule
 
 The complete behavior can be reduced to this rule:
 
-> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, bass voicing, a compatible playing bass riff, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
+> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, chord-arpeggio controls, bass voicing, a compatible playing bass riff, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
