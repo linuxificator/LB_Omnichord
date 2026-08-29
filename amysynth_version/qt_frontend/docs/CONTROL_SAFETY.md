@@ -51,10 +51,11 @@ The ESP32-P4 also exhibited low-frequency rumble when an exact `h0` reverb comma
 Manual chord hold is another timing-sensitive path. Finger-down immediately
 starts manual synth 3 and selects the chord for strum, bass and automatic-chord
 pitches. Every real finger-up immediately stops that manual voice, with no
-release-grace timer and no dependency on sequencer phase. Inside the 160 ms
-quick-tap window it does so without closing or draining the automatic-chord
-lane. Only a contact which remains down past that window is promoted to
-takeover. Promotion must not stop
+release-grace timer and no dependency on sequencer phase. A tap release does so
+without closing or draining the automatic-chord lane. Qt's `TapHandler`
+classifies a long press using the platform style hint and only that semantic
+event promotes the contact to takeover; the Python backend owns no gesture
+timer. Promotion must not stop
 percussion or bass and must not change the `CHORD ON/OFF` state: it clears
 future synth-4 note-ons but retains the sequencer's existing synth-4 all-off
 tags, so a chord already sounding completes its normal rhythmic gate. The

@@ -101,10 +101,11 @@ The serial regression requires the factory patch to remain authoritative for nat
   automatic-chord lane. They do select the active chord and replace the
   corresponding strum, bass and automatic-chord pitches while transport keeps
   running.
-- A contact which remains down past the quick-tap window must enter the existing
-  manual-hold takeover: future automatic chord onsets drain, already scheduled
-  automatic note-offs remain, and release stops manual synth 3 immediately
-  before reinstating the automatic chord lane.
+- When Qt's `TapHandler` reports a platform-defined long press, the contact must
+  enter the existing manual-hold takeover: future automatic chord onsets drain,
+  already scheduled automatic note-offs remain, and release stops manual synth
+  3 immediately before reinstating the automatic chord lane. The backend must
+  not run a second gesture-classification timer.
 
 **Failure history:** earlier builds showed erratic repeated chord starts while
 a chord was held. A backend release filter then hid spurious pointer events by
@@ -118,7 +119,7 @@ filter unnecessary; release now follows the actual pointer-up directly.
   `backend.pressChord()` directly is not an input test.
 - A quick tap must select the chord, expose its blue active-border state, emit
   manual synth-3 note-on/off commands and leave no pressed chord behind.
-- A contact held beyond the quick-tap window must remain visually pressed,
+- A contact held until Qt reports a long press must remain visually pressed,
   promote to the temporary accompaniment takeover, stop manual synth 3
   immediately on physical release, and restore the stored chord activity.
 - The macOS job runs this test from the mounted final DMG. The Windows job runs
@@ -257,8 +258,9 @@ installation failed to show or release chord-key interaction correctly.
 - The learning touch cannot unlink the new binding in the same gesture.
 - One click on a bound target does not unlink.
 - Drag/edit gestures on a bound target are consumed and do not move or unlink
-  it. A second press within 550 ms is the explicit unlink gesture, but that
-  second gesture still cannot edit the numeric value.
+  it. Qt's standard double-click/double-tap event is the explicit unlink
+  gesture, using platform time and distance style hints; that second gesture
+  still cannot edit the numeric value.
 - The controller becomes blue and visible when capacity permits.
 - The next genuine CC movement changes a blue controller immediately into an
   ordinary grey unbound indicator. Without movement, blue expires and removes
@@ -559,10 +561,9 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
   chord for strum, bass and automatic accompaniment pitches.
 - Every real finger-up immediately stops the manual synth-3 voice, including a
   release shortly after hold promotion. Its release is neither delayed by a
-  dropout-grace timer nor quantized to rhythm. Inside the quick-tap window it
-  must not change effective chord activity, close the automatic-chord lane or
-  drain its tags.
-- If the contact remains down past the quick-tap window, hold promotion
+  dropout-grace timer nor quantized to rhythm. A tap must not change effective
+  chord activity, close the automatic-chord lane or drain its tags.
+- If Qt reports a long press using its platform style hint, hold promotion
   suppresses the effective automatic-chord lane without changing the `CHORD
   ON/OFF` state or sending an immediate `l0i4`.
 - Positive-velocity synth-4 note-on tags are cleared. Existing synth-4 `l0`

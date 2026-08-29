@@ -144,10 +144,6 @@ PRESET_COUNT = 18
 PRESET_DIRECTORY = OMNI_PRESET_DIR
 LAST_PRESET_FILE = "last_preset.json"
 
-# A contact becomes a hold after this tap window. Pointer-up always ends the
-# directly played manual voice immediately; it is never rhythm-quantized.
-CHORD_QUICK_TAP_MAX_MS = 160
-
 # Four visible activity states map onto the original five pattern levels.
 # State 4 selects the complete arrangement, including both the stylistic
 # colour layer and the final fill layer.
@@ -1142,11 +1138,6 @@ class InstrumentBackend(QObject):
         self._promoted_chords: set[tuple[int, int]] = set()
         self._chord_activity_hold_override = False
 
-        self._pending_chord_promotions: dict[
-            tuple[int, int],
-            QTimer,
-        ] = {}
-
         self._ensure_preset_storage()
         self._load_startup_preset()
 
@@ -1221,12 +1212,6 @@ class InstrumentBackend(QObject):
             "rhythm_running": (
                 self._rhythm_running
             ),
-            "pending_promotion": [
-                list(key)
-                for key in sorted(
-                    self._pending_chord_promotions
-                )
-            ],
         }
 
     @Slot(str, int, int, float, float)
@@ -2906,8 +2891,6 @@ class InstrumentBackend(QObject):
         self._rhythm_running = False
         self._running_tempo = None
         self._bass_running = False
-        self._clear_chord_contact_state()
-
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
@@ -3342,51 +3325,6 @@ class InstrumentBackend(QObject):
         if publish:
             self._send_rhythm_chord_enabled()
 
-    def _clear_chord_contact_state(self) -> None:
-        for timer in list(
-            self._pending_chord_promotions.values()
-        ):
-            timer.stop()
-            timer.deleteLater()
-
-        self._pending_chord_promotions.clear()
-
-    def _cancel_pending_chord_promotion(
-        self,
-        key: tuple[int, int],
-    ) -> None:
-        timer = self._pending_chord_promotions.pop(
-            key,
-            None,
-        )
-        if timer is None:
-            return
-        timer.stop()
-        timer.deleteLater()
-
-    def _schedule_chord_hold_promotion(
-        self,
-        key: tuple[int, int],
-    ) -> None:
-        self._cancel_pending_chord_promotion(key)
-        if key in self._promoted_chords:
-            return
-
-        timer = QTimer(self)
-        timer.setSingleShot(True)
-        timer.setInterval(CHORD_QUICK_TAP_MAX_MS)
-
-        def promote() -> None:
-            if self._pending_chord_promotions.get(key) is not timer:
-                return
-            self._pending_chord_promotions.pop(key, None)
-            timer.deleteLater()
-            self.promoteChordHold(key[0], key[1])
-
-        timer.timeout.connect(promote)
-        self._pending_chord_promotions[key] = timer
-        timer.start()
-
     def _finalize_chord_release(
         self,
         key: tuple[int, int],
@@ -3408,7 +3346,6 @@ class InstrumentBackend(QObject):
             key=key,
         )
 
-        self._cancel_pending_chord_promotion(key)
         self._pressed_chords.discard(key)
         self._promoted_chords.discard(key)
 
@@ -3455,8 +3392,6 @@ class InstrumentBackend(QObject):
         # stop_all is intentionally unconditional. It also clears a voice
         # left behind by a previous GUI run or an interrupted touch sequence.
         self._send_manual_chord("stop_all")
-        self._clear_chord_contact_state()
-
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
@@ -3510,11 +3445,6 @@ class InstrumentBackend(QObject):
             key=key,
             notes=self._current_notes(),
         )
-        # A quick tap belongs only to manual synth 3. If the contact remains
-        # down past the quick-tap window, promote it to the existing hold
-        # behavior which temporarily drains automatic synth-4 note-ons.
-        self._schedule_chord_hold_promotion(key)
-
         self._debug(
             "pressChord_exit",
             row=row_index,
@@ -3529,16 +3459,15 @@ class InstrumentBackend(QObject):
         root_semitone: int,
     ) -> None:
         key = (row_index, root_semitone)
-        self._cancel_pending_chord_promotion(key)
         if (
             key not in self._pressed_chords
             or key in self._promoted_chords
         ):
             return
 
-        # Promotion performs only the accompaniment takeover which a quick tap
-        # must avoid. The active chord and its replacement pitches were already
-        # published on finger-down.
+        # Qt/QML owns long-press recognition. Promotion performs only the
+        # accompaniment takeover; the active chord and its replacement pitches
+        # were already published on pointer-down.
         self._promoted_chords.add(key)
         self._debug(
             "chord_hold_promoted",
@@ -3575,7 +3504,6 @@ class InstrumentBackend(QObject):
         # A real pointer-up owns the lifetime of manual synth 3. Stop it now,
         # independently of rhythm phase, then restore the automatic lane if
         # this contact had already been promoted to a hold.
-        self._cancel_pending_chord_promotion(key)
         self._finalize_chord_release(key)
 
     @Slot(int, int)
@@ -4037,7 +3965,6 @@ class InstrumentBackend(QObject):
         self._active_row = -1
         self._active_root_semitone = -1
         self._strum_last_index = None
-        self._clear_chord_contact_state()
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
@@ -4748,7 +4675,6 @@ def main() -> int:
                     window,
                     backend,
                     smoke_checkpoint,
-                    quick_tap_ms=CHORD_QUICK_TAP_MAX_MS,
                 )
             except Exception as exc:
                 message = (

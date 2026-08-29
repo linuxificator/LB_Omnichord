@@ -48,7 +48,8 @@ Window {
         function isControlTargetBound(target) { return targetBound }
         function controlTargetVisualState(target) { return targetVisualState }
         function activateControlTarget(target) { return true }
-        function controlTargetTapped(target) {}
+        function controlTargetDoubleTapped(target) {}
+        function controlTargetMoved(target) {}
     }
 
     LabeledSlider {

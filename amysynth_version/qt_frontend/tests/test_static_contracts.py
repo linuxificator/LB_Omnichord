@@ -154,7 +154,7 @@ class StaticContractTests(unittest.TestCase):
         )
         for component in (parameter, labeled, volume, tuning):
             self.assertIn("activateControlTarget", component)
-            self.assertIn("controlTargetTapped", component)
+            self.assertIn("controlTargetDoubleTapped", component)
             self.assertIn("controlTargetVisualState", component)
             self.assertIn("midiBound", component)
             self.assertIn('"#35b85a"', component)
@@ -220,7 +220,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("id: midiLearnLed", rainbow)
         self.assertIn("visible: root.midiLearnActive", rainbow)
         self.assertIn("modeLabel.contentWidth", rainbow)
-        self.assertIn("+ root.extensionWidth", rainbow)
+        self.assertIn("root.width - root.extensionWidth", rainbow)
         self.assertIn("width: 12", rainbow)
         self.assertIn('color: "#f22b2b"', rainbow)
         self.assertIn("running: root.midiLearnActive", rainbow)
@@ -533,7 +533,8 @@ class StaticContractTests(unittest.TestCase):
 
         self.assertIn("property bool centerButtonEnabled: false", tap_number)
         self.assertIn("signal centerClicked()", tap_number)
-        self.assertIn("root.centerHit(numberPoint.y)", tap_number)
+        self.assertIn("visible: root.centerButtonEnabled", tap_number)
+        self.assertIn("anchors.centerIn: parent", tap_number)
         self.assertIn("root.centerClicked()", tap_number)
         for screen in (main, midi):
             self.assertIn("utilityRightEdge:", screen)
@@ -572,12 +573,12 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("x: root.hostWindow.omniTitleX", midi)
         self.assertIn("width: root.hostWindow.omniTitleWidth", midi)
 
-    def test_chord_taps_are_promoted_to_holds_only_after_a_delay(self) -> None:
+    def test_qt_owns_chord_gesture_recognition(self) -> None:
         backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
-        self.assertIn("self._pending_chord_promotions", backend)
-        self.assertIn("timer.setInterval(CHORD_QUICK_TAP_MAX_MS)", backend)
-        self.assertIn("self._schedule_chord_hold_promotion(key)", backend)
+        self.assertNotIn("CHORD_QUICK_TAP_MAX_MS", backend)
+        self.assertNotIn("_pending_chord_promotions", backend)
+        self.assertNotIn("_schedule_chord_hold_promotion", backend)
         self.assertIn("def promoteChordHold(", backend)
         self.assertIn("self._promoted_chords.add(key)", backend)
         press_start = backend.index("def pressChord(")
@@ -593,7 +594,6 @@ class StaticContractTests(unittest.TestCase):
         release_start = backend.index("def releaseChord(")
         release_end = backend.index("def selectChord(", release_start)
         release = backend[release_start:release_end]
-        self.assertIn("self._cancel_pending_chord_promotion(key)", release)
         self.assertIn("self._finalize_chord_release(key)", release)
         self.assertNotIn("_schedule_chord_release", backend)
         self.assertNotIn("RELEASE_GRACE", backend)
@@ -605,11 +605,64 @@ class StaticContractTests(unittest.TestCase):
             "Repeater {\n                                model: octaveNames"
         )
         chord_buttons = qml[chord_start:chord_end]
-        self.assertIn("PointHandler {", chord_buttons)
-        self.assertIn("onActiveChanged:", chord_buttons)
+        self.assertIn("TapHandler {", chord_buttons)
+        self.assertIn("gesturePolicy:", chord_buttons)
+        self.assertIn("TapHandler.ReleaseWithinBounds", chord_buttons)
+        self.assertIn("onPressedChanged:", chord_buttons)
+        self.assertIn("onLongPressed:", chord_buttons)
         self.assertIn("backend.pressChord(", chord_buttons)
+        self.assertIn("backend.promoteChordHold(", chord_buttons)
         self.assertIn("backend.releaseChord(", chord_buttons)
         self.assertNotIn("MultiPointTouchArea", chord_buttons)
+
+    def test_numeric_controls_delegate_gesture_timing_to_qt(self) -> None:
+        numeric = [
+            (ROOT / "gui" / name).read_text(encoding="utf-8")
+            for name in (
+                "TapNumber.qml",
+                "VerticalVolume.qml",
+                "LabeledSlider.qml",
+                "ParameterSlider.qml",
+            )
+        ]
+        combined = "\n".join(numeric)
+        for marker in (
+            "Date.now()",
+            "holdDelayMs",
+            "repeatIntervalMs",
+            "midiMoveCount",
+            "MultiPointTouchArea",
+        ):
+            self.assertNotIn(marker, combined)
+        self.assertIn("autoRepeat: true", numeric[0])
+        self.assertIn("autoRepeat: true", numeric[1])
+        self.assertIn("onDoubleClicked:", numeric[0])
+        self.assertIn("onDoubleClicked:", numeric[1])
+        self.assertIn("onDoubleTapped:", numeric[2])
+        self.assertIn("onDoubleTapped:", numeric[3])
+        self.assertIn("onMoved:", numeric[2])
+        self.assertIn("onMoved:", numeric[3])
+        midi_state = (ROOT / "code" / "midi_control.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("double_tap_window", midi_state)
+        self.assertNotIn("_target_taps", midi_state)
+        self.assertIn("def target_double_tapped(", midi_state)
+
+    def test_clickable_visuals_use_qt_quick_buttons(self) -> None:
+        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
+            encoding="utf-8"
+        )
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        self.assertTrue(rainbow.lstrip().startswith("import QtQuick"))
+        self.assertIn("\nButton {\n", rainbow)
+        self.assertNotIn("MouseArea {", rainbow)
+
+        delegate_start = midi.index("delegate: Button {")
+        delegate_end = midi.index("MidiStrumPad {", delegate_start)
+        indicator = midi[delegate_start:delegate_end]
+        self.assertIn("onClicked:", indicator)
+        self.assertNotIn("MouseArea {", indicator)
 
     def test_runtime_ui_does_not_branch_on_operating_system_names(self) -> None:
         runtime_files = [
@@ -663,6 +716,8 @@ class StaticContractTests(unittest.TestCase):
         )
         self.assertIn("horizontalAlignment: Text.AlignHCenter", qml)
         self.assertIn("verticalAlignment: Text.AlignVCenter", qml)
+        self.assertIn("readonly property real labelWidth:", qml)
+        self.assertNotIn("MouseArea {", qml)
 
     def test_hidden_preset_binding_leds_are_wired_to_location_feedback(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")

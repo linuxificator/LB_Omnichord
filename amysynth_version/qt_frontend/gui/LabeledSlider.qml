@@ -19,8 +19,6 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
-    property int midiMoveCount: 0
-    property double midiPressStarted: 0
 
     readonly property bool midiBound: {
         if (root.midiControlRouter === null)
@@ -48,8 +46,6 @@ Item {
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        if (!learned)
-            root.midiControlRouter.controlTargetTapped(root.midiTarget)
         // A green binding owns the value.  Its first/second tap may form the
         // explicit unlink gesture, but that same gesture never edits it.
         return learned || wasBound || root.midiPresetFeedback
@@ -96,8 +92,6 @@ Item {
 
         onPressedChanged: {
             if (pressed) {
-                root.midiMoveCount = 0
-                root.midiPressStarted = Date.now()
                 root.midiBindingGesture = root.beginMidiInteraction()
                 root.activated()
             } else {
@@ -110,17 +104,21 @@ Item {
                 root.restoreCurrentValueBinding()
                 return
             }
-            root.midiMoveCount += 1
-            if (
-                root.midiControlRouter !== null
-                && (
-                    root.midiMoveCount >= 2
-                    || Date.now() - root.midiPressStarted >= 180
-                )
-            ) {
+            if (root.midiControlRouter !== null) {
                 root.midiControlRouter.controlTargetMoved(root.midiTarget)
             }
             root.edited(value)
+        }
+
+        TapHandler {
+            gesturePolicy: TapHandler.DragThreshold
+            onDoubleTapped: {
+                if (root.midiControlRouter !== null) {
+                    root.midiControlRouter.controlTargetDoubleTapped(
+                        root.midiTarget
+                    )
+                }
+            }
         }
 
         background: Rectangle {

@@ -70,11 +70,13 @@ Bindings are globally one-to-one:
   and makes that old indicator blue.
 
 A green target consumes every normal edit gesture, including slider movement,
-and remains visually synchronized to its MIDI-owned value. Two presses of the
-same bound target within 550 ms form the explicit double-tap unlink gesture.
-The second press may unlink, but that same gesture is still consumed and cannot
-edit the value; a later gesture may edit after ownership has been released.
-This also works for click-only numeric controls such as volume and tuning.
+and remains visually synchronized to its MIDI-owned value. Qt Quick's standard
+double-click/double-tap recognition defines the explicit unlink gesture, using
+the platform style hints for time and distance instead of an application-owned
+timer. The second press may unlink, but that same gesture is still consumed and
+cannot edit the value; a later gesture may edit after ownership has been
+released. This also works for click-only numeric controls such as volume and
+tuning.
 Unlinking makes the controller LED blue and ensures that controller is visible
 when capacity allows.
 The blue state is an inactivity notice, not a latch: the next genuine CC
@@ -258,7 +260,8 @@ The behavior is intentionally split along existing responsibilities:
 
 - `../qt_frontend/code/midi_control.py` contains the transport-independent
   `MidiControlState` state machine for controller identity, genuine movement,
-  LRU visibility, LED states, one-to-one bindings and serialization.
+  LRU visibility, LED states, one-to-one bindings and serialization. It receives
+  an already-classified double-tap action and owns no pointer-gesture timer.
 - `../qt_frontend/code/midi_player.py` owns that state, queues raw CC changes
   onto the Qt object thread, resolves target ranges, calls the existing
   MIDI/OMNI setters and captures/restores bound numeric values around live

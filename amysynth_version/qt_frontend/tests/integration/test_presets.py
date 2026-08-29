@@ -552,10 +552,10 @@ class PresetIntegrationTests(unittest.TestCase):
                 start=0,
                 timeout=3.0,
             )
-            # This scenario intentionally exercises a held chord, not the new
-            # manual-only quick-tap path. Let the contact cross the promotion
-            # threshold before switching presets.
-            time.sleep(0.25)
+            # This scenario intentionally exercises a held chord. Qt owns the
+            # long-press threshold; this backend test supplies its resulting
+            # semantic event directly before switching presets.
+            app.action("promoteChordHold", 0, 0)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
             checkpoint = app.bridge.count()

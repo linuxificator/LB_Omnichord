@@ -14,8 +14,6 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
-    property int midiMoveCount: 0
-    property double midiPressStarted: 0
 
     readonly property bool midiBound: {
         if (root.midiControlRouter === null)
@@ -43,8 +41,6 @@ Item {
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        if (!learned)
-            root.midiControlRouter.controlTargetTapped(root.midiTarget)
         return learned || wasBound || root.midiPresetFeedback
     }
 
@@ -136,8 +132,6 @@ Item {
 
         onPressedChanged: {
             if (pressed) {
-                root.midiMoveCount = 0
-                root.midiPressStarted = Date.now()
                 root.midiBindingGesture = root.beginMidiInteraction()
                 root.activated()
             } else {
@@ -150,17 +144,22 @@ Item {
                 root.syncSliderValue()
                 return
             }
-            root.midiMoveCount += 1
-            if (
-                root.midiMoveCount >= 2
-                || Date.now() - root.midiPressStarted >= 180
-            ) {
-                root.moveMidiInteraction()
-            }
+            root.moveMidiInteraction()
             root.edited(
                 root.control.key,
                 root.sliderToControl(value)
             )
+        }
+
+        TapHandler {
+            gesturePolicy: TapHandler.DragThreshold
+            onDoubleTapped: {
+                if (root.midiControlRouter !== null) {
+                    root.midiControlRouter.controlTargetDoubleTapped(
+                        root.midiTarget
+                    )
+                }
+            }
         }
 
         background: Rectangle {

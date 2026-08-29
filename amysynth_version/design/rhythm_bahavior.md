@@ -489,8 +489,10 @@ schedules are replaced without stopping transport. A tap must not change
 effective chord activity, close the automatic-chord lane or perform the
 hold-specific draining of its note-on tags.
 
-If the contact remains down past the quick-tap window, it is promoted to a
-manual hold. That promotion performs the established accompaniment takeover:
+If Qt's `TapHandler` reports a long press using its platform long-press style
+hint, the contact is promoted to a manual hold. The backend does not classify
+the contact with another timer. That promotion performs the established
+accompaniment takeover:
 while automatic rhythm chords are enabled it temporarily closes the effective
 automatic-chord lane without changing the independent `CHORD ON/OFF` state. It
 must remove the repeating positive-velocity synth-4 note-on tags, but retain the

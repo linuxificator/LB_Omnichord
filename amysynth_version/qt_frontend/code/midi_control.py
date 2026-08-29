@@ -22,13 +22,11 @@ class MidiControlState:
         capacity: int = 17,
         *,
         blue_timeout: float = 30.0,
-        double_tap_window: float = 0.55,
         replacement_duration: float = 0.42,
         preset_feedback_duration: float = 2.0,
     ) -> None:
         self.capacity = max(1, int(capacity))
         self.blue_timeout = float(blue_timeout)
-        self.double_tap_window = float(double_tap_window)
         self.replacement_duration = float(replacement_duration)
         self.preset_feedback_duration = float(preset_feedback_duration)
 
@@ -39,7 +37,6 @@ class MidiControlState:
         self._target_to_control: dict[str, ControlKey] = {}
         self.learn_key: ControlKey | None = None
         self.blue_since: dict[ControlKey, float] = {}
-        self._target_taps: dict[str, float] = {}
         self._preset_target_feedback: dict[str, tuple[str, float]] = {}
 
     @staticmethod
@@ -274,7 +271,6 @@ class MidiControlState:
         self.blue_since.pop(key, None)
         self.learn_key = None
         self.ensure_visible(key, now=now)
-        self._target_taps.pop(target_id, None)
         return True
 
     def is_target_bound(self, target: dict[str, Any]) -> bool:
@@ -330,7 +326,6 @@ class MidiControlState:
     def _unbind_target(self, target: dict[str, Any], now: float) -> bool:
         target_id = self.target_id(target)
         key = self._target_to_control.pop(target_id, None)
-        self._target_taps.pop(target_id, None)
         if key is None:
             return False
         self.bindings.pop(key, None)
@@ -338,21 +333,13 @@ class MidiControlState:
         self.ensure_visible(key, now=now)
         return True
 
-    def target_tapped(
+    def target_double_tapped(
         self,
         target: dict[str, Any],
         *,
         now: float | None = None,
     ) -> bool:
         now = time.monotonic() if now is None else float(now)
-        target_id = self.target_id(target)
-        if target_id not in self._target_to_control:
-            self._target_taps.pop(target_id, None)
-            return False
-        previous = self._target_taps.get(target_id)
-        self._target_taps[target_id] = now
-        if previous is None or now - previous > self.double_tap_window:
-            return False
         return self._unbind_target(target, now)
 
     def target_moved(

@@ -107,8 +107,7 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertNotIn((1, 1), state.bindings)
         self.assertEqual(state.status((1, 1)), "blue")
         self.assertEqual(state.status((1, 2)), "bound")
-        self.assertFalse(state.target_tapped(shared, now=4.0))
-        self.assertTrue(state.target_tapped(shared, now=4.3))
+        self.assertTrue(state.target_double_tapped(shared, now=4.0))
         self.assertEqual(state.status((1, 2)), "blue")
         self.assertEqual(state.omni_led_state(), "blue")
 

@@ -98,8 +98,9 @@ process cleanup. Windows CMake builds pinned AMY without `GAMMA9001` or the
 optional `drums_bin.c`, so it selects the same built-in tiny PCM preset map as
 Linux, macOS and ESP32-P4.
 
-The macOS and Windows package jobs drive both a quick tap and a promoted hold
-through the real packaged QML chord item with synthesized Qt pointer events.
+The macOS and Windows package jobs drive both a quick tap and a long press
+classified by the real packaged QML `TapHandler`, using synthesized Qt pointer
+events and Qt's platform long-press interval.
 They require the active-border state, tap release, hold takeover and hold
 release checkpoints before publication; hold release must be visible on the
 first event-loop turn rather than after a grace timer. The Windows job invokes

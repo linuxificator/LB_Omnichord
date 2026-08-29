@@ -30,14 +30,10 @@ Frame {
         root.midiVisualState === "preset-displaced"
         || root.midiVisualState === "preset-incoming"
 
-    // A tap changes volume by five percentage points. After a short hold,
-    // it auto-repeats in smaller, fast increments.
+    // A tap changes volume by five percentage points. Qt's standard button
+    // auto-repeat supplies the held increments and their cadence.
     property real tapStep: 0.05
     property real repeatStep: 0.025
-    property int holdDelayMs: 380
-    property int repeatIntervalMs: 75
-
-    property int repeatDirection: 0
 
     signal edited(real value)
     signal activated()
@@ -64,21 +60,6 @@ Frame {
         )
     }
 
-    function beginPress(yPosition) {
-        root.repeatDirection =
-            yPosition < root.height / 2
-            ? 1
-            : -1
-
-        // Immediate response for an ordinary tap.
-        root.step(
-            root.repeatDirection,
-            root.tapStep
-        )
-
-        holdDelay.restart()
-    }
-
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
             return false
@@ -86,15 +67,7 @@ Frame {
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        if (!learned)
-            root.midiControlRouter.controlTargetTapped(root.midiTarget)
         return learned || wasBound || root.midiPresetFeedback
-    }
-
-    function endPress() {
-        holdDelay.stop()
-        fastRepeat.stop()
-        root.repeatDirection = 0
     }
 
     background: Rectangle {
@@ -220,61 +193,79 @@ Frame {
         }
     }
 
-    Timer {
-        id: holdDelay
+    Button {
+        id: incrementButton
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: parent.height / 2
+        autoRepeat: true
+        property bool repeatingPress: false
+        background: Item {}
+        contentItem: Item {}
 
-        interval: root.holdDelayMs
-        repeat: false
-
-        onTriggered: {
-            if (root.repeatDirection !== 0) {
-                fastRepeat.start()
+        onPressedChanged: {
+            if (pressed) {
+                repeatingPress = false
+                root.midiBindingGesture = root.beginMidiInteraction()
+                root.activated()
+            } else {
+                root.midiBindingGesture = false
             }
         }
-    }
-
-    Timer {
-        id: fastRepeat
-
-        interval: root.repeatIntervalMs
-        repeat: true
-
-        onTriggered:
-            root.step(
-                root.repeatDirection,
-                root.repeatStep
-            )
-    }
-
-    // One independent touch point per volume control. This retains the
-    // application's multi-touch behavior.
-    MultiPointTouchArea {
-        anchors.fill: parent
-        minimumTouchPoints: 1
-        maximumTouchPoints: 1
-        mouseEnabled: true
-
-        touchPoints: [
-            TouchPoint {
-                id: volumePoint
-            }
-        ]
-
         onPressed: {
-            root.midiBindingGesture = root.beginMidiInteraction()
-            root.activated()
-            if (!root.midiBindingGesture)
-                root.beginPress(volumePoint.y)
+            if (!root.midiBindingGesture) {
+                root.step(
+                    1,
+                    repeatingPress ? root.repeatStep : root.tapStep
+                )
+            }
+            repeatingPress = true
         }
-
-        onReleased: {
-            root.endPress()
-            root.midiBindingGesture = false
+        onDoubleClicked: {
+            if (root.midiControlRouter !== null) {
+                root.midiControlRouter.controlTargetDoubleTapped(
+                    root.midiTarget
+                )
+            }
         }
+    }
 
-        onCanceled: {
-            root.endPress()
-            root.midiBindingGesture = false
+    Button {
+        id: decrementButton
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: parent.height / 2
+        autoRepeat: true
+        property bool repeatingPress: false
+        background: Item {}
+        contentItem: Item {}
+
+        onPressedChanged: {
+            if (pressed) {
+                repeatingPress = false
+                root.midiBindingGesture = root.beginMidiInteraction()
+                root.activated()
+            } else {
+                root.midiBindingGesture = false
+            }
+        }
+        onPressed: {
+            if (!root.midiBindingGesture) {
+                root.step(
+                    -1,
+                    repeatingPress ? root.repeatStep : root.tapStep
+                )
+            }
+            repeatingPress = true
+        }
+        onDoubleClicked: {
+            if (root.midiControlRouter !== null) {
+                root.midiControlRouter.controlTargetDoubleTapped(
+                    root.midiTarget
+                )
+            }
         }
     }
 }

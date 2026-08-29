@@ -310,13 +310,12 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("activeRowIndex")), 1)
             self.assertEqual(int(app.query("activeRootSemitone")), 9)
 
-            # Keeping the same contact down promotes it to the established
-            # hold behavior after the quick-tap window. Releasing shortly
-            # after promotion must stop manual synth 3 immediately; it is not
-            # delayed or quantized to the rhythm lane.
+            # Qt reports a long-press separately from pointer-down. The backend
+            # consequence is tested explicitly here; the packaged-QML smoke
+            # covers Qt's actual gesture recognition.
             app.action("pressChord", 0, 0)
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
-            time.sleep(0.25)
+            app.action("promoteChordHold", 0, 0)
             self.assertEqual(int(app.query("rhythmChordActivity")), 0)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
@@ -360,7 +359,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             # owns only the automatic synth-4 lane. The manual synth-3 voice
             # must remain alive until the matching button release.
             app.action("pressChord", 0, 0)
-            time.sleep(0.85)
+            app.action("promoteChordHold", 0, 0)
             self.assertEqual(int(app.query("rhythmChordActivity")), 0)
             self.assertEqual(int(app.query("chordGateState")), 1)
             start = app.bridge.count()
@@ -480,13 +479,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 float(mapped["maximum"]),
             )
 
-            app.action("tapMidiControlTarget", midi_target)
-            states = {
-                (item["channel"], item["controller"]): item["state"]
-                for item in app.action("midiControlIndicators")
-            }
-            self.assertEqual(states[(1, 74)], "bound")
-            app.action("tapMidiControlTarget", midi_target)
+            app.action("doubleTapMidiControlTarget", midi_target)
             states = {
                 (item["channel"], item["controller"]): item["state"]
                 for item in app.action("midiControlIndicators")

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Window
 
 Item {
@@ -309,6 +310,7 @@ Item {
             root.hostWindow.contentX
             + 2 * root.hostWindow.rowIndent
             - root.hostWindow.controlSpacing
+            + omniButton.extensionWidth
         height: root.hostWindow.rowHeight
         text: "OMNI"
         midiControlRouter: backend.midiPlayer
@@ -323,7 +325,6 @@ Item {
         x:
             omniButton.x
             + omniButton.width
-            + omniButton.extensionWidth
             + root.hostWindow.controlSpacing
         y:
             root.hostWindow.chordRowsY
@@ -351,10 +352,14 @@ Item {
                 id: midiControlRepeater
                 model: root.midiControlModel
 
-                delegate: Item {
+                delegate: Button {
                     required property var modelData
                     width: midiControlBar.indicatorWidth
                     height: 68
+                    enabled: !modelData.evicting
+                    padding: 0
+                    background: Item {}
+                    contentItem: Item {}
 
                     Rectangle {
                         id: controlLed
@@ -429,15 +434,11 @@ Item {
                         NumberAnimation { from: 0.2; to: 1.0; duration: 100 }
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: !modelData.evicting
-                        onClicked: {
-                            backend.midiPlayer.selectControlIndicator(
-                                modelData.channel,
-                                modelData.controller
-                            )
-                        }
+                    onClicked: {
+                        backend.midiPlayer.selectControlIndicator(
+                            modelData.channel,
+                            modelData.controller
+                        )
                     }
                 }
             }

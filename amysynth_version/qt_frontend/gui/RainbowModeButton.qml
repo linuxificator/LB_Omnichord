@@ -10,6 +10,8 @@ Button {
     property var midiControlRouter: null
     property string bindingLocationScreen: ""
     property bool midiLearnActive: false
+    readonly property real labelWidth:
+        Math.max(0, root.width - root.extensionWidth)
 
     padding: 0
     leftPadding: 0
@@ -22,12 +24,12 @@ Button {
     contentItem: Item {
         x: 0
         y: 0
-        width: root.width + root.extensionWidth
+        width: root.width
         height: root.height
 
         Text {
             id: modeLabel
-            width: root.width
+            width: root.labelWidth
             height: root.height
             anchors.centerIn: parent
             anchors.horizontalCenterOffset: root.extensionWidth / 2
@@ -45,7 +47,6 @@ Button {
             visible: root.midiLearnActive
             x: Math.min(
                 root.width
-                + root.extensionWidth
                 - width
                 - 5,
                 modeLabel.x
@@ -85,7 +86,7 @@ Button {
     background: Rectangle {
         x: 0
         y: 0
-        width: root.width + root.extensionWidth
+        width: root.width
         height: root.height
         radius: 9
         border.color: "#6a5264"
@@ -103,11 +104,4 @@ Button {
         }
     }
 
-    MouseArea {
-        x: root.width
-        y: 0
-        width: root.extensionWidth
-        height: root.height
-        onClicked: root.clicked()
-    }
 }

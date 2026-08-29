@@ -19,8 +19,6 @@ def exercise_chord_input(
     window: Any,
     backend: Any,
     checkpoint: Callable[[str], None],
-    *,
-    quick_tap_ms: int,
 ) -> None:
     """Drive a quick tap and hold through the real packaged QML event path."""
 
@@ -90,7 +88,7 @@ def exercise_chord_input(
         Qt.KeyboardModifier.NoModifier,
         scene_position,
     )
-    QTest.qWait(20)
+    app.processEvents()
     require(
         not bool(button.property("touchActive")),
         "QML quick tap remained visually pressed after release",
@@ -111,7 +109,10 @@ def exercise_chord_input(
         Qt.KeyboardModifier.NoModifier,
         scene_position,
     )
-    QTest.qWait(int(quick_tap_ms) + 60)
+    QTest.qWait(
+        int(app.styleHints().mousePressAndHoldInterval())
+        + 100
+    )
     require(
         bool(button.property("touchActive")),
         "held QML chord lost its physical pressed state",
@@ -129,7 +130,7 @@ def exercise_chord_input(
         Qt.KeyboardModifier.NoModifier,
         scene_position,
     )
-    QTest.qWait(20)
+    app.processEvents()
     require(
         not bool(button.property("touchActive")),
         "held QML chord remained visually pressed after release",

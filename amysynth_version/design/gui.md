@@ -106,12 +106,20 @@ state exists independently of the active chord and is available before a chord
 has been selected. Selecting, pressing or releasing a chord must never change
 that state.
 
-Each musical chord key uses one Qt pointer-handler path for mouse, touchscreen
-and pen input. The handler keeps tracking the physical point through release;
-platform-specific raw trackpad touch must not replace this path. Pointer-down
-starts and selects the chord. Pointer-up immediately releases the directly
-played manual voice, independently of rhythm timing, and the selected chord
-keeps its blue active border after a quick tap.
+Each musical chord key uses one Qt `TapHandler` path for mouse, touchscreen,
+stylus and other supported pointer devices. Qt owns press, release and
+long-press classification and uses the platform long-press style hint; the
+Omnichord backend contains no duplicate gesture timer. The handler retains the
+button grab through release. Pointer-down starts and selects the chord.
+Pointer-up immediately releases the directly played manual voice,
+independently of rhythm timing, and the selected chord keeps its blue active
+border after a quick tap.
+
+Ordinary buttons use Qt Quick Controls button signals. Held increment/decrement
+controls use `AbstractButton.autoRepeat`; sliders use `Slider.onMoved`; MIDI
+unlink uses Qt's double-click/double-tap signals. Application code assigns the
+musical meaning after Qt has classified the input and must not infer these
+gestures with elapsed-time or movement-count thresholds.
 
 The RST/UP/DWN block left of the first two chord rows ends at the bottom of the
 second row. Its three controls are distributed evenly over that complete

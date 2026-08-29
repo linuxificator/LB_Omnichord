@@ -1297,12 +1297,12 @@ class MidiPlayerBackend(QObject):
             return self._midi_control_state.target_visual_state(target)
 
     @Slot("QVariantMap")
-    def controlTargetTapped(self, raw: dict[str, Any]) -> None:
+    def controlTargetDoubleTapped(self, raw: dict[str, Any]) -> None:
         target = self._normalize_control_target(raw)
         if target is None:
             return
         with self._midi_control_lock:
-            changed = self._midi_control_state.target_tapped(target)
+            changed = self._midi_control_state.target_double_tapped(target)
         if changed:
             self._write_cc_test_log(
                 {"event": "unbind", "reason": "double-tap", "target": target["id"]}

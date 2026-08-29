@@ -1208,6 +1208,24 @@ ApplicationWindow {
                                         touchActive = false
                                     }
 
+                                    function promoteChordPointer() {
+                                        if (!touchActive) {
+                                            return
+                                        }
+
+                                        backend.debugChordTouch(
+                                            "long-pressed",
+                                            rowItem.rowIndex,
+                                            modelData.semitone,
+                                            chordPointer.point.position.x,
+                                            chordPointer.point.position.y
+                                        )
+                                        backend.promoteChordHold(
+                                            rowItem.rowIndex,
+                                            modelData.semitone
+                                        )
+                                    }
+
                                     property bool selected: {
                                         backend.stateVersion
 
@@ -1287,19 +1305,19 @@ ApplicationWindow {
                                             Text.AlignVCenter
                                     }
 
-                                    // PointHandler keeps a passive grab until
-                                    // physical release. It gives mouse,
-                                    // touchscreen and pen input one portable
-                                    // Qt path without enabling raw macOS
-                                    // trackpad touch for the complete window.
-                                    PointHandler {
+                                    // Qt classifies press, long-press and
+                                    // release using its platform style hints
+                                    // for mouse, touch and pen input alike.
+                                    TapHandler {
                                         id: chordPointer
 
                                         acceptedButtons:
                                             Qt.LeftButton
+                                        gesturePolicy:
+                                            TapHandler.ReleaseWithinBounds
 
-                                        onActiveChanged: {
-                                            if (active) {
+                                        onPressedChanged: {
+                                            if (pressed) {
                                                 noteButton
                                                     .beginChordPointer(
                                                         point
@@ -1317,6 +1335,10 @@ ApplicationWindow {
                                                     )
                                             }
                                         }
+
+                                        onLongPressed:
+                                            noteButton
+                                                .promoteChordPointer()
                                     }
                                 }
                             }
@@ -1571,6 +1593,7 @@ ApplicationWindow {
             }
 
             RainbowModeButton {
+                id: midiModeButton
                 x: 0
                 y:
                     window.chordRowsY
@@ -1583,6 +1606,7 @@ ApplicationWindow {
                     window.contentX
                     + 2 * window.rowIndent
                     - window.controlSpacing
+                    + midiModeButton.extensionWidth
                 height: window.rowHeight
                 text: "MIDI"
                 midiControlRouter: backend.midiPlayer

@@ -465,6 +465,7 @@ class SerialIntegrationTests(unittest.TestCase):
 
             start = app.bridge.count()
             app.action("pressChord", 0, 0)
+            app.action("promoteChordHold", 0, 0)
             # The localhost API returns before the asynchronous UART writer has
             # necessarily emitted anything. Wait for the actual manual press,
             # then for the targeted chord-tag clears; an idle-age heuristic can

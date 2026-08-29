@@ -187,8 +187,8 @@ class InstrumentBackend(OmniInstrumentBackend):
         return self._midi_player.activateControlTarget(target)
 
     @Slot("QVariantMap")
-    def tapMidiControlTarget(self, target: dict[str, Any]) -> None:
-        self._midi_player.controlTargetTapped(target)
+    def doubleTapMidiControlTarget(self, target: dict[str, Any]) -> None:
+        self._midi_player.controlTargetDoubleTapped(target)
 
     @Slot("QVariantMap")
     def moveMidiControlTarget(self, target: dict[str, Any]) -> None:

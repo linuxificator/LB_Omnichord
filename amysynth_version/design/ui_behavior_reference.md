@@ -182,8 +182,9 @@ The following behaviors must be regression tested:
 8. Change rhythm during playback.
 9. Switch screens without unintended parameter changes.
 10. Verify local AMY and remote AMY produce identical wire command streams.
-11. Drive a quick tap and a hold through the real QML chord item and verify
-    active-border, note-release and hold-takeover state.
+11. Drive a quick tap and a framework-classified long press through the real
+    QML chord item and verify active-border, note-release and hold-takeover
+    state.
 
 The current exact persistence, MIDI drum, bus-allocation and factory/user
 preset rules are no longer open UI questions; their authoritative contracts

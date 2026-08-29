@@ -166,9 +166,9 @@ Validation uses only files extracted from the final zip:
    service with offline rendering and one-client lifetime, then the frozen Qt
    executable with its offscreen/software renderer.
 3. The frontend must load the packaged QML/assets, connect through the native
-   Windows named pipe, publish initial state, send quick-tap and hold pointer
-   events through a real QML chord key, observe its active border and release
-   both manual chords successfully.
+   Windows named pipe, publish initial state, send quick-tap and framework-long-
+   press pointer events through a real QML chord key, observe its active border
+   and release both manual chords successfully.
 4. The service must report both received wire commands and nonzero rendered PCM,
    exit after disconnect, and leave no process or ready file behind.
 

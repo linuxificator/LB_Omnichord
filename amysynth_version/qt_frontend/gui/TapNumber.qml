@@ -18,7 +18,6 @@ Frame {
     property color centerPanelColor: root.panelColor
     property color centerPanelTextColor: root.textColor
     property color centerPanelBorderColor: root.panelBorderColor
-    property bool centerPressActive: false
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
@@ -39,10 +38,6 @@ Frame {
         root.midiVisualState === "preset-displaced"
         || root.midiVisualState === "preset-incoming"
 
-    property int holdDelayMs: 380
-    property int repeatIntervalMs: 75
-    property int repeatDirection: 0
-
     signal edited(int value)
     signal activated()
     signal centerClicked()
@@ -54,8 +49,6 @@ Frame {
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        if (!learned)
-            root.midiControlRouter.controlTargetTapped(root.midiTarget)
         return learned || wasBound || root.midiPresetFeedback
     }
 
@@ -79,27 +72,6 @@ Frame {
                 + direction * root.stepValue
             )
         )
-    }
-
-    function beginPress(yPosition) {
-        root.repeatDirection =
-            yPosition < root.height / 2
-            ? 1
-            : -1
-
-        root.step(root.repeatDirection)
-        holdDelay.restart()
-    }
-
-    function centerHit(yPosition) {
-        return root.centerButtonEnabled
-            && Math.abs(yPosition - root.height / 2) <= 13.5
-    }
-
-    function endPress() {
-        holdDelay.stop()
-        fastRepeat.stop()
-        root.repeatDirection = 0
     }
 
     background: Rectangle {
@@ -202,66 +174,81 @@ Frame {
         }
     }
 
-    Timer {
-        id: holdDelay
-        interval: root.holdDelayMs
-        repeat: false
+    Button {
+        id: incrementButton
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height:
+            root.centerButtonEnabled
+            ? (parent.height - 27) / 2
+            : parent.height / 2
+        autoRepeat: true
+        background: Item {}
+        contentItem: Item {}
 
-        onTriggered: {
-            if (root.repeatDirection !== 0) {
-                fastRepeat.start()
-            }
-        }
-    }
-
-    Timer {
-        id: fastRepeat
-        interval: root.repeatIntervalMs
-        repeat: true
-
-        onTriggered:
-            root.step(root.repeatDirection)
-    }
-
-    MultiPointTouchArea {
-        anchors.fill: parent
-        minimumTouchPoints: 1
-        maximumTouchPoints: 1
-        mouseEnabled: true
-
-        touchPoints: [
-            TouchPoint {
-                id: numberPoint
-            }
-        ]
-
-        onPressed: {
-            root.centerPressActive = root.centerHit(numberPoint.y)
-            if (root.centerPressActive) {
-                root.endPress()
+        onPressedChanged: {
+            if (pressed) {
+                root.midiBindingGesture = root.beginMidiInteraction()
+                root.activated()
+            } else {
                 root.midiBindingGesture = false
-                return
             }
-            root.midiBindingGesture = root.beginMidiInteraction()
-            root.activated()
+        }
+        onPressed: {
             if (!root.midiBindingGesture)
-                root.beginPress(numberPoint.y)
+                root.step(1)
         }
+        onDoubleClicked: {
+            if (root.midiControlRouter !== null) {
+                root.midiControlRouter.controlTargetDoubleTapped(
+                    root.midiTarget
+                )
+            }
+        }
+    }
 
-        onReleased: {
-            const activateCenter = root.centerPressActive
-                && root.centerHit(numberPoint.y)
-            root.endPress()
-            root.midiBindingGesture = false
-            root.centerPressActive = false
-            if (activateCenter)
-                root.centerClicked()
-        }
+    Button {
+        id: decrementButton
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height:
+            root.centerButtonEnabled
+            ? (parent.height - 27) / 2
+            : parent.height / 2
+        autoRepeat: true
+        background: Item {}
+        contentItem: Item {}
 
-        onCanceled: {
-            root.endPress()
-            root.midiBindingGesture = false
-            root.centerPressActive = false
+        onPressedChanged: {
+            if (pressed) {
+                root.midiBindingGesture = root.beginMidiInteraction()
+                root.activated()
+            } else {
+                root.midiBindingGesture = false
+            }
         }
+        onPressed: {
+            if (!root.midiBindingGesture)
+                root.step(-1)
+        }
+        onDoubleClicked: {
+            if (root.midiControlRouter !== null) {
+                root.midiControlRouter.controlTargetDoubleTapped(
+                    root.midiTarget
+                )
+            }
+        }
+    }
+
+    Button {
+        anchors.centerIn: parent
+        width: parent.width
+        height: 27
+        visible: root.centerButtonEnabled
+        background: Item {}
+        contentItem: Item {}
+        onClicked: root.centerClicked()
     }
 }
