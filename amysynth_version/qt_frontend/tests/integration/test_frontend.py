@@ -399,6 +399,31 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("setBassVoicingShift", 99.0)
             self.assertEqual(int(app.query("bassVoicingShift")), 6)
 
+    def test_chord_arpeggio_controls_are_independent_and_clamped(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertFalse(bool(app.query("chordArpeggioEnabled")))
+            self.assertEqual(int(app.query("chordArpeggioRate")), 1)
+            self.assertFalse(bool(app.query("chordArpeggioDescending")))
+            self.assertEqual(
+                str(app.query("chordArpeggioDirectionLabel")), "U"
+            )
+
+            app.action("setChordArpeggioRate", 9.0)
+            self.assertEqual(int(app.query("chordArpeggioRate")), 4)
+            self.assertFalse(bool(app.query("chordArpeggioEnabled")))
+
+            app.action("toggleChordArpeggioDirection")
+            self.assertTrue(bool(app.query("chordArpeggioDescending")))
+            self.assertEqual(
+                str(app.query("chordArpeggioDirectionLabel")), "D"
+            )
+            self.assertFalse(bool(app.query("chordArpeggioEnabled")))
+
+            app.action("toggleChordArpeggio")
+            self.assertTrue(bool(app.query("chordArpeggioEnabled")))
+            self.assertEqual(int(app.query("rhythmChordActivity")), 1)
+
     def test_riff_selector_tracks_the_playing_riff_across_chord_sets(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)

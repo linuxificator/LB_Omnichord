@@ -685,6 +685,9 @@ class PresetIntegrationTests(unittest.TestCase):
                 "bass_activity": 1,
             })
             preset_two["rhythm"]["bass_voicing_shift"] = 5
+            preset_two["rhythm"]["chord_arpeggio_enabled"] = False
+            preset_two["rhythm"]["chord_arpeggio_rate"] = 1
+            preset_two["rhythm"]["chord_arpeggio_direction"] = "up"
             target_octaves = ("O5", "O1", "O2", "O6")
             for row, octave in zip(preset_two["chord_rows"], target_octaves):
                 row["octave"] = octave
@@ -705,6 +708,9 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setRhythmChordActivity", 3.0)
             app.action("setRhythmBassActivity", 4.0)
             app.action("setBassVoicingShift", -2.0)
+            app.action("setChordArpeggioRate", 3.0)
+            app.action("toggleChordArpeggioDirection")
+            app.action("toggleChordArpeggio")
             app.action("toggleRhythm")
             app.action("setRhythmTempo", 107.0)
             app.bridge.wait_idle(timeout=8.0)
@@ -733,6 +739,9 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
             self.assertEqual(int(app.query("rhythmBassActivity")), 4)
             self.assertEqual(int(app.query("bassVoicingShift")), -2)
+            self.assertTrue(bool(app.query("chordArpeggioEnabled")))
+            self.assertEqual(int(app.query("chordArpeggioRate")), 3)
+            self.assertTrue(bool(app.query("chordArpeggioDescending")))
             self.assertEqual(int(app.query("chordGateState")), 1)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
@@ -766,6 +775,13 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(stored_settings["chord_activity"]), 3)
             self.assertEqual(int(stored_settings["bass_activity"]), 4)
             self.assertEqual(int(stored["rhythm"]["bass_voicing_shift"]), -2)
+            self.assertTrue(bool(stored["rhythm"]["chord_arpeggio_enabled"]))
+            self.assertEqual(
+                int(stored["rhythm"]["chord_arpeggio_rate"]), 3
+            )
+            self.assertEqual(
+                str(stored["rhythm"]["chord_arpeggio_direction"]), "down"
+            )
             self.assertEqual(
                 tuple(row["octave"] for row in stored["chord_rows"]),
                 ("O3", "O1", "O2", "O6"),
@@ -784,6 +800,9 @@ class PresetIntegrationTests(unittest.TestCase):
                 "bass_activity": 1,
             })
             preset_two["rhythm"]["bass_voicing_shift"] = 5
+            preset_two["rhythm"]["chord_arpeggio_enabled"] = True
+            preset_two["rhythm"]["chord_arpeggio_rate"] = 4
+            preset_two["rhythm"]["chord_arpeggio_direction"] = "down"
             target_octaves = ("O1", "O2", "O5", "O6")
             for row, octave in zip(preset_two["chord_rows"], target_octaves):
                 row["octave"] = octave
@@ -808,6 +827,9 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("rhythmChordActivity")), 1)
             self.assertEqual(int(app.query("rhythmBassActivity")), 1)
             self.assertEqual(int(app.query("bassVoicingShift")), 5)
+            self.assertTrue(bool(app.query("chordArpeggioEnabled")))
+            self.assertEqual(int(app.query("chordArpeggioRate")), 4)
+            self.assertTrue(bool(app.query("chordArpeggioDescending")))
             self.assertEqual(
                 tuple(app.action("octaveIndexForRow", row) for row in range(4)),
                 (0, 1, 4, 5),

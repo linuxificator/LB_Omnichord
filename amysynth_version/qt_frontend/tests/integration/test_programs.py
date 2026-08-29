@@ -44,6 +44,27 @@ class ProgramIntegrationTests(unittest.TestCase):
             app.action("strumTap", 0.0)
             app.bridge.wait_for_lines(["i2iV4.2Z"], start=high_note, timeout=5.0)
 
+    def test_physical_chord_keeps_warning_policy_on_automatic_synth_only(self) -> None:
+        physical_index = len(synths())
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            start = app.bridge.count()
+            app.action("setChordSynthIndex", physical_index)
+            app.bridge.wait_for_lines(
+                [
+                    "i3iv7in1iy3Z",
+                    "i4iv7in1iy3if8Z",
+                ],
+                start=start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+
+            lines = app.bridge.lines_since(start)
+            self.assertFalse(
+                any("i3" in line and "if8" in line for line in lines)
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

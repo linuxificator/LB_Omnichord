@@ -521,16 +521,18 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 - Current AMY stores exactly one sequencer entry per user tag; reusing a tag replaces that entry, and `H0,0,<tag>` clears only that entry. Multiple simultaneous events therefore require distinct tags.
 - The application reserves non-overlapping ranges sized from the complete rhythm catalogue: drums 0..55, bass 56..111 and automatic chords 112..251. Tags 252..255 remain unused.
-- Every scheduled note-on/off owns one deterministic tag in its lane.
+- Every scheduled wire body owns deterministic lane tags. Exact circular
+  repetitions may share one shorter-period tag only when expanding that tag
+  reproduces the complete original tick/body set.
 - Holding/releasing a manual chord clears/reinstalls only the automatic-chord range; bass and drums keep running and transport remains started.
 - Bass on/off, bass retuning and riff selection replace only the bass range.
   The largest current riff uses 34 of its 56 tags. Tuning/chord pitch changes
   may replace both bass and automatic-chord ranges but must not touch
   percussion or stop transport.
 - A live rhythm-style or preset change must preserve tempo, all three activity
-  values, bass voicing, the active-row octave and sequencer timebase. It may
-  replace tagged pattern events but may not stop/restart transport or issue
-  `RESET_SEQUENCER`.
+  values, chord-arpeggio mode/rate/direction, bass voicing, the active-row
+  octave and sequencer timebase. It may replace tagged pattern events but may
+  not stop/restart transport or issue `RESET_SEQUENCER`.
 
 **Failure history:** whole-sequencer rebuilds were used for chord hold/release, pitch changes and other lane-local operations. On the ESP32-P4 this could make the rhythm audibly disappear while a manual chord was held and then return on release.
 
@@ -592,12 +594,12 @@ that prevented hanging but audibly shortened the accompaniment gate.
 **RHYTHM-07 — live preset changes preserve beat-shaping controls**
 
 - With rhythm stopped, preset selection loads stored tempo, percussion
-  activity, chord activity, bass activity, bass voicing, riff selector and all
-  chord-row octaves.
+  activity, chord activity, chord-arpeggio mode/rate/direction, bass activity,
+  bass voicing, riff selector and all chord-row octaves.
 - With rhythm running, preset selection preserves the effective values of the
-  tempo, all three activities and bass voicing. A compatible playing riff is
-  preserved by stable ID and the selector follows its new position; otherwise
-  the destination preset/default selector is used.
+  tempo, all three activities, chord-arpeggio controls and bass voicing. A
+  compatible playing riff is preserved by stable ID and the selector follows
+  its new position; otherwise the destination preset/default selector is used.
 - The octave of the active chord row is also preserved. Every non-active row
   loads its octave from the destination preset.
 - The destination rhythm pattern may change, but transport and sequencer
@@ -617,11 +619,14 @@ that prevented hanging but audibly shortened the accompaniment gate.
 - Neither action releases a chord which is physically held on a chord-button
   row. That manual synth-3 voice ends only through its normal button release.
 
-**RHYTHM-09 — bass activity adds an equal-width R button**
+**RHYTHM-09 — chord and bass activity add equal-width fifth columns**
 
-- Percussion and chord activity retain four equal buttons numbered 1 through 4.
+- Chord activity fills the yellow bar height with two five-button rows. Upper
+  `1..4` retain the old exclusive onset selection and upper-right `A` toggles
+  arpeggio mode independently. Lower `/1..4` are exclusive and lower-right
+  toggles `U` (idle/up) and `D` (selected/down).
 - Bass activity retains that button size and adds a fifth `R` button. The bass
-  group becomes wider and the tempo slider narrower.
+  and chord groups become wider and the tempo slider narrower.
 - Chord activity has no zero button. `CHORD OFF` is the only user-facing way
   to disable automatic sequencer chords.
 - While a manual chord suppresses the automatic lane, no chord-activity button
@@ -642,6 +647,29 @@ that prevented hanging but audibly shortened the accompaniment gate.
   preset selector, or the application default for legacy presets, is used.
 - Riff selector changes replace only bass tags and never stop/reset transport
   or edit the percussion/automatic-chord ranges.
+
+**RHYTHM-11 — A selects complete circular chord arpeggios**
+
+- With `A` off, automatic whole chords and upper activity `1..4` behave exactly
+  as before; the lower row remains editable but has no musical effect.
+- With `A` on, each existing chord onset launches every note in the active
+  chord voicing at `/1`, `/2`, `/3` or `/4` notes per beat. `U` plays low to
+  high and `D` high to low. A new onset may overlap an unfinished arpeggio.
+- Note and release ticks wrap across the repeating period. A four-note maj7 at
+  `/1`, starting only at beat 1 of a four-beat measure, therefore starts notes
+  at beats 1, 2, 3 and 4 and repeats from beat 1.
+- The tag audit expands every compacted period and proves exact timing for all
+  catalogue rhythms, activity levels, rates and 2–7-note chords. The worst
+  arpeggio uses 84 of the existing 140 chord tags.
+- The real serial test proves a seven-note dominant-13 chord is sent in both
+  directions using only tags 112..251. Disabling `A` restores the old four-note
+  whole-chord limit. Arpeggio changes never touch drums, bass, transport or
+  sequencer timebase.
+- Turning `A` or `CHORD ON/OFF` off may retain repeating, note-specific synth-4
+  releases after their matching onsets have been removed. AMY flag `if8` is
+  present only on automatic chord synth 4, including after ROM and physical
+  instrument changes, so those expected unmatched-off diagnostics cannot flood
+  stderr while lifecycle warnings on synths 0–3 remain visible.
 
 ### TUNING — all note-producing paths follow the selected tuning
 

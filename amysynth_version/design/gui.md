@@ -95,13 +95,23 @@ make it appear off-center. Both transport canvases repaint when their backend
 running state changes.
 
 The percussion, chord and bass activity groups form one top-aligned row.
-Percussion and chord activity each have four equal buttons numbered 1 through
-4. Bass activity retains those four button sizes and adds a fifth, equally
-sized `R` button on the right. The wider bass group takes its extra horizontal
-space from the tempo slider. Chord activity has no zero button: `CHORD ON/OFF`
-is the sole user-facing automatic-chord gate.
-While a manual chord temporarily suppresses sequencer chords, none of the four
-chord-activity buttons is selected; the stored level remains unchanged.
+Percussion activity has four equal buttons numbered 1 through 4. Chord
+activity fills the complete yellow rhythm-bar height with two rows of five
+buttons, using the same column width as bass activity. Its upper `1 2 3 4`
+selection remains the exclusive automatic-chord onset activity; upper-right
+`A` toggles arpeggio mode independently. Its lower `/1 /2 /3 /4` selection is
+the exclusive arpeggio-note density and lower-right `U`/`D` toggles ascending
+versus descending order independently. `U` is the idle/up state and `D` is the
+selected/down state. When `A` is off, the complete lower row has no musical
+effect, although it remains editable for the next arpeggio activation.
+
+Bass activity retains the original button sizes and adds a fifth, equally
+sized `R` button on the right. The wider chord and bass groups take their extra
+horizontal space from the tempo slider. Chord activity has no zero button:
+`CHORD ON/OFF` is the sole user-facing automatic-chord gate. While a manual
+chord temporarily suppresses sequencer chords, none of the four upper
+chord-activity buttons is selected; the stored level and independent
+arpeggio controls remain unchanged.
 
 With bass activity 1 through 4, the lower bass slider is labelled `bass
 voicing` and keeps its `-6..6` inversion range. Selecting `R` changes that same

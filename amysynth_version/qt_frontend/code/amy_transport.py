@@ -20,11 +20,71 @@ RESET_SEQUENCER = 4096
 RESET_ALL_OSCS = 8192
 RESET_TIMEBASE = 16384
 RESET_ALL_NOTES = 131072
+SYNTH_FLAGS_NO_NOTE_WARNINGS = 8
+
+
+def _period_divisors(period: int) -> tuple[int, ...]:
+    """Return every positive divisor in deterministic ascending order."""
+    period = max(1, int(period))
+    lower: list[int] = []
+    upper: list[int] = []
+    for candidate in range(1, math.isqrt(period) + 1):
+        if period % candidate:
+            continue
+        lower.append(candidate)
+        paired = period // candidate
+        if paired != candidate:
+            upper.append(paired)
+    return tuple(lower + list(reversed(upper)))
+
+
+def _compact_repeating_events(
+    occurrences: list[tuple[int, str]],
+    bar_period: int,
+) -> list[tuple[int, int, str]]:
+    """Encode an exact circular event set using the fewest obvious periods.
+
+    A single AMY sequencer tag can repeat on a shorter period when every
+    occurrence of that residue is present in the full rhythm cycle.  Folding
+    those exact repetitions keeps dense arpeggios inside the existing chord
+    lane without changing their audible tick set or allocating more tags.
+    """
+    bar_period = max(1, int(bar_period))
+    ticks_by_body: dict[str, set[int]] = {}
+    for tick, body in occurrences:
+        ticks_by_body.setdefault(str(body), set()).add(
+            int(tick) % bar_period
+        )
+
+    divisors = _period_divisors(bar_period)
+    compacted: list[tuple[int, int, str]] = []
+    for body, source_ticks in ticks_by_body.items():
+        remaining = set(source_ticks)
+        while remaining:
+            best_period = bar_period
+            best_residue = min(remaining)
+            best_cycle = {best_residue}
+            for candidate_period in divisors:
+                for residue in sorted(
+                    {tick % candidate_period for tick in remaining}
+                ):
+                    cycle = set(
+                        range(residue, bar_period, candidate_period)
+                    )
+                    if cycle.issubset(remaining) and len(cycle) > len(
+                        best_cycle
+                    ):
+                        best_period = candidate_period
+                        best_residue = residue
+                        best_cycle = cycle
+            compacted.append((best_residue, best_period, body))
+            remaining.difference_update(best_cycle)
+    return compacted
 
 
 DEFAULT_CONFIG: dict[str, Any] = {'serial': {'port': '/dev/serial0', 'baud': 1000000, 'write_timeout': 0.5},
  'synth_ids': {'drums': 0, 'bass': 1, 'strum': 2, 'manual_chord': 3, 'rhythm_chord': 4},
- 'voices': {'drums': 4, 'bass': 1, 'strum': 2, 'manual_chord': 7, 'rhythm_chord': 4},
+ 'voices': {'drums': 4, 'bass': 1, 'strum': 2, 'manual_chord': 7, 'rhythm_chord': 7},
  'default_synths': {'chord': 'juno_004', 'strum': 'juno_028', 'bass': 'dx7_143'},
  'buses': {'main': 0, 'percussion': 1},
  'drums': {'velocity_gain': 5.0,
@@ -934,6 +994,20 @@ class AmySerialClient:
                 return self.voice_count[role]
         raise KeyError(synth)
 
+    def _synth_flag_fields(self, synth: int) -> str:
+        """Return AMY policy fields which belong to one synth instance.
+
+        The automatic chord lane deliberately retains repeating note-offs
+        while its note-ons are drained. AMY flag 8 exists for exactly this
+        sequencer-join/drain case: unmatched note-offs remain harmless but do
+        not flood stderr (which may itself be a slow target UART). Keep the
+        policy scoped to the automatic synth so unexpected manual, strum,
+        bass and percussion note lifecycles remain visible.
+        """
+        if synth == self.synth_id["rhythm_chord"]:
+            return f"if{SYNTH_FLAGS_NO_NOTE_WARNINGS}"
+        return ""
+
     def _patch_compatibility_commands(
         self, patch: int, synth: int
     ) -> list[str]:
@@ -1046,18 +1120,21 @@ class AmySerialClient:
         self._bump_synth_generation(synth)
         patch = self._patch(role)
         bus = self._bus_for_synth(synth)
+        flag_fields = self._synth_flag_fields(synth)
         already_configured = synth in self._configured_synths
         if already_configured:
             # The synth already owns its dedicated bus. Current AMY preserves
             # that bus across a repatch, so patch-level EQ/chorus remain local.
             self._wire(f"l0i{synth}Z")
-            self._wire(f"K{patch}i{synth}Z")
+            self._wire(f"K{patch}i{synth}{flag_fields}Z")
         else:
             voices = self._voice_count_for_synth(synth)
             # Put the bus in the allocation/patch event itself. Many Juno ROM
             # patches contain bus FX; without iy here those startup FX briefly
             # (and persistently) land on default bus 0 before a later route.
-            self._wire(f"K{patch}i{synth}iv{voices}iy{bus}Z")
+            self._wire(
+                f"K{patch}i{synth}iv{voices}iy{bus}{flag_fields}Z"
+            )
             self._configured_synths.add(synth)
 
             guard_ms = float(
@@ -1498,7 +1575,7 @@ class AmySerialClient:
         retained_indexes = {
             index
             for index, (_, _, body) in enumerate(existing_events)
-            if str(body).removesuffix("Z") == note_off
+            if str(body).removesuffix("Z").endswith(note_off)
         }
         lane = self._sequencer_lanes["chords"]
         retained_indexes = {
@@ -1684,6 +1761,52 @@ class AmySerialClient:
             if not self.rhythm_chord_enabled or not self.chord_notes:
                 return []
             chord_synth = self.synth_id["rhythm_chord"]
+            arpeggio = config.get("chord_arpeggio", {})
+            if isinstance(arpeggio, dict) and bool(
+                arpeggio.get("enabled", False)
+            ):
+                rate = max(
+                    1,
+                    min(4, int(arpeggio.get("notes_per_beat", 1))),
+                )
+                step = max(1, round(AMY_PPQ / rate))
+                gate = max(
+                    1,
+                    round(float(rhythm_cfg["chord_gate_beats"]) * step),
+                )
+                rhythm_notes = list(self.chord_notes)
+                if str(arpeggio.get("direction", "up")).lower() == "down":
+                    rhythm_notes.reverse()
+
+                note_offs: list[tuple[int, str]] = []
+                note_ons: list[tuple[int, str]] = []
+                for event in config.get("chord_events", []):
+                    start_tick = round(
+                        float(event.get("time", 0.0)) * AMY_PPQ
+                    )
+                    velocity = max(
+                        0.0,
+                        min(1.0, float(event.get("amp", 1.0))),
+                    )
+                    for note_index, note in enumerate(rhythm_notes):
+                        tick = start_tick + note_index * step
+                        note_offs.append((
+                            tick + gate,
+                            f"n{self._f(note)}l0i{chord_synth}",
+                        ))
+                        note_ons.append((
+                            tick,
+                            f"n{self._f(note)}l{self._f(velocity)}"
+                            f"i{chord_synth}",
+                        ))
+
+                # Off tags receive lower indexes than on tags. If one arp's
+                # release meets another's onset on the same tick, AMY closes
+                # the old note before it retriggers the new one.
+                return _compact_repeating_events(
+                    note_offs, period
+                ) + _compact_repeating_events(note_ons, period)
+
             max_notes = max(
                 1,
                 int(rhythm_cfg.get("max_rhythm_chord_notes", 4)),
@@ -1729,6 +1852,30 @@ class AmySerialClient:
             key: value
             for key, value in new_config.items()
             if key not in bass_fields
+        }
+        return old_shared == new_shared
+
+    @staticmethod
+    def _only_chord_config_changed(
+        old_config: dict[str, Any] | None,
+        new_config: dict[str, Any],
+    ) -> bool:
+        if not isinstance(old_config, dict) or old_config == new_config:
+            return False
+        chord_fields = {
+            "chord_activity",
+            "chord_events",
+            "chord_arpeggio",
+        }
+        old_shared = {
+            key: value
+            for key, value in old_config.items()
+            if key not in chord_fields
+        }
+        new_shared = {
+            key: value
+            for key, value in new_config.items()
+            if key not in chord_fields
         }
         return old_shared == new_shared
 
@@ -1791,6 +1938,9 @@ class AmySerialClient:
         bass_only_changed = self._only_bass_config_changed(
             old_config, new_config
         )
+        chord_only_changed = self._only_chord_config_changed(
+            old_config, new_config
+        )
         old_id = (
             str(self.rhythm_config.get("id", ""))
             if isinstance(self.rhythm_config, dict)
@@ -1806,6 +1956,9 @@ class AmySerialClient:
 
         if bass_only_changed:
             self._replace_lane("bass")
+            return
+        if chord_only_changed:
+            self._replace_lane("chords")
             return
 
         if style_changed and self.rhythm_running:

@@ -16,7 +16,7 @@
     "bass": 1,
     "strum": 2,
     "manual_chord": 7,
-    "rhythm_chord": 4
+    "rhythm_chord": 7
   },
   "midi_player": {
     "synth_ids": [5, 6, 7, 8, 9, 10],
