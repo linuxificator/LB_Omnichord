@@ -27,7 +27,7 @@ Lane-local operations do not reset the sequencer:
   strum, bass and automatic chords. The corresponding bass/chord pitch schedules
   are replaced while transport and the automatic-chord lane remain enabled; it
   does not perform the hold-specific drain of synth-4 note-on tags;
-- promotion to a manual chord hold and its eventual release change only the automatic-chord tag range (and may update bass pitches because the active chord changed). On hold promotion, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
+- promotion to a manual chord hold and restoration after release change only the automatic-chord tag range (and may update bass pitches because the active chord changed). Pointer-up separately stops manual synth 3 immediately; that direct note lifetime has no sequencer delay. On hold promotion, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
 - `CHORD OFF` performs the same synth-4 drain and `CHORD ON` reinstalls that
   lane. These controls never trigger or release manual synth-3 voices;
 - bass on/off changes only the bass range;

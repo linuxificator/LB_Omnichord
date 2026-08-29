@@ -132,10 +132,11 @@ The default directory is `$HOME/LB_Omnichord/amysynth_version/qt_frontend`, the 
 
 Unix local mode consists of two processes. `local_amy_service.py` owns AMY and
 the desktop audio device. The Qt application only sends AMY wire packets over a
-filesystem `AF_UNIX` `SOCK_SEQPACKET` socket. It does not import AMY or call an
-AMY API. macOS uses an LF-framed `AF_UNIX` stream because Darwin does not
-provide `SOCK_SEQPACKET`. This deliberately matches the Android AMY-service
-boundary.
+filesystem `AF_UNIX` socket. It does not import AMY or call an AMY API. The
+service and client prefer packet-preserving `SOCK_SEQPACKET` and fall back to
+an LF-framed stream according to endpoint capability, without testing an OS
+name. Linux currently selects packets and macOS the stream fallback. This
+deliberately matches the Android AMY-service boundary.
 
 Start both processes with:
 
@@ -242,20 +243,32 @@ if ($actual -ne $expected) { throw "Checksum mismatch" }
 Expand-Archive -LiteralPath $zip.FullName -DestinationPath .\LB_Omnichord
 ```
 
-Start the package with its launcher:
+Keep the extracted directory intact, then double-click:
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\LB_Omnichord\run_windows.ps1 -Windowed
+```text
+LB_Omnichord\LB_Omnichord.cmd
 ```
 
-Omit `-Windowed` for the normal fullscreen application. The zip is
-self-contained: `LB_Omnichord.exe` is the frozen PySide6 frontend,
-`amy_service.exe` is the independent native AMY/miniaudio process, and
-`run_windows.ps1` starts and cleans up both. The launcher gives each run a
-unique private pipe name. Qt connects with `QLocalSocket`; the service accepts
-LF-framed AMY wire commands with `CreateNamedPipeA` and rejects remote clients.
-No TCP port is opened and AMY is not linked into the frontend.
+This is the supported Explorer entry point. It starts the bundled PowerShell
+supervisor with a process-only execution-policy bypass and keeps its console
+open when startup fails, so the actual error remains readable. It does not
+change the user or machine execution policy. For a windowed diagnostic launch,
+open Command Prompt in the extracted directory and run:
+
+```bat
+LB_Omnichord.cmd -Windowed
+```
+
+The zip is portable and includes its runtime dependencies after extraction,
+but it is not a single executable. `LB_Omnichord.exe` is the frozen PySide6
+frontend, `amy_service.exe` is the independent native AMY/miniaudio process,
+and `run_windows.ps1` is their internal supervisor. The complete extracted
+directory must remain together. This preserves the required two-process
+architecture instead of hiding a second runtime in a self-extracting frontend.
+The supervisor gives each run a unique private pipe name. Qt connects with
+`QLocalSocket`; the service accepts LF-framed AMY wire commands with
+`CreateNamedPipeA` and rejects remote clients. No TCP port is opened and AMY is
+not linked into the frontend.
 
 The Windows service is built with AMY's built-in tiny PCM bank, matching Linux,
 macOS and ESP32-P4 drum preset numbering. Do not substitute a Gamma9001 AMY
@@ -264,9 +277,11 @@ sound for the same commands.
 
 The package is currently experimental. GitHub's Windows Server 2025 job proves
 native compilation, offline non-silent PCM rendering, frozen QML/assets,
-named-pipe command delivery and clean process shutdown. Physical Windows audio,
-MIDI and low-latency/drop-out behavior have not yet been validated. The current
-MIDI reader is ALSA-only, so native Windows MIDI input is not implemented.
+named-pipe command delivery, quick-tap/hold behavior through the packaged QML
+chord item and clean process shutdown. Physical Windows pointer hardware,
+audio, MIDI and low-latency/drop-out behavior have not yet been validated. The
+current MIDI reader is ALSA-only, so native Windows MIDI input is not
+implemented.
 
 ### Build the native package
 
@@ -388,6 +403,11 @@ package targets Apple Silicon only. It is ad-hoc signed but not notarized with
 an Apple Developer ID, so Gatekeeper may require Control-click **Open** and an
 explicit confirmation on first launch. Intel Macs are not supported by this
 DMG.
+
+The release job mounts the final DMG and drives a quick tap and hold through a
+real packaged QML chord key before publication. That catches QML/backend input
+wiring regressions, but it does not prove a physical Mac trackpad, touchscreen
+or audio device.
 
 # Troubleshooting
 

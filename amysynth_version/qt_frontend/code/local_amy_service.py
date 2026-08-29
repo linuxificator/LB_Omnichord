@@ -4,10 +4,11 @@ from __future__ import annotations
 import argparse
 import json
 import signal
-import socket
 import stat
 import sys
 from pathlib import Path
+
+from unix_wire_socket import listen_unix_wire_socket
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -74,13 +75,9 @@ def main() -> int:
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
 
-    stream_transport = sys.platform == "darwin"
-    socket_type = socket.SOCK_STREAM if stream_transport else socket.SOCK_SEQPACKET
-    server = socket.socket(socket.AF_UNIX, socket_type)
+    server, stream_transport = listen_unix_wire_socket(args.socket)
     try:
-        server.bind(str(args.socket))
         args.socket.chmod(0o600)
-        server.listen(1)
         server.settimeout(0.25)
         print(f"AMY service ready: {args.socket}", flush=True)
 

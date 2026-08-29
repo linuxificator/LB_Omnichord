@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 import math
 import queue
-import socket
-import sys
 import threading
 import time
 from datetime import datetime
@@ -14,6 +12,7 @@ from typing import Any
 import serial
 
 from control_limits import clamp_control_value
+from unix_wire_socket import connect_unix_wire_socket
 
 
 AMY_PPQ = 48
@@ -441,25 +440,13 @@ class _UnixSocketWriter(_SerialWriter):
         from collections import deque
 
         self.debug_log = debug_log
-        # Linux supports packet-preserving SOCK_SEQPACKET. macOS exposes a
-        # stream socket, so delimit each wire request with LF there.
-        self._stream_transport = sys.platform == "darwin"
-        socket_type = (
-            socket.SOCK_STREAM
-            if self._stream_transport
-            else socket.SOCK_SEQPACKET
+        # Prefer packet-preserving local IPC and fall back to an LF-framed
+        # stream when that socket mode is unavailable. The choice follows the
+        # actual endpoint capability rather than an operating-system name.
+        self.socket, self._stream_transport = connect_unix_wire_socket(
+            str(socket_path),
+            timeout=5.0,
         )
-        self.socket = socket.socket(socket.AF_UNIX, socket_type)
-        try:
-            # A missing or incompatible local service must not freeze the UI
-            # process indefinitely.  Restore blocking mode after connecting;
-            # normal AMY command delivery remains synchronous at the writer.
-            self.socket.settimeout(5.0)
-            self.socket.connect(str(socket_path))
-            self.socket.settimeout(None)
-        except BaseException:
-            self.socket.close()
-            raise
         self.serial = self.socket
         self._high = deque()
         self._low = deque()

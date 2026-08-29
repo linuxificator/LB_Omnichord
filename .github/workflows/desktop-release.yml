@@ -197,10 +197,6 @@ jobs:
           mkdir -p "$mountpoint"
           hdiutil attach -nobrowse -readonly -mountpoint "$mountpoint" "$package"
           cleanup_dmg() {
-            if [[ -n "${app_pid:-}" ]] && kill -0 "$app_pid" 2>/dev/null; then
-              kill -TERM "$app_pid" 2>/dev/null || true
-              wait "$app_pid" || true
-            fi
             for _ in {1..5}; do
               if hdiutil detach "$mountpoint"; then
                 return
@@ -212,35 +208,33 @@ jobs:
           trap cleanup_dmg EXIT
           app="$mountpoint/LB_Omnichord.app/Contents/MacOS/LB_Omnichord"
           "$app" --package-self-test
-          QT_QPA_PLATFORM=offscreen "$app" --windowed \
-            > /tmp/omnichord-package-smoke.log 2>&1 &
-          app_pid=$!
-          for _ in {1..80}; do
-            if ! kill -0 "$app_pid" 2>/dev/null; then
-              set +e
-              wait "$app_pid"
-              app_status=$?
-              set -e
-              cat /tmp/omnichord-package-smoke.log
-              echo "Packaged macOS application exit status: $app_status" >&2
-              echo 'Packaged macOS application stopped during startup' >&2
-              exit 1
-            fi
-            if grep -q 'AMY backend: external socket' \
-              /tmp/omnichord-package-smoke.log; then
-              break
-            fi
-            sleep 0.1
-          done
+          smoke_status=/tmp/omnichord-package-smoke.status
+          rm -f "$smoke_status"
+          set +e
+          OMNICHORD_PACKAGE_SMOKE_STATUS="$smoke_status" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            "$app" --windowed --package-smoke-test \
+            > /tmp/omnichord-package-smoke.log 2>&1
+          app_status=$?
+          set -e
           cat /tmp/omnichord-package-smoke.log
+          if [[ "$app_status" -ne 0 ]]; then
+            echo "Packaged macOS application exit status: $app_status" >&2
+            cat "$smoke_status" >&2 || true
+            exit "$app_status"
+          fi
           grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
           grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
-          kill -TERM "$app_pid"
-          # The frozen Qt process can report 139 while tearing down CoreAudio
-          # after our synthetic TERM. Startup correctness is established by
-          # both markers above; do not turn a CI-forced shutdown into failure.
-          wait "$app_pid" || true
-          app_pid=""
+          for checkpoint in \
+            qml-root-ready \
+            qml-chord-press-observed \
+            active-chord-visible \
+            qml-chord-tap-released \
+            qml-chord-hold-promoted \
+            qml-chord-hold-released \
+            event-loop-exited; do
+            grep -q "$checkpoint" "$smoke_status"
+          done
           cleanup_dmg
           trap - EXIT
           package_name="$(basename "$package")"
@@ -290,7 +284,7 @@ jobs:
           git clone https://github.com/linuxificator/amy.git "$env:RUNNER_TEMP\amy-lb"
           git -C "$env:RUNNER_TEMP\amy-lb" checkout 25213785696dd40e6cce59ab428e560a410d240f
 
-      - name: Build native service and self-contained package
+      - name: Build native service and portable package
         shell: pwsh
         env:
           OMNICHORD_RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
@@ -309,12 +303,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Native AMY service self-test failed" }
           if (-not (Test-Path "$root\LB_Omnichord.exe")) { throw "Frontend executable missing" }
           if (-not (Test-Path "$root\run_windows.ps1")) { throw "Launcher missing" }
+          if (-not (Test-Path "$root\LB_Omnichord.cmd")) { throw "Double-click launcher missing" }
           if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked during self-test" }
           $smokeUser = "$env:RUNNER_TEMP\lb-omnichord-smoke-user"
           New-Item -ItemType Directory -Force -Path $smokeUser | Out-Null
           $env:USERPROFILE = $smokeUser
           $env:LOCALAPPDATA = $smokeUser
-          & "$root\run_windows.ps1" -Windowed -SmokeTest
+          & "$root\LB_Omnichord.cmd" -Windowed -SmokeTest
+          if ($LASTEXITCODE -ne 0) { throw "Windows package launcher failed" }
           if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked during package smoke test" }
 
       - name: Upload Windows package
@@ -380,7 +376,9 @@ jobs:
             echo
             echo '## Windows native (experimental)'
             echo
-            echo "Download \`$windows_file\` and its SHA-256 file. The zip contains separate native AMY and Qt frontend executables plus a launcher. Native Windows audio/MIDI still needs physical validation."
+            echo "Download \`$windows_file\` and its SHA-256 file, extract the complete zip, then double-click \`LB_Omnichord.cmd\`. Do not use Explorer's \`Run with PowerShell\` on the internal \`run_windows.ps1\`: the double-click launcher supplies a process-only execution-policy bypass and keeps startup errors visible."
+            echo
+            echo 'The portable directory contains separate native AMY and Qt frontend executables; it is not a single executable and the extracted files must stay together. Native Windows pointer hardware, audio and MIDI still need physical validation.'
           } > release-notes.md
           gh release create "$RELEASE_TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \

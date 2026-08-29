@@ -103,9 +103,32 @@ The serial regression requires the factory patch to remain authoritative for nat
   running.
 - A contact which remains down past the quick-tap window must enter the existing
   manual-hold takeover: future automatic chord onsets drain, already scheduled
-  automatic note-offs remain, and release reinstalls the automatic chord lane.
+  automatic note-offs remain, and release stops manual synth 3 immediately
+  before reinstating the automatic chord lane.
 
-**Failure history:** earlier builds showed erratic repeated chord starts while a chord was held. Debugging introduced explicit chord-touch state and release filtering.
+**Failure history:** earlier builds showed erratic repeated chord starts while
+a chord was held. A backend release filter then hid spurious pointer events by
+delaying some real releases by 450 ms. The unified Qt pointer grab makes that
+filter unnecessary; release now follows the actual pointer-up directly.
+
+**CHORD-03 — packaged QML input is portable across desktop targets**
+
+- The package smoke must locate a real chord-key delegate in production QML
+  and send pointer-down/up events through its `QQuickWindow`; calling
+  `backend.pressChord()` directly is not an input test.
+- A quick tap must select the chord, expose its blue active-border state, emit
+  manual synth-3 note-on/off commands and leave no pressed chord behind.
+- A contact held beyond the quick-tap window must remain visually pressed,
+  promote to the temporary accompaniment takeover, stop manual synth 3
+  immediately on physical release, and restore the stored chord activity.
+- The macOS job runs this test from the mounted final DMG. The Windows job runs
+  it from the extracted final zip through the user-facing double-click
+  launcher. Hosted pointer injection is deterministic package validation, not
+  a substitute for testing a physical Mac trackpad or Windows touchscreen.
+
+**Failure history:** the former package smoke loaded QML but invoked the
+backend chord methods directly. It therefore passed while a physical macOS
+installation failed to show or release chord-key interaction correctly.
 
 ### STRUM — strum input
 
@@ -534,7 +557,9 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 - Finger-down immediately starts manual synth 3 and selects the new active
   chord for strum, bass and automatic accompaniment pitches.
-- Finger-up inside the quick-tap window stops only the manual synth-3 voice. It
+- Every real finger-up immediately stops the manual synth-3 voice, including a
+  release shortly after hold promotion. Its release is neither delayed by a
+  dropout-grace timer nor quantized to rhythm. Inside the quick-tap window it
   must not change effective chord activity, close the automatic-chord lane or
   drain its tags.
 - If the contact remains down past the quick-tap window, hold promotion

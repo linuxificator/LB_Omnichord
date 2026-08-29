@@ -26,6 +26,7 @@ $pyDist = Join-Path $buildRoot "pyinstaller"
 python -m PyInstaller --noconfirm --clean --windowed --onedir `
     --name LB_Omnichord --distpath $pyDist --workpath (Join-Path $buildRoot "pyinstaller-work") `
     --specpath $buildRoot --paths (Join-Path $frontend "code") `
+    --hidden-import package_smoke --hidden-import PySide6.QtTest `
     --add-data "$(Join-Path $frontend 'licence.txt');." `
     --add-data "$(Join-Path $frontend 'config');config" `
     --add-data "$(Join-Path $frontend 'gui');gui" `
@@ -38,6 +39,7 @@ New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 Copy-Item -Recurse -Force (Join-Path $pyDist "LB_Omnichord\*") $packageRoot
 Copy-Item -Force (Join-Path $buildRoot "amy-build\Release\amy_service.exe") $packageRoot
 Copy-Item -Force (Join-Path $PSScriptRoot "windows\run_windows.ps1") $packageRoot
+Copy-Item -Force (Join-Path $PSScriptRoot "windows\LB_Omnichord.cmd") $packageRoot
 $zip = Join-Path $dist "LB_Omnichord.$stamp.Windows-x86_64.zip"
 Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $zip
 Get-FileHash $zip -Algorithm SHA256 | ForEach-Object {

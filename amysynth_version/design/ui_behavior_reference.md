@@ -93,7 +93,16 @@ Examples:
 - holding a chord past the tap window selects it for accompaniment and keeps it
   active while temporarily suppressing future automatic-chord onsets;
 - holding performance controls must not repeatedly reset state;
-- accidental short releases should not create unwanted retriggers.
+- duplicate pointer-down events while a contact is active must not retrigger it.
+
+Any real chord pointer-up stops the directly played manual synth immediately,
+including after hold promotion. It has no release-grace timer and is not
+quantized to the automatic rhythm lane. Restoring future automatic-chord events
+is a separate sequencer-lane update.
+
+Chord keys use Qt's device-independent pointer handling for mouse, touchscreen
+and pen input. A desktop trackpad click follows the mouse path; enabling raw
+trackpad touch for the complete window is not required for chord input.
 
 ### Strum behavior
 
@@ -173,6 +182,8 @@ The following behaviors must be regression tested:
 8. Change rhythm during playback.
 9. Switch screens without unintended parameter changes.
 10. Verify local AMY and remote AMY produce identical wire command streams.
+11. Drive a quick tap and a hold through the real QML chord item and verify
+    active-border, note-release and hold-takeover state.
 
 The current exact persistence, MIDI drum, bus-allocation and factory/user
 preset rules are no longer open UI questions; their authoritative contracts

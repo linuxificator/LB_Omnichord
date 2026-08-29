@@ -85,10 +85,11 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 
 The AppImages bundle PySide6, the frontend assets and the pinned AMY bus-mixer
 fork built with the ESP32-compatible tiny PCM bank. The executable starts AMY
-as a separate child process. Linux uses the existing Unix `SOCK_SEQPACKET`
-wire-protocol boundary. macOS uses newline-framed Unix `SOCK_STREAM`, because
-Darwin does not support Unix-domain `SOCK_SEQPACKET`. Packaging therefore does
-not collapse the application and synthesizer architectures into one process.
+as a separate child process. Unix IPC selects the best endpoint capability:
+packet-preserving `SOCK_SEQPACKET` where accepted, otherwise newline-framed
+`SOCK_STREAM`. The runtime has no OS-name branch for this choice. Packaging
+therefore does not collapse the application and synthesizer architectures into
+one process.
 
 The Windows zip also preserves two processes: frozen `LB_Omnichord.exe`
 connects through `QLocalSocket` to a private named pipe owned by native
@@ -96,6 +97,16 @@ connects through `QLocalSocket` to a private named pipe owned by native
 process cleanup. Windows CMake builds pinned AMY without `GAMMA9001` or the
 optional `drums_bin.c`, so it selects the same built-in tiny PCM preset map as
 Linux, macOS and ESP32-P4.
+
+The macOS and Windows package jobs drive both a quick tap and a promoted hold
+through the real packaged QML chord item with synthesized Qt pointer events.
+They require the active-border state, tap release, hold takeover and hold
+release checkpoints before publication; hold release must be visible on the
+first event-loop turn rather than after a grace timer. The Windows job invokes
+the packaged `LB_Omnichord.cmd` double-click entry point, which in turn starts
+the PowerShell supervisor with a process-only execution-policy bypass. These
+hosted tests do not replace physical trackpad/touchscreen or audible-output
+validation.
 
 `packaging/build_appimage.sh` builds either Linux AppImage;
 `packaging/build_macos_dmg.sh` builds the Apple Silicon application/DMG. The
@@ -204,3 +215,6 @@ Important regression tests:
   the MIDI image contains representative controller knobs in the grey CC bar
 - instrument balance captures cover low/middle/high registers and report RMS,
   peak, crest factor and clipping
+- packaged macOS and Windows QML chord input observes pointer-down/up, retains
+  the selected chord border after a tap, promotes a hold and releases both
+  gestures without leaving synth 3 active

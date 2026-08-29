@@ -50,9 +50,11 @@ The ESP32-P4 also exhibited low-frequency rumble when an exact `h0` reverb comma
 
 Manual chord hold is another timing-sensitive path. Finger-down immediately
 starts manual synth 3 and selects the chord for strum, bass and automatic-chord
-pitches. Finger-up inside the 160 ms quick-tap window stops that manual voice
-without closing or draining the automatic-chord lane. Only a contact which
-remains down past that window is promoted to takeover. Promotion must not stop
+pitches. Every real finger-up immediately stops that manual voice, with no
+release-grace timer and no dependency on sequencer phase. Inside the 160 ms
+quick-tap window it does so without closing or draining the automatic-chord
+lane. Only a contact which remains down past that window is promoted to
+takeover. Promotion must not stop
 percussion or bass and must not change the `CHORD ON/OFF` state: it clears
 future synth-4 note-ons but retains the sequencer's existing synth-4 all-off
 tags, so a chord already sounding completes its normal rhythmic gate. The
