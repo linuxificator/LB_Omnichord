@@ -1152,6 +1152,12 @@ ApplicationWindow {
                                 delegate: Item {
                                     id: noteButton
 
+                                    objectName:
+                                        "chordButton_"
+                                        + rowItem.rowIndex
+                                        + "_"
+                                        + modelData.semitone
+
                                     required property var
                                         modelData
 
@@ -1163,6 +1169,44 @@ ApplicationWindow {
 
                                     property bool touchActive:
                                         false
+
+                                    function beginChordPointer(x, y) {
+                                        if (touchActive) {
+                                            return
+                                        }
+
+                                        touchActive = true
+                                        backend.debugChordTouch(
+                                            "pressed",
+                                            rowItem.rowIndex,
+                                            modelData.semitone,
+                                            x,
+                                            y
+                                        )
+                                        backend.pressChord(
+                                            rowItem.rowIndex,
+                                            modelData.semitone
+                                        )
+                                    }
+
+                                    function endChordPointer(x, y) {
+                                        if (!touchActive) {
+                                            return
+                                        }
+
+                                        backend.debugChordTouch(
+                                            "released",
+                                            rowItem.rowIndex,
+                                            modelData.semitone,
+                                            x,
+                                            y
+                                        )
+                                        backend.releaseChord(
+                                            rowItem.rowIndex,
+                                            modelData.semitone
+                                        )
+                                        touchActive = false
+                                    }
 
                                     property bool selected: {
                                         backend.stateVersion
@@ -1243,78 +1287,35 @@ ApplicationWindow {
                                             Text.AlignVCenter
                                     }
 
-                                    MultiPointTouchArea {
-                                        anchors.fill: parent
+                                    // PointHandler keeps a passive grab until
+                                    // physical release. It gives mouse,
+                                    // touchscreen and pen input one portable
+                                    // Qt path without enabling raw macOS
+                                    // trackpad touch for the complete window.
+                                    PointHandler {
+                                        id: chordPointer
 
-                                        minimumTouchPoints: 1
-                                        maximumTouchPoints: 1
-                                        mouseEnabled: true
+                                        acceptedButtons:
+                                            Qt.LeftButton
 
-                                        touchPoints: [
-                                            TouchPoint {
-                                                id:
-                                                    chordTouchPoint
+                                        onActiveChanged: {
+                                            if (active) {
+                                                noteButton
+                                                    .beginChordPointer(
+                                                        point
+                                                            .position.x,
+                                                        point
+                                                            .position.y
+                                                    )
+                                            } else {
+                                                noteButton
+                                                    .endChordPointer(
+                                                        point
+                                                            .position.x,
+                                                        point
+                                                            .position.y
+                                                    )
                                             }
-                                        ]
-
-                                        onPressed: {
-                                            noteButton.touchActive =
-                                                true
-
-                                            backend.debugChordTouch(
-                                                "pressed",
-                                                rowItem.rowIndex,
-                                                modelData
-                                                    .semitone,
-                                                chordTouchPoint.x,
-                                                chordTouchPoint.y
-                                            )
-
-                                            backend.pressChord(
-                                                rowItem.rowIndex,
-                                                modelData
-                                                    .semitone
-                                            )
-                                        }
-
-                                        onReleased: {
-                                            backend.debugChordTouch(
-                                                "released",
-                                                rowItem.rowIndex,
-                                                modelData
-                                                    .semitone,
-                                                chordTouchPoint.x,
-                                                chordTouchPoint.y
-                                            )
-
-                                            backend.releaseChord(
-                                                rowItem.rowIndex,
-                                                modelData
-                                                    .semitone
-                                            )
-
-                                            noteButton.touchActive =
-                                                false
-                                        }
-
-                                        onCanceled: {
-                                            backend.debugChordTouch(
-                                                "canceled",
-                                                rowItem.rowIndex,
-                                                modelData
-                                                    .semitone,
-                                                chordTouchPoint.x,
-                                                chordTouchPoint.y
-                                            )
-
-                                            backend.releaseChord(
-                                                rowItem.rowIndex,
-                                                modelData
-                                                    .semitone
-                                            )
-
-                                            noteButton.touchActive =
-                                                false
                                         }
                                     }
                                 }

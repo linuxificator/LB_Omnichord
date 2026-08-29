@@ -31,6 +31,8 @@ python -m PyInstaller \
     --specpath "$build_root" \
     --paths "$frontend_dir/code" \
     --hidden-import c_amy \
+    --hidden-import package_smoke \
+    --hidden-import PySide6.QtTest \
     --collect-all amy \
     --add-data "$frontend_dir/licence.txt:." \
     --add-data "$frontend_dir/config:config" \

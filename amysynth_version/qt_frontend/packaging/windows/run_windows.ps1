@@ -96,8 +96,19 @@ try {
         $status = if (Test-Path $smokeStatus) {
             Get-Content -Raw $smokeStatus
         } else { "" }
-        if ($status -notmatch "event-loop-exited") {
-            throw "Packaged frontend did not report a clean Qt event-loop exit"
+        $requiredCheckpoints = @(
+            "qml-root-ready",
+            "qml-chord-press-observed",
+            "active-chord-visible",
+            "qml-chord-tap-released",
+            "qml-chord-hold-promoted",
+            "qml-chord-hold-released",
+            "event-loop-exited"
+        )
+        foreach ($checkpoint in $requiredCheckpoints) {
+            if ($status -notmatch [regex]::Escape($checkpoint)) {
+                throw "Packaged frontend missed smoke checkpoint: $checkpoint"
+            }
         }
         if (-not $service.WaitForExit(10000)) {
             throw "AMY smoke service did not exit after the frontend disconnected"

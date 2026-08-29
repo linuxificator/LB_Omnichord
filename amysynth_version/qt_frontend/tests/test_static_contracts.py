@@ -574,6 +574,7 @@ class StaticContractTests(unittest.TestCase):
 
     def test_chord_taps_are_promoted_to_holds_only_after_a_delay(self) -> None:
         backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         self.assertIn("self._pending_chord_promotions", backend)
         self.assertIn("timer.setInterval(CHORD_QUICK_TAP_MAX_MS)", backend)
         self.assertIn("self._schedule_chord_hold_promotion(key)", backend)
@@ -593,6 +594,38 @@ class StaticContractTests(unittest.TestCase):
         release_end = backend.index("def selectChord(", release_start)
         release = backend[release_start:release_end]
         self.assertIn("self._cancel_pending_chord_promotion(key)", release)
+        self.assertIn("self._finalize_chord_release(key)", release)
+        self.assertNotIn("_schedule_chord_release", backend)
+        self.assertNotIn("RELEASE_GRACE", backend)
+
+        chord_start = qml.index(
+            "objectName:\n                                        \"chordButton_\""
+        )
+        chord_end = qml.index(
+            "Repeater {\n                                model: octaveNames"
+        )
+        chord_buttons = qml[chord_start:chord_end]
+        self.assertIn("PointHandler {", chord_buttons)
+        self.assertIn("onActiveChanged:", chord_buttons)
+        self.assertIn("backend.pressChord(", chord_buttons)
+        self.assertIn("backend.releaseChord(", chord_buttons)
+        self.assertNotIn("MultiPointTouchArea", chord_buttons)
+
+    def test_runtime_ui_does_not_branch_on_operating_system_names(self) -> None:
+        runtime_files = [
+            *sorted((ROOT / "code").glob("*.py")),
+            *sorted((ROOT / "gui").glob("*.qml")),
+        ]
+        forbidden = (
+            "sys.platform",
+            "platform.system(",
+            "os.name",
+            "Qt.platform.os",
+        )
+        for path in runtime_files:
+            source = path.read_text(encoding="utf-8")
+            for marker in forbidden:
+                self.assertNotIn(marker, source, f"{path}: {marker}")
 
     def test_apg_ldr_button_uses_backend_preset_state(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")

@@ -6,7 +6,6 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from PySide6.QtCore import QCoreApplication
 
@@ -15,9 +14,27 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 from amy_transport import _QtLocalSocketWriter, _UnixSocketWriter  # noqa: E402
+from unix_wire_socket import listen_unix_wire_socket  # noqa: E402
 
 
 class AmySocketWriterTests(unittest.TestCase):
+    def test_service_listener_and_client_negotiate_the_same_mode(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="amy-listener-test-") as tmp:
+            path = Path(tmp) / "amy.sock"
+            server, server_stream = listen_unix_wire_socket(path)
+            server.settimeout(2.0)
+            writer = _UnixSocketWriter(str(path))
+            try:
+                client, _ = server.accept()
+                with client:
+                    writer.high("K215i5Z")
+                    expected = b"K215i5Z\n" if server_stream else b"K215i5Z"
+                    self.assertEqual(client.recv(1024), expected)
+                self.assertEqual(writer._stream_transport, server_stream)
+            finally:
+                writer.close()
+                server.close()
+
     def test_each_wire_request_is_one_seqpacket(self) -> None:
         with tempfile.TemporaryDirectory(prefix="amy-socket-test-") as tmp:
             path = Path(tmp) / "amy.sock"
@@ -48,10 +65,7 @@ class AmySocketWriterTests(unittest.TestCase):
 
             self.assertEqual(packets, [b"K215i5Z", b"n60l1i5Z"])
 
-    def test_stream_platforms_frame_each_wire_request(self) -> None:
-        self._assert_stream_framing("darwin")
-
-    def _assert_stream_framing(self, platform: str) -> None:
+    def test_stream_endpoint_frames_each_wire_request(self) -> None:
         with tempfile.TemporaryDirectory(prefix="amy-stream-test-") as tmp:
             path = Path(tmp) / "amy.sock"
             server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -69,8 +83,7 @@ class AmySocketWriterTests(unittest.TestCase):
 
             thread = threading.Thread(target=receive, daemon=True)
             thread.start()
-            with patch("amy_transport.sys.platform", platform):
-                writer = _UnixSocketWriter(str(path))
+            writer = _UnixSocketWriter(str(path))
             try:
                 writer.high("K215i5Z")
                 writer.high("n60l1i5Z")

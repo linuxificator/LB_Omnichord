@@ -28,6 +28,8 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("hdiutil attach", release)
         self.assertIn("AMY backend: external socket", release)
+        self.assertIn("--windowed --package-smoke-test", release)
+        self.assertIn("qml-chord-hold-promoted", release)
         self.assertIn("branches: [main, testing/windows_smoke]", release)
         self.assertGreaterEqual(
             release.count("if: github.ref == 'refs/heads/main'"),
@@ -65,6 +67,9 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("macOS-arm64.dmg", release)
         self.assertIn("Windows-x86_64.zip", release)
         self.assertIn("## Windows native", release)
+        self.assertIn("double-click", release)
+        self.assertIn("LB_Omnichord.cmd", release)
+        self.assertIn("process-only execution-policy bypass", release)
         self.assertIn("## Linux x64", release)
         self.assertIn("## Raspberry Pi 4 / 5", release)
         self.assertIn("## macOS Apple Silicon", release)
@@ -98,6 +103,9 @@ class PackagingContracts(unittest.TestCase):
         launcher = (
             FRONTEND / "packaging" / "windows" / "run_windows.ps1"
         ).read_text(encoding="utf-8")
+        click_launcher = (
+            FRONTEND / "packaging" / "windows" / "LB_Omnichord.cmd"
+        ).read_text(encoding="utf-8")
         main = (FRONTEND / "code" / "main.py").read_text(encoding="utf-8")
         core = (FRONTEND / "code" / "app_core.py").read_text(
             encoding="utf-8"
@@ -109,6 +117,9 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("windows-native]", workflow)
         self.assertIn("amy_service.exe", build)
         self.assertIn("--name LB_Omnichord", build)
+        self.assertIn("LB_Omnichord.cmd", build)
+        self.assertIn("--hidden-import package_smoke", build)
+        self.assertIn("--hidden-import PySide6.QtTest", build)
         self.assertIn("cmake --help", build)
         self.assertIn("Visual Studio 18 2026", build)
         self.assertIn("Visual Studio 17 2022", build)
@@ -129,6 +140,14 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("OMNICHORD_PACKAGE_SMOKE_STATUS", launcher)
         self.assertIn("Service errors:", launcher)
         self.assertIn("event-loop-exited", launcher)
+        self.assertIn("qml-chord-press-observed", launcher)
+        self.assertIn("active-chord-visible", launcher)
+        self.assertIn("qml-chord-tap-released", launcher)
+        self.assertIn("qml-chord-hold-promoted", launcher)
+        self.assertIn("qml-chord-hold-released", launcher)
+        self.assertIn("-ExecutionPolicy Bypass", click_launcher)
+        self.assertIn('"%~dp0run_windows.ps1" %*', click_launcher)
+        self.assertIn("pause", click_launcher)
         self.assertIn("if sys.stdout is None:", main)
         self.assertIn("if sys.stderr is None:", main)
         self.assertIn("fatal-error", main)
@@ -141,7 +160,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("AMY service smoke passed:", service)
         self.assertIn("runs-on: windows-2025", workflow)
         self.assertIn(
-            '& "$root\\run_windows.ps1" -Windowed -SmokeTest',
+            '& "$root\\LB_Omnichord.cmd" -Windowed -SmokeTest',
             workflow,
         )
 
@@ -172,6 +191,8 @@ class PackagingContracts(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("LB_Omnichord.${release_stamp}.macOS-arm64.dmg", dmg_script)
+        self.assertIn("--hidden-import package_smoke", dmg_script)
+        self.assertIn("--hidden-import PySide6.QtTest", dmg_script)
 
 
 if __name__ == "__main__":

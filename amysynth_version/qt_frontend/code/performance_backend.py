@@ -22,7 +22,7 @@ REVERB_LEVEL_MAX = app_core.REVERB_LEVEL_MAX
 class InstrumentBackend(app_core.InstrumentBackend):
     """Live-performance state layered on the stable application core.
 
-    The base class still owns catalogue/preset loading, touch dropout handling,
+    The base class still owns catalogue/preset loading, chord-contact handling,
     tuning, synth state and transport.  This layer owns performance concepts
     that must survive independently of the sounding chord: remembered chord
     identity, chord gate state, bass inversion/voicing and grouped row rolls.

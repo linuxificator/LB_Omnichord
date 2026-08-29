@@ -64,8 +64,18 @@ The implementation is intentionally small and direct:
   and LF record assembly;
 - `packaging/windows/run_windows.ps1` creates a unique name, starts the service,
   validates its ready file, launches Qt and cleans up both processes;
+- `packaging/windows/LB_Omnichord.cmd` is the user-facing double-click entry
+  point. It applies `-ExecutionPolicy Bypass` only to the bundled launcher
+  process and leaves an interactive error visible;
 - `packaging/build_windows.ps1` independently builds `amy_service.exe`, freezes
   `LB_Omnichord.exe`, and places both beside the launcher in the final zip.
+
+The resulting zip is a portable, dependency-complete directory after
+extraction, not a single-file executable. That layout is intentional: the Qt
+frontend and AMY service remain separately replaceable processes. Users should
+extract the complete zip and double-click `LB_Omnichord.cmd`; invoking an
+unsigned `.ps1` through Explorer's **Run with PowerShell** can be rejected by
+the machine execution policy before the script can report its own error.
 
 The ready file contains only the generated pipe name. It is written below the
 per-user application directory after both AMY and the pipe exist, consumed and
@@ -87,7 +97,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Android | `origin/upstream/android-oboe` contains the separate `:amy` service, private socket and transport-only Java client, but it is not merged with active `feature/bus-mixer`. |
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
 | Native Windows frontend transport | The launcher supplies a unique Windows named-pipe name; `QLocalSocket` sends LF-framed requests without opening a network port. |
-| Windows package/release | CI builds an experimental self-contained zip with separate service/frontend executables. It performs an offline native AMY render test and starts the unpacked launcher, offscreen Qt/QML frontend and named-pipe service end to end; no physical validation yet for audio/MIDI. |
+| Windows package/release | CI builds an experimental portable zip with separate service/frontend executables and bundled dependencies. It performs an offline native AMY render test and starts the unpacked double-click launcher, offscreen Qt/QML frontend and named-pipe service end to end; no physical validation yet for pointer hardware, audio or MIDI. |
 | Windows MIDI input | Not implemented; the current reader is Linux ALSA raw MIDI only. |
 
 The Windows build script selects the newest supported Visual Studio CMake
@@ -150,12 +160,15 @@ Validation uses only files extracted from the final zip:
 1. `amy_service.exe --self-test` initializes native AMY without an audio device,
    sends real wire note-on/off commands, renders PCM blocks and requires
    non-silent output.
-2. `run_windows.ps1 -SmokeTest` starts the separate service with offline
-   rendering and one-client lifetime, then starts the frozen Qt executable with
-   its offscreen/software renderer.
+2. `LB_Omnichord.cmd -SmokeTest` exercises the same user-facing wrapper that is
+   double-clicked after extraction. It starts `run_windows.ps1` with a
+   process-only execution-policy bypass; the supervisor starts the separate
+   service with offline rendering and one-client lifetime, then the frozen Qt
+   executable with its offscreen/software renderer.
 3. The frontend must load the packaged QML/assets, connect through the native
-   Windows named pipe, publish initial state, play/release a test chord and exit
-   successfully.
+   Windows named pipe, publish initial state, send quick-tap and hold pointer
+   events through a real QML chord key, observe its active border and release
+   both manual chords successfully.
 4. The service must report both received wire commands and nonzero rendered PCM,
    exit after disconnect, and leave no process or ready file behind.
 
@@ -165,8 +178,10 @@ Frozen frontend assets are resolved from PyInstaller's bundle root
 skip the packaged `config`, `gui`, `instruments` and `music` directories.
 
 This smoke path deliberately does not substitute a mock transport or import AMY
-into the frontend. It verifies the packaged two-process boundary while avoiding
-an unreliable dependency on audio hardware in a hosted CI runner.
+into the frontend. It verifies the packaged two-process boundary and the QML
+pointer path while avoiding an unreliable dependency on audio hardware in a
+hosted CI runner. Synthesized Qt pointer events still do not prove a physical
+mouse, trackpad or touchscreen.
 
 The successful four-platform run above observed 6,140 nonzero samples in the
 service's standalone offline self-test. Its packaged end-to-end smoke delivered

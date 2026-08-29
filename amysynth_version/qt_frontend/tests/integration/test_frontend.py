@@ -311,16 +311,23 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("activeRootSemitone")), 9)
 
             # Keeping the same contact down promotes it to the established
-            # hold behavior after the quick-tap window.
+            # hold behavior after the quick-tap window. Releasing shortly
+            # after promotion must stop manual synth 3 immediately; it is not
+            # delayed or quantized to the rhythm lane.
             app.action("pressChord", 0, 0)
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
-            time.sleep(0.85)
+            time.sleep(0.25)
             self.assertEqual(int(app.query("rhythmChordActivity")), 0)
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
+            release_start = app.bridge.count()
             app.action("releaseChord", 0, 0)
-            app.bridge.wait_idle(timeout=3.0)
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            app.bridge.wait_for_lines(
+                ["l0i3Z"],
+                start=release_start,
+                timeout=0.3,
+            )
 
             # Keeping the gate off must not erase the remembered identity.
             self.assertEqual(int(app.query("activeRowIndex")), 0)

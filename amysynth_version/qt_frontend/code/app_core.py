@@ -144,11 +144,9 @@ PRESET_COUNT = 18
 PRESET_DIRECTORY = OMNI_PRESET_DIR
 LAST_PRESET_FILE = "last_preset.json"
 
-# Chord-touch dropout filter, derived from the captured Pi touchscreen trace.
+# A contact becomes a hold after this tap window. Pointer-up always ends the
+# directly played manual voice immediately; it is never rhythm-quantized.
 CHORD_QUICK_TAP_MAX_MS = 160
-CHORD_INITIAL_RELEASE_GRACE_MS = 450
-CHORD_BOUNCE_RELEASE_GRACE_MS = 1300
-CHORD_STABLE_HOLD_MS = 800
 
 # Four visible activity states map onto the original five pattern levels.
 # State 4 selects the complete arrangement, including both the stylistic
@@ -1144,21 +1142,10 @@ class InstrumentBackend(QObject):
         self._promoted_chords: set[tuple[int, int]] = set()
         self._chord_activity_hold_override = False
 
-        self._chord_press_started: dict[
-            tuple[int, int],
-            float,
-        ] = {}
-        self._pending_chord_releases: dict[
-            tuple[int, int],
-            QTimer,
-        ] = {}
         self._pending_chord_promotions: dict[
             tuple[int, int],
             QTimer,
         ] = {}
-        self._chord_bounce_mode: set[
-            tuple[int, int]
-        ] = set()
 
         self._ensure_preset_storage()
         self._load_startup_preset()
@@ -1234,22 +1221,10 @@ class InstrumentBackend(QObject):
             "rhythm_running": (
                 self._rhythm_running
             ),
-            "pending_release": [
-                list(key)
-                for key in sorted(
-                    self._pending_chord_releases
-                )
-            ],
             "pending_promotion": [
                 list(key)
                 for key in sorted(
                     self._pending_chord_promotions
-                )
-            ],
-            "bounce_mode": [
-                list(key)
-                for key in sorted(
-                    self._chord_bounce_mode
                 )
             ],
         }
@@ -2931,7 +2906,7 @@ class InstrumentBackend(QObject):
         self._rhythm_running = False
         self._running_tempo = None
         self._bass_running = False
-        self._clear_touch_dropout_state()
+        self._clear_chord_contact_state()
 
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
@@ -3367,23 +3342,14 @@ class InstrumentBackend(QObject):
         if publish:
             self._send_rhythm_chord_enabled()
 
-    def _clear_touch_dropout_state(self) -> None:
+    def _clear_chord_contact_state(self) -> None:
         for timer in list(
             self._pending_chord_promotions.values()
         ):
             timer.stop()
             timer.deleteLater()
 
-        for timer in list(
-            self._pending_chord_releases.values()
-        ):
-            timer.stop()
-            timer.deleteLater()
-
         self._pending_chord_promotions.clear()
-        self._pending_chord_releases.clear()
-        self._chord_press_started.clear()
-        self._chord_bounce_mode.clear()
 
     def _cancel_pending_chord_promotion(
         self,
@@ -3421,48 +3387,10 @@ class InstrumentBackend(QObject):
         self._pending_chord_promotions[key] = timer
         timer.start()
 
-    def _cancel_pending_chord_release(
-        self,
-        key: tuple[int, int],
-    ) -> bool:
-        timer = self._pending_chord_releases.pop(
-            key,
-            None,
-        )
-
-        if timer is None:
-            return False
-
-        timer.stop()
-        timer.deleteLater()
-
-        self._chord_bounce_mode.add(key)
-        self._chord_press_started[key] = (
-            time.monotonic()
-        )
-
-        self._debug(
-            "touch_dropout_recovered",
-            row=key[0],
-            root=key[1],
-            **self._debug_chord_state(),
-        )
-        return True
-
     def _finalize_chord_release(
         self,
         key: tuple[int, int],
-        reason: str,
     ) -> None:
-        timer = self._pending_chord_releases.pop(
-            key,
-            None,
-        )
-
-        if timer is not None:
-            timer.stop()
-            timer.deleteLater()
-
         if key not in self._pressed_chords:
             return
 
@@ -3472,7 +3400,6 @@ class InstrumentBackend(QObject):
             "chord_release_finalized",
             row=row_index,
             root=root_semitone,
-            reason=reason,
             **self._debug_chord_state(),
         )
 
@@ -3484,13 +3411,6 @@ class InstrumentBackend(QObject):
         self._cancel_pending_chord_promotion(key)
         self._pressed_chords.discard(key)
         self._promoted_chords.discard(key)
-        self._chord_press_started.pop(
-            key,
-            None,
-        )
-        self._chord_bounce_mode.discard(
-            key
-        )
 
         try:
             self._pressed_chord_order.remove(key)
@@ -3531,64 +3451,11 @@ class InstrumentBackend(QObject):
             **self._debug_chord_state(),
         )
 
-    def _schedule_chord_release(
-        self,
-        key: tuple[int, int],
-        delay_ms: int,
-        reason: str,
-    ) -> None:
-        old_timer = (
-            self._pending_chord_releases.pop(
-                key,
-                None,
-            )
-        )
-
-        if old_timer is not None:
-            old_timer.stop()
-            old_timer.deleteLater()
-
-        timer = QTimer(self)
-        timer.setSingleShot(True)
-        timer.setInterval(int(delay_ms))
-
-        def finish_release() -> None:
-            if (
-                self._pending_chord_releases.get(
-                    key
-                )
-                is not timer
-            ):
-                return
-
-            self._finalize_chord_release(
-                key,
-                reason=reason,
-            )
-
-        timer.timeout.connect(
-            finish_release
-        )
-        self._pending_chord_releases[
-            key
-        ] = timer
-
-        self._debug(
-            "chord_release_delayed",
-            row=key[0],
-            root=key[1],
-            delay_ms=int(delay_ms),
-            reason=reason,
-            **self._debug_chord_state(),
-        )
-
-        timer.start()
-
     def _release_all_pressed_chords(self) -> None:
         # stop_all is intentionally unconditional. It also clears a voice
         # left behind by a previous GUI run or an interrupted touch sequence.
         self._send_manual_chord("stop_all")
-        self._clear_touch_dropout_state()
+        self._clear_chord_contact_state()
 
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
@@ -3616,18 +3483,6 @@ class InstrumentBackend(QObject):
             **self._debug_chord_state(),
         )
 
-        if self._cancel_pending_chord_release(
-            key
-        ):
-            self._schedule_chord_hold_promotion(key)
-            self._debug(
-                "pressChord_dropout_resume",
-                row=row_index,
-                root=root_semitone,
-                **self._debug_chord_state(),
-            )
-            return
-
         if key in self._pressed_chords:
             self._debug(
                 "pressChord_duplicate_ignored",
@@ -3639,9 +3494,6 @@ class InstrumentBackend(QObject):
 
         self._pressed_chords.add(key)
         self._pressed_chord_order.append(key)
-        self._chord_press_started[key] = (
-            time.monotonic()
-        )
 
         # Every chord touch immediately selects the active chord used by the
         # manual synth, strum, bass and automatic chord lane. A quick tap may
@@ -3720,55 +3572,11 @@ class InstrumentBackend(QObject):
             )
             return
 
-        # Finger-up makes this a tap if promotion has not already fired. Do
-        # not let the dropout-release grace period promote it afterwards.
+        # A real pointer-up owns the lifetime of manual synth 3. Stop it now,
+        # independently of rhythm phase, then restore the automatic lane if
+        # this contact had already been promoted to a hold.
         self._cancel_pending_chord_promotion(key)
-
-        started = self._chord_press_started.get(
-            key,
-            time.monotonic(),
-        )
-        held_ms = (
-            time.monotonic() - started
-        ) * 1000.0
-
-        # A normal intentional tap should remain responsive. In the captured
-        # failure traces, the *first* false release happened only after the
-        # finger had been down for roughly 240-340 ms, so releases in this
-        # short-tap region are finalized immediately.
-        if (
-            key not in self._chord_bounce_mode
-            and held_ms <= CHORD_QUICK_TAP_MAX_MS
-        ):
-            self._finalize_chord_release(
-                key,
-                reason="quick_tap_release",
-            )
-            return
-
-        if held_ms >= CHORD_STABLE_HOLD_MS:
-            self._finalize_chord_release(
-                key,
-                reason="stable_physical_release",
-            )
-            return
-
-        if key in self._chord_bounce_mode:
-            self._schedule_chord_release(
-                key,
-                delay_ms=(
-                    CHORD_BOUNCE_RELEASE_GRACE_MS
-                ),
-                reason="bounce_mode_timeout",
-            )
-        else:
-            self._schedule_chord_release(
-                key,
-                delay_ms=(
-                    CHORD_INITIAL_RELEASE_GRACE_MS
-                ),
-                reason="initial_release_timeout",
-            )
+        self._finalize_chord_release(key)
 
     @Slot(int, int)
     def selectChord(
@@ -4229,7 +4037,7 @@ class InstrumentBackend(QObject):
         self._active_row = -1
         self._active_root_semitone = -1
         self._strum_last_index = None
-        self._clear_touch_dropout_state()
+        self._clear_chord_contact_state()
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
@@ -4925,25 +4733,41 @@ def main() -> int:
             amy_client.close()
             return 2
 
-        # Exercise QML startup, backend state publication, the packaged socket
-        # transport and actual note generation.  The Windows CI service renders
-        # these wire commands offline, so this remains deterministic without an
-        # audio device while production continues to use native miniaudio.
-        def smoke_press() -> None:
-            backend.pressChord(0, 0)
-            smoke_checkpoint("test-chord-pressed")
+        # Exercise QML startup, backend state publication, real Qt pointer
+        # delivery, tap/hold behavior, the packaged transport and actual note
+        # generation. The Windows service renders these commands offline, so
+        # this remains deterministic without an audio device.
+        window = engine.rootObjects()[0]
 
-        def smoke_release() -> None:
-            backend.releaseChord(0, 0)
-            smoke_checkpoint("test-chord-released")
+        def smoke_input() -> None:
+            try:
+                from package_smoke import exercise_chord_input
 
-        def smoke_quit() -> None:
+                exercise_chord_input(
+                    app,
+                    window,
+                    backend,
+                    smoke_checkpoint,
+                    quick_tap_ms=CHORD_QUICK_TAP_MAX_MS,
+                )
+            except Exception as exc:
+                message = (
+                    "Package chord-input smoke failed: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+                print(message, file=sys.stderr, flush=True)
+                smoke_checkpoint(
+                    f"chord-input-failed {type(exc).__name__}: {exc}"
+                )
+                app.exit(3)
+                return
+
             smoke_checkpoint("quit-requested")
             app.quit()
 
-        QTimer.singleShot(0, smoke_press)
-        QTimer.singleShot(250, smoke_release)
-        QTimer.singleShot(750, smoke_quit)
+        # Let the first complete scene-graph frame settle before synthesizing
+        # input through the QQuickWindow.
+        QTimer.singleShot(150, smoke_input)
 
     # Make teardown order explicit. QML must be destroyed while the Python
     # backend QObject is still alive; otherwise its context property becomes

@@ -17,15 +17,17 @@ separate AMY service / ESP32-P4
 ```
 
 The Qt application must not import AMY, call AMY synthesis APIs, or manage the
-AMY service lifetime. It only produces AMY wire messages. On Linux those
-messages cross an `AF_UNIX` `SOCK_SEQPACKET` socket; on macOS, which does not
-provide Unix-domain `SOCK_SEQPACKET`, they use a Unix `SOCK_STREAM` with one
-newline-framed AMY request per record. Native Windows uses a private named pipe
-between Qt `QLocalSocket` and the native C AMY service. Windows itself supports
-AF_UNIX, but the official CPython Windows build does not expose it; the Qt API
-avoids a custom Python socket extension and opens no network listener. Android
-uses the app-private `amy.sock`; ESP32-P4 uses serial. Framing is a transport
-concern and does not expose the AMY Python or C API to Qt.
+AMY service lifetime. It only produces AMY wire messages. Unix local IPC
+prefers an `AF_UNIX` `SOCK_SEQPACKET` endpoint and falls back by capability to
+a `SOCK_STREAM` endpoint with one newline-framed AMY request per record. This
+currently selects packet framing on Linux and stream framing on macOS without
+branching application behavior on an operating-system name. Native Windows
+uses a private named pipe between Qt `QLocalSocket` and the native C AMY
+service. Windows itself supports AF_UNIX, but the official CPython Windows
+build does not expose it; the Qt API avoids a custom Python socket extension
+and opens no network listener. Android uses the app-private `amy.sock`;
+ESP32-P4 uses serial. Framing is a transport concern and does not expose the
+AMY Python or C API to Qt.
 
 The Linux convenience launcher owns both child processes only as a development
 shell wrapper. Released Linux and Raspberry Pi AppImages and the macOS app

@@ -106,6 +106,13 @@ state exists independently of the active chord and is available before a chord
 has been selected. Selecting, pressing or releasing a chord must never change
 that state.
 
+Each musical chord key uses one Qt pointer-handler path for mouse, touchscreen
+and pen input. The handler keeps tracking the physical point through release;
+platform-specific raw trackpad touch must not replace this path. Pointer-down
+starts and selects the chord. Pointer-up immediately releases the directly
+played manual voice, independently of rhythm timing, and the selected chord
+keeps its blue active border after a quick tap.
+
 The RST/UP/DWN block left of the first two chord rows ends at the bottom of the
 second row. Its three controls are distributed evenly over that complete
 height.
