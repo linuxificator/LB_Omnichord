@@ -1,9 +1,10 @@
 # Codex Session Handoff
 
-Updated 2026-08-28 for the merge of `refactoring/ui_changes` into `main`.
-Inspect `git status`, the current branch and the latest GitHub Actions run
-before continuing; the release build triggered by this merge may still be in
-progress when the next session begins.
+Updated 2026-08-30 after the chord-arpeggio feature was merged and released.
+The intended continuation branch is `feature/drum_fills`, created from clean
+`main` at merge commit `387776cffad7394c1fcf6add1ced5d3e69a8d382` and release
+tag `R20260829T230734`. No drum-fill behavior or implementation has been
+specified or added yet; do not infer it from the branch name.
 
 This file records operational state and completed work from the AMY/Qt UI,
 performance, MIDI-control and native-Windows sessions. It supplements, but does
@@ -23,11 +24,26 @@ all of:
 
 Do not use this handoff as a replacement for those contracts.
 
-At the merge audit, `origin/main` contained no commit missing from
-`refactoring/ui_changes`. The only other remote branch not merged into main was
-`origin/codex_info`: it is an old, heavily diverged documentation line and was
-intentionally not merged. Current design contracts plus this automatically read
-handoff supersede it.
+At this handoff, local `main`, `origin/main` and `R20260829T230734` all resolve
+to `387776c`. The feature commit `b2a0934` remains available on
+`feature/chord_arpeggio` and `origin/feature/chord_arpeggio`. The old,
+heavily-diverged `origin/codex_info` documentation line remains intentionally
+unmerged; current design contracts plus this automatically read handoff
+supersede it.
+
+## Required branch and release workflow
+
+- Never implement directly on `main`. Start or continue an appropriately named
+  feature/fix branch and keep `main` clean while the user performs physical
+  checks.
+- Do not merge or start a release merely because automated tests pass. Commit,
+  push and merge only when the user explicitly asks for those operations.
+- Every push to `main` intentionally starts `.github/workflows/desktop-release.yml`.
+  Follow that run through all six regression jobs, four package validations and
+  release publication. If it fails, diagnose it and repair it on a new fix
+  branch; do not make an unreviewed direct-on-main repair.
+- The current `feature/drum_fills` branch is the prepared workspace for the
+  next task. Preserve it until the user supplies the drum-fill requirements.
 
 ## Current architectural state
 
@@ -48,8 +64,9 @@ handoff supersede it.
 
 ## Current musical/UI baseline
 
-The 2026-08-28 merge contains the UI/performance series beginning at `6f006ee`
-and the subsequent LDR audit. Treat these details as current behavior, not a
+The 2026-08-30 release contains the UI/performance series beginning at
+`6f006ee`, the LDR audit, portable Qt gesture work, bass riffs and chord
+arpeggios through `387776c`. Treat these details as current behavior, not a
 future plan.
 
 ### Shared visual layout
@@ -68,8 +85,10 @@ future plan.
 - Tuning is at the top. Brown independent master controls sit between tuning and
   `PNC!`; `PNC!` and `FSC`/`ESC` align to the reverb panel's right edge.
 - The chord-row RST/UP/DWN block ends at row two and distributes its controls
-  evenly. Percussion, chord and bass activity each show four equal, top-aligned
-  buttons; chord activity has no user-selectable zero.
+  evenly. Percussion activity keeps four buttons. Bass activity has five equal
+  buttons (`1..4`, `R`). Chord activity fills the yellow bar with two rows of
+  five buttons: upper `1..4` plus independent `A`, and lower `/1..4` plus
+  independent `U/D`. Chord activity has no user-selectable zero.
 
 The public images are real 1920x850 Qt renders at
 `amysynth_version/qt_frontend/screenshots/omni.png` and `midi.png`. The root
@@ -94,24 +113,67 @@ three representative CC knobs in the grey bar.
 
 ### Chords, sequencer and live presets
 
-- A quick chord tap starts/stops manual synth 3 and selects the new active chord
-  for manual play, strum, bass and automatic-chord pitches. It never closes or
-  drains the automatic synth-4 lane.
-- A contact held beyond the 160 ms tap window is promoted to manual takeover.
-  Promotion clears only future synth-4 note-ons while retaining the sequenced
-  synth-4 all-off tags, so the currently sounding accompaniment reaches its own
-  rhythmic note-off instead of hanging or being cut short. Drums, bass,
-  transport and timebase continue.
+- Chord-button input uses Qt/QML gesture semantics. `TapHandler` and Qt's
+  platform long-press style hint classify tap/hold; Omnichord code contains no
+  second gesture timer and no mouse/stylus/OS-specific classification. The same
+  rule applies generally: use Qt Quick controls/handlers for press, release,
+  tap, hold, mouse, touch and future pointer devices.
+- Pointer-down starts manual synth 3 immediately and pointer-up stops it
+  immediately. A quick tap also selects the new active chord for strum, bass
+  and automatic-chord pitches. It never closes or drains the automatic synth-4
+  lane.
+- Qt long-press promotion performs manual takeover. It clears only future
+  synth-4 note-ons while retaining sequenced whole-chord and note-specific
+  arpeggio offs, so sounding accompaniment reaches its rhythmic release.
+  Drums, bass, transport and timebase continue.
 - `CHORD ON/OFF` owns only automatic synth 4 and keeps state independent of
   chord selection. OFF performs the same deferred-release drain; ON reinstalls
-  the lane and never triggers a one-shot manual chord.
+  the lane and never triggers a one-shot manual chord. Its label reports status:
+  `CHORD ON` means scheduled chords are enabled and uses the selected activity
+  color; `CHORD OFF` uses the unselected activity color.
+- Retained repeating arpeggio offs become intentionally unmatched after their
+  matching onsets are removed. Automatic chord synth 4 alone receives AMY
+  `SYNTH_FLAGS_NO_NOTE_WARNINGS` (`if8`), atomically with every ROM or physical
+  allocation. Other synths retain normal lifecycle diagnostics.
 - While rhythm is running, preset switches preserve live tempo, percussion,
-  chord and bass activity, bass voicing, and the octave of the active chord row.
-  Inactive chord-row octaves may load from the preset. When rhythm is stopped,
-  all those stored values load normally.
+  chord and bass activity, chord-arpeggio mode/rate/direction, bass voicing, a
+  compatible playing bass riff, and the octave of the active chord row. The
+  same set survives a live rhythm-type change. Inactive chord-row octaves may
+  load from the preset. When rhythm is stopped, all stored values load normally.
 - Physical chord-button ownership, active row/root and chord-gate state survive
   a preset switch. A held chord converges to the destination voicing/timbre but
   remains held and releasable by its original button-up.
+
+### Bass riffs
+
+- Bass activity `R` switches the bass voicing slider to a discrete riff
+  selector. Levels `1..4` retain the original generated bass behavior.
+- The runtime catalogue is
+  `amysynth_version/qt_frontend/music/omnichord_bass_riffs.json`, loaded and
+  validated through `code/bass_riffs.py`. Application code has no runtime
+  dependency on the design directory.
+- Catalogue notes are normalized to C2 and transpose live with the active
+  chord. Riff PPQ, duration and velocity remain unchanged.
+- After a rhythm/chord-set change, a compatible currently playing riff is kept
+  by stable ID and the selector follows its new position. Otherwise the
+  destination preset selector or application default wins.
+- Riff changes replace only bass sequencer tags. The complete catalogue fits
+  the reserved bass range and is covered by unit and real-serial tests.
+
+### Chord arpeggios
+
+- `A` is independent of upper chord activity `1..4`. With `A` off, whole-chord
+  scheduling is unchanged and lower `/1..4` plus `U/D` have no musical effect.
+- With `A` on, every existing chord onset launches every note of the active
+  2–7-note chord. `/1..4` means one through four arpeggio notes per quarter-note
+  beat; `U` is low-to-high and `D` high-to-low.
+- Arpeggios and note gates wrap circularly across the repeating rhythm period.
+  A later onset may overlap an unfinished arpeggio. Exact repeated tick/body
+  sets may be compacted onto a shorter-period AMY tag only when expansion is
+  mathematically identical.
+- Arpeggio edits replace only automatic chord tags 112..251 and never stop or
+  reset transport. The exhaustive audit covers every rhythm, activity, rate
+  and supported chord size; the worst current case uses 84 of 140 chord tags.
 
 ### MIDI feedback and output ownership
 
@@ -230,34 +292,31 @@ and does not publish a release. On `main`, all six frontend suites gate Linux,
 Raspberry Pi, macOS and Windows jobs, and one release is published only after
 all four packages pass.
 
-GitHub Actions run `33021825480`, from main commit
-`33455020101744ffa9c360b1a3cbf04dabd3009d`, completed successfully on
-2026-08-26:
+The latest GitHub Actions run is `33280227230`, from main merge commit
+`387776cffad7394c1fcf6add1ced5d3e69a8d382`. It completed successfully on
+2026-08-30 local time:
 
 - all six frontend suite jobs passed;
 - Linux x86_64 AppImage passed;
 - Raspberry Pi aarch64 AppImage passed;
 - macOS arm64 DMG passed;
 - native Windows x86_64 zip passed;
-- release publication passed.
+- release publication passed and targeted the tested merge commit.
 
-The Windows Server 2025 job extracted only the final zip and then observed:
+The resulting four-platform release is `R20260829T230734`. It contains:
 
-- `amy_service.exe --self-test`: 6,140 nonzero rendered samples;
-- packaged launcher smoke: 209 real wire commands and 13,138 nonzero rendered
-  samples;
-- offscreen/software Qt/QML startup, packaged asset loading, initial-state
-  publication, test-chord note-on/release, named-pipe delivery and clean Qt
-  event-loop exit;
-- no leaked `amy_service.exe` and no leftover ready file.
-
-The resulting four-platform release is `R20260826T230234`. It contains:
-
-- `LB_Omnichord.R20260826230234.Linux-x86_64.AppImage`;
-- `LB_Omnichord.R20260826230234.RaspberryPi-aarch64.AppImage`;
-- `LB_Omnichord.R20260826230234.macOS-arm64.dmg`;
-- `LB_Omnichord.R20260826230234.Windows-x86_64.zip`;
+- `LB_Omnichord.R20260829230734.Linux-x86_64.AppImage`;
+- `LB_Omnichord.R20260829230734.RaspberryPi-aarch64.AppImage`;
+- `LB_Omnichord.R20260829230734.macOS-arm64.dmg`;
+- `LB_Omnichord.R20260829230734.Windows-x86_64.zip`;
 - one matching SHA-256 file per package.
+
+The release is published at
+`https://github.com/linuxificator/LB_Omnichord/releases/tag/R20260829T230734`.
+The run is at
+`https://github.com/linuxificator/LB_Omnichord/actions/runs/33280227230`.
+Its only annotations were GitHub's non-failing Node.js 20 deprecation warnings
+for official checkout/setup/upload/download actions being forced onto Node 24.
 
 ### What Windows CI does not prove
 
@@ -287,22 +346,27 @@ service/wire boundary when those lines are eventually reconciled.
 
 ## Verification already completed
 
-- The complete 2026-08-28 local matrix passed 147 individual tests: 106 unit,
-  13 frontend, 10 serial/program, 13 preset, 3 native-control and 2
-  native-rhythm tests. This includes the exhaustive 36-chord LDR audit and the
-  screenshot/README contract.
-- The screenshot helper completed twice consecutively with byte-identical
-  1920x850 results. The final SHA-256 values at handoff were
-  `ab071b66e33e8cfd5f8e5105e85616f53df9b6bfac4916a8acc80e557a60c04c`
+- The complete 2026-08-30 local matrix passed 166 individual tests: 119 unit,
+  15 frontend, 13 serial/program, 14 preset, 3 native-control and 2
+  native-rhythm tests. This includes exhaustive chord-arpeggio tag expansion,
+  bass-riff validation, the 36-chord LDR audit and screenshot/README contracts.
+- Real-serial tests prove seven-note dominant-13 arpeggios in both directions,
+  lane isolation, ROM and physical synth-4 `if8` policy, live riff
+  transposition and unchanged transport/timebase. Native AMY state readback
+  confirms `if8` exists on synth 4 and not manual synth 3.
+- The current public screenshots are 1920x850. Their SHA-256 values are
+  `57a39b64db137eb54f395294cc84a24a8e004cd9668bc8ead2ff92255eb53f5b`
   for OMNI and
   `e792e63f5c223526179b9768ff27a4db24433ce5063b91bc82808e81d8048df1`
   for MIDI.
-- `3345502` made the preset integration test wait deterministically for live
-  preset continuation instead of racing the frontend.
-- GitHub Actions run `33021825480` independently passed each of the six suites
-  and all release jobs as described above.
-- `git diff --check` and Python compilation were run during the implementation
-  work before its commits.
+- Feature commit `b2a0934` and merge commit `387776c` contain the complete
+  chord-arpeggio work and its unmatched-note-off diagnostic fix. The preceding
+  release line also includes `3199032` (Qt gesture delegation), `01b7c6a`
+  (rainbow label centering), `a48b4be` (status-oriented chord gate), `f22247b`
+  (bass riffs) and `b519182` (live rhythm-control preservation).
+- GitHub Actions run `33280227230` independently passed every suite, built and
+  validated all four packages, and published `R20260829T230734`.
+- `git diff --check` passed before the feature commit and merge.
 
 The standard complete local command, from
 `amysynth_version/qt_frontend`, is:
@@ -319,14 +383,17 @@ four-platform release.
 
 ## Remaining work / safe next steps
 
-1. Physically test the released Windows zip on a recent Windows 10/11 x64 host:
+1. Continue only on `feature/drum_fills`. Await the user's exact musical/UI and
+   preset behavior for drum fills; no behavior is authorized by the branch
+   name alone. Route the new scope through `design/README.md` before editing.
+2. Physically test the released Windows zip on a recent Windows 10/11 x64 host:
    UI, native audio, shutdown and representative heavy patches/rhythms.
-2. Implement a native Windows MIDI input adapter behind the existing MIDI
+3. Implement a native Windows MIDI input adapter behind the existing MIDI
    callback boundary, without changing CC-learning/application semantics.
-3. Measure and tune a WASAPI-first realtime audio profile on physical hardware.
-4. Add an explicit Windows tiny-bank identity regression if AMY build inputs or
+4. Measure and tune a WASAPI-first realtime audio profile on physical hardware.
+5. Add an explicit Windows tiny-bank identity regression if AMY build inputs or
    the pinned revision change; the current smoke checks non-silence only.
-5. Reconcile relevant Android service work with the active AMY bus-mixer line
+6. Reconcile relevant Android service work with the active AMY bus-mixer line
    only when that fork task is explicitly in scope.
 
 WSL2/WSLg documentation remains an optional way to experiment with the Linux
