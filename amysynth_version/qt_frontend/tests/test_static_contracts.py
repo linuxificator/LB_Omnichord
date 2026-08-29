@@ -220,7 +220,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("id: midiLearnLed", rainbow)
         self.assertIn("visible: root.midiLearnActive", rainbow)
         self.assertIn("modeLabel.contentWidth", rainbow)
-        self.assertIn("root.width - root.extensionWidth", rainbow)
+        self.assertIn("width: root.width", rainbow)
         self.assertIn("width: 12", rainbow)
         self.assertIn('color: "#f22b2b"', rainbow)
         self.assertIn("running: root.midiLearnActive", rainbow)
@@ -710,13 +710,11 @@ class StaticContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("font.pixelSize: height * 0.55", qml)
-        self.assertIn(
-            "anchors.horizontalCenterOffset: root.extensionWidth / 2",
-            qml,
-        )
+        self.assertNotIn("anchors.horizontalCenterOffset", qml)
+        self.assertIn("width: root.width", qml)
         self.assertIn("horizontalAlignment: Text.AlignHCenter", qml)
         self.assertIn("verticalAlignment: Text.AlignVCenter", qml)
-        self.assertIn("readonly property real labelWidth:", qml)
+        self.assertNotIn("readonly property real labelWidth:", qml)
         self.assertNotIn("MouseArea {", qml)
 
     def test_hidden_preset_binding_leds_are_wired_to_location_feedback(self) -> None:

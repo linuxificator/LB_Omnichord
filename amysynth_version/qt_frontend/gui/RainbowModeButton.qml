@@ -10,8 +10,6 @@ Button {
     property var midiControlRouter: null
     property string bindingLocationScreen: ""
     property bool midiLearnActive: false
-    readonly property real labelWidth:
-        Math.max(0, root.width - root.extensionWidth)
 
     padding: 0
     leftPadding: 0
@@ -29,10 +27,9 @@ Button {
 
         Text {
             id: modeLabel
-            width: root.labelWidth
+            width: root.width
             height: root.height
             anchors.centerIn: parent
-            anchors.horizontalCenterOffset: root.extensionWidth / 2
             text: root.text
             color: "#ffffff"
             font: root.font
