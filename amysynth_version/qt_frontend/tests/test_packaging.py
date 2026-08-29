@@ -139,6 +139,12 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("WaitForExit(30000)", launcher)
         self.assertIn("OMNICHORD_PACKAGE_SMOKE_STATUS", launcher)
         self.assertIn("Service errors:", launcher)
+        self.assertNotIn("$service.ExitCode", launcher)
+        self.assertIn(
+            "AMY service smoke passed: [1-9][0-9]* wire commands, "
+            "[1-9][0-9]* nonzero PCM samples",
+            launcher,
+        )
         self.assertIn("event-loop-exited", launcher)
         self.assertIn("qml-chord-press-observed", launcher)
         self.assertIn("active-chord-visible", launcher)

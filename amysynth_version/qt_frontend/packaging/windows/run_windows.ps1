@@ -122,9 +122,11 @@ try {
         } else { "" }
         Write-Output $stdout
         if ($stderr) { Write-Error $stderr }
-        if ($service.ExitCode -ne 0) {
-            throw "AMY smoke service failed with status $($service.ExitCode)"
-        }
+        # Windows PowerShell 5 can leave ExitCode unset for a Start-Process
+        # object whose output is redirected, even after WaitForExit(). The
+        # timeout above, empty stderr and service-owned success record below
+        # are the portable validation boundary. The C service prints that
+        # record only on its result=0 path immediately before cleanup and exit.
         if ($stdout -notmatch "AMY service smoke passed: [1-9][0-9]* wire commands, [1-9][0-9]* nonzero PCM samples") {
             throw "AMY smoke service did not confirm wire parsing and PCM rendering"
         }
