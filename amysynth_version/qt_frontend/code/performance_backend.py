@@ -6,6 +6,7 @@ from typing import Any
 from PySide6.QtCore import Property, Signal, Slot
 
 import app_core
+from bass_riffs import BassRiffDefinition, transpose_riff_events
 from performance_logic import (
     clamp_bass_voicing_shift,
     roll_bass_voicing,
@@ -16,6 +17,7 @@ from performance_logic import (
 CHORD_GATE_ON = 1
 CHORD_GATE_OFF = 2
 BASS_VOICING_LIMIT = 6
+BASS_RIFF_ACTIVITY = 5
 REVERB_LEVEL_MAX = app_core.REVERB_LEVEL_MAX
 
 
@@ -36,6 +38,9 @@ class InstrumentBackend(app_core.InstrumentBackend):
         # fields must exist before super().__init__() starts.
         self._chord_gate_state = CHORD_GATE_OFF
         self._bass_voicing_shift = 0
+        self._bass_riff_selector = 1
+        self._active_bass_riff_id: str | None = None
+        self._bass_riff_context: tuple[str, str] | None = None
         super().__init__(*args, **kwargs)
 
     def _reset_synth_role_to_preset(
@@ -96,6 +101,174 @@ class InstrumentBackend(app_core.InstrumentBackend):
     def bassVoicingShift(self) -> int:
         return self._bass_voicing_shift
 
+    @Property(bool, notify=bassVoicingChanged)
+    def bassRiffMode(self) -> bool:
+        return self.rhythmBassActivity == BASS_RIFF_ACTIVITY
+
+    @Property(int, notify=bassVoicingChanged)
+    def bassRiffSelector(self) -> int:
+        return self._bass_riff_selector
+
+    @Property(int, notify=bassVoicingChanged)
+    def bassRiffSelectorMaximum(self) -> int:
+        candidates = self._available_bass_riffs()
+        if candidates:
+            return len(candidates)
+        return max(1, self._bass_riff_selector)
+
+    @Property(str, notify=bassVoicingChanged)
+    def selectedBassRiffId(self) -> str:
+        return self._active_bass_riff_id or ""
+
+    @Property(str, notify=bassVoicingChanged)
+    def selectedBassRiffName(self) -> str:
+        riff = self._bass_riffs.by_id(self._active_bass_riff_id)
+        return riff.name if riff is not None else ""
+
+    def _current_bass_riff_context(self) -> tuple[str, str] | None:
+        if self._active_row < 0 or self._active_root_semitone < 0:
+            return None
+        chord = self._chords[self._row_chord_indexes[self._active_row]]
+        return self._selected_rhythm().key, chord.suffix
+
+    def _available_bass_riffs(self) -> tuple[BassRiffDefinition, ...]:
+        context = self._current_bass_riff_context()
+        if context is None:
+            return ()
+        return self._bass_riffs.candidates(*context)
+
+    def _default_bass_riff_selector(self) -> int:
+        rhythm = self._defaults.get("rhythm", {})
+        if not isinstance(rhythm, dict):
+            return 1
+        return max(1, int(rhythm.get("bass_riff_selector", 1)))
+
+    def _preset_bass_riff_selector(
+        self,
+        data: dict[str, Any] | None = None,
+    ) -> int:
+        source = self._preset_reference_data if data is None else data
+        rhythm = source.get("rhythm", {})
+        if not isinstance(rhythm, dict):
+            return self._default_bass_riff_selector()
+        return max(
+            1,
+            int(
+                rhythm.get(
+                    "bass_riff_selector",
+                    self._default_bass_riff_selector(),
+                )
+            ),
+        )
+
+    def _bass_riff_is_playing(self) -> bool:
+        return bool(
+            self._rhythm_running
+            and self._bass_running
+            and self.bassRiffMode
+            and self._active_bass_riff_id
+        )
+
+    def _choose_bass_riff(
+        self,
+        *,
+        fallback_selector: int,
+        preserve_riff_id: str | None = None,
+    ) -> bool:
+        previous = (
+            self._bass_riff_selector,
+            self._active_bass_riff_id,
+            self._bass_riff_context,
+        )
+        candidates = self._available_bass_riffs()
+        self._bass_riff_context = self._current_bass_riff_context()
+        selected_index: int | None = None
+        if preserve_riff_id:
+            selected_index = next(
+                (
+                    index
+                    for index, riff in enumerate(candidates)
+                    if riff.riff_id == preserve_riff_id
+                ),
+                None,
+            )
+        if selected_index is None and candidates:
+            selected_index = max(
+                0,
+                min(len(candidates) - 1, int(fallback_selector) - 1),
+            )
+        if selected_index is None:
+            self._bass_riff_selector = max(1, int(fallback_selector))
+            self._active_bass_riff_id = None
+        else:
+            self._bass_riff_selector = selected_index + 1
+            self._active_bass_riff_id = candidates[selected_index].riff_id
+        return previous != (
+            self._bass_riff_selector,
+            self._active_bass_riff_id,
+            self._bass_riff_context,
+        )
+
+    def _reconcile_bass_riff_context(
+        self,
+        *,
+        fallback_selector: int | None = None,
+        preserve_riff_id: str | None = None,
+        force: bool = False,
+    ) -> bool:
+        context = self._current_bass_riff_context()
+        if not force and context == self._bass_riff_context:
+            return False
+        changed = self._choose_bass_riff(
+            fallback_selector=(
+                self._preset_bass_riff_selector()
+                if fallback_selector is None
+                else fallback_selector
+            ),
+            preserve_riff_id=preserve_riff_id,
+        )
+        if changed:
+            self.bassVoicingChanged.emit()
+        return changed
+
+    def _current_bass_riff_payload(self) -> dict[str, Any] | None:
+        if not self.bassRiffMode:
+            return None
+        if self._current_bass_riff_context() != self._bass_riff_context:
+            self._reconcile_bass_riff_context(
+                preserve_riff_id=(
+                    self._active_bass_riff_id
+                    if self._bass_riff_is_playing()
+                    else None
+                )
+            )
+        riff = self._bass_riffs.by_id(self._active_bass_riff_id)
+        if riff is None or self._active_root_semitone < 0:
+            return None
+        events = transpose_riff_events(riff, self._active_root_semitone)
+        return {
+            "id": riff.riff_id,
+            "index": riff.index,
+            "name": riff.name,
+            "ppq": riff.ppq,
+            "phrase_ticks": riff.phrase_ticks,
+            "events": [
+                {
+                    **event,
+                    "note": self._tuned_note(
+                        event["note"], self._active_root_semitone
+                    ),
+                }
+                for event in events
+            ],
+        }
+
+    def _rhythm_payload(self) -> dict[str, Any]:
+        payload = super()._rhythm_payload()
+        payload["bass_mode"] = "riff" if self.bassRiffMode else "activity"
+        payload["bass_riff"] = self._current_bass_riff_payload()
+        return payload
+
     def _chord_gate_enabled(self) -> bool:
         return (
             self._chord_gate_state == CHORD_GATE_ON
@@ -132,6 +305,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
             ),
             "rhythm_running": bool(self._rhythm_running),
             "rhythm_chord_enabled": self._chord_gate_enabled(),
+            "bass_riff": self._current_bass_riff_payload(),
         }
         self._debug(
             "osc_chord_state",
@@ -192,6 +366,37 @@ class InstrumentBackend(app_core.InstrumentBackend):
             self._send_chord_state(play_now=False)
 
     @Slot(float)
+    def setBassRiffSelector(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "bass_riff_selector"}
+        ):
+            return
+        candidates = self._available_bass_riffs()
+        if not candidates:
+            return
+        selected = max(1, min(len(candidates), int(round(float(value)))))
+        riff = candidates[selected - 1]
+        if (
+            selected == self._bass_riff_selector
+            and riff.riff_id == self._active_bass_riff_id
+            and self._bass_riff_context == self._current_bass_riff_context()
+        ):
+            return
+        self._bass_riff_selector = selected
+        self._active_bass_riff_id = riff.riff_id
+        self._bass_riff_context = self._current_bass_riff_context()
+        self.bassVoicingChanged.emit()
+        if self.bassRiffMode:
+            self._send_rhythm_config()
+
+    @Slot(float)
+    def setRhythmBassActivity(self, value: float) -> None:
+        previous = self.rhythmBassActivity
+        super().setRhythmBassActivity(value)
+        if previous != self.rhythmBassActivity:
+            self.bassVoicingChanged.emit()
+
+    @Slot(float)
     def setReverbLevel(self, value: float) -> None:
         """Expose AMY reverb wet-return gain through 3.0."""
         if self._midi_control_blocks(
@@ -214,10 +419,19 @@ class InstrumentBackend(app_core.InstrumentBackend):
         previous_index = self._rhythm.selected_index
         if rhythm_index == previous_index:
             return
+        preserve_riff_id = (
+            self._active_bass_riff_id
+            if self._bass_riff_is_playing()
+            else None
+        )
         running_tempo = self._rhythm.tempo_by_rhythm[previous_index]
         self._rhythm.selected_index = rhythm_index
         if self._rhythm_running:
             self._rhythm.tempo_by_rhythm[rhythm_index] = running_tempo
+        self._reconcile_bass_riff_context(
+            preserve_riff_id=preserve_riff_id,
+            force=True,
+        )
         self.rhythmStateChanged.emit()
         self.rhythmControlsChanged.emit()
         self._send_rhythm_config()
@@ -244,6 +458,9 @@ class InstrumentBackend(app_core.InstrumentBackend):
             rhythm.get("bass_voicing_shift", 0),
             limit=BASS_VOICING_LIMIT,
         )
+        self._bass_riff_selector = self._default_bass_riff_selector()
+        self._active_bass_riff_id = None
+        self._bass_riff_context = None
         effects = self._defaults.get("effects", {})
         self._reverb_level = max(
             0.0,
@@ -257,6 +474,11 @@ class InstrumentBackend(app_core.InstrumentBackend):
             if rhythm_was_running
             else None
         )
+        live_bass_riff_id = (
+            self._active_bass_riff_id
+            if self._bass_riff_is_playing()
+            else None
+        )
         super()._apply_preset_data(data)
         self._rhythm_running = rhythm_was_running
         rhythm = data.get("rhythm", {})
@@ -267,6 +489,12 @@ class InstrumentBackend(app_core.InstrumentBackend):
             if live_bass_voicing is not None
             else rhythm.get("bass_voicing_shift", self._bass_voicing_shift),
             limit=BASS_VOICING_LIMIT,
+        )
+        stored_riff_selector = self._preset_bass_riff_selector(data)
+        self._reconcile_bass_riff_context(
+            fallback_selector=stored_riff_selector,
+            preserve_riff_id=live_bass_riff_id,
+            force=True,
         )
         effects = data.get("effects", {})
         if not isinstance(effects, dict):
@@ -294,6 +522,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
             transport.pop("rhythm_running", None)
         rhythm = snapshot.setdefault("rhythm", {})
         rhythm["bass_voicing_shift"] = self._bass_voicing_shift
+        rhythm["bass_riff_selector"] = self._bass_riff_selector
         return snapshot
 
     def _emit_full_preset_state(self) -> None:
@@ -303,6 +532,8 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     def send_initial_state(self) -> None:
         self._chord_gate_state = CHORD_GATE_OFF
+        self._active_bass_riff_id = None
+        self._bass_riff_context = None
         super().send_initial_state()
         self.chordGateChanged.emit()
         self.bassVoicingChanged.emit()
@@ -310,5 +541,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
     @Slot()
     def panic(self) -> None:
         self._chord_gate_state = CHORD_GATE_OFF
+        self._active_bass_riff_id = None
+        self._bass_riff_context = None
         super().panic()
         self.chordGateChanged.emit()

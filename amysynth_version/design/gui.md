@@ -94,12 +94,20 @@ the bass start symbol. It must not use a font glyph whose visual side bearings
 make it appear off-center. Both transport canvases repaint when their backend
 running state changes.
 
-The percussion, chord and bass activity groups form one top-aligned row. Each
-group has the same width and four equal buttons numbered 1 through 4. Chord
-activity has no zero button: `CHORD ON/OFF` is the sole user-facing
-automatic-chord gate.
+The percussion, chord and bass activity groups form one top-aligned row.
+Percussion and chord activity each have four equal buttons numbered 1 through
+4. Bass activity retains those four button sizes and adds a fifth, equally
+sized `R` button on the right. The wider bass group takes its extra horizontal
+space from the tempo slider. Chord activity has no zero button: `CHORD ON/OFF`
+is the sole user-facing automatic-chord gate.
 While a manual chord temporarily suppresses sequencer chords, none of the four
 chord-activity buttons is selected; the stored level remains unchanged.
+
+With bass activity 1 through 4, the lower bass slider is labelled `bass
+voicing` and keeps its `-6..6` inversion range. Selecting `R` changes that same
+Qt slider to `riff selector`, with the discrete range `1..N` for the riffs
+compatible with the current rhythm and chord suffix. No custom pointer or
+gesture handling is introduced for either function.
 
 The `CHORD ON/OFF` button reports its current state: `CHORD ON` means sequencer
 chords are enabled and `CHORD OFF` means they are disabled. Its ON appearance

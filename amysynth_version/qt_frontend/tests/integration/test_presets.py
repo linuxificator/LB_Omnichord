@@ -793,6 +793,31 @@ class PresetIntegrationTests(unittest.TestCase):
                 (0, 1, 4, 5),
             )
 
+    def test_preset_loads_and_stores_the_riff_selector_fallback(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            preset_path = app.home / ".omnichord" / "omni_presets" / "p2.json"
+            preset = json.loads(preset_path.read_text(encoding="utf-8"))
+            preset["rhythm"]["selected"] = "pop_8"
+            preset["rhythm"]["settings"]["pop_8"]["bass_activity"] = 5
+            preset["rhythm"]["bass_riff_selector"] = 4
+            preset["chord_rows"][0]["chord"] = "major"
+            preset_path.write_text(json.dumps(preset), encoding="utf-8")
+
+            app.action("selectPreset", 2)
+            app.action("selectChord", 0, 0)
+            self.assertTrue(bool(app.query("bassRiffMode")))
+            self.assertEqual(int(app.query("bassRiffSelector")), 4)
+            self.assertEqual(
+                str(app.query("selectedBassRiffId")),
+                "riff_0004_pop_8_root_fifth",
+            )
+
+            app.action("setBassRiffSelector", 2.0)
+            app.action("storeSelectedPreset")
+            stored = json.loads(preset_path.read_text(encoding="utf-8"))
+            self.assertEqual(int(stored["rhythm"]["bass_riff_selector"]), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

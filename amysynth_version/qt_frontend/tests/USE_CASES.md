@@ -239,8 +239,8 @@ installation failed to show or release chord-key interaction correctly.
 
 - Touching a numeric target while red binds it and consumes that gesture.
 - Instrument parameters, role/row and master volumes, both reverb sections,
-  both tuning references, tempo and bass voicing are bindable;
-  switches/selectors, including `MUT`/`UMT`, are not.
+  both tuning references, tempo, bass voicing and the riff selector are
+  bindable; switches/selectors, including `MUT`/`UMT`, are not.
 - One CC owns at most one target and one target owns at most one CC.
 - Reassigning an occupied target turns the displaced controller blue.
 - The target handle and bound controller LED are steady green.
@@ -299,7 +299,8 @@ installation failed to show or release chord-key interaction correctly.
 
 - Manual slider/tap gestures and direct frontend setter actions cannot change
   any bound instrument control, role/row volume, master volume, reverb
-  parameter, tuning reference, rhythm tempo or bass voicing value.
+  parameter, tuning reference, rhythm tempo, bass voicing or riff-selector
+  value.
 - Copy actions, RST and runtime preset selection preserve bound values while
   still applying their normal changes to unbound state.
 - Bound rhythm tempo disables and greys both rhythm UP/DWN buttons.
@@ -522,7 +523,10 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 - The application reserves non-overlapping ranges sized from the complete rhythm catalogue: drums 0..55, bass 56..111 and automatic chords 112..251. Tags 252..255 remain unused.
 - Every scheduled note-on/off owns one deterministic tag in its lane.
 - Holding/releasing a manual chord clears/reinstalls only the automatic-chord range; bass and drums keep running and transport remains started.
-- Bass on/off and bass retuning replace only the bass range. Tuning/chord pitch changes may replace both bass and automatic-chord ranges but must not touch percussion or stop transport.
+- Bass on/off, bass retuning and riff selection replace only the bass range.
+  The largest current riff uses 34 of its 56 tags. Tuning/chord pitch changes
+  may replace both bass and automatic-chord ranges but must not touch
+  percussion or stop transport.
 - A live rhythm-style or preset change must preserve tempo and sequencer timebase; it may replace tagged pattern events but may not stop/restart transport or issue `RESET_SEQUENCER`.
 
 **Failure history:** whole-sequencer rebuilds were used for chord hold/release, pitch changes and other lane-local operations. On the ESP32-P4 this could make the rhythm audibly disappear while a manual chord was held and then return on release.
@@ -585,10 +589,12 @@ that prevented hanging but audibly shortened the accompaniment gate.
 **RHYTHM-07 — live preset changes preserve beat-shaping controls**
 
 - With rhythm stopped, preset selection loads stored tempo, percussion
-  activity, chord activity, bass activity, bass voicing and all chord-row
-  octaves.
+  activity, chord activity, bass activity, bass voicing, riff selector and all
+  chord-row octaves.
 - With rhythm running, preset selection preserves the effective values of the
-  tempo, all three activities and bass voicing.
+  tempo, all three activities and bass voicing. A compatible playing riff is
+  preserved by stable ID and the selector follows its new position; otherwise
+  the destination preset/default selector is used.
 - The octave of the active chord row is also preserved. Every non-active row
   loads its octave from the destination preset.
 - The destination rhythm pattern may change, but transport and sequencer
@@ -608,15 +614,31 @@ that prevented hanging but audibly shortened the accompaniment gate.
 - Neither action releases a chord which is physically held on a chord-button
   row. That manual synth-3 voice ends only through its normal button release.
 
-**RHYTHM-09 — activity controls share one four-level layout**
+**RHYTHM-09 — bass activity adds an equal-width R button**
 
-- Percussion, chord and bass activity are top-aligned, equal-width groups with
-  four equal buttons numbered 1 through 4.
+- Percussion and chord activity retain four equal buttons numbered 1 through 4.
+- Bass activity retains that button size and adds a fifth `R` button. The bass
+  group becomes wider and the tempo slider narrower.
 - Chord activity has no zero button. `CHORD OFF` is the only user-facing way
   to disable automatic sequencer chords.
 - While a manual chord suppresses the automatic lane, no chord-activity button
   is selected. Releasing it restores the unchanged 1–4 selection.
 - A legacy preset containing chord activity 0 loads as level 1.
+
+**RHYTHM-10 — R selects independent, live-transposed bass riffs**
+
+- Selecting `R` changes `bass voicing` into a discrete `riff selector` whose
+  `1..N` range is the stable catalogue order for the current rhythm ID and exact
+  chord suffix. Levels 1–4 restore the voicing slider and simple bass patterns.
+- A riff uses only its own 96-PPQ ticks, durations, pitches and velocities; it
+  is never generated from or quantized to `rhythms.json` `bass_levels`.
+- C2-normalized pitches transpose by the active chord root and use normal OMNI
+  tuning. A root change alters pitch but not timing, duration or velocity.
+- If a playing riff remains compatible after an available-set change, its ID is
+  retained and the selector follows its position in the new set. Otherwise the
+  preset selector, or the application default for legacy presets, is used.
+- Riff selector changes replace only bass tags and never stop/reset transport
+  or edit the percussion/automatic-chord ranges.
 
 ### TUNING — all note-producing paths follow the selected tuning
 

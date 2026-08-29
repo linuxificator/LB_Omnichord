@@ -1038,7 +1038,11 @@ class MidiPlayerBackend(QObject):
             target["id"] = f"{screen}:{kind}"
             return target
 
-        if screen == "omni" and kind in ("rhythm_tempo", "bass_voicing"):
+        if screen == "omni" and kind in (
+            "rhythm_tempo",
+            "bass_voicing",
+            "bass_riff_selector",
+        ):
             target["id"] = f"omni:{kind}"
             return target
         return None
@@ -1086,6 +1090,13 @@ class MidiPlayerBackend(QObject):
             return 40.0, 200.0, 1.0, "linear"
         if kind == "bass_voicing":
             return -6.0, 6.0, 1.0, "linear"
+        if kind == "bass_riff_selector":
+            return (
+                1.0,
+                float(self.owner.bassRiffSelectorMaximum),
+                1.0,
+                "linear",
+            )
         return None
 
     def _mapped_target_value(
@@ -1248,6 +1259,8 @@ class MidiPlayerBackend(QObject):
             self._apply_midi_setter(self.owner.setRhythmTempo, value)
         elif kind == "bass_voicing":
             self._apply_midi_setter(self.owner.setBassVoicingShift, value)
+        elif kind == "bass_riff_selector":
+            self._apply_midi_setter(self.owner.setBassRiffSelector, value)
 
         self._write_cc_test_log(
             {
@@ -1559,6 +1572,8 @@ class MidiPlayerBackend(QObject):
             return float(self.owner.rhythmTempo)
         if kind == "bass_voicing":
             return float(self.owner._bass_voicing_shift)
+        if kind == "bass_riff_selector":
+            return float(self.owner.bassRiffSelector)
         return None
 
     def restore_control_values(
@@ -1612,6 +1627,20 @@ class MidiPlayerBackend(QObject):
                         self.owner._running_tempo = value
                 elif kind == "bass_voicing":
                     self.owner._bass_voicing_shift = int(round(value))
+                elif kind == "bass_riff_selector":
+                    candidates = self.owner._available_bass_riffs()
+                    if candidates:
+                        selected = max(
+                            1,
+                            min(len(candidates), int(round(value))),
+                        )
+                        self.owner._bass_riff_selector = selected
+                        self.owner._active_bass_riff_id = (
+                            candidates[selected - 1].riff_id
+                        )
+                        self.owner._bass_riff_context = (
+                            self.owner._current_bass_riff_context()
+                        )
 
     def replace_control_bindings(self, screen: str, data: Any) -> None:
         entries = self._normalized_binding_entries(screen, data)

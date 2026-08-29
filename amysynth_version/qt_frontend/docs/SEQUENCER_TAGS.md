@@ -31,6 +31,9 @@ Lane-local operations do not reset the sequencer:
 - `CHORD OFF` performs the same synth-4 drain and `CHORD ON` reinstalls that
   lane. These controls never trigger or release manual synth-3 voices;
 - bass on/off changes only the bass range;
+- bass activity `R` replaces the simple `bass_levels` pattern with the selected
+  riff's own PPQ phrase in the same bass range. A selector change replaces only
+  that range; it never edits drum/chord tags or resets transport;
 - tuning/chord-pitch changes replace bass and automatic-chord ranges but do not touch percussion;
 - chord timbre changes repatch synths 3/4 without replacing their sequencer events;
 - normal activity/config changes replace the affected tagged patterns while transport continues;
@@ -41,6 +44,12 @@ A live rhythm-style or preset change replaces tagged events without stopping
 transport or resetting the timebase. The new meter enters at the current
 sequencer phase. Only explicit Start begins a new transport run; Panic remains
 a full reset operation. `../../design/rhythm_bahavior.md` is authoritative.
+
+Riff note-ons and their duration-defined note-offs each own one tag. The
+catalogue currently needs at most 34 bass tags (17 notes), below the existing
+56-tag bass capacity. A riff may have a period independent from the drum
+pattern; its 96-PPQ ticks are converted to AMY's 48-PPQ sequencer units without
+deriving or quantizing them from `rhythms.json` `bass_levels`.
 
 ## Start and stop
 

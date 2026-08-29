@@ -201,6 +201,7 @@ class StaticContractTests(unittest.TestCase):
             "master_volume",
             "rhythm_tempo",
             "bass_voicing",
+            "bass_riff_selector",
         ):
             self.assertIn(f'"kind": "{kind}"', combined)
 
@@ -394,7 +395,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("y: chordControlPanel.controlGap", panel)
         self.assertIn("spacing: chordControlPanel.controlGap", panel)
 
-    def test_bass_activity_has_adjacent_voicing_slider(self) -> None:
+    def test_bass_activity_has_five_equal_buttons_and_dynamic_slider(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
         self.assertEqual(qml.count("ActivitySelector {"), 3)
         selector_labels = (
@@ -410,20 +411,34 @@ class StaticContractTests(unittest.TestCase):
                 end = qml.index("LabeledSlider {", start)
             selector = qml[start:end]
             self.assertIn("y: 0", selector)
-            self.assertIn("width: activityArea.width * 0.32", selector)
+            if label == 'label: "bass activity"':
+                self.assertIn("width: controlsArea.bassActivityWidth", selector)
+            else:
+                self.assertIn(
+                    "width: controlsArea.standardActivityWidth", selector
+                )
         self.assertNotIn("levels: [0, 1, 2, 3, 4]", qml)
         activity_selector = (
             ROOT / "gui" / "ActivitySelector.qml"
         ).read_text(encoding="utf-8")
         self.assertIn("property var levels: [1, 2, 3, 4]", activity_selector)
+        self.assertIn("property var levelLabels: []", activity_selector)
         self.assertIn("height: 29", activity_selector)
         self.assertIn('label: "bass activity"', qml)
-        self.assertIn('label: "bass voicing"', qml)
-        self.assertIn("fromValue: -6", qml)
-        self.assertIn("toValue: 6", qml)
+        self.assertIn("levels: [1, 2, 3, 4, 5]", qml)
+        self.assertIn('levelLabels: ["1", "2", "3", "4", "R"]', qml)
+        self.assertIn('"bass voicing"', qml)
+        self.assertIn('"riff selector"', qml)
+        self.assertIn("? 1 : -6", qml)
+        self.assertIn("root.controller.bassRiffSelectorMaximum", qml)
+        self.assertIn(": 6", qml)
         self.assertIn("stepValue: 1", qml)
         self.assertIn("root.controller.bassVoicingShift", qml)
+        self.assertIn("root.controller.bassRiffSelector", qml)
         self.assertIn(".setBassVoicingShift(value)", qml)
+        self.assertIn(".setBassRiffSelector(value)", qml)
+        self.assertIn("controlsArea.expandedActivityWidth", qml)
+        self.assertIn("5 * activityButtonWidth", qml)
 
     def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
         panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")

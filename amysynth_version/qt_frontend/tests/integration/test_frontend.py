@@ -144,6 +144,19 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("setBassVoicingShift", -6.0)
             self.assertEqual(int(app.query("bassVoicingShift")), 6)
 
+            app.action("setRhythmIndex", 0)
+            app.action("setRowChordType", 0, 0)
+            app.action("selectChord", 0, 0)
+            app.action("setRhythmBassActivity", 5.0)
+            riff_target = {
+                "screen": "omni",
+                "kind": "bass_riff_selector",
+            }
+            bind_control(app, 7, 86, riff_target)
+            app.action("injectMidiControl", 7, 86, 127)
+            app.action("setBassRiffSelector", 1.0)
+            self.assertEqual(int(app.query("bassRiffSelector")), 5)
+
             tempo_target = {"screen": "omni", "kind": "rhythm_tempo"}
             bind_control(app, 5, 84, tempo_target)
             app.action("injectMidiControl", 5, 84, 64)
@@ -385,6 +398,53 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("bassVoicingShift")), 1)
             app.action("setBassVoicingShift", 99.0)
             self.assertEqual(int(app.query("bassVoicingShift")), 6)
+
+    def test_riff_selector_tracks_the_playing_riff_across_chord_sets(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            app.action("setRhythmIndex", 0)  # pop_8
+            app.action("setRowChordType", 0, 1)  # minor
+            app.action("selectChord", 0, 0)
+            app.action("setRhythmBassActivity", 5.0)
+
+            self.assertTrue(bool(app.query("bassRiffMode")))
+            self.assertEqual(int(app.query("bassRiffSelectorMaximum")), 5)
+            self.assertEqual(int(app.query("bassRiffSelector")), 1)
+            app.action("setBassRiffSelector", 5.0)
+            self.assertEqual(
+                str(app.query("selectedBassRiffId")),
+                "riff_0006_pop_8_minor_triadic",
+            )
+
+            # With transport stopped, compatibility alone does not make a riff
+            # "currently playing": a changed set falls back to the preset.
+            app.action("setRowChordType", 0, 33)  # dominant7_sharp9
+            self.assertEqual(int(app.query("bassRiffSelector")), 1)
+
+            app.action("setRowChordType", 0, 1)
+            app.action("setBassRiffSelector", 5.0)
+            if not bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+            app.action("toggleRhythm")
+            app.bridge.wait_idle(timeout=8.0)
+
+            # The same riff is sixth in the new compatible set. While it is
+            # playing, identity wins and the slider follows its new position.
+            app.action("setRowChordType", 0, 33)
+            self.assertEqual(int(app.query("bassRiffSelector")), 6)
+            self.assertEqual(
+                str(app.query("selectedBassRiffId")),
+                "riff_0006_pop_8_minor_triadic",
+            )
+
+            # That riff is not major-compatible, so this set change uses the
+            # preset/default selector position instead.
+            app.action("setRowChordType", 0, 0)
+            self.assertEqual(int(app.query("bassRiffSelector")), 1)
+            self.assertEqual(
+                str(app.query("selectedBassRiffId")),
+                "riff_0001_pop_8_root_pedal",
+            )
 
     def test_sustain_frontend_range_and_numeric_value(self) -> None:
         with HeadlessApp(native_amy=False) as app:

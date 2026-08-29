@@ -265,6 +265,107 @@ class SerialIntegrationTests(unittest.TestCase):
                 "HARM strum contains no intonation-adjusted pitch",
             )
 
+    def test_riff_selector_replaces_only_bass_and_live_transposition_keeps_timing(
+        self,
+    ) -> None:
+        riff_pattern = re.compile(
+            rf"^H(?P<tick>\d+),(?P<period>\d+),(?P<tag>\d+)"
+            rf"n(?P<note>{_NOTE})l(?P<velocity>{_NOTE})i1Z$"
+        )
+
+        def riff_note_ons(
+            lines: list[str],
+        ) -> list[tuple[int, int, int, float, float]]:
+            events = []
+            for line in lines:
+                match = riff_pattern.match(line)
+                if match is None or float(match.group("velocity")) <= 0.0:
+                    continue
+                events.append((
+                    int(match.group("tick")),
+                    int(match.group("period")),
+                    int(match.group("tag")),
+                    float(match.group("note")),
+                    float(match.group("velocity")),
+                ))
+            return events
+
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            app.action("setRhythmIndex", 0)  # pop_8
+            app.action("setTuningModeIndex", 1)  # EQ
+            app.action("setRowChordType", 0, 0)  # major
+            app.action("selectChord", 0, 0)  # C
+            app.action("setRhythmBassActivity", 5.0)
+            if not bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+            start = app.bridge.count()
+            app.action("toggleRhythm")
+            app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+
+            selector_start = app.bridge.count()
+            app.action("setBassRiffSelector", 4.0)
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                c_lines = app.bridge.lines_since(selector_start)
+                c_events = riff_note_ons(c_lines)
+                if len(c_events) >= 8:
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("riff selector did not install its own bass phrase")
+            app.bridge.wait_idle(timeout=8.0)
+            c_lines = app.bridge.lines_since(selector_start)
+            c_events = riff_note_ons(c_lines)
+            self.assertEqual(
+                [event[3] for event in c_events],
+                [36.0, 43.0, 48.0, 43.0, 36.0, 31.0, 36.0, 43.0],
+            )
+            tagged = [line for line in c_lines if line.startswith("H")]
+            self.assertTrue(tagged)
+            for line in tagged:
+                match = re.match(r"^H\d+,\d+,(\d+)", line)
+                self.assertIsNotNone(match)
+                assert match is not None
+                tag = int(match.group(1))
+                self.assertGreaterEqual(tag, 56)
+                self.assertLess(tag, 112)
+            self.assertNotIn("zY0Z", c_lines)
+            self.assertNotIn("S4096Z", c_lines)
+
+            transpose_start = app.bridge.count()
+            app.action("selectChord", 0, 4)  # E major
+            deadline = time.monotonic() + 8.0
+            while time.monotonic() < deadline:
+                e_lines = app.bridge.lines_since(transpose_start)
+                e_events = riff_note_ons(e_lines)
+                if len(e_events) >= 8:
+                    break
+                time.sleep(0.01)
+            else:
+                self.fail("chord change did not transpose the active riff")
+            app.bridge.wait_idle(timeout=8.0)
+            e_events = riff_note_ons(app.bridge.lines_since(transpose_start))
+            self.assertEqual(
+                [event[3] for event in e_events],
+                [40.0, 47.0, 52.0, 47.0, 40.0, 35.0, 40.0, 47.0],
+            )
+            self.assertEqual(
+                [
+                    (tick, period, tag, velocity)
+                    for tick, period, tag, _, velocity in c_events
+                ],
+                [
+                    (tick, period, tag, velocity)
+                    for tick, period, tag, _, velocity in e_events
+                ],
+            )
+            self.assertEqual(
+                str(app.query("selectedBassRiffId")),
+                "riff_0004_pop_8_root_fifth",
+            )
+
     def test_strum_patch_change_is_bus_isolated_from_chords(self) -> None:
         meow = synth_index("Meow Brass")
         sustainer = synth_index("Sustainer")

@@ -101,6 +101,10 @@ class ProgramAmySerialClient(base.AmySerialClient):
         if not isinstance(new_config, dict):
             return
 
+        old_config = self.rhythm_config
+        bass_only_changed = self._only_bass_config_changed(
+            old_config, new_config
+        )
         old_id = (
             str(self.rhythm_config.get("id", ""))
             if isinstance(self.rhythm_config, dict)
@@ -110,8 +114,14 @@ class ProgramAmySerialClient(base.AmySerialClient):
         style_changed = bool(old_id) and old_id != new_id
 
         self.rhythm_config = new_config
+        bass_riff = new_config.get("bass_riff")
+        self.bass_riff = bass_riff if isinstance(bass_riff, dict) else None
         self._scheduled_rhythm_id = new_id
         self._wire(f"j{self._f(float(new_config.get('tempo', 108.0)))}Z")
+
+        if bass_only_changed:
+            self._replace_lane("bass")
+            return
 
         if style_changed and self.rhythm_running:
             # Do not send zY0, accompaniment note-offs, RESET_TIMEBASE or zY1.

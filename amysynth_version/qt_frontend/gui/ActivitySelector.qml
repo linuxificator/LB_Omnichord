@@ -7,6 +7,7 @@ Item {
     property string label: "activity"
     property int currentLevel: 1
     property var levels: [1, 2, 3, 4]
+    property var levelLabels: []
 
     property color textColor: "#4c3b08"
     property color groupColor: "#f7ebae"
@@ -74,7 +75,10 @@ Item {
                     )
 
                 height: buttonRow.height
-                text: String(modelData)
+                text:
+                    root.levelLabels.length > index
+                    ? String(root.levelLabels[index])
+                    : String(modelData)
 
                 property bool selectedState:
                     root.currentLevel

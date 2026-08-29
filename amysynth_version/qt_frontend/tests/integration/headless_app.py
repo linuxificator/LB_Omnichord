@@ -28,6 +28,11 @@ def main() -> int:
         legacy_bass_synth_index,
     ) = omnichord.load_synth_catalog(omnichord.INSTRUMENT_DIR / "synths.json")
     rhythms = omnichord.load_rhythm_catalog(omnichord.MUSIC_DIR / "rhythms.json")
+    bass_riffs = omnichord.load_bass_riff_catalog(
+        omnichord.MUSIC_DIR / "omnichord_bass_riffs.json",
+        rhythm_ids=(rhythm.key for rhythm in rhythms),
+        chord_suffixes=(chord.suffix for chord in chords),
+    )
     intonation_eq = omnichord.load_intonation_table(
         omnichord.MUSIC_DIR / "intonation_eq.json"
     )
@@ -83,6 +88,7 @@ def main() -> int:
         chords=chords,
         synths=synths,
         rhythms=rhythms,
+        bass_riffs=bass_riffs,
         intonation_eq=intonation_eq,
         intonation_harm=intonation_harm,
         intonation_jv=intonation_jv,

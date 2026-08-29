@@ -120,12 +120,34 @@ Item {
     Item {
         id: controlsArea
         x: runButton.x + runButton.width + 12; y: 0; width: parent.width - x; height: parent.height
+
+        // Preserve the original four-button activity width. The bass group
+        // adds one button with exactly that button width; only tempo yields
+        // the extra horizontal space.
+        readonly property real formerActivityWidth:
+            width * 0.57 - 14
+        readonly property real standardActivityWidth:
+            formerActivityWidth * 0.32
+        readonly property real activityGap:
+            formerActivityWidth * 0.02
+        readonly property real activityButtonWidth:
+            (standardActivityWidth - 10 - 3 * 4) / 4
+        readonly property real bassActivityWidth:
+            10 + 5 * activityButtonWidth + 4 * 4
+        readonly property real expandedActivityWidth:
+            2 * standardActivityWidth
+            + bassActivityWidth
+            + 2 * activityGap
+
         LabeledSlider {
             id: tempoSlider
 
             x: 0
             y: 0
-            width: parent.width * 0.43
+            width:
+                parent.width
+                - 14
+                - controlsArea.expandedActivityWidth
             height: parent.height
 
             label: "tempo"
@@ -156,7 +178,7 @@ Item {
             ActivitySelector {
                 x: 0
                 y: 0
-                width: activityArea.width * 0.32
+                width: controlsArea.standardActivityWidth
                 height: 58
 
                 label: "percussion activity"
@@ -174,9 +196,11 @@ Item {
             }
 
             ActivitySelector {
-                x: activityArea.width * 0.34
+                x:
+                    controlsArea.standardActivityWidth
+                    + controlsArea.activityGap
                 y: 0
-                width: activityArea.width * 0.32
+                width: controlsArea.standardActivityWidth
                 height: 58
 
                 label: "chord activity"
@@ -196,12 +220,19 @@ Item {
             }
 
             ActivitySelector {
-                x: activityArea.width * 0.68
+                x:
+                    2
+                    * (
+                        controlsArea.standardActivityWidth
+                        + controlsArea.activityGap
+                    )
                 y: 0
-                width: activityArea.width * 0.32
+                width: controlsArea.bassActivityWidth
                 height: 52
 
                 label: "bass activity"
+                levels: [1, 2, 3, 4, 5]
+                levelLabels: ["1", "2", "3", "4", "R"]
                 currentLevel:
                     root.controller
                         .rhythmBassActivity
@@ -218,16 +249,32 @@ Item {
             }
 
             LabeledSlider {
-                x: activityArea.width * 0.68
+                id: bassFunctionSlider
+
+                x:
+                    2
+                    * (
+                        controlsArea.standardActivityWidth
+                        + controlsArea.activityGap
+                    )
                 y: 56
-                width: activityArea.width * 0.32
+                width: controlsArea.bassActivityWidth
                 height: 48
 
-                label: "bass voicing"
+                label:
+                    root.controller.bassRiffMode
+                    ? "riff selector"
+                    : "bass voicing"
                 currentValue:
-                    root.controller.bassVoicingShift
-                fromValue: -6
-                toValue: 6
+                    root.controller.bassRiffMode
+                    ? root.controller.bassRiffSelector
+                    : root.controller.bassVoicingShift
+                fromValue:
+                    root.controller.bassRiffMode ? 1 : -6
+                toValue:
+                    root.controller.bassRiffMode
+                    ? root.controller.bassRiffSelectorMaximum
+                    : 6
                 stepValue: 1
                 decimals: 0
 
@@ -237,14 +284,24 @@ Item {
                 handleColor: "#fffbea"
                 borderColor: "#8a6810"
                 midiControlRouter: root.controller.midiPlayer
-                midiTarget: ({
-                    "screen": "omni",
-                    "kind": "bass_voicing"
-                })
+                midiTarget:
+                    root.controller.bassRiffMode
+                    ? ({
+                        "screen": "omni",
+                        "kind": "bass_riff_selector"
+                    })
+                    : ({
+                        "screen": "omni",
+                        "kind": "bass_voicing"
+                    })
 
-                onEdited: (value) =>
-                    root.controller
-                        .setBassVoicingShift(value)
+                onEdited: (value) => {
+                    if (root.controller.bassRiffMode) {
+                        root.controller.setBassRiffSelector(value)
+                    } else {
+                        root.controller.setBassVoicingShift(value)
+                    }
+                }
             }
         }
     }

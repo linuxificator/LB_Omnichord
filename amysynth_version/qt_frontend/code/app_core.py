@@ -23,6 +23,7 @@ from amy_serial import (
     AmySocketClient,
     load_amy_config,
 )
+from bass_riffs import BassRiffCatalog, load_bass_riff_catalog
 from control_limits import bounded_control_range, clamp_control_value
 from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
@@ -867,6 +868,7 @@ class InstrumentBackend(QObject):
         chords: tuple[ChordType, ...],
         synths: tuple[SynthDefinition, ...],
         rhythms: tuple[RhythmDefinition, ...],
+        bass_riffs: BassRiffCatalog,
         intonation_eq: tuple[tuple[float, ...], ...],
         intonation_harm: tuple[tuple[float, ...], ...],
         intonation_jv: tuple[tuple[float, ...], ...],
@@ -903,6 +905,7 @@ class InstrumentBackend(QObject):
         self._chords = chords
         self._synths = synths
         self._rhythms = rhythms
+        self._bass_riffs = bass_riffs
         self._intonation_tables = {
             "EQ": intonation_eq,
             "HARM": intonation_harm,
@@ -2637,7 +2640,7 @@ class InstrumentBackend(QObject):
                     ] = max(
                         1,
                         min(
-                            4,
+                            5,
                             int(
                                 stored.get(
                                     "bass_activity",
@@ -3044,7 +3047,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setRhythmBassActivity(self, value: float) -> None:
-        level = max(1, min(4, int(round(float(value)))))
+        level = max(1, min(5, int(round(float(value)))))
         index = self._rhythm.selected_index
 
         if level == self._rhythm.bass_activity_by_rhythm[index]:
@@ -3849,7 +3852,11 @@ class InstrumentBackend(QObject):
             if chord_activity > 0
             else None
         )
-        bass_source = ui_activity_to_source(bass_activity)
+        bass_source = (
+            ui_activity_to_source(bass_activity)
+            if bass_activity <= 4
+            else None
+        )
 
         percussion_events: list[dict[str, Any]] = []
 
@@ -3882,10 +3889,14 @@ class InstrumentBackend(QObject):
                 if chord_source is not None
                 else []
             ),
-            "bass_events": [
-                copy.deepcopy(event)
-                for event in rhythm.bass_levels[bass_source]
-            ],
+            "bass_events": (
+                [
+                    copy.deepcopy(event)
+                    for event in rhythm.bass_levels[bass_source]
+                ]
+                if bass_source is not None
+                else []
+            ),
         }
 
     def _send_rhythm_config(self) -> None:
@@ -4292,6 +4303,12 @@ def main() -> int:
     smoke_checkpoint("synth-catalog-loaded")
     rhythms = load_rhythm_catalog(MUSIC_DIR / "rhythms.json")
     smoke_checkpoint("rhythm-catalog-loaded")
+    bass_riffs = load_bass_riff_catalog(
+        MUSIC_DIR / "omnichord_bass_riffs.json",
+        rhythm_ids=(rhythm.key for rhythm in rhythms),
+        chord_suffixes=(chord.suffix for chord in chords),
+    )
+    smoke_checkpoint("bass-riff-catalog-loaded")
     title_config = load_title_config(
         user_config_dir / "title.json"
     )
@@ -4477,6 +4494,7 @@ def main() -> int:
         chords=chords,
         synths=synths,
         rhythms=rhythms,
+        bass_riffs=bass_riffs,
         intonation_eq=intonation_eq,
         intonation_harm=intonation_harm,
         intonation_jv=intonation_jv,

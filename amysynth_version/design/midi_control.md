@@ -94,7 +94,7 @@ Every continuous numeric control is bindable:
 - OMNI and MIDI reverb level, liveness and damping;
 - OMNI and MIDI tuning reference;
 - rhythm tempo;
-- bass voicing.
+- bass voicing and the dynamic bass riff selector.
 
 Buttons, switches (including `MUT`/`UMT`), activity selectors, instrument
 tumblers and tuning-mode selectors are not slider targets.
@@ -143,8 +143,11 @@ normal live-value protection above.
 Live rhythm continuity has higher priority for the rhythm controls it protects.
 While rhythm transport is running, neither rhythm tempo nor bass voicing takes
 a destination-preset numeric value, including during a binding-conflict
-handoff. The binding handoff and its visual feedback still occur; only the
-currently effective musical value survives until genuine controller movement.
+handoff. A bound riff selector maps over the currently available `1..N` range;
+the `bass_voicing` and `bass_riff_selector` bindings remain distinct when the
+shared visual slider changes function. The binding handoff and its visual
+feedback still occur; only the currently effective musical value survives
+until genuine controller movement.
 
 Coupled OMNI/MIDI tuning treats a binding on either reference as ownership of
 the effective shared reference, so both screens' UP/DOWN controls are locked.

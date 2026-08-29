@@ -56,6 +56,7 @@ def self_test() -> int:
         APP_ROOT / "gui" / "Main.qml",
         APP_ROOT / "instruments" / "synths.json",
         APP_ROOT / "music" / "rhythms.json",
+        APP_ROOT / "music" / "omnichord_bass_riffs.json",
     )
     missing = [str(path) for path in required if not path.is_file()]
     if missing:

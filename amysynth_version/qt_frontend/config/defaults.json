@@ -38,7 +38,8 @@
   },
   "rhythm": {
     "selected": "waltz",
-    "bass_voicing_shift": 0
+    "bass_voicing_shift": 0,
+    "bass_riff_selector": 1
   },
   "window": {
     "start_fullscreen": false,

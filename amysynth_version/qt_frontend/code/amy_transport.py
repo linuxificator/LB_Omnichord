@@ -792,6 +792,7 @@ class AmySerialClient:
 
         self.chord_notes: list[float] = []
         self.bass_notes: list[float] = []
+        self.bass_riff: dict[str, Any] | None = None
         self.rhythm_config: dict[str, Any] | None = None
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
@@ -1548,6 +1549,9 @@ class AmySerialClient:
         existing_chord_events = self._lane_events("chords")
         self.chord_notes = [float(x) for x in payload.get("notes", [])]
         self.bass_notes = [float(x) for x in payload.get("bass_notes", [])]
+        if "bass_riff" in payload:
+            bass_riff = payload.get("bass_riff")
+            self.bass_riff = bass_riff if isinstance(bass_riff, dict) else None
         if "rhythm_chord_enabled" in payload:
             self._set_rhythm_chord_enabled(
                 payload.get("rhythm_chord_enabled"),
@@ -1614,9 +1618,47 @@ class AmySerialClient:
             return events
 
         if lane_name == "bass":
-            if not self.bass_running or not self.bass_notes:
+            if not self.bass_running:
                 return []
             bass_synth = self.synth_id["bass"]
+            if str(config.get("bass_mode", "activity")) == "riff":
+                riff = self.bass_riff
+                if not isinstance(riff, dict):
+                    return []
+                ppq = max(1, int(riff.get("ppq", AMY_PPQ)))
+                phrase_ticks = max(1, int(riff.get("phrase_ticks", ppq)))
+                riff_period = max(1, round(phrase_ticks * AMY_PPQ / ppq))
+                for event in riff.get("events", []):
+                    if not isinstance(event, dict):
+                        continue
+                    tick = round(float(event.get("tick", 0)) * AMY_PPQ / ppq)
+                    duration = max(
+                        1,
+                        round(
+                            float(event.get("duration_ticks", 1))
+                            * AMY_PPQ
+                            / ppq
+                        ),
+                    )
+                    note = float(event.get("note", 36.0))
+                    velocity = max(
+                        0.0,
+                        min(1.0, float(event.get("velocity", 0)) / 127.0),
+                    )
+                    events.append((
+                        tick,
+                        riff_period,
+                        f"n{self._f(note)}l{self._f(velocity)}i{bass_synth}",
+                    ))
+                    events.append((
+                        tick + duration,
+                        riff_period,
+                        f"n{self._f(note)}l0i{bass_synth}",
+                    ))
+                return events
+
+            if not self.bass_notes:
+                return []
             gate = max(
                 1,
                 round(float(rhythm_cfg["bass_gate_beats"]) * AMY_PPQ),
@@ -1664,6 +1706,31 @@ class AmySerialClient:
             return events
 
         raise KeyError(lane_name)
+
+    @staticmethod
+    def _only_bass_config_changed(
+        old_config: dict[str, Any] | None,
+        new_config: dict[str, Any],
+    ) -> bool:
+        if not isinstance(old_config, dict) or old_config == new_config:
+            return False
+        bass_fields = {
+            "bass_activity",
+            "bass_events",
+            "bass_mode",
+            "bass_riff",
+        }
+        old_shared = {
+            key: value
+            for key, value in old_config.items()
+            if key not in bass_fields
+        }
+        new_shared = {
+            key: value
+            for key, value in new_config.items()
+            if key not in bass_fields
+        }
+        return old_shared == new_shared
 
     def _replace_lane(self, lane_name: str) -> None:
         if lane_name == "chords" and self._rhythm_chord_draining:
@@ -1720,6 +1787,10 @@ class AmySerialClient:
         if not isinstance(new_config, dict):
             return
 
+        old_config = self.rhythm_config
+        bass_only_changed = self._only_bass_config_changed(
+            old_config, new_config
+        )
         old_id = (
             str(self.rhythm_config.get("id", ""))
             if isinstance(self.rhythm_config, dict)
@@ -1728,8 +1799,14 @@ class AmySerialClient:
         new_id = str(new_config.get("id", ""))
         style_changed = bool(old_id) and old_id != new_id
         self.rhythm_config = new_config
+        bass_riff = new_config.get("bass_riff")
+        self.bass_riff = bass_riff if isinstance(bass_riff, dict) else None
         self._scheduled_rhythm_id = new_id
         self._wire(f"j{self._f(float(new_config.get('tempo', 108.0)))}Z")
+
+        if bass_only_changed:
+            self._replace_lane("bass")
+            return
 
         if style_changed and self.rhythm_running:
             self._cancel_queued_rhythm_updates()

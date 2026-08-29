@@ -37,6 +37,11 @@ class SequencerTagTests(unittest.TestCase):
         cls.rhythms = json.loads(
             (FRONTEND / "music" / "rhythms.json").read_text(encoding="utf-8")
         )["rhythms"]
+        cls.riffs = json.loads(
+            (FRONTEND / "music" / "omnichord_bass_riffs.json").read_text(
+                encoding="utf-8"
+            )
+        )["riffs"]
 
     def test_reserved_ranges_are_disjoint_and_inside_current_amy_limit(self) -> None:
         rhythm_cfg = self.config["rhythm"]
@@ -95,6 +100,13 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(worst["drums"], (56, "trance"))
         self.assertEqual(worst["bass"], (56, "seven_four_funk"))
         self.assertEqual(worst["chords"], (140, "seven_four_funk"))
+
+        riff_tags = max(
+            len(riff["timing"]["events"]) * 2
+            for riff in self.riffs
+        )
+        self.assertEqual(riff_tags, 34)
+        self.assertLessEqual(riff_tags, int(ranges["bass"]["count"]))
 
     def test_one_tag_tracks_one_event_and_clear_is_targeted(self) -> None:
         writer = _WriterProbe()

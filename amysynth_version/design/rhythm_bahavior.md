@@ -9,9 +9,9 @@ The central rule is:
 A preset or rhythm selection may change the pattern and other stored rhythm parameters, but it must not unexpectedly start or stop the rhythm, change the currently running tempo, reset the sequencer timebase, or interrupt the beat.
 
 For preset selection, playback continuity also includes the current
-percussion/chord/bass activity, bass voicing and active chord-row octave. These
-controls shape the accompaniment that is already in progress and therefore
-remain live while transport runs.
+percussion/chord/bass activity, bass voicing, compatible playing bass riff and
+active chord-row octave. These controls shape the accompaniment that is already
+in progress and therefore remain live while transport runs.
 
 ## 1. State model
 
@@ -42,6 +42,30 @@ A preset may store rhythm configuration such as:
 - rhythm-related parameters that are part of the preset design.
 
 The stored tempo is a configuration value. It is not permission to change the currently running tempo during a live preset switch.
+
+### 1.4 Bass activity and independent riff mode
+
+Bass activity values 1 through 4 select the existing simple accompaniment
+levels. Value 5 is displayed as `R` and selects an independent riff phrase.
+Riff mode never derives timing or pitches from `rhythms.json` `bass_levels`:
+each catalogue riff owns its complete 96-PPQ event timing, duration and
+velocity.
+
+The available riff set is the stable-index order of entries compatible with
+both the current rhythm ID and exact chord suffix. The one-based riff selector
+chooses within that set. Stored pitches are normalized to C2/MIDI 36; every
+event is transposed by the active chord root and then passes through the normal
+OMNI tuning conversion. A root change therefore changes pitch immediately for
+the replacement bass schedule without changing event ticks, durations,
+velocities, transport or sequencer timebase.
+
+When a chord-suffix, rhythm or preset change produces a new available set, a
+riff which is actually playing (`rhythmRunning`, bass transport and `R` all
+active) is retained by stable riff ID when that ID occurs in the new set. The
+selector follows its possibly different one-based position. If it is not
+present, or no riff is playing, the selector uses the loaded preset's
+`bass_riff_selector`, clamped to the set, with the application default as the
+legacy fallback. Selector and mode changes replace only the bass tag range.
 
 ## 2. Application startup
 
@@ -135,7 +159,8 @@ When another preset is selected:
 1. `rhythmRunning` remains `true`.
 2. The effective live tempo remains exactly `T`.
 3. Live percussion activity, chord activity, bass activity and bass voicing
-   remain unchanged.
+   remain unchanged. In riff mode, a compatible playing riff is retained by
+   ID; otherwise the destination preset/default riff selector is applied.
 4. The octave of the active chord row remains unchanged. Octaves belonging to
    non-active chord rows may load from the destination preset.
 5. The new preset may change the rhythm/pattern.
@@ -402,7 +427,7 @@ This is true whether the rhythm happens to be running or stopped when `STR` is u
 
 | User action | Rhythm stopped | Rhythm running |
 |---|---|---|
-| Select preset | Load all preset rhythm controls and row octaves; stay stopped | Load preset rhythm; preserve live tempo, three activities, bass voicing and active-row octave; load non-active-row octaves; stay running |
+| Select preset | Load all preset rhythm controls, riff selector and row octaves; stay stopped | Load preset rhythm; preserve live tempo, three activities, bass voicing, a compatible playing riff and active-row octave; otherwise use the destination riff selector; load non-active-row octaves; stay running |
 | Select rhythm type | Load rhythm and its stored/default tempo; stay stopped | Change rhythm; preserve current live tempo; stay running |
 | Preset says rhythm ON | Ignore | Ignore |
 | Preset says rhythm OFF | Ignore | Ignore |
@@ -514,10 +539,12 @@ and release. Drums, bass, transport, effects and sequencer timebase continue.
 ### RHYTHM-017 — running preset selection preserves live performance controls
 
 When `rhythmRunning == true`, preset selection must preserve percussion
-activity, chord activity, bass activity, bass voicing and the octave of the
-active chord row, in addition to live tempo. Octaves of non-active chord rows
-load from the destination preset. When `rhythmRunning == false`, the complete
-stored set loads normally.
+activity, chord activity, bass activity, bass voicing, a compatible playing
+bass riff and the octave of the active chord row, in addition to live tempo.
+The riff selector follows that riff's destination-set position; an incompatible
+or non-playing riff uses the destination preset/default selector. Octaves of
+non-active chord rows load from the destination preset. When
+`rhythmRunning == false`, the complete stored set loads normally.
 
 ### RHYTHM-018 — CHORD ON/OFF owns only automatic sequencer chords
 
@@ -534,17 +561,28 @@ that gate state or temporarily close the lane. When the gate is ON, only a
 manual hold temporarily suppresses its sequencer lane; release restores it
 without toggling the control.
 
-### RHYTHM-019 — activity controls expose four aligned levels
+### RHYTHM-019 — bass activity adds independent riff mode
 
-Percussion, chord and bass activity each expose levels 1 through 4. Chord
-activity 0 is not a selectable or stored state; `CHORD OFF` owns that meaning.
+Percussion and chord activity expose levels 1 through 4. Bass activity exposes
+the same four levels plus a fifth `R` mode. Chord activity 0 is not a selectable
+or stored state; `CHORD OFF` owns that meaning.
 During manual chord takeover the effective chord activity may temporarily be 0
 so the sequencer lane remains closed. In that interval the interface shows no
 selected chord-activity button and restores the unchanged stored 1–4 selection
 on release. Legacy presets containing chord activity 0 load as level 1.
 
+### RHYTHM-020 — riffs keep independent timing and transpose live
+
+Riff selection reads only the independent bass-riff catalogue and filters by
+current rhythm ID and exact chord suffix. Its PPQ timing, durations and
+velocities remain unchanged under transposition. Root/tuning changes replace
+only the bass pitches; selector changes replace only bass tags. Neither path
+may stop/reset transport or edit percussion/automatic-chord tags. Every current
+rhythm/chord combination has at least three candidates and every selected riff
+fits the reserved bass tag range.
+
 ## 16. Summary rule
 
 The complete behavior can be reduced to this rule:
 
-> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, bass voicing, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
+> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, bass voicing, a compatible playing bass riff, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**

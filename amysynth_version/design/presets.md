@@ -13,13 +13,20 @@ live-switch semantics.
 
 While rhythm transport is running, an OMNI preset switch preserves the live
 tempo, percussion activity, chord activity, bass activity and bass voicing.
-It also preserves the octave of the active chord row. The destination preset
-still supplies the octaves of every non-active row. With transport stopped,
-all of these values load normally from the destination preset.
+When bass activity is `R`, a currently playing riff also survives if its stable
+ID is compatible with the destination rhythm/chord set; the selector follows
+that riff's position in the new set. Otherwise the destination preset's
+`bass_riff_selector` is used, falling back to the application default. The
+octave of the active chord row is preserved. The destination preset still
+supplies the octaves of every non-active row. With transport stopped, all of
+these values load normally from the destination preset.
 
-All three stored activity values use the visible range 1 through 4. A legacy
-preset containing chord activity 0 loads as level 1; disabling automatic
-chords is live `CHORD ON/OFF` state, not a preset activity value.
+Stored percussion and chord activity use the visible range 1 through 4. Bass
+activity uses 1 through 5, where stored value 5 is the visible `R` riff mode.
+`rhythm.bass_riff_selector` stores the one-based preferred position used when
+no compatible riff is already playing; older presets default to the application
+value. A legacy preset containing chord activity 0 loads as level 1; disabling
+automatic chords is live `CHORD ON/OFF` state, not a preset activity value.
 
 The active chord identity, chord gate and physical chord-button hold state are
 also live performance state. Selecting an OMNI preset preserves them. The same
