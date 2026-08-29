@@ -206,7 +206,9 @@ for a live preset switch.
 
 ## 6. Rhythm-type selection while rhythm is stopped
 
-When the user selects another rhythm/pattern while playback is stopped, the selected rhythm configuration may load its own stored/default tempo.
+When the user selects another rhythm/pattern while playback is stopped, the
+selected rhythm configuration loads its own stored/default tempo and
+percussion, chord and bass activity.
 
 Example:
 
@@ -231,7 +233,12 @@ running = false
 
 ## 7. Rhythm-type selection while rhythm is running
 
-When playback is running, selecting a different rhythm must preserve the current live tempo.
+When playback is running, selecting a different rhythm must preserve the
+current live tempo, percussion activity, chord activity, bass activity, bass
+voicing and the octave of the active chord row. Those live values shape the
+performance independently from the destination pattern's remembered controls.
+The riff-retention rule from section 1.4 continues to apply when bass activity
+is `R`.
 
 Initial state:
 
@@ -248,19 +255,24 @@ Required result:
 ```text
 rhythm = B
 effective tempo = T
+effective activities = those of rhythm A
+active chord-row octave = unchanged
 running = true
 ```
 
-The following invariant applies:
+The following invariants apply:
 
 ```text
 effectiveTempoAfterSwitch == effectiveTempoBeforeSwitch
+effectiveActivitiesAfterSwitch == effectiveActivitiesBeforeSwitch
+activeRowOctaveAfterSwitch == activeRowOctaveBeforeSwitch
 ```
 
 not:
 
 ```text
 effectiveTempoAfterSwitch == storedTempoOfNewRhythm
+effectiveActivitiesAfterSwitch == storedActivitiesOfNewRhythm
 ```
 
 Example:
@@ -428,7 +440,7 @@ This is true whether the rhythm happens to be running or stopped when `STR` is u
 | User action | Rhythm stopped | Rhythm running |
 |---|---|---|
 | Select preset | Load all preset rhythm controls, riff selector and row octaves; stay stopped | Load preset rhythm; preserve live tempo, three activities, bass voicing, a compatible playing riff and active-row octave; otherwise use the destination riff selector; load non-active-row octaves; stay running |
-| Select rhythm type | Load rhythm and its stored/default tempo; stay stopped | Change rhythm; preserve current live tempo; stay running |
+| Select rhythm type | Load rhythm and its stored/default tempo and activities; stay stopped | Change rhythm; preserve current live tempo, three activities, bass voicing and active-row octave; retain a compatible playing riff or use the preset/default selector; stay running |
 | Preset says rhythm ON | Ignore | Ignore |
 | Preset says rhythm OFF | Ignore | Ignore |
 | Change tempo | Change current displayed/configured tempo | Change effective live sequencer tempo immediately |
@@ -461,13 +473,17 @@ When `rhythmRunning == false`, preset selection must apply the selected preset's
 
 When `rhythmRunning == true`, preset selection must preserve the currently effective live tempo.
 
-### RHYTHM-005 — stopped rhythm selection applies rhythm tempo
+### RHYTHM-005 — stopped rhythm selection applies stored controls
 
-When `rhythmRunning == false`, selecting a rhythm type must apply that rhythm's stored/default tempo.
+When `rhythmRunning == false`, selecting a rhythm type must apply that rhythm's
+stored/default tempo and percussion, chord and bass activity.
 
-### RHYTHM-006 — running rhythm selection preserves live tempo
+### RHYTHM-006 — running rhythm selection preserves live controls
 
-When `rhythmRunning == true`, selecting a rhythm type must preserve the currently effective live tempo.
+When `rhythmRunning == true`, selecting a rhythm type must preserve the
+currently effective live tempo, percussion activity, chord activity, bass
+activity, bass voicing and active-row octave. A compatible playing riff is
+retained by ID; otherwise the preset/default selector is used.
 
 ### RHYTHM-007 — live changes do not stop the sequencer
 
@@ -497,9 +513,10 @@ While rhythm playback is running, the tempo shown in the GUI must equal the effe
 
 If the user manually changes the tempo while running, that tempo must remain effective through subsequent live preset selections until the user explicitly changes tempo or stops and selects another stored configuration.
 
-### RHYTHM-014 — manual tempo survives live rhythm changes
+### RHYTHM-014 — manual controls survive live rhythm changes
 
-If the user manually changes the tempo while running, that tempo must remain effective through subsequent live rhythm-type changes.
+If the user manually changes tempo or any activity while running, those values
+must remain effective through subsequent live rhythm-type changes.
 
 ### RHYTHM-015 — starting uses current visible configuration
 

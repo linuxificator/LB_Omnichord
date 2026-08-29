@@ -527,7 +527,10 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
   The largest current riff uses 34 of its 56 tags. Tuning/chord pitch changes
   may replace both bass and automatic-chord ranges but must not touch
   percussion or stop transport.
-- A live rhythm-style or preset change must preserve tempo and sequencer timebase; it may replace tagged pattern events but may not stop/restart transport or issue `RESET_SEQUENCER`.
+- A live rhythm-style or preset change must preserve tempo, all three activity
+  values, bass voicing, the active-row octave and sequencer timebase. It may
+  replace tagged pattern events but may not stop/restart transport or issue
+  `RESET_SEQUENCER`.
 
 **Failure history:** whole-sequencer rebuilds were used for chord hold/release, pitch changes and other lane-local operations. On the ESP32-P4 this could make the rhythm audibly disappear while a manual chord was held and then return on release.
 

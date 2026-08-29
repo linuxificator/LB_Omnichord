@@ -585,17 +585,33 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("releaseChord", 0, 0)
             app.bridge.wait_for_lines(["l0i3Z"], start=checkpoint, timeout=3.0)
 
-    def test_running_rhythm_switch_keeps_tempo_and_clock_running(self) -> None:
+    def test_running_rhythm_switch_keeps_live_controls_and_clock_running(
+        self,
+    ) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
 
-            # Give two styles distinct remembered tempos while stopped.
+            # Give three styles distinct remembered controls while stopped.
             app.action("setRhythmIndex", 0)
             app.action("setRhythmTempo", 100.0)
+            app.action("setRhythmBusyness", 4.0)
+            app.action("setRhythmChordActivity", 3.0)
+            app.action("setRhythmBassActivity", 4.0)
             app.action("setRhythmIndex", 1)
             app.action("setRhythmTempo", 80.0)
+            app.action("setRhythmBusyness", 1.0)
+            app.action("setRhythmChordActivity", 2.0)
+            app.action("setRhythmBassActivity", 1.0)
+            app.action("setRhythmIndex", 2)
+            app.action("setRhythmTempo", 73.0)
+            app.action("setRhythmBusyness", 2.0)
+            app.action("setRhythmChordActivity", 4.0)
+            app.action("setRhythmBassActivity", 3.0)
             app.action("setRhythmIndex", 0)
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
+            app.action("selectChord", 0, 0)
+            app.action("setRowOctave", 0, 2)
+            app.action("setBassVoicingShift", -2.0)
 
             app.action("toggleRhythm")
             self.assertTrue(bool(app.query("rhythmRunning")))
@@ -607,6 +623,11 @@ class PresetIntegrationTests(unittest.TestCase):
 
             self.assertTrue(bool(app.query("rhythmRunning")))
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
+            self.assertEqual(int(app.query("rhythmBusyness")), 4)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 3)
+            self.assertEqual(int(app.query("rhythmBassActivity")), 4)
+            self.assertEqual(int(app.query("bassVoicingShift")), -2)
+            self.assertEqual(int(app.action("octaveIndexForRow", 0)), 2)
 
             switched = app.bridge.lines_since(checkpoint)
             self.assertNotIn(
@@ -637,14 +658,13 @@ class PresetIntegrationTests(unittest.TestCase):
             )
 
             # Stopped switching still recalls the destination style's own
-            # stored tempo; only live switching transfers tempo.
+            # stored controls; only live switching transfers them.
             app.action("toggleRhythm")
             app.action("setRhythmIndex", 2)
-            app.action("setRhythmTempo", 73.0)
-            app.action("setRhythmIndex", 0)
-            self.assertAlmostEqual(float(app.query("rhythmTempo")), 100.0)
-            app.action("setRhythmIndex", 2)
             self.assertAlmostEqual(float(app.query("rhythmTempo")), 73.0)
+            self.assertEqual(int(app.query("rhythmBusyness")), 2)
+            self.assertEqual(int(app.query("rhythmChordActivity")), 4)
+            self.assertEqual(int(app.query("rhythmBassActivity")), 3)
 
     def test_running_preset_switch_preserves_live_rhythm_controls(self) -> None:
         with HeadlessApp(native_amy=False) as app:

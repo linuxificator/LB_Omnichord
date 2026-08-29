@@ -412,7 +412,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Slot(int)
     def setRhythmIndex(self, rhythm_index: int) -> None:
-        """Switch rhythm style without changing a running transport tempo."""
+        """Switch style without replacing controls shaping a running rhythm."""
         self._stop_tempo_nudge()
         if not 0 <= rhythm_index < len(self._rhythms):
             return
@@ -424,10 +424,20 @@ class InstrumentBackend(app_core.InstrumentBackend):
             if self._bass_riff_is_playing()
             else None
         )
-        running_tempo = self._rhythm.tempo_by_rhythm[previous_index]
+        live_controls = (
+            self._rhythm.tempo_by_rhythm[previous_index],
+            self._rhythm.busyness_by_rhythm[previous_index],
+            self._rhythm.chord_activity_by_rhythm[previous_index],
+            self._rhythm.bass_activity_by_rhythm[previous_index],
+        )
         self._rhythm.selected_index = rhythm_index
         if self._rhythm_running:
-            self._rhythm.tempo_by_rhythm[rhythm_index] = running_tempo
+            (
+                self._rhythm.tempo_by_rhythm[rhythm_index],
+                self._rhythm.busyness_by_rhythm[rhythm_index],
+                self._rhythm.chord_activity_by_rhythm[rhythm_index],
+                self._rhythm.bass_activity_by_rhythm[rhythm_index],
+            ) = live_controls
         self._reconcile_bass_riff_context(
             preserve_riff_id=preserve_riff_id,
             force=True,
