@@ -8,6 +8,24 @@ Prefer the simplest architecture with clear separation of responsibilities. Do n
 
 Do not silently reinterpret an implementation task as an architecture redesign.
 
+## Branch, physical acceptance and release gate
+
+- Never implement or commit a task directly on `main`. Before editing, create
+  or switch to a task-specific feature/fix branch and keep the work there
+  through automated validation and user testing.
+- Treat local tests, hosted CI and synthesized input as necessary engineering
+  evidence, not as a substitute for physical-device, audible-output or manual
+  UI acceptance when the changed behavior can only be confirmed that way.
+- Do not merge to `main`, push a `main` update, create a release or trigger a
+  release-producing workflow until the user has tested the branch result and
+  explicitly approved that specific result for merge/release.
+- A general instruction given before implementation such as “merge/release if
+  it works” is not post-implementation acceptance. Report the ready branch and
+  wait for explicit approval after the user has had the opportunity to test it.
+- Only skip this gate when the user explicitly waives the physical/manual test
+  for that specific change or explicitly directs an immediate merge/release
+  after reviewing the completed result.
+
 ## Repository direction
 
 - The active synthesizer implementation uses **AMY / amysynth**.

@@ -38,6 +38,21 @@ listed explicitly because their process, PTY and native-engine requirements
 differ. `test-artifacts/<suite>/` is recreated for every suite invocation and
 is intentionally ignored by Git.
 
+## Branch and human acceptance gate
+
+Implementation work is performed on a task-specific feature/fix branch, never
+directly on `main`. Passing local tests and hosted CI makes a branch a release
+candidate; it does not make physical input, audible output or manual UI
+behavior accepted.
+
+Because every update of `main` starts the release-producing desktop workflow,
+the branch may be merged only after the user has tested the completed branch
+result and explicitly approved that specific result for merge/release. A
+general pre-implementation instruction to merge or release “if it works” is
+not post-implementation acceptance. The gate may be skipped only when the user
+explicitly waives the applicable physical/manual test for that specific
+change.
+
 ## GitHub Actions
 
 Four repository workflows are maintained:
