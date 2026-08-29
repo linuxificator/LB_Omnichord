@@ -357,10 +357,21 @@ class StaticContractTests(unittest.TestCase):
         gate_start = qml.index("id: chordGateButton")
         gate_end = qml.index("RainbowModeButton {", gate_start)
         gate = qml[gate_start:gate_end]
-        self.assertIn('color: "#4c3505"', gate)
-        self.assertIn(': "#fbf0bd"', gate)
-        self.assertIn('border.color: "#d2b650"', gate)
-        self.assertNotIn("chordGateButton.selected", gate)
+        activity_selector = (
+            ROOT / "gui" / "ActivitySelector.qml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("backend.chordGateState === 1", gate)
+        for color in (
+            '"#fff9dd"',
+            '"#4c3b08"',
+            '"#c79214"',
+            '"#e1ca6a"',
+            '"#f3e5a5"',
+            '"#96720f"',
+        ):
+            self.assertIn(color, gate)
+            self.assertIn(color, activity_selector)
+        self.assertIn("chordGateButton.selectedState ? 2 : 1", gate)
         self.assertIn("backend.rollChordRows(-1)", qml)
         self.assertIn("backend.rollChordRows(1)", qml)
 

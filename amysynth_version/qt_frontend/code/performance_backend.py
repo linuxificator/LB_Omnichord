@@ -85,8 +85,8 @@ class InstrumentBackend(app_core.InstrumentBackend):
     @Property(str, notify=chordGateChanged)
     def chordGateButtonText(self) -> str:
         if self._chord_gate_state == CHORD_GATE_ON:
-            return "CHORD\nOFF"
-        return "CHORD\nON"
+            return "CHORD\nON"
+        return "CHORD\nOFF"
 
     @Property(bool, notify=chordGateChanged)
     def isOff(self) -> bool:

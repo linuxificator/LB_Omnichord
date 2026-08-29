@@ -598,6 +598,9 @@ that prevented hanging but audibly shortened the accompaniment gate.
 
 - The control starts OFF, is usable before a chord is selected and retains its
   own state when any chord button is pressed or released.
+- Its label reports the current state rather than the next action: `CHORD ON`
+  means sequencer chords are enabled and `CHORD OFF` means they are disabled.
+  ON uses the selected chord-activity colors; OFF uses its unselected colors.
 - `CHORD OFF` removes future automatic synth-4 onsets while preserving the
   sequenced release of a currently sounding automatic chord.
 - `CHORD ON` reinstalls automatic synth-4 events without playing the remembered

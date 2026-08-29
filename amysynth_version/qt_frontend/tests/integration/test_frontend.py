@@ -285,6 +285,7 @@ class FrontendIntegrationTests(unittest.TestCase):
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
             self.assertEqual(int(app.query("chordGateState")), 2)
+            self.assertEqual(str(app.query("chordGateButtonText")), "CHORD\nOFF")
 
             # Activity zero is no longer user-selectable. It is reserved as
             # the transient effective value while a manual chord takes over.
@@ -296,8 +297,10 @@ class FrontendIntegrationTests(unittest.TestCase):
             # remains independent of subsequent chord selection.
             app.action("toggleChordGate")
             self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertEqual(str(app.query("chordGateButtonText")), "CHORD\nON")
             app.action("toggleChordGate")
             self.assertEqual(int(app.query("chordGateState")), 2)
+            self.assertEqual(str(app.query("chordGateButtonText")), "CHORD\nOFF")
 
             # A tap starts manual synth 3 and selects the chord for strum and
             # accompaniment, but never enters the temporary hold override.

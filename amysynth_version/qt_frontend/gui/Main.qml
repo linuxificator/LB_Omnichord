@@ -1563,12 +1563,18 @@ ApplicationWindow {
                 height: window.rowHeight
                 text: backend.chordGateButtonText
 
+                readonly property bool selectedState:
+                    backend.chordGateState === 1
+
                 font.pixelSize: 14
                 font.bold: true
 
                 contentItem: Text {
                     text: chordGateButton.text
-                    color: "#4c3505"
+                    color:
+                        chordGateButton.selectedState
+                        ? "#fff9dd"
+                        : "#4c3b08"
                     font: chordGateButton.font
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
@@ -1577,15 +1583,16 @@ ApplicationWindow {
                 background: Rectangle {
                     radius: 9
                     color:
-                        chordGateButton.pressed
-                        ? "#e0c14e"
+                        chordGateButton.selectedState
+                        ? "#c79214"
                         : (
-                            chordGateButton.hovered
-                            ? "#f4dc78"
-                            : "#fbf0bd"
+                            chordGateButton.pressed
+                            ? "#e1ca6a"
+                            : "#f3e5a5"
                         )
-                    border.color: "#d2b650"
-                    border.width: 1
+                    border.color: "#96720f"
+                    border.width:
+                        chordGateButton.selectedState ? 2 : 1
                 }
 
                 onClicked:

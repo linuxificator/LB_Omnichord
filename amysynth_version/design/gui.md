@@ -101,10 +101,12 @@ automatic-chord gate.
 While a manual chord temporarily suppresses sequencer chords, none of the four
 chord-activity buttons is selected; the stored level remains unchanged.
 
-The `CHORD ON/OFF` button uses the yellow rhythm-section palette. Its binary
-state exists independently of the active chord and is available before a chord
-has been selected. Selecting, pressing or releasing a chord must never change
-that state.
+The `CHORD ON/OFF` button reports its current state: `CHORD ON` means sequencer
+chords are enabled and `CHORD OFF` means they are disabled. Its ON appearance
+matches a selected chord-activity button; its OFF appearance matches an
+unselected chord-activity button. This binary state exists independently of the
+active chord and is available before a chord has been selected. Selecting,
+pressing or releasing a chord must never change that state.
 
 Each musical chord key uses one Qt `TapHandler` path for mouse, touchscreen,
 stylus and other supported pointer devices. Qt owns press, release and
