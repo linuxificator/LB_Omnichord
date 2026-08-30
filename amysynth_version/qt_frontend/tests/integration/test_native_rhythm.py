@@ -8,6 +8,24 @@ from catalog import control_default, patch_for_index, synth_index
 from harness import HeadlessApp
 
 
+CHORD_PATTERN_START = 936
+DRUM_BASE_PATTERN_START = 1000
+
+
+def is_chord_trigger(line: str) -> bool:
+    match = re.match(
+        r"^H\d+,\d+,(?P<tag>\d+)zQT(?P<pattern>\d+),0,0Z$",
+        line,
+    )
+    return bool(
+        match
+        and 112 <= int(match.group("tag")) < 252
+        and CHORD_PATTERN_START
+        <= int(match.group("pattern"))
+        < DRUM_BASE_PATTERN_START
+    )
+
+
 def normalized_timbre(commands: list[str]) -> list[str]:
     # Voice-pool metadata and synth 4's intentional no-warning policy are not
     # timbre. Normalize those and compare every oscillator command exactly.
@@ -208,7 +226,7 @@ class NativeRhythmTests(unittest.TestCase):
             scheduled_chords = [
                 line
                 for line in switched_lines
-                if line.startswith("H") and "i4Z" in line
+                if is_chord_trigger(line)
             ]
             self.assertTrue(
                 scheduled_chords,

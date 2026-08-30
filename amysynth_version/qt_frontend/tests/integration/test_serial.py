@@ -9,6 +9,8 @@ from harness import HeadlessApp
 
 
 _NOTE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
+CHORD_PATTERN_START = 936
+DRUM_BASE_PATTERN_START = 1000
 
 
 def wire_float(value: float) -> str:
@@ -16,15 +18,53 @@ def wire_float(value: float) -> str:
 
 
 def scheduled_note_ons(lines: list[str], synth: int) -> list[float]:
-    pattern = re.compile(
+    direct_pattern = re.compile(
         rf"^H\d+,\d+,\d+n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
     )
+    definition_pattern = re.compile(
+        rf"^zQE(?P<pattern>\d+),\d+,\d+,\d+"
+        rf"n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
+    )
+    trigger_pattern = re.compile(
+        r"^H\d+,\d+,\d+zQT(?P<pattern>\d+),0,0Z$"
+    )
+    begin_pattern = re.compile(r"^zQB(?P<pattern>\d+),\d+Z$")
+    definitions: dict[int, list[float]] = {}
     notes: list[float] = []
     for line in lines:
-        match = pattern.match(line)
+        match = begin_pattern.match(line)
+        if match:
+            definitions[int(match.group("pattern"))] = []
+            continue
+        match = direct_pattern.match(line)
         if match and float(match.group("vel")) > 0.0:
             notes.append(float(match.group("note")))
+            continue
+        match = definition_pattern.match(line)
+        if match and float(match.group("vel")) > 0.0:
+            definitions.setdefault(int(match.group("pattern")), []).append(
+                float(match.group("note"))
+            )
+        match = trigger_pattern.match(line)
+        if match:
+            notes.extend(definitions.get(int(match.group("pattern")), []))
     return notes
+
+
+def chord_trigger(line: str) -> tuple[int, int] | None:
+    match = re.match(
+        r"^H\d+,\d+,(?P<tag>\d+)zQT(?P<pattern>\d+),0,0Z$",
+        line,
+    )
+    if match is None:
+        return None
+    tag = int(match.group("tag"))
+    pattern = int(match.group("pattern"))
+    if not 112 <= tag < 252:
+        return None
+    if not CHORD_PATTERN_START <= pattern < DRUM_BASE_PATTERN_START:
+        return None
+    return tag, pattern
 
 
 def immediate_note_ons(lines: list[str], synth: int) -> list[float]:
@@ -147,7 +187,7 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertNotIn(native_cutoff4, lines)
             self.assertNotIn(f"K{chorus_patch}i4if8Z", lines)
             self.assertTrue(
-                any(line.startswith("H") and "i4Z" in line for line in lines),
+                any(chord_trigger(line) is not None for line in lines),
                 "no rhythm-chord events were scheduled",
             )
 
@@ -436,7 +476,7 @@ class SerialIntegrationTests(unittest.TestCase):
             arpeggio_start = app.bridge.count()
             app.action("toggleChordArpeggio")
             app.bridge.wait_for_line_match(
-                lambda line: line.startswith("H") and "i4Z" in line,
+                lambda line: chord_trigger(line) is not None,
                 "ascending arpeggio chord tags",
                 start=arpeggio_start,
                 timeout=8.0,
@@ -448,12 +488,10 @@ class SerialIntegrationTests(unittest.TestCase):
                 [48.0, 52.0, 55.0, 58.0, 62.0, 65.0, 69.0],
             )
             for line in arpeggio_lines:
-                if not line.startswith("H"):
+                trigger = chord_trigger(line)
+                if trigger is None:
                     continue
-                match = re.match(r"^H\d+,\d+,(\d+)", line)
-                self.assertIsNotNone(match)
-                assert match is not None
-                tag = int(match.group(1))
+                tag, _ = trigger
                 self.assertGreaterEqual(tag, 112)
                 self.assertLess(tag, 252)
             self.assertFalse(
@@ -471,11 +509,7 @@ class SerialIntegrationTests(unittest.TestCase):
             direction_start = app.bridge.count()
             app.action("toggleChordArpeggioDirection")
             app.bridge.wait_for_line_match(
-                lambda line: (
-                    line.startswith("H")
-                    and "n69" in line
-                    and "i4Z" in line
-                ),
+                lambda line: chord_trigger(line) is not None,
                 "descending arpeggio chord tags",
                 start=direction_start,
                 timeout=8.0,
@@ -489,7 +523,7 @@ class SerialIntegrationTests(unittest.TestCase):
             whole_chord_start = app.bridge.count()
             app.action("toggleChordArpeggio")
             app.bridge.wait_for_line_match(
-                lambda line: line.startswith("H") and "i4Z" in line,
+                lambda line: chord_trigger(line) is not None,
                 "whole-chord tags after arpeggio off",
                 start=whole_chord_start,
                 timeout=8.0,
@@ -680,12 +714,15 @@ class SerialIntegrationTests(unittest.TestCase):
             seed = app.bridge.count()
             app.action("selectChord", 0, 0)
             app.action("toggleChordGate")
+            if not bool(app.query("chordArpeggioEnabled")):
+                app.action("toggleChordArpeggio")
+            app.action("setChordArpeggioRate", 2.0)
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 seeded = app.bridge.lines_since(seed)
                 if (
                     any(line.startswith("H") and "i1Z" in line for line in seeded)
-                    and any(line.startswith("H") and "i4Z" in line for line in seeded)
+                    and any(chord_trigger(line) is not None for line in seeded)
                 ):
                     break
                 time.sleep(0.01)
@@ -694,25 +731,12 @@ class SerialIntegrationTests(unittest.TestCase):
             time.sleep(0.75)  # allow one-shot chord release timer to drain
             app.bridge.wait_idle(timeout=8.0)
             seeded = app.bridge.lines_since(seed)
-            scheduled_tag = re.compile(
-                r"^H\d+,\d+,(?P<tag>\d+)(?P<body>.*)$"
-            )
-            chord_on_tags: set[int] = set()
-            chord_off_tags: set[int] = set()
-            for line in seeded:
-                match = scheduled_tag.match(line)
-                if match is None:
-                    continue
-                tag = int(match.group("tag"))
-                if not 112 <= tag < 252:
-                    continue
-                body = match.group("body")
-                if body == "l0i4Z":
-                    chord_off_tags.add(tag)
-                elif "i4Z" in body and body.startswith("n"):
-                    chord_on_tags.add(tag)
-            self.assertTrue(chord_on_tags, seeded)
-            self.assertTrue(chord_off_tags, seeded)
+            chord_trigger_tags = {
+                trigger[0]
+                for line in seeded
+                if (trigger := chord_trigger(line)) is not None
+            }
+            self.assertTrue(chord_trigger_tags, seeded)
 
             start = app.bridge.count()
             app.action("pressChord", 0, 0)
@@ -739,10 +763,10 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=8.0)
             delta = app.bridge.lines_since(start)
 
-            # Finger-down starts synth 3 immediately, but does not truncate a
-            # sounding rhythm chord. Only future synth-4 onsets are removed;
-            # its sequenced all-off tags remain to end the existing chord at
-            # the original rhythmic gate.
+            # Finger-down starts synth 3 immediately. Promotion removes only
+            # future child triggers. A child which already fired owns its
+            # immutable note-off, so no root release tag needs retaining and
+            # no immediate synth-4 all-off is allowed.
             self.assertNotIn("l0i4Z", delta)
             manual_note_pattern = re.compile(
                 rf"^n{_NOTE}l(?P<vel>{_NOTE})i3Z$"
@@ -762,17 +786,9 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertTrue(cancellations, delta)
             cancel_tags = {int(line.split(",", 2)[2][:-1]) for line in cancellations}
             self.assertTrue(all(112 <= tag < 252 for tag in cancel_tags), cancel_tags)
-            self.assertTrue(chord_on_tags <= cancel_tags, (chord_on_tags, cancel_tags))
-            self.assertFalse(chord_off_tags & cancel_tags, (chord_off_tags, cancel_tags))
-            rewritten_off_tags = {
-                int(match.group("tag"))
-                for line in delta
-                if (match := scheduled_tag.match(line)) is not None
-                and match.group("body") == "l0i4Z"
-            }
             self.assertTrue(
-                chord_off_tags <= rewritten_off_tags,
-                (chord_off_tags, rewritten_off_tags),
+                chord_trigger_tags <= cancel_tags,
+                (chord_trigger_tags, cancel_tags),
             )
             self.assertFalse(
                 any(
@@ -792,7 +808,10 @@ class SerialIntegrationTests(unittest.TestCase):
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 release_delta = app.bridge.lines_since(release_start)
-                if any(line.startswith("H") and "i4Z" in line for line in release_delta):
+                if any(
+                    chord_trigger(line) is not None
+                    for line in release_delta
+                ):
                     break
                 time.sleep(0.01)
             else:
@@ -804,6 +823,105 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertFalse(any("i0Z" in line for line in release_delta if line.startswith("H")))
             self.assertFalse(any("i1Z" in line for line in release_delta if line.startswith("H")))
             self.assertTrue(bool(app.query("rhythmRunning")))
+
+    def test_arpeggio_rate_switch_keeps_running_note_gate_owned_by_old_rate(
+        self,
+    ) -> None:
+        """A /2 child keeps its 17-tick off when future triggers become /4."""
+        begin_pattern = re.compile(r"^zQB(?P<pattern>\d+),(?P<length>\d+)Z$")
+        off_pattern = re.compile(
+            rf"^zQE(?P<pattern>\d+),(?P<tick>\d+),0,1"
+            rf"n(?P<note>{_NOTE})l0i4Z$"
+        )
+        any_definition = re.compile(r"^zQ[BEC](?P<pattern>\d+)")
+
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("setRhythmIndex", 0)
+            app.action("setTuningModeIndex", 1)
+            app.action("setRowChordType", 0, 27)
+            app.action("selectChord", 0, 0)
+            app.action("setRhythmChordActivity", 4.0)
+            if int(app.query("chordGateState")) != 1:
+                app.action("toggleChordGate")
+            if not bool(app.query("chordArpeggioEnabled")):
+                app.action("toggleChordArpeggio")
+            if not bool(app.query("rhythmRunning")):
+                app.action("toggleRhythm")
+            app.action("setChordArpeggioRate", 1.0)
+            app.bridge.wait_idle(timeout=10.0)
+
+            rate2_start = app.bridge.count()
+            app.action("setChordArpeggioRate", 2.0)
+            app.bridge.wait_for_line_match(
+                lambda line: chord_trigger(line) is not None,
+                "/2 child triggers",
+                start=rate2_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=10.0)
+            rate2_lines = app.bridge.lines_since(rate2_start)
+            rate2_patterns = {
+                int(match.group("pattern"))
+                for line in rate2_lines
+                if (match := begin_pattern.match(line)) is not None
+                and int(match.group("length")) == 18
+            }
+            rate2_offs = {
+                int(match.group("pattern")): float(match.group("note"))
+                for line in rate2_lines
+                if (match := off_pattern.match(line)) is not None
+                and int(match.group("tick")) == 17
+            }
+            rate2_triggers = {
+                trigger[1]
+                for line in rate2_lines
+                if (trigger := chord_trigger(line)) is not None
+            }
+            self.assertEqual(rate2_patterns, set(rate2_offs))
+            self.assertTrue(rate2_triggers <= rate2_patterns)
+            self.assertGreaterEqual(len(set(rate2_offs.values())), 7)
+
+            rate4_start = app.bridge.count()
+            app.action("setChordArpeggioRate", 4.0)
+            app.bridge.wait_for_line_match(
+                lambda line: chord_trigger(line) is not None,
+                "/4 child triggers",
+                start=rate4_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=10.0)
+            rate4_lines = app.bridge.lines_since(rate4_start)
+            rate4_patterns = {
+                int(match.group("pattern"))
+                for line in rate4_lines
+                if (match := begin_pattern.match(line)) is not None
+                and int(match.group("length")) == 10
+            }
+            rate4_offs = {
+                int(match.group("pattern")): float(match.group("note"))
+                for line in rate4_lines
+                if (match := off_pattern.match(line)) is not None
+                and int(match.group("tick")) == 9
+            }
+            rate4_triggers = {
+                trigger[1]
+                for line in rate4_lines
+                if (trigger := chord_trigger(line)) is not None
+            }
+            self.assertEqual(rate4_patterns, set(rate4_offs))
+            self.assertTrue(rate4_triggers <= rate4_patterns)
+            self.assertTrue(rate2_patterns.isdisjoint(rate4_patterns))
+            rewritten_patterns = {
+                int(match.group("pattern"))
+                for line in rate4_lines
+                if (match := any_definition.match(line)) is not None
+            }
+            self.assertFalse(rate2_patterns & rewritten_patterns)
+            self.assertNotIn("l0i4Z", rate4_lines)
+            self.assertNotIn("zY0Z", rate4_lines)
+            self.assertNotIn("zY1Z", rate4_lines)
+            self.assertFalse(any(line.startswith("S") for line in rate4_lines))
 
     def test_quick_chord_tap_never_drains_automatic_chord_lane(self) -> None:
         with HeadlessApp(native_amy=False) as app:
@@ -901,7 +1019,7 @@ class SerialIntegrationTests(unittest.TestCase):
                 seeded = app.bridge.lines_since(seed)
                 if (
                     any(line.startswith("H") and "i1Z" in line for line in seeded)
-                    and any(line.startswith("H") and "i4Z" in line for line in seeded)
+                    and any(chord_trigger(line) is not None for line in seeded)
                 ):
                     break
                 time.sleep(0.01)
@@ -947,22 +1065,17 @@ class SerialIntegrationTests(unittest.TestCase):
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 lines = app.bridge.lines_since(start)
-                if any(line.startswith("H") and "i4Z" in line for line in lines):
+                if any(chord_trigger(line) is not None for line in lines):
                     break
                 time.sleep(0.01)
             else:
                 self.fail("chord lane was not reinstalled")
             self.assertEqual(int(app.query("chordGateState")), 1)
-            chord_tags = []
+            chord_tags: list[int] = []
             for line in lines:
-                if not line.startswith("H") or "i4Z" not in line:
-                    continue
-                header = line[1:].split("i", 1)[0]
-                parts = header.split(",", 3)
-                if len(parts) >= 3:
-                    tag_text = re.match(r"(\d+)", parts[2])
-                    if tag_text:
-                        chord_tags.append(int(tag_text.group(1)))
+                trigger = chord_trigger(line)
+                if trigger is not None:
+                    chord_tags.append(trigger[0])
             self.assertTrue(chord_tags, lines)
             self.assertTrue(all(112 <= tag < 252 for tag in chord_tags), chord_tags)
 

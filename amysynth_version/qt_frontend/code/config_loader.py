@@ -5,6 +5,9 @@ from pathlib import Path
 from typing import Any
 
 
+CHORD_VOICE_CAPACITY = 7
+
+
 def load_amy_config(path: Path) -> dict[str, Any]:
     """Load the one authoritative AMY frontend configuration file.
 
@@ -42,6 +45,18 @@ def load_amy_config(path: Path) -> dict[str, Any]:
             f"{path} is missing required AMY configuration sections: "
             + ", ".join(missing)
         )
+
+    voices = data["voices"]
+    if not isinstance(voices, dict):
+        raise ValueError("voices must be a JSON object")
+    for role in ("manual_chord", "rhythm_chord"):
+        available = int(voices.get(role, 0))
+        if available < CHORD_VOICE_CAPACITY:
+            raise ValueError(
+                f"voices.{role} must be at least {CHORD_VOICE_CAPACITY}; "
+                "the chord catalogue and sequenced arpeggios contain up to "
+                f"{CHORD_VOICE_CAPACITY} distinct notes"
+            )
 
     # Keep the old transport implementation source-compatible while program
     # resolution moves out of its ROM-only patch map.  This map is derived at

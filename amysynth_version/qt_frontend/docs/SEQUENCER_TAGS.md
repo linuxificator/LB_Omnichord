@@ -16,11 +16,13 @@ tag namespace is local to each definition and the integration profile allows
 | --- | ---: | ---: | ---: |
 | Fill launches | 0..55 | 56 | 10 root triggers in the largest current fill supercycle |
 | Bass | 56..111 | 56 | 28 hits × note-on/off (`seven_four_funk`) |
-| Automatic chords/arpeggios | 112..251 | 140 | whole chords: 140 (`seven_four_funk`); compacted 2–7-note arpeggios: 84 |
+| Automatic chord child triggers | 112..251 | 140 | compacted 2–7-note arpeggios: 42 (`soul`) |
 | Spare | 252..255 | 4 | unused |
 
-Base-role pattern IDs are 1000 upward and their stable instance tags are 1000
-upward. Fill IDs are 0..999. These are separate namespaces from root tags.
+Fill pattern IDs are 0..935; the current library occupies 0..269. Automatic
+chord one-shots reserve 936..999. Base-role pattern IDs are 1000 upward and
+their stable instance tags are 1000 upward; the current 18 roles occupy
+1000..1017, leaving 1018..1023 spare. These are separate namespaces from root tags.
 `tests/test_sequencer_tags.py` and `tests/test_drum_patterns.py` recalculate
 the maxima. Adding data which no longer fits must fail CI rather than silently
 drop events.
@@ -35,12 +37,11 @@ live replacement is quantized to a whole-bar boundary.
 
 Lane-local operations do not reset the sequencer:
 
-- a quick chord tap starts/stops manual synth 3 and selects the active chord for
-  strum, bass and automatic chords. The corresponding bass/chord pitch schedules
-  are replaced while transport and the automatic-chord lane remain enabled; it
-  does not perform the hold-specific drain of synth-4 note-on tags;
-- promotion to a manual chord hold and restoration after release change only the automatic-chord tag range (and may update bass pitches because the active chord changed). Pointer-up separately stops manual synth 3 immediately; that direct note lifetime has no sequencer delay. On hold promotion, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
-- `CHORD OFF` performs the same synth-4 drain and `CHORD ON` reinstalls that
+- a quick chord tap starts/stops manual synth 3 and immediately selects the
+  active chord for strum, bass and future automatic-child definitions. Active
+  children retain their immutable old pitch and release;
+- promotion to a manual chord hold and restoration after release change only the automatic-chord tag range (and may update bass pitches because the active chord changed). Pointer-up separately stops manual synth 3 immediately; that direct note lifetime has no sequencer delay. On hold promotion every future synth-4 child trigger is cleared. An already-running child still owns its original note-off and reaches its configured gate; manual synth-3 note-ons may overlap it;
+- `CHORD OFF` clears the same future triggers and `CHORD ON` reinstalls that
   lane. These controls never trigger or release manual synth-3 voices;
 - chord-arpeggio `A`, `/1..4` and `U/D` changes replace only the automatic
   chord range. With `A` off, rate and direction remain editable preset state
@@ -67,20 +68,25 @@ catalogue currently needs at most 34 bass tags (17 notes), below the existing
 pattern; its 96-PPQ ticks are converted to AMY's 48-PPQ sequencer units without
 deriving or quantizing them from `rhythms.json` `bass_levels`.
 
-Arpeggios expand every selected `chord_events` onset into every note of the
-active 2–7-note chord. `/1..4` maps to a 48, 24, 16 or 12-tick interval. Note
-gates use the normal `chord_gate_beats` value as the sounding fraction of that
-subdivision, and direction only reverses the current low-to-high chord voicing.
-Generated ticks are circular and each complete arpeggio continues across the
-end of the rhythm period.
+Arpeggios expand every selected `chord_events` onset into a root trigger for
+every note of the active 2–7-note chord. Each trigger launches an untagged
+`ONE_SHOT` child containing exactly one synth-4 note-on and its note-specific
+off. `/1..4` maps to a 48, 24, 16 or 12-tick interval and to four disjoint
+pattern-ID families. Note gates use the normal `chord_gate_beats` value as the
+sounding fraction of that subdivision, and direction only reverses which child
+IDs the root tags launch. Generated trigger ticks are circular.
 
 One AMY tag can safely encode several of these occurrences when an identical
 wire body has an exact shorter period which divides the full rhythm period.
 The frontend folds only complete residue classes: expanding every compacted tag
 over the full period yields exactly the original tick/body set. Coincident
-identical events are one audible retrigger and are stored once. The catalogue
+identical triggers are one audible retrigger and are stored once. The catalogue
 audit covers every rhythm, visible chord activity, rate and 2–7-note chord;
-the current worst case is 84 tags, below the existing 140-tag range. The
+the current worst case is 42 tags, below the existing 140-tag range. At most 58
+of the reserved 64 chord definitions are needed for all four rates, seven notes,
+two catalogue velocities and whole-chord children. The joint instance audit
+counts overlapping chord children, the maximum active drum roles and one fill
+on every tick; its worst case is 30 of the configured 32 instances. The
 rhythm-chord synth has seven voices so a circular overlap can sound every chord
 tone instead of truncating the set to the old four-voice whole-chord limit.
 
@@ -94,26 +100,15 @@ and queues `zY1` last.
 
 Stopping transport is different from clearing a lane. `zY0` prevents future sequencer events from firing, so a note that is currently sounding cannot rely on its later tagged note-off. Stop therefore performs an explicit all-off immediately after `zY0` for the rhythm-owned synths: percussion synth 0, bass synth 1 and automatic-chord synth 4. Manual chord synth 3 and strum synth 2 are deliberately left alone because they are controlled directly by the player rather than by rhythm transport.
 
-The same lost-future-note-off rule applies when a promoted manual chord hold
-temporarily closes the automatic-chord lane while transport keeps running. A
-quick tap may replace that lane's pitches but never closes or drains it. Current AMY has
-no deferred tag-clear operation and the wire protocol has no callback when a
-repeating event fires. Because every onset and whole-chord or note-specific
-arpeggio off has its own tag, the
-receiver instead clears only positive-velocity chord onsets and keeps the
-existing bodies ending in `l0i4`. It explicitly reinstalls those note-offs before clearing
-the onsets, so a superseded, partially transmitted lane update cannot lose the
-required release. The retained tags may repeat harmlessly against the
-isolated synth 4 while the lane is disabled. Note-specific arpeggio offs are
-then intentionally unmatched after their first effective release. Automatic
-synth 4 therefore owns AMY `SYNTH_FLAGS_NO_NOTE_WARNINGS` (`if8`), the engine
-policy intended for a sequencer joining or draining mid-bar. The flag suppresses
-only those expected synth-4 diagnostics; manual chord synth 3 and all other
-synths retain normal note-lifecycle warnings. It is included atomically in
-every ROM or physical-model chord allocation. Re-enabling or fully
-reinstalling the lane replaces the retained tags with the authoritative
-schedule. Drums, bass,
-transport/timebase and effects remain untouched.
+Manual-hold promotion and `CHORD OFF` do not share Stop's lost-off problem.
+Their root range contains only future `zQT` triggers, never the releases of
+already-sounding notes. Clearing that range cannot alter an active child's
+immutable definition, so the child executes its original note-off at its
+original gate. `/1`, `/2`, `/3` and `/4` use disjoint pattern families: a live
+rate change authors the new family's short children and replaces future root
+triggers without rewriting the old family. For example, a running `/2` child
+keeps its 17-tick release when future triggers switch to `/4` children with a
+9-tick gate. Drums, bass, transport/timebase and effects remain untouched.
 
 The real-serial regression tests this ordering and also requires the frontend `rhythmRunning` state to become false after Stop. This guards both against hanging accompaniment notes and against a transport button that remains visually stuck on STOP even though the AMY sequencer has stopped.
 

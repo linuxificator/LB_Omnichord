@@ -104,6 +104,14 @@ preset switch loads them. A running preset switch preserves their current live
 values. Toggling `A` or changing an effective arpeggio control replaces only
 the automatic-chord tag range and never stops or resets transport.
 
+The root range schedules only `ONE_SHOT` child triggers. A whole-chord child
+owns all of its onsets and its all-off; an arpeggio child owns one note-on and
+that note's normal off. `/1` through `/4` use disjoint child-pattern families.
+Changing rate removes old future triggers and installs new-rate triggers, but a
+child which has already begun remains immutable and completes its original
+gate. Thus `/2 -> /4` may not cut a sounding `/2` note short, nor may it defer
+that note's off until `/4` next reaches the same pitch.
+
 ## 2. Application startup
 
 Every application start must begin with:
@@ -573,8 +581,7 @@ Chord finger-down must start the manual synth-3 chord immediately. A quick tap
 ends that manual voice on finger-up and immediately selects the chord for the
 strum, bass and automatic chord accompaniment. The affected bass/chord pitch
 schedules are replaced without stopping transport. A tap must not change
-effective chord activity, close the automatic-chord lane or perform the
-hold-specific draining of its note-on tags.
+effective chord activity or close the automatic-chord lane.
 
 If Qt's `TapHandler` reports a long press using its platform long-press style
 hint, the contact is promoted to a manual hold. The backend does not classify
@@ -582,24 +589,10 @@ the contact with another timer. That promotion performs the established
 accompaniment takeover:
 while automatic rhythm chords are enabled it temporarily closes the effective
 automatic-chord lane without changing the independent `CHORD ON/OFF` state. It
-must remove the repeating positive-velocity synth-4 note-on tags, but retain the
-already scheduled synth-4 `l0` tags. Retained note-offs are explicitly
-reinstalled so their delivery does not depend on an older queued lane update. A
-rhythm chord which is sounding when the hold is promoted therefore reaches the
-note-off at its original sequencer gate instead of being cut off immediately or
-hanging because its future note-off was removed.
-
-Current AMY has no deferred tag-removal command or wire callback which says
-that a repeating event has just fired. Its per-event user tags nevertheless
-provide the required behavior: note-on tags and note-off tags are addressed
-independently. While automatic chords are gated off, retained note-off tags may
-continue firing harmless synth-4 all-offs or note-specific arpeggio offs; they
-are replaced or cleared when the lane is enabled, restarted or reset. Because
-repeating arpeggio offs are intentionally unmatched after the first effective
-release, automatic synth 4 uses AMY's `SYNTH_FLAGS_NO_NOTE_WARNINGS` (`if8`).
-That policy is included atomically in every ROM or physical-model allocation
-and is not set on manual synth 3 or any other synth, so unrelated lifecycle
-errors remain observable. Manual synth-3 note-ons begin at
+must remove the repeating future `zQT` triggers. Root tags contain no synth-4
+release: every already-running immutable child owns its own whole-chord or
+note-specific off and reaches that original gate without an immediate all-off.
+Manual synth-3 note-ons begin at
 finger-down and may overlap the remainder of the automatic chord's normal gate
 and release. Drums, bass, transport, effects and sequencer timebase continue.
 
@@ -616,8 +609,8 @@ non-active chord rows load from the destination preset. When
 
 ### RHYTHM-018 — CHORD ON/OFF owns only automatic sequencer chords
 
-`CHORD OFF` drains future synth-4 note-ons while preserving their sequenced
-note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
+`CHORD OFF` removes future synth-4 child triggers; already-running children
+retain their immutable sequenced note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
 chord identity. Neither action may start, retrigger, release or otherwise
 control a manual synth-3 chord. A physically held chord remains owned by its
 chord-button press/release lifecycle.
@@ -660,14 +653,13 @@ sequence is truncated at its end. Overlapping starts remain valid.
 
 Exact repeated tick/body sets may be represented by one AMY tag with a shorter
 period, but expanding those tags over the rhythm cycle must reproduce exactly
-the generated circular event set. Arpeggio changes replace only tags 112..251.
+the generated circular trigger set. Arpeggio changes replace only tags 112..251.
 Every catalogue rhythm, every activity selection, `/1..4` and every supported
 2–7-note chord must fit that existing range. Disabling automatic chords or
-promoting a manual hold retains both whole-chord all-offs and arpeggio
-note-specific offs until their scheduled gates have closed sounding notes.
-The automatic chord synth alone suppresses AMY's expected unmatched-note-off
-diagnostic during this retained-off drain; the events and audio behavior are
-unchanged.
+promoting a manual hold clears future triggers while active children retain
+their whole-chord or note-specific offs. The exhaustive catalogue proof also
+counts overlapping chord children together with the maximum active drum roles
+and one fill; the current worst case is 30 of 32 configured instances.
 
 ## 16. Drum-fill behavior
 

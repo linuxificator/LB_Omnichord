@@ -311,18 +311,21 @@ class StaticContractTests(unittest.TestCase):
         gate_start = transport_py.index("def _set_rhythm_chord_enabled(")
         gate_end = transport_py.index("def _chord_state(", gate_start)
         gate_transition = transport_py[gate_start:gate_end]
-        self.assertIn("self._begin_rhythm_chord_drain(", gate_transition)
         self.assertNotIn("self._wire(", gate_transition)
+        self.assertNotIn("_begin_rhythm_chord_drain", transport_py)
         self.assertIn(
             "if not self._set_rhythm_chord_enabled(enabled):",
             transport_py,
         )
+        self.assertIn("def _chord_pattern_plan(", transport_py)
+        self.assertIn('f"zQT{pattern},0,0"', transport_py)
+        self.assertIn('f"zQE{pattern},{gate},0,1"', transport_py)
 
         # Rhythm is now independent tagged lanes. Reintroducing the previous
         # whole-sequencer rebuild helpers would again make lane-local edits able
         # to interrupt drums/bass/chords together.
         self.assertIn("class _TaggedSequencerLane:", transport_py)
-        self.assertIn("def retain_only(", transport_py)
+        self.assertNotIn("def retain_only(", transport_py)
         self.assertIn("def _replace_lane(", transport_py)
         self.assertIn('self._replace_lane("bass")', transport_py)
         self.assertIn('self._replace_lane("chords")', transport_py)

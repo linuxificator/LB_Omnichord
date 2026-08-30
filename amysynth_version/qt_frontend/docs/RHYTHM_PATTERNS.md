@@ -15,13 +15,21 @@ stored at 96 PPQ and every shipped event is exactly representable at AMY's
 
 At process startup the frontend validates the complete timing, continuation
 and selected-kit mapping, then authors every fill into AMY exactly once. Fill
-indexes 1..1000 map to stored pattern IDs 0..999. IDs 1000 and above are
-reserved for the small set of currently active base-role loops. The integration
+indexes 1..936 map to stored pattern IDs 0..935. IDs 936..999 are reserved for
+small automatic-chord one-shots and IDs 1000 and above for the currently active
+base-role loops. The integration
 profile therefore configures 1024 stored patterns, 64 events per pattern and
 32 active or pending instances. The shipped 270-fill library, and a future
 library of more than 700 fills, fit without creating hundreds of active
 players. Only the current base roles and the few one-shots that are actually
 sounding consume instance slots.
+
+The chord bank holds separate `/1`, `/2`, `/3` and `/4` note-one-shot
+families. Each child contains one note-on and its normal note-off; whole chords
+use the same ownership model in a compact multi-note child. The complete
+catalogue needs at most 58 of the 64 reserved chord patterns. An exhaustive
+tick audit includes every overlapping chord child, the maximum current drum
+roles and one fill, and reaches 30 of the configured 32 instances.
 
 Stored events use AMY's `zQE<pattern>,<tick>[,<period>[,<tag>]]<event>Z`
 operation. It carries the root sequencer's familiar tick/period/tag model

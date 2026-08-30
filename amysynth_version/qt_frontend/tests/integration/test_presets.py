@@ -1,11 +1,26 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import unittest
 
 from catalog import control_default, entry_for_index, synth_index
 from harness import HeadlessApp
+
+
+def chord_child_note(line: str, expected_note: float) -> bool:
+    match = re.match(
+        r"^zQE(?P<pattern>\d+),\d+,\d+,\d+"
+        r"n(?P<note>[-+]?\d+(?:\.\d+)?)l(?P<velocity>[-+]?\d+(?:\.\d+)?)i4Z$",
+        line,
+    )
+    return bool(
+        match
+        and 936 <= int(match.group("pattern")) < 1000
+        and float(match.group("velocity")) > 0.0
+        and abs(float(match.group("note")) - expected_note) < 1e-6
+    )
 
 
 def bind_control(
@@ -744,11 +759,7 @@ class PresetIntegrationTests(unittest.TestCase):
             # observe the old idle period and return before the first new
             # serial line.  Wait for the musical continuation contract first.
             app.bridge.wait_for_line_match(
-                lambda line: (
-                    line.startswith("H")
-                    and "n52" in line
-                    and "i4Z" in line
-                ),
+                lambda line: chord_child_note(line, 52.0),
                 "continuing C-major rhythm chord",
                 start=checkpoint,
                 timeout=3.0,
@@ -782,11 +793,15 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertNotIn("S16384Z", switched)
             self.assertNotIn("S20480Z", switched)
             self.assertTrue(
+                any(chord_child_note(line, 52.0) for line in switched),
+                "running preset switch did not continue the new C-major chord",
+            )
+            self.assertTrue(
                 any(
-                    line.startswith("H") and "n52" in line and "i4Z" in line
+                    line.startswith("H") and "zQT" in line
                     for line in switched
                 ),
-                "running preset switch did not continue the new C-major chord",
+                "running preset switch installed no chord child triggers",
             )
 
             # STR stores the effective live tempo, not the dormant preset

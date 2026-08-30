@@ -92,6 +92,55 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             finally:
                 user_data.USER_CONFIG_DIR = original
 
+    def test_old_arpeggio_voice_default_is_migrated_without_losing_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shipped = root / "shipped"
+            shipped.mkdir()
+            (shipped / "amy_config.json").write_text(
+                json.dumps({
+                    "config_revision": 1,
+                    "serial": {"baud": 1_000_000},
+                    "voices": {"manual_chord": 7, "rhythm_chord": 7},
+                }),
+                encoding="utf-8",
+            )
+            original = user_data.USER_CONFIG_DIR
+            try:
+                user_data.USER_CONFIG_DIR = root / "user"
+                user_data.USER_CONFIG_DIR.mkdir()
+                target = user_data.USER_CONFIG_DIR / "amy_config.json"
+                target.write_text(
+                    json.dumps({
+                        "serial": {"baud": 230_400},
+                        "voices": {
+                            "manual_chord": 7,
+                            "rhythm_chord": 4,
+                        },
+                        "custom": "preserved",
+                    }),
+                    encoding="utf-8",
+                )
+
+                user_data.ensure_user_configs(shipped)
+                migrated = json.loads(target.read_text(encoding="utf-8"))
+                self.assertEqual(migrated["config_revision"], 1)
+                self.assertEqual(migrated["voices"]["rhythm_chord"], 7)
+                self.assertEqual(migrated["serial"]["baud"], 230_400)
+                self.assertEqual(migrated["custom"], "preserved")
+
+                # The revision makes the migration idempotent: later edits
+                # are authoritative and are never repeatedly rewritten.
+                migrated["voices"]["rhythm_chord"] = 8
+                target.write_text(json.dumps(migrated), encoding="utf-8")
+                user_data.ensure_user_configs(shipped)
+                self.assertEqual(
+                    json.loads(target.read_text())["voices"]["rhythm_chord"],
+                    8,
+                )
+            finally:
+                user_data.USER_CONFIG_DIR = original
+
     def test_midi_running_status_parses_control_changes(self) -> None:
         notes = []
         controls = []

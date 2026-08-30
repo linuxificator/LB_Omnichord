@@ -33,6 +33,20 @@ class ProgramArchitectureTests(unittest.TestCase):
             with self.assertRaises(FileNotFoundError):
                 load_amy_config(Path(directory) / "missing.json")
 
+    def test_chord_voice_pools_cannot_underallocate_seven_note_arpeggios(self) -> None:
+        config = json.loads(
+            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
+        config["voices"]["rhythm_chord"] = 4
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "amy_config.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(
+                ValueError,
+                r"voices\.rhythm_chord must be at least 7",
+            ):
+                load_amy_config(path)
+
     def test_rom_programs_are_derived_from_stable_keys(self) -> None:
         config = load_amy_config(ROOT / "config" / "amy_config.json")
         juno = resolve_program("juno_036", config)

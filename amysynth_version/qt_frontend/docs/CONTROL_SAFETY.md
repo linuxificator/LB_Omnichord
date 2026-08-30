@@ -50,16 +50,21 @@ A first-time AMY `K...iv...` synth allocation is executed at an audio-block boun
 The ESP32-P4 also exhibited low-frequency rumble when an exact `h0` reverb command was sent. A fresh dry bus is now left untouched when the logical reverb value is zero. If an already-active reverb is turned off, the UI/preset state remains exactly 0 while the wire uses a sub-audible nonzero coefficient (`0.001`) as a target-side workaround for the exact-zero edge case. The serial regression forbids `y0h0Z` and `y1h0Z` on cold startup.
 
 Manual chord hold is another timing-sensitive path. Finger-down immediately
-starts manual synth 3 and selects the chord for strum, bass and automatic-chord
-pitches. Every real finger-up immediately stops that manual voice, with no
-release-grace timer and no dependency on sequencer phase. A tap release does so
-without closing or draining the automatic-chord lane. Qt's `TapHandler`
+starts manual synth 3 and selects the chord for strum, bass and future
+automatic-chord triggers. Every automatic whole chord, and every individual
+arpeggio note, runs as an AMY `ONE_SHOT` child which contains both its note-on
+and matching note-off. Replacing the root schedule or committing new child
+definitions therefore cannot retarget or delete the release owned by an
+already-running immutable child. Every real finger-up immediately stops the
+manual voice, with no release-grace timer and no dependency on sequencer phase.
+A tap never closes or drains the automatic-chord lane. Qt's `TapHandler`
 classifies a long press using the platform style hint and only that semantic
 event promotes the contact to takeover; the Python backend owns no gesture
 timer. Promotion must not stop
 percussion or bass and must not change the `CHORD ON/OFF` state: it clears
-future synth-4 note-ons but retains the sequencer's existing synth-4 all-off
-tags, so a chord already sounding completes its normal rhythmic gate. The
+future child triggers, while every child already sounding executes its own
+original release and completes its normal rhythmic gate. There is no immediate
+synth-4 all-off. The
 serial regression holds a chord for one second and requires rhythm transport
 to stay logically running with percussion events still scheduled during the
 hold.

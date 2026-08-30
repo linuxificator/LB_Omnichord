@@ -29,6 +29,8 @@ SYNTH_FLAGS_NO_NOTE_WARNINGS = 8
 DRUM_BASE_PATTERN_START = 1000
 DRUM_BASE_INSTANCE_TAG_START = 1000
 DRUM_PATTERN_CAPACITY = 1024
+CHORD_PATTERN_START = 936
+CHORD_PATTERN_CAPACITY = DRUM_BASE_PATTERN_START - CHORD_PATTERN_START
 
 
 def _period_divisors(period: int) -> tuple[int, ...]:
@@ -712,45 +714,6 @@ class _TaggedSequencerLane:
         for command in self.commands(events):
             self.writer.low(self.name, generation, command)
 
-    def retain_only(
-        self,
-        events: list[tuple[int, int, str]],
-        retained_indexes: set[int],
-    ) -> None:
-        """Reinstall selected events and clear every other occupied tag."""
-        retained = {int(index) for index in retained_indexes}
-        invalid = {
-            index
-            for index in retained
-            if index < 0
-            or index >= len(events)
-            or index >= self.high_water
-        }
-        if invalid:
-            raise ValueError(
-                f"sequencer lane {self.name} cannot retain indexes "
-                f"{sorted(invalid)} with high-water {self.high_water}"
-            )
-
-        generation = self.writer.new_low_generation(self.name)
-        # Starting a new lane generation invalidates commands from an update
-        # which may only have been partially transmitted. Reinstall retained
-        # events first so their delivery does not depend on that older queue.
-        for index in sorted(retained):
-            self.writer.low(
-                self.name,
-                generation,
-                self._event_command(index, events[index]),
-            )
-        for index in range(self.high_water):
-            if index in retained:
-                continue
-            self.writer.low(
-                self.name,
-                generation,
-                f"H0,0,{self.start + index}Z",
-            )
-
     def clear(self) -> None:
         self.enqueue([])
 
@@ -865,7 +828,6 @@ class AmySerialClient:
         self.rhythm_config: dict[str, Any] | None = None
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
-        self._rhythm_chord_draining = False
         self.bass_running = True
         self._scheduled_rhythm_id: str | None = None
         self.drum_catalog: DrumPatternCatalog = load_drum_pattern_catalog(
@@ -1002,7 +964,7 @@ class AmySerialClient:
     @staticmethod
     def _fill_pattern_id(fill: DrumFill) -> int:
         pattern = int(fill.index) - 1
-        if not 0 <= pattern < DRUM_BASE_PATTERN_START:
+        if not 0 <= pattern < CHORD_PATTERN_START:
             raise ValueError(
                 f"fill {fill.fill_id!r} has unsupported index {fill.index}"
             )
@@ -1676,52 +1638,17 @@ class AmySerialClient:
         elif action == "stop_all":
             self._stop_all_manual()
 
-    def _begin_rhythm_chord_drain(
-        self,
-        existing_events: list[tuple[int, int, str]],
-    ) -> None:
-        """Suppress future onsets while preserving sequenced synth-4 offs."""
-        note_off = f"l0i{self.synth_id['rhythm_chord']}"
-        retained_indexes = {
-            index
-            for index, (_, _, body) in enumerate(existing_events)
-            if str(body).removesuffix("Z").endswith(note_off)
-        }
-        lane = self._sequencer_lanes["chords"]
-        retained_indexes = {
-            index
-            for index in retained_indexes
-            if index < lane.high_water
-        }
-        if not retained_indexes:
-            return
-
-        lane.retain_only(existing_events, retained_indexes)
-        self._rhythm_chord_draining = True
-
     def _set_rhythm_chord_enabled(
         self,
         enabled: bool,
-        *,
-        existing_chord_events: list[tuple[int, int, str]] | None = None,
     ) -> bool:
-        """Apply an automatic-chord gate transition without truncating it."""
+        """Apply an automatic-chord gate without truncating active children."""
         enabled = bool(enabled)
         if self.rhythm_chord_enabled == enabled:
             return False
 
-        if existing_chord_events is None:
-            existing_chord_events = self._lane_events("chords")
-
         self.rhythm_chord_enabled = enabled
-        self._rhythm_chord_draining = False
-        if not enabled:
-            # AMY has no deferred tag deletion. Clear only the scheduled
-            # positive-velocity onsets and leave the already-installed l0
-            # events to close a sounding chord at its original rhythmic gate.
-            if self.rhythm_running:
-                self._begin_rhythm_chord_drain(existing_chord_events)
-        else:
+        if enabled:
             self._sync_synth_params(
                 "chord",
                 (self.synth_id["rhythm_chord"],),
@@ -1733,7 +1660,6 @@ class AmySerialClient:
             payload = json.loads(payload_text)
         except json.JSONDecodeError:
             return
-        existing_chord_events = self._lane_events("chords")
         self.chord_notes = [float(x) for x in payload.get("notes", [])]
         self.bass_notes = [float(x) for x in payload.get("bass_notes", [])]
         if "bass_riff" in payload:
@@ -1742,7 +1668,6 @@ class AmySerialClient:
         if "rhythm_chord_enabled" in payload:
             self._set_rhythm_chord_enabled(
                 payload.get("rhythm_chord_enabled"),
-                existing_chord_events=existing_chord_events,
             )
 
         if payload.get("play_now") and self.chord_notes:
@@ -1772,6 +1697,149 @@ class AmySerialClient:
         if not config:
             return AMY_PPQ
         return max(1, round(float(config["length_beats"]) * AMY_PPQ))
+
+    def _chord_pattern_plan(
+        self,
+    ) -> tuple[list[str], list[tuple[int, int, str]]]:
+        """Build short note-owner patterns and their repeating root triggers.
+
+        Every arpeggio note is an untagged one-shot child. Its immutable AMY
+        definition owns both the onset and the matching release, so replacing
+        a root schedule can remove future old-rate onsets without shortening
+        a note which is already sounding. The four rate families occupy
+        disjoint pattern ids; a /2 -> /4 change never rewrites a live /2
+        definition.
+        """
+        config = self.rhythm_config
+        if (
+            not isinstance(config, dict)
+            or not self.rhythm_chord_enabled
+            or not self.chord_notes
+        ):
+            return [], []
+
+        source_events = [
+            event
+            for event in config.get("chord_events", [])
+            if isinstance(event, dict)
+        ]
+        if not source_events:
+            return [], []
+
+        period = self._rhythm_period_ticks()
+        rhythm_cfg = self.config["rhythm"]
+        chord_synth = self.synth_id["rhythm_chord"]
+        velocity_values = sorted({
+            max(0.0, min(1.0, float(event.get("amp", 1.0))))
+            for event in source_events
+        })
+        velocity_slots = {
+            self._f(velocity): index
+            for index, velocity in enumerate(velocity_values)
+        }
+        note_count = len(self.chord_notes)
+        required_patterns = len(velocity_values) * (1 + 4 * note_count)
+        if required_patterns > CHORD_PATTERN_CAPACITY:
+            raise ValueError(
+                f"chord one-shots need {required_patterns} AMY patterns; "
+                f"reserved capacity is {CHORD_PATTERN_CAPACITY}"
+            )
+
+        commands: list[str] = []
+        occurrences: list[tuple[int, str]] = []
+        arpeggio = config.get("chord_arpeggio", {})
+        arpeggio_enabled = (
+            isinstance(arpeggio, dict)
+            and bool(arpeggio.get("enabled", False))
+        )
+
+        if not arpeggio_enabled:
+            max_notes = max(
+                1,
+                int(rhythm_cfg.get("max_rhythm_chord_notes", 4)),
+            )
+            rhythm_notes = self.chord_notes[:max_notes]
+            gate = max(
+                1,
+                round(float(rhythm_cfg["chord_gate_beats"]) * AMY_PPQ),
+            )
+            length = gate + 1
+            for velocity_index, velocity in enumerate(velocity_values):
+                pattern = CHORD_PATTERN_START + velocity_index
+                commands.append(f"zQB{pattern},{length}Z")
+                for tag, note in enumerate(rhythm_notes):
+                    commands.append(
+                        f"zQE{pattern},0,{length},{tag}"
+                        f"n{self._f(note)}l{self._f(velocity)}i{chord_synth}Z"
+                    )
+                commands.append(
+                    f"zQE{pattern},{gate},0,{len(rhythm_notes)}"
+                    f"l0i{chord_synth}Z"
+                )
+                commands.append(f"zQC{pattern}Z")
+
+            for event in source_events:
+                tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
+                velocity = max(
+                    0.0,
+                    min(1.0, float(event.get("amp", 1.0))),
+                )
+                pattern = (
+                    CHORD_PATTERN_START
+                    + velocity_slots[self._f(velocity)]
+                )
+                occurrences.append((tick, f"zQT{pattern},0,0"))
+            return commands, _compact_repeating_events(occurrences, period)
+
+        rate = max(
+            1,
+            min(4, int(arpeggio.get("notes_per_beat", 1))),
+        )
+        step = max(1, round(AMY_PPQ / rate))
+        gate = max(
+            1,
+            round(float(rhythm_cfg["chord_gate_beats"]) * step),
+        )
+        length = gate + 1
+        rate_stride = len(velocity_values) * note_count
+        rate_base = (
+            CHORD_PATTERN_START
+            + len(velocity_values)
+            + (rate - 1) * rate_stride
+        )
+        for velocity_index, velocity in enumerate(velocity_values):
+            for note_index, note in enumerate(self.chord_notes):
+                pattern = (
+                    rate_base + velocity_index * note_count + note_index
+                )
+                commands.extend((
+                    f"zQB{pattern},{length}Z",
+                    f"zQE{pattern},0,{length},0"
+                    f"n{self._f(note)}l{self._f(velocity)}i{chord_synth}Z",
+                    f"zQE{pattern},{gate},0,1"
+                    f"n{self._f(note)}l0i{chord_synth}Z",
+                    f"zQC{pattern}Z",
+                ))
+
+        note_indexes = list(range(note_count))
+        if str(arpeggio.get("direction", "up")).lower() == "down":
+            note_indexes.reverse()
+        for event in source_events:
+            start_tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
+            velocity = max(
+                0.0,
+                min(1.0, float(event.get("amp", 1.0))),
+            )
+            velocity_index = velocity_slots[self._f(velocity)]
+            for sequence_index, note_index in enumerate(note_indexes):
+                pattern = (
+                    rate_base + velocity_index * note_count + note_index
+                )
+                occurrences.append((
+                    start_tick + sequence_index * step,
+                    f"zQT{pattern},0,0",
+                ))
+        return commands, _compact_repeating_events(occurrences, period)
 
     def _lane_events(self, lane_name: str) -> list[tuple[int, int, str]]:
         config = self.rhythm_config
@@ -1851,75 +1919,7 @@ class AmySerialClient:
             return events
 
         if lane_name == "chords":
-            if not self.rhythm_chord_enabled or not self.chord_notes:
-                return []
-            chord_synth = self.synth_id["rhythm_chord"]
-            arpeggio = config.get("chord_arpeggio", {})
-            if isinstance(arpeggio, dict) and bool(
-                arpeggio.get("enabled", False)
-            ):
-                rate = max(
-                    1,
-                    min(4, int(arpeggio.get("notes_per_beat", 1))),
-                )
-                step = max(1, round(AMY_PPQ / rate))
-                gate = max(
-                    1,
-                    round(float(rhythm_cfg["chord_gate_beats"]) * step),
-                )
-                rhythm_notes = list(self.chord_notes)
-                if str(arpeggio.get("direction", "up")).lower() == "down":
-                    rhythm_notes.reverse()
-
-                note_offs: list[tuple[int, str]] = []
-                note_ons: list[tuple[int, str]] = []
-                for event in config.get("chord_events", []):
-                    start_tick = round(
-                        float(event.get("time", 0.0)) * AMY_PPQ
-                    )
-                    velocity = max(
-                        0.0,
-                        min(1.0, float(event.get("amp", 1.0))),
-                    )
-                    for note_index, note in enumerate(rhythm_notes):
-                        tick = start_tick + note_index * step
-                        note_offs.append((
-                            tick + gate,
-                            f"n{self._f(note)}l0i{chord_synth}",
-                        ))
-                        note_ons.append((
-                            tick,
-                            f"n{self._f(note)}l{self._f(velocity)}"
-                            f"i{chord_synth}",
-                        ))
-
-                # Off tags receive lower indexes than on tags. If one arp's
-                # release meets another's onset on the same tick, AMY closes
-                # the old note before it retriggers the new one.
-                return _compact_repeating_events(
-                    note_offs, period
-                ) + _compact_repeating_events(note_ons, period)
-
-            max_notes = max(
-                1,
-                int(rhythm_cfg.get("max_rhythm_chord_notes", 4)),
-            )
-            rhythm_notes = self.chord_notes[:max_notes]
-            gate = max(
-                1,
-                round(float(rhythm_cfg["chord_gate_beats"]) * AMY_PPQ),
-            )
-            for event in config.get("chord_events", []):
-                tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
-                velocity = max(0.0, min(1.0, float(event.get("amp", 1.0))))
-                for note in rhythm_notes:
-                    events.append((
-                        tick,
-                        period,
-                        f"n{self._f(note)}l{self._f(velocity)}i{chord_synth}",
-                    ))
-                events.append((tick + gate, period, f"l0i{chord_synth}"))
-            return events
+            return self._chord_pattern_plan()[1]
 
         raise KeyError(lane_name)
 
@@ -2173,14 +2173,17 @@ class AmySerialClient:
         )
 
     def _replace_lane(self, lane_name: str) -> None:
-        if lane_name == "chords" and self._rhythm_chord_draining:
-            return
         lane = self._sequencer_lanes[lane_name]
         try:
             if lane_name == "drums":
                 generation = self.writer.new_low_generation("drums")
                 for command in self._drum_commands():
                     self.writer.low("drums", generation, command)
+            elif lane_name == "chords":
+                generation = self.writer.new_low_generation("chords")
+                pattern_commands, events = self._chord_pattern_plan()
+                for command in pattern_commands + lane.commands(events):
+                    self.writer.low("chords", generation, command)
             else:
                 lane.enqueue(self._lane_events(lane_name))
         except ValueError as exc:
@@ -2203,7 +2206,6 @@ class AmySerialClient:
             print(f"AMY rhythm warning: {exc}", flush=True)
 
     def _replace_all_lanes(self, *, resume_transport: bool) -> None:
-        self._rhythm_chord_draining = False
         for lane_name in self._sequencer_lanes:
             self.writer.new_low_generation(lane_name)
         generation = self.writer.new_low_generation("rhythm-full")
@@ -2222,7 +2224,12 @@ class AmySerialClient:
         for lane_name in ("bass", "chords"):
             lane = self._sequencer_lanes[lane_name]
             try:
-                commands.extend(lane.commands(self._lane_events(lane_name)))
+                if lane_name == "chords":
+                    pattern_commands, events = self._chord_pattern_plan()
+                    commands.extend(pattern_commands)
+                else:
+                    events = self._lane_events(lane_name)
+                commands.extend(lane.commands(events))
             except ValueError as exc:
                 print(f"AMY rhythm warning: {exc}", flush=True)
                 return
@@ -2329,7 +2336,6 @@ class AmySerialClient:
         if not self.rhythm_running:
             return
         self.rhythm_running = False
-        self._rhythm_chord_draining = False
         self._cancel_queued_rhythm_updates()
         self._wire("zY0Z")
         self._silence_accompaniment()
@@ -2401,7 +2407,6 @@ class AmySerialClient:
 
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
-        self._rhythm_chord_draining = False
         self.bass_running = False
         self._manual_active_id = None
         self._manual_active_notes = []
