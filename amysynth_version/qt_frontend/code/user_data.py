@@ -44,5 +44,7 @@ def ensure_user_configs(shipped_config_dir: Path) -> Path:
     for source in Path(shipped_config_dir).glob("*.json"):
         target = USER_CONFIG_DIR / source.name
         if not target.exists():
-            shutil.copy2(source, target)
+            # Shipped JSON is application content, not a file-metadata backup.
+            # Some valid private filesystems reject copied xattrs/timestamps.
+            shutil.copyfile(source, target)
     return USER_CONFIG_DIR
