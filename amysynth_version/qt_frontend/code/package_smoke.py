@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Callable
 
 from PySide6.QtCore import QPointF, Qt
@@ -53,6 +54,19 @@ def exercise_chord_input(
         )
     ).toPoint()
     key = (0, 0)
+
+    # Use valid full-scale application controls for the audio gate.  This is
+    # still the normal LB backend and wire translation, not a raw AMY test
+    # tone; it keeps quiet patches such as juno_004 above the package gate
+    # without weakening that gate for every platform.
+    backend.setChordVolume(1.0)
+    backend.setMasterVolume(1.0)
+    require(
+        math.isclose(float(backend.chordVolume), 1.0, abs_tol=1e-4)
+        and math.isclose(float(backend.masterVolume), 1.0, abs_tol=1e-4),
+        "package smoke could not select full application audio levels",
+    )
+    checkpoint("smoke-audio-levels-full")
 
     # Make hold takeover observable without starting transport. Both chord
     # gestures below still enter exclusively through Qt/QML.

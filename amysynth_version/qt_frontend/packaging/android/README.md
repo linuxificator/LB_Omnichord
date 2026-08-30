@@ -79,9 +79,11 @@ frontend startup variation and the complete UI-driven synth attack.
 The readiness poll filters out verbose extraction traffic and retries a
 transient `adb logcat` read instead of confusing a host transport reset with an
 application failure; the filtered Python log must still contain no traceback.
-The captured packaged-QML gesture uses LB's normal `0.5` chord amplitude, not
-the hello-world example's full-scale `V10`/`l1` sequence. Its non-silence gate
-therefore requires at least -20 dBFS peak while still rejecting clipping and
+Before the captured packaged-QML gesture, the platform-independent package
+smoke selects LB's valid maximum chord and master controls (`1.0`) through the
+normal backend. The notes still enter through real QML tap/hold events and the
+usual LB wire translation; no raw AMY test tone is injected. The non-silence
+gate requires at least -20 dBFS peak while still rejecting clipping and
 requiring every signed-16-bit AMY sample to equal the sample handed to Oboe.
 
 On `main`, the same Android gate joins Linux x64, Raspberry Pi aarch64, macOS

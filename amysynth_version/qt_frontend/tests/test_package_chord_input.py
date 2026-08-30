@@ -91,6 +91,7 @@ class PackageChordInputTests(unittest.TestCase):
             status = status_path.read_text(encoding="utf-8")
             for checkpoint in (
                 "qml-root-ready",
+                "smoke-audio-levels-full",
                 "qml-chord-press-observed",
                 "active-chord-visible",
                 "qml-chord-tap-released",
@@ -108,6 +109,8 @@ class PackageChordInputTests(unittest.TestCase):
                 6,
                 packets,
             )
+            self.assertIn("i3iV1Z", packets)
+            self.assertIn("i4iV1Z", packets)
             self.assertGreaterEqual(packets.count("l0i3Z"), 2, packets)
 
 

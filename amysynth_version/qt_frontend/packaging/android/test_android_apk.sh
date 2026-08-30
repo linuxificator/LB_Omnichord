@@ -67,6 +67,7 @@ for checkpoint in \
   android-runtime-configured \
   qml-root-ready \
   initial-state-sent \
+  smoke-audio-levels-full \
   qml-chord-press-observed \
   active-chord-visible \
   qml-chord-tap-released \
