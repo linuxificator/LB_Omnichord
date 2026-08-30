@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import tempfile
 import unittest
 from itertools import combinations
 from pathlib import Path
@@ -18,6 +19,7 @@ from amy_transport import (  # noqa: E402
     DRUM_BASE_INSTANCE_TAG_START,
     AmySerialClient,
     _TaggedSequencerLane,
+    _resolve_drum_catalog_directory,
 )
 from drum_patterns import (  # noqa: E402
     KIT_FAMILIES,
@@ -63,6 +65,35 @@ class DrumPatternTests(unittest.TestCase):
             "drums": _TaggedSequencerLane("drums", 0, 56, _WriterProbe())
         }
         return client
+
+    def test_drum_assets_resolve_in_source_frozen_and_android_layouts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            source_module = root / "source" / "code" / "amy_transport.py"
+            source_drums = root / "source" / "music" / "drums"
+            source_drums.mkdir(parents=True)
+            self.assertEqual(
+                _resolve_drum_catalog_directory(source_module),
+                source_drums,
+            )
+
+            flat_module = root / "android" / "amy_transport.py"
+            flat_drums = root / "android" / "music" / "drums"
+            flat_drums.mkdir(parents=True)
+            self.assertEqual(
+                _resolve_drum_catalog_directory(flat_module),
+                flat_drums,
+            )
+
+            frozen_root = root / "frozen"
+            self.assertEqual(
+                _resolve_drum_catalog_directory(
+                    root / "irrelevant" / "amy_transport.py",
+                    packaged_root=frozen_root,
+                ),
+                frozen_root / "music" / "drums",
+            )
 
     def test_catalogue_has_complete_validated_coverage(self) -> None:
         self.assertEqual(len(self.catalog.rhythms), 54)

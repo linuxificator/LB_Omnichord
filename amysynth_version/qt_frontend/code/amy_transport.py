@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import queue
+import sys
 import threading
 import time
 from datetime import datetime
@@ -31,6 +32,22 @@ DRUM_BASE_INSTANCE_TAG_START = 1000
 DRUM_PATTERN_CAPACITY = 1024
 CHORD_PATTERN_START = 936
 CHORD_PATTERN_CAPACITY = DRUM_BASE_PATTERN_START - CHORD_PATTERN_START
+
+
+def _resolve_drum_catalog_directory(
+    module_file: Path = Path(__file__),
+    packaged_root: Path | None = None,
+) -> Path:
+    """Resolve drum assets in source, frozen, and flat Android layouts."""
+
+    if packaged_root is not None:
+        return Path(packaged_root) / "music" / "drums"
+
+    module_directory = Path(module_file).resolve().parent
+    source_directory = module_directory.parent / "music" / "drums"
+    if source_directory.is_dir():
+        return source_directory
+    return module_directory / "music" / "drums"
 
 
 def _period_divisors(period: int) -> tuple[int, ...]:
@@ -831,7 +848,11 @@ class AmySerialClient:
         self.bass_running = True
         self._scheduled_rhythm_id: str | None = None
         self.drum_catalog: DrumPatternCatalog = load_drum_pattern_catalog(
-            Path(__file__).resolve().parent.parent / "music" / "drums"
+            _resolve_drum_catalog_directory(
+                packaged_root=(
+                    Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else None
+                )
+            )
         )
         self.drum_kit = str(
             config.get("drums", {}).get("kit", "tiny")
