@@ -11,6 +11,24 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class StaticContractTests(unittest.TestCase):
+    def test_esp32_build_uses_the_immutable_omnichord_amy_release(self) -> None:
+        repository = ROOT.parents[1]
+        workflow = (
+            repository / ".github" / "workflows" / "esp32p4-build.yml"
+        ).read_text(encoding="utf-8")
+        prepare = (ROOT.parent / "esp32p4" / "prepare_amy.sh").read_text(
+            encoding="utf-8"
+        )
+        release_branch = "releases/amy_omnichord_R20260830T220021"
+        release_commit = "32f3a68861a68979ceb715cf32e0322e8614365b"
+
+        for contract in (workflow, prepare):
+            self.assertIn("https://github.com/linuxificator/amy.git", contract)
+            self.assertIn(release_branch, contract)
+            self.assertIn(release_commit, contract)
+        self.assertNotIn("AMY_REF:-main", prepare)
+        self.assertIn("release branch and immutable commit do not match", prepare)
+
     def test_frontend_code_has_no_amy_library_imports(self) -> None:
         """Only the separately managed local service may load AMY."""
         allowed = {"local_amy_service.py"}

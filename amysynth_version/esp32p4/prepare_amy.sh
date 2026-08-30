@@ -3,8 +3,9 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPONENT_DIR="$PROJECT_DIR/components/amy"
-AMY_REPO="${AMY_REPO:-https://github.com/shorepine/amy.git}"
-AMY_REF="${AMY_REF:-main}"
+AMY_REPO="${AMY_REPO:-https://github.com/linuxificator/amy.git}"
+AMY_RELEASE_BRANCH="${AMY_RELEASE_BRANCH:-releases/amy_omnichord_R20260830T220021}"
+AMY_REF="${AMY_REF:-32f3a68861a68979ceb715cf32e0322e8614365b}"
 
 rm -rf "$COMPONENT_DIR"
 mkdir -p "$(dirname "$COMPONENT_DIR")"
@@ -16,6 +17,17 @@ if [[ "$AMY_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
     git -C "$COMPONENT_DIR" checkout --detach FETCH_HEAD
 else
     git clone --depth 1 --branch "$AMY_REF" "$AMY_REPO" "$COMPONENT_DIR"
+fi
+
+# The firmware and frontend must use one immutable AMY release. Fetch the
+# declared branch separately and fail if its tip is not the exact requested
+# commit; this prevents an accidental fallback to incompatible upstream main.
+git -C "$COMPONENT_DIR" fetch --depth 1 origin \
+    "refs/heads/$AMY_RELEASE_BRANCH:refs/remotes/origin/$AMY_RELEASE_BRANCH"
+if [[ "$(git -C "$COMPONENT_DIR" rev-parse HEAD)" != "$AMY_REF" ]] || \
+   [[ "$(git -C "$COMPONENT_DIR" rev-parse "origin/$AMY_RELEASE_BRANCH")" != "$AMY_REF" ]]; then
+    echo "AMY release branch and immutable commit do not match" >&2
+    exit 1
 fi
 
 python3 - "$COMPONENT_DIR" <<'PY'

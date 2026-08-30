@@ -20,6 +20,11 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  AMY_REPO: https://github.com/linuxificator/amy.git
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T220021
+  AMY_REF: 32f3a68861a68979ceb715cf32e0322e8614365b
+
 jobs:
   build:
     runs-on: ubuntu-24.04
