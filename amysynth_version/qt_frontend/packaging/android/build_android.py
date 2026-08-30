@@ -17,7 +17,7 @@ from pathlib import Path
 
 
 PYSIDE_VERSION = "6.11.2"
-P4A_COMMIT = "9d5918bf752379f4520902524c15f794e45972b4"
+P4A_COMMIT = "3762c88c56e3443efb8eba2a02a2604b680240fd"
 APP_ID = "org.linuxificator.lb_omnichord"
 ARCHITECTURES = {
     "x86_64": ("x86_64", "x86_64"),
@@ -183,6 +183,8 @@ def verify_apk(apk: Path, architecture: str) -> None:
         "AndroidManifest.xml",
         f"lib/{abi}/libamy_android.so",
         f"lib/{abi}/liboboe.so",
+        f"lib/{abi}/libpython3.11.so",
+        f"lib/{abi}/libshiboken6.abi3.so",
     }
     missing = required.difference(names)
     if missing:

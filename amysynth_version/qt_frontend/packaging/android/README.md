@@ -32,7 +32,8 @@ pipe contract.
 - Python 3.11 (the supported host version for `pyside6-android-deploy`)
 - PySide6 and shiboken6 Android wheels 6.11.2 from Qt's official release site
 - Android SDK 36 and NDK 27.2.12479018 (r27c)
-- python-for-android commit `9d5918bf752379f4520902524c15f794e45972b4`
+- python-for-android commit `3762c88c56e3443efb8eba2a02a2604b680240fd`
+  (Python 3.11.13, matching the official `cp311` Qt wheels)
 - Cython 0.29.36, matching that python-for-android revision's tested environment
 - Oboe 1.10.0
 - the exact AMY fork commit recorded in `.github/workflows/desktop-release.yml`
@@ -49,8 +50,8 @@ The generated Gradle repository explicitly includes python-for-Android's local
 lets Qt's supported Android deploy tool generate its recipes/JAR list, then
 adds the AMY AAR and its Oboe dependency to the generated Gradle package. The
 script rejects an AAR without both CI and production ABIs and rejects an APK
-that lacks `libamy_android.so`/`liboboe.so` or contains an in-process `c_amy`
-binding.
+that lacks the AMY/Oboe libraries or the matching CPython 3.11/shiboken native
+libraries. It also rejects an APK containing an in-process `c_amy` binding.
 
 ## Volume notation
 

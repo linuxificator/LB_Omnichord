@@ -4,6 +4,7 @@ import configparser
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
@@ -17,6 +18,7 @@ from build_android import (  # noqa: E402
     create_buildozer_sdk_compat,
     patch_buildozer_spec,
     release_values,
+    verify_apk,
 )
 
 
@@ -97,6 +99,27 @@ class AndroidPackagingTests(unittest.TestCase):
                 (compat / "platform-tools").resolve(), sdk / "platform-tools"
             )
             self.assertNotEqual(resolved_manager, stale)
+
+    def test_apk_verifier_rejects_a_python_abi_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            apk = Path(directory) / "frontend.apk"
+            required = {
+                "AndroidManifest.xml",
+                "lib/x86_64/libamy_android.so",
+                "lib/x86_64/liboboe.so",
+                "lib/x86_64/libshiboken6.abi3.so",
+            }
+            with zipfile.ZipFile(apk, "w") as archive:
+                for name in required:
+                    archive.writestr(name, b"test")
+                archive.writestr("lib/x86_64/libpython3.14.so", b"wrong")
+
+            with self.assertRaisesRegex(ValueError, "libpython3.11.so"):
+                verify_apk(apk, "x86_64")
+
+            with zipfile.ZipFile(apk, "a") as archive:
+                archive.writestr("lib/x86_64/libpython3.11.so", b"correct")
+            verify_apk(apk, "x86_64")
 
     def test_documented_toolchain_is_pinned(self) -> None:
         readme = (
