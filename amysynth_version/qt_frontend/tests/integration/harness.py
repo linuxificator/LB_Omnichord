@@ -155,6 +155,17 @@ class SerialAmyBridge:
         line = line.strip("\r")
         if not line:
             return
+
+        if self.native_amy:
+            assert self.amy is not None
+            with self._amy_lock:
+                self.amy.send_wire(line)
+            self._write_native_log("WIRE", line)
+
+        # In native mode a line is observable only after AMY has ingested it.
+        # Otherwise wait_for_lines(zY1) could wake the test before the bridge
+        # called amy.send_wire(zY1), letting a fast test render ahead of the
+        # transport-start event it was supposedly waiting for.
         with self._line_condition:
             self.lines.append(line)
             self.line_times.append(time.monotonic())
@@ -162,12 +173,6 @@ class SerialAmyBridge:
             self._line_condition.notify_all()
         with self._serial_log_path.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
-
-        if self.native_amy:
-            assert self.amy is not None
-            with self._amy_lock:
-                self.amy.send_wire(line)
-            self._write_native_log("WIRE", line)
 
     def _read_serial(self) -> None:
         while True:
@@ -213,6 +218,20 @@ class SerialAmyBridge:
             raise RuntimeError("native AMY is not enabled")
         with self._amy_lock:
             return int(self._native_peak)
+
+    def render_until_audio(self, duration_seconds: float) -> bool:
+        """Advance a bounded amount of AMY time independent of runner load."""
+        if not self.native_amy:
+            raise RuntimeError("native AMY is not enabled")
+        maximum_blocks = max(
+            1,
+            int(max(0.0, float(duration_seconds)) / self._block_seconds) + 1,
+        )
+        for _ in range(maximum_blocks):
+            self._render_block()
+            if self.audio_peak() > 0:
+                return True
+        return False
 
     def _run(self) -> None:
         next_render = time.monotonic()
