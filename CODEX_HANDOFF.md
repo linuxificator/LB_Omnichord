@@ -367,8 +367,8 @@ bus-mixer experiment is absent.
 
 ## Verification already completed
 
-- On `features/gamma9001`, the complete 2026-08-31 local matrix passes all 197
-  tests: 147 unit, 15 frontend, 15 serial/program, 14 preset, 3 native-control
+- On `features/gamma9001`, the complete 2026-08-31 local matrix passes all 199
+  tests: 149 unit, 15 frontend, 15 serial/program, 14 preset, 3 native-control
   and 3 native-rhythm tests. This includes the complete 54-rhythm/270-fill catalogue,
   exhaustive fill combinations, chord-arpeggio tag expansion, bass-riff
   validation, the 36-chord LDR audit and package contracts.
