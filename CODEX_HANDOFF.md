@@ -2,11 +2,13 @@
 
 Updated 2026-08-30 after the nested-sequencer drum-fill feature was implemented
 and independently regression-tested. The continuation branch is
-`feature/drum_fills`; implementation commit
+`feature/drum_fills`; original implementation commit
 `32488d37a25af025eb6fd2cdbc1422341466932a` is based on current main
-`f872432` plus the branch's intended preset/licence changes. It is pushed but
-not yet merged: physical UI/audio validation and explicit merge approval remain
-the release boundary.
+`f872432` plus the branch's intended preset/licence changes. Physical follow-up
+`de7b4590570e288fb0fda00d5d37c83e8e521631` fixes the cold-start reset race
+and bass-column alignment. The branch is pushed but not yet merged: renewed
+physical UI/audio validation and explicit merge approval remain the release
+boundary.
 
 This file records operational state and completed work from the AMY/Qt UI,
 performance, MIDI-control and native-Windows sessions. It supplements, but does
@@ -376,6 +378,8 @@ sequencer. The abandoned bus-mixer experiment is absent.
   134 Python regressions at the release threshold.
 - GitHub Actions run `33328685849` independently passed the complete LB suite
   on feature commit `32488d37` with the immutable AMY pin.
+- GitHub Actions run `33329576417` independently passed all 192 tests on
+  physical-regression fix `de7b4590` with the same immutable AMY pin.
 - Real-serial tests prove seven-note dominant-13 arpeggios in both directions,
   lane isolation, ROM and physical synth-4 `if8` policy, live riff
   transposition and unchanged transport/timebase. Native AMY state readback
