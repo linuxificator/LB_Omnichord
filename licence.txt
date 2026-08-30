@@ -3,7 +3,7 @@ This is the very strict Luciel's Birthday software licence. Failure to comply wi
 By using this software you agree to:
 
 * Have fun with it
-* Wish Luciel a happy birthday! It's her birthday* today, so please send her a card or a present.
+* Wish Luciel a happy birthday! It's her birthday today*, so please send her a card or a present.
 * Do your best to make this world a better place
 * Ask Apple why I need to pay them if I want to make an iOS version of this Omnichord software and give it away for free without any ads or restrictions
 
