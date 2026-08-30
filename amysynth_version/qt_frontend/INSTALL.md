@@ -409,6 +409,28 @@ real packaged QML chord key before publication. That catches QML/backend input
 wiring regressions, but it does not prove a physical Mac trackpad, touchscreen
 or audio device.
 
+## Install the Android arm64 APK
+
+Download `LB_Omnichord.R<date><time>.Android-arm64.apk` and its checksum from
+GitHub Releases, then verify it on a Linux host before transferring it:
+
+```bash
+sha256sum --check LB_Omnichord.R*.Android-arm64.apk.sha256
+```
+
+On the Android device, allow installation from the file/browser application
+used to open the APK, then install it. This experimental artifact is CI
+debug-signed; it is not a Play Store package or a stable update channel. The
+APK contains both the PySide6 frontend and the AMY AAR, but they run as separate
+processes. No AMY Python package or external service installation is needed.
+See `packaging/android/README.md` for the socket, test and signing contract.
+
+CI installs the x86_64 build into an emulator, drives real packaged QML chord
+tap/hold input, requires the private `amy.sock` service connection, and checks
+that AMY's non-silent render samples match the samples sent to Oboe. A physical
+arm64 phone/tablet still needs touchscreen, speaker/headphone route, lifecycle,
+latency and sustained-load validation.
+
 # Troubleshooting
 
 ## No local AMY module (Unix convenience service)

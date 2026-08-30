@@ -86,7 +86,7 @@ References: [Microsoft's Windows AF_UNIX announcement](https://devblogs.microsof
 [Qt for Python QLocalSocket](https://doc.qt.io/qtforpython-6/PySide6/QtNetwork/QLocalSocket.html)
 and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.html).
 
-## Verified repository state (2026-08-27)
+## Verified repository state (2026-08-30)
 
 | Area | Current state |
 | --- | --- |
@@ -94,7 +94,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Linux desktop | Separate Python AMY service and Qt process over `AF_UNIX/SOCK_SEQPACKET`. |
 | macOS desktop | Separate Python AMY service and Qt process over LF-framed `AF_UNIX/SOCK_STREAM`. |
 | Raspberry Pi + ESP32-P4 | Qt sends LF-delimited wire requests over UART to an independent AMY target. |
-| Android | `origin/upstream/android-oboe` contains the separate `:amy` service, private socket and transport-only Java client, but it is not merged with active `feature/bus-mixer`. |
+| Android | `integration/android_build` packages PySide6 with the pinned `integration/amy_android` AAR. The frontend uses the private socket only; the AAR owns the separate `:amy`/Oboe process. Emulator package/QML/audio validation is a release gate, while physical validation remains outstanding. |
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
 | Native Windows frontend transport | The launcher supplies a unique Windows named-pipe name; `QLocalSocket` sends LF-framed requests without opening a network port. |
 | Windows package/release | CI builds an experimental portable zip with separate service/frontend executables and bundled dependencies. It performs an offline native AMY render test and starts the unpacked double-click launcher, offscreen Qt/QML frontend and named-pipe service end to end; no physical validation yet for pointer hardware, audio or MIDI. |

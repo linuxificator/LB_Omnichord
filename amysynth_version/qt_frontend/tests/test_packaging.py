@@ -22,18 +22,21 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("linux-appimages:", release)
         self.assertIn("macos-dmg:", release)
         self.assertIn("needs: [tests, release-metadata]", release)
-        self.assertIn(
-            "needs: [release-metadata, linux-appimages, macos-dmg, windows-native]",
-            release,
-        )
+        self.assertIn("android-packages:", release)
+        self.assertIn("android-emulator:", release)
+        self.assertIn("android-packages, android-emulator]", release)
         self.assertIn("hdiutil attach", release)
         self.assertIn("AMY backend: external socket", release)
         self.assertIn("--windowed --package-smoke-test", release)
         self.assertIn("qml-chord-hold-promoted", release)
-        self.assertIn("branches: [main, testing/windows_smoke]", release)
+        self.assertIn(
+            "branches: [main, testing/windows_smoke, integration/android_build]",
+            release,
+        )
+        self.assertIn("refs/heads/integration/android_build", release)
         self.assertGreaterEqual(
             release.count("if: github.ref == 'refs/heads/main'"),
-            4,
+            3,
         )
         self.assertIn("needs.tests.result == 'success'", release)
         self.assertIn(
@@ -66,6 +69,9 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("RaspberryPi-aarch64.AppImage", release)
         self.assertIn("macOS-arm64.dmg", release)
         self.assertIn("Windows-x86_64.zip", release)
+        self.assertIn("Android-arm64.apk", release)
+        self.assertIn("## Android arm64", release)
+        self.assertIn("CI debug-signed", release)
         self.assertIn("## Windows native", release)
         self.assertIn("double-click", release)
         self.assertIn("LB_Omnichord.cmd", release)
@@ -114,7 +120,7 @@ class PackagingContracts(unittest.TestCase):
             FRONTEND / "packaging" / "windows" / "amy_service.c"
         ).read_text(encoding="utf-8")
         self.assertIn("windows-native:", workflow)
-        self.assertIn("windows-native]", workflow)
+        self.assertIn("windows-native,", workflow)
         self.assertIn("amy_service.exe", build)
         self.assertIn("--name LB_Omnichord", build)
         self.assertIn("LB_Omnichord.cmd", build)

@@ -1,0 +1,72 @@
+# Native Android package
+
+The Android build preserves the same service/frontend boundary as every other
+LB Omnichord package:
+
+```text
+PySide6 / Qt frontend process
+        |
+        | AF_UNIX + SOCK_SEQPACKET
+        | <Android filesDir>/amy.sock
+        | one ordinary AMY wire request per packet
+        v
+private :amy service process -> AMY C engine -> Oboe -> AAudio
+```
+
+The application embeds the `amy-service` AAR from the fork branch
+`integration/amy_android`. The AAR's unexported lifecycle provider starts AMY
+in a separate `:amy` process under the same package UID. Qt discovers the
+application's real private files directory with `QStandardPaths`; neither the
+data path nor an Android user number is hard-coded. The Python frontend opens
+the socket and sends wire messages only. It does not import or link AMY and it
+does not call the AAR's JNI implementation.
+
+This is the Android equivalent of the desktop wrappers. Linux and macOS use a
+supervisor around a separate service and Unix socket; Windows uses
+`QLocalSocket` plus a native named-pipe service because CPython on Windows does
+not expose `AF_UNIX`. See `docs/WINDOWS_NATIVE.md` for that wrapper and named
+pipe contract.
+
+## Pinned build inputs
+
+- Python 3.11 (the supported host version for `pyside6-android-deploy`)
+- PySide6 and shiboken6 Android wheels 6.11.2 from Qt's official release site
+- Android SDK 36 and NDK 27.2.12479018 (r27c)
+- python-for-android commit `9d5918bf752379f4520902524c15f794e45972b4`
+- Oboe 1.10.0
+- the exact AMY fork commit recorded in `.github/workflows/desktop-release.yml`
+
+`build_android.py` stages only the frontend Python modules and runtime assets,
+lets Qt's supported Android deploy tool generate its recipes/JAR list, then
+adds the AMY AAR and its Oboe dependency to the generated Gradle package. The
+script rejects an AAR without both CI and production ABIs and rejects an APK
+that lacks `libamy_android.so`/`liboboe.so` or contains an in-process `c_amy`
+binding.
+
+## Volume notation
+
+LB Omnichord's UI volume values are logical amplitudes which its wire backend
+maps onto AMY controls. On the raw AMY wire protocol, uppercase `V` addresses a
+bus/master output volume on the 0..10 AMY scale: `V10` is unity/full output at
+the final mixer, not an oscillator-local amplitude. Lowercase `l` is note
+velocity and lowercase `a` is oscillator amplitude. Android adds no new volume
+syntax; it transports the same messages as the other platforms.
+
+## Validation and release status
+
+On `integration/android_build`, CI runs all six existing frontend regression
+suites but builds no desktop package. It builds x86_64 and arm64 Android APKs,
+installs the x86_64 package into an emulator, exercises the existing packaged
+QML tap/hold smoke path, checks the private socket and separate AMY service,
+and compares the exact AMY render samples with the samples handed to Oboe.
+
+On `main`, the same Android gate joins Linux x64, Raspberry Pi aarch64, macOS
+arm64 and Windows x64. Publication waits for all five platform jobs. The
+GitHub-hosted build is debug-signed so it can be installed and tested without a
+repository signing secret; the release notes label this arm64 APK experimental.
+A stable production/update signing key must be supplied through protected
+repository secrets before treating it as a store or update-channel build.
+
+The emulator is strong evidence for packaging, process isolation, socket wire
+delivery, QML input behavior and non-silent audio generation. It is not a
+physical-device latency, touchscreen, speaker, lifecycle or audio-route test.

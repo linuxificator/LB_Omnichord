@@ -47,15 +47,21 @@ Four repository workflows are maintained:
   and accepts a selected suite or `all` through manual dispatch. Native jobs
   install the AMY fork at the commit pinned in the workflow and record that SHA
   in their artifacts.
-- `Test and release desktop packages` runs after every update of `main`. It
+- `Test and release platform packages` runs after every update of `main`. It
   calls the complete regression matrix and, only after all suites pass, builds
   and validates Linux x86_64, Raspberry Pi aarch64, macOS arm64 and native
-  Windows x86_64 packages. One timestamped tag/release contains all four
-  packages and their SHA-256 files. The dedicated `testing/windows_smoke`
+  Windows x86_64 packages plus the Android arm64 APK. One timestamped
+  tag/release contains all five packages and their SHA-256 files. The dedicated
+  `testing/windows_smoke`
   branch builds only the Windows job without publishing; `main` retains the
   complete gated release. The native package/smoke job runs on the current
   Windows Server 2025 image and verifies the Qt named-pipe boundary; Windows is
   not represented by the Linux AppImage or WSL.
+  The dedicated `integration/android_build` branch runs every frontend suite,
+  builds only Android x86_64/arm64 packages, and installs the x86_64 APK in an
+  emulator. That smoke drives the packaged QML tap/hold path through the
+  app-private socket and verifies AMY's render samples equal the samples handed
+  to Oboe before Android joins the complete `main` release gate.
 - `ESP32-P4 firmware build` builds and validates the firmware package when the
   ESP32-P4 project changes. It is a build/package check, not part of the Python
   frontend suite.
@@ -81,6 +87,7 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 - Raspberry Pi asset: `LB_Omnichord.R20260824223000.RaspberryPi-aarch64.AppImage`
 - macOS asset: `LB_Omnichord.R20260824223000.macOS-arm64.dmg`
 - Windows asset: `LB_Omnichord.R20260824223000.Windows-x86_64.zip`
+- Android asset: `LB_Omnichord.R20260824223000.Android-arm64.apk`
 - one matching `.sha256` file for each package
 
 The AppImages bundle PySide6, the frontend assets and the pinned AMY bus-mixer
@@ -97,6 +104,14 @@ connects through `QLocalSocket` to a private named pipe owned by native
 process cleanup. Windows CMake builds pinned AMY without `GAMMA9001` or the
 optional `drums_bin.c`, so it selects the same built-in tiny PCM preset map as
 Linux, macOS and ESP32-P4.
+
+The Android APK likewise preserves two processes. The PySide6 activity is a
+wire-only client, while an unexported AAR provider starts AMY/Oboe in `:amy`.
+CI creates private one-shot markers so the packaged QML chord smoke produces
+audio, then compares the captured AMY render buffer and exact Oboe callback
+buffer. The published arm64 APK is debug-signed and explicitly experimental;
+stable distribution signing and physical-device validation remain separate
+acceptance steps.
 
 The macOS and Windows package jobs drive both a quick tap and a long press
 classified by the real packaged QML `TapHandler`, using synthesized Qt pointer
