@@ -118,6 +118,6 @@ cat "$evidence_dir/amy-audio-levels.txt"
 python3 "$RUNNER_TEMP/amy-lb/tests/check_android_audio_capture.py" \
   "$evidence_dir/amy-render.wav" \
   "$evidence_dir/amy-oboe.wav" \
-  --min-peak-dbfs -20.0
+  --min-peak-dbfs -26.0
 
 trap - EXIT

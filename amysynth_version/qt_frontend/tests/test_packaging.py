@@ -86,7 +86,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("set -euo pipefail", android_smoke)
         self.assertIn("AMY backend: external socket", android_smoke)
         self.assertIn("Audio capture armed: 384000 frames", android_smoke)
-        self.assertIn("--min-peak-dbfs -20.0", android_smoke)
+        self.assertIn("--min-peak-dbfs -26.0", android_smoke)
         self.assertIn("smoke-audio-levels-full", android_smoke)
         self.assertIn("--windowed --package-smoke-test", release)
         self.assertIn("qml-chord-hold-promoted", android_smoke)

@@ -130,6 +130,8 @@ class AndroidPackagingTests(unittest.TestCase):
         self.assertIn("Cython 0.29.36", readme)
         self.assertIn("debug-signed", readme)
         self.assertIn("V10", readme)
+        self.assertIn("LB's maximum is `V1`", readme)
+        self.assertIn("at least -26 dBFS peak", readme)
         self.assertIn("QLocalSocket", readme)
         self.assertIn("does not use PulseAudio", readme)
         self.assertIn("AmyAndroid: Oboe output", readme)

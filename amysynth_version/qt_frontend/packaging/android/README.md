@@ -57,12 +57,15 @@ libraries. It also rejects an APK containing an in-process `c_amy` binding.
 
 ## Volume notation
 
-LB Omnichord's UI volume values are logical amplitudes which its wire backend
-maps onto AMY controls. On the raw AMY wire protocol, uppercase `V` addresses a
-bus/master output volume on the 0..10 AMY scale: `V10` is unity/full output at
-the final mixer, not an oscillator-local amplitude. Lowercase `l` is note
-velocity and lowercase `a` is oscillator amplitude. Android adds no new volume
-syntax; it transports the same messages as the other platforms.
+LB Omnichord's UI volume values are logical amplitudes in the safe 0..1 range.
+Role/row controls use AMY's per-synth `iV`, where `iV1` is full per-synth
+level. Master controls deliberately send the same logical value to AMY's raw
+bus `V` field, so LB's maximum is `V1`: AMY's normal 10%-of-final-mix bus gain.
+AMY's raw bus field itself accepts 0..10 and applies `V * 0.1`; `V10` is unity
+at the final mixer, but is not LB's UI maximum because several simultaneous
+voices can then clip. Lowercase `l` is note velocity and lowercase `a` is
+oscillator amplitude. Android adds no new volume syntax; it transports the
+same messages as the other platforms.
 
 ## Validation and release status
 
@@ -85,8 +88,10 @@ Before the captured packaged-QML gesture, the platform-independent package
 smoke selects LB's valid maximum chord and master controls (`1.0`) through the
 normal backend. The notes still enter through real QML tap/hold events and the
 usual LB wire translation; no raw AMY test tone is injected. The non-silence
-gate requires at least -20 dBFS peak while still rejecting clipping and
-requiring every signed-16-bit AMY sample to equal the sample handed to Oboe.
+gate requires at least -26 dBFS peak: the raw `V1` bus scaling accounts for
+20 dB and the remaining 6 dB allows normal patch/phase headroom. The gate still
+rejects clipping and requires every signed-16-bit AMY sample to equal the
+sample handed to Oboe.
 
 On `main`, the same Android gate joins Linux x64, Raspberry Pi aarch64, macOS
 arm64 and Windows x64. Publication waits for all five platform jobs. The
