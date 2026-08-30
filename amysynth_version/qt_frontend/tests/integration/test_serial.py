@@ -69,7 +69,7 @@ class SerialIntegrationTests(unittest.TestCase):
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=12.0)
             startup = app.bridge.lines_since(0)
-            self.assertIn("zQB0,48,0,0Z", startup)
+            self.assertIn("zQB0,48Z", startup)
             self.assertTrue(
                 any(line.startswith("zQB269,") for line in startup),
                 "last fill definition was not preloaded",

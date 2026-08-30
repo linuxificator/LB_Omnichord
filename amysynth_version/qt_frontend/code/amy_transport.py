@@ -1018,7 +1018,7 @@ class AmySerialClient:
         for _, (rhythm_id, fill) in sorted(fills.items()):
             pattern = self._fill_pattern_id(fill)
             length = fill.duration_ticks // 2
-            commands = [f"zQB{pattern},{length},0,0Z"]
+            commands = [f"zQB{pattern},{length}Z"]
             tag = 0
             # Mutes are stored in the fill itself. AMY treats them as a
             # pre-pass, so an onset on the fill's first tick cannot leak.
@@ -1964,7 +1964,7 @@ class AmySerialClient:
                 if self.rhythm_running:
                     commands.append(f"zQS{instance_tag},{quantum}Z")
                 continue
-            commands.append(f"zQB{pattern},{length},0,0Z")
+            commands.append(f"zQB{pattern},{length}Z")
             for tag, event in enumerate(events):
                 commands.append(
                     f"J{pattern},{event.tick // 2},0,{tag}"

@@ -198,7 +198,7 @@ class DrumPatternTests(unittest.TestCase):
         commits = [command for command in commands if command.startswith("zQC")]
         self.assertEqual(len(begins), 270)
         self.assertEqual(len(commits), 270)
-        self.assertIn("zQB0,48,0,0Z", begins)
+        self.assertIn("zQB0,48Z", begins)
         self.assertTrue(any(command.startswith("zQB269,") for command in begins))
 
         current_count = 0

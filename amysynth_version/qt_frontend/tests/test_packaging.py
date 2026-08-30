@@ -15,8 +15,8 @@ class PackagingContracts(unittest.TestCase):
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml",
             REPOSITORY / ".github" / "workflows" / "amy-regression.yml",
         ]
-        release_branch = "releases/amy_omnichord_R20260830T191146"
-        release_commit = "e0ef93c0c8b9c049cf5b37b25d50768cd1136e22"
+        release_branch = "releases/amy_omnichord_R20260830T211550"
+        release_commit = "57a97d7f5399f00afff0d498e060b53b8cd305c4"
 
         for workflow_path in workflows:
             workflow = workflow_path.read_text(encoding="utf-8")
