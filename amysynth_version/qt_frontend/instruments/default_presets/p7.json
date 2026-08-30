@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "factory_name": "Latin Light",
+  "strum_mode": "APG",
   "chord_rows": [
     {
       "chord": "major6",
@@ -33,18 +33,21 @@
       "parameters": {}
     },
     "bass": {
-      "selected": "dx7_190",
-      "parameters": {}
+      "selected": "dx7_196",
+      "parameters": {
+        "dx7_190": {
+          "algorithm": 13.0
+        }
+      }
     }
   },
   "volumes": {
     "chord": 0.46,
     "strum": 0.55,
-    "bass": 0.44,
+    "bass": 0.9900000000000004,
     "percussion": 0.5
   },
   "transport": {
-    "rhythm_running": false,
     "bass_running": true
   },
   "rhythm": {
@@ -282,7 +285,7 @@
         "tempo": 116.0,
         "percussion_activity": 2,
         "chord_activity": 2,
-        "bass_activity": 2
+        "bass_activity": 5
       },
       "mambo": {
         "tempo": 176.0,
@@ -374,10 +377,19 @@
         "chord_activity": 2,
         "bass_activity": 2
       }
-    }
+    },
+    "bass_voicing_shift": 1,
+    "bass_riff_selector": 5
   },
   "tuning": {
     "mode": "HARM",
     "reference_hz": 440
-  }
+  },
+  "effects": {
+    "reverb_level": 0.0,
+    "reverb_liveness": 0.5,
+    "reverb_damping": 0.5,
+    "reverb_drums": false
+  },
+  "midi_control_bindings": []
 }
