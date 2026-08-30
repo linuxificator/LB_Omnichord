@@ -40,3 +40,10 @@ Platform-specific packaging and service code must stay outside the Qt
 application. A single startup preamble may discover an unavoidable private
 platform endpoint, such as Android's app-private `amy.sock`; it must not add
 platform-specific synthesis or UI behavior.
+
+A manual `Test and release platform packages` dispatch from a feature branch
+runs the complete regression matrix and all five platform package jobs, but it
+cannot publish a release. The `publish-release` job remains restricted to
+`main`. This is the release-candidate gate for AMY profile changes such as a
+different PCM bank: every native integration is compiled and exercised before
+the profile can be considered for a main release.

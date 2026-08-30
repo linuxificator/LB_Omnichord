@@ -2,6 +2,12 @@ name: AMY frontend regression
 
 on:
   workflow_call:
+    inputs:
+      run_matrix:
+        description: Run the complete parallel suite matrix when called by another workflow
+        required: false
+        default: false
+        type: boolean
   pull_request:
     branches: [main]
     paths:
@@ -40,7 +46,7 @@ concurrency:
 
 jobs:
   regression-matrix:
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' || inputs.run_matrix
     name: ${{ matrix.suite }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -113,7 +119,7 @@ jobs:
           retention-days: 14
 
   manual:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && !inputs.run_matrix
     name: manual-${{ inputs.suite }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35

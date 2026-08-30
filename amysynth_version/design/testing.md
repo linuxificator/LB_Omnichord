@@ -63,6 +63,10 @@ Four repository workflows are maintained:
   emulator. That smoke drives the packaged QML tap/hold path through the
   app-private socket and verifies AMY's render samples equal the samples handed
   to Oboe before Android joins the complete `main` release gate.
+  A manual dispatch from any feature branch runs the same complete regression
+  matrix and all five platform package jobs, retains their artifacts, and skips
+  publication unconditionally. This is the release-candidate gate for changes
+  that affect every native AMY build, such as selecting another PCM bank.
 - `ESP32-P4 firmware build` builds and validates the firmware package when the
   ESP32-P4 project changes. It is a build/package check, not part of the Python
   frontend suite.

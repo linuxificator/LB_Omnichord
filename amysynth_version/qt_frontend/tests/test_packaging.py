@@ -124,6 +124,10 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("refs/heads/integration/android_build", release)
         self.assertGreaterEqual(
+            release.count("github.event_name == 'workflow_dispatch'"),
+            6,
+        )
+        self.assertGreaterEqual(
             release.count("if: github.ref == 'refs/heads/main'"),
             3,
         )
@@ -133,6 +137,12 @@ class PackagingContracts(unittest.TestCase):
             release,
         )
         self.assertIn("workflow_call:", regression)
+        self.assertIn("run_matrix: true", release)
+        self.assertIn("github.event_name != 'workflow_dispatch' || inputs.run_matrix", regression)
+        self.assertIn("github.event_name == 'workflow_dispatch' && !inputs.run_matrix", regression)
+        publish = release[release.index("  publish-release:"):]
+        self.assertIn("if: github.ref == 'refs/heads/main'", publish)
+        self.assertNotIn("workflow_dispatch", publish)
         self.assertIn("ALSA_CONFIG_PATH:", regression)
         self.assertTrue((FRONTEND / "tests" / "alsa-null.conf").is_file())
         for suite in (
