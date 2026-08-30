@@ -54,6 +54,7 @@ class AndroidPackagingTests(unittest.TestCase):
             parser = configparser.ConfigParser(interpolation=None)
             parser.read(spec, encoding="utf-8")
             app = parser["app"]
+            buildozer = parser["buildozer"]
             self.assertEqual(
                 f"{app['package.domain']}.{app['package.name']}", APP_ID
             )
@@ -73,6 +74,7 @@ class AndroidPackagingTests(unittest.TestCase):
                 app["android.add_packaging_options"],
                 "pickFirst 'lib/**/libc++_shared.so'",
             )
+            self.assertEqual(buildozer["bin_dir"], str((root / "bin").resolve()))
             self.assertIn("json", app["source.include_exts"])
 
     def test_buildozer_sdk_compat_uses_modern_sdkmanager(self) -> None:

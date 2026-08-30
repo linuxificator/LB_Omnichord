@@ -144,6 +144,7 @@ def patch_buildozer_spec(
     }
     for key, value in app_values.items():
         parser.set("app", key, value)
+    parser.set("buildozer", "bin_dir", str((spec_path.parent / "bin").resolve()))
 
     with spec_path.open("w", encoding="utf-8") as handle:
         parser.write(handle)
