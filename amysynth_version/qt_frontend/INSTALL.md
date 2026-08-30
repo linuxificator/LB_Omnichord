@@ -295,10 +295,11 @@ $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 .\packaging\build_windows.ps1
 ```
 
-The zip and checksum are written below `dist`. The release workflow pins AMY
-revision `25213785696dd40e6cce59ab428e560a410d240f`; local release candidates
-must use the same revision unless the pin and its compatibility tests are
-deliberately updated together.
+The zip and checksum are written below `dist`. The release workflow pins both
+AMY fork branch `releases/amy_omnichord_R20260830T123342` and commit
+`1e81ea571294c6aed8e2c0d57a9e09786561e9cf`; local release candidates must use
+that exact commit unless the shared release contract and its compatibility
+tests are deliberately updated together.
 
 See [WINDOWS_NATIVE.md](docs/WINDOWS_NATIVE.md) for the full transport,
 packaging, smoke-test and remaining-hardware-validation contract.
@@ -408,6 +409,28 @@ The release job mounts the final DMG and drives a quick tap and hold through a
 real packaged QML chord key before publication. That catches QML/backend input
 wiring regressions, but it does not prove a physical Mac trackpad, touchscreen
 or audio device.
+
+## Install the Android arm64 APK
+
+Download `LB_Omnichord.R<date><time>.Android-arm64.apk` and its checksum from
+GitHub Releases, then verify it on a Linux host before transferring it:
+
+```bash
+sha256sum --check LB_Omnichord.R*.Android-arm64.apk.sha256
+```
+
+On the Android device, allow installation from the file/browser application
+used to open the APK, then install it. This experimental artifact is CI
+debug-signed; it is not a Play Store package or a stable update channel. The
+APK contains both the PySide6 frontend and the AMY AAR, but they run as separate
+processes. No AMY Python package or external service installation is needed.
+See `packaging/android/README.md` for the socket, test and signing contract.
+
+CI installs the x86_64 build into an emulator, drives real packaged QML chord
+tap/hold input, requires the private `amy.sock` service connection, and checks
+that AMY's non-silent render samples match the samples sent to Oboe. A physical
+arm64 phone/tablet still needs touchscreen, speaker/headphone route, lifecycle,
+latency and sustained-load validation.
 
 # Troubleshooting
 

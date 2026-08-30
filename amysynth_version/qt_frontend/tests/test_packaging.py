@@ -10,6 +10,54 @@ REPOSITORY = FRONTEND.parents[1]
 
 
 class PackagingContracts(unittest.TestCase):
+    def test_every_platform_uses_one_amy_release_branch_and_commit(self) -> None:
+        workflows = [
+            REPOSITORY / ".github" / "workflows" / "desktop-release.yml",
+            REPOSITORY / ".github" / "workflows" / "amy-regression.yml",
+        ]
+        release_branch = "releases/amy_omnichord_R20260830T123342"
+        release_commit = "1e81ea571294c6aed8e2c0d57a9e09786561e9cf"
+
+        for workflow_path in workflows:
+            workflow = workflow_path.read_text(encoding="utf-8")
+            self.assertIn(f"AMY_RELEASE_BRANCH: {release_branch}", workflow)
+            self.assertIn(f"AMY_COMMIT: {release_commit}", workflow)
+            self.assertIn("merge-base --is-ancestor", workflow)
+            self.assertNotIn(
+                "25213785696dd40e6cce59ab428e560a410d240f",
+                workflow,
+            )
+            self.assertNotIn(
+                "20f714a6ed309077a2a4fcca1f998e552cc7510a",
+                workflow,
+            )
+
+        release = workflows[0].read_text(encoding="utf-8")
+        self.assertIn("## Build provenance", release)
+        self.assertIn("\\`$AMY_RELEASE_BRANCH\\`", release)
+        self.assertIn("\\`$AMY_COMMIT\\`", release)
+
+        contract = (FRONTEND / "packaging" / "AMY_RELEASE.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(release_branch, contract)
+        self.assertIn(release_commit, contract)
+        self.assertIn("every supported platform succeeds", contract)
+
+    def test_platform_logic_is_limited_to_one_startup_preamble(self) -> None:
+        core = (FRONTEND / "code" / "app_core.py").read_text(
+            encoding="utf-8"
+        )
+        architecture = (
+            REPOSITORY / "amysynth_version" / "design" / "architecture.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(core.count('casefold() != "android"'), 1)
+        self.assertNotIn("sys.platform", core)
+        self.assertNotIn("platform.system", core)
+        self.assertRegex(architecture, r"single\s+startup preamble")
+        self.assertIn("Asset-root discovery", architecture)
+
     def test_release_is_gated_by_complete_reusable_test_workflow(self) -> None:
         release = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
@@ -17,23 +65,49 @@ class PackagingContracts(unittest.TestCase):
         regression = (
             REPOSITORY / ".github" / "workflows" / "amy-regression.yml"
         ).read_text(encoding="utf-8")
+        android_smoke = (
+            FRONTEND / "packaging" / "android" / "test_android_apk.sh"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("uses: ./.github/workflows/amy-regression.yml", release)
         self.assertIn("linux-appimages:", release)
         self.assertIn("macos-dmg:", release)
         self.assertIn("needs: [tests, release-metadata]", release)
+        self.assertIn("android-packages:", release)
+        self.assertIn("android-emulator:", release)
+        self.assertIn("android-packages, android-emulator]", release)
+        self.assertIn("hdiutil attach", release)
         self.assertIn(
-            "needs: [release-metadata, linux-appimages, macos-dmg, windows-native]",
+            "bash amysynth_version/qt_frontend/packaging/android/"
+            "test_android_apk.sh",
             release,
         )
-        self.assertIn("hdiutil attach", release)
-        self.assertIn("AMY backend: external socket", release)
+        self.assertIn("if: always()", release)
+        self.assertIn("set -euo pipefail", android_smoke)
+        self.assertIn("AMY backend: external socket", android_smoke)
+        self.assertIn("Audio capture armed: 384000 frames", android_smoke)
+        self.assertIn("--min-peak-dbfs -26.0", android_smoke)
+        self.assertIn("smoke-audio-levels-full", android_smoke)
         self.assertIn("--windowed --package-smoke-test", release)
-        self.assertIn("qml-chord-hold-promoted", release)
-        self.assertIn("branches: [main, testing/windows_smoke]", release)
+        self.assertIn("qml-chord-hold-promoted", android_smoke)
+        self.assertLess(
+            android_smoke.index('am force-stop "$package"'),
+            android_smoke.index("amy-audio-capture.enable"),
+        )
+        self.assertIn("warmup_ready=0", android_smoke)
+        self.assertIn("for warmup_attempt in {1..3}", android_smoke)
+        self.assertIn('pidof "$package"', android_smoke)
+        self.assertIn("break 2", android_smoke)
+        self.assertIn("'python:I' '*:S'", android_smoke)
+        self.assertIn('test "$warmup_ready" -eq 1', android_smoke)
+        self.assertIn(
+            "branches: [main, testing/windows_smoke, integration/android_build]",
+            release,
+        )
+        self.assertIn("refs/heads/integration/android_build", release)
         self.assertGreaterEqual(
             release.count("if: github.ref == 'refs/heads/main'"),
-            4,
+            3,
         )
         self.assertIn("needs.tests.result == 'success'", release)
         self.assertIn(
@@ -66,6 +140,9 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("RaspberryPi-aarch64.AppImage", release)
         self.assertIn("macOS-arm64.dmg", release)
         self.assertIn("Windows-x86_64.zip", release)
+        self.assertIn("Android-arm64.apk", release)
+        self.assertIn("## Android arm64", release)
+        self.assertIn("CI debug-signed", release)
         self.assertIn("## Windows native", release)
         self.assertIn("double-click", release)
         self.assertIn("LB_Omnichord.cmd", release)
@@ -114,7 +191,7 @@ class PackagingContracts(unittest.TestCase):
             FRONTEND / "packaging" / "windows" / "amy_service.c"
         ).read_text(encoding="utf-8")
         self.assertIn("windows-native:", workflow)
-        self.assertIn("windows-native]", workflow)
+        self.assertIn("windows-native,", workflow)
         self.assertIn("amy_service.exe", build)
         self.assertIn("--name LB_Omnichord", build)
         self.assertIn("LB_Omnichord.cmd", build)
@@ -157,7 +234,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("if sys.stdout is None:", main)
         self.assertIn("if sys.stderr is None:", main)
         self.assertIn("fatal-error", main)
-        self.assertIn('getattr(sys, "_MEIPASS", CODE_DIR.parent)', core)
+        self.assertIn("resolve_frontend_asset_root", core)
+        self.assertIn('Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS")', core)
         self.assertIn("amy_add_message", service)
         self.assertIn("run_self_test", service)
         self.assertIn("amy_simple_fill_buffer", service)

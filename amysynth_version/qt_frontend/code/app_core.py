@@ -13,7 +13,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from PySide6.QtCore import QObject, Property, QTimer, QUrl, Signal, Slot
+from PySide6.QtCore import (
+    QObject,
+    Property,
+    QStandardPaths,
+    QTimer,
+    QUrl,
+    Signal,
+    Slot,
+)
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -29,10 +37,30 @@ from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
 
+ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
+
+
+def resolve_frontend_asset_root(
+    code_dir: Path,
+    packaged_root: Path | None = None,
+) -> Path:
+    """Find assets in source, frozen, or Android's flat staged layout."""
+
+    code_dir = Path(code_dir)
+    if all((code_dir / name).is_dir() for name in ASSET_DIRECTORIES):
+        return code_dir
+    if packaged_root is not None:
+        return Path(packaged_root)
+    return code_dir.parent
+
+
 CODE_DIR = Path(__file__).resolve().parent
-# PyInstaller keeps bundled data under ``sys._MEIPASS``.  In source runs the
-# existing repository-relative root remains authoritative.
-FRONTEND_DIR = Path(getattr(sys, "_MEIPASS", CODE_DIR.parent))
+# PyInstaller exposes its data root as ``sys._MEIPASS``. Android's p4a stage
+# instead puts modules and data directories beside each other under ``app``.
+FRONTEND_DIR = resolve_frontend_asset_root(
+    CODE_DIR,
+    Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else None,
+)
 GUI_DIR = FRONTEND_DIR / "gui"
 CONFIG_DIR = FRONTEND_DIR / "config"
 INSTRUMENT_DIR = FRONTEND_DIR / "instruments"
@@ -4246,6 +4274,42 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
+ANDROID_SMOKE_ENABLE = "lb-android-package-smoke.enable"
+ANDROID_SMOKE_STATUS = "lb-android-package-smoke.status"
+
+
+def configure_android_runtime(
+    args: argparse.Namespace,
+    *,
+    platform_name: str,
+    files_dir: Path,
+) -> Path | None:
+    """Select Android's private AMY socket and consume the CI smoke marker.
+
+    The AMY AAR and the Qt activity share one application UID.  Qt's Android
+    HomeLocation is Android's app-private files directory, which is also where
+    the AAR publishes ``amy.sock``.  Explicit command-line transports remain
+    authoritative for diagnostics and source-tree tests.
+    """
+
+    if str(platform_name).casefold() != "android":
+        return None
+
+    files_dir = Path(files_dir)
+    if not args.amy_socket and not args.amy_local_name:
+        args.amy_socket = str(files_dir / "amy.sock")
+
+    marker = files_dir / ANDROID_SMOKE_ENABLE
+    if not marker.is_file():
+        return None
+
+    marker.unlink()
+    status = files_dir / ANDROID_SMOKE_STATUS
+    status.unlink(missing_ok=True)
+    args.package_smoke_test = True
+    return status
+
+
 def main() -> int:
     args = parse_arguments()
     if args.package_smoke_test and args.capture_screenshots_dir is not None:
@@ -4370,6 +4434,17 @@ def main() -> int:
     app = QGuiApplication(sys.argv)
     app.setApplicationName("Qt Omnichord")
     smoke_checkpoint("qgui-created")
+
+    android_smoke_status = configure_android_runtime(
+        args,
+        platform_name=QGuiApplication.platformName(),
+        files_dir=Path(
+            QStandardPaths.writableLocation(QStandardPaths.HomeLocation)
+        ),
+    )
+    if android_smoke_status is not None:
+        smoke_status = android_smoke_status
+    smoke_checkpoint("android-runtime-configured")
 
     print(
         "Qt Omnichord display diagnostics:",

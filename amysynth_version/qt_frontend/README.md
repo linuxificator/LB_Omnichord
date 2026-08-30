@@ -121,16 +121,17 @@ buses and 336 oscillators, and verify resulting AMY synth state. A passing
 native test is therefore stronger than merely finding an expected command in
 the host log. See `../design/testing.md` for the complete local/CI inventory.
 
-## Desktop releases
+## Platform releases
 
 Every successful complete test run after an update to `main` publishes one
-four-platform GitHub Release. Tags use `RYYYYMMDDTHHMMSS`; asset timestamps
+five-platform GitHub Release. Tags use `RYYYYMMDDTHHMMSS`; asset timestamps
 omit the `T`. The release page has separate sections and downloads for:
 
 - Linux x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Linux-x86_64.AppImage`
 - Raspberry Pi 4/5: `LB_Omnichord.RYYYYMMDDHHMMSS.RaspberryPi-aarch64.AppImage`
 - macOS Apple Silicon: `LB_Omnichord.RYYYYMMDDHHMMSS.macOS-arm64.dmg`
 - Windows x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Windows-x86_64.zip`
+- Android arm64: `LB_Omnichord.RYYYYMMDDHHMMSS.Android-arm64.apk`
 
 Each package has a matching `.sha256` asset. All timestamps are UTC.
 
@@ -149,6 +150,15 @@ zip is portable and contains its dependencies, but it is deliberately not a
 single executable: the frontend and AMY service remain separate processes and
 the extracted directory must stay together.
 
+The Android APK embeds the `amy-service` AAR from the pinned AMY Omnichord
+release branch and exact commit. Its unexported provider owns the separate
+`:amy` service process and Oboe output; PySide6 discovers the
+application-private files directory and sends ordinary AMY packets through
+`amy.sock`. The CI APK is debug-signed and is therefore an experimental
+sideloadable artifact, not a Play Store/update-channel build. See
+[the shared AMY release contract](packaging/AMY_RELEASE.md) and
+[the Android package contract](packaging/android/README.md).
+
 To install the macOS build, open the DMG, drag `LB_Omnichord.app` to
 `Applications`, eject the DMG and try to open the app once. After macOS blocks
 that first launch, open Apple menu > `System Settings` > `Privacy & Security`,
@@ -165,6 +175,7 @@ included an offline native-AMY render and an end-to-end start of the extracted
 Qt frontend and AMY service over the named pipe. The earlier x64 release
 `R20260824T204611` was downloaded and physically tested on Linux with working
 UI and audio. Raspberry Pi, macOS and Windows still need physical-device/audio
+validation. Android also needs physical touchscreen/audio-route/latency
 validation. Windows MIDI input and measured low-latency audio tuning are also
 outstanding. See [the native Windows status and contract](docs/WINDOWS_NATIVE.md).
 Current macOS and Windows package jobs additionally drive quick-tap and hold

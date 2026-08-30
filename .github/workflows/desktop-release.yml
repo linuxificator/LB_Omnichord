@@ -1,8 +1,8 @@
-name: Test and release desktop packages
+name: Test and release platform packages
 
 on:
   push:
-    branches: [main, testing/windows_smoke]
+    branches: [main, testing/windows_smoke, integration/android_build]
   workflow_dispatch:
 
 concurrency:
@@ -12,9 +12,15 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T123342
+  AMY_COMMIT: 1e81ea571294c6aed8e2c0d57a9e09786561e9cf
+
 jobs:
   tests:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/integration/android_build'
     uses: ./.github/workflows/amy-regression.yml
 
   release-metadata:
@@ -75,7 +81,10 @@ jobs:
       - name: Install pinned AMY with ESP32-compatible drum bank
         run: |
           git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
-          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
+          git -C /tmp/amy-lb checkout "$AMY_COMMIT"
+          test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
           git -C /tmp/amy-lb apply \
             "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
           AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
@@ -180,7 +189,10 @@ jobs:
       - name: Install pinned AMY with ESP32-compatible drum bank
         run: |
           git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
-          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
+          git -C /tmp/amy-lb checkout "$AMY_COMMIT"
+          test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
           git -C /tmp/amy-lb apply \
             "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
           AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
@@ -255,7 +267,8 @@ jobs:
       always() &&
       needs.release-metadata.result == 'success' &&
       (github.ref == 'refs/heads/testing/windows_smoke' ||
-       needs.tests.result == 'success')
+       (github.ref == 'refs/heads/main' &&
+        needs.tests.result == 'success'))
     needs: [tests, release-metadata]
     runs-on: windows-2025
     timeout-minutes: 45
@@ -282,7 +295,12 @@ jobs:
         shell: pwsh
         run: |
           git clone https://github.com/linuxificator/amy.git "$env:RUNNER_TEMP\amy-lb"
-          git -C "$env:RUNNER_TEMP\amy-lb" checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C "$env:RUNNER_TEMP\amy-lb" merge-base --is-ancestor `
+            $env:AMY_COMMIT "origin/$env:AMY_RELEASE_BRANCH"
+          if ($LASTEXITCODE -ne 0) { throw "AMY commit is not on declared release branch" }
+          git -C "$env:RUNNER_TEMP\amy-lb" checkout $env:AMY_COMMIT
+          $actualAmyCommit = (git -C "$env:RUNNER_TEMP\amy-lb" rev-parse HEAD).Trim()
+          if ($actualAmyCommit -ne $env:AMY_COMMIT) { throw "AMY checkout did not resolve to pinned commit" }
 
       - name: Build native service and portable package
         shell: pwsh
@@ -323,9 +341,202 @@ jobs:
           if-no-files-found: error
           retention-days: 2
 
+  android-packages:
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/integration/android_build'
+    needs: [tests, release-metadata]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            output_arch: x86_64
+            artifact_name: android-emulator-x86_64
+            pyside_wheel: pyside6-6.11.2-6.11.2-cp311-cp311-android_x86_64.whl
+            pyside_sha256: 7dc0335592a11a612fd6a16b48b202ddd85bf0bcd2d2e3fc2d50dbb8e4f7a5fe
+            shiboken_wheel: shiboken6-6.11.2-6.11.2-cp311-cp311-android_x86_64.whl
+            shiboken_sha256: 642bb59b6f4654236f8cba0c2fa45dbfcca6363d83b2c1b53f245a2a7bd77530
+          - arch: aarch64
+            output_arch: arm64
+            artifact_name: package-Android-arm64
+            pyside_wheel: pyside6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+            pyside_sha256: c5288e0740ad91d87d4cafa16132768c149c56521bf63c83c98404b865911678
+            shiboken_wheel: shiboken6-6.11.2-6.11.2-cp311-cp311-android_aarch64.whl
+            shiboken_sha256: e99609b689d3df2ac97ffbe17df0ce8b1246b2c47b4d24f6fb73f1eaad4bd0f2
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python 3.11 for Qt Android deployment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android and host build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake ccache cmake libffi-dev libltdl-dev \
+            libncurses5-dev libncursesw5-dev libssl-dev libtool \
+            pkg-config unzip zip zlib1g-dev
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager \
+            'platforms;android-36' \
+            'build-tools;35.0.0' \
+            'ndk;27.2.12479018' \
+            'cmake;3.22.1'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Install pinned Qt Android deployment frontend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install \
+            -r amysynth_version/qt_frontend/requirements.txt \
+            'PySide6==6.11.2' \
+            'Cython==0.29.36'
+          python - <<'PY'
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          import PySide6
+
+          requirements = Path(PySide6.__file__).parent / "scripts" / "requirements-android.txt"
+          subprocess.run(
+              [sys.executable, "-m", "pip", "install", "-r", str(requirements)],
+              check=True,
+          )
+          PY
+
+      - name: Build pinned AMY service AAR
+        run: |
+          git clone https://github.com/linuxificator/amy.git "$RUNNER_TEMP/amy-lb"
+          git -C "$RUNNER_TEMP/amy-lb" merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
+          git -C "$RUNNER_TEMP/amy-lb" checkout "$AMY_COMMIT"
+          gradle -p "$RUNNER_TEMP/amy-lb/android" \
+            :amy-service:assembleDebug --stacktrace
+          test "$(git -C "$RUNNER_TEMP/amy-lb" rev-parse HEAD)" = "$AMY_COMMIT"
+
+      - name: Download verified Qt for Python Android wheels
+        env:
+          PYSIDE_WHEEL: ${{ matrix.pyside_wheel }}
+          PYSIDE_SHA256: ${{ matrix.pyside_sha256 }}
+          SHIBOKEN_WHEEL: ${{ matrix.shiboken_wheel }}
+          SHIBOKEN_SHA256: ${{ matrix.shiboken_sha256 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/qt-android-wheels"
+          curl -L --fail --silent --show-error \
+            "https://download.qt.io/official_releases/QtForPython/pyside6/$PYSIDE_WHEEL" \
+            -o "$RUNNER_TEMP/qt-android-wheels/$PYSIDE_WHEEL"
+          curl -L --fail --silent --show-error \
+            "https://download.qt.io/official_releases/QtForPython/shiboken6/$SHIBOKEN_WHEEL" \
+            -o "$RUNNER_TEMP/qt-android-wheels/$SHIBOKEN_WHEEL"
+          echo "$PYSIDE_SHA256  $RUNNER_TEMP/qt-android-wheels/$PYSIDE_WHEEL" \
+            | sha256sum --check --strict
+          echo "$SHIBOKEN_SHA256  $RUNNER_TEMP/qt-android-wheels/$SHIBOKEN_WHEEL" \
+            | sha256sum --check --strict
+
+      - name: Build Qt frontend plus separate AMY service APK
+        working-directory: amysynth_version/qt_frontend
+        env:
+          PYSIDE_WHEEL: ${{ matrix.pyside_wheel }}
+          SHIBOKEN_WHEEL: ${{ matrix.shiboken_wheel }}
+        run: |
+          python packaging/android/build_android.py \
+            --frontend "$PWD" \
+            --build-dir "$RUNNER_TEMP/lb-android-${{ matrix.arch }}" \
+            --aar "$RUNNER_TEMP/amy-lb/android/amy-service/build/outputs/aar/amy-service-debug.aar" \
+            --wheel-pyside "$RUNNER_TEMP/qt-android-wheels/$PYSIDE_WHEEL" \
+            --wheel-shiboken "$RUNNER_TEMP/qt-android-wheels/$SHIBOKEN_WHEEL" \
+            --ndk "$ANDROID_SDK_ROOT/ndk/27.2.12479018" \
+            --sdk "$ANDROID_SDK_ROOT" \
+            --arch '${{ matrix.arch }}' \
+            --release-stamp '${{ needs.release-metadata.outputs.stamp }}'
+
+      - name: Upload Android package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk
+            amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk.sha256
+          if-no-files-found: error
+          retention-days: 2
+
+  android-emulator:
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/integration/android_build'
+    needs: [android-packages]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Download x86_64 Android package
+        uses: actions/download-artifact@v4
+        with:
+          name: android-emulator-x86_64
+          path: android-package
+
+      - name: Checkout pinned AMY audio analyzer
+        run: |
+          git clone https://github.com/linuxificator/amy.git "$RUNNER_TEMP/amy-lb"
+          git -C "$RUNNER_TEMP/amy-lb" merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
+          git -C "$RUNNER_TEMP/amy-lb" checkout "$AMY_COMMIT"
+          test "$(git -C "$RUNNER_TEMP/amy-lb" rev-parse HEAD)" = "$AMY_COMMIT"
+
+      - name: Enable KVM for Android emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Packaged Android end-to-end smoke test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim
+          script: bash amysynth_version/qt_frontend/packaging/android/test_android_apk.sh
+
+      - name: Upload Omnichord Android smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lb-omnichord-android-smoke
+          path: android-audio-capture/
+          if-no-files-found: error
+          retention-days: 7
+
   publish-release:
     if: github.ref == 'refs/heads/main'
-    needs: [release-metadata, linux-appimages, macos-dmg, windows-native]
+    needs: [release-metadata, linux-appimages, macos-dmg, windows-native, android-packages, android-emulator]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -338,7 +549,7 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Create tag and four-part GitHub Release
+      - name: Create tag and five-platform GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
@@ -348,6 +559,7 @@ jobs:
           pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
           mac_file="LB_Omnichord.${RELEASE_STAMP}.macOS-arm64.dmg"
           windows_file="LB_Omnichord.${RELEASE_STAMP}.Windows-x86_64.zip"
+          android_file="LB_Omnichord.${RELEASE_STAMP}.Android-arm64.apk"
           {
             echo '## Linux x64'
             echo
@@ -379,6 +591,16 @@ jobs:
             echo "Download \`$windows_file\` and its SHA-256 file, extract the complete zip, then double-click \`LB_Omnichord.cmd\`. Do not use Explorer's \`Run with PowerShell\` on the internal \`run_windows.ps1\`: the double-click launcher supplies a process-only execution-policy bypass and keeps startup errors visible."
             echo
             echo 'The portable directory contains separate native AMY and Qt frontend executables; it is not a single executable and the extracted files must stay together. Native Windows pointer hardware, audio and MIDI still need physical validation.'
+            echo
+            echo '## Android arm64 (experimental)'
+            echo
+            echo "Download \`$android_file\` and its SHA-256 file, allow installation from this source when Android asks, then install the APK. The package contains a PySide6 frontend and a separate private AMY/Oboe service process communicating through the app-private \`amy.sock\`."
+            echo
+            echo 'This package is CI debug-signed so it can be installed and emulator-tested without a repository signing secret. It is not a Play Store bundle or a stable update channel, and physical touchscreen, speaker, route-change and latency validation is still required.'
+            echo
+            echo '## Build provenance'
+            echo
+            echo "AMY fork release: \`$AMY_RELEASE_BRANCH\` at immutable build commit \`$AMY_COMMIT\`."
           } > release-notes.md
           gh release create "$RELEASE_TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \

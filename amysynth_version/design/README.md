@@ -24,7 +24,7 @@ Core rules:
 - Shared state is explicit; tuning is shared only when coupling is enabled.
 - `rhythm_bahavior.md` is the authoritative rhythm transport/tempo contract.
 - `testing.md` defines the maintained local suites and CI responsibilities;
-  it also defines four-platform desktop release packaging and validation.
+  it also defines five-platform release packaging and validation.
   Detailed executable scenarios live in `../qt_frontend/tests/USE_CASES.md`.
 - `sound_balance.md` defines user storage/config overrides, strum modes, MIDI
   control indicators and the instrument-balance measurement contract.
@@ -55,7 +55,7 @@ Then add every row that matches the task:
 | Tuning, pitch or note conversion | `tuning.md`, `use_cases.md`, `../qt_frontend/tests/USE_CASES.md` |
 | AMY commands, sockets, serial or buses | `amy_interface.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |
 | Instrument catalogue, defaults or balance | `sound_balance.md`, `presets.md`, `../qt_frontend/instruments/README_defaults.md` |
-| Desktop packages, releases or native Windows | `../qt_frontend/README.md`, `../qt_frontend/INSTALL.md`, `../qt_frontend/docs/WINDOWS_NATIVE.md`, `../../.github/workflows/desktop-release.yml` |
+| Platform packages, releases, Android or native Windows | `../qt_frontend/README.md`, `../qt_frontend/INSTALL.md`, `../qt_frontend/packaging/android/README.md`, `../qt_frontend/docs/WINDOWS_NATIVE.md`, `../../.github/workflows/desktop-release.yml` |
 | Optional historical WSL experiment | `../qt_frontend/docs/WSL_APPIMAGE_TESTING.md`, plus the desktop documents above |
 | ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |

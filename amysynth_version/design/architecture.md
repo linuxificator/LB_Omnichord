@@ -35,7 +35,22 @@ bundle use an equivalent packaging wrapper: it starts the bundled AMY
 executable as a separate child, waits for its private socket and then starts
 Qt. The Qt process itself neither imports AMY nor starts or stops its service.
 Each socket packet contains one complete logical AMY wire request, matching the
-`upstream/android-oboe` service and decoupled hello-world reference.
+fork's Android service and decoupled hello-world reference.
+
+The Android APK packages that service as an AAR. Its unexported lifecycle
+provider starts a separate `:amy` process under the application's UID; Oboe owns
+audio there. Qt resolves Android's actual app-private files directory with
+`QStandardPaths` and connects to `amy.sock` without importing AMY, loading JNI
+or taking over service lifecycle. The pinned Android AMY host profile provides
+the complete 336-oscillator/11-bus application capacity.
+
+Platform-specific code is not permitted in the Qt application beyond a single
+startup preamble when platform facilities make it unavoidable. Android uses
+that exception only to select the app-private socket path and consume the CI
+smoke marker; Windows transport selection is capability-driven. Packaging,
+service lifecycle, Oboe/AAudio, named-pipe and operating-system build logic all
+remain outside the portable Qt behavior. Asset-root discovery is based on the
+packaged directory layout rather than an operating-system name.
 
 The native Windows service/package is now built by the Windows packaging
 script as an experimental zip: `amy_service.exe` is compiled against the
@@ -51,6 +66,7 @@ Supported transports:
 
 - external local AMY service over a Unix-domain socket
 - external native Windows AMY service over a private named pipe
+- private Android `:amy`/Oboe service over the application Unix socket
 - serial transport to ESP32-P4
 
 The same user action must result in the same AMY wire command stream regardless of transport.

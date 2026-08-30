@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,8 +78,14 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             original = user_data.USER_CONFIG_DIR
             try:
                 user_data.USER_CONFIG_DIR = root / "user"
-                selected = user_data.ensure_user_configs(shipped)
+                with mock.patch.object(
+                    user_data.shutil,
+                    "copy2",
+                    side_effect=AssertionError("metadata copy is not portable"),
+                ):
+                    selected = user_data.ensure_user_configs(shipped)
                 target = selected / "amy_config.json"
+                self.assertEqual(json.loads(target.read_text())["serial"], 1)
                 target.write_text('{"serial": 2}', encoding="utf-8")
                 user_data.ensure_user_configs(shipped)
                 self.assertEqual(json.loads(target.read_text())["serial"], 2)
