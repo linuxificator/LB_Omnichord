@@ -1,0 +1,1432 @@
+{
+  "schema_version": 1,
+  "title": "LB Omnichord drum fills instrument realization — gamma9001",
+  "timing_catalogue": "drum_fills_timing.json",
+  "kit_family": "gamma9001",
+  "separation_contract": {
+    "timing_owned_by_timing_catalogue": true,
+    "this_file_may_not_change_ticks": true,
+    "this_file_may_not_add_or_remove_timing_events": true,
+    "role_resolution_only": true,
+    "rule": "Resolve each event logical_role using the profile selected for that rhythm. Velocity comes from the timing catalogue and may be scaled but not used to move events."
+  },
+  "source_info": {
+    "implementation": "AMY Gamma9001 GM-mapped kit patches",
+    "upstream": "shorepine/amy docs/api.md and sounds/gamma9001/manifest.json",
+    "kits": {
+      "384": "TR-808",
+      "385": "TR-909",
+      "386": "Linn 9000",
+      "387": "Univox Micro Rythmer 12",
+      "388": "Tokyo Synthetics",
+      "389": "80s Power Kit",
+      "390": "Percussion"
+    },
+    "constraint": "Mappings use GM note semantics through Gamma9001 patches; Latin profiles deliberately use a main kit plus patch 390 percussion roles."
+  },
+  "profiles": {
+    "gamma_808": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 50,
+        "gm_role": "High Tom"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 48,
+        "gm_role": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 45,
+        "gm_role": "Low Tom"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 39,
+        "gm_role": "Hand Clap"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_909": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 50,
+        "gm_role": "High Tom"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 48,
+        "gm_role": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 45,
+        "gm_role": "Low Tom"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 39,
+        "gm_role": "Hand Clap"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_linn": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 50,
+        "gm_role": "High Tom"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 48,
+        "gm_role": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 45,
+        "gm_role": "Low Tom"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 39,
+        "gm_role": "Hand Clap"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_mr12": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 50,
+        "gm_role": "High Tom"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 48,
+        "gm_role": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 45,
+        "gm_role": "Low Tom"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 39,
+        "gm_role": "Hand Clap"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 387,
+        "kit": "Univox Micro Rythmer 12",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_tokyo": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 50,
+        "gm_role": "High Tom"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 48,
+        "gm_role": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 45,
+        "gm_role": "Low Tom"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 39,
+        "gm_role": "Hand Clap"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_power": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 50,
+        "gm_role": "High Tom"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 48,
+        "gm_role": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 45,
+        "gm_role": "Low Tom"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 39,
+        "gm_role": "Hand Clap"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_jazz_linn": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 59,
+        "gm_role": "Ride Cymbal 2"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 59,
+        "gm_role": "Ride Cymbal 2"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 57,
+        "gm_role": "Crash Cymbal 2"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 50,
+        "gm_role": "High Tom"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 48,
+        "gm_role": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 45,
+        "gm_role": "Low Tom"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 39,
+        "gm_role": "Hand Clap"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_latin_dual": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 65,
+        "gm_role": "High Timbale"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 66,
+        "gm_role": "Low Timbale"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_reggae_808": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 50,
+        "gm_role": "High Tom"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 48,
+        "gm_role": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 45,
+        "gm_role": "Low Tom"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 39,
+        "gm_role": "Hand Clap"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    }
+  },
+  "rhythm_profile": {
+    "pop_8": "gamma_power",
+    "pop_16": "gamma_linn",
+    "slow_ballad": "gamma_linn",
+    "six_eight_ballad": "gamma_linn",
+    "rock": "gamma_power",
+    "shuffle": "gamma_jazz_linn",
+    "punk": "gamma_power",
+    "metal": "gamma_power",
+    "country_train": "gamma_linn",
+    "country_waltz": "gamma_linn",
+    "waltz": "gamma_linn",
+    "polka": "gamma_linn",
+    "march": "gamma_power",
+    "straight_blues": "gamma_power",
+    "twelve_eight_blues": "gamma_power",
+    "jazz_swing": "gamma_jazz_linn",
+    "jazz_waltz": "gamma_jazz_linn",
+    "jazz_shuffle": "gamma_jazz_linn",
+    "funk": "gamma_linn",
+    "jazz_funk": "gamma_linn",
+    "soul": "gamma_linn",
+    "soul_shuffle": "gamma_jazz_linn",
+    "gospel_6_8": "gamma_linn",
+    "rnb": "gamma_linn",
+    "disco": "gamma_909",
+    "house": "gamma_909",
+    "techno": "gamma_909",
+    "trance": "gamma_909",
+    "garage_2step": "gamma_tokyo",
+    "breakbeat": "gamma_tokyo",
+    "drum_and_bass": "gamma_tokyo",
+    "dubstep": "gamma_808",
+    "hip_hop": "gamma_808",
+    "boom_bap": "gamma_808",
+    "trap": "gamma_808",
+    "bossa": "gamma_latin_dual",
+    "samba": "gamma_latin_dual",
+    "salsa": "gamma_latin_dual",
+    "cha_cha": "gamma_latin_dual",
+    "mambo": "gamma_latin_dual",
+    "merengue": "gamma_latin_dual",
+    "cumbia": "gamma_latin_dual",
+    "bolero": "gamma_latin_dual",
+    "tango": "gamma_linn",
+    "son_clave_3_2": "gamma_latin_dual",
+    "rumba_clave_3_2": "gamma_latin_dual",
+    "afro_cuban_6_8": "gamma_latin_dual",
+    "reggae": "gamma_reggae_808",
+    "calypso_soca": "gamma_latin_dual",
+    "five_four": "gamma_power",
+    "seven_eight": "gamma_power",
+    "seven_four_funk": "gamma_linn",
+    "nine_eight": "gamma_power",
+    "eleven_eight": "gamma_power"
+  },
+  "gamma_kit_selection_policy": {
+    "style_driven": true,
+    "dual_kit_allowed": true,
+    "latin_rule": "Profiles may use main-kit drum roles and patch 390 for Latin/hand-percussion roles. Do not collapse these to one patch if that changes the intended orchestration.",
+    "esp32_p4_note": "This is design data only. Gamma9001 storage/build integration on the P4 must be verified separately before selecting this realization at runtime."
+  }
+}
