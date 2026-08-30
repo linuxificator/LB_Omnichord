@@ -16,7 +16,7 @@ class PackagingContracts(unittest.TestCase):
             REPOSITORY / ".github" / "workflows" / "amy-regression.yml",
         ]
         release_branch = "releases/amy_omnichord_R20260830T123342"
-        release_commit = "45005c0f4d226c8090e39f9dccd6ece788b33189"
+        release_commit = "1e81ea571294c6aed8e2c0d57a9e09786561e9cf"
 
         for workflow_path in workflows:
             workflow = workflow_path.read_text(encoding="utf-8")
@@ -85,6 +85,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("if: always()", release)
         self.assertIn("set -euo pipefail", android_smoke)
         self.assertIn("AMY backend: external socket", android_smoke)
+        self.assertIn("Audio capture armed: 384000 frames", android_smoke)
         self.assertIn("--min-peak-dbfs -20.0", android_smoke)
         self.assertIn("--windowed --package-smoke-test", release)
         self.assertIn("qml-chord-hold-promoted", android_smoke)

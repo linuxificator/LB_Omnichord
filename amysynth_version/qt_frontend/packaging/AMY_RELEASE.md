@@ -2,7 +2,7 @@
 
 Every LB Omnichord build uses AMY from the fork release branch
 `releases/amy_omnichord_R20260830T123342` at exact commit
-`45005c0f4d226c8090e39f9dccd6ece788b33189`.
+`1e81ea571294c6aed8e2c0d57a9e09786561e9cf`.
 
 The branch name records the maintained AMY-for-Omnichord line. The commit SHA
 is the immutable build input: CI checks that the commit belongs to the declared

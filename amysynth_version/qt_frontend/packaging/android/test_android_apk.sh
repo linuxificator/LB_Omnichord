@@ -27,7 +27,7 @@ adb install "$apk"
 adb shell run-as "$package" mkdir -p files
 
 # python-for-Android extracts its private Python/Qt payload on first launch.
-# Warm that install before arming AMY's fixed-duration Oboe capture so unpacking
+# Warm that install before arming AMY's eight-second Oboe capture so unpacking
 # time cannot consume the capture window before the frontend sends notes.
 adb logcat -c
 adb shell monkey -p "$package" 1
@@ -76,6 +76,7 @@ for checkpoint in \
   grep -q "$checkpoint" "$status_file"
 done
 grep -q 'AMY/Oboe started: .*336 oscs, 11 buses' "$log_file"
+grep -q 'Audio capture armed: 384000 frames, 48000 Hz, 2 channels' "$log_file"
 grep -q 'AMY output route: deviceId=' "$log_file"
 grep -q 'QPA platform: android' "$log_file"
 grep -q 'AMY backend: external socket .*amy.sock' "$log_file"

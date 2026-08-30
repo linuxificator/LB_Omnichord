@@ -15,7 +15,7 @@ private :amy service process -> AMY C engine -> Oboe -> AAudio
 
 The application embeds the `amy-service` AAR from fork release branch
 `releases/amy_omnichord_R20260830T123342`, pinned to commit
-`45005c0f4d226c8090e39f9dccd6ece788b33189`. The AAR's unexported lifecycle
+`1e81ea571294c6aed8e2c0d57a9e09786561e9cf`. The AAR's unexported lifecycle
 provider starts AMY in a separate `:amy` process under the same package UID.
 Qt discovers the application's real private files directory with
 `QStandardPaths`; neither the data path nor an Android user number is
@@ -73,7 +73,9 @@ QML tap/hold smoke path, checks the private socket and separate AMY service,
 and compares the exact AMY render samples with the samples handed to Oboe.
 The emulator performs one unmeasured warm-up launch for python-for-Android's
 first-run asset extraction, force-stops the complete package, and only then
-arms AMY's fixed-duration Oboe capture for the measured launch.
+arms AMY's eight-second Oboe capture for the measured launch. After the
+first-launch warm-up, that window leaves enough margin for normal packaged
+frontend startup variation and the complete UI-driven synth attack.
 The readiness poll filters out verbose extraction traffic and retries a
 transient `adb logcat` read instead of confusing a host transport reset with an
 application failure; the filtered Python log must still contain no traceback.

@@ -116,7 +116,7 @@ native-runner package validation, not a physical Windows audio/MIDI test.
 All supported targets must give PCM preset numbers 0–18 the same meaning. The
 Windows service is built from pinned AMY release branch
 `releases/amy_omnichord_R20260830T123342` at commit
-`45005c0f4d226c8090e39f9dccd6ece788b33189`. Its CMake target compiles `amy.c`
+`1e81ea571294c6aed8e2c0d57a9e09786561e9cf`. Its CMake target compiles `amy.c`
 and `pcm.c` without defining `GAMMA9001` and without linking the optional
 Gamma9001 `drums_bin.c`. The pinned source consequently includes `pcm_tiny.h`,
 including the tiny-bank mapping for MIDI drum patch 258.
