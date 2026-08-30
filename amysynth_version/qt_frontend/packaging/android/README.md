@@ -74,6 +74,9 @@ and compares the exact AMY render samples with the samples handed to Oboe.
 The emulator performs one unmeasured warm-up launch for python-for-Android's
 first-run asset extraction, force-stops the complete package, and only then
 arms AMY's fixed-duration Oboe capture for the measured launch.
+The readiness poll filters out verbose extraction traffic and retries a
+transient `adb logcat` read instead of confusing a host transport reset with an
+application failure; the filtered Python log must still contain no traceback.
 The captured packaged-QML gesture uses LB's normal `0.5` chord amplitude, not
 the hello-world example's full-scale `V10`/`l1` sequence. Its non-silence gate
 therefore requires at least -20 dBFS peak while still rejecting clipping and

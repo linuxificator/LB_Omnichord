@@ -92,6 +92,9 @@ class PackagingContracts(unittest.TestCase):
             android_smoke.index('am force-stop "$package"'),
             android_smoke.index("amy-audio-capture.enable"),
         )
+        self.assertIn("warmup_ready=0", android_smoke)
+        self.assertIn("'python:I' '*:S'", android_smoke)
+        self.assertIn('test "$warmup_ready" -eq 1', android_smoke)
         self.assertIn(
             "branches: [main, testing/windows_smoke, integration/android_build]",
             release,

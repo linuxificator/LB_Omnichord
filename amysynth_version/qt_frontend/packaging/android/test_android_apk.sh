@@ -31,14 +31,18 @@ adb shell run-as "$package" mkdir -p files
 # time cannot consume the capture window before the frontend sends notes.
 adb logcat -c
 adb shell monkey -p "$package" 1
+warmup_ready=0
 for _ in {1..120}; do
-  adb logcat -d > /tmp/lb-android-warmup.log
-  if grep -q 'QPA platform: android' /tmp/lb-android-warmup.log; then
+  if adb logcat -d -s 'python:I' '*:S' \
+      > /tmp/lb-android-warmup.log 2>/dev/null && \
+      grep -q 'QPA platform: android' /tmp/lb-android-warmup.log; then
+    warmup_ready=1
     break
   fi
   sleep 0.5
 done
-grep -q 'QPA platform: android' /tmp/lb-android-warmup.log
+test "$warmup_ready" -eq 1
+! grep -q 'Traceback (most recent call last)' /tmp/lb-android-warmup.log
 adb shell am force-stop "$package"
 
 adb shell run-as "$package" touch files/lb-android-package-smoke.enable
