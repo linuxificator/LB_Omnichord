@@ -579,6 +579,7 @@ class PresetIntegrationTests(unittest.TestCase):
                 )
             self.assertNotIn("zY0Z", switched)
             self.assertNotIn("S16384Z", switched)
+            self.assertNotIn("S20480Z", switched)
 
             # The original physical button-up must still own the live voice.
             checkpoint = app.bridge.count()
@@ -612,6 +613,8 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("selectChord", 0, 0)
             app.action("setRowOctave", 0, 2)
             app.action("setBassVoicingShift", -2.0)
+            app.action("toggleRhythmFill", 2)
+            app.action("setRhythmFillDensity", 5.0)
 
             app.action("toggleRhythm")
             self.assertTrue(bool(app.query("rhythmRunning")))
@@ -627,6 +630,11 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
             self.assertEqual(int(app.query("rhythmBassActivity")), 4)
             self.assertEqual(int(app.query("bassVoicingShift")), -2)
+            self.assertEqual(
+                list(app.query("rhythmFillEnabled")),
+                [False, False, True, False, False],
+            )
+            self.assertEqual(int(app.query("rhythmFillDensityIndex")), 5)
             self.assertEqual(int(app.action("octaveIndexForRow", 0)), 2)
 
             switched = app.bridge.lines_since(checkpoint)
@@ -645,6 +653,11 @@ class PresetIntegrationTests(unittest.TestCase):
                 switched,
                 "live style switch reset the sequencer timebase",
             )
+            self.assertNotIn(
+                "S20480Z",
+                switched,
+                "live style switch reset nested sequencer instances",
+            )
             for synth in (0, 1, 4):
                 self.assertNotIn(
                     f"l0i{synth}Z",
@@ -653,8 +666,12 @@ class PresetIntegrationTests(unittest.TestCase):
                 )
 
             self.assertTrue(
-                any(line.startswith("H") and "i0Z" in line for line in switched),
-                "live style switch did not replace tagged drum events",
+                any(line.startswith("J") and "i0Z" in line for line in switched),
+                "live style switch did not author nested drum events",
+            )
+            self.assertTrue(
+                any(line.startswith("zQT") for line in switched),
+                "live style switch did not quantize new drum role loops",
             )
 
             # Stopped switching still recalls the destination style's own
@@ -708,6 +725,8 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setRhythmChordActivity", 3.0)
             app.action("setRhythmBassActivity", 4.0)
             app.action("setBassVoicingShift", -2.0)
+            app.action("toggleRhythmFill", 4)
+            app.action("setRhythmFillDensity", 6.0)
             app.action("setChordArpeggioRate", 3.0)
             app.action("toggleChordArpeggioDirection")
             app.action("toggleChordArpeggio")
@@ -739,6 +758,11 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
             self.assertEqual(int(app.query("rhythmBassActivity")), 4)
             self.assertEqual(int(app.query("bassVoicingShift")), -2)
+            self.assertEqual(
+                list(app.query("rhythmFillEnabled")),
+                [False, False, False, False, True],
+            )
+            self.assertEqual(int(app.query("rhythmFillDensityIndex")), 6)
             self.assertTrue(bool(app.query("chordArpeggioEnabled")))
             self.assertEqual(int(app.query("chordArpeggioRate")), 3)
             self.assertTrue(bool(app.query("chordArpeggioDescending")))
@@ -753,6 +777,7 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertNotIn("zY0Z", switched)
             self.assertNotIn("zY1Z", switched)
             self.assertNotIn("S16384Z", switched)
+            self.assertNotIn("S20480Z", switched)
             self.assertTrue(
                 any(
                     line.startswith("H") and "n52" in line and "i4Z" in line
@@ -774,6 +799,8 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(stored_settings["percussion_activity"]), 4)
             self.assertEqual(int(stored_settings["chord_activity"]), 3)
             self.assertEqual(int(stored_settings["bass_activity"]), 4)
+            self.assertEqual(stored_settings["fill_order"], [4])
+            self.assertEqual(int(stored_settings["fill_density_bars"]), 2)
             self.assertEqual(int(stored["rhythm"]["bass_voicing_shift"]), -2)
             self.assertTrue(bool(stored["rhythm"]["chord_arpeggio_enabled"]))
             self.assertEqual(

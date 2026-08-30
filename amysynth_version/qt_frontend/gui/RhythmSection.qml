@@ -121,8 +121,8 @@ Item {
         id: controlsArea
         x: runButton.x + runButton.width + 12; y: 0; width: parent.width - x; height: parent.height
 
-        // Preserve the original button width. Chord and bass each add a fifth
-        // column; only tempo yields the extra horizontal space.
+        // Percussion, chord and bass each use five columns. Tempo and fill
+        // density share the remaining strip.
         readonly property real formerActivityWidth:
             width * 0.57 - 14
         readonly property real standardActivityWidth:
@@ -134,8 +134,7 @@ Item {
         readonly property real bassActivityWidth:
             10 + 5 * activityButtonWidth + 4 * 4
         readonly property real expandedActivityWidth:
-            standardActivityWidth
-            + 2 * bassActivityWidth
+            3 * bassActivityWidth
             + 2 * activityGap
 
         LabeledSlider {
@@ -147,7 +146,7 @@ Item {
                 parent.width
                 - 14
                 - controlsArea.expandedActivityWidth
-            height: parent.height
+            height: 52
 
             label: "tempo"
             currentValue:
@@ -166,6 +165,28 @@ Item {
                 root.controller.setRhythmTempo(value)
         }
 
+        LabeledSlider {
+            id: fillDensitySlider
+            x: 0
+            y: 56
+            width: tempoSlider.width
+            height: parent.height - y
+            label: "fill density"
+            currentValue: root.controller.rhythmFillDensityIndex
+            fromValue: 0
+            toValue: 7
+            stepValue: 1
+            decimals: 0
+            valueLabels: ["/32", "/16", "/8", "/6", "/4", "/3", "/2", "/1"]
+            midiControlRouter: root.controller.midiPlayer
+            midiTarget: ({
+                "screen": "omni",
+                "kind": "rhythm_fill_density"
+            })
+            onEdited: (value) =>
+                root.controller.setRhythmFillDensity(value)
+        }
+
         Item {
             id: activityArea
 
@@ -174,29 +195,31 @@ Item {
             width: parent.width - x
             height: parent.height
 
-            ActivitySelector {
+            PercussionActivitySelector {
                 x: 0
                 y: 0
-                width: controlsArea.standardActivityWidth
-                height: 58
-
-                label: "percussion activity"
+                width: controlsArea.bassActivityWidth
+                height: parent.height
                 currentLevel:
                     root.controller.rhythmBusyness
+                fillEnabled:
+                    root.controller.rhythmFillEnabled
 
                 groupColor: "#f5df78"
                 idleColor: "#f7e9a8"
                 selectedColor: "#bc8410"
 
-                onSelected: (level) =>
+                onActivitySelected: (level) =>
                     root.controller.setRhythmBusyness(
                         level
                     )
+                onFillToggled: (fillIndex) =>
+                    root.controller.toggleRhythmFill(fillIndex)
             }
 
             ChordActivitySelector {
                 x:
-                    controlsArea.standardActivityWidth
+                    controlsArea.bassActivityWidth
                     + controlsArea.activityGap
                 y: 0
                 width: controlsArea.bassActivityWidth
@@ -239,7 +262,7 @@ Item {
 
             ActivitySelector {
                 x:
-                    controlsArea.standardActivityWidth
+                    controlsArea.bassActivityWidth
                     + controlsArea.activityGap
                     + controlsArea.bassActivityWidth
                     + controlsArea.activityGap

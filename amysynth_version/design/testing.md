@@ -7,9 +7,10 @@ legacy material and is outside these tests and workflows.
 `qt_frontend/tests/run_tests.py` is the single local and CI entry point. Its
 `unit` suite automatically discovers every top-level `test_*.py`; integration
 suites remain explicit because they have different runtime/native-AMY needs.
-The native suites start AMY with the production capacity of 11 buses and 336
-oscillators. CI installs a pinned revision of the LB Omnichord AMY bus-mixer
-fork so a passing run tests the deployed architecture reproducibly.
+The native suites start AMY with the production capacity of 11 buses, 336
+oscillators, 1024 stored patterns, 64 events per pattern and 32 active pattern
+instances. CI installs the exact pinned LB Omnichord AMY release so a passing
+run tests the deployed architecture reproducibly.
 
 ## Local suites
 
@@ -90,8 +91,8 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 - Android asset: `LB_Omnichord.R20260824223000.Android-arm64.apk`
 - one matching `.sha256` file for each package
 
-The AppImages bundle PySide6, the frontend assets and the pinned AMY bus-mixer
-fork built with the ESP32-compatible tiny PCM bank. The executable starts AMY
+The AppImages bundle PySide6, the frontend assets and the pinned AMY release
+built with the ESP32-compatible tiny PCM bank. The executable starts AMY
 as a separate child process. Unix IPC selects the best endpoint capability:
 packet-preserving `SOCK_SEQPACKET` where accepted, otherwise newline-framed
 `SOCK_STREAM`. The runtime has no OS-name branch for this choice. Packaging

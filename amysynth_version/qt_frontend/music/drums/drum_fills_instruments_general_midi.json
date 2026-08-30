@@ -1,0 +1,783 @@
+{
+  "schema_version": 1,
+  "title": "LB Omnichord drum fills instrument realization — general_midi",
+  "timing_catalogue": "drum_fills_timing.json",
+  "kit_family": "general_midi",
+  "separation_contract": {
+    "timing_owned_by_timing_catalogue": true,
+    "this_file_may_not_change_ticks": true,
+    "this_file_may_not_add_or_remove_timing_events": true,
+    "role_resolution_only": true,
+    "rule": "Resolve each event logical_role using the profile selected for that rhythm. Velocity comes from the timing catalogue and may be scaled but not used to move events."
+  },
+  "source_info": {
+    "implementation": "General MIDI Level 1 percussion note map",
+    "channel": "10 (1-based conventional MIDI channel numbering)",
+    "standard_range": "35..81",
+    "constraint": "This file specifies GM note numbers/roles, not a particular sample library or vendor timbre."
+  },
+  "profiles": {
+    "gm_standard": {
+      "low_primary": {
+        "midi_note": 36,
+        "gm_name": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "midi_note": 35,
+        "gm_name": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "ghost_detail": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "midi_note": 42,
+        "gm_name": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "midi_note": 46,
+        "gm_name": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "midi_note": 44,
+        "gm_name": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "midi_note": 51,
+        "gm_name": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "midi_note": 53,
+        "gm_name": "Ride Bell"
+      },
+      "section_accent": {
+        "midi_note": 49,
+        "gm_name": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "midi_note": 50,
+        "gm_name": "High Tom"
+      },
+      "tonal_mid": {
+        "midi_note": 48,
+        "gm_name": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "midi_note": 45,
+        "gm_name": "Low Tom"
+      },
+      "timeline_primary": {
+        "midi_note": 56,
+        "gm_name": "Cowbell"
+      },
+      "texture_shaker": {
+        "midi_note": 70,
+        "gm_name": "Maracas"
+      },
+      "hand_high": {
+        "midi_note": 63,
+        "gm_name": "Open Hi Conga"
+      },
+      "hand_low": {
+        "midi_note": 64,
+        "gm_name": "Low Conga"
+      },
+      "hand_accent": {
+        "midi_note": 39,
+        "gm_name": "Hand Clap"
+      },
+      "dry_click": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "electronic_detail": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      }
+    },
+    "gm_jazz": {
+      "low_primary": {
+        "midi_note": 36,
+        "gm_name": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "midi_note": 35,
+        "gm_name": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "ghost_detail": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "midi_note": 51,
+        "gm_name": "Ride Cymbal 1"
+      },
+      "timekeeper_open": {
+        "midi_note": 59,
+        "gm_name": "Ride Cymbal 2"
+      },
+      "timekeeper_foot": {
+        "midi_note": 44,
+        "gm_name": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "midi_note": 59,
+        "gm_name": "Ride Cymbal 2"
+      },
+      "sustain_bell": {
+        "midi_note": 53,
+        "gm_name": "Ride Bell"
+      },
+      "section_accent": {
+        "midi_note": 57,
+        "gm_name": "Crash Cymbal 2"
+      },
+      "tonal_high": {
+        "midi_note": 50,
+        "gm_name": "High Tom"
+      },
+      "tonal_mid": {
+        "midi_note": 48,
+        "gm_name": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "midi_note": 45,
+        "gm_name": "Low Tom"
+      },
+      "timeline_primary": {
+        "midi_note": 56,
+        "gm_name": "Cowbell"
+      },
+      "texture_shaker": {
+        "midi_note": 70,
+        "gm_name": "Maracas"
+      },
+      "hand_high": {
+        "midi_note": 63,
+        "gm_name": "Open Hi Conga"
+      },
+      "hand_low": {
+        "midi_note": 64,
+        "gm_name": "Low Conga"
+      },
+      "hand_accent": {
+        "midi_note": 39,
+        "gm_name": "Hand Clap"
+      },
+      "dry_click": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "electronic_detail": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      }
+    },
+    "gm_latin": {
+      "low_primary": {
+        "midi_note": 36,
+        "gm_name": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "midi_note": 35,
+        "gm_name": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "backbeat_soft": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "ghost_detail": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "midi_note": 42,
+        "gm_name": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "midi_note": 46,
+        "gm_name": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "midi_note": 44,
+        "gm_name": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "midi_note": 51,
+        "gm_name": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "midi_note": 53,
+        "gm_name": "Ride Bell"
+      },
+      "section_accent": {
+        "midi_note": 57,
+        "gm_name": "Crash Cymbal 2"
+      },
+      "tonal_high": {
+        "midi_note": 65,
+        "gm_name": "High Timbale"
+      },
+      "tonal_mid": {
+        "midi_note": 66,
+        "gm_name": "Low Timbale"
+      },
+      "tonal_low": {
+        "midi_note": 64,
+        "gm_name": "Low Conga"
+      },
+      "timeline_primary": {
+        "midi_note": 75,
+        "gm_name": "Claves"
+      },
+      "texture_shaker": {
+        "midi_note": 70,
+        "gm_name": "Maracas"
+      },
+      "hand_high": {
+        "midi_note": 63,
+        "gm_name": "Open Hi Conga"
+      },
+      "hand_low": {
+        "midi_note": 64,
+        "gm_name": "Low Conga"
+      },
+      "hand_accent": {
+        "midi_note": 56,
+        "gm_name": "Cowbell"
+      },
+      "dry_click": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "electronic_detail": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      }
+    },
+    "gm_electronic": {
+      "low_primary": {
+        "midi_note": 36,
+        "gm_name": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "midi_note": 35,
+        "gm_name": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      },
+      "backbeat_soft": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      },
+      "ghost_detail": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      },
+      "timekeeper_primary": {
+        "midi_note": 42,
+        "gm_name": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "midi_note": 46,
+        "gm_name": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "midi_note": 44,
+        "gm_name": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "midi_note": 51,
+        "gm_name": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "midi_note": 53,
+        "gm_name": "Ride Bell"
+      },
+      "section_accent": {
+        "midi_note": 49,
+        "gm_name": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "midi_note": 50,
+        "gm_name": "High Tom"
+      },
+      "tonal_mid": {
+        "midi_note": 48,
+        "gm_name": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "midi_note": 45,
+        "gm_name": "Low Tom"
+      },
+      "timeline_primary": {
+        "midi_note": 56,
+        "gm_name": "Cowbell"
+      },
+      "texture_shaker": {
+        "midi_note": 70,
+        "gm_name": "Maracas"
+      },
+      "hand_high": {
+        "midi_note": 63,
+        "gm_name": "Open Hi Conga"
+      },
+      "hand_low": {
+        "midi_note": 64,
+        "gm_name": "Low Conga"
+      },
+      "hand_accent": {
+        "midi_note": 39,
+        "gm_name": "Hand Clap"
+      },
+      "dry_click": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "electronic_detail": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      }
+    },
+    "gm_reggae": {
+      "low_primary": {
+        "midi_note": 36,
+        "gm_name": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "midi_note": 35,
+        "gm_name": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "backbeat_soft": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "ghost_detail": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "midi_note": 42,
+        "gm_name": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "midi_note": 46,
+        "gm_name": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "midi_note": 44,
+        "gm_name": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "midi_note": 51,
+        "gm_name": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "midi_note": 53,
+        "gm_name": "Ride Bell"
+      },
+      "section_accent": {
+        "midi_note": 49,
+        "gm_name": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "midi_note": 50,
+        "gm_name": "High Tom"
+      },
+      "tonal_mid": {
+        "midi_note": 48,
+        "gm_name": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "midi_note": 45,
+        "gm_name": "Low Tom"
+      },
+      "timeline_primary": {
+        "midi_note": 56,
+        "gm_name": "Cowbell"
+      },
+      "texture_shaker": {
+        "midi_note": 70,
+        "gm_name": "Maracas"
+      },
+      "hand_high": {
+        "midi_note": 63,
+        "gm_name": "Open Hi Conga"
+      },
+      "hand_low": {
+        "midi_note": 64,
+        "gm_name": "Low Conga"
+      },
+      "hand_accent": {
+        "midi_note": 39,
+        "gm_name": "Hand Clap"
+      },
+      "dry_click": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "electronic_detail": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      }
+    },
+    "gm_power": {
+      "low_primary": {
+        "midi_note": 36,
+        "gm_name": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "midi_note": 36,
+        "gm_name": "Bass Drum 1"
+      },
+      "backbeat_primary": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "ghost_detail": {
+        "midi_note": 38,
+        "gm_name": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "midi_note": 42,
+        "gm_name": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "midi_note": 46,
+        "gm_name": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "midi_note": 44,
+        "gm_name": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "midi_note": 51,
+        "gm_name": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "midi_note": 53,
+        "gm_name": "Ride Bell"
+      },
+      "section_accent": {
+        "midi_note": 57,
+        "gm_name": "Crash Cymbal 2"
+      },
+      "tonal_high": {
+        "midi_note": 50,
+        "gm_name": "High Tom"
+      },
+      "tonal_mid": {
+        "midi_note": 48,
+        "gm_name": "Hi-Mid Tom"
+      },
+      "tonal_low": {
+        "midi_note": 43,
+        "gm_name": "High Floor Tom"
+      },
+      "timeline_primary": {
+        "midi_note": 56,
+        "gm_name": "Cowbell"
+      },
+      "texture_shaker": {
+        "midi_note": 70,
+        "gm_name": "Maracas"
+      },
+      "hand_high": {
+        "midi_note": 63,
+        "gm_name": "Open Hi Conga"
+      },
+      "hand_low": {
+        "midi_note": 64,
+        "gm_name": "Low Conga"
+      },
+      "hand_accent": {
+        "midi_note": 39,
+        "gm_name": "Hand Clap"
+      },
+      "dry_click": {
+        "midi_note": 37,
+        "gm_name": "Side Stick"
+      },
+      "electronic_detail": {
+        "midi_note": 40,
+        "gm_name": "Electric Snare"
+      }
+    }
+  },
+  "rhythm_profile": {
+    "pop_8": "gm_power",
+    "pop_16": "gm_standard",
+    "slow_ballad": "gm_standard",
+    "six_eight_ballad": "gm_standard",
+    "rock": "gm_power",
+    "shuffle": "gm_jazz",
+    "punk": "gm_power",
+    "metal": "gm_power",
+    "country_train": "gm_standard",
+    "country_waltz": "gm_standard",
+    "waltz": "gm_standard",
+    "polka": "gm_standard",
+    "march": "gm_power",
+    "straight_blues": "gm_power",
+    "twelve_eight_blues": "gm_power",
+    "jazz_swing": "gm_jazz",
+    "jazz_waltz": "gm_jazz",
+    "jazz_shuffle": "gm_jazz",
+    "funk": "gm_standard",
+    "jazz_funk": "gm_standard",
+    "soul": "gm_standard",
+    "soul_shuffle": "gm_jazz",
+    "gospel_6_8": "gm_standard",
+    "rnb": "gm_standard",
+    "disco": "gm_electronic",
+    "house": "gm_electronic",
+    "techno": "gm_electronic",
+    "trance": "gm_electronic",
+    "garage_2step": "gm_electronic",
+    "breakbeat": "gm_electronic",
+    "drum_and_bass": "gm_electronic",
+    "dubstep": "gm_electronic",
+    "hip_hop": "gm_electronic",
+    "boom_bap": "gm_electronic",
+    "trap": "gm_electronic",
+    "bossa": "gm_latin",
+    "samba": "gm_latin",
+    "salsa": "gm_latin",
+    "cha_cha": "gm_latin",
+    "mambo": "gm_latin",
+    "merengue": "gm_latin",
+    "cumbia": "gm_latin",
+    "bolero": "gm_latin",
+    "tango": "gm_standard",
+    "son_clave_3_2": "gm_latin",
+    "rumba_clave_3_2": "gm_latin",
+    "afro_cuban_6_8": "gm_latin",
+    "reggae": "gm_reggae",
+    "calypso_soca": "gm_latin",
+    "five_four": "gm_power",
+    "seven_eight": "gm_power",
+    "seven_four_funk": "gm_standard",
+    "nine_eight": "gm_power",
+    "eleven_eight": "gm_power"
+  },
+  "gm_percussion_map_used": [
+    {
+      "midi_note": 35,
+      "name": "Acoustic Bass Drum"
+    },
+    {
+      "midi_note": 36,
+      "name": "Bass Drum 1"
+    },
+    {
+      "midi_note": 37,
+      "name": "Side Stick"
+    },
+    {
+      "midi_note": 38,
+      "name": "Acoustic Snare"
+    },
+    {
+      "midi_note": 39,
+      "name": "Hand Clap"
+    },
+    {
+      "midi_note": 40,
+      "name": "Electric Snare"
+    },
+    {
+      "midi_note": 41,
+      "name": "Low Floor Tom"
+    },
+    {
+      "midi_note": 42,
+      "name": "Closed Hi-Hat"
+    },
+    {
+      "midi_note": 43,
+      "name": "High Floor Tom"
+    },
+    {
+      "midi_note": 44,
+      "name": "Pedal Hi-Hat"
+    },
+    {
+      "midi_note": 45,
+      "name": "Low Tom"
+    },
+    {
+      "midi_note": 46,
+      "name": "Open Hi-Hat"
+    },
+    {
+      "midi_note": 47,
+      "name": "Low-Mid Tom"
+    },
+    {
+      "midi_note": 48,
+      "name": "Hi-Mid Tom"
+    },
+    {
+      "midi_note": 49,
+      "name": "Crash Cymbal 1"
+    },
+    {
+      "midi_note": 50,
+      "name": "High Tom"
+    },
+    {
+      "midi_note": 51,
+      "name": "Ride Cymbal 1"
+    },
+    {
+      "midi_note": 52,
+      "name": "Chinese Cymbal"
+    },
+    {
+      "midi_note": 53,
+      "name": "Ride Bell"
+    },
+    {
+      "midi_note": 54,
+      "name": "Tambourine"
+    },
+    {
+      "midi_note": 55,
+      "name": "Splash Cymbal"
+    },
+    {
+      "midi_note": 56,
+      "name": "Cowbell"
+    },
+    {
+      "midi_note": 57,
+      "name": "Crash Cymbal 2"
+    },
+    {
+      "midi_note": 58,
+      "name": "Vibraslap"
+    },
+    {
+      "midi_note": 59,
+      "name": "Ride Cymbal 2"
+    },
+    {
+      "midi_note": 60,
+      "name": "Hi Bongo"
+    },
+    {
+      "midi_note": 61,
+      "name": "Low Bongo"
+    },
+    {
+      "midi_note": 62,
+      "name": "Mute Hi Conga"
+    },
+    {
+      "midi_note": 63,
+      "name": "Open Hi Conga"
+    },
+    {
+      "midi_note": 64,
+      "name": "Low Conga"
+    },
+    {
+      "midi_note": 65,
+      "name": "High Timbale"
+    },
+    {
+      "midi_note": 66,
+      "name": "Low Timbale"
+    },
+    {
+      "midi_note": 67,
+      "name": "High Agogo"
+    },
+    {
+      "midi_note": 68,
+      "name": "Low Agogo"
+    },
+    {
+      "midi_note": 69,
+      "name": "Cabasa"
+    },
+    {
+      "midi_note": 70,
+      "name": "Maracas"
+    },
+    {
+      "midi_note": 71,
+      "name": "Short Whistle"
+    },
+    {
+      "midi_note": 72,
+      "name": "Long Whistle"
+    },
+    {
+      "midi_note": 73,
+      "name": "Short Guiro"
+    },
+    {
+      "midi_note": 74,
+      "name": "Long Guiro"
+    },
+    {
+      "midi_note": 75,
+      "name": "Claves"
+    },
+    {
+      "midi_note": 76,
+      "name": "Hi Wood Block"
+    },
+    {
+      "midi_note": 77,
+      "name": "Low Wood Block"
+    },
+    {
+      "midi_note": 78,
+      "name": "Mute Cuica"
+    },
+    {
+      "midi_note": 79,
+      "name": "Open Cuica"
+    },
+    {
+      "midi_note": 80,
+      "name": "Mute Triangle"
+    },
+    {
+      "midi_note": 81,
+      "name": "Open Triangle"
+    }
+  ]
+}

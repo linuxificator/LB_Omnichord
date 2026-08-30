@@ -1040,6 +1040,7 @@ class MidiPlayerBackend(QObject):
 
         if screen == "omni" and kind in (
             "rhythm_tempo",
+            "rhythm_fill_density",
             "bass_voicing",
             "bass_riff_selector",
         ):
@@ -1088,6 +1089,8 @@ class MidiPlayerBackend(QObject):
             return 415.0, 466.0, 1.0, "linear"
         if kind == "rhythm_tempo":
             return 40.0, 200.0, 1.0, "linear"
+        if kind == "rhythm_fill_density":
+            return 0.0, 7.0, 1.0, "linear"
         if kind == "bass_voicing":
             return -6.0, 6.0, 1.0, "linear"
         if kind == "bass_riff_selector":
@@ -1257,6 +1260,10 @@ class MidiPlayerBackend(QObject):
                 )
         elif kind == "rhythm_tempo":
             self._apply_midi_setter(self.owner.setRhythmTempo, value)
+        elif kind == "rhythm_fill_density":
+            self._apply_midi_setter(
+                self.owner.setRhythmFillDensity, value
+            )
         elif kind == "bass_voicing":
             self._apply_midi_setter(self.owner.setBassVoicingShift, value)
         elif kind == "bass_riff_selector":
@@ -1570,6 +1577,8 @@ class MidiPlayerBackend(QObject):
             return float(controller._tuning_reference)
         if kind == "rhythm_tempo":
             return float(self.owner.rhythmTempo)
+        if kind == "rhythm_fill_density":
+            return float(self.owner.rhythmFillDensityIndex)
         if kind == "bass_voicing":
             return float(self.owner._bass_voicing_shift)
         if kind == "bass_riff_selector":
@@ -1625,6 +1634,11 @@ class MidiPlayerBackend(QObject):
                     rhythm.tempo_by_rhythm[rhythm.selected_index] = value
                     if self.owner._rhythm_running:
                         self.owner._running_tempo = value
+                elif kind == "rhythm_fill_density":
+                    rhythm = self.owner._rhythm
+                    rhythm.fill_density_index_by_rhythm[
+                        rhythm.selected_index
+                    ] = int(round(value))
                 elif kind == "bass_voicing":
                     self.owner._bass_voicing_shift = int(round(value))
                 elif kind == "bass_riff_selector":

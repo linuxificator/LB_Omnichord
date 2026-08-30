@@ -5,7 +5,7 @@ Omnichord:
 
 1. **Raspberry Pi frontend + ESP32-P4 AMY over UART** — the hardware layout
    used for the instrument.
-2. **Local Unix desktop AMY** — the Qt frontend and the supported AMY bus-mixer
+2. **Local Unix desktop AMY** — the Qt frontend and the supported AMY release
    fork run as separate processes on Linux or macOS.
 3. **Native Windows package** — separate frozen Qt and native AMY executables
    communicate through a private Windows named pipe.
@@ -144,8 +144,8 @@ Start both processes with:
 ./run_local.sh --windowed
 ```
 
-Install the bus-mixer/tiny-bank-capable AMY fork into the environment used by
-the service. The Qt process remains independent of those modules.
+Install the pinned nested-sequencer/tiny-bank AMY release into the environment
+used by the service. The Qt process remains independent of AMY.
 `OMNICHORD_VENV` can override the launcher's
 default `../omnichord-env`; `OMNICHORD_AMY_SOCKET` can override
 `~/.omnichord/amy.sock`; and `OMNICHORD_AMY_ROOT` can override the expected AMY
@@ -296,8 +296,8 @@ $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 ```
 
 The zip and checksum are written below `dist`. The release workflow pins both
-AMY fork branch `releases/amy_omnichord_R20260830T123342` and commit
-`1e81ea571294c6aed8e2c0d57a9e09786561e9cf`; local release candidates must use
+AMY fork branch `releases/amy_omnichord_R20260830T191146` and commit
+`e0ef93c0c8b9c049cf5b37b25d50768cd1136e22`; local release candidates must use
 that exact commit unless the shared release contract and its compatibility
 tests are deliberately updated together.
 
@@ -350,11 +350,11 @@ python tests/run_tests.py --suite all
 
 The command without `--suite` runs all automatically discovered unit tests.
 `all` additionally needs Linux PTY/local-socket support, PySide6, pyserial and
-the LB Omnichord AMY bus-mixer fork. Native suites start AMY with 11 buses and
-336 oscillators; an ordinary four-bus upstream build is deliberately rejected
-instead of silently routing extra buses to bus 0. Run `./prepare_local_amy.sh`
-first when the supported fork is not installed. The full suite and CI layout
-are documented in `../design/testing.md`.
+the pinned LB Omnichord AMY release. Native suites start AMY with 11 buses, 336
+oscillators, 1024 stored patterns, 64 events per pattern and 32 active pattern
+instances. Run `./prepare_local_amy.sh` first when that release is not
+installed. The full suite and CI layout is documented in
+`../design/testing.md`.
 
 ## Install a released Linux x86_64 AppImage
 

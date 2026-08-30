@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import amy_transport as base
@@ -87,57 +86,8 @@ class ProgramAmySerialClient(base.AmySerialClient):
         self._apply_reverb_buses()
 
     def _set_rhythm_config(self, payload_text: str) -> None:
-        """Hot-swap a running rhythm without stopping or resetting its clock.
-
-        Tagged AMY sequencer events can be replaced while transport is live.
-        Keeping the existing sequencer timebase preserves the musical beat;
-        only the pattern definition changes. A new meter may therefore enter
-        part-way through its measure, but the 48-PPQ pulse never pauses.
-        """
-        try:
-            new_config = json.loads(str(payload_text))
-        except json.JSONDecodeError:
-            return
-        if not isinstance(new_config, dict):
-            return
-
-        old_config = self.rhythm_config
-        bass_only_changed = self._only_bass_config_changed(
-            old_config, new_config
-        )
-        chord_only_changed = self._only_chord_config_changed(
-            old_config, new_config
-        )
-        old_id = (
-            str(self.rhythm_config.get("id", ""))
-            if isinstance(self.rhythm_config, dict)
-            else ""
-        )
-        new_id = str(new_config.get("id", ""))
-        style_changed = bool(old_id) and old_id != new_id
-
-        self.rhythm_config = new_config
-        bass_riff = new_config.get("bass_riff")
-        self.bass_riff = bass_riff if isinstance(bass_riff, dict) else None
-        self._scheduled_rhythm_id = new_id
-        self._wire(f"j{self._f(float(new_config.get('tempo', 108.0)))}Z")
-
-        if bass_only_changed:
-            self._replace_lane("bass")
-            return
-        if chord_only_changed:
-            self._replace_lane("chords")
-            return
-
-        if style_changed and self.rhythm_running:
-            # Do not send zY0, accompaniment note-offs, RESET_TIMEBASE or zY1.
-            # Replacing the tagged repeating events is sufficient and leaves
-            # AMY's sequencer_tick_count advancing continuously.
-            self._replace_all_lanes(resume_transport=False)
-            return
-
-        for lane_name in ("drums", "bass", "chords"):
-            self._replace_lane(lane_name)
+        """Use the common nested-pattern transport for every synth program."""
+        super()._set_rhythm_config(payload_text)
 
     def _configure_physical_one(
         self, role: str, synth: int, program: SynthProgram

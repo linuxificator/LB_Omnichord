@@ -65,6 +65,49 @@ def contains_fractional_pitch(notes: list[float]) -> bool:
 
 
 class SerialIntegrationTests(unittest.TestCase):
+    def test_drum_library_is_preloaded_once_and_controls_send_only_deltas(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=12.0)
+            startup = app.bridge.lines_since(0)
+            self.assertIn("zQB0,48,0,0Z", startup)
+            self.assertTrue(
+                any(line.startswith("zQB269,") for line in startup),
+                "last fill definition was not preloaded",
+            )
+            self.assertEqual(
+                sum(
+                    line.startswith("zQC")
+                    and int(line[3:-1]) < 1000
+                    for line in startup
+                ),
+                270,
+            )
+
+            fill_start = app.bridge.count()
+            app.action("toggleRhythmFill", 0)
+            app.bridge.wait_idle(timeout=8.0)
+            fill_lines = app.bridge.lines_since(fill_start)
+            self.assertTrue(any(line.startswith("zQA") for line in fill_lines))
+            self.assertFalse(
+                any(line.startswith(("zQB", "J", "zQC")) for line in fill_lines),
+                "fill selection resent its stored event block",
+            )
+
+            activity_start = app.bridge.count()
+            app.action("setRhythmBusyness", 5.0)
+            app.bridge.wait_idle(timeout=8.0)
+            activity_lines = app.bridge.lines_since(activity_start)
+            self.assertTrue(any(line.startswith("zQB10") for line in activity_lines))
+            self.assertTrue(any(line.startswith("J10") for line in activity_lines))
+            self.assertFalse(
+                any(
+                    line.startswith("zQB")
+                    and int(line[3:].split(",", 1)[0]) < 1000
+                    for line in activity_lines
+                ),
+                "activity change rebuilt a preloaded fill",
+            )
+
     def test_preset7_rhythm_start_preserves_native_filter_until_user_override(self) -> None:
         """Fresh P7 must leave Chorus Vibes' complete native VCF model intact."""
         chorus_index = synth_index("Chorus Vibes")
@@ -418,6 +461,7 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertNotIn("zY0Z", arpeggio_lines)
             self.assertNotIn("zY1Z", arpeggio_lines)
             self.assertNotIn("S16384Z", arpeggio_lines)
+            self.assertNotIn("S20480Z", arpeggio_lines)
 
             direction_start = app.bridge.count()
             app.action("toggleChordArpeggioDirection")

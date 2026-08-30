@@ -259,18 +259,25 @@ requirement changes the architectural decision.
 
 ### AMY and drum-bank compatibility
 
-The release workflow pins the AMY fork at
-`25213785696dd40e6cce59ab428e560a410d240f`.
+The release workflow pins AMY branch
+`releases/amy_omnichord_R20260830T191146` at
+`e0ef93c0c8b9c049cf5b37b25d50768cd1136e22`.
 
-- Linux and macOS apply `packaging/amy-tiny-bank.patch`, install with
-  `AMY_PCM_BANK=tiny`, and Linux CI rejects Gamma9001 symbols.
+- Linux and macOS install that revision directly with `AMY_PCM_BANK=tiny`;
+  Linux CI rejects Gamma9001 symbols. The old local patch is gone because the
+  release branch owns and tests this integration-only build selector.
 - The Windows build does not go through AMY `setup.py`. Its CMake target
   compiles `amy.c`/`pcm.c` without defining `GAMMA9001` and does not link the
   optional generated `drums_bin.c`.
 - At the pinned AMY revision, that selects `pcm_tiny.h` and the tiny version of
   MIDI drum patch 258 by construction.
-- OMNI rhythm commands use direct preset/native-note pairs 0–10 from
-  `config/amy_config.json`; these meanings match Linux, macOS and ESP32-P4.
+- OMNI rhythm commands use the dedicated timing and kit catalogues under
+  `music/drums`; the shipped configuration selects direct tiny-bank
+  preset/native-note pairs which match Linux, macOS, Windows and ESP32-P4.
+- The optional Gamma9001 mapping resolves kit-patch/note pairs to direct PCM,
+  and the optional General-MIDI mapping uses AMY patch 258. Both require a
+  matching Gamma-enabled local build for complete coverage and are not the
+  published-package default.
 - Defining `GAMMA9001` on Windows would make identical wire requests select
   different drums and is therefore a compatibility regression.
 
@@ -337,19 +344,23 @@ for official checkout/setup/upload/download actions being forced onto Node 24.
 ## Android/fork audit context
 
 The local AMY fork convention is `/home/jeroen/omnichord/amyfork/amy`.
-`origin/upstream/android-oboe` contains the separate Android `:amy` process,
-private `amy.sock`, service-only JNI and transport-only Java client used as the
-process-separation reference. That branch was not an ancestor of the active
-`feature/bus-mixer` line during the audit, so Android service work and the
-desktop bus-mixer fork are not assumed to be unified. Preserve the proven
-service/wire boundary when those lines are eventually reconciled.
+`origin/upstream/android-oboe` remains the historical full Android reference.
+The active LB dependency is now the cumulative release branch
+`releases/amy_omnichord_R20260830T191146`, pinned at
+`e0ef93c0c8b9c049cf5b37b25d50768cd1136e22`. It combines the proven separate
+Android `:amy`/Oboe and desktop wire-service boundaries with the generic nested
+sequencer. The abandoned bus-mixer experiment is absent.
 
 ## Verification already completed
 
-- The complete 2026-08-30 local matrix passed 166 individual tests: 119 unit,
-  15 frontend, 13 serial/program, 14 preset, 3 native-control and 2
-  native-rhythm tests. This includes exhaustive chord-arpeggio tag expansion,
-  bass-riff validation, the 36-chord LDR audit and screenshot/README contracts.
+- The complete 2026-08-30 local matrix now passes 190 individual tests: 142
+  unit, 15 frontend, 14 serial/program, 14 preset, 3 native-control and 2
+  native-rhythm tests. This includes the complete 54-rhythm/270-fill catalogue,
+  exhaustive fill combinations, chord-arpeggio tag expansion, bass-riff
+  validation, the 36-chord LDR audit and package contracts.
+- Native audio smoke renders every used drum realization non-silent: 13 tiny,
+  62 Gamma9001 and 24 General-MIDI sounds. AMY itself passes C tests and all
+  134 Python regressions at the release threshold.
 - Real-serial tests prove seven-note dominant-13 arpeggios in both directions,
   lane isolation, ROM and physical synth-4 `if8` policy, live riff
   transposition and unchanged transport/timebase. Native AMY state readback
@@ -383,9 +394,10 @@ four-platform release.
 
 ## Remaining work / safe next steps
 
-1. Continue only on `feature/drum_fills`. Await the user's exact musical/UI and
-   preset behavior for drum fills; no behavior is authorized by the branch
-   name alone. Route the new scope through `design/README.md` before editing.
+1. Complete and verify `feature/drum_fills` against
+   `design/rhythm_rework/rhythm_rework_task` and
+   `qt_frontend/docs/RHYTHM_PATTERNS.md`. Do not offer AMY upstream until every
+   LB suite and the complete platform release gate pass.
 2. Physically test the released Windows zip on a recent Windows 10/11 x64 host:
    UI, native audio, shutdown and representative heavy patches/rhythms.
 3. Implement a native Windows MIDI input adapter behind the existing MIDI
@@ -393,8 +405,8 @@ four-platform release.
 4. Measure and tune a WASAPI-first realtime audio profile on physical hardware.
 5. Add an explicit Windows tiny-bank identity regression if AMY build inputs or
    the pinned revision change; the current smoke checks non-silence only.
-6. Reconcile relevant Android service work with the active AMY bus-mixer line
-   only when that fork task is explicitly in scope.
+6. Keep kit/timing policy in LB and generic nested-sequencer behavior in AMY;
+   do not restore the abandoned bus-mixer experiment.
 
 WSL2/WSLg documentation remains an optional way to experiment with the Linux
 artifact. It is not the Windows implementation, release gate or realtime-audio

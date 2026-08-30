@@ -15,8 +15,8 @@ class PackagingContracts(unittest.TestCase):
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml",
             REPOSITORY / ".github" / "workflows" / "amy-regression.yml",
         ]
-        release_branch = "releases/amy_omnichord_R20260830T123342"
-        release_commit = "1e81ea571294c6aed8e2c0d57a9e09786561e9cf"
+        release_branch = "releases/amy_omnichord_R20260830T191146"
+        release_commit = "e0ef93c0c8b9c049cf5b37b25d50768cd1136e22"
 
         for workflow_path in workflows:
             workflow = workflow_path.read_text(encoding="utf-8")
@@ -36,6 +36,11 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("## Build provenance", release)
         self.assertIn("\\`$AMY_RELEASE_BRANCH\\`", release)
         self.assertIn("\\`$AMY_COMMIT\\`", release)
+        self.assertIn("AMY_PCM_BANK=tiny", release)
+        self.assertNotIn("amy-tiny-bank.patch", release)
+        self.assertFalse(
+            (FRONTEND / "packaging" / "amy-tiny-bank.patch").exists()
+        )
 
         contract = (FRONTEND / "packaging" / "AMY_RELEASE.md").read_text(
             encoding="utf-8"
@@ -258,6 +263,18 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('"--amy-socket"', entry)
         self.assertIn("local_amy_service.main()", entry)
         self.assertIn("configure_frontend_asset_paths(app_core)", entry)
+        for asset in (
+            "drum_activity_timing.json",
+            "drum_fills_timing.json",
+            "drum_fill_continuation_roles.json",
+            "drum_activity_instruments_tiny.json",
+            "drum_fills_instruments_tiny.json",
+            "drum_activity_instruments_gamma9001.json",
+            "drum_fills_instruments_gamma9001.json",
+            "drum_activity_instruments_general_midi.json",
+            "drum_fills_instruments_general_midi.json",
+        ):
+            self.assertIn(asset, entry)
         self.assertLess(entry.index("import app_core"), entry.index("import main"))
         self.assertNotIn("amy.live(", entry)
 

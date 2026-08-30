@@ -57,6 +57,9 @@ static int run_self_test(void) {
     config.features.default_synths = 0;
     config.max_buses = 11;
     config.max_oscs = 336;
+    config.max_patterns = 1024;
+    config.max_pattern_tags = 64;
+    config.max_pattern_instances = 32;
 
     amy_start(config);
     amy_add_message("v0w0f440a1n69l1Z");
@@ -160,6 +163,9 @@ static int run_service(
     config.features.default_synths = 0;
     config.max_buses = 11;
     config.max_oscs = 336;
+    config.max_patterns = 1024;
+    config.max_pattern_tags = 64;
+    config.max_pattern_instances = 32;
     g_offline_render = no_audio;
     g_wire_records = 0;
     g_nonzero_samples = 0;

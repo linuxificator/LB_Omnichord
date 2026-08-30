@@ -50,6 +50,7 @@
     "juno_089": 0.4
   },
   "drums": {
+    "kit": "tiny",
     "velocity_gain": 5.0,
     "sample_map": {
       "bd_haus": {"preset": 1, "note": 39},
@@ -87,6 +88,9 @@
     "synth_alloc_guard_ms": 10.0
   },
   "amy_max_oscs": 336,
+  "amy_max_patterns": 1024,
+  "amy_max_pattern_tags": 64,
+  "amy_max_pattern_instances": 32,
   "amy_max_buses": 11,
   "debug": {
     "log_amy_commands": true,

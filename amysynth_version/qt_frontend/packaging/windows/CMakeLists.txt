@@ -8,7 +8,7 @@ endif()
 file(TO_CMAKE_PATH "${AMY_ROOT}" AMY_ROOT_CMAKE)
 set(AMY_SRC "${AMY_ROOT_CMAKE}/src")
 set(AMY_SOURCES
-    algorithms.c amy.c bus_mixer.c envelope.c examples.c parse.c filters.c
+    algorithms.c amy.c envelope.c examples.c parse.c filters.c
     oscillators.c pcm.c interp_partials.c custom.c delay.c log2_exp2.c
     patches.c transfer.c sequencer.c libminiaudio-audio.c instrument.c
     amy_midi.c api.c midi_mappings.c cv_trigger.c)

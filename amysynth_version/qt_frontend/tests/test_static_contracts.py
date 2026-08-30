@@ -397,26 +397,25 @@ class StaticContractTests(unittest.TestCase):
 
     def test_rhythm_activity_groups_keep_equal_button_columns(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
-        self.assertEqual(qml.count("\n            ActivitySelector {"), 2)
-        self.assertEqual(qml.count("\n            ChordActivitySelector {"), 1)
-        selector_labels = (
-            'label: "percussion activity"',
-            'label: "bass activity"',
+        self.assertEqual(qml.count("\n            ActivitySelector {"), 1)
+        self.assertEqual(
+            qml.count("\n            PercussionActivitySelector {"), 1
         )
-        for index, label in enumerate(selector_labels):
-            start = qml.rfind("ActivitySelector {", 0, qml.index(label))
-            if index + 1 < len(selector_labels):
-                end = qml.index("ActivitySelector {", start + 1)
-            else:
-                end = qml.index("LabeledSlider {", start)
-            selector = qml[start:end]
-            self.assertIn("y: 0", selector)
-            if label == 'label: "bass activity"':
-                self.assertIn("width: controlsArea.bassActivityWidth", selector)
-            else:
-                self.assertIn(
-                    "width: controlsArea.standardActivityWidth", selector
-                )
+        self.assertEqual(qml.count("\n            ChordActivitySelector {"), 1)
+        percussion = (
+            ROOT / "gui" / "PercussionActivitySelector.qml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("model: 5", percussion)
+        self.assertIn('text: "F" + String(index + 1)', percussion)
+        self.assertIn("root.fillToggled(index)", percussion)
+        self.assertIn(
+            "width: controlsArea.bassActivityWidth",
+            qml[qml.index("PercussionActivitySelector {"):],
+        )
+        self.assertIn('label: "bass activity"', qml)
+        self.assertIn('label: "fill density"', qml)
+        for label in ('"/32"', '"/16"', '"/8"', '"/1"'):
+            self.assertIn(label, qml)
         self.assertNotIn("levels: [0, 1, 2, 3, 4]", qml)
         activity_selector = (
             ROOT / "gui" / "ActivitySelector.qml"

@@ -57,6 +57,15 @@ def self_test() -> int:
         APP_ROOT / "instruments" / "synths.json",
         APP_ROOT / "music" / "rhythms.json",
         APP_ROOT / "music" / "omnichord_bass_riffs.json",
+        APP_ROOT / "music" / "drums" / "drum_activity_timing.json",
+        APP_ROOT / "music" / "drums" / "drum_fills_timing.json",
+        APP_ROOT / "music" / "drums" / "drum_fill_continuation_roles.json",
+        APP_ROOT / "music" / "drums" / "drum_activity_instruments_tiny.json",
+        APP_ROOT / "music" / "drums" / "drum_fills_instruments_tiny.json",
+        APP_ROOT / "music" / "drums" / "drum_activity_instruments_gamma9001.json",
+        APP_ROOT / "music" / "drums" / "drum_fills_instruments_gamma9001.json",
+        APP_ROOT / "music" / "drums" / "drum_activity_instruments_general_midi.json",
+        APP_ROOT / "music" / "drums" / "drum_fills_instruments_general_midi.json",
     )
     missing = [str(path) for path in required if not path.is_file()]
     if missing:

@@ -6,7 +6,7 @@ The application has three observable layers:
 
 1. **Frontend/backend state** — Qt `InstrumentBackend`, preset state and slider models.
 2. **Transport** — logical events translated to AMY wire commands and, in the Raspberry Pi setup, framed as 1,000,000-baud 8N1 serial lines.
-3. **AMY engine state/output** — the commands must actually configure the supported AMY runtime as intended. Native-Linux tests use the pinned `linuxificator/amy` bus-mixer revision from CI and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
+3. **AMY engine state/output** — the commands must actually configure the supported AMY runtime as intended. Native-Linux tests use the exact `linuxificator/amy` nested-sequencer release pinned by CI and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
 
 Every defect below must have a permanent regression test before it is considered fixed.
 

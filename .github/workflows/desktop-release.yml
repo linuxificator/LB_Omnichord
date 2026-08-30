@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 env:
-  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T123342
-  AMY_COMMIT: 1e81ea571294c6aed8e2c0d57a9e09786561e9cf
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T191146
+  AMY_COMMIT: e0ef93c0c8b9c049cf5b37b25d50768cd1136e22
 
 jobs:
   tests:
@@ -85,8 +85,6 @@ jobs:
             "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
           git -C /tmp/amy-lb checkout "$AMY_COMMIT"
           test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
-          git -C /tmp/amy-lb apply \
-            "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
           AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
           amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
           if nm -D "$amy_so" | grep -Eq 'gamma9001|amy_set_gamma'; then
@@ -193,8 +191,6 @@ jobs:
             "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
           git -C /tmp/amy-lb checkout "$AMY_COMMIT"
           test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
-          git -C /tmp/amy-lb apply \
-            "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
           AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
 
       - name: Build and validate DMG

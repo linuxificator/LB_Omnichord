@@ -33,6 +33,10 @@ from amy_serial import (
 )
 from bass_riffs import BassRiffCatalog, load_bass_riff_catalog
 from control_limits import bounded_control_range, clamp_control_value
+from drum_patterns import (
+    DrumRhythm,
+    load_drum_pattern_catalog,
+)
 from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
@@ -252,6 +256,9 @@ class RhythmDefinition:
     default_busyness: int
     default_chord_activity: int
     default_bass_activity: int
+    drum_pattern: DrumRhythm
+    # Retained only for backwards-compatible catalogue diagnostics. Runtime
+    # percussion uses drum_pattern's five complete logical-role patterns.
     percussion_layers: tuple[dict[str, Any], ...]
     chord_levels: tuple[tuple[dict[str, Any], ...], ...]
     bass_levels: tuple[tuple[dict[str, Any], ...], ...]
@@ -264,6 +271,11 @@ class RhythmRuntime:
     busyness_by_rhythm: list[int]
     chord_activity_by_rhythm: list[int]
     bass_activity_by_rhythm: list[int]
+    fill_order_by_rhythm: list[list[int]]
+    fill_density_index_by_rhythm: list[int]
+
+
+FILL_DENSITY_BARS = (32, 16, 8, 6, 4, 3, 2, 1)
 
 
 def display_label(suffix: str) -> str:
@@ -795,6 +807,7 @@ def load_rhythm_catalog(
     path: Path,
 ) -> tuple[RhythmDefinition, ...]:
     raw = json.loads(path.read_text(encoding="utf-8"))
+    drum_catalog = load_drum_pattern_catalog(path.parent / "drums")
     rhythms: list[RhythmDefinition] = []
 
     for item in raw["rhythms"]:
@@ -816,6 +829,7 @@ def load_rhythm_catalog(
                 default_bass_activity=int(
                     item["default_bass_activity"]
                 ),
+                drum_pattern=drum_catalog.rhythm(str(item["id"])),
                 percussion_layers=tuple(
                     dict(layer)
                     for layer in item["percussion_layers"]
@@ -838,6 +852,10 @@ def load_rhythm_catalog(
         if len(rhythm.percussion_layers) != 5:
             raise ValueError(
                 f"Rhythm {rhythm.key!r} must have five percussion layers"
+            )
+        if rhythm.drum_pattern.meter != rhythm.meter:
+            raise ValueError(
+                f"Rhythm {rhythm.key!r} meter differs from drum catalogue"
             )
         if len(rhythm.chord_levels) != 5:
             raise ValueError(
@@ -1125,7 +1143,7 @@ class InstrumentBackend(QObject):
                 rhythm.tempo_default for rhythm in rhythms
             ],
             busyness_by_rhythm=[
-                source_activity_to_ui(rhythm.default_busyness)
+                max(1, min(5, rhythm.default_busyness + 1))
                 for rhythm in rhythms
             ],
             chord_activity_by_rhythm=[
@@ -1136,6 +1154,8 @@ class InstrumentBackend(QObject):
                 source_activity_to_ui(rhythm.default_bass_activity)
                 for rhythm in rhythms
             ],
+            fill_order_by_rhythm=[[] for _ in rhythms],
+            fill_density_index_by_rhythm=[0 for _ in rhythms],
         )
         # Rhythm transport is live session state, never startup/preset state.
         self._rhythm_running = False
@@ -1415,6 +1435,25 @@ class InstrumentBackend(QObject):
         return self._rhythm.busyness_by_rhythm[
             self._rhythm.selected_index
         ]
+
+    @Property("QVariantList", notify=rhythmControlsChanged)
+    def rhythmFillEnabled(self) -> list[bool]:
+        enabled = set(
+            self._rhythm.fill_order_by_rhythm[
+                self._rhythm.selected_index
+            ]
+        )
+        return [index in enabled for index in range(5)]
+
+    @Property(int, notify=rhythmControlsChanged)
+    def rhythmFillDensityIndex(self) -> int:
+        return self._rhythm.fill_density_index_by_rhythm[
+            self._rhythm.selected_index
+        ]
+
+    @Property(int, notify=rhythmControlsChanged)
+    def rhythmFillDensityBars(self) -> int:
+        return FILL_DENSITY_BARS[self.rhythmFillDensityIndex]
 
     def _effective_chord_activity(self) -> int:
         if self._chord_activity_hold_override:
@@ -2003,6 +2042,12 @@ class InstrumentBackend(QObject):
                     self._rhythm
                     .bass_activity_by_rhythm[index]
                 ),
+                "fill_order": list(
+                    self._rhythm.fill_order_by_rhythm[index]
+                ),
+                "fill_density_bars": FILL_DENSITY_BARS[
+                    self._rhythm.fill_density_index_by_rhythm[index]
+                ],
             }
 
         snapshot: dict[str, Any] = {
@@ -2351,7 +2396,7 @@ class InstrumentBackend(QObject):
             rhythm.tempo_default for rhythm in self._rhythms
         ]
         self._rhythm.busyness_by_rhythm = [
-            source_activity_to_ui(rhythm.default_busyness)
+            max(1, min(5, rhythm.default_busyness + 1))
             for rhythm in self._rhythms
         ]
         self._rhythm.chord_activity_by_rhythm = [
@@ -2361,6 +2406,12 @@ class InstrumentBackend(QObject):
         self._rhythm.bass_activity_by_rhythm = [
             source_activity_to_ui(rhythm.default_bass_activity)
             for rhythm in self._rhythms
+        ]
+        self._rhythm.fill_order_by_rhythm = [
+            [] for _ in self._rhythms
+        ]
+        self._rhythm.fill_density_index_by_rhythm = [
+            0 for _ in self._rhythms
         ]
 
         tuning = self._defaults.get("tuning", {})
@@ -2385,7 +2436,9 @@ class InstrumentBackend(QObject):
     ) -> None:
         rhythm_was_running = self._rhythm_running
         live_tempo = self.rhythmTempo if rhythm_was_running else None
-        live_rhythm_controls: tuple[int, int, int] | None = None
+        live_rhythm_controls: tuple[
+            int, int, int, list[int], int
+        ] | None = None
         live_active_row_octave: tuple[int, int] | None = None
         if rhythm_was_running:
             rhythm_index = self._rhythm.selected_index
@@ -2393,6 +2446,8 @@ class InstrumentBackend(QObject):
                 self._rhythm.busyness_by_rhythm[rhythm_index],
                 self._rhythm.chord_activity_by_rhythm[rhythm_index],
                 self._rhythm.bass_activity_by_rhythm[rhythm_index],
+                list(self._rhythm.fill_order_by_rhythm[rhythm_index]),
+                self._rhythm.fill_density_index_by_rhythm[rhythm_index],
             )
             if 0 <= self._active_row < ROW_COUNT:
                 live_active_row_octave = (
@@ -2634,7 +2689,7 @@ class InstrumentBackend(QObject):
                     ] = max(
                         1,
                         min(
-                            4,
+                            5,
                             int(
                                 stored.get(
                                     "percussion_activity",
@@ -2646,6 +2701,33 @@ class InstrumentBackend(QObject):
                             ),
                         ),
                     )
+                    raw_order = stored.get(
+                        "fill_order",
+                        self._rhythm.fill_order_by_rhythm[index],
+                    )
+                    if isinstance(raw_order, list):
+                        self._rhythm.fill_order_by_rhythm[index] = list(
+                            dict.fromkeys(
+                                fill_index
+                                for fill_index in (
+                                    int(value) for value in raw_order
+                                )
+                                if 0 <= fill_index < 5
+                            )
+                        )
+                    raw_density = int(
+                        stored.get(
+                            "fill_density_bars",
+                            FILL_DENSITY_BARS[
+                                self._rhythm
+                                .fill_density_index_by_rhythm[index]
+                            ],
+                        )
+                    )
+                    if raw_density in FILL_DENSITY_BARS:
+                        self._rhythm.fill_density_index_by_rhythm[index] = (
+                            FILL_DENSITY_BARS.index(raw_density)
+                        )
                     self._rhythm.chord_activity_by_rhythm[
                         index
                     ] = max(
@@ -2724,6 +2806,8 @@ class InstrumentBackend(QObject):
                 self._rhythm.busyness_by_rhythm[rhythm_index],
                 self._rhythm.chord_activity_by_rhythm[rhythm_index],
                 self._rhythm.bass_activity_by_rhythm[rhythm_index],
+                self._rhythm.fill_order_by_rhythm[rhythm_index],
+                self._rhythm.fill_density_index_by_rhythm[rhythm_index],
             ) = live_rhythm_controls
         if live_active_row_octave is not None:
             row_index, octave_index = live_active_row_octave
@@ -3033,13 +3117,55 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setRhythmBusyness(self, value: float) -> None:
-        level = max(1, min(4, int(round(float(value)))))
+        level = max(1, min(5, int(round(float(value)))))
         index = self._rhythm.selected_index
 
         if level == self._rhythm.busyness_by_rhythm[index]:
             return
 
         self._rhythm.busyness_by_rhythm[index] = level
+        self.rhythmControlsChanged.emit()
+        self._send_rhythm_config()
+
+    @Slot(int)
+    def toggleRhythmFill(self, fill_index: int) -> None:
+        fill_index = int(fill_index)
+        if not 0 <= fill_index < 5:
+            return
+        rhythm_index = self._rhythm.selected_index
+        order = list(self._rhythm.fill_order_by_rhythm[rhythm_index])
+        if fill_index in order:
+            order.remove(fill_index)
+        else:
+            # The most recently enabled fill is musically next. Existing
+            # enabled fills retain their relative cycling order.
+            order.insert(0, fill_index)
+        self._rhythm.fill_order_by_rhythm[rhythm_index] = order
+        self.rhythmControlsChanged.emit()
+        self._send_rhythm_config()
+
+    @Slot(float)
+    def setRhythmFillDensity(self, value: float) -> None:
+        if self._midi_control_blocks(
+            {"screen": "omni", "kind": "rhythm_fill_density"}
+        ):
+            return
+        density_index = max(
+            0,
+            min(
+                len(FILL_DENSITY_BARS) - 1,
+                int(round(float(value))),
+            ),
+        )
+        rhythm_index = self._rhythm.selected_index
+        if (
+            self._rhythm.fill_density_index_by_rhythm[rhythm_index]
+            == density_index
+        ):
+            return
+        self._rhythm.fill_density_index_by_rhythm[
+            rhythm_index
+        ] = density_index
         self.rhythmControlsChanged.emit()
         self._send_rhythm_config()
 
@@ -3874,7 +4000,6 @@ class InstrumentBackend(QObject):
             self._rhythm.bass_activity_by_rhythm[index]
         )
 
-        busyness_source = ui_activity_to_source(busyness)
         chord_source = (
             ui_activity_to_source(chord_activity)
             if chord_activity > 0
@@ -3886,19 +4011,6 @@ class InstrumentBackend(QObject):
             else None
         )
 
-        percussion_events: list[dict[str, Any]] = []
-
-        for layer_index in range(busyness_source + 1):
-            percussion_events.extend(
-                copy.deepcopy(
-                    rhythm.percussion_layers[layer_index]["events"]
-                )
-            )
-
-        percussion_events.sort(
-            key=lambda event: float(event["time"])
-        )
-
         return {
             "id": rhythm.key,
             "label": rhythm.label,
@@ -3908,7 +4020,13 @@ class InstrumentBackend(QObject):
             "busyness": busyness,
             "chord_activity": chord_activity,
             "bass_activity": bass_activity,
-            "percussion_events": percussion_events,
+            "percussion_activity": busyness,
+            "fill_order": list(
+                self._rhythm.fill_order_by_rhythm[index]
+            ),
+            "fill_density_bars": FILL_DENSITY_BARS[
+                self._rhythm.fill_density_index_by_rhythm[index]
+            ],
             "chord_events": (
                 [
                     copy.deepcopy(event)

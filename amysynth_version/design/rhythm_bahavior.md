@@ -10,9 +10,15 @@ A preset or rhythm selection may change the pattern and other stored rhythm para
 
 For preset selection, playback continuity also includes the current
 percussion/chord/bass activity, chord-arpeggio mode/rate/direction, bass
-voicing, compatible playing bass riff and active chord-row octave. These
+voicing, selected drum fills, fill density, compatible playing bass riff and
+active chord-row octave. These
 controls shape the accompaniment that is already in progress and therefore
 remain live while transport runs.
+
+The five percussion levels are complete pattern alternatives, not cumulative
+layers. Drum fills are compact AMY one-shot patterns, preloaded once at startup
+and launched by the AMY root sequencer. The frontend never follows AMY's
+musical clock with a host timer.
 
 ## 1. State model
 
@@ -658,8 +664,36 @@ The automatic chord synth alone suppresses AMY's expected unmatched-note-off
 diagnostic during this retained-off drain; the events and audio behavior are
 unchanged.
 
-## 16. Summary rule
+## 16. Drum-fill behavior
+
+The lower percussion row contains independent `F1` through `F5` enables. No
+enabled F button means no fills. The density choices are exactly 32, 16, 8, 6,
+4, 3, 2 or 1 bars between launches. Selected fills rotate in selection order
+and rotate through the allowed whole-beat start positions stored in the data.
+
+Enabling the first fill begins a new cycle at the next whole-bar boundary.
+Enabling another fill while a cycle exists puts it first in the next schedule.
+Disabling one removes future launches, but a fill which is already playing is
+immutable and always finishes.
+
+Each base percussion role is an independent tagged AMY loop. The LB data for a
+fill lists the musical roles which continue. During the fill, every other
+active role suppresses new onsets for the complete, whole-beat fill duration;
+already-ringing sound is not cut off and the loop phase is not reset. A listed
+role which is absent from the selected activity level remains absent. This
+musical continuation decision is LB Omnichord policy; AMY implements only the
+generic tag-targeted mute operation.
+
+Fill selection and density are preset configuration. A stopped preset switch
+loads them. A running preset switch preserves the current live fill order and
+density. Any live fill edit replaces only future fill-launch root events. It
+must not send `zY0`, `zY1`, reset the sequencer or reset the timebase.
+
+The complete storage, kit and wire contract is documented in
+`../qt_frontend/docs/RHYTHM_PATTERNS.md`.
+
+## 17. Summary rule
 
 The complete behavior can be reduced to this rule:
 
-> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, chord-arpeggio controls, bass voicing, a compatible playing bass riff, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
+> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, drum fills and density, chord-arpeggio controls, bass voicing, a compatible playing bass riff, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**

@@ -376,6 +376,9 @@ void app_main(void)
      * with two spare buffers for future voice-layout changes.
      */
     config.ks_oscs = 16;
+    config.max_patterns = 1024;
+    config.max_pattern_tags = 64;
+    config.max_pattern_instances = 32;
 
 
     /*

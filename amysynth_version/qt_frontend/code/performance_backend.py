@@ -486,6 +486,8 @@ class InstrumentBackend(app_core.InstrumentBackend):
             self._rhythm.busyness_by_rhythm[previous_index],
             self._rhythm.chord_activity_by_rhythm[previous_index],
             self._rhythm.bass_activity_by_rhythm[previous_index],
+            list(self._rhythm.fill_order_by_rhythm[previous_index]),
+            self._rhythm.fill_density_index_by_rhythm[previous_index],
         )
         self._rhythm.selected_index = rhythm_index
         if self._rhythm_running:
@@ -494,6 +496,8 @@ class InstrumentBackend(app_core.InstrumentBackend):
                 self._rhythm.busyness_by_rhythm[rhythm_index],
                 self._rhythm.chord_activity_by_rhythm[rhythm_index],
                 self._rhythm.bass_activity_by_rhythm[rhythm_index],
+                self._rhythm.fill_order_by_rhythm[rhythm_index],
+                self._rhythm.fill_density_index_by_rhythm[rhythm_index],
             ) = live_controls
         self._reconcile_bass_riff_context(
             preserve_riff_id=preserve_riff_id,

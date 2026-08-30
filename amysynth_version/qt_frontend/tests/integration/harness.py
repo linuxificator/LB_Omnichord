@@ -102,17 +102,24 @@ class SerialAmyBridge:
                 import c_amy  # type: ignore
             except ImportError as exc:
                 raise RuntimeError(
-                    "native AMY suite requires the LB Omnichord AMY bus-mixer "
-                    "fork installed"
+                    "native AMY suite requires the pinned LB Omnichord AMY "
+                    "release installed"
                 ) from exc
             self.amy = amy
             self.c_amy = c_amy
             try:
-                c_amy.live(default_synths=0, max_buses=11, max_oscs=336)
+                c_amy.live(
+                    default_synths=0,
+                    max_buses=11,
+                    max_oscs=336,
+                    max_patterns=1024,
+                    max_pattern_tags=64,
+                    max_pattern_instances=32,
+                )
             except (AttributeError, TypeError) as exc:
                 raise RuntimeError(
-                    "installed AMY does not support configurable buses; "
-                    "install linuxificator/amy feature/bus-mixer"
+                    "installed AMY lacks the pinned configurable nested "
+                    "sequencer API"
                 ) from exc
             self._block_seconds = float(amy.AMY_BLOCK_SIZE) / float(
                 amy.AMY_SAMPLE_RATE
@@ -124,6 +131,7 @@ class SerialAmyBridge:
                     "sample_rate": int(amy.AMY_SAMPLE_RATE),
                     "max_buses": 11,
                     "max_oscs": 336,
+                    "max_patterns": 1024,
                 },
             )
 

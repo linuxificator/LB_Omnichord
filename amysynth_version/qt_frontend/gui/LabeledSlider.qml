@@ -10,6 +10,7 @@ Item {
     property real toValue: 1
     property real stepValue: 0.01
     property int decimals: 2
+    property var valueLabels: []
 
     property color textColor: "#4c3b08"
     property color trackColor: "#eee2a5"
@@ -65,8 +66,10 @@ Item {
         text:
             root.label
             + " "
-            + Number(slider.value).toFixed(
-                root.decimals
+            + (
+                root.valueLabels.length > Math.round(slider.value)
+                ? String(root.valueLabels[Math.round(slider.value)])
+                : Number(slider.value).toFixed(root.decimals)
             )
 
         color: root.textColor

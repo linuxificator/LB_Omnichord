@@ -1,25 +1,37 @@
 # AMY sequencer tag allocation
 
-The Omnichord rhythm engine uses current AMY's user-addressable sequencer tags to keep percussion, bass and automatic chords independent.
+The Omnichord rhythm engine uses AMY root sequencer tags for sparse fill
+launches, bass and automatic chords. Base percussion now runs as tagged nested
+`LOOP` patterns; fills are stored `ONE_SHOT` patterns.
 
 AMY stores one sequencer entry per tag. Sending another `H<tick>,<period>,<tag>...` message replaces that tag's previous entry. `H0,0,<tag>Z` clears exactly that tag. A tag is therefore an event identity, not a track identifier: simultaneous note-ons/note-offs require different tags.
 
 ## Reserved ranges
 
-Current AMY defaults to 256 user-addressable tags. The complete `music/rhythms.json` catalogue has been audited at every maximum activity level and requires at most:
+The root sequencer retains 256 user-addressable tags. The nested-pattern event
+tag namespace is local to each definition and the integration profile allows
+64 entries per pattern. The allocation is:
 
 | Lane | Tag range | Capacity | Current worst case |
 | --- | ---: | ---: | ---: |
-| Percussion | 0..55 | 56 | 56 events (`trance`) |
+| Fill launches | 0..55 | 56 | 10 root triggers in the largest current fill supercycle |
 | Bass | 56..111 | 56 | 28 hits × note-on/off (`seven_four_funk`) |
 | Automatic chords/arpeggios | 112..251 | 140 | whole chords: 140 (`seven_four_funk`); compacted 2–7-note arpeggios: 84 |
 | Spare | 252..255 | 4 | unused |
 
-`tests/test_sequencer_tags.py` recalculates these maxima from the catalogue. Adding or editing a rhythm which no longer fits must fail CI rather than silently dropping events.
+Base-role pattern IDs are 1000 upward and their stable instance tags are 1000
+upward. Fill IDs are 0..999. These are separate namespaces from root tags.
+`tests/test_sequencer_tags.py` and `tests/test_drum_patterns.py` recalculate
+the maxima. Adding data which no longer fits must fail CI rather than silently
+drop events.
 
 ## Lane updates
 
-Each lane assigns deterministic consecutive tags to its current events. When a new pattern uses fewer tags than an older one, the no-longer-used tags are explicitly cleared. The lane remembers its maximum occupied count so an interrupted earlier update cannot leave an unreachable stale event behind.
+Bass and chords assign deterministic consecutive tags to their current root
+events. The percussion root range contains only `zQA` fill launches. When a
+new schedule uses fewer tags than an older one, the no-longer-used root tags
+are explicitly cleared. Each base drum role has a stable tagged loop instance;
+live replacement is quantized to a whole-bar boundary.
 
 Lane-local operations do not reset the sequencer:
 
@@ -40,8 +52,9 @@ Lane-local operations do not reset the sequencer:
 - tuning/chord-pitch changes replace bass and automatic-chord ranges but do not touch percussion;
 - chord timbre changes repatch synths 3/4 without replacing their sequencer events;
 - normal activity/config changes replace the affected tagged patterns while transport continues;
-- a live preset switch carries the current percussion/chord/bass activity into
-  the destination pattern instead of substituting the preset's stored activity.
+- a live preset switch carries the current percussion/chord/bass activity,
+  fill order and fill density into the destination pattern instead of
+  substituting the preset's stored live controls.
 
 A live rhythm-style or preset change replaces tagged events without stopping
 transport or resetting the timebase. The new meter enters at the current
@@ -73,7 +86,11 @@ tone instead of truncating the set to the old four-voice whole-chord limit.
 
 ## Start and stop
 
-Starting transport installs the complete current drum, bass and automatic-chord tag ranges first and queues `zY1` last.
+Starting transport first sends
+`S(RESET_TIMEBASE|RESET_SEQUENCER)`. Stored nested definitions survive this
+reset, while frozen instances and old root triggers do not. It then installs
+the current drum loops, fill-launch schedule, bass and automatic-chord ranges,
+and queues `zY1` last.
 
 Stopping transport is different from clearing a lane. `zY0` prevents future sequencer events from firing, so a note that is currently sounding cannot rely on its later tagged note-off. Stop therefore performs an explicit all-off immediately after `zY0` for the rhythm-owned synths: percussion synth 0, bass synth 1 and automatic-chord synth 4. Manual chord synth 3 and strum synth 2 are deliberately left alone because they are controlled directly by the player rather than by rhythm transport.
 
