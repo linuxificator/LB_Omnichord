@@ -74,6 +74,10 @@ and compares the exact AMY render samples with the samples handed to Oboe.
 The emulator performs one unmeasured warm-up launch for python-for-Android's
 first-run asset extraction, force-stops the complete package, and only then
 arms AMY's fixed-duration Oboe capture for the measured launch.
+The captured packaged-QML gesture uses LB's normal `0.5` chord amplitude, not
+the hello-world example's full-scale `V10`/`l1` sequence. Its non-silence gate
+therefore requires at least -20 dBFS peak while still rejecting clipping and
+requiring every signed-16-bit AMY sample to equal the sample handed to Oboe.
 
 On `main`, the same Android gate joins Linux x64, Raspberry Pi aarch64, macOS
 arm64 and Windows x64. Publication waits for all five platform jobs. The
