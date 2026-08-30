@@ -1,8 +1,11 @@
+This is the very strict Luciel's Brithday software licence, a failure to comply will result in severe friendly reminders every time you update this software, and just to be on the safe side, you will get those reminders anyway if I ever have the time to actually implement reminders. 
+
 By using this software you agree to:
 
 * Have fun with it
-* Wish Luciel a happy birthday!
+* Wish Luciel a happy birthday! It's her brithday today, please send her a card or a present.
 * Do your best to make this world a better place 
+* Ask Apple why I need to pay them if I want to make an iOS version of this Omnichord software and give it away for free without any adds or restrictions
 
 If you are using it or performing with it, I would like to know!
 Leave a comment at: https://hackaday.io/project/206368-lb-omnichord
