@@ -69,6 +69,9 @@ suites but builds no desktop package. It builds x86_64 and arm64 Android APKs,
 installs the x86_64 package into an emulator, exercises the existing packaged
 QML tap/hold smoke path, checks the private socket and separate AMY service,
 and compares the exact AMY render samples with the samples handed to Oboe.
+The emulator performs one unmeasured warm-up launch for python-for-Android's
+first-run asset extraction, force-stops the complete package, and only then
+arms AMY's fixed-duration Oboe capture for the measured launch.
 
 On `main`, the same Android gate joins Linux x64, Raspberry Pi aarch64, macOS
 arm64 and Windows x64. Publication waits for all five platform jobs. The

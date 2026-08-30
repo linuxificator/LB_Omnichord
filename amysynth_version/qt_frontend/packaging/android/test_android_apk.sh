@@ -25,6 +25,22 @@ test -s "$apk"
 adb uninstall "$package" >/dev/null 2>&1 || true
 adb install "$apk"
 adb shell run-as "$package" mkdir -p files
+
+# python-for-Android extracts its private Python/Qt payload on first launch.
+# Warm that install before arming AMY's fixed-duration Oboe capture so unpacking
+# time cannot consume the capture window before the frontend sends notes.
+adb logcat -c
+adb shell monkey -p "$package" 1
+for _ in {1..120}; do
+  adb logcat -d > /tmp/lb-android-warmup.log
+  if grep -q 'QPA platform: android' /tmp/lb-android-warmup.log; then
+    break
+  fi
+  sleep 0.5
+done
+grep -q 'QPA platform: android' /tmp/lb-android-warmup.log
+adb shell am force-stop "$package"
+
 adb shell run-as "$package" touch files/lb-android-package-smoke.enable
 adb shell run-as "$package" touch files/amy-audio-capture.enable
 adb logcat -c

@@ -39,6 +39,10 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("AMY backend: external socket", android_smoke)
         self.assertIn("--windowed --package-smoke-test", release)
         self.assertIn("qml-chord-hold-promoted", android_smoke)
+        self.assertLess(
+            android_smoke.index('am force-stop "$package"'),
+            android_smoke.index("amy-audio-capture.enable"),
+        )
         self.assertIn(
             "branches: [main, testing/windows_smoke, integration/android_build]",
             release,
