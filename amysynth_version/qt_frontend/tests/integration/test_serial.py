@@ -138,6 +138,12 @@ class SerialIntegrationTests(unittest.TestCase):
 
             activity_start = app.bridge.count()
             app.action("setRhythmBusyness", 5.0)
+            app.bridge.wait_for_line_match(
+                lambda line: line.startswith("zQB10"),
+                "replacement base-drum pattern definition",
+                start=activity_start,
+                timeout=8.0,
+            )
             app.bridge.wait_idle(timeout=8.0)
             activity_lines = app.bridge.lines_since(activity_start)
             self.assertTrue(any(line.startswith("zQB10") for line in activity_lines))
