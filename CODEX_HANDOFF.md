@@ -1,10 +1,12 @@
 # Codex Session Handoff
 
-Updated 2026-08-30 after the chord-arpeggio feature was merged and released.
-The intended continuation branch is `feature/drum_fills`, created from clean
-`main` at merge commit `387776cffad7394c1fcf6add1ced5d3e69a8d382` and release
-tag `R20260829T230734`. No drum-fill behavior or implementation has been
-specified or added yet; do not infer it from the branch name.
+Updated 2026-08-30 after the nested-sequencer drum-fill feature was implemented
+and independently regression-tested. The continuation branch is
+`feature/drum_fills`; implementation commit
+`32488d37a25af025eb6fd2cdbc1422341466932a` is based on current main
+`f872432` plus the branch's intended preset/licence changes. It is pushed but
+not yet merged: physical UI/audio validation and explicit merge approval remain
+the release boundary.
 
 This file records operational state and completed work from the AMY/Qt UI,
 performance, MIDI-control and native-Windows sessions. It supplements, but does
@@ -24,12 +26,10 @@ all of:
 
 Do not use this handoff as a replacement for those contracts.
 
-At this handoff, local `main`, `origin/main` and `R20260829T230734` all resolve
-to `387776c`. The feature commit `b2a0934` remains available on
-`feature/chord_arpeggio` and `origin/feature/chord_arpeggio`. The old,
-heavily-diverged `origin/codex_info` documentation line remains intentionally
-unmerged; current design contracts plus this automatically read handoff
-supersede it.
+At this handoff, local and origin `main` resolve to `f872432`; local and origin
+`feature/drum_fills` contain `32488d37`. The old, heavily-diverged
+`origin/codex_info` documentation line remains intentionally unmerged; current
+design contracts plus this automatically read handoff supersede it.
 
 ## Required branch and release workflow
 
@@ -42,8 +42,9 @@ supersede it.
   Follow that run through all six regression jobs, four package validations and
   release publication. If it fails, diagnose it and repair it on a new fix
   branch; do not make an unreviewed direct-on-main repair.
-- The current `feature/drum_fills` branch is the prepared workspace for the
-  next task. Preserve it until the user supplies the drum-fill requirements.
+- The current `feature/drum_fills` branch is the tested workspace. Preserve it
+  through physical validation; merge it only on explicit user approval, then
+  follow the complete five-platform release to publication.
 
 ## Current architectural state
 
@@ -68,6 +69,14 @@ The 2026-08-30 release contains the UI/performance series beginning at
 `6f006ee`, the LDR audit, portable Qt gesture work, bass riffs and chord
 arpeggios through `387776c`. Treat these details as current behavior, not a
 future plan.
+
+The branch adds five complete percussion-activity levels, five independent
+fill selectors, the `/32..../1` density series, selection-order rotation and
+all 270 authoritative one-shot fills. All definitions are preloaded once into
+AMY; live changes replace only quantized root triggers. Fill IDs 0..999 are
+reserved so the catalogue can grow beyond 700 without changing the wire
+layout; base-role loop patterns start at 1000. See
+`amysynth_version/qt_frontend/docs/RHYTHM_PATTERNS.md` for the complete contract.
 
 ### Shared visual layout
 
@@ -361,6 +370,8 @@ sequencer. The abandoned bus-mixer experiment is absent.
 - Native audio smoke renders every used drum realization non-silent: 13 tiny,
   62 Gamma9001 and 24 General-MIDI sounds. AMY itself passes C tests and all
   134 Python regressions at the release threshold.
+- GitHub Actions run `33328685849` independently passed the complete LB suite
+  on feature commit `32488d37` with the immutable AMY pin.
 - Real-serial tests prove seven-note dominant-13 arpeggios in both directions,
   lane isolation, ROM and physical synth-4 `if8` policy, live riff
   transposition and unchanged transport/timebase. Native AMY state readback
@@ -388,16 +399,16 @@ ALSA_CONFIG_PATH="$PWD/tests/alsa-null.conf" \
   tests/run_tests.py --suite all
 ```
 
-Use `testing/windows_smoke` only for isolated Windows package iteration. Merge
-or apply the final Windows changes to `main` to exercise the full gated
-four-platform release.
+Use `testing/windows_smoke` only for isolated Windows package iteration. Main
+exercises the full gated five-platform release.
 
 ## Remaining work / safe next steps
 
-1. Complete and verify `feature/drum_fills` against
-   `design/rhythm_rework/rhythm_rework_task` and
-   `qt_frontend/docs/RHYTHM_PATTERNS.md`. Do not offer AMY upstream until every
-   LB suite and the complete platform release gate pass.
+1. Physically validate `feature/drum_fills`: launch the Qt frontend, verify the
+   five activity buttons, independent F1..F5 toggles, density labels, tiny-kit
+   audio, fill rotation/continuation and live rhythm/preset continuity. After
+   explicit approval, merge to `main` and follow the complete five-platform
+   release. Do not offer AMY upstream until that release gate passes.
 2. Physically test the released Windows zip on a recent Windows 10/11 x64 host:
    UI, native audio, shutdown and representative heavy patches/rhythms.
 3. Implement a native Windows MIDI input adapter behind the existing MIDI
