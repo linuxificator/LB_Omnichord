@@ -37,10 +37,30 @@ from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
 
+ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
+
+
+def resolve_frontend_asset_root(
+    code_dir: Path,
+    packaged_root: Path | None = None,
+) -> Path:
+    """Find assets in source, frozen, or Android's flat staged layout."""
+
+    code_dir = Path(code_dir)
+    if all((code_dir / name).is_dir() for name in ASSET_DIRECTORIES):
+        return code_dir
+    if packaged_root is not None:
+        return Path(packaged_root)
+    return code_dir.parent
+
+
 CODE_DIR = Path(__file__).resolve().parent
-# PyInstaller keeps bundled data under ``sys._MEIPASS``.  In source runs the
-# existing repository-relative root remains authoritative.
-FRONTEND_DIR = Path(getattr(sys, "_MEIPASS", CODE_DIR.parent))
+# PyInstaller exposes its data root as ``sys._MEIPASS``. Android's p4a stage
+# instead puts modules and data directories beside each other under ``app``.
+FRONTEND_DIR = resolve_frontend_asset_root(
+    CODE_DIR,
+    Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else None,
+)
 GUI_DIR = FRONTEND_DIR / "gui"
 CONFIG_DIR = FRONTEND_DIR / "config"
 INSTRUMENT_DIR = FRONTEND_DIR / "instruments"

@@ -14,6 +14,7 @@ from app_core import (
     ANDROID_SMOKE_ENABLE,
     ANDROID_SMOKE_STATUS,
     configure_android_runtime,
+    resolve_frontend_asset_root,
 )
 
 
@@ -28,6 +29,25 @@ def arguments(**updates: object) -> argparse.Namespace:
 
 
 class AndroidRuntimeTests(unittest.TestCase):
+    def test_flat_android_stage_is_the_frontend_asset_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            stage = Path(directory)
+            for name in ("config", "gui", "instruments", "music"):
+                (stage / name).mkdir()
+
+            self.assertEqual(
+                resolve_frontend_asset_root(stage, stage / "frozen"),
+                stage,
+            )
+
+            source_code = stage / "source" / "code"
+            source_code.mkdir(parents=True)
+            frozen = stage / "frozen"
+            self.assertEqual(
+                resolve_frontend_asset_root(source_code, frozen),
+                frozen,
+            )
+
     def test_android_defaults_to_the_aar_socket_in_private_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             files_dir = Path(directory)

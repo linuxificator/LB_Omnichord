@@ -80,3 +80,8 @@ repository secrets before treating it as a store or update-channel build.
 The emulator is strong evidence for packaging, process isolation, socket wire
 delivery, QML input behavior and non-silent audio generation. It is not a
 physical-device latency, touchscreen, speaker, lifecycle or audio-route test.
+The Android application does not use PulseAudio: AMY opens Oboe, which selects
+AAudio on the tested API level. The Linux-hosted emulator executable may print
+a host PulseAudio (`pa`) initialization warning; the gate separately requires
+the guest `AmyAndroid: Oboe output` route and validates the frames delivered
+through that stream.

@@ -131,6 +131,8 @@ class AndroidPackagingTests(unittest.TestCase):
         self.assertIn("debug-signed", readme)
         self.assertIn("V10", readme)
         self.assertIn("QLocalSocket", readme)
+        self.assertIn("does not use PulseAudio", readme)
+        self.assertIn("AmyAndroid: Oboe output", readme)
 
     def test_workflow_installs_pyside_android_deploy_requirements(self) -> None:
         repository = FRONTEND.parents[1]
