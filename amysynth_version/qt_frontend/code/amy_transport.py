@@ -1030,13 +1030,15 @@ class AmySerialClient:
                     + self._drum_role_index[role]
                 )
                 commands.append(
-                    f"zQE{pattern},0,0,{tag}"
+                    f"zQE{pattern},0,{length},{tag}"
                     f"zQM{instance_tag},{length}Z"
                 )
                 tag += 1
             for event in fill.events:
+                event_tick = event.tick // 2
+                event_period = length if event_tick == 0 else 0
                 commands.append(
-                    f"zQE{pattern},{event.tick // 2},0,{tag}"
+                    f"zQE{pattern},{event_tick},{event_period},{tag}"
                     f"{self._drum_hit_body(rhythm_id, event.role, event.velocity, fill=True)}Z"
                 )
                 tag += 1
@@ -1966,8 +1968,10 @@ class AmySerialClient:
                 continue
             commands.append(f"zQB{pattern},{length}Z")
             for tag, event in enumerate(events):
+                event_tick = event.tick // 2
+                event_period = length if event_tick == 0 else 0
                 commands.append(
-                    f"zQE{pattern},{event.tick // 2},0,{tag}"
+                    f"zQE{pattern},{event_tick},{event_period},{tag}"
                     f"{self._drum_hit_body(rhythm.rhythm_id, role, event.velocity, fill=False)}Z"
                 )
             commands.append(f"zQC{pattern}Z")

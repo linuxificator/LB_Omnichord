@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import unittest
 from itertools import combinations
@@ -107,6 +108,13 @@ class DrumPatternTests(unittest.TestCase):
         )
         self.assertTrue(any(command.startswith("zQT") for command in commands))
         self.assertFalse(any(command.startswith("H") for command in commands))
+        pattern_length = pop.period_ticks // 2
+        for command in authored_events:
+            match = re.match(r"^zQE\d+,(\d+),(\d+),\d+", command)
+            self.assertIsNotNone(match, command)
+            assert match is not None
+            tick, period = (int(value) for value in match.groups())
+            self.assertEqual(period, pattern_length if tick == 0 else 0)
 
     def test_every_kit_resolves_without_changing_timing(self) -> None:
         for rhythm in self.catalog.rhythms.values():
@@ -204,11 +212,25 @@ class DrumPatternTests(unittest.TestCase):
         self.assertTrue(any(command.startswith("zQB269,") for command in begins))
 
         current_count = 0
+        current_length = 0
         maximum = 0
         for command in commands:
             if command.startswith("zQB"):
+                match = re.fullmatch(r"zQB\d+,(\d+)Z", command)
+                self.assertIsNotNone(match, command)
+                assert match is not None
+                current_length = int(match.group(1))
                 current_count = 0
             elif command.startswith("zQE"):
+                match = re.match(r"^zQE\d+,(\d+),(\d+),\d+", command)
+                self.assertIsNotNone(match, command)
+                assert match is not None
+                tick, period = (int(value) for value in match.groups())
+                self.assertEqual(
+                    period,
+                    current_length if tick == 0 else 0,
+                    command,
+                )
                 current_count += 1
             elif command.startswith("zQC"):
                 maximum = max(maximum, current_count)
@@ -223,13 +245,19 @@ class DrumPatternTests(unittest.TestCase):
         first_commit = commands.index("zQC0Z")
         first = commands[:first_commit]
         fill = self.catalog.rhythm("pop_8").fills[0]
+        length = fill.duration_ticks // 2
         for role in client._drum_roles:
             tag = (
                 DRUM_BASE_INSTANCE_TAG_START
                 + client._drum_role_index[role]
             )
-            muted = any(f"zQM{tag}," in command for command in first)
+            mute_commands = [
+                command for command in first if f"zQM{tag},{length}Z" in command
+            ]
+            muted = bool(mute_commands)
             self.assertEqual(muted, role not in fill.continue_roles)
+            for command in mute_commands:
+                self.assertRegex(command, rf"^zQE0,0,{length},\d+zQM")
 
     def test_fill_order_and_allowed_starts_form_a_finite_supercycle(self) -> None:
         client = self.client()

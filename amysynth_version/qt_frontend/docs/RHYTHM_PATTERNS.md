@@ -28,6 +28,12 @@ operation. It carries the root sequencer's familiar tick/period/tag model
 inside the existing `zQ` extended-control family; LB does not use or require a
 separate top-level pattern-authoring command.
 
+The inherited tag semantics make `tick=0,period=0,tag=N` a clear operation,
+not a stored onset. LB therefore writes every tagged local-tick-zero event with
+the pattern length as its period. It fires once in a `ONE_SHOT` and once per
+cycle in a `LOOP`; tagged events at later local ticks use period zero. This
+applies equally to drum hits and the `zQM` controls embedded in fills.
+
 These enlarged limits are wrapper configuration on the LB release branch for
 Python/local Unix, Windows, Android/Oboe and ESP32-P4. AMY's portable upstream
 defaults remain deliberately smaller.
