@@ -10,6 +10,54 @@ REPOSITORY = FRONTEND.parents[1]
 
 
 class PackagingContracts(unittest.TestCase):
+    def test_every_platform_uses_one_amy_release_branch_and_commit(self) -> None:
+        workflows = [
+            REPOSITORY / ".github" / "workflows" / "desktop-release.yml",
+            REPOSITORY / ".github" / "workflows" / "amy-regression.yml",
+        ]
+        release_branch = "releases/amy_omnichord_R20260830T123342"
+        release_commit = "45005c0f4d226c8090e39f9dccd6ece788b33189"
+
+        for workflow_path in workflows:
+            workflow = workflow_path.read_text(encoding="utf-8")
+            self.assertIn(f"AMY_RELEASE_BRANCH: {release_branch}", workflow)
+            self.assertIn(f"AMY_COMMIT: {release_commit}", workflow)
+            self.assertIn("merge-base --is-ancestor", workflow)
+            self.assertNotIn(
+                "25213785696dd40e6cce59ab428e560a410d240f",
+                workflow,
+            )
+            self.assertNotIn(
+                "20f714a6ed309077a2a4fcca1f998e552cc7510a",
+                workflow,
+            )
+
+        release = workflows[0].read_text(encoding="utf-8")
+        self.assertIn("## Build provenance", release)
+        self.assertIn("\\`$AMY_RELEASE_BRANCH\\`", release)
+        self.assertIn("\\`$AMY_COMMIT\\`", release)
+
+        contract = (FRONTEND / "packaging" / "AMY_RELEASE.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(release_branch, contract)
+        self.assertIn(release_commit, contract)
+        self.assertIn("every supported platform succeeds", contract)
+
+    def test_platform_logic_is_limited_to_one_startup_preamble(self) -> None:
+        core = (FRONTEND / "code" / "app_core.py").read_text(
+            encoding="utf-8"
+        )
+        architecture = (
+            REPOSITORY / "amysynth_version" / "design" / "architecture.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertEqual(core.count('casefold() != "android"'), 1)
+        self.assertNotIn("sys.platform", core)
+        self.assertNotIn("platform.system", core)
+        self.assertRegex(architecture, r"single\s+startup preamble")
+        self.assertIn("Asset-root discovery", architecture)
+
     def test_release_is_gated_by_complete_reusable_test_workflow(self) -> None:
         release = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"

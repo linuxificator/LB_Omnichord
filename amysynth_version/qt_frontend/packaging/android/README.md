@@ -13,13 +13,15 @@ PySide6 / Qt frontend process
 private :amy service process -> AMY C engine -> Oboe -> AAudio
 ```
 
-The application embeds the `amy-service` AAR from the fork branch
-`integration/amy_android`. The AAR's unexported lifecycle provider starts AMY
-in a separate `:amy` process under the same package UID. Qt discovers the
-application's real private files directory with `QStandardPaths`; neither the
-data path nor an Android user number is hard-coded. The Python frontend opens
-the socket and sends wire messages only. It does not import or link AMY and it
-does not call the AAR's JNI implementation.
+The application embeds the `amy-service` AAR from fork release branch
+`releases/amy_omnichord_R20260830T123342`, pinned to commit
+`45005c0f4d226c8090e39f9dccd6ece788b33189`. The AAR's unexported lifecycle
+provider starts AMY in a separate `:amy` process under the same package UID.
+Qt discovers the application's real private files directory with
+`QStandardPaths`; neither the data path nor an Android user number is
+hard-coded. The Python frontend opens the socket and sends wire messages only.
+It does not import or link AMY and it does not call the AAR's JNI
+implementation.
 
 This is the Android equivalent of the desktop wrappers. Linux and macOS use a
 supervisor around a separate service and Unix socket; Windows uses

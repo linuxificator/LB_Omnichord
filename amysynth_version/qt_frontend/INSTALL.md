@@ -295,10 +295,11 @@ $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 .\packaging\build_windows.ps1
 ```
 
-The zip and checksum are written below `dist`. The release workflow pins AMY
-revision `25213785696dd40e6cce59ab428e560a410d240f`; local release candidates
-must use the same revision unless the pin and its compatibility tests are
-deliberately updated together.
+The zip and checksum are written below `dist`. The release workflow pins both
+AMY fork branch `releases/amy_omnichord_R20260830T123342` and commit
+`45005c0f4d226c8090e39f9dccd6ece788b33189`; local release candidates must use
+that exact commit unless the shared release contract and its compatibility
+tests are deliberately updated together.
 
 See [WINDOWS_NATIVE.md](docs/WINDOWS_NATIVE.md) for the full transport,
 packaging, smoke-test and remaining-hardware-validation contract.

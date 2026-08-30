@@ -12,6 +12,10 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T123342
+  AMY_COMMIT: 45005c0f4d226c8090e39f9dccd6ece788b33189
+
 jobs:
   tests:
     if: >-
@@ -77,7 +81,10 @@ jobs:
       - name: Install pinned AMY with ESP32-compatible drum bank
         run: |
           git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
-          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
+          git -C /tmp/amy-lb checkout "$AMY_COMMIT"
+          test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
           git -C /tmp/amy-lb apply \
             "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
           AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
@@ -182,7 +189,10 @@ jobs:
       - name: Install pinned AMY with ESP32-compatible drum bank
         run: |
           git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
-          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
+          git -C /tmp/amy-lb checkout "$AMY_COMMIT"
+          test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
           git -C /tmp/amy-lb apply \
             "$GITHUB_WORKSPACE/amysynth_version/qt_frontend/packaging/amy-tiny-bank.patch"
           AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
@@ -285,7 +295,12 @@ jobs:
         shell: pwsh
         run: |
           git clone https://github.com/linuxificator/amy.git "$env:RUNNER_TEMP\amy-lb"
-          git -C "$env:RUNNER_TEMP\amy-lb" checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C "$env:RUNNER_TEMP\amy-lb" merge-base --is-ancestor `
+            $env:AMY_COMMIT "origin/$env:AMY_RELEASE_BRANCH"
+          if ($LASTEXITCODE -ne 0) { throw "AMY commit is not on declared release branch" }
+          git -C "$env:RUNNER_TEMP\amy-lb" checkout $env:AMY_COMMIT
+          $actualAmyCommit = (git -C "$env:RUNNER_TEMP\amy-lb" rev-parse HEAD).Trim()
+          if ($actualAmyCommit -ne $env:AMY_COMMIT) { throw "AMY checkout did not resolve to pinned commit" }
 
       - name: Build native service and portable package
         shell: pwsh
@@ -410,10 +425,10 @@ jobs:
           PY
 
       - name: Build pinned AMY service AAR
-        env:
-          AMY_COMMIT: 20f714a6ed309077a2a4fcca1f998e552cc7510a
         run: |
           git clone https://github.com/linuxificator/amy.git "$RUNNER_TEMP/amy-lb"
+          git -C "$RUNNER_TEMP/amy-lb" merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
           git -C "$RUNNER_TEMP/amy-lb" checkout "$AMY_COMMIT"
           gradle -p "$RUNNER_TEMP/amy-lb/android" \
             :amy-service:assembleDebug --stacktrace
@@ -486,11 +501,12 @@ jobs:
           path: android-package
 
       - name: Checkout pinned AMY audio analyzer
-        env:
-          AMY_COMMIT: 20f714a6ed309077a2a4fcca1f998e552cc7510a
         run: |
           git clone https://github.com/linuxificator/amy.git "$RUNNER_TEMP/amy-lb"
+          git -C "$RUNNER_TEMP/amy-lb" merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
           git -C "$RUNNER_TEMP/amy-lb" checkout "$AMY_COMMIT"
+          test "$(git -C "$RUNNER_TEMP/amy-lb" rev-parse HEAD)" = "$AMY_COMMIT"
 
       - name: Enable KVM for Android emulator
         run: |
@@ -581,6 +597,10 @@ jobs:
             echo "Download \`$android_file\` and its SHA-256 file, allow installation from this source when Android asks, then install the APK. The package contains a PySide6 frontend and a separate private AMY/Oboe service process communicating through the app-private \`amy.sock\`."
             echo
             echo 'This package is CI debug-signed so it can be installed and emulator-tested without a repository signing secret. It is not a Play Store bundle or a stable update channel, and physical touchscreen, speaker, route-change and latency validation is still required.'
+            echo
+            echo '## Build provenance'
+            echo
+            echo "AMY fork release: \`$AMY_RELEASE_BRANCH\` at immutable build commit \`$AMY_COMMIT\`."
           } > release-notes.md
           gh release create "$RELEASE_TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \

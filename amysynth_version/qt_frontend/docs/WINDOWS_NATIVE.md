@@ -94,7 +94,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Linux desktop | Separate Python AMY service and Qt process over `AF_UNIX/SOCK_SEQPACKET`. |
 | macOS desktop | Separate Python AMY service and Qt process over LF-framed `AF_UNIX/SOCK_STREAM`. |
 | Raspberry Pi + ESP32-P4 | Qt sends LF-delimited wire requests over UART to an independent AMY target. |
-| Android | `integration/android_build` packages PySide6 with the pinned `integration/amy_android` AAR. The frontend uses the private socket only; the AAR owns the separate `:amy`/Oboe process. Emulator package/QML/audio validation is a release gate, while physical validation remains outstanding. |
+| Android | `integration/android_build` packages PySide6 with the AAR from the pinned `releases/amy_omnichord_R20260830T123342` AMY fork commit. The frontend uses the private socket only; the AAR owns the separate `:amy`/Oboe process. Emulator package/QML/audio validation is a release gate, while physical validation remains outstanding. |
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
 | Native Windows frontend transport | The launcher supplies a unique Windows named-pipe name; `QLocalSocket` sends LF-framed requests without opening a network port. |
 | Windows package/release | CI builds an experimental portable zip with separate service/frontend executables and bundled dependencies. It performs an offline native AMY render test and starts the unpacked double-click launcher, offscreen Qt/QML frontend and named-pipe service end to end; no physical validation yet for pointer hardware, audio or MIDI. |
@@ -114,11 +114,12 @@ native-runner package validation, not a physical Windows audio/MIDI test.
 ## PCM/drum compatibility
 
 All supported targets must give PCM preset numbers 0–18 the same meaning. The
-Windows service is built from pinned AMY revision
-`25213785696dd40e6cce59ab428e560a410d240f`. Its CMake target compiles `amy.c`
+Windows service is built from pinned AMY release branch
+`releases/amy_omnichord_R20260830T123342` at commit
+`45005c0f4d226c8090e39f9dccd6ece788b33189`. Its CMake target compiles `amy.c`
 and `pcm.c` without defining `GAMMA9001` and without linking the optional
-Gamma9001 `drums_bin.c`. The pinned source consequently includes
-`pcm_tiny.h`, including the tiny-bank mapping for MIDI drum patch 258.
+Gamma9001 `drums_bin.c`. The pinned source consequently includes `pcm_tiny.h`,
+including the tiny-bank mapping for MIDI drum patch 258.
 
 This is equivalent to the explicit `AMY_PCM_BANK=tiny` used by the Linux and
 macOS Python-extension builds. That environment variable belongs to AMY's

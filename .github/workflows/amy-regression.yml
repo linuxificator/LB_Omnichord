@@ -26,6 +26,10 @@ on:
 permissions:
   contents: read
 
+env:
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T123342
+  AMY_COMMIT: 45005c0f4d226c8090e39f9dccd6ece788b33189
+
 # A feature branch can receive several quick follow-up commits while a hardware
 # regression is being fixed. Do not finish six obsolete jobs for every older
 # PR head; keep only the newest run for that PR/ref. Manual runs use their own
@@ -74,7 +78,10 @@ jobs:
         if: startsWith(matrix.suite, 'native-')
         run: |
           git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
-          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
+          git -C /tmp/amy-lb checkout "$AMY_COMMIT"
+          test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
           python -m pip install /tmp/amy-lb
           mkdir -p amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}
           git -C /tmp/amy-lb rev-parse HEAD \
@@ -131,7 +138,10 @@ jobs:
         if: inputs.suite == 'all' || startsWith(inputs.suite, 'native-')
         run: |
           git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
-          git -C /tmp/amy-lb checkout 25213785696dd40e6cce59ab428e560a410d240f
+          git -C /tmp/amy-lb merge-base --is-ancestor \
+            "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
+          git -C /tmp/amy-lb checkout "$AMY_COMMIT"
+          test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
           python -m pip install /tmp/amy-lb
           mkdir -p amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}
           git -C /tmp/amy-lb rev-parse HEAD \

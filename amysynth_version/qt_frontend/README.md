@@ -150,12 +150,14 @@ zip is portable and contains its dependencies, but it is deliberately not a
 single executable: the frontend and AMY service remain separate processes and
 the extracted directory must stay together.
 
-The Android APK embeds the `amy-service` AAR from the pinned AMY integration
-branch. Its unexported provider owns the separate `:amy` service process and
-Oboe output; PySide6 discovers the application-private files directory and
-sends ordinary AMY packets through `amy.sock`. The CI APK is debug-signed and
-is therefore an experimental sideloadable artifact, not a Play Store/update-
-channel build. See [the Android package contract](packaging/android/README.md).
+The Android APK embeds the `amy-service` AAR from the pinned AMY Omnichord
+release branch and exact commit. Its unexported provider owns the separate
+`:amy` service process and Oboe output; PySide6 discovers the
+application-private files directory and sends ordinary AMY packets through
+`amy.sock`. The CI APK is debug-signed and is therefore an experimental
+sideloadable artifact, not a Play Store/update-channel build. See
+[the shared AMY release contract](packaging/AMY_RELEASE.md) and
+[the Android package contract](packaging/android/README.md).
 
 To install the macOS build, open the DMG, drag `LB_Omnichord.app` to
 `Applications`, eject the DMG and try to open the app once. After macOS blocks
