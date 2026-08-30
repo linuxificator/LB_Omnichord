@@ -73,6 +73,13 @@ class AndroidPackagingTests(unittest.TestCase):
         self.assertIn("V10", readme)
         self.assertIn("QLocalSocket", readme)
 
+    def test_workflow_installs_pyside_android_deploy_requirements(self) -> None:
+        repository = FRONTEND.parents[1]
+        workflow = (repository / ".github" / "workflows" / "desktop-release.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("requirements-android.txt", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
