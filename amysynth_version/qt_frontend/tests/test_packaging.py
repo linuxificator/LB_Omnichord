@@ -95,6 +95,9 @@ class PackagingContracts(unittest.TestCase):
             android_smoke.index("amy-audio-capture.enable"),
         )
         self.assertIn("warmup_ready=0", android_smoke)
+        self.assertIn("for warmup_attempt in {1..3}", android_smoke)
+        self.assertIn('pidof "$package"', android_smoke)
+        self.assertIn("break 2", android_smoke)
         self.assertIn("'python:I' '*:S'", android_smoke)
         self.assertIn('test "$warmup_ready" -eq 1', android_smoke)
         self.assertIn(

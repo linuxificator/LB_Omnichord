@@ -71,11 +71,13 @@ suites but builds no desktop package. It builds x86_64 and arm64 Android APKs,
 installs the x86_64 package into an emulator, exercises the existing packaged
 QML tap/hold smoke path, checks the private socket and separate AMY service,
 and compares the exact AMY render samples with the samples handed to Oboe.
-The emulator performs one unmeasured warm-up launch for python-for-Android's
-first-run asset extraction, force-stops the complete package, and only then
-arms AMY's eight-second Oboe capture for the measured launch. After the
-first-launch warm-up, that window leaves enough margin for normal packaged
-frontend startup variation and the complete UI-driven synth attack.
+The emulator performs an unmeasured warm-up for python-for-Android's first-run
+asset extraction, force-stops the complete package, and only then arms AMY's
+eight-second Oboe capture for the measured launch. If Qt exits during the
+first-extraction startup race, the warm-up alone is retried up to three times;
+the measured QML/audio launch remains single-shot. After the warm-up, that
+window leaves enough margin for normal packaged frontend startup variation and
+the complete UI-driven synth attack.
 The readiness poll filters out verbose extraction traffic and retries a
 transient `adb logcat` read instead of confusing a host transport reset with an
 application failure; the filtered Python log must still contain no traceback.

@@ -28,18 +28,34 @@ adb shell run-as "$package" mkdir -p files
 
 # python-for-Android extracts its private Python/Qt payload on first launch.
 # Warm that install before arming AMY's eight-second Oboe capture so unpacking
-# time cannot consume the capture window before the frontend sends notes.
-adb logcat -c
-adb shell monkey -p "$package" 1
+# time cannot consume the capture window before the frontend sends notes. A
+# Qt/JNI startup can occasionally lose the race with that first extraction;
+# retry only this unmeasured warm-up, while leaving the measured launch and all
+# of its QML/audio assertions single-shot.
 warmup_ready=0
-for _ in {1..120}; do
-  if adb logcat -d -s 'python:I' '*:S' \
-      > /tmp/lb-android-warmup.log 2>/dev/null && \
-      grep -q 'QPA platform: android' /tmp/lb-android-warmup.log; then
-    warmup_ready=1
-    break
-  fi
-  sleep 0.5
+for warmup_attempt in {1..3}; do
+  adb logcat -c
+  adb shell monkey -p "$package" 1
+  for warmup_poll in {1..120}; do
+    if adb logcat -d -s 'python:I' '*:S' \
+        > /tmp/lb-android-warmup.log 2>/dev/null && \
+        grep -q 'QPA platform: android' /tmp/lb-android-warmup.log; then
+      warmup_ready=1
+      break 2
+    fi
+    # Give ActivityManager two seconds to register the launched process, then
+    # stop waiting immediately if Qt died so the extracted payload can be
+    # retried. The :amy service has a different process name and cannot make
+    # this exact pidof check pass.
+    if (( warmup_poll >= 4 )) && \
+        ! adb shell pidof "$package" >/dev/null 2>&1; then
+      echo "Warm-up attempt $warmup_attempt exited before Qt became ready" >&2
+      break
+    fi
+    sleep 0.5
+  done
+  adb shell am force-stop "$package"
+  sleep 1
 done
 test "$warmup_ready" -eq 1
 ! grep -q 'Traceback (most recent call last)' /tmp/lb-android-warmup.log
