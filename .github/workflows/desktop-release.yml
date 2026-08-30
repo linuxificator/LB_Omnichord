@@ -507,74 +507,10 @@ jobs:
           profile: pixel_2
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim
-          script: |
-            package=org.linuxificator.lb_omnichord
-            apk="$(find android-package -name '*.apk' -print -quit)"
-            test -s "$apk"
-            adb uninstall "$package" >/dev/null 2>&1 || true
-            adb install "$apk"
-            adb shell run-as "$package" mkdir -p files
-            adb shell run-as "$package" touch files/lb-android-package-smoke.enable
-            adb shell run-as "$package" touch files/amy-audio-capture.enable
-            adb logcat -c
-            adb shell monkey -p "$package" 1
-
-            for _ in {1..120}; do
-              if adb exec-out run-as "$package" cat \
-                  files/lb-android-package-smoke.status \
-                  > /tmp/lb-android-smoke.status 2>/dev/null && \
-                  grep -q 'event-loop-exited' /tmp/lb-android-smoke.status; then
-                break
-              fi
-              sleep 0.5
-            done
-            adb logcat -d > /tmp/lb-android.log
-            cat /tmp/lb-android-smoke.status
-            grep -E 'AmyAndroid|AmyAudioCapture|AMY backend|QPA platform|Traceback' \
-              /tmp/lb-android.log || true
-            for checkpoint in \
-              android-runtime-configured \
-              qml-root-ready \
-              initial-state-sent \
-              qml-chord-press-observed \
-              active-chord-visible \
-              qml-chord-tap-released \
-              qml-chord-hold-promoted \
-              qml-chord-hold-released \
-              event-loop-exited; do
-              grep -q "$checkpoint" /tmp/lb-android-smoke.status
-            done
-            grep -q 'AMY/Oboe started: .*336 oscs, 11 buses' /tmp/lb-android.log
-            grep -q 'AMY output route: deviceId=' /tmp/lb-android.log
-            grep -q 'QPA platform: android' /tmp/lb-android.log
-            grep -q 'AMY backend: external socket .*amy.sock' /tmp/lb-android.log
-            ! grep -q 'Traceback (most recent call last)' /tmp/lb-android.log
-
-            for _ in {1..60}; do
-              if adb shell run-as "$package" test -s \
-                  files/amy-audio-levels.txt; then
-                break
-              fi
-              sleep 0.5
-            done
-            mkdir -p android-audio-capture
-            adb exec-out run-as "$package" cat files/amy-render.wav \
-              > android-audio-capture/amy-render.wav
-            adb exec-out run-as "$package" cat files/amy-oboe.wav \
-              > android-audio-capture/amy-oboe.wav
-            adb exec-out run-as "$package" cat files/amy-audio-levels.txt \
-              > android-audio-capture/amy-audio-levels.txt
-            test -s android-audio-capture/amy-render.wav
-            test -s android-audio-capture/amy-oboe.wav
-            test -s android-audio-capture/amy-audio-levels.txt
-            cat android-audio-capture/amy-audio-levels.txt
-            python3 "$RUNNER_TEMP/amy-lb/tests/check_android_audio_capture.py" \
-              android-audio-capture/amy-render.wav \
-              android-audio-capture/amy-oboe.wav
-            cp /tmp/lb-android-smoke.status /tmp/lb-android.log \
-              android-audio-capture/
+          script: bash amysynth_version/qt_frontend/packaging/android/test_android_apk.sh
 
       - name: Upload Omnichord Android smoke evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: lb-omnichord-android-smoke

@@ -17,6 +17,9 @@ class PackagingContracts(unittest.TestCase):
         regression = (
             REPOSITORY / ".github" / "workflows" / "amy-regression.yml"
         ).read_text(encoding="utf-8")
+        android_smoke = (
+            FRONTEND / "packaging" / "android" / "test_android_apk.sh"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("uses: ./.github/workflows/amy-regression.yml", release)
         self.assertIn("linux-appimages:", release)
@@ -26,9 +29,16 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("android-emulator:", release)
         self.assertIn("android-packages, android-emulator]", release)
         self.assertIn("hdiutil attach", release)
-        self.assertIn("AMY backend: external socket", release)
+        self.assertIn(
+            "bash amysynth_version/qt_frontend/packaging/android/"
+            "test_android_apk.sh",
+            release,
+        )
+        self.assertIn("if: always()", release)
+        self.assertIn("set -euo pipefail", android_smoke)
+        self.assertIn("AMY backend: external socket", android_smoke)
         self.assertIn("--windowed --package-smoke-test", release)
-        self.assertIn("qml-chord-hold-promoted", release)
+        self.assertIn("qml-chord-hold-promoted", android_smoke)
         self.assertIn(
             "branches: [main, testing/windows_smoke, integration/android_build]",
             release,
