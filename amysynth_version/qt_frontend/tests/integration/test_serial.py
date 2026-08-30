@@ -89,7 +89,10 @@ class SerialIntegrationTests(unittest.TestCase):
             fill_lines = app.bridge.lines_since(fill_start)
             self.assertTrue(any(line.startswith("zQA") for line in fill_lines))
             self.assertFalse(
-                any(line.startswith(("zQB", "J", "zQC")) for line in fill_lines),
+                any(
+                    line.startswith(("zQB", "zQE", "zQC"))
+                    for line in fill_lines
+                ),
                 "fill selection resent its stored event block",
             )
 
@@ -98,7 +101,9 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=8.0)
             activity_lines = app.bridge.lines_since(activity_start)
             self.assertTrue(any(line.startswith("zQB10") for line in activity_lines))
-            self.assertTrue(any(line.startswith("J10") for line in activity_lines))
+            self.assertTrue(
+                any(line.startswith("zQE10") for line in activity_lines)
+            )
             self.assertFalse(
                 any(
                     line.startswith("zQB")

@@ -23,6 +23,11 @@ library of more than 700 fills, fit without creating hundreds of active
 players. Only the current base roles and the few one-shots that are actually
 sounding consume instance slots.
 
+Stored events use AMY's `zQE<pattern>,<tick>[,<period>[,<tag>]]<event>Z`
+operation. It carries the root sequencer's familiar tick/period/tag model
+inside the existing `zQ` extended-control family; LB does not use or require a
+separate top-level pattern-authoring command.
+
 These enlarged limits are wrapper configuration on the LB release branch for
 Python/local Unix, Windows, Android/Oboe and ESP32-P4. AMY's portable upstream
 defaults remain deliberately smaller.

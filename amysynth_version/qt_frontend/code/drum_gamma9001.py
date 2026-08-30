@@ -3,7 +3,7 @@
 The source instrument catalogues deliberately name a kit patch plus GM note.
 LB uses a small polyphonic PCM synth for drums, so this immutable table resolves
 the pairs to the exact PCM preset and native note encoded by AMY release commit
-57a97d7f5399f00afff0d498e060b53b8cd305c4. Keeping this kit-specific data in
+32f3a68861a68979ceb715cf32e0322e8614365b. Keeping this kit-specific data in
 LB avoids allocating seven 38/42-oscillator GM patch synths and keeps all
 musical policy out of AMY.
 """

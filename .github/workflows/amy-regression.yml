@@ -27,8 +27,8 @@ permissions:
   contents: read
 
 env:
-  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T211550
-  AMY_COMMIT: 57a97d7f5399f00afff0d498e060b53b8cd305c4
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T220021
+  AMY_COMMIT: 32f3a68861a68979ceb715cf32e0322e8614365b
 
 # A feature branch can receive several quick follow-up commits while a hardware
 # regression is being fixed. Do not finish six obsolete jobs for every older

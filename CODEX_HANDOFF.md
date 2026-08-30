@@ -271,8 +271,8 @@ requirement changes the architectural decision.
 ### AMY and drum-bank compatibility
 
 The release workflow pins AMY branch
-`releases/amy_omnichord_R20260830T191146` at
-`e0ef93c0c8b9c049cf5b37b25d50768cd1136e22`.
+`releases/amy_omnichord_R20260830T220021` at
+`32f3a68861a68979ceb715cf32e0322e8614365b`.
 
 - Linux and macOS install that revision directly with `AMY_PCM_BANK=tiny`;
   Linux CI rejects Gamma9001 symbols. The old local patch is gone because the
@@ -357,15 +357,18 @@ for official checkout/setup/upload/download actions being forced onto Node 24.
 The local AMY fork convention is `/home/jeroen/omnichord/amyfork/amy`.
 `origin/upstream/android-oboe` remains the historical full Android reference.
 The active LB dependency is now the cumulative release branch
-`releases/amy_omnichord_R20260830T191146`, pinned at
-`e0ef93c0c8b9c049cf5b37b25d50768cd1136e22`. It combines the proven separate
+`releases/amy_omnichord_R20260830T220021`, pinned at
+`32f3a68861a68979ceb715cf32e0322e8614365b`. It combines the proven separate
 Android `:amy`/Oboe and desktop wire-service boundaries with the generic nested
-sequencer. The abandoned bus-mixer experiment is absent.
+sequencer. Nested-pattern authoring uses `zQE`, keeping every new wire
+operation under the existing `zQ` extended-control family. The abandoned
+bus-mixer experiment is absent.
 
 ## Verification already completed
 
-- The complete 2026-08-30 local matrix now passes 192 individual tests: 143
-  unit, 15 frontend, 14 serial/program, 14 preset, 3 native-control and 3
+- After migrating nested-pattern authoring from the temporary top-level `J`
+  command to `zQE`, the complete 2026-08-30 local matrix passes all 192 tests:
+  143 unit, 15 frontend, 14 serial/program, 14 preset, 3 native-control and 3
   native-rhythm tests. This includes the complete 54-rhythm/270-fill catalogue,
   exhaustive fill combinations, chord-arpeggio tag expansion, bass-riff
   validation, the 36-chord LDR audit and package contracts.
@@ -374,8 +377,9 @@ sequencer. The abandoned bus-mixer experiment is absent.
   reset block boundary before creating tick-zero instances, preventing the
   reset from erasing freshly ingested `zQT` triggers.
 - Native audio smoke renders every used drum realization non-silent: 13 tiny,
-  62 Gamma9001 and 24 General-MIDI sounds. AMY itself passes C tests and all
-  134 Python regressions at the release threshold.
+  62 Gamma9001 and 24 General-MIDI sounds. The pinned AMY release passes
+  `make ctest` and all 134 Python/audio regressions at the release threshold;
+  those AMY tests include explicit legacy `H` semantics and new `zQE` coverage.
 - GitHub Actions run `33328685849` independently passed the complete LB suite
   on feature commit `32488d37` with the immutable AMY pin.
 - GitHub Actions run `33329576417` independently passed all 192 tests on

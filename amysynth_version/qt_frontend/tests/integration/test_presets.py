@@ -666,7 +666,10 @@ class PresetIntegrationTests(unittest.TestCase):
                 )
 
             self.assertTrue(
-                any(line.startswith("J") and "i0Z" in line for line in switched),
+                any(
+                    line.startswith("zQE") and "i0Z" in line
+                    for line in switched
+                ),
                 "live style switch did not author nested drum events",
             )
             self.assertTrue(

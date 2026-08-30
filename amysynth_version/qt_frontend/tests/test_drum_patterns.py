@@ -97,7 +97,9 @@ class DrumPatternTests(unittest.TestCase):
             "percussion_activity": 2,
         }
         commands = client._drum_activity_commands()
-        authored_events = [command for command in commands if command.startswith("J")]
+        authored_events = [
+            command for command in commands if command.startswith("zQE")
+        ]
         self.assertEqual(len(authored_events), len(pop.levels[1]))
         self.assertNotEqual(
             len(authored_events),
@@ -206,7 +208,7 @@ class DrumPatternTests(unittest.TestCase):
         for command in commands:
             if command.startswith("zQB"):
                 current_count = 0
-            elif command.startswith("J"):
+            elif command.startswith("zQE"):
                 current_count += 1
             elif command.startswith("zQC"):
                 maximum = max(maximum, current_count)
