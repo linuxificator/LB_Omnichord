@@ -1,5 +1,5 @@
 {
-  "config_revision": 1,
+  "config_revision": 2,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,
@@ -51,23 +51,23 @@
     "juno_089": 0.4
   },
   "drums": {
-    "kit": "tiny",
+    "kit": "gamma9001",
     "velocity_gain": 5.0,
     "sample_map": {
-      "bd_haus": {"preset": 1, "note": 39},
-      "drum_bass_hard": {"preset": 1, "note": 39},
-      "drum_bass_soft": {"preset": 1, "note": 39},
-      "drum_snare_hard": {"preset": 2, "note": 45},
-      "drum_snare_soft": {"preset": 5, "note": 41},
-      "drum_cymbal_closed": {"preset": 6, "note": 53},
-      "drum_cymbal_pedal": {"preset": 7, "note": 61},
-      "drum_cymbal_open": {"preset": 7, "note": 56},
-      "drum_tom_hi_soft": {"preset": 8, "note": 73},
-      "drum_tom_mid_soft": {"preset": 8, "note": 63},
-      "drum_tom_lo_soft": {"preset": 8, "note": 61},
-      "elec_tick": {"preset": 4, "note": 51},
-      "perc_bell": {"preset": 10, "note": 69},
-      "perc_snap": {"preset": 9, "note": 94}
+      "bd_haus": {"preset": 0, "note": 60},
+      "drum_bass_hard": {"preset": 2, "note": 60},
+      "drum_bass_soft": {"preset": 0, "note": 60},
+      "drum_snare_hard": {"preset": 12, "note": 45},
+      "drum_snare_soft": {"preset": 14, "note": 41},
+      "drum_cymbal_closed": {"preset": 9, "note": 60},
+      "drum_cymbal_pedal": {"preset": 9, "note": 57},
+      "drum_cymbal_open": {"preset": 10, "note": 60},
+      "drum_tom_hi_soft": {"preset": 17, "note": 70},
+      "drum_tom_mid_soft": {"preset": 17, "note": 67},
+      "drum_tom_lo_soft": {"preset": 16, "note": 61},
+      "elec_tick": {"preset": 15, "note": 90},
+      "perc_bell": {"preset": 18, "note": 66},
+      "perc_snap": {"preset": 3, "note": 60}
     }
   },
   "rhythm": {

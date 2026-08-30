@@ -141,6 +141,72 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             finally:
                 user_data.USER_CONFIG_DIR = original
 
+    def test_gamma_release_migrates_only_the_old_shipped_drum_default(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shipped = root / "shipped"
+            shipped.mkdir()
+            (shipped / "amy_config.json").write_text(
+                json.dumps({
+                    "config_revision": 2,
+                    "drums": {
+                        "kit": "gamma9001",
+                        "sample_map": {
+                            "drum_bass_hard": {"preset": 2, "note": 60},
+                            "perc_snap": {"preset": 3, "note": 60},
+                        },
+                    },
+                }),
+                encoding="utf-8",
+            )
+            original = user_data.USER_CONFIG_DIR
+            try:
+                user_data.USER_CONFIG_DIR = root / "user"
+                user_data.USER_CONFIG_DIR.mkdir()
+                target = user_data.USER_CONFIG_DIR / "amy_config.json"
+
+                target.write_text(
+                    json.dumps({
+                        "config_revision": 1,
+                        "drums": {
+                            "kit": "tiny",
+                            "sample_map": {
+                                "drum_bass_hard": {"preset": 1, "note": 39},
+                                "perc_snap": {"preset": 999, "note": 12},
+                            },
+                        },
+                        "custom": "preserved",
+                    }),
+                    encoding="utf-8",
+                )
+                user_data.ensure_user_configs(shipped)
+                migrated = json.loads(target.read_text(encoding="utf-8"))
+                self.assertEqual(migrated["config_revision"], 2)
+                self.assertEqual(migrated["drums"]["kit"], "gamma9001")
+                self.assertEqual(
+                    migrated["drums"]["sample_map"]["drum_bass_hard"],
+                    {"preset": 2, "note": 60},
+                )
+                self.assertEqual(
+                    migrated["drums"]["sample_map"]["perc_snap"],
+                    {"preset": 999, "note": 12},
+                )
+                self.assertEqual(migrated["custom"], "preserved")
+
+                target.write_text(
+                    json.dumps({
+                        "config_revision": 1,
+                        "drums": {"kit": "general_midi"},
+                    }),
+                    encoding="utf-8",
+                )
+                user_data.ensure_user_configs(shipped)
+                preserved = json.loads(target.read_text(encoding="utf-8"))
+                self.assertEqual(preserved["config_revision"], 2)
+                self.assertEqual(preserved["drums"]["kit"], "general_midi")
+            finally:
+                user_data.USER_CONFIG_DIR = original
+
     def test_midi_running_status_parses_control_changes(self) -> None:
         notes = []
         controls = []

@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 env:
-  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T220021
-  AMY_COMMIT: 32f3a68861a68979ceb715cf32e0322e8614365b
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260831T001253
+  AMY_COMMIT: 00157856312de89f6dc293f90efb1889f0ceff23
 
 jobs:
   tests:
@@ -78,19 +78,17 @@ jobs:
             -r amysynth_version/qt_frontend/requirements.txt \
             'pyinstaller==6.22.2'
 
-      - name: Install pinned AMY with ESP32-compatible drum bank
+      - name: Install pinned AMY with Gamma9001 drum bank
         run: |
           git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
           git -C /tmp/amy-lb merge-base --is-ancestor \
             "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
           git -C /tmp/amy-lb checkout "$AMY_COMMIT"
           test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
-          AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
+          AMY_PCM_BANK=gamma9001 python -m pip install --no-cache-dir /tmp/amy-lb
           amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
-          if nm -D "$amy_so" | grep -Eq 'gamma9001|amy_set_gamma'; then
-            echo 'AMY was built with the wrong PCM bank' >&2
-            exit 1
-          fi
+          nm -D "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null
+          nm -D "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null
 
       - name: Download verified AppImage tools
         env:
@@ -184,14 +182,17 @@ jobs:
             -r amysynth_version/qt_frontend/requirements.txt \
             'pyinstaller==6.22.2'
 
-      - name: Install pinned AMY with ESP32-compatible drum bank
+      - name: Install pinned AMY with Gamma9001 drum bank
         run: |
           git clone https://github.com/linuxificator/amy.git /tmp/amy-lb
           git -C /tmp/amy-lb merge-base --is-ancestor \
             "$AMY_COMMIT" "origin/$AMY_RELEASE_BRANCH"
           git -C /tmp/amy-lb checkout "$AMY_COMMIT"
           test "$(git -C /tmp/amy-lb rev-parse HEAD)" = "$AMY_COMMIT"
-          AMY_PCM_BANK=tiny python -m pip install --no-cache-dir /tmp/amy-lb
+          AMY_PCM_BANK=gamma9001 python -m pip install --no-cache-dir /tmp/amy-lb
+          amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
+          nm -gU "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null
+          nm -gU "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null
 
       - name: Build and validate DMG
         working-directory: amysynth_version/qt_frontend

@@ -107,8 +107,8 @@ No bus-mixer extension is used or required.
 Timing and sound choice are separate assets. `drums.kit` in
 `config/amy_config.json` selects one of:
 
-- `tiny` (default): AMY's tiny PCM bank;
-- `gamma9001`: AMY compiled with the Gamma9001 bank;
+- `gamma9001` (default on this branch): AMY's full Gamma9001 bank;
+- `tiny`: AMY's compact PCM bank, retained as a mapping/test option;
 - `general_midi`: AMY's engine-side patch-258 drum-note map.
 
 `general_midi` describes familiar drum-note assignments, but remains AMY audio:
@@ -117,12 +117,17 @@ the kit requires restarting the AMY service/frontend so the stored library is
 rebuilt consistently. The tests prove that all three mappings resolve every
 role without changing any timing.
 
-The published packages intentionally use the compact `tiny` bank. Local use of
-`gamma9001`, and complete coverage of `general_midi` patch 258, require the
-default Gamma-enabled CPython AMY build from the pinned release commit. Build
-that variant without setting `AMY_PCM_BANK`; `prepare_local_amy.sh` deliberately
-sets `AMY_PCM_BANK=tiny` because it prepares the release-compatible default.
-The repeatable native audio checks are:
+The `features/gamma9001` package profile uses the full Gamma bank on Linux,
+Raspberry Pi, macOS, Windows and Android. Every hosted build is pinned to the
+same AMY release; `prepare_local_amy.sh` explicitly sets
+`AMY_PCM_BANK=gamma9001` and verifies that both the PCM registration and linked
+data symbols exist. The current tiny-bank ESP32-P4 firmware is not compatible
+with this profile. The repeatable native audio checks are:
+
+Revision 2 of `amy_config.json` also changes the legacy `drums.sample_map`
+used by MIDI-drum and program preview hits to direct Gamma808 realizations.
+Startup migrates only entries that still equal the former shipped tiny values;
+individual user overrides are preserved.
 
 ```sh
 python tests/drum_kit_audio_smoke.py tiny

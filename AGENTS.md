@@ -55,9 +55,13 @@ LF-framed AMY wire request at a time. Every request still ends in `Z`.
   `socket.AF_UNIX`; Qt local IPC avoids a custom Python Winsock layer.
 - A package launcher may start and supervise both executables. The Qt
   application itself must not import AMY or manage the service lifetime.
-- Windows AMY must use the built-in `pcm_tiny` bank, with the same preset
-  numbering as Linux and ESP32-P4. The Windows CMake target must not define
-  `GAMMA9001` or link the optional Gamma9001 `drums_bin.c` data.
+- On `features/gamma9001`, every locally hosted AMY service must use the full
+  Gamma9001 bank. The Windows CMake target must define `GAMMA9001`, generate
+  and link `drums_bin.c`, and register that data before `amy_start()`.
+- The current ESP32-P4 firmware remains pinned to the preceding tiny-bank AMY
+  release. Do not claim Gamma9001 serial compatibility or send the Gamma
+  preset map to that firmware; it needs a separately designed flash/storage
+  profile before it can join this release variant.
 - Windows CI proves native compilation, offline PCM rendering and the packaged
   Qt/named-pipe/AMY process boundary. It does not prove physical audio, MIDI,
   low latency or absence of drop-outs. State those limitations explicitly.

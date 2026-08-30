@@ -1,14 +1,17 @@
 # Codex Session Handoff
 
-Updated 2026-08-30 after the nested-sequencer drum-fill feature was implemented
-and independently regression-tested. The continuation branch is
-`feature/drum_fills`; original implementation commit
-`32488d37a25af025eb6fd2cdbc1422341466932a` is based on current main
-`f872432` plus the branch's intended preset/licence changes. Physical follow-up
-`de7b4590570e288fb0fda00d5d37c83e8e521631` fixes the cold-start reset race
-and bass-column alignment. The branch is pushed but not yet merged: renewed
-physical UI/audio validation and explicit merge approval remain the release
-boundary.
+Updated 2026-08-31. `feature/drum_fills` was physically approved, committed at
+`57f627ac060bc4cb3d84298ea313211ec1232226`, fast-forwarded to `main` and
+pushed. That five-platform release run exposed that the ESP32 workflow still
+cloned incompatible Shorepine `main`; main commit `770be1b` now pins and
+verifies our preceding AMY release instead. The repair push started a new run,
+which was deliberately not followed live at the user's request.
+
+Active continuation work is on `features/gamma9001`, based on `main`. It uses
+new AMY fork release `releases/amy_omnichord_R20260831T001253` at
+`00157856312de89f6dc293f90efb1889f0ceff23` for all hosted services. That AMY
+release is based directly on the preceding Omnichord release and adds the full
+Gamma build profile plus Android PCM registration.
 
 This file records operational state and completed work from the AMY/Qt UI,
 performance, MIDI-control and native-Windows sessions. It supplements, but does
@@ -28,8 +31,9 @@ all of:
 
 Do not use this handoff as a replacement for those contracts.
 
-At this handoff, local and origin `main` resolve to `f872432`; local and origin
-`feature/drum_fills` contain `32488d37`. The old, heavily-diverged
+At this handoff, local and origin `main` resolve to `770be1b`; local
+`features/gamma9001` contains that main fix plus the Gamma changes described
+below. The old, heavily-diverged
 `origin/codex_info` documentation line remains intentionally unmerged; current
 design contracts plus this automatically read handoff supersede it.
 
@@ -41,12 +45,11 @@ design contracts plus this automatically read handoff supersede it.
 - Do not merge or start a release merely because automated tests pass. Commit,
   push and merge only when the user explicitly asks for those operations.
 - Every push to `main` intentionally starts `.github/workflows/desktop-release.yml`.
-  Follow that run through all six regression jobs, four package validations and
+  Follow that run through all six regression jobs, five package validations and
   release publication. If it fails, diagnose it and repair it on a new fix
   branch; do not make an unreviewed direct-on-main repair.
-- The current `feature/drum_fills` branch is the tested workspace. Preserve it
-  through physical validation; merge it only on explicit user approval, then
-  follow the complete five-platform release to publication.
+- The merged `feature/drum_fills` branch remains historical point-in-time
+  evidence. Continue Gamma work only on `features/gamma9001`.
 
 ## Current architectural state
 
@@ -270,32 +273,29 @@ requirement changes the architectural decision.
 
 ### AMY and drum-bank compatibility
 
-The release workflow pins AMY branch
-`releases/amy_omnichord_R20260830T220021` at
-`32f3a68861a68979ceb715cf32e0322e8614365b`.
+The `features/gamma9001` workflow pins AMY branch
+`releases/amy_omnichord_R20260831T001253` at
+`00157856312de89f6dc293f90efb1889f0ceff23`.
 
-- Linux and macOS install that revision directly with `AMY_PCM_BANK=tiny`;
-  Linux CI rejects Gamma9001 symbols. The old local patch is gone because the
-  release branch owns and tests this integration-only build selector.
-- The Windows build does not go through AMY `setup.py`. Its CMake target
-  compiles `amy.c`/`pcm.c` without defining `GAMMA9001` and does not link the
-  optional generated `drums_bin.c`.
-- At the pinned AMY revision, that selects `pcm_tiny.h` and the tiny version of
-  MIDI drum patch 258 by construction.
-- OMNI rhythm commands use the dedicated timing and kit catalogues under
-  `music/drums`; the shipped configuration selects direct tiny-bank
-  preset/native-note pairs which match Linux, macOS, Windows and ESP32-P4.
-- The optional Gamma9001 mapping resolves kit-patch/note pairs to direct PCM,
-  and the optional General-MIDI mapping uses AMY patch 258. Both require a
-  matching Gamma-enabled local build for complete coverage and are not the
-  published-package default.
-- Defining `GAMMA9001` on Windows would make identical wire requests select
-  different drums and is therefore a compatibility regression.
+- Linux and macOS install that revision with `AMY_PCM_BANK=gamma9001` and CI
+  requires both the registration and linked-data symbols.
+- Windows CMake defines `GAMMA9001`, generates and links `drums_bin.c`, and
+  registers the blob before both normal and self-test `amy_start()` paths.
+- Android performs the same per-ABI generation/link and registers the data
+  before starting AMY/Oboe. This registration was added in the second release
+  commit after a source audit caught that linking alone was insufficient.
+- `config/amy_config.json` revision 2 selects `gamma9001`; migration changes
+  only the former shipped `tiny` default and preserves explicit user choices.
+- The timing and kit catalogues remain separate. The supplied Gamma mapping
+  resolves more than fifty distinct direct PCM preset/note realizations without
+  changing a single authored event tick.
+- ESP32-P4 remains pinned to the preceding tiny-bank release. Its current
+  single-app firmware has no full Gamma blob storage profile, so serial is not
+  claimed compatible with this variant.
 
-The current Windows smoke proves non-silent PCM rendering, but it does not yet
-identify each tiny-bank drum acoustically. If the AMY pin/build inputs change,
-add or run an explicit bank-identity regression rather than relying only on a
-nonzero-sample check.
+Package smoke still proves the service/process boundary and non-silent output;
+`tests/drum_kit_audio_smoke.py gamma9001` is the acoustic bank check for every
+distinct Gamma realization used by the catalogue.
 
 ### Windows build and release status
 
@@ -356,9 +356,10 @@ for official checkout/setup/upload/download actions being forced onto Node 24.
 
 The local AMY fork convention is `/home/jeroen/omnichord/amyfork/amy`.
 `origin/upstream/android-oboe` remains the historical full Android reference.
-The active LB dependency is now the cumulative release branch
-`releases/amy_omnichord_R20260830T220021`, pinned at
-`32f3a68861a68979ceb715cf32e0322e8614365b`. It combines the proven separate
+The Gamma LB dependency is the cumulative release branch
+`releases/amy_omnichord_R20260831T001253`, pinned at
+`00157856312de89f6dc293f90efb1889f0ceff23`. It builds on the preceding release
+and combines the proven separate
 Android `:amy`/Oboe and desktop wire-service boundaries with the generic nested
 sequencer. Nested-pattern authoring uses `zQE`, keeping every new wire
 operation under the existing `zQ` extended-control family. The abandoned
@@ -366,12 +367,14 @@ bus-mixer experiment is absent.
 
 ## Verification already completed
 
-- After migrating nested-pattern authoring from the temporary top-level `J`
-  command to `zQE`, the complete 2026-08-30 local matrix passes all 192 tests:
-  143 unit, 15 frontend, 14 serial/program, 14 preset, 3 native-control and 3
-  native-rhythm tests. This includes the complete 54-rhythm/270-fill catalogue,
+- On `features/gamma9001`, the complete 2026-08-31 local matrix passes all 197
+  tests: 147 unit, 15 frontend, 15 serial/program, 14 preset, 3 native-control
+  and 3 native-rhythm tests. This includes the complete 54-rhythm/270-fill catalogue,
   exhaustive fill combinations, chord-arpeggio tag expansion, bass-riff
   validation, the 36-chord LDR audit and package contracts.
+- The Gamma audio smoke renders all 62 distinct direct PCM realizations used by
+  the supplied catalogue and rejects silence. `prepare_local_amy.sh` also
+  rebuilt the exact pinned AMY commit and verified both Gamma symbols.
 - A dedicated cold-start native test proves the visible percussion level
   renders non-silent within one second after Start. The host observes AMY's
   reset block boundary before creating tick-zero instances, preventing the
@@ -416,18 +419,15 @@ exercises the full gated five-platform release.
 
 ## Remaining work / safe next steps
 
-1. Physically validate `feature/drum_fills`: launch the Qt frontend, verify the
-   five activity buttons, independent F1..F5 toggles, density labels, tiny-kit
-   audio, fill rotation/continuation and live rhythm/preset continuity. After
-   explicit approval, merge to `main` and follow the complete five-platform
-   release. Do not offer AMY upstream until that release gate passes.
+1. Finish and physically validate `features/gamma9001`: representative Gamma
+   kit families, fills, activity levels and live rhythm/preset continuity.
 2. Physically test the released Windows zip on a recent Windows 10/11 x64 host:
    UI, native audio, shutdown and representative heavy patches/rhythms.
 3. Implement a native Windows MIDI input adapter behind the existing MIDI
    callback boundary, without changing CC-learning/application semantics.
 4. Measure and tune a WASAPI-first realtime audio profile on physical hardware.
-5. Add an explicit Windows tiny-bank identity regression if AMY build inputs or
-   the pinned revision change; the current smoke checks non-silence only.
+5. Keep the Gamma symbol, generator/registration and catalogue audio-smoke
+   checks together whenever AMY build inputs change.
 6. Keep kit/timing policy in LB and generic nested-sequencer behavior in AMY;
    do not restore the abandoned bus-mixer experiment.
 

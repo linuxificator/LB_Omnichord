@@ -131,7 +131,7 @@ Every curated OMNI instrument must be rendered at low, middle and high notes
 using its catalogue defaults and production wire commands. Captures must record
 RMS, peak, crest factor and clipping per register. Corrections belong in the
 catalogue or the narrow `patch_compatibility` table and must remain compatible
-with the ESP32-P4 tiny-bank AMY build. A control must not be used as a level
+with the pinned Omnichord AMY release. A control must not be used as a level
 correction when a broken filter/envelope range is the actual cause.
 
 The host-native reference sweep completed on 2026-08-25: 124 WAV files, each

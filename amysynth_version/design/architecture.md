@@ -71,19 +71,20 @@ Supported transports:
 
 The same user action must result in the same AMY wire command stream regardless of transport.
 
-That guarantee also requires identical built-in PCM preset numbering. Local
-Linux AMY is built with `AMY_PCM_BANK=tiny`, matching ESP32-P4. Gamma9001 uses a
-different meaning for PCM presets 0–18 and must not be selected for this
-application unless the wire-level sample map changes for every target.
+That guarantee also requires identical built-in PCM preset numbering. The
+`features/gamma9001` variant therefore builds every locally hosted AMY service
+from one immutable fork release with the Gamma9001 profile. Linux and macOS
+set `AMY_PCM_BANK=gamma9001`; Windows and Android generate, link and register
+the same PCM blob. The rhythm engine then resolves the supplied catalogue to
+direct Gamma preset/native-note pairs on all four transports.
 
-The native Windows CMake build reaches the same result through AMY's C
-preprocessor contract rather than its Python `setup.py` option. It deliberately
-does not define `GAMMA9001` and does not link the optional generated
-`drums_bin.c`; at the pinned AMY revision, `amy.c` therefore includes
-`pcm_tiny.h`, and patch 258 also selects its `pcm_tiny` mapping. The OMNI rhythm
-engine sends the direct tiny-bank preset/native-note pairs from
-`config/amy_config.json`, so enabling Gamma9001 on only one platform would be a
-wire-level compatibility bug, not merely a packaging choice.
+The current ESP32-P4 target is a deliberate exception, not a silently degraded
+sixth package: its firmware remains on the preceding tiny-bank release and its
+single-app flash layout has no Gamma blob storage design. Consequently this
+Gamma configuration is not compatible with the UART target. Presets 256–391
+would otherwise resolve as unavailable or fall back incorrectly. A future P4
+Gamma profile must add explicit flash/storage and PCM registration before
+serial transport can be enabled for this variant.
 
 ## Audio ownership
 

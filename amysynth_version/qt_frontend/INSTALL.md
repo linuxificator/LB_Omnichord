@@ -11,8 +11,10 @@ Omnichord:
    communicate through a private Windows named pipe.
 
 The Raspberry Pi/UART path has been exercised on the project hardware. The
-Linux two-process socket path has also been exercised with working audio,
-multibus routing and the ESP32-compatible tiny drum bank. The published x86_64
+Linux two-process socket path has also been exercised with working audio and
+multibus routing. This branch changes the hosted-service release profile to the
+full Gamma9001 drum bank; its package candidates must pass the same tests
+before publication. The published x86_64
 AppImage was downloaded from GitHub Releases and physically validated with
 working UI and audio on Linux on 2026-08-24. Release `R20260824T212125` also
 passed native packaged-runtime validation for Linux x64, Linux aarch64 and
@@ -144,24 +146,29 @@ Start both processes with:
 ./run_local.sh --windowed
 ```
 
-Install the pinned nested-sequencer/tiny-bank AMY release into the environment
+Install the pinned nested-sequencer/Gamma9001 AMY release into the environment
 used by the service. The Qt process remains independent of AMY.
 `OMNICHORD_VENV` can override the launcher's
 default `../omnichord-env`; `OMNICHORD_AMY_SOCKET` can override
 `~/.omnichord/amy.sock`; and `OMNICHORD_AMY_ROOT` can override the expected AMY
 checkout at `../amyfork/amy`.
 
-The ESP32-P4 drum mapping uses AMY's tiny PCM bank. Prepare the local AMY fork
-with the same bank before first use (and after rebuilding AMY):
+Prepare the local AMY fork with the Gamma9001 bank before first use (and after
+rebuilding AMY):
 
 ```bash
 ./prepare_local_amy.sh
 ```
 
-This invokes the fork's `AMY_PCM_BANK=tiny` build option and verifies that the
-installed extension does not contain Gamma9001 symbols. Without this explicit
-choice, Linux presets 0–18 refer to a different TR-808 table and the same wire
-commands produce congas/tones in place of hats and snares.
+This invokes the fork's `AMY_PCM_BANK=gamma9001` build option and verifies both
+the PCM registration and linked-data symbols. The application resolves the
+supplied dataset to presets 0–18 and 256–391, so a tiny-bank service is not a
+compatible substitute.
+
+The current ESP32-P4 firmware remains pinned to the preceding tiny-bank AMY
+release and cannot run this Gamma configuration over UART. It needs a future
+flash/storage profile for the full PCM blob; use a hosted socket, named-pipe or
+Android service with this branch.
 
 ## Linux
 
@@ -184,8 +191,8 @@ python3 -m venv .venv
 
 Place the project AMY fork at `../amyfork/amy` relative to the LB_Omnichord
 repository, or set `OMNICHORD_AMY_ROOT`. Then run
-`./prepare_local_amy.sh`; a generic upstream/Gamma9001 build is not compatible
-with the shipped drum mapping.
+`./prepare_local_amy.sh`; it installs and verifies the exact Gamma-enabled fork
+release required by the shipped drum mapping.
 
 Run the frontend:
 
@@ -215,8 +222,8 @@ python3 -m venv .venv
 ```
 
 Use the same project AMY fork and `prepare_local_amy.sh` process described for
-Linux. The fork must support the bus count and `AMY_PCM_BANK=tiny`; installing a
-generic Gamma9001 build changes the drum preset meanings.
+Linux. The fork must be the exact pinned release and support the bus count,
+nested sequencer and `AMY_PCM_BANK=gamma9001` profile.
 
 Then run:
 
@@ -270,10 +277,10 @@ The supervisor gives each run a unique private pipe name. Qt connects with
 `CreateNamedPipeA` and rejects remote clients. No TCP port is opened and AMY is
 not linked into the frontend.
 
-The Windows service is built with AMY's built-in tiny PCM bank, matching Linux,
-macOS and ESP32-P4 drum preset numbering. Do not substitute a Gamma9001 AMY
-build: presets 0–18 then name different samples and the rhythm section changes
-sound for the same commands.
+The Windows service is built with the full Gamma9001 PCM bank. CMake generates
+and links the same PCM blob as the other hosted targets and the service
+registers it before calling `amy_start()`. Do not substitute a tiny-bank AMY:
+the dataset deliberately addresses Gamma presets 0–18 and 256–391.
 
 The package is currently experimental. GitHub's Windows Server 2025 job proves
 native compilation, offline non-silent PCM rendering, frozen QML/assets,
@@ -296,8 +303,8 @@ $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 ```
 
 The zip and checksum are written below `dist`. The release workflow pins both
-AMY fork branch `releases/amy_omnichord_R20260830T220021` and commit
-`32f3a68861a68979ceb715cf32e0322e8614365b`; local release candidates must use
+AMY fork branch `releases/amy_omnichord_R20260831T001253` and commit
+`00157856312de89f6dc293f90efb1889f0ceff23`; local release candidates must use
 that exact commit unless the shared release contract and its compatibility
 tests are deliberately updated together.
 

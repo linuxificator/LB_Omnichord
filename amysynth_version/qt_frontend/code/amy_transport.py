@@ -97,22 +97,22 @@ DEFAULT_CONFIG: dict[str, Any] = {'serial': {'port': '/dev/serial0', 'baud': 100
  'voices': {'drums': 4, 'bass': 1, 'strum': 2, 'manual_chord': 7, 'rhythm_chord': 7},
  'default_synths': {'chord': 'juno_004', 'strum': 'juno_028', 'bass': 'dx7_143'},
  'buses': {'main': 0, 'percussion': 1},
- 'drums': {'kit': 'tiny',
+ 'drums': {'kit': 'gamma9001',
            'velocity_gain': 5.0,
-           'sample_map': {'bd_haus': {'preset': 1, 'note': 39},
-                          'drum_bass_hard': {'preset': 1, 'note': 39},
-                          'drum_bass_soft': {'preset': 1, 'note': 39},
-                          'drum_snare_hard': {'preset': 2, 'note': 45},
-                          'drum_snare_soft': {'preset': 5, 'note': 41},
-                          'drum_cymbal_closed': {'preset': 6, 'note': 53},
-                          'drum_cymbal_pedal': {'preset': 7, 'note': 61},
-                          'drum_cymbal_open': {'preset': 7, 'note': 56},
-                          'drum_tom_hi_soft': {'preset': 8, 'note': 73},
-                          'drum_tom_mid_soft': {'preset': 8, 'note': 63},
-                          'drum_tom_lo_soft': {'preset': 8, 'note': 61},
-                          'elec_tick': {'preset': 4, 'note': 51},
-                          'perc_bell': {'preset': 10, 'note': 69},
-                          'perc_snap': {'preset': 9, 'note': 94}}},
+           'sample_map': {'bd_haus': {'preset': 0, 'note': 60},
+                          'drum_bass_hard': {'preset': 2, 'note': 60},
+                          'drum_bass_soft': {'preset': 0, 'note': 60},
+                          'drum_snare_hard': {'preset': 12, 'note': 45},
+                          'drum_snare_soft': {'preset': 14, 'note': 41},
+                          'drum_cymbal_closed': {'preset': 9, 'note': 60},
+                          'drum_cymbal_pedal': {'preset': 9, 'note': 57},
+                          'drum_cymbal_open': {'preset': 10, 'note': 60},
+                          'drum_tom_hi_soft': {'preset': 17, 'note': 70},
+                          'drum_tom_mid_soft': {'preset': 17, 'note': 67},
+                          'drum_tom_lo_soft': {'preset': 16, 'note': 61},
+                          'elec_tick': {'preset': 15, 'note': 90},
+                          'perc_bell': {'preset': 18, 'note': 66},
+                          'perc_snap': {'preset': 3, 'note': 60}}},
  'rhythm': {'chord_gate_beats': 0.72,
             'bass_gate_beats': 0.3,
             'max_rhythm_chord_notes': 4,
@@ -834,7 +834,7 @@ class AmySerialClient:
             Path(__file__).resolve().parent.parent / "music" / "drums"
         )
         self.drum_kit = str(
-            config.get("drums", {}).get("kit", "tiny")
+            config.get("drums", {}).get("kit", "gamma9001")
         )
         if self.drum_kit not in self.drum_catalog.kits:
             raise ValueError(

@@ -140,11 +140,12 @@ class StaticContractTests(unittest.TestCase):
     def test_local_launcher_validates_but_never_builds_amy(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
         self.assertIn("import c_amy", launcher)
-        self.assertIn("gamma9001|amy_set_gamma", launcher)
+        self.assertIn("amy_set_gamma9001_pcm", launcher)
+        self.assertIn("gamma9001_pcm_data", launcher)
         self.assertNotIn('"$frontend_dir/prepare_local_amy.sh"', launcher)
         self.assertNotIn("pip install", launcher)
         self.assertLess(
-            launcher.index("gamma9001|amy_set_gamma"),
+            launcher.index("amy_set_gamma9001_pcm"),
             launcher.index("code/local_amy_service.py"),
         )
 

@@ -15,8 +15,8 @@ class PackagingContracts(unittest.TestCase):
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml",
             REPOSITORY / ".github" / "workflows" / "amy-regression.yml",
         ]
-        release_branch = "releases/amy_omnichord_R20260830T220021"
-        release_commit = "32f3a68861a68979ceb715cf32e0322e8614365b"
+        release_branch = "releases/amy_omnichord_R20260831T001253"
+        release_commit = "00157856312de89f6dc293f90efb1889f0ceff23"
 
         for workflow_path in workflows:
             workflow = workflow_path.read_text(encoding="utf-8")
@@ -36,7 +36,15 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("## Build provenance", release)
         self.assertIn("\\`$AMY_RELEASE_BRANCH\\`", release)
         self.assertIn("\\`$AMY_COMMIT\\`", release)
-        self.assertIn("AMY_PCM_BANK=tiny", release)
+        self.assertIn("AMY_PCM_BANK=gamma9001", release)
+        self.assertGreaterEqual(
+            release.count("amy_set_gamma9001_pcm"),
+            2,
+        )
+        self.assertGreaterEqual(
+            release.count("gamma9001_pcm_data"),
+            2,
+        )
         self.assertNotIn("amy-tiny-bank.patch", release)
         self.assertFalse(
             (FRONTEND / "packaging" / "amy-tiny-bank.patch").exists()
@@ -45,9 +53,14 @@ class PackagingContracts(unittest.TestCase):
         contract = (FRONTEND / "packaging" / "AMY_RELEASE.md").read_text(
             encoding="utf-8"
         )
+        local_prepare = (FRONTEND / "prepare_local_amy.sh").read_text(
+            encoding="utf-8"
+        )
         self.assertIn(release_branch, contract)
         self.assertIn(release_commit, contract)
         self.assertIn("every supported platform succeeds", contract)
+        self.assertIn(release_branch, local_prepare)
+        self.assertIn(release_commit, local_prepare)
 
     def test_platform_logic_is_limited_to_one_startup_preamble(self) -> None:
         core = (FRONTEND / "code" / "app_core.py").read_text(
@@ -195,6 +208,9 @@ class PackagingContracts(unittest.TestCase):
         service = (
             FRONTEND / "packaging" / "windows" / "amy_service.c"
         ).read_text(encoding="utf-8")
+        cmake = (
+            FRONTEND / "packaging" / "windows" / "CMakeLists.txt"
+        ).read_text(encoding="utf-8")
         self.assertIn("windows-native:", workflow)
         self.assertIn("windows-native,", workflow)
         self.assertIn("amy_service.exe", build)
@@ -247,6 +263,10 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("AMY named-pipe connect failed:", service)
         self.assertIn("AMY named-pipe read failed:", service)
         self.assertIn("AMY service smoke passed:", service)
+        self.assertIn("GAMMA9001=1", cmake)
+        self.assertIn("gamma9001-blob-c", cmake)
+        self.assertIn("${GAMMA9001_PCM_C}", cmake)
+        self.assertIn("amy_set_gamma9001_pcm(gamma9001_pcm_data)", service)
         self.assertIn("runs-on: windows-2025", workflow)
         self.assertIn(
             '& "$root\\LB_Omnichord.cmd" -Windowed -SmokeTest',

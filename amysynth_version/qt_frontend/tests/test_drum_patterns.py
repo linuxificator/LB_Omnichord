@@ -23,6 +23,7 @@ from drum_patterns import (  # noqa: E402
     KIT_FAMILIES,
     load_drum_pattern_catalog,
 )
+from drum_gamma9001 import GAMMA9001_DIRECT_PCM  # noqa: E402
 
 
 class _WriterProbe:
@@ -65,6 +66,8 @@ class DrumPatternTests(unittest.TestCase):
         return client
 
     def test_catalogue_has_complete_validated_coverage(self) -> None:
+        self.assertEqual(self.config["config_revision"], 2)
+        self.assertEqual(self.config["drums"]["kit"], "gamma9001")
         self.assertEqual(len(self.catalog.rhythms), 54)
         fills = [
             fill
@@ -176,6 +179,31 @@ class DrumPatternTests(unittest.TestCase):
                     self.assertIsNotNone(sound.preset)
                     resolved.add((int(sound.preset), sound.note))
         self.assertGreater(len(resolved), 50)
+
+    def test_legacy_preview_map_uses_dataset_gamma808_realizations(self) -> None:
+        gm_notes = {
+            "bd_haus": 35,
+            "drum_bass_hard": 36,
+            "drum_bass_soft": 35,
+            "drum_snare_hard": 38,
+            "drum_snare_soft": 40,
+            "drum_cymbal_closed": 42,
+            "drum_cymbal_pedal": 44,
+            "drum_cymbal_open": 46,
+            "drum_tom_hi_soft": 50,
+            "drum_tom_mid_soft": 48,
+            "drum_tom_lo_soft": 45,
+            "elec_tick": 37,
+            "perc_bell": 51,
+            "perc_snap": 39,
+        }
+        sample_map = self.config["drums"]["sample_map"]
+        for sample_name, gm_note in gm_notes.items():
+            hit = sample_map[sample_name]
+            self.assertEqual(
+                (hit["preset"], hit["note"]),
+                GAMMA9001_DIRECT_PCM[(384, gm_note)],
+            )
 
     def test_kit_hit_wire_uses_pcm_presets_or_engine_gm_patch_notes(self) -> None:
         client = self.client()

@@ -19,7 +19,9 @@ The documents define:
 Core rules:
 
 - The Qt application produces AMY wire commands only.
-- AMY transport may be local development or ESP32-P4 serial without changing behavior.
+- AMY transport changes no musical behavior only when the target has the same
+  PCM profile. The `features/gamma9001` hosted services share the full Gamma
+  bank; the current tiny-bank ESP32-P4 firmware is not compatible with it.
 - OMNI and MIDI remain separate subsystems.
 - Shared state is explicit; tuning is shared only when coupling is enabled.
 - `rhythm_bahavior.md` is the authoritative rhythm transport/tempo contract.

@@ -92,7 +92,7 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 - one matching `.sha256` file for each package
 
 The AppImages bundle PySide6, the frontend assets and the pinned AMY release
-built with the ESP32-compatible tiny PCM bank. The executable starts AMY
+built with the full Gamma9001 PCM bank. The executable starts AMY
 as a separate child process. Unix IPC selects the best endpoint capability:
 packet-preserving `SOCK_SEQPACKET` where accepted, otherwise newline-framed
 `SOCK_STREAM`. The runtime has no OS-name branch for this choice. Packaging
@@ -102,9 +102,10 @@ one process.
 The Windows zip also preserves two processes: frozen `LB_Omnichord.exe`
 connects through `QLocalSocket` to a private named pipe owned by native
 `amy_service.exe`. The package launcher supplies a unique pipe name and owns
-process cleanup. Windows CMake builds pinned AMY without `GAMMA9001` or the
-optional `drums_bin.c`, so it selects the same built-in tiny PCM preset map as
-Linux, macOS and ESP32-P4.
+process cleanup. Windows CMake defines `GAMMA9001`, generates and links
+`drums_bin.c`, and registers the data before AMY starts, so it selects the same
+full preset map as Linux, macOS and Android. The existing tiny-bank ESP32-P4
+firmware is explicitly outside this Gamma release variant.
 
 The Android APK likewise preserves two processes. The PySide6 activity is a
 wire-only client, while an unexported AAR provider starts AMY/Oboe in `:amy`.
