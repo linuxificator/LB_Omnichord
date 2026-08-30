@@ -135,10 +135,9 @@ def patch_buildozer_spec(
         "android.allow_backup": "False",
         "android.manifest.orientation": "landscape",
         "android.add_aars": str(aar.resolve()),
+        "android.add_gradle_repositories": "flatDir { dirs 'libs' }",
         "android.gradle_dependencies": "com.google.oboe:oboe:1.10.0",
-        "android.add_packaging_options": (
-            '"pickFirst \'lib/**/libc++_shared.so\'"'
-        ),
+        "android.add_packaging_options": "pickFirst 'lib/**/libc++_shared.so'",
         "android.debug_artifact": "apk",
         "android.release_artifact": "apk",
         "p4a.commit": P4A_COMMIT,

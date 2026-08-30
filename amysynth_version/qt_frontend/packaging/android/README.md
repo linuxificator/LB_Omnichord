@@ -42,6 +42,8 @@ tools. Kivy is not an application dependency and is not included in the APK.
 The build exposes the installed modern Android command-line tool through the
 legacy SDK-manager path expected by Buildozer 1.5; it never executes an old
 `tools/bin/sdkmanager` from the host image.
+The generated Gradle repository explicitly includes python-for-Android's local
+`libs` directory so the verified AMY AAR passed with `--add-aar` is resolvable.
 
 `build_android.py` stages only the frontend Python modules and runtime assets,
 lets Qt's supported Android deploy tool generate its recipes/JAR list, then

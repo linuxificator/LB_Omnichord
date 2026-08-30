@@ -65,7 +65,14 @@ class AndroidPackagingTests(unittest.TestCase):
             self.assertEqual(app["p4a.commit"], P4A_COMMIT)
             self.assertIn("pyserial", app["requirements"])
             self.assertEqual(app["android.add_aars"], str(aar.resolve()))
+            self.assertEqual(
+                app["android.add_gradle_repositories"], "flatDir { dirs 'libs' }"
+            )
             self.assertIn("com.google.oboe:oboe:1.10.0", app["android.gradle_dependencies"])
+            self.assertEqual(
+                app["android.add_packaging_options"],
+                "pickFirst 'lib/**/libc++_shared.so'",
+            )
             self.assertIn("json", app["source.include_exts"])
 
     def test_buildozer_sdk_compat_uses_modern_sdkmanager(self) -> None:
