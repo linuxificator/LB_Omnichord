@@ -14,6 +14,7 @@ from build_android import (  # noqa: E402
     APP_ID,
     P4A_COMMIT,
     PYSIDE_VERSION,
+    create_buildozer_sdk_compat,
     patch_buildozer_spec,
     release_values,
 )
@@ -47,6 +48,7 @@ class AndroidPackagingTests(unittest.TestCase):
                 aar=aar,
                 architecture="aarch64",
                 stamp="R20260830123456",
+                sdk_path=root / "sdk-compat",
             )
 
             parser = configparser.ConfigParser(interpolation=None)
@@ -57,11 +59,35 @@ class AndroidPackagingTests(unittest.TestCase):
             )
             self.assertEqual(app["android.archs"], "arm64-v8a")
             self.assertEqual(app["android.ndk"], "27c")
+            self.assertEqual(
+                app["android.sdk_path"], str((root / "sdk-compat").resolve())
+            )
             self.assertEqual(app["p4a.commit"], P4A_COMMIT)
             self.assertIn("pyserial", app["requirements"])
             self.assertEqual(app["android.add_aars"], str(aar.resolve()))
             self.assertIn("com.google.oboe:oboe:1.10.0", app["android.gradle_dependencies"])
             self.assertIn("json", app["source.include_exts"])
+
+    def test_buildozer_sdk_compat_uses_modern_sdkmanager(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sdk = root / "sdk"
+            modern = sdk / "cmdline-tools" / "16.0" / "bin" / "sdkmanager"
+            stale = sdk / "tools" / "bin" / "sdkmanager"
+            modern.parent.mkdir(parents=True)
+            stale.parent.mkdir(parents=True)
+            modern.touch()
+            stale.touch()
+            (sdk / "platform-tools").mkdir()
+
+            compat = create_buildozer_sdk_compat(sdk, root / "compat")
+
+            resolved_manager = (compat / "tools" / "bin" / "sdkmanager").resolve()
+            self.assertEqual(resolved_manager, modern)
+            self.assertEqual(
+                (compat / "platform-tools").resolve(), sdk / "platform-tools"
+            )
+            self.assertNotEqual(resolved_manager, stale)
 
     def test_documented_toolchain_is_pinned(self) -> None:
         readme = (

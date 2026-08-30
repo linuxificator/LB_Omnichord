@@ -54,6 +54,39 @@ def stage_frontend(frontend: Path, staging: Path) -> None:
         shutil.copytree(frontend / name, staging / name)
 
 
+def create_buildozer_sdk_compat(sdk: Path, destination: Path) -> Path:
+    """Expose the modern SDK manager at Buildozer 1.5's legacy path."""
+    sdk = sdk.resolve()
+    command_line_tools = sdk / "cmdline-tools"
+    candidates = [command_line_tools / "latest" / "bin" / "sdkmanager"]
+    versioned = sorted(
+        command_line_tools.glob("*/bin/sdkmanager"),
+        key=lambda path: tuple(
+            int(component)
+            for component in re.findall(r"\d+", path.parent.parent.name)
+        ),
+        reverse=True,
+    )
+    candidates.extend(versioned)
+    sdkmanager = next((path for path in candidates if path.is_file()), None)
+    if sdkmanager is None:
+        raise FileNotFoundError(
+            f"modern sdkmanager not found below {command_line_tools}"
+        )
+    if destination.exists():
+        raise FileExistsError(destination)
+
+    destination.mkdir(parents=True)
+    for source in sdk.iterdir():
+        if source.name == "tools":
+            continue
+        (destination / source.name).symlink_to(source.resolve())
+    legacy_bin = destination / "tools" / "bin"
+    legacy_bin.mkdir(parents=True)
+    (legacy_bin / "sdkmanager").symlink_to(sdkmanager.resolve())
+    return destination.resolve()
+
+
 def release_values(stamp: str) -> tuple[str, str]:
     match = re.fullmatch(r"R(\d{8})(\d{6})", stamp)
     if match is None:
@@ -70,6 +103,7 @@ def patch_buildozer_spec(
     aar: Path,
     architecture: str,
     stamp: str,
+    sdk_path: Path,
 ) -> None:
     android_arch, _ = ARCHITECTURES[architecture]
     version, numeric_version = release_values(stamp)
@@ -95,6 +129,7 @@ def patch_buildozer_spec(
         "android.api": "36",
         "android.minapi": "26",
         "android.ndk": "27c",
+        "android.sdk_path": str(sdk_path.resolve()),
         "android.archs": android_arch,
         "android.numeric_version": numeric_version,
         "android.allow_backup": "False",
@@ -189,6 +224,10 @@ def build(args: argparse.Namespace) -> Path:
         ],
         cwd=staging,
     )
+    sdk_compat = create_buildozer_sdk_compat(
+        args.sdk,
+        staging / "deployment" / "android-sdk-compat",
+    )
     spec = staging / "buildozer.spec"
     if not spec.is_file():
         raise FileNotFoundError("pyside6-android-deploy did not create buildozer.spec")
@@ -197,6 +236,7 @@ def build(args: argparse.Namespace) -> Path:
         aar=aar,
         architecture=args.arch,
         stamp=args.release_stamp,
+        sdk_path=sdk_compat,
     )
     run([sys.executable, "-m", "buildozer", "android", args.mode], cwd=staging)
 

@@ -37,6 +37,12 @@ pipe contract.
 - Oboe 1.10.0
 - the exact AMY fork commit recorded in `.github/workflows/desktop-release.yml`
 
+Qt's deployment command uses Buildozer/python-for-android as host-side package
+tools. Kivy is not an application dependency and is not included in the APK.
+The build exposes the installed modern Android command-line tool through the
+legacy SDK-manager path expected by Buildozer 1.5; it never executes an old
+`tools/bin/sdkmanager` from the host image.
+
 `build_android.py` stages only the frontend Python modules and runtime assets,
 lets Qt's supported Android deploy tool generate its recipes/JAR list, then
 adds the AMY AAR and its Oboe dependency to the generated Gradle package. The
