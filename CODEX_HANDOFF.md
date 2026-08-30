@@ -362,11 +362,15 @@ sequencer. The abandoned bus-mixer experiment is absent.
 
 ## Verification already completed
 
-- The complete 2026-08-30 local matrix now passes 190 individual tests: 142
-  unit, 15 frontend, 14 serial/program, 14 preset, 3 native-control and 2
+- The complete 2026-08-30 local matrix now passes 192 individual tests: 143
+  unit, 15 frontend, 14 serial/program, 14 preset, 3 native-control and 3
   native-rhythm tests. This includes the complete 54-rhythm/270-fill catalogue,
   exhaustive fill combinations, chord-arpeggio tag expansion, bass-riff
   validation, the 36-chord LDR audit and package contracts.
+- A dedicated cold-start native test proves the visible percussion level
+  renders non-silent within one second after Start. The host observes AMY's
+  reset block boundary before creating tick-zero instances, preventing the
+  reset from erasing freshly ingested `zQT` triggers.
 - Native audio smoke renders every used drum realization non-silent: 13 tiny,
   62 Gamma9001 and 24 General-MIDI sounds. AMY itself passes C tests and all
   134 Python regressions at the release threshold.

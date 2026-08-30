@@ -31,6 +31,34 @@ def wire_float(value: float) -> str:
 
 
 class NativeRhythmTests(unittest.TestCase):
+    def test_cold_start_activates_visible_percussion_level_immediately(self) -> None:
+        with HeadlessApp(native_amy=True) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            self.assertEqual(int(app.query("rhythmBusyness")), 1)
+
+            start = app.bridge.count()
+            app.bridge.reset_audio_peak()
+            app.action("toggleRhythm")
+            app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline and app.bridge.audio_peak() == 0:
+                time.sleep(0.01)
+
+            lines = app.bridge.lines_since(start)
+            triggers = [line for line in lines if line.startswith("zQT")]
+            self.assertTrue(triggers, "cold Start authored no drum loop trigger")
+            self.assertTrue(
+                all(line.split(",")[2] == "0" for line in triggers),
+                "cold Start delayed the visible percussion level by a bar",
+            )
+            self.assertGreater(
+                app.bridge.audio_peak(),
+                0,
+                "visible percussion level produced no audio within one second",
+            )
+
     def test_preset7_start_keeps_native_manual_and_rhythm_filter_state_equal(self) -> None:
         chorus_index = synth_index("Chorus Vibes")
         cutoff = control_default(chorus_index, "filter_hz")

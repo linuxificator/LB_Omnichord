@@ -671,6 +671,15 @@ that prevented hanging but audibly shortened the accompaniment gate.
   instrument changes, so those expected unmatched-off diagnostics cannot flood
   stderr while lifecycle warnings on synths 0–3 remain visible.
 
+**RHYTHM-12 — cold Start plays the visible percussion level immediately**
+
+- With a fresh application and rhythm stopped, press Start without touching a
+  percussion activity button first.
+- The backend sends the reset, waits until it has crossed an AMY audio-block
+  boundary, creates the visible level's loop at tick zero and starts transport.
+- The native regression requires non-silent rendered drum audio within one
+  second. A one-bar delay or a required activity reselection is a failure.
+
 ### TUNING — all note-producing paths follow the selected tuning
 
 **TUNING-01 — live EQ/HARM/JV changes propagate everywhere**
@@ -710,6 +719,13 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 - Curated names must not acquire redundant `PATCH` suffixes or unwanted generic engine prefixes in the visible label.
 
 **Failure history:** labels previously appeared with unwanted Juno/DX7 prefixes and later a `PATCH` suffix.
+
+**UI-04 — bass function slider aligns with bass activity**
+
+- The `bass voicing` / `riff selector` slider and the five bass-activity
+  buttons use the same horizontal column origin and width.
+- The layout contract references the shared `bassColumnX`; it may not reuse
+  the obsolete four-button activity width.
 
 ## Proof produced by CI
 

@@ -90,6 +90,7 @@ class SerialAmyBridge:
         self._closed = False
         self._thread: threading.Thread | None = None
         self._amy_lock = threading.Lock()
+        self._native_peak = 0
         self._native_log_path = artifact_dir / "native_amy_state.log"
         self._serial_log_path = artifact_dir / "serial_rx.log"
 
@@ -194,7 +195,24 @@ class SerialAmyBridge:
             return
         assert self.c_amy is not None
         with self._amy_lock:
-            self.c_amy.render_to_list()
+            block = self.c_amy.render_to_list()
+            if block:
+                self._native_peak = max(
+                    self._native_peak,
+                    max(abs(int(sample)) for sample in block),
+                )
+
+    def reset_audio_peak(self) -> None:
+        if not self.native_amy:
+            raise RuntimeError("native AMY is not enabled")
+        with self._amy_lock:
+            self._native_peak = 0
+
+    def audio_peak(self) -> int:
+        if not self.native_amy:
+            raise RuntimeError("native AMY is not enabled")
+        with self._amy_lock:
+            return int(self._native_peak)
 
     def _run(self) -> None:
         next_render = time.monotonic()

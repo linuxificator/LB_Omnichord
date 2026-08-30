@@ -561,6 +561,11 @@ must remain effective through subsequent live rhythm-type changes.
 ### RHYTHM-015 — starting uses current visible configuration
 
 Starting rhythm playback must use the currently selected rhythm and current displayed tempo without first reloading preset defaults.
+The already-visible percussion activity is part of that configuration: its
+first tick must become audible immediately after Start, without reselecting an
+activity button and without an artificial one-bar wait. Because AMY applies a
+sequencer reset at an audio-block boundary, wrapper transports must not submit
+new nested instances until that reset has crossed the boundary.
 
 ### RHYTHM-016 — manual chord takeover preserves the sequenced gate
 

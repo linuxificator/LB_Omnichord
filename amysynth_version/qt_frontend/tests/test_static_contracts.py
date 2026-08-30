@@ -438,6 +438,8 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn(".setBassRiffSelector(value)", qml)
         self.assertIn("controlsArea.expandedActivityWidth", qml)
         self.assertIn("5 * activityButtonWidth", qml)
+        self.assertIn("2 * bassActivityWidth + 2 * activityGap", qml)
+        self.assertEqual(qml.count("x: controlsArea.bassColumnX"), 2)
 
         chord = (
             ROOT / "gui" / "ChordActivitySelector.qml"

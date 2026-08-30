@@ -1931,7 +1931,11 @@ class AmySerialClient:
             (rhythm.period_ticks // rhythm.period_bars) // 2,
         )
 
-    def _drum_activity_commands(self) -> list[str]:
+    def _drum_activity_commands(
+        self,
+        *,
+        quantize_live: bool | None = None,
+    ) -> list[str]:
         config = self.rhythm_config
         if not isinstance(config, dict):
             return []
@@ -1945,7 +1949,12 @@ class AmySerialClient:
             by_role.setdefault(event.role, []).append(event)
 
         length = rhythm.period_ticks // 2
-        quantum = self._drum_quantum() if self.rhythm_running else 0
+        use_live_quantization = (
+            self.rhythm_running
+            if quantize_live is None
+            else bool(quantize_live)
+        )
+        quantum = self._drum_quantum() if use_live_quantization else 0
         commands: list[str] = []
         for role_index, role in enumerate(self._drum_roles):
             pattern = DRUM_BASE_PATTERN_START + role_index
@@ -2000,7 +2009,11 @@ class AmySerialClient:
             position = (position + 1) % len(order)
         return occurrences
 
-    def _fill_schedule_commands(self) -> list[str]:
+    def _fill_schedule_commands(
+        self,
+        *,
+        quantize_live: bool | None = None,
+    ) -> list[str]:
         config = self.rhythm_config
         if not isinstance(config, dict):
             return []
@@ -2027,7 +2040,12 @@ class AmySerialClient:
                 f"drum range has {lane.count}"
             )
         lane.high_water = max(lane.high_water, len(occurrences))
-        quantum = bar_ticks if self.rhythm_running else 0
+        use_live_quantization = (
+            self.rhythm_running
+            if quantize_live is None
+            else bool(quantize_live)
+        )
+        quantum = bar_ticks if use_live_quantization else 0
         commands: list[str] = []
         for occurrence_index, (fill, start_beat) in enumerate(occurrences):
             offset = (
@@ -2050,12 +2068,17 @@ class AmySerialClient:
         *,
         activity: bool = True,
         fills: bool = True,
+        quantize_live: bool | None = None,
     ) -> list[str]:
         commands: list[str] = []
         if activity:
-            commands.extend(self._drum_activity_commands())
+            commands.extend(self._drum_activity_commands(
+                quantize_live=quantize_live,
+            ))
         if fills:
-            commands.extend(self._fill_schedule_commands())
+            commands.extend(self._fill_schedule_commands(
+                quantize_live=quantize_live,
+            ))
         return commands
 
     @staticmethod
@@ -2183,7 +2206,12 @@ class AmySerialClient:
 
         commands: list[str] = []
         try:
-            commands.extend(self._drum_commands())
+            commands.extend(self._drum_commands(
+                # Explicit Start has just reset the timebase and must begin at
+                # tick zero. Only replacements on a running transport wait for
+                # the next whole-bar boundary.
+                quantize_live=False if resume_transport else None,
+            ))
         except ValueError as exc:
             print(f"AMY rhythm warning: {exc}", flush=True)
             return
@@ -2286,6 +2314,11 @@ class AmySerialClient:
         # instances and old root H events do not. Starting is therefore a
         # clean transport boundary even after an earlier stop mid-pattern.
         self._wire(f"S{RESET_TIMEBASE | RESET_SEQUENCER}Z")
+        # Reset is an ordinary AMY event and takes effect at the next audio
+        # block boundary, whereas zQT is handled immediately on ingest. Keep
+        # the new instances behind several 128-sample blocks so the reset can
+        # never erase triggers that arrived in the same host burst.
+        self.writer.delay(0.020)
         self._replace_all_lanes(resume_transport=True)
 
     def _stop_rhythm(self) -> None:

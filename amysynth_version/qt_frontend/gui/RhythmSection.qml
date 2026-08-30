@@ -133,6 +133,8 @@ Item {
             (standardActivityWidth - 10 - 3 * 4) / 4
         readonly property real bassActivityWidth:
             10 + 5 * activityButtonWidth + 4 * 4
+        readonly property real bassColumnX:
+            2 * bassActivityWidth + 2 * activityGap
         readonly property real expandedActivityWidth:
             3 * bassActivityWidth
             + 2 * activityGap
@@ -261,11 +263,7 @@ Item {
             }
 
             ActivitySelector {
-                x:
-                    controlsArea.bassActivityWidth
-                    + controlsArea.activityGap
-                    + controlsArea.bassActivityWidth
-                    + controlsArea.activityGap
+                x: controlsArea.bassColumnX
                 y: 0
                 width: controlsArea.bassActivityWidth
                 height: 52
@@ -291,11 +289,7 @@ Item {
             LabeledSlider {
                 id: bassFunctionSlider
 
-                x:
-                    controlsArea.standardActivityWidth
-                    + controlsArea.activityGap
-                    + controlsArea.bassActivityWidth
-                    + controlsArea.activityGap
+                x: controlsArea.bassColumnX
                 y: 56
                 width: controlsArea.bassActivityWidth
                 height: 48

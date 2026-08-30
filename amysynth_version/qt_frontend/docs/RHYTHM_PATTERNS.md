@@ -119,8 +119,12 @@ they cover 13 tiny, 62 Gamma9001 and 24 General-MIDI realizations.
 
 Explicit Start is a clean run boundary. It sends
 `S(RESET_TIMEBASE|RESET_SEQUENCER)`; stored definitions survive, while frozen
-instances and old root triggers are removed. The frontend then installs the
-current base loops, fill schedule, bass and chords, and sends `zY1` last.
+instances and old root triggers are removed. Reset is applied by AMY at an
+audio-block boundary, so the host waits across several blocks before creating
+new instances. It then installs the current base loops immediately at tick
+zero, plus the fill schedule, bass and chords, and sends `zY1` last. The
+already-selected percussion level therefore sounds without a button reselection
+or a silent first bar.
 
 Live edits send neither reset nor a stop/start pulse. Stop sends `zY0` and
 explicitly releases rhythm-owned voices because future scheduled note-offs no
@@ -138,4 +142,6 @@ Unit tests validate every catalogue entry, all kit mappings, exact complete
 activity-level selection, all 270 preloaded definitions, the 64-event limit,
 continuation mutes, fill-order supercycles and the 1024/64/32 integration
 profile. Serial and native suites additionally exercise the real wire path
-against the exact AMY release pinned in both workflows.
+against the exact AMY release pinned in both workflows. The native cold-start
+gate renders real audio and requires the visible default level to become
+non-silent within one second.

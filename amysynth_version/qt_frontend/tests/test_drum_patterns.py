@@ -254,6 +254,29 @@ class DrumPatternTests(unittest.TestCase):
             )
         ))
 
+    def test_cold_start_is_immediate_but_live_drum_edits_are_quantized(self) -> None:
+        client = self.client()
+        client.rhythm_config = {
+            "id": "pop_8",
+            "percussion_activity": 1,
+            "fill_order": [0],
+            "fill_density_bars": 4,
+        }
+
+        cold = client._drum_commands(quantize_live=False)
+        live = client._drum_commands(quantize_live=True)
+        cold_triggers = [line for line in cold if line.startswith("zQT")]
+        live_triggers = [line for line in live if line.startswith("zQT")]
+        cold_roots = [line for line in cold if line.startswith("zQA")]
+        live_roots = [line for line in live if line.startswith("zQA")]
+
+        self.assertTrue(cold_triggers)
+        self.assertTrue(cold_roots)
+        self.assertTrue(all(line.split(",")[2] == "0" for line in cold_triggers))
+        self.assertTrue(all(line.split(",")[-2] == "0" for line in cold_roots))
+        self.assertTrue(all(line.split(",")[2] == "192" for line in live_triggers))
+        self.assertTrue(all(line.split(",")[-2] == "192" for line in live_roots))
+
     def test_every_fill_subset_fits_root_lane_and_whole_beat_schedule(self) -> None:
         maximum = 0
         for rhythm in self.catalog.rhythms.values():
