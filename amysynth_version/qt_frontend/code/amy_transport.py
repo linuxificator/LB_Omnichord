@@ -1278,7 +1278,15 @@ class AmySerialClient:
         if self.drum_kit == "general_midi":
             self._wire(f"K258i{drums}iy{self._bus_for_synth(drums)}Z")
         else:
-            self._wire(f"i{drums}iv{drum_voices}in1Z")
+            # Direct PCM hits are one-shots: sending artificial early note-offs
+            # would truncate their tails. Voice reuse is therefore expected to
+            # fill AMY's finite stolen-note bookkeeping pool during a long
+            # rhythm. Flag 8 suppresses only those inapplicable diagnostics;
+            # it does not change allocation, stealing, rendering or all-off.
+            self._wire(
+                f"i{drums}iv{drum_voices}in1"
+                f"if{SYNTH_FLAGS_NO_NOTE_WARNINGS}Z"
+            )
             self._wire(f"v0w7i{drums}Z")
         self._route_synth_bus(drums)
         self._wire(f"i{drums}iV{self._f(self.volume['drums'])}Z")

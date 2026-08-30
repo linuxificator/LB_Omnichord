@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
+import textwrap
 import time
 import unittest
+from pathlib import Path
 
 from catalog import control_default, patch_for_index, synth_index
 from harness import HeadlessApp
@@ -49,6 +53,45 @@ def wire_float(value: float) -> str:
 
 
 class NativeRhythmTests(unittest.TestCase):
+    def test_direct_pcm_drum_flag_suppresses_only_expected_pool_warning(self) -> None:
+        frontend = Path(__file__).resolve().parents[2]
+        probe = textwrap.dedent(
+            """
+            import sys
+
+            import amy
+            import c_amy
+
+            sys.path.insert(0, "code")
+            from drum_gamma9001 import GAMMA9001_DIRECT_PCM
+
+            flag = int(sys.argv[1])
+            c_amy.live(default_synths=0, max_buses=11, max_oscs=336)
+            try:
+                amy.send_wire(f"i0iv4in1if{flag}Zv0w7i0Z")
+                sounds = list(dict.fromkeys(GAMMA9001_DIRECT_PCM.values()))
+                for preset, note in sounds[:24]:
+                    amy.send_wire(f"p{preset}n{note}l1i0Z")
+                    c_amy.render_to_list()
+            finally:
+                c_amy.stop()
+            """
+        )
+
+        def stderr_for(flag: int) -> str:
+            result = subprocess.run(
+                [sys.executable, "-c", probe, str(flag)],
+                cwd=frontend,
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            return result.stderr
+
+        warning = "forgotten pool overflow synth 0"
+        self.assertIn(warning, stderr_for(0))
+        self.assertNotIn(warning, stderr_for(8))
+
     def test_cold_start_activates_visible_percussion_level_immediately(self) -> None:
         with HeadlessApp(native_amy=True) as app:
             app.bridge.wait_idle(timeout=10.0)

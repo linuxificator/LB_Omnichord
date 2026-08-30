@@ -75,7 +75,7 @@ def main() -> int:
         if args.kit == "general_midi":
             amy.send_wire("K258i0iy0Z")
         else:
-            amy.send_wire("i0iv4in1Zv0w7i0Z")
+            amy.send_wire("i0iv4in1if8Zv0w7i0Z")
         amy.send_wire("i0iV1Zy0V1Z")
         render_blocks(8)
 

@@ -117,6 +117,14 @@ the kit requires restarting the AMY service/frontend so the stored library is
 rebuilt consistently. The tests prove that all three mappings resolve every
 role without changing any timing.
 
+Tiny and Gamma9001 are realized as direct one-shot PCM hits on four reusable
+voices. The host deliberately does not send artificial early note-offs, since
+they could truncate a drum tail. It sets AMY synth flag 8
+(`SYNTH_FLAGS_NO_NOTE_WARNINGS`) on that drum synth instead. This suppresses
+only expected stolen-note bookkeeping diagnostics after long playback; voice
+allocation, audio rendering and the explicit transport-stop all-off are
+unchanged. General MIDI keeps the flags supplied by patch 258.
+
 The `features/gamma9001` package profile uses the full Gamma bank on Linux,
 Raspberry Pi, macOS, Windows and Android. Every hosted build is pinned to the
 same AMY release; `prepare_local_amy.sh` explicitly sets

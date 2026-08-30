@@ -695,6 +695,16 @@ proves that hold promotion clears only root triggers and emits no immediate
 - The native regression requires non-silent rendered drum audio within one
   second. A one-bar delay or a required activity reselection is a failure.
 
+**RHYTHM-13 — direct PCM drums retain natural tails without warning floods**
+
+- Tiny and Gamma9001 use four reusable direct-PCM voices. The synth is created
+  with AMY's `SYNTH_FLAGS_NO_NOTE_WARNINGS` flag because one-shot hits have no
+  synthetic early note-off and expected voice stealing can fill AMY's finite
+  forgotten-note diagnostic pool during long playback.
+- The flag suppresses diagnostics only. It may not alter PCM rendering, voice
+  stealing, sequencer timing or the explicit drum all-off on transport Stop.
+- General MIDI patch 258 retains its own engine-supplied synth flags.
+
 ### TUNING — all note-producing paths follow the selected tuning
 
 **TUNING-01 — live EQ/HARM/JV changes propagate everywhere**
