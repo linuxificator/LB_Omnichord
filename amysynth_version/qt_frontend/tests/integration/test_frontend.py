@@ -694,11 +694,11 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("activeRowIndex")), -1)
             start = app.bridge.count()
             app.action("midiPreviewStart", 0, 0.5, True)
-            app.bridge.wait_idle(timeout=3.0)
-            synth_lines = app.bridge.lines_since(start)
-            self.assertTrue(
-                any("i5" in line and "n" in line and "l" in line for line in synth_lines),
-                "MIDI synth preview emitted no synth-5 note",
+            synth_lines = app.bridge.wait_for_line_match(
+                lambda line: "i5" in line and "n" in line and "l" in line,
+                "MIDI synth-5 preview note",
+                start=start,
+                timeout=3.0,
             )
             app.action("midiPreviewEnd")
             app.action("finishMidiPreview")
@@ -710,11 +710,11 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("setMidiSynthIndex", 0, len(names) - 1)
             start = app.bridge.count()
             app.action("midiPreviewStart", 0, 0.5, True)
-            app.bridge.wait_idle(timeout=3.0)
-            drum_lines = app.bridge.lines_since(start)
-            self.assertTrue(
-                any(line.startswith("p") and "i11Z" in line for line in drum_lines),
-                "Drum Kit 0 preview emitted no synth-11 sample hit",
+            drum_lines = app.bridge.wait_for_line_match(
+                lambda line: line.startswith("p") and "i11Z" in line,
+                "Drum Kit 0 synth-11 sample hit",
+                start=start,
+                timeout=3.0,
             )
             self.assertFalse(
                 any("drum_kit_0" in line for line in drum_lines),
