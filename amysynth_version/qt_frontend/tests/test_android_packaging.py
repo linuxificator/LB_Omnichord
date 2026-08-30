@@ -69,6 +69,7 @@ class AndroidPackagingTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn(PYSIDE_VERSION, readme)
         self.assertIn(P4A_COMMIT, readme)
+        self.assertIn("Cython 0.29.36", readme)
         self.assertIn("debug-signed", readme)
         self.assertIn("V10", readme)
         self.assertIn("QLocalSocket", readme)
@@ -79,6 +80,7 @@ class AndroidPackagingTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("requirements-android.txt", workflow)
+        self.assertIn("Cython==0.29.36", workflow)
 
 
 if __name__ == "__main__":

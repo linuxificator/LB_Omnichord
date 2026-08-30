@@ -393,7 +393,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install \
             -r amysynth_version/qt_frontend/requirements.txt \
-            'PySide6==6.11.2'
+            'PySide6==6.11.2' \
+            'Cython==0.29.36'
           python - <<'PY'
           import subprocess
           import sys

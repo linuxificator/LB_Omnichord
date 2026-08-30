@@ -33,6 +33,7 @@ pipe contract.
 - PySide6 and shiboken6 Android wheels 6.11.2 from Qt's official release site
 - Android SDK 36 and NDK 27.2.12479018 (r27c)
 - python-for-android commit `9d5918bf752379f4520902524c15f794e45972b4`
+- Cython 0.29.36, matching that python-for-android revision's tested environment
 - Oboe 1.10.0
 - the exact AMY fork commit recorded in `.github/workflows/desktop-release.yml`
 
