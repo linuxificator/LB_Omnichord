@@ -17,6 +17,15 @@ Item {
             ) / 3
         )
 
+    function midiButtonHandled(target) {
+        if (root.midiControlRouter === null)
+            return false
+        const learned = root.midiControlRouter.activateControlTarget(target)
+        if (learned)
+            return true
+        return root.midiControlRouter.midiButtonTargetBlocked(target)
+    }
+
     Rectangle {
         anchors.fill: parent
         radius: 11
@@ -101,6 +110,11 @@ Item {
             id: drumButton
             width: 50
             height: Math.min(50, parent.height)
+            property var midiTarget: ({
+                "screen": root.controlScreen,
+                "kind": "button",
+                "action": "reverb_drums"
+            })
             anchors.verticalCenter: parent.verticalCenter
             text: "DRM"
             font.pixelSize: 12
@@ -123,7 +137,19 @@ Item {
                 border.width: root.controller.reverbDrumsIncluded ? 3 : 2
             }
 
-            onClicked: root.controller.toggleReverbDrums()
+            MidiButtonLed {
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 5
+                z: 2
+                midiControlRouter: root.midiControlRouter
+                midiTarget: drumButton.midiTarget
+            }
+
+            onClicked: {
+                if (!root.midiButtonHandled(drumButton.midiTarget)) {
+                    root.controller.toggleReverbDrums()
+                }
+            }
         }
     }
 }

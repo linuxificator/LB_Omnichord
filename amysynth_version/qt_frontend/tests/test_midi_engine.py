@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -16,6 +17,8 @@ from midi_player import (  # noqa: E402
     _LinuxRawMidiReader,
     _MidiInputTechManager,
 )
+from midi_control import NOTE_BUTTON_OFFSET, PITCH_BEND_CONTROLLER  # noqa: E402
+from midi_control import MidiControlState  # noqa: E402
 from synth_state import SynthState  # noqa: E402
 
 
@@ -259,9 +262,17 @@ class MidiAmyEngineTests(unittest.TestCase):
 
         first._parse_stream(bytes([0x90, 60, 100, 61, 101]), state_a)
         second._parse_stream(bytes([0xB1, 7, 64, 74, 99]), state_b)
+        second._parse_stream(bytes([0xE1, 0x00, 0x40]), state_b)
 
         self.assertEqual(notes, [(1, 60, 100, True), (1, 61, 101, True)])
-        self.assertEqual(controls, [(2, 7, 64), (2, 74, 99)])
+        self.assertEqual(
+            controls,
+            [
+                (2, 7, 64),
+                (2, 74, 99),
+                (2, PITCH_BEND_CONTROLLER, 8192),
+            ],
+        )
 
     def test_cc_mapping_follows_logarithmic_visual_slider_travel(self) -> None:
         class Control:
@@ -296,6 +307,82 @@ class MidiAmyEngineTests(unittest.TestCase):
         )
         self.assertEqual(middle, expected)
         self.assertNotAlmostEqual(middle, (20.0 + 20000.0) / 2.0)
+
+    def test_preset_binding_loader_accepts_new_source_types(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._midi_control_state = MidiControlState()
+        data = [
+            {
+                "channel": 1,
+                "controller": 74,
+                "target": {
+                    "kind": "master_volume",
+                },
+            },
+            {
+                "channel": 2,
+                "source_type": "pitch_bend",
+                "target": {
+                    "kind": "master_volume",
+                },
+            },
+            {
+                "channel": 3,
+                "source_type": "note_button",
+                "note": 42,
+                "target": {
+                    "kind": "button",
+                    "action": "rhythm_toggle",
+                },
+            },
+        ]
+
+        entries = backend._normalized_binding_entries("omni", data)
+
+        self.assertEqual(
+            [key for key, _target in entries],
+            [
+                (1, 74),
+                (2, PITCH_BEND_CONTROLLER),
+                (3, NOTE_BUTTON_OFFSET + 42),
+            ],
+        )
+
+    def test_midi_button_takeover_blocks_other_button_targets(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._applying_midi_control = 0
+        backend._midi_control_lock = threading.Lock()
+        backend._held_midi_button_targets = {"omni:button:rhythm_toggle"}
+
+        self.assertFalse(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "rhythm_toggle",
+                }
+            )
+        )
+        self.assertTrue(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "master_mute",
+                }
+            )
+        )
+
+        backend._held_midi_button_targets.clear()
+        self.assertFalse(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "master_mute",
+                }
+            )
+        )
 
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
         client = _Client()

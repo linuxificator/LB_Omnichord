@@ -19,6 +19,13 @@ Item {
         }
     }
 
+    function midiButtonHandled(target) {
+        const learned = root.controller.midiPlayer.activateControlTarget(target)
+        if (learned)
+            return true
+        return root.controller.midiPlayer.midiButtonTargetBlocked(target)
+    }
+
     Frame {
         id: wheelFrame
         x: 0; y: 0; width: 150; height: parent.height; padding: 0
@@ -74,6 +81,11 @@ Item {
     Button {
         id: runButton
         x: wheelFrame.width + 7; y: (parent.height - height) / 2; width: 62; height: 62
+        property var midiTarget: ({
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle"
+        })
         contentItem: Canvas {
             id: rhythmTransportSymbol
             anchors.fill: parent
@@ -114,7 +126,18 @@ Item {
             color: root.controller.rhythmRunning ? "#a56b19" : "#f0d66b"
             border.color: "#8e7012"; border.width: 2
         }
-        onClicked: root.controller.toggleRhythm()
+        MidiButtonLed {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 8
+            z: 2
+            midiControlRouter: root.controller.midiPlayer
+            midiTarget: runButton.midiTarget
+        }
+        onClicked: {
+            if (!root.midiButtonHandled(runButton.midiTarget)) {
+                root.controller.toggleRhythm()
+            }
+        }
     }
 
     Item {
@@ -211,12 +234,28 @@ Item {
                 idleColor: "#f7e9a8"
                 selectedColor: "#bc8410"
 
-                onActivitySelected: (level) =>
-                    root.controller.setRhythmBusyness(
-                        level
-                    )
-                onFillToggled: (fillIndex) =>
-                    root.controller.toggleRhythmFill(fillIndex)
+                onActivitySelected: (level) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_busyness",
+                        "level": level
+                    })) {
+                        root.controller.setRhythmBusyness(
+                            level
+                        )
+                    }
+                }
+                onFillToggled: (fillIndex) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_fill",
+                        "fill": fillIndex
+                    })) {
+                        root.controller.toggleRhythmFill(fillIndex)
+                    }
+                }
             }
 
             ChordActivitySelector {
@@ -246,20 +285,50 @@ Item {
                 idleColor: "#faefbd"
                 selectedColor: "#cb981d"
 
-                onActivitySelected: (level) =>
-                    root.controller
-                        .setRhythmChordActivity(
-                            level
-                        )
-                onArpeggioToggled:
-                    root.controller
-                        .toggleChordArpeggio()
-                onRateSelected: (rate) =>
-                    root.controller
-                        .setChordArpeggioRate(rate)
-                onDirectionToggled:
-                    root.controller
-                        .toggleChordArpeggioDirection()
+                onActivitySelected: (level) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_chord_activity",
+                        "level": level
+                    })) {
+                        root.controller
+                            .setRhythmChordActivity(
+                                level
+                            )
+                    }
+                }
+                onArpeggioToggled: {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_arpeggio"
+                    })) {
+                        root.controller
+                            .toggleChordArpeggio()
+                    }
+                }
+                onRateSelected: (rate) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_arpeggio_rate",
+                        "rate": rate
+                    })) {
+                        root.controller
+                            .setChordArpeggioRate(rate)
+                    }
+                }
+                onDirectionToggled: {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_arpeggio_direction"
+                    })) {
+                        root.controller
+                            .toggleChordArpeggioDirection()
+                    }
+                }
             }
 
             ActivitySelector {
@@ -279,11 +348,19 @@ Item {
                 idleColor: "#fff5d1"
                 selectedColor: "#d4aa3a"
 
-                onSelected: (level) =>
-                    root.controller
-                        .setRhythmBassActivity(
-                            level
-                        )
+                onSelected: (level) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_bass_activity",
+                        "level": level
+                    })) {
+                        root.controller
+                            .setRhythmBassActivity(
+                                level
+                            )
+                    }
+                }
             }
 
             LabeledSlider {

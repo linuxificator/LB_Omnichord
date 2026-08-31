@@ -16,7 +16,11 @@ from PySide6.QtGui import QGuiApplication
 
 import app_core
 from control_limits import clamp_control_value
-from midi_control import MidiControlState
+from midi_control import (
+    NOTE_BUTTON_OFFSET,
+    PITCH_BEND_CONTROLLER,
+    MidiControlState,
+)
 from synth_programs import resolve_program
 from synth_state import SynthState
 from user_data import MIDI_PRESET_DIR
@@ -122,6 +126,10 @@ class _MidiByteStreamParser:
             elif hi == 0xB0:
                 controller, value = payload
                 self._control_callback(channel, controller, value)
+            elif hi == 0xE0:
+                lsb, msb = payload
+                value = int(lsb) | (int(msb) << 7)
+                self._control_callback(channel, PITCH_BEND_CONTROLLER, value)
 
         state["running"] = running
         state["pending"] = pending
@@ -1126,6 +1134,7 @@ class MidiPlayerBackend(QObject):
     bindingStateChanged = Signal()
     bindingLocationRequested = Signal(str, int)
     _queuedControlChange = Signal(int, int, int)
+    _queuedButtonChange = Signal(int, int, int)
     midiInputTechsChanged = Signal()
     _queuedMidiTechActivity = Signal(str)
 
@@ -1178,9 +1187,11 @@ class MidiPlayerBackend(QObject):
         self._binding_version = 0
         self._midi_control_lock = threading.Lock()
         self._applying_midi_control = 0
+        self._held_midi_button_targets: set[str] = set()
         raw_cc_log = os.environ.get("OMNICHORD_TEST_MIDI_CC_LOG", "")
         self._midi_cc_test_log = Path(raw_cc_log) if raw_cc_log else None
         self._queuedControlChange.connect(self.process_midi_control)
+        self._queuedButtonChange.connect(self.process_midi_button)
         self._queuedMidiTechActivity.connect(self._mark_midi_tech_activity)
         self._blue_expiry_timer = QTimer(self)
         self._blue_expiry_timer.setInterval(250)
@@ -1325,10 +1336,24 @@ class MidiPlayerBackend(QObject):
 
     def _queue_midi_control(self, channel: int, controller: int, value: int) -> None:
         """Move raw-MIDI thread callbacks onto this QObject's Qt thread."""
+        key = self._midi_control_state.key(channel, controller)
         self._queuedControlChange.emit(
             max(1, min(16, int(channel))),
-            max(0, min(127, int(controller))),
-            max(0, min(127, int(value))),
+            key[1],
+            max(0, min(self._midi_control_state.value_max_for_key(key), int(value))),
+        )
+
+    def _queue_midi_button(
+        self,
+        channel: int,
+        note: int,
+        velocity: int,
+        is_on: bool,
+    ) -> None:
+        self._queuedButtonChange.emit(
+            max(1, min(16, int(channel))),
+            max(0, min(127, int(note))),
+            max(0, min(127, int(velocity))) if is_on else 0,
         )
 
     @Slot(int, int, int)
@@ -1371,7 +1396,45 @@ class MidiPlayerBackend(QObject):
             self._sync_blue_timer()
             self._bump_binding_state()
         if target is not None:
-            self._apply_control_target(target, int(value))
+            if self._is_button_target(target):
+                self._apply_button_target(target, int(value) > 0)
+            else:
+                self._apply_control_target(target, int(value), control_key)
+        self._emit_binding_location_feedback(key, target)
+
+    @Slot(int, int, int)
+    def process_midi_button(self, channel: int, note: int, velocity: int) -> None:
+        controller = NOTE_BUTTON_OFFSET + max(0, min(127, int(note)))
+        control_key = self._midi_control_state.key(channel, controller)
+        with self._midi_control_lock:
+            was_blue = control_key in self._midi_control_state.blue_since
+            changed, target, key = self._midi_control_state.observe(
+                channel,
+                controller,
+                max(0, min(127, int(velocity))),
+                now=time.monotonic(),
+            )
+            if not changed or key is None:
+                return
+            self._write_cc_test_log({
+                "event": "button-change",
+                "channel": key[0],
+                "note": key[1] - NOTE_BUTTON_OFFSET,
+                "clock": self._midi_control_state.clock,
+                "mapped": target is not None,
+            })
+            blue_cleared = (
+                was_blue
+                and control_key not in self._midi_control_state.blue_since
+            )
+        if blue_cleared:
+            self._sync_blue_timer()
+            self._bump_binding_state()
+        if target is not None:
+            if self._is_button_target(target):
+                self._apply_button_target(target, int(velocity) > 0)
+            else:
+                self._apply_control_target(target, int(velocity), key)
         self._emit_binding_location_feedback(key, target)
 
     def _write_cc_test_log(self, record: dict[str, Any]) -> None:
@@ -1577,6 +1640,26 @@ class MidiPlayerBackend(QObject):
         ):
             target["id"] = f"omni:{kind}"
             return target
+        if kind == "button":
+            action = str(raw.get("action", ""))
+            if not action:
+                return None
+            target["action"] = action
+            for field in ("preset", "row", "level", "fill", "rate"):
+                if field in raw:
+                    try:
+                        target[field] = int(raw[field])
+                    except (TypeError, ValueError):
+                        return None
+            target["id"] = ":".join(
+                [screen, "button", action]
+                + [
+                    str(target[field])
+                    for field in ("preset", "row", "level", "fill")
+                    if field in target
+                ]
+            )
+            return target
         return None
 
     def _target_range(
@@ -1637,12 +1720,18 @@ class MidiPlayerBackend(QObject):
         self,
         target: dict[str, Any],
         midi_value: int,
+        source_key: tuple[int, int] | None = None,
     ) -> float | None:
         target_range = self._target_range(target)
         if target_range is None:
             return None
         minimum, maximum, step, scale = target_range
-        position = max(0.0, min(1.0, float(midi_value) / 127.0))
+        value_max = (
+            self._midi_control_state.value_max_for_key(source_key)
+            if source_key is not None
+            else 127
+        )
+        position = max(0.0, min(1.0, float(midi_value) / float(value_max)))
         if scale == "log" and minimum > 0.0:
             value = math.exp(
                 math.log(minimum)
@@ -1682,6 +1771,20 @@ class MidiPlayerBackend(QObject):
                 for item in targets
             )
 
+    @Slot("QVariantMap", result=bool)
+    def midiButtonTargetBlocked(self, raw: dict[str, Any]) -> bool:
+        if self._applying_midi_control:
+            return False
+        target = self._normalize_control_target(raw)
+        if target is None or not self._is_button_target(target):
+            return False
+        target_id = str(target["id"])
+        with self._midi_control_lock:
+            return bool(
+                self._held_midi_button_targets
+                and target_id not in self._held_midi_button_targets
+            )
+
     def _apply_midi_setter(self, setter: Any, *args: Any) -> None:
         self._applying_midi_control += 1
         try:
@@ -1693,8 +1796,9 @@ class MidiPlayerBackend(QObject):
         self,
         target: dict[str, Any],
         midi_value: int,
+        source_key: tuple[int, int] | None = None,
     ) -> None:
-        value = self._mapped_target_value(target, midi_value)
+        value = self._mapped_target_value(target, midi_value, source_key)
         if value is None:
             return
         screen = str(target["screen"])
@@ -1809,6 +1913,94 @@ class MidiPlayerBackend(QObject):
             }
         )
 
+    @staticmethod
+    def _is_button_target(target: dict[str, Any]) -> bool:
+        return str(target.get("kind", "")) == "button"
+
+    def _apply_button_target(
+        self,
+        target: dict[str, Any],
+        pressed: bool,
+    ) -> None:
+        target_id = str(target["id"])
+        with self._midi_control_lock:
+            if pressed:
+                self._held_midi_button_targets.add(target_id)
+            else:
+                self._held_midi_button_targets.discard(target_id)
+        if not pressed:
+            return
+
+        action = str(target.get("action", ""))
+        screen = str(target.get("screen", ""))
+
+        if screen == "midi":
+            if action == "store_preset":
+                self._apply_midi_setter(self.storeSelectedPreset)
+            elif action == "select_preset":
+                self._apply_midi_setter(
+                    self.selectPreset,
+                    int(target.get("preset", self._selected_preset)),
+                )
+            elif action == "master_mute":
+                self._apply_midi_setter(self.toggleMasterMuted)
+            elif action == "reverb_drums":
+                self._apply_midi_setter(self.toggleReverbDrums)
+            elif action == "cycle_channel":
+                self._apply_midi_setter(
+                    self.cycleChannel,
+                    int(target.get("row", 0)),
+                )
+        elif screen == "omni":
+            if action == "store_preset":
+                self._apply_midi_setter(self.owner.storeSelectedPreset)
+            elif action == "select_preset":
+                self._apply_midi_setter(
+                    self.owner.selectPreset,
+                    int(target.get("preset", self.owner.selectedPreset)),
+                )
+            elif action == "master_mute":
+                self._apply_midi_setter(self.owner.toggleMasterMuted)
+            elif action == "reverb_drums":
+                self._apply_midi_setter(self.owner.toggleReverbDrums)
+            elif action == "panic":
+                self._apply_midi_setter(self.owner.panic)
+            elif action == "rhythm_toggle":
+                self._apply_midi_setter(self.owner.toggleRhythm)
+            elif action == "rhythm_busyness":
+                self._apply_midi_setter(
+                    self.owner.setRhythmBusyness,
+                    int(target.get("level", 0)),
+                )
+            elif action == "rhythm_chord_activity":
+                self._apply_midi_setter(
+                    self.owner.setRhythmChordActivity,
+                    int(target.get("level", 0)),
+                )
+            elif action == "rhythm_bass_activity":
+                self._apply_midi_setter(
+                    self.owner.setRhythmBassActivity,
+                    int(target.get("level", 1)),
+                )
+            elif action == "rhythm_fill":
+                self._apply_midi_setter(
+                    self.owner.toggleRhythmFill,
+                    int(target.get("fill", 0)),
+                )
+            elif action == "strum_ladder":
+                self._apply_midi_setter(self.owner.toggleStrumLadderMode)
+            elif action == "chord_arpeggio":
+                self._apply_midi_setter(self.owner.toggleChordArpeggio)
+            elif action == "chord_arpeggio_rate":
+                self._apply_midi_setter(
+                    self.owner.setChordArpeggioRate,
+                    int(target.get("rate", 1)),
+                )
+            elif action == "chord_arpeggio_direction":
+                self._apply_midi_setter(
+                    self.owner.toggleChordArpeggioDirection
+                )
+
     @Slot(int, int)
     def selectControlIndicator(self, channel: int, controller: int) -> None:
         with self._midi_control_lock:
@@ -1879,6 +2071,14 @@ class MidiPlayerBackend(QObject):
     def injectControl(self, channel: int, controller: int, value: int) -> None:
         self.process_midi_control(channel, controller, value)
 
+    @Slot(int, int)
+    def injectPitchBend(self, channel: int, value: int) -> None:
+        self.process_midi_control(channel, PITCH_BEND_CONTROLLER, value)
+
+    @Slot(int, int, int)
+    def injectButton(self, channel: int, note: int, velocity: int) -> None:
+        self.process_midi_button(channel, note, velocity)
+
     def control_bindings_snapshot(self, screen: str) -> list[dict[str, Any]]:
         with self._midi_control_lock:
             result = self._midi_control_state.serialize_bindings(screen)
@@ -1927,6 +2127,7 @@ class MidiPlayerBackend(QObject):
                     "event": "binding-location",
                     "channel": int(key[0]),
                     "controller": int(key[1]),
+                    "sourceType": self._midi_control_state.source_type(key),
                     "screen": screen,
                     "preset": preset_number,
                     "active": active_target is not None,
@@ -1994,13 +2195,28 @@ class MidiPlayerBackend(QObject):
                 if target is None:
                     continue
                 try:
-                    key = (
-                        int(raw.get("channel", 0)),
-                        int(raw.get("controller", -1)),
-                    )
+                    channel = int(raw.get("channel", 0))
+                    source_type = str(raw.get("source_type", "cc"))
+                    if source_type == "pitch_bend":
+                        controller = PITCH_BEND_CONTROLLER
+                    elif source_type == "note_button":
+                        controller = NOTE_BUTTON_OFFSET + int(raw.get("note", -1))
+                    else:
+                        controller = int(raw.get("controller", -1))
+                    key = self._midi_control_state.key(channel, controller)
                 except (TypeError, ValueError):
                     continue
-                if not 1 <= key[0] <= 16 or not 0 <= key[1] <= 127:
+                if not 1 <= key[0] <= 16:
+                    continue
+                if source_type == "pitch_bend" and key[1] != PITCH_BEND_CONTROLLER:
+                    continue
+                if source_type == "note_button" and not (
+                    NOTE_BUTTON_OFFSET <= key[1] <= NOTE_BUTTON_OFFSET + 127
+                ):
+                    continue
+                if source_type not in ("cc", "pitch_bend", "note_button"):
+                    continue
+                if source_type == "cc" and not 0 <= key[1] <= 127:
                     continue
                 entries.append((key, target))
         return entries
@@ -2722,6 +2938,7 @@ class MidiPlayerBackend(QObject):
         velocity: int,
         is_on: bool,
     ) -> None:
+        self._queue_midi_button(channel, note, velocity, is_on)
         root, _ = self._chord_context()
         for row in range(MIDI_ROW_COUNT):
             configured = self.channels[row]

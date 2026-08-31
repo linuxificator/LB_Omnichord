@@ -54,6 +54,13 @@ Item {
         }
     }
 
+    function midiButtonHandled(target) {
+        const learned = root.controller.activateControlTarget(target)
+        if (learned)
+            return true
+        return root.controller.midiButtonTargetBlocked(target)
+    }
+
     Rectangle {
         anchors.fill: parent
         radius: 12
@@ -199,6 +206,12 @@ Item {
         y: (parent.height - height) / 2
         width: 62
         height: 62
+        property var midiTarget: ({
+            "screen": "midi",
+            "kind": "button",
+            "action": "cycle_channel",
+            "row": root.rowIndex
+        })
         text: {
             root.controller.stateVersion
             const channel = root.controller.channel(root.rowIndex)
@@ -225,9 +238,19 @@ Item {
             border.width: 2
         }
 
+        MidiButtonLed {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 7
+            z: 2
+            midiControlRouter: root.controller
+            midiTarget: channelButton.midiTarget
+        }
+
         onClicked: {
-            root.controller.cycleChannel(root.rowIndex)
-            root.markInteraction()
+            if (!root.midiButtonHandled(channelButton.midiTarget)) {
+                root.controller.cycleChannel(root.rowIndex)
+                root.markInteraction()
+            }
         }
     }
 

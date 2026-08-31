@@ -392,39 +392,130 @@ Item {
                         }
                     }
 
-                    Rectangle {
-                        id: radioKnob
+                    Item {
+                        id: f06Control
                         anchors.horizontalCenter: parent.horizontalCenter
                         y: 12
                         width: 40
                         height: 40
-                        radius: 20
-                        color: modelData.evicting ? "#d62f2f" : "#686864"
-                        border.color: "#e8e8df"
-                        border.width: 2
-                        rotation:
-                            Number(modelData.displayValue) * 270 / 127 - 135
+                        readonly property bool pitchBend:
+                            modelData.displayType === "pitch_bend"
+                        readonly property bool noteButton:
+                            modelData.displayType === "note_button"
+                        readonly property color bodyColor:
+                            modelData.evicting ? "#d62f2f" : "#686864"
 
                         Rectangle {
-                            x: parent.width / 2 - 2
-                            y: 4
-                            width: 4
-                            height: 14
-                            radius: 2
-                            color: "#f2d56b"
+                            visible: !f06Control.noteButton
+                            anchors.centerIn: parent
+                            width: 40
+                            height: 40
+                            radius: 20
+                            color: "#353532"
+                            border.color: "#d8d4c8"
+                            border.width: 1
                         }
 
-                        Behavior on rotation {
-                            NumberAnimation { duration: 90 }
+                        Rectangle {
+                            id: knobSkirt
+                            visible: !f06Control.noteButton
+                            anchors.centerIn: parent
+                            width: 34
+                            height: 34
+                            radius: 17
+                            color: f06Control.bodyColor
+                            border.color: "#f0ece1"
+                            border.width: 2
+                            rotation: f06Control.pitchBend
+                                ? (Number(modelData.displayValue) - 64) * 180 / 64
+                                : Number(modelData.displayValue) * 270 / 127 - 135
+
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                y: 3
+                                width: 4
+                                height: f06Control.pitchBend ? 10 : 14
+                                radius: 2
+                                color:
+                                    f06Control.pitchBend ? "#82d6ff" : "#f2d56b"
+                            }
+
+                            Behavior on rotation {
+                                NumberAnimation { duration: 90 }
+                            }
+                        }
+
+                        Repeater {
+                            model: 9
+                            delegate: Rectangle {
+                                visible: !f06Control.noteButton
+                                width: 2
+                                height: 5
+                                radius: 1
+                                color: "#252522"
+                                opacity: 0.55
+                                x: f06Control.width / 2 - width / 2
+                                y: 1
+                                transform: Rotation {
+                                    origin.x: 1
+                                    origin.y: f06Control.height / 2 - 1
+                                    angle: index * 30 - 120
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: f06Control.pitchBend
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: -1
+                            width: 2
+                            height: 7
+                            radius: 1
+                            color: "#82d6ff"
+                            opacity: 0.7
+                        }
+
+                        Rectangle {
+                            visible: f06Control.noteButton
+                            anchors.centerIn: parent
+                            width: 36
+                            height: 36
+                            radius: 7
+                            scale:
+                                modelData.buttonDown && !modelData.evicting
+                                ? 0.92
+                                : 1.0
+                            color:
+                                modelData.buttonDown && !modelData.evicting
+                                ? "#f4d85f"
+                                : f06Control.bodyColor
+                            border.color:
+                                modelData.buttonDown && !modelData.evicting
+                                ? "#fff4a8"
+                                : "#e8e8df"
+                            border.width: 2
+
+                            Behavior on scale {
+                                NumberAnimation { duration: 70 }
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "BTN"
+                                color:
+                                    modelData.buttonDown && !modelData.evicting
+                                    ? "#3c2d00"
+                                    : "#f4f0e6"
+                                font.pixelSize: 9
+                                font.bold: true
+                            }
                         }
                     }
 
                     Text {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text:
-                            "CH" + modelData.displayChannel
-                            + " CC" + modelData.displayController
+                        text: modelData.displayLabel
                         color: "#292927"
                         font.pixelSize: 11
                     }

@@ -99,9 +99,10 @@ documented in `../design/architecture.md`.
 
 Rhythm timing is compiled into AMY's 48-PPQ sequencer; Linux/Python is not used as the beat clock. A live tuning change updates the shared tuned chord state: held manual chords are retuned immediately, rhythm chord and bass sequencer events are rebuilt with the new pitches, and subsequent strum notes use the selected tuning. Bass retuning therefore appears in the AMY wire/debug stream mainly as rebuilt `H...n<note>...i1Z` sequencer events rather than standalone immediate bass note commands.
 
-Linux MIDI input currently opens ALSA raw-MIDI devices matching
-`/dev/snd/midiC*D*`. VMPK exposes an ALSA Sequencer port rather than a raw device;
-use `snd-virmidi` as a bridge for current testing. See `../design/midi.md`.
+Linux MIDI input opens ALSA raw-MIDI devices and an ALSA sequencer input port
+named `LB Omnichord / MIDI In`. Graph tools such as `qpwgraph` can connect VMPK,
+BLE MIDI bridges and MIDI Through directly to that port. See
+`../design/midi.md`.
 
 The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
 

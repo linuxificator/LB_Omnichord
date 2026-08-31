@@ -196,6 +196,7 @@ Important regression tests:
 - decoupled tuning stays independent
 - local and serial AMY transports generate identical commands
 - raw-MIDI running status, Note On/Off and velocity-zero Note Off parsing
+- Pitch Bend parsing and 14-bit centered MIDI-learn mapping
 - incoming EQ/HARM/JV MIDI conversion to exact/fractional AMY notes
 - MIDI preview stays within its live voice allocation and emits no stale offs
 - OMNI and MIDI reverb controls generate commands for only their owned buses
@@ -226,6 +227,9 @@ Important regression tests:
   protects red/blue indicators, preserves hidden instrument-specific bindings,
   consumes bound drag/edit gestures, unlinks only on an explicit double-tap,
   expires blue state and persists bindings in the owning MIDI or OMNI preset
+- MIDI note-button learn binds supported app buttons, presses through the same
+  backend action as a screen tap, shows the same button LED colors as sliders,
+  and blocks other screen button taps while an on/off MIDI button is held
 - the rhythm start arrow uses the same centered triangle geometry as bass and
   repaints on backend transport changes
 - a preset that reuses an already-bound channel/controller for another target

@@ -179,6 +179,23 @@ class InstrumentBackend(OmniInstrumentBackend):
         self._midi_player.injectControl(channel, controller, value)
 
     @Slot(int, int)
+    def injectMidiPitchBend(
+        self,
+        channel: int,
+        value: int,
+    ) -> None:
+        self._midi_player.injectPitchBend(channel, value)
+
+    @Slot(int, int, int)
+    def injectMidiButton(
+        self,
+        channel: int,
+        note: int,
+        velocity: int,
+    ) -> None:
+        self._midi_player.injectButton(channel, note, velocity)
+
+    @Slot(int, int)
     def selectMidiControlIndicator(self, channel: int, controller: int) -> None:
         self._midi_player.selectControlIndicator(channel, controller)
 

@@ -20,6 +20,7 @@ Frame {
     property color centerPanelBorderColor: root.panelBorderColor
     property var midiControlRouter: null
     property var midiTarget: ({})
+    property var centerMidiTarget: ({})
     property bool midiBindingGesture: false
 
     readonly property bool midiBound: {
@@ -50,6 +51,19 @@ Frame {
             root.midiTarget
         )
         return learned || wasBound || root.midiPresetFeedback
+    }
+
+    function centerMidiButtonHandled() {
+        if (root.midiControlRouter === null)
+            return false
+        const learned = root.midiControlRouter.activateControlTarget(
+            root.centerMidiTarget
+        )
+        if (learned)
+            return true
+        return root.midiControlRouter.midiButtonTargetBlocked(
+            root.centerMidiTarget
+        )
     }
 
     padding: 4
@@ -137,6 +151,32 @@ Frame {
         opacity: 0.96
         border.color: root.centerPanelBorderColor
         border.width: 1
+
+        Rectangle {
+            visible:
+                root.centerButtonEnabled
+                && root.midiControlRouter !== null
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 2
+            width: 7
+            height: 7
+            radius: 4
+            color: {
+                if (root.midiControlRouter === null)
+                    return "#a5a5a0"
+                root.midiControlRouter.bindingVersion
+                const state = root.midiControlRouter.controlTargetVisualState(
+                    root.centerMidiTarget
+                )
+                if (state === "preset-displaced")
+                    return "#f22b2b"
+                if (state === "preset-incoming")
+                    return "#3186d7"
+                return root.midiControlRouter.isControlTargetBound(
+                    root.centerMidiTarget
+                ) ? "#35b85a" : "#a5a5a0"
+            }
+        }
 
         Text {
             anchors.centerIn: parent
@@ -249,6 +289,9 @@ Frame {
         visible: root.centerButtonEnabled
         background: Item {}
         contentItem: Item {}
-        onClicked: root.centerClicked()
+        onClicked: {
+            if (!root.centerMidiButtonHandled())
+                root.centerClicked()
+        }
     }
 }

@@ -1,25 +1,44 @@
 # MIDI Control Learn and Binding
 
-This document is the behavioral contract for MIDI Control Change indicators,
-MIDI-learn slider bindings, preset ownership and the corresponding OMNI status
-LED. It resolves the implementation notes in `midi_control.txt`.
+This document is the behavioral contract for MIDI Control Change, Pitch Bend and
+MIDI-button indicators, MIDI-learn bindings, preset ownership and the
+corresponding OMNI status LED. It resolves the implementation notes in
+`midi_control.txt`.
 
 ## Controller identity and genuine movement
 
-A controller is identified by the pair `(MIDI channel, controller number)`.
-Channels 1–16 and controllers 0–127 are independent identities, even when the
-controller numbers match.
+A MIDI control source is identified by the pair `(MIDI channel, controller
+number)`. Channels 1–16 and controllers 0–127 are normal MIDI CC identities,
+even when the controller numbers match across channels. The application also
+uses reserved internal controller numbers for non-CC sources:
+
+- controller `128` is Pitch Bend on that channel;
+- controllers `256..383` are MIDI note buttons `0..127` on that channel.
 
 The first received value establishes a baseline. A repeated identical value is
 ignored. Only a later different value is genuine controller movement. This
 prevents controller snapshots sent during a channel or preset switch from
 creating indicators, selecting instruments or changing audio state.
 
+Pitch Bend uses MIDI center (`8192`) as its baseline and full 14-bit input
+range (`0..16383`) for numeric mapping. This makes a centered pitch-bend wheel
+or encoder neutral, while movement away from center can be learned and mapped to
+any continuous control with higher resolution than CC.
+
+MIDI note buttons use Note On as pressed and Note Off or velocity-zero Note On
+as released. A first released value is ignored; a first press creates the
+indicator. Press and release are both genuine changes after the source is known.
+
 ## Indicator bar and LRU behavior
 
 The grey MIDI bar fills from left to right to the capacity calculated from its
-current width. Every visible indicator shows its channel, controller number and
-latest value. The radio knob rotates across 270 degrees for MIDI values 0–127.
+current width. Every visible indicator preserves the existing `74x68` hit
+target and shows its source label and state LED. CC sources render as F06-style
+studio-console potentiometers rotating across 270 degrees. Pitch Bend renders
+as an F06-style encoder with a center detent and 14-bit input mapped to display
+travel. MIDI note buttons render as illuminated F06-style pushbuttons: pressed
+buttons light and depress, released/tap buttons return to the idle button
+surface.
 
 When the bar is full, a genuinely moving controller which is not visible takes
 the slot of the least recently moved eligible controller. Pointer interaction
@@ -57,15 +76,15 @@ state.
 
 ## Binding and manual unlink
 
-While one indicator is red, touching any supported numeric control binds that
-controller to the touched target. The binding gesture is consumed: it does not
-also edit or unlink the target. The slider handle and MIDI indicator LED become
-green.
+While one indicator is red, touching any supported numeric control or supported
+application button binds that MIDI source to the touched target. The binding
+gesture is consumed: it does not also edit, tap or unlink the target. The slider
+handle or button LED and MIDI indicator LED become green.
 
 Bindings are globally one-to-one:
 
-- one channel/controller pair controls at most one target;
-- one target is controlled by at most one channel/controller pair;
+- one MIDI source controls at most one target;
+- one target is controlled by at most one MIDI source;
 - assigning an occupied target to another controller unbinds the old controller
   and makes that old indicator blue.
 
@@ -84,7 +103,7 @@ movement ends it immediately and leaves the controller visible as an ordinary
 unbound grey indicator. Without new movement, the blue state and its indicator
 are removed after 30 seconds.
 
-## Supported targets and range mapping
+## Supported continuous targets and range mapping
 
 Every continuous numeric control is bindable:
 
@@ -96,14 +115,12 @@ Every continuous numeric control is bindable:
 - rhythm tempo;
 - bass voicing and the dynamic bass riff selector.
 
-Buttons, switches (including `MUT`/`UMT`), activity selectors, instrument
-tumblers and tuning-mode selectors are not slider targets.
-
-MIDI 0–127 maps over the complete visible slider travel. Linear sliders map
-linearly. Logarithmic controls such as frequency map logarithmically, matching
-the QML slider path. The result is rounded to the control's declared step and
-clamped to its current catalogue/application range. Instrument catalogue ranges
-are authoritative.
+MIDI CC values `0..127` map over the complete visible slider travel. Pitch Bend
+values `0..16383` map over the same target range, with center at roughly the
+midpoint for linear targets. Linear sliders map linearly. Logarithmic controls
+such as frequency map logarithmically, matching the QML slider path. The result
+is rounded to the control's declared step and clamped to its current
+catalogue/application range. Instrument catalogue ranges are authoritative.
 
 Binding does not immediately jump the slider to the controller's remembered
 value. The next genuine incoming CC movement applies the mapped value through
@@ -111,10 +128,37 @@ the same backend setter used by manual UI editing. Backend notify signals must
 also resynchronize the visible QML control after the binding touch, including
 the three OMNI and MIDI reverb sliders.
 
+## Supported button targets and takeover
+
+MIDI note buttons can be learned against the supported tap/button actions on
+the OMNI and MIDI screens. Supported button targets include:
+
+- OMNI/MIDI preset store and preset select;
+- OMNI/MIDI master mute;
+- OMNI/MIDI reverb drum inclusion;
+- OMNI panic;
+- OMNI rhythm transport, percussion activity, fill toggles, chord activity,
+  chord arpeggio enable, chord arpeggio rate, chord arpeggio direction, bass
+  activity and APG/LDR strum-ladder mode;
+- MIDI row channel cycling.
+
+The backend treats MIDI note-button bindings as application button actions, not
+as AMY-specific behavior. Pressing a learned note button calls the same backend
+action as a screen tap. Releasing it clears the held state. A tap-style MIDI
+button therefore behaves like a screen tap.
+
+For on/off MIDI buttons, the pressed state is a temporary takeover of the bound
+application button. While one MIDI button target is held, screen taps on other
+button targets are ignored so the physical controller remains authoritative.
+The held target itself is allowed, and release removes the takeover. Tap-style
+MIDI buttons do not create a lasting takeover because they release immediately.
+Screen gestures needed to unlink a MIDI binding remain available through the
+normal explicit unlink path.
+
 ## Controller authority
 
-A green binding gives MIDI exclusive write authority over its numeric value.
-Manual sliders/tap controls, direct frontend setter calls, tempo/tuning
+A green continuous binding gives MIDI exclusive write authority over its numeric
+value. Manual sliders/tap controls, direct frontend setter calls, tempo/tuning
 UP/DOWN holds, copy operations and any other non-MIDI edit must leave that
 value unchanged. Tempo and tuning UP/DOWN buttons are disabled and grey while
 their effective value is bound. A section `RST` may restore the preset's
@@ -168,11 +212,14 @@ instrument and then applies the mapped parameter through the normal
 ## Presets
 
 Only green bindings are persisted. Red learn selection, blue timers, indicator
-LRU age and current CC values are runtime state.
+LRU age and current source values are runtime state.
 
 - MIDI-target bindings are stored in the selected MIDI preset.
 - OMNI-target bindings are stored in the selected OMNI preset.
 - the optional JSON field is `midi_control_bindings`;
+- legacy CC bindings keep their existing `channel`/`controller` JSON shape;
+- Pitch Bend adds `"source_type": "pitch_bend"` and uses controller `128`;
+- MIDI note buttons add `"source_type": "note_button"` and `"note": N`;
 - presets without the field load with no bindings for that screen;
 - loading a preset replaces only that screen's bindings;
 - runtime loading preserves bound numeric values according to the controller
@@ -250,12 +297,12 @@ does not change learn, binding or musical state.
 
 ## Thread and AMY boundaries
 
-Raw MIDI bytes are parsed on the existing background reader. Genuine CC changes
-are queued onto the Qt object thread before they mutate application state.
-Mapped updates call the existing MIDI/OMNI setters under a narrow in-call MIDI
-authority flag; they do not introduce a second synth-state path, call AMY
-directly or change the socket/serial wire boundary. The same setters reject
-non-MIDI writes while their target is bound.
+Raw MIDI bytes are parsed on the existing background reader. Genuine CC, Pitch
+Bend and MIDI-button changes are queued onto the Qt object thread before they
+mutate application state. Mapped updates call the existing MIDI/OMNI setters
+under a narrow in-call MIDI authority flag; they do not introduce a second
+synth-state path, call AMY directly or change the socket/serial wire boundary.
+The same setters reject non-MIDI writes while their target is bound.
 
 ## Implementation map
 
@@ -266,9 +313,9 @@ The behavior is intentionally split along existing responsibilities:
   LRU visibility, LED states, one-to-one bindings and serialization. It receives
   an already-classified double-tap action and owns no pointer-gesture timer.
 - `../qt_frontend/code/midi_player.py` owns that state, queues raw CC changes
-  onto the Qt object thread, resolves target ranges, calls the existing
-  MIDI/OMNI setters and captures/restores bound numeric values around live
-  preset and RST operations.
+  onto the Qt object thread, resolves target ranges, applies button targets,
+  calls the existing MIDI/OMNI setters and captures/restores bound numeric
+  values around live preset and RST operations.
 - `../qt_frontend/code/midi_integration.py` connects OMNI preset ownership and
   exposes the narrow integration-test actions. It does not create a second
   binding state.
