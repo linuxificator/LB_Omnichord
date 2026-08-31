@@ -9,7 +9,6 @@ Rectangle {
     width: 8
     height: 8
     radius: width / 2
-    visible: root.midiControlRouter !== null
 
     readonly property string midiVisualState: {
         if (root.midiControlRouter === null)
@@ -30,6 +29,8 @@ Rectangle {
     readonly property bool midiPresetFeedback:
         root.midiVisualState === "preset-displaced"
         || root.midiVisualState === "preset-incoming"
+
+    visible: root.midiBound || root.midiPresetFeedback
 
     color: {
         if (root.midiVisualState === "preset-displaced")

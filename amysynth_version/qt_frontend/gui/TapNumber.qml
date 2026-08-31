@@ -38,6 +38,25 @@ Frame {
     readonly property bool midiPresetFeedback:
         root.midiVisualState === "preset-displaced"
         || root.midiVisualState === "preset-incoming"
+    readonly property string centerMidiVisualState: {
+        if (root.midiControlRouter === null)
+            return "idle"
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.controlTargetVisualState(
+            root.centerMidiTarget
+        )
+    }
+    readonly property bool centerMidiBound: {
+        if (root.midiControlRouter === null)
+            return false
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.isControlTargetBound(
+            root.centerMidiTarget
+        )
+    }
+    readonly property bool centerMidiPresetFeedback:
+        root.centerMidiVisualState === "preset-displaced"
+        || root.centerMidiVisualState === "preset-incoming"
 
     signal edited(int value)
     signal activated()
@@ -155,26 +174,21 @@ Frame {
         Rectangle {
             visible:
                 root.centerButtonEnabled
-                && root.midiControlRouter !== null
+                && (
+                    root.centerMidiBound
+                    || root.centerMidiPresetFeedback
+                )
             anchors.horizontalCenter: parent.horizontalCenter
             y: 2
             width: 7
             height: 7
             radius: 4
             color: {
-                if (root.midiControlRouter === null)
-                    return "#a5a5a0"
-                root.midiControlRouter.bindingVersion
-                const state = root.midiControlRouter.controlTargetVisualState(
-                    root.centerMidiTarget
-                )
-                if (state === "preset-displaced")
+                if (root.centerMidiVisualState === "preset-displaced")
                     return "#f22b2b"
-                if (state === "preset-incoming")
+                if (root.centerMidiVisualState === "preset-incoming")
                     return "#3186d7"
-                return root.midiControlRouter.isControlTargetBound(
-                    root.centerMidiTarget
-                ) ? "#35b85a" : "#a5a5a0"
+                return root.centerMidiBound ? "#35b85a" : "#a5a5a0"
             }
         }
 

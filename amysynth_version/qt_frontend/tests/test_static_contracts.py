@@ -162,6 +162,27 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("root.controller.tuningModeIndex", utility)
         self.assertNotIn("root.controller.midiStateVersion", synth)
 
+    def test_midi_button_leds_are_not_visible_in_idle_state(self) -> None:
+        led = (ROOT / "gui" / "MidiButtonLed.qml").read_text(encoding="utf-8")
+        preset = (ROOT / "gui" / "PresetResetButton.qml").read_text(
+            encoding="utf-8"
+        )
+        tap_number = (ROOT / "gui" / "TapNumber.qml").read_text(
+            encoding="utf-8"
+        )
+        screen = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+
+        self.assertIn("visible: root.midiBound || root.midiPresetFeedback", led)
+        self.assertIn("visible: root.midiBound || root.midiPresetFeedback", preset)
+        self.assertIn("root.centerMidiBound", tap_number)
+        self.assertIn("root.centerMidiPresetFeedback", tap_number)
+
+        # F06-P01 button vocabulary: mounting bezel plus moving cap/plunger.
+        self.assertIn("id: f06ButtonCap", screen)
+        self.assertIn("GradientStop { position: 0.00; color: \"#8e9088\" }", screen)
+        self.assertIn("GradientStop { position: 1.00; color: \"#343531\" }", screen)
+        self.assertIn("Behavior on y", screen)
+
     def test_local_launcher_validates_but_never_builds_amy(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
         self.assertIn("import c_amy", launcher)

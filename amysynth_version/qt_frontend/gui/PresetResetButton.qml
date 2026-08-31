@@ -61,7 +61,7 @@ Button {
     }
 
     Rectangle {
-        visible: root.midiControlRouter !== null
+        visible: root.midiBound || root.midiPresetFeedback
         anchors.horizontalCenter: parent.horizontalCenter
         y: 4
         width: 8

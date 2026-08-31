@@ -478,27 +478,43 @@ Item {
 
                         Rectangle {
                             visible: f06Control.noteButton
+                            width: 40
+                            height: 32
+                            x: 0
+                            y: 7
+                            radius: 6
+                            color: "#2f302d"
+                            opacity: 0.34
+                        }
+
+                        Rectangle {
+                            visible: f06Control.noteButton
                             anchors.centerIn: parent
-                            width: 38
-                            height: 28
-                            radius: 5
-                            color: "#4f4f4a"
-                            border.color: "#242421"
+                            width: 39
+                            height: 31
+                            radius: 6
+                            border.color: "#60615a"
                             border.width: 2
+                            gradient: Gradient {
+                                GradientStop { position: 0.00; color: "#8e9088" }
+                                GradientStop { position: 0.42; color: "#5f615b" }
+                                GradientStop { position: 1.00; color: "#343531" }
+                            }
 
                             Rectangle {
-                                x: 4
+                                id: f06ButtonCap
+                                x: 5
                                 y:
                                     modelData.buttonDown && !modelData.evicting
-                                    ? 5
-                                    : 3
-                                width: parent.width - 8
-                                height: parent.height - 8
+                                    ? 8
+                                    : 5
+                                width: parent.width - 10
+                                height: 18
                                 radius: 4
                                 border.color:
                                     modelData.buttonDown && !modelData.evicting
                                     ? "#fff6f6"
-                                    : "#f0e6d8"
+                                    : "#efe8df"
                                 border.width: 1
                                 gradient: Gradient {
                                     GradientStop {
@@ -533,9 +549,9 @@ Item {
                             }
 
                             Rectangle {
-                                x: 6
-                                y: 5
-                                width: parent.width - 12
+                                x: f06ButtonCap.x + 3
+                                y: f06ButtonCap.y + 2
+                                width: f06ButtonCap.width - 6
                                 height: 3
                                 radius: 2
                                 color: "#ffffff"
