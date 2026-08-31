@@ -15,7 +15,7 @@ import signal
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QTimer, QUrl, Qt
+from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -134,7 +134,6 @@ def main(argv: list[str] | None = None) -> int:
     request_activate = getattr(window, "requestActivate", None)
     if callable(request_activate):
         request_activate()
-    window.setProperty("visibility", int(Qt.Windowed))
     print(
         f"  Window visible property: {window.property('visible')}",
         file=sys.stderr,
