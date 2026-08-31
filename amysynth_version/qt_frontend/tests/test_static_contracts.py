@@ -540,6 +540,26 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("root.controller.bassRiffSelector", qml)
         self.assertIn(".setBassVoicingShift(value)", qml)
         self.assertIn(".setBassRiffSelector(value)", qml)
+        guarded_rhythm_button_actions = {
+            "rhythm_busyness": "setRhythmBusyness",
+            "rhythm_fill": "toggleRhythmFill",
+            "rhythm_chord_activity": "setRhythmChordActivity",
+            "chord_arpeggio": "toggleChordArpeggio",
+            "chord_arpeggio_rate": "setChordArpeggioRate",
+            "chord_arpeggio_direction": "toggleChordArpeggioDirection",
+            "rhythm_bass_activity": "setRhythmBassActivity",
+        }
+        for action, setter in guarded_rhythm_button_actions.items():
+            self.assertRegex(
+                qml,
+                r"(?s)root\.midiButtonHandled\(\{"
+                r".{0,250}"
+                + re.escape(f'"action": "{action}"')
+                + r".{0,250}\}\)\) \{"
+                r".{0,180}"
+                + re.escape(setter),
+                action,
+            )
         self.assertIn("controlsArea.expandedActivityWidth", qml)
         self.assertIn("5 * activityButtonWidth", qml)
         self.assertIn("2 * bassActivityWidth + 2 * activityGap", qml)
