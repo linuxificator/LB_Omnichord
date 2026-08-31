@@ -806,6 +806,64 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn("_target_taps", midi_state)
         self.assertIn("def target_double_tapped(", midi_state)
 
+    def test_parameter_slider_live_edits_do_not_reset_repeater_models(self) -> None:
+        app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        midi_player = (ROOT / "code" / "midi_player.py").read_text(
+            encoding="utf-8"
+        )
+        synth_section = (ROOT / "gui" / "SynthSection.qml").read_text(
+            encoding="utf-8"
+        )
+        midi_synth = (ROOT / "gui" / "MidiSynthSection.qml").read_text(
+            encoding="utf-8"
+        )
+        parameter = (ROOT / "gui" / "ParameterSlider.qml").read_text(
+            encoding="utf-8"
+        )
+
+        for slot in (
+            "def editChordSynthControl(",
+            "def editStrumSynthControl(",
+            "def editBassSynthControl(",
+        ):
+            self.assertIn(slot, app_core)
+        self.assertIn("emit_controls: bool = True", app_core)
+        self.assertIn("emit_controls=False", app_core)
+        self.assertIn("if emit_controls:", app_core)
+        self.assertIn(
+            "must not republish the QML control-list model",
+            app_core,
+        )
+
+        self.assertIn("def editControl(", midi_player)
+        self.assertIn("emit_state: bool", midi_player)
+        self.assertIn("if emit_state:", midi_player)
+
+        self.assertIn("editStrumSynthControl(", synth_section)
+        self.assertIn("editBassSynthControl(", synth_section)
+        self.assertIn("editChordSynthControl(", synth_section)
+        self.assertNotIn("root.controller.setStrumSynthControl(", synth_section)
+        self.assertNotIn("root.controller.setBassSynthControl(", synth_section)
+        self.assertNotIn("root.controller.setChordSynthControl(", synth_section)
+        self.assertIn("root.controller.editControl(", midi_synth)
+        self.assertNotIn("root.controller.setControl(\n", midi_synth)
+
+        release_block = re.search(
+            r"onPressedChanged:\s*\{(?P<body>.*?)\n\s*\}\n\s*\n\s*onMoved:",
+            parameter,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(release_block)
+        assert release_block is not None
+        self.assertNotIn(
+            "} else {\n                root.syncSliderValue()",
+            release_block.group("body"),
+        )
+        self.assertIn(
+            "if (root.midiBindingGesture)\n                    root.syncSliderValue()",
+            release_block.group("body"),
+        )
+
     def test_clickable_visuals_use_qt_quick_buttons(self) -> None:
         rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
             encoding="utf-8"

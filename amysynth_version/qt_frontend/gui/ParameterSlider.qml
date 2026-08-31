@@ -179,7 +179,8 @@ Item {
                 root.midiBindingGesture = root.beginMidiInteraction()
                 root.activated()
             } else {
-                root.syncSliderValue()
+                if (root.midiBindingGesture)
+                    root.syncSliderValue()
                 root.midiBindingGesture = false
             }
         }

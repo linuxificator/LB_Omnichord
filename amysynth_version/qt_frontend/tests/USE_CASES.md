@@ -434,6 +434,10 @@ Expected:
 
 - Sustain zero is the left edge, not the middle of the slider.
 - The label always renders a numeric value such as `Sustain 0.00`.
+- Dragging a synth-parameter slider must not republish/reset the QML
+  `Repeater` control-list model on every movement. The live edit still updates
+  backend state and AMY immediately, but the active delegate must keep Qt's
+  mouse grab until release.
 
 **Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the control; negative values also caused the numeric text to disappear.
 

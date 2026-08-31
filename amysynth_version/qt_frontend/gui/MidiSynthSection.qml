@@ -301,7 +301,7 @@ Item {
 
                         onActivated: root.markInteraction()
                         onEdited: (key, value) => {
-                            root.controller.setControl(
+                            root.controller.editControl(
                                 root.rowIndex,
                                 key,
                                 value
@@ -351,7 +351,7 @@ Item {
 
                         onActivated: root.markInteraction()
                         onEdited: (key, value) => {
-                            root.controller.setControl(
+                            root.controller.editControl(
                                 root.rowIndex,
                                 key,
                                 value

@@ -2509,6 +2509,20 @@ class MidiPlayerBackend(QObject):
 
     @Slot(int, str, float)
     def setControl(self, row: int, key: str, value: float) -> None:
+        self._set_control(row, key, value, emit_state=True)
+
+    @Slot(int, str, float)
+    def editControl(self, row: int, key: str, value: float) -> None:
+        self._set_control(row, key, value, emit_state=False)
+
+    def _set_control(
+        self,
+        row: int,
+        key: str,
+        value: float,
+        *,
+        emit_state: bool,
+    ) -> None:
         if not self._valid_row(row):
             return
         runtime = self._runtime(row)
@@ -2524,7 +2538,8 @@ class MidiPlayerBackend(QObject):
             return
         if runtime.set_control(key, value):
             self._configure_row(int(row))
-            self._emit_state()
+            if emit_state:
+                self._emit_state()
 
     @Slot(int, float)
     def setVolume(self, row: int, value: float) -> None:

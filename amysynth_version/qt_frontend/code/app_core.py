@@ -1737,12 +1737,28 @@ class InstrumentBackend(QObject):
         self._set_synth_control("chord", key, value)
 
     @Slot(str, float)
+    def editChordSynthControl(
+        self,
+        key: str,
+        value: float,
+    ) -> None:
+        self._set_synth_control("chord", key, value, emit_controls=False)
+
+    @Slot(str, float)
     def setStrumSynthControl(
         self,
         key: str,
         value: float,
     ) -> None:
         self._set_synth_control("strum", key, value)
+
+    @Slot(str, float)
+    def editStrumSynthControl(
+        self,
+        key: str,
+        value: float,
+    ) -> None:
+        self._set_synth_control("strum", key, value, emit_controls=False)
 
     @Slot(str, float)
     def setBassSynthControl(
@@ -1752,11 +1768,21 @@ class InstrumentBackend(QObject):
     ) -> None:
         self._set_synth_control("bass", key, value)
 
+    @Slot(str, float)
+    def editBassSynthControl(
+        self,
+        key: str,
+        value: float,
+    ) -> None:
+        self._set_synth_control("bass", key, value, emit_controls=False)
+
     def _set_synth_control(
         self,
         role: SynthRole,
         key: str,
         value: float,
+        *,
+        emit_controls: bool = True,
     ) -> None:
         runtime = self._runtime(role)
         if self._midi_control_blocks(
@@ -1772,10 +1798,13 @@ class InstrumentBackend(QObject):
         if not runtime.set_control(key, value):
             return
 
-        # UI edits publish the same complete logical state as preset loads and
-        # instrument switches. AmySerialClient diffs this state and sends only
-        # the engine parameters which actually changed.
-        self._emit_synth_change(role, selection_changed=False)
+        # UI live edits send the same complete logical state to AMY, but they
+        # must not republish the QML control-list model on every mouse move:
+        # resetting a Repeater delegate during an active drag drops Qt's mouse
+        # grab after the first movement. Instrument switches, preset loads and
+        # external API/MIDI writes keep the default controlsChanged emission.
+        if emit_controls:
+            self._emit_synth_change(role, selection_changed=False)
         self._send_synth_state(role)
 
     def _effective_tuning_reference(self) -> float:
