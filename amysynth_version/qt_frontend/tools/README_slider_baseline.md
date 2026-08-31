@@ -64,3 +64,13 @@ This adds the real app's outer shape: a `Flickable` viewport and scaled
 slider and a delayed-echo slider. If this fails, the bug is in viewport/layout
 pointer handling. If it works, the remaining suspect is full-app runtime state
 feedback or another surrounding full-app control.
+
+For full-app slider tracing on a desktop machine, use the local AMY launcher:
+
+```bash
+./run_local.sh --slider-trace
+```
+
+Do not run `code/main.py --slider-trace` directly on a desktop unless a serial
+AMY device exists or an AMY socket option is supplied. Direct `code/main.py`
+uses the default Pi serial config (`/dev/serial0`).
