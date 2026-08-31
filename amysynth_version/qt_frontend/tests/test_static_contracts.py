@@ -129,7 +129,7 @@ class StaticContractTests(unittest.TestCase):
             repository / ".github" / "workflows" / "desktop-release.yml"
         ).read_text(encoding="utf-8")
         self.assertIn("refresh-readme-screenshots:", workflow)
-        self.assertIn("needs: [publish-release]", workflow)
+        self.assertIn("needs: [publish-release, release-metadata]", workflow)
         self.assertIn(
             "python amysynth_version/qt_frontend/capture_screenshots.py",
             workflow,

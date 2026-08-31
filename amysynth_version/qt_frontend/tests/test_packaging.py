@@ -147,7 +147,7 @@ class PackagingContracts(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("refresh-readme-screenshots:", release)
-        self.assertIn("needs: [publish-release]", release)
+        self.assertIn("needs: [publish-release, release-metadata]", release)
         self.assertNotIn("validation_only:", release)
         self.assertNotIn("inputs.validation_only", release)
         self.assertNotIn("actions: write", release)

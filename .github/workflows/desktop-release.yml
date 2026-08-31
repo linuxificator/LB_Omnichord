@@ -606,7 +606,7 @@ jobs:
 
   refresh-readme-screenshots:
     if: github.ref == 'refs/heads/main'
-    needs: [publish-release]
+    needs: [publish-release, release-metadata]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
