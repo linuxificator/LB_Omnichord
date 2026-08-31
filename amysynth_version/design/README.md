@@ -33,6 +33,37 @@ Core rules:
 - `CODEX_HANDOVER_EXTERNAL_CONTROLS.md` records the branch-local lessons from
   the external-control rework: smooth Qt slider drag, backend echo boundaries,
   MIDI input tech indicators and scoped hardware button takeover.
+- `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md` indexes the 2026-08-31
+  repository-wide code-quality audit. Those files are analysis and proposed
+  refactoring guidance, not authority to change product behavior.
+
+## Code-quality audit handovers
+
+The audit is intentionally split by responsibility so future work can select a
+small, behavior-preserving phase:
+
+- `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md` — method, measurements, strengths,
+  highest-priority findings and index;
+- `CODEX_HANDOVER_CONFIGURATION_AND_DRY.md` — configuration authority,
+  validation, migration and duplicated defaults;
+- `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md` — dependency direction,
+  composition, state ownership and incremental component boundaries;
+- `CODEX_HANDOVER_PYTHON_MODULARITY_AND_TYPES.md` — Python hotspots, typing,
+  public interfaces, errors and tooling;
+- `CODEX_HANDOVER_QML_UI_ARCHITECTURE.md` — QML responsibilities, reusable
+  interaction primitives, slider lessons and UI testing;
+- `CODEX_HANDOVER_MUSICAL_DOMAIN_AND_DATA.md` — musical policy separation,
+  command plans, catalogues, provenance and duplicated datasets;
+- `CODEX_HANDOVER_TEST_ARCHITECTURE.md` — behavior/static test balance,
+  quality gates, timing and release evidence;
+- `CODEX_HANDOVER_CONCURRENCY_REALTIME_AND_IO.md` — thread ownership, bounded
+  queues, failure, shutdown and local framing;
+- `CODEX_HANDOVER_PORTABILITY_RELEASE_AND_SECURITY.md` — platform selection,
+  pinned inputs, manifest, provenance, SBOM and signing boundaries;
+- `CODEX_HANDOVER_DOCUMENTATION_AND_REPOSITORY_HYGIENE.md` — document
+  authority/status, stale facts, tools, screenshots and repository policy;
+- `CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md` — prioritized, independently
+  releasable phases and proof required for each.
 
 ## Required reading route for Codex
 
@@ -62,6 +93,7 @@ Then add every row that matches the task:
 | Optional historical WSL experiment | `../qt_frontend/docs/WSL_APPIMAGE_TESTING.md`, plus the desktop documents above |
 | ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |
+| Architecture, code quality or refactoring | `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md`, the relevant dedicated audit handover, `CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md`, plus every owning subsystem contract touched by the proposed change |
 
 When a selected document points to a more specific behavioral contract, read
 that contract too. Historical files under `qt_frontend/docs/history/` and the
