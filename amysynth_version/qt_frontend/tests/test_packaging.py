@@ -154,6 +154,11 @@ class PackagingContracts(unittest.TestCase):
             "python amysynth_version/qt_frontend/capture_screenshots.py",
             release,
         )
+        self.assertIn(
+            "python amysynth_version/qt_frontend/tools/"
+            "normalize_screenshot_changes.py",
+            release,
+        )
         self.assertIn("git diff --quiet --", release)
         self.assertIn("git push origin HEAD:main", release)
         self.assertIn("gh workflow run desktop-release.yml", release)

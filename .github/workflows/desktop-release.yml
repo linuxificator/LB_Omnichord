@@ -635,6 +635,7 @@ jobs:
       - name: Capture and validate the released interface
         run: |
           python amysynth_version/qt_frontend/capture_screenshots.py
+          python amysynth_version/qt_frontend/tools/normalize_screenshot_changes.py
           python amysynth_version/qt_frontend/tests/test_static_contracts.py
 
       - name: Commit changed README screenshots and queue validation release
