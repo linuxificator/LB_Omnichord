@@ -538,7 +538,7 @@ class MidiAmyEngineTests(unittest.TestCase):
             applied.append((dict(target), int(midi_value), source_key))
 
         backend._apply_control_target = apply_target
-        backend._midi_control_state.select_control(
+        backend._midi_control_state.indicator_clicked(
             (1, PITCH_BEND_CONTROLLER),
             now=1.0,
         )
@@ -555,6 +555,34 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(applied[0][1], 8192)
         self.assertEqual(applied[0][2], (1, PITCH_BEND_CONTROLLER))
         self.assertEqual(applied[0][0]["id"], "midi:master_volume")
+
+    def test_indicator_click_unlinks_green_before_blue_can_start_learn(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._midi_control_state = MidiControlState()
+        backend._midi_control_lock = threading.Lock()
+        records: list[dict[str, object]] = []
+        backend._write_cc_test_log = lambda record: records.append(dict(record))
+        backend._sync_blue_timer = lambda *_args, **_kwargs: None
+        backend._bump_binding_state = lambda *_args, **_kwargs: None
+
+        state = backend._midi_control_state
+        state.observe(1, 74, 0, now=1.0)
+        state.observe(1, 74, 1, now=1.1)
+        state.indicator_clicked((1, 74), now=1.2)
+        state.bind_learned_target(
+            {"id": "omni:master_volume", "screen": "omni"},
+            now=1.3,
+        )
+
+        backend.clickControlIndicator(1, 74)
+        self.assertEqual(state.status((1, 74)), "blue")
+        self.assertIsNone(state.learn_key)
+        self.assertEqual(records[-1]["reason"], "indicator-click")
+
+        backend.clickControlIndicator(1, 74)
+        self.assertEqual(state.status((1, 74)), "learn")
+        self.assertEqual(state.learn_key, (1, 74))
+        self.assertEqual(len(records), 1)
 
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
         client = _Client()

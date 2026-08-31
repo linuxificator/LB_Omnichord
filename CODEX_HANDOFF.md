@@ -34,6 +34,13 @@ For `rework/external_controls`, also read at minimum:
 - `amysynth_version/qt_frontend/docs/CONTROL_SAFETY.md`;
 - `amysynth_version/qt_frontend/tests/USE_CASES.md`.
 
+Also read `amysynth_version/design/CODEX_HANDOVER_EXTERNAL_CONTROLS.md` before
+changing slider or MIDI-learn interaction. It records why stable QML delegates
+are required during a drag and why manual movement of a bound numeric control
+is now an intentional release-before-edit operation rather than an incidental
+side effect. Indicator clicks use the explicit grey/blue-to-learn,
+green-to-unlinked-blue and red-to-grey state machine documented there.
+
 If the task touches rhythm, platform packages, Windows, Android, ESP32-P4 or
 the AMY fork, follow the additional rows in `design/README.md` before editing.
 

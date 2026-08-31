@@ -31,7 +31,19 @@ def bind_control(
 ) -> None:
     app.action("injectMidiControl", channel, controller, 0)
     app.action("injectMidiControl", channel, controller, 1)
-    app.action("selectMidiControlIndicator", channel, controller)
+    states = {
+        (item["channel"], item["controller"]): item["state"]
+        for item in app.action("midiControlIndicators")
+    }
+    if states.get((channel, controller)) == "bound":
+        app.action("clickMidiControlIndicator", channel, controller)
+        unlinked = {
+            (item["channel"], item["controller"]): item["state"]
+            for item in app.action("midiControlIndicators")
+        }
+        if unlinked.get((channel, controller)) != "blue":
+            raise AssertionError("green indicator click did not unlink to blue")
+    app.action("clickMidiControlIndicator", channel, controller)
     if not app.action("activateMidiControlTarget", target):
         raise AssertionError(f"could not bind MIDI target {target}")
 
@@ -130,7 +142,7 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("tuningReference")), 466)
             self.assertEqual(int(app.action("midiTuningReference")), 466)
 
-            app.action("moveMidiControlTarget", midi_target)
+            app.action("manuallyEditMidiControlTarget", midi_target)
             omni_target = {"screen": "omni", "kind": "tuning_reference"}
             bind_control(app, 11, 91, omni_target)
             app.action("injectMidiControl", 11, 91, 127)
@@ -167,7 +179,7 @@ class PresetIntegrationTests(unittest.TestCase):
                 app.action("injectMidiControl", channel, controller, 0)
                 app.action("injectMidiControl", channel, controller, 1)
                 app.action(
-                    "selectMidiControlIndicator",
+                    "clickMidiControlIndicator",
                     channel,
                     controller,
                 )

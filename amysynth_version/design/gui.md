@@ -143,10 +143,11 @@ border after a quick tap.
 
 Ordinary buttons use Qt Quick Controls button signals. Held increment/decrement
 controls use `AbstractButton.autoRepeat`; sliders use `Slider.onMoved`; MIDI
-unlink uses Qt's double-click/double-tap signals outside the slider drag path
-for horizontal sliders. Application code assigns the musical meaning after Qt
-has classified the input and must not infer these gestures with elapsed-time or
-movement-count thresholds.
+manual takeover uses the first real `Slider.onMoved` value change or the first
+increment/decrement step. Pressing a slider without changing its value does not
+unlink it. Application code assigns the musical meaning after Qt has classified
+the input and must not infer these gestures with elapsed-time or movement-count
+thresholds.
 
 Custom Qt Slider handles must expose `implicitWidth` and `implicitHeight`.
 Setting only visual `width` and `height` can leave `implicitHandleWidth` at

@@ -14,6 +14,7 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
+    property bool midiManualTakeoverPending: false
     readonly property bool traceGestures:
         typeof sliderTrace !== "undefined" && sliderTrace
 
@@ -45,9 +46,12 @@ Item {
         return learned || root.midiPresetFeedback
     }
 
-    function moveMidiInteraction() {
-        if (root.midiControlRouter !== null)
-            root.midiControlRouter.controlTargetMoved(root.midiTarget)
+    function releaseMidiBindingForManualEdit() {
+        if (root.midiControlRouter !== null) {
+            root.midiControlRouter.releaseControlTargetForManualEdit(
+                root.midiTarget
+            )
+        }
     }
 
     function isLogScale() {
@@ -135,16 +139,6 @@ Item {
         font.bold: true
         elide: Text.ElideRight
 
-        TapHandler {
-            gesturePolicy: TapHandler.DragThreshold
-            onDoubleTapped: {
-                if (root.midiControlRouter !== null) {
-                    root.midiControlRouter.controlTargetDoubleTapped(
-                        root.midiTarget
-                    )
-                }
-            }
-        }
     }
 
     Slider {
@@ -177,11 +171,14 @@ Item {
             if (pressed) {
                 root.beginSliderDrag()
                 root.midiBindingGesture = root.beginMidiInteraction()
+                root.midiManualTakeoverPending =
+                    !root.midiBindingGesture && root.midiBound
                 root.activated()
             } else {
                 if (root.midiBindingGesture)
                     root.syncSliderValue()
                 root.midiBindingGesture = false
+                root.midiManualTakeoverPending = false
             }
         }
 
@@ -191,7 +188,13 @@ Item {
                 root.syncSliderValue()
                 return
             }
-            root.moveMidiInteraction()
+            if (root.midiManualTakeoverPending) {
+                // Manual UI movement intentionally takes ownership from MIDI
+                // before the new value is applied. A press without movement
+                // never reaches this path and therefore stays bound.
+                root.releaseMidiBindingForManualEdit()
+                root.midiManualTakeoverPending = false
+            }
             root.edited(
                 root.control.key,
                 root.sliderToControl(value)

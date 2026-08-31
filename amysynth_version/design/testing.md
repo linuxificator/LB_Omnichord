@@ -225,8 +225,9 @@ Important regression tests:
 - MIDI CC learn permits one red controller, binds every continuous numeric
   control family one-to-one, maps logarithmic sliders over visual travel,
   protects red/blue indicators, preserves hidden instrument-specific bindings,
-  allows manual takeover through bound drag/edit gestures, unlinks explicitly
-  through double-tap/double-click controls outside slider drag handles,
+  unlinks before applying the first real bound drag/edit value, keeps a bound
+  press without movement coupled, gives green/blue/grey/red indicator clicks
+  their state-specific single-click meanings,
   expires blue state and persists bindings in the owning MIDI or OMNI preset
 - CC-style MIDI controller-button learn binds supported app buttons, presses
   through the same backend action as a screen tap, shows the same button LED

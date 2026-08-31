@@ -294,16 +294,30 @@ class MidiControlState:
             changed = True
         return changed
 
-    def select_control(self, key: ControlKey, *, now: float | None = None) -> bool:
+    def indicator_clicked(
+        self,
+        key: ControlKey,
+        *,
+        now: float | None = None,
+    ) -> bool:
+        """Apply the single-click contract for a controller indicator.
+
+        A bound (green) indicator is an unlink action only.  An unbound grey
+        or blue indicator starts learn, while clicking the already-red learn
+        indicator cancels learn.  Keeping these transitions here prevents the
+        QML button from accidentally combining unlink and relearn.
+        """
         now = time.monotonic() if now is None else float(now)
         key = self.key(*key)
         if self.learn_key == key:
             self.learn_key = None
             self.blue_since.pop(key, None)
             return True
-        previous_target = self.bindings.pop(key, None)
-        if previous_target is not None:
-            self._target_to_control.pop(self.target_id(previous_target), None)
+
+        bound_target = self.bindings.get(key)
+        if bound_target is not None:
+            return self._unbind_target(bound_target, now)
+
         self.learn_key = key
         self.blue_since.pop(key, None)
         self.ensure_visible(key, now=now)
@@ -398,21 +412,13 @@ class MidiControlState:
         self.ensure_visible(key, now=now)
         return True
 
-    def target_double_tapped(
+    def release_target_for_manual_edit(
         self,
         target: dict[str, Any],
         *,
         now: float | None = None,
     ) -> bool:
-        now = time.monotonic() if now is None else float(now)
-        return self._unbind_target(target, now)
-
-    def target_moved(
-        self,
-        target: dict[str, Any],
-        *,
-        now: float | None = None,
-    ) -> bool:
+        """Release MIDI ownership immediately before a genuine UI edit."""
         now = time.monotonic() if now is None else float(now)
         return self._unbind_target(target, now)
 

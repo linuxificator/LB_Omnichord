@@ -244,9 +244,10 @@ class StaticContractTests(unittest.TestCase):
         tuning = (ROOT / "gui" / "TapNumber.qml").read_text(
             encoding="utf-8"
         )
-        for component in (parameter, labeled, volume, tuning):
+        numeric_components = (parameter, labeled, volume, tuning)
+        for component in numeric_components:
             self.assertIn("activateControlTarget", component)
-            self.assertIn("controlTargetDoubleTapped", component)
+            self.assertIn("releaseControlTargetForManualEdit", component)
             self.assertIn("controlTargetVisualState", component)
             self.assertIn("midiBound", component)
             self.assertIn('"#35b85a"', component)
@@ -263,12 +264,13 @@ class StaticContractTests(unittest.TestCase):
             )
             self.assertNotIn("const wasBound = root.midiBound", component)
 
-        self.assertIn("controlTargetMoved", parameter)
-        self.assertIn("controlTargetMoved", labeled)
-        self.assertIn("controlTargetMoved", volume)
-        self.assertIn("controlTargetMoved", tuning)
+        numeric_combined = "\n".join(numeric_components)
+        self.assertNotIn("controlTargetDoubleTapped", numeric_combined)
+        self.assertNotIn("controlTargetMoved", numeric_combined)
         self.assertIn("if (root.midiBindingGesture)", parameter)
         self.assertIn("if (root.midiBindingGesture)", labeled)
+        self.assertIn("midiManualTakeoverPending", parameter)
+        self.assertIn("midiManualTakeoverPending", labeled)
         self.assertIn("root.syncSliderValue()", parameter)
         self.assertIn("slider.value = Qt.binding", labeled)
         self.assertIn("return root.currentValue", labeled)
@@ -315,7 +317,7 @@ class StaticContractTests(unittest.TestCase):
         for state in ("learn", "bound", "blue"):
             self.assertIn(f'modelData.state === "{state}"', midi)
         self.assertIn("modelData.evicting", midi)
-        self.assertIn("selectControlIndicator", midi)
+        self.assertIn("clickControlIndicator", midi)
         self.assertNotIn("id: omniMidiControlLed", omni)
         self.assertIn("backend.midiPlayer.omniControlLedState", omni)
         self.assertIn('=== "learn"', omni)
@@ -802,10 +804,8 @@ class StaticContractTests(unittest.TestCase):
             self.assertNotIn(marker, combined)
         self.assertIn("autoRepeat: true", numeric[0])
         self.assertIn("autoRepeat: true", numeric[1])
-        self.assertIn("onDoubleClicked:", numeric[0])
-        self.assertIn("onDoubleClicked:", numeric[1])
-        self.assertIn("onDoubleTapped:", numeric[2])
-        self.assertIn("onDoubleTapped:", numeric[3])
+        self.assertNotIn("onDoubleClicked:", combined)
+        self.assertNotIn("onDoubleTapped:", combined)
         self.assertIn("onMoved:", numeric[2])
         self.assertIn("onMoved:", numeric[3])
         for slider_qml in numeric[2:4]:
@@ -824,7 +824,9 @@ class StaticContractTests(unittest.TestCase):
         )
         self.assertNotIn("double_tap_window", midi_state)
         self.assertNotIn("_target_taps", midi_state)
-        self.assertIn("def target_double_tapped(", midi_state)
+        self.assertNotIn("def target_double_tapped(", midi_state)
+        self.assertIn("def indicator_clicked(", midi_state)
+        self.assertIn("def release_target_for_manual_edit(", midi_state)
 
     def test_parameter_slider_live_edits_do_not_reset_repeater_models(self) -> None:
         app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")

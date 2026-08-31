@@ -43,13 +43,35 @@ The implementation keeps the public setter paths unchanged for non-drag cases:
 Regression coverage is intentionally layered:
 
 - `test_qml_gesture_controls.py` proves plain and custom sliders still drag,
-  stale backend echoes do not fight a drag, and replacing a parameter model
-  during a press no longer prevents reaching the dragged value.
+  stale backend echoes do not fight a drag, replacing a parameter model during
+  a press no longer prevents reaching the dragged value, and a bound drag
+  releases MIDI ownership exactly once before its first UI edit.
 - `test_slider_backend_contracts.py` proves public setters keep model emission
   while UI-live edit slots suppress only the model-reset side effect.
 - `test_static_contracts.py` prevents future QML rewiring from bypassing the
-  live-edit path or moving double-tap unlink handlers back onto slider drag
-  handles.
+  live-edit path or restoring the superseded double-tap unlink path.
+
+## Intentional manual MIDI takeover
+
+During implementation, moving a MIDI-bound slider already happened to unlink
+it because `onMoved` called a generic movement hook. The behavior proved useful,
+but retaining an incidental call would leave it vulnerable to cleanup or gesture
+refactoring. The contract and code now name the intent directly:
+
+- `MidiControlState.release_target_for_manual_edit()` is the sole numeric-target
+  unlink transition;
+- QML calls `releaseControlTargetForManualEdit()` before applying the first
+  changed value from a bound mouse/touch drag;
+- horizontal sliders track `midiManualTakeoverPending` per press, so only a real
+  `Slider.onMoved` event unlinks and the release happens once;
+- click-only volume/tuning controls release before their first value step;
+- there is no double-tap unlink handler or Python gesture classifier.
+
+The grey-bar controller indicator also has an explicit single-click state
+machine in `MidiControlState.indicator_clicked()`: grey/blue starts learn, red
+cancels learn, and green only unlinks to blue. In particular, green never means
+“unlink and immediately relearn”. State-machine, real QML pointer and static
+contract tests protect these transitions and their release-before-edit order.
 
 ## MIDI input techs
 

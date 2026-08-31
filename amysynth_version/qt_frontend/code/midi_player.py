@@ -2029,11 +2029,23 @@ class MidiPlayerBackend(QObject):
                 )
 
     @Slot(int, int)
-    def selectControlIndicator(self, channel: int, controller: int) -> None:
+    def clickControlIndicator(self, channel: int, controller: int) -> None:
+        key = (int(channel), int(controller))
         with self._midi_control_lock:
-            self._midi_control_state.select_control((channel, controller))
-        self._sync_blue_timer()
-        self._bump_binding_state()
+            was_bound = self._midi_control_state.status(key) == "bound"
+            changed = self._midi_control_state.indicator_clicked(key)
+        if changed:
+            if was_bound:
+                self._write_cc_test_log(
+                    {
+                        "event": "unbind",
+                        "reason": "indicator-click",
+                        "channel": key[0],
+                        "controller": key[1],
+                    }
+                )
+            self._sync_blue_timer()
+            self._bump_binding_state()
 
     @Slot("QVariantMap", result=bool)
     def activateControlTarget(self, raw: dict[str, Any]) -> bool:
@@ -2079,29 +2091,22 @@ class MidiPlayerBackend(QObject):
             return self._midi_control_state.target_visual_state(target)
 
     @Slot("QVariantMap")
-    def controlTargetDoubleTapped(self, raw: dict[str, Any]) -> None:
+    def releaseControlTargetForManualEdit(self, raw: dict[str, Any]) -> None:
+        """Release MIDI ownership before QML applies a manual UI value."""
         target = self._normalize_control_target(raw)
         if target is None:
             return
         with self._midi_control_lock:
-            changed = self._midi_control_state.target_double_tapped(target)
-        if changed:
-            self._write_cc_test_log(
-                {"event": "unbind", "reason": "double-tap", "target": target["id"]}
+            changed = self._midi_control_state.release_target_for_manual_edit(
+                target
             )
-            self._sync_blue_timer()
-            self._bump_binding_state()
-
-    @Slot("QVariantMap")
-    def controlTargetMoved(self, raw: dict[str, Any]) -> None:
-        target = self._normalize_control_target(raw)
-        if target is None:
-            return
-        with self._midi_control_lock:
-            changed = self._midi_control_state.target_moved(target)
         if changed:
             self._write_cc_test_log(
-                {"event": "unbind", "reason": "move", "target": target["id"]}
+                {
+                    "event": "unbind",
+                    "reason": "manual-ui-edit",
+                    "target": target["id"],
+                }
             )
             self._sync_blue_timer()
             self._bump_binding_state()

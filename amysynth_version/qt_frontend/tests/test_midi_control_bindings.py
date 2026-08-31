@@ -67,16 +67,16 @@ class MidiControlStateTests(unittest.TestCase):
         state = MidiControlState(capacity=2)
         change(state, 1, now=1.0)
         change(state, 2, now=2.0)
-        state.select_control((1, 1), now=3.0)
+        state.indicator_clicked((1, 1), now=3.0)
         self.assertEqual(state.status((1, 1)), "learn")
 
         change(state, 3, now=4.0)
         self.assertIsNotNone(state._visible((1, 1)))
         self.assertIsNone(state._visible((1, 2)))
 
-        state.select_control((1, 1), now=5.0)
+        state.indicator_clicked((1, 1), now=5.0)
         self.assertEqual(state.status((1, 1)), "idle")
-        state.select_control((1, 3), now=6.0)
+        state.indicator_clicked((1, 3), now=6.0)
         self.assertEqual(state.status((1, 3)), "learn")
         self.assertEqual(state.status((1, 1)), "idle")
 
@@ -84,7 +84,7 @@ class MidiControlStateTests(unittest.TestCase):
         state = MidiControlState(capacity=2)
         change(state, 1, now=1.0)
         change(state, 2, now=2.0)
-        state.select_control((1, 1), now=2.1)
+        state.indicator_clicked((1, 1), now=2.1)
         state.bind_learned_target(target("volume"), now=2.2)
 
         change(state, 3, now=3.0)
@@ -97,21 +97,23 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertEqual(mapped, target("volume"))
         self.assertIsNotNone(state._visible((1, 1)))
 
-    def test_one_to_one_replacement_and_double_tap_unbind(self) -> None:
+    def test_one_to_one_replacement_and_manual_edit_unbind(self) -> None:
         state = MidiControlState(capacity=3)
         change(state, 1, now=1.0)
         change(state, 2, now=2.0)
         shared = target("shared")
 
-        state.select_control((1, 1), now=3.0)
+        state.indicator_clicked((1, 1), now=3.0)
         state.bind_learned_target(shared, now=3.1)
-        state.select_control((1, 2), now=3.2)
+        state.indicator_clicked((1, 2), now=3.2)
         state.bind_learned_target(shared, now=3.3)
 
         self.assertNotIn((1, 1), state.bindings)
         self.assertEqual(state.status((1, 1)), "blue")
         self.assertEqual(state.status((1, 2)), "bound")
-        self.assertTrue(state.target_double_tapped(shared, now=4.0))
+        self.assertTrue(
+            state.release_target_for_manual_edit(shared, now=4.0)
+        )
         self.assertEqual(state.status((1, 2)), "blue")
         self.assertEqual(state.omni_led_state(), "blue")
 
@@ -120,18 +122,32 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertIsNone(state._visible((1, 1)))
         self.assertIsNone(state._visible((1, 2)))
 
-    def test_clicking_green_starts_relearn_and_second_click_cancels_to_off(self) -> None:
+    def test_indicator_single_click_unlinks_or_toggles_learn_by_state(self) -> None:
         state = MidiControlState(capacity=2)
         change(state, 1, now=1.0)
+        change(state, 2, now=1.1)
         binding = target("volume")
-        state.select_control((1, 1), now=2.0)
+        state.indicator_clicked((1, 1), now=2.0)
         state.bind_learned_target(binding, now=2.1)
         self.assertEqual(state.status((1, 1)), "bound")
 
-        state.select_control((1, 1), now=3.0)
-        self.assertEqual(state.status((1, 1)), "learn")
+        state.indicator_clicked((1, 2), now=2.2)
+        self.assertEqual(state.status((1, 2)), "learn")
+
+        # Clicking green means unlink only; it must not silently start relearn
+        # or steal an existing red learn selection.
+        state.indicator_clicked((1, 1), now=3.0)
+        self.assertEqual(state.status((1, 1)), "blue")
+        self.assertEqual(state.status((1, 2)), "learn")
         self.assertNotIn((1, 1), state.bindings)
-        state.select_control((1, 1), now=3.1)
+
+        # Clicking blue starts learn and transfers the unique red selection.
+        state.indicator_clicked((1, 1), now=3.1)
+        self.assertEqual(state.status((1, 1)), "learn")
+        self.assertEqual(state.status((1, 2)), "idle")
+
+        # Clicking the already-red indicator cancels learn.
+        state.indicator_clicked((1, 1), now=3.2)
         self.assertEqual(state.status((1, 1)), "idle")
 
     def test_real_move_unbinds_and_oldest_blue_can_leave_early(self) -> None:
@@ -143,9 +159,14 @@ class MidiControlStateTests(unittest.TestCase):
             (2, second, 2.0),
         ):
             change(state, controller, now=start)
-            state.select_control((1, controller), now=start + 0.1)
+            state.indicator_clicked((1, controller), now=start + 0.1)
             state.bind_learned_target(binding, now=start + 0.2)
-            self.assertTrue(state.target_moved(binding, now=start + 0.3))
+            self.assertTrue(
+                state.release_target_for_manual_edit(
+                    binding,
+                    now=start + 0.3,
+                )
+            )
 
         change(state, 3, now=4.0)
         self.assertIsNone(state._visible((1, 1)))
@@ -156,9 +177,11 @@ class MidiControlStateTests(unittest.TestCase):
         state = MidiControlState(capacity=2)
         binding = target("volume")
         change(state, 1, now=1.0)
-        state.select_control((1, 1), now=2.0)
+        state.indicator_clicked((1, 1), now=2.0)
         state.bind_learned_target(binding, now=2.1)
-        self.assertTrue(state.target_moved(binding, now=3.0))
+        self.assertTrue(
+            state.release_target_for_manual_edit(binding, now=3.0)
+        )
         self.assertEqual(state.status((1, 1)), "blue")
 
         changed, mapped, key = state.observe(1, 1, 1, now=3.5)
@@ -267,7 +290,7 @@ class MidiControlStateTests(unittest.TestCase):
         }
 
         change(state, 21, value=127, now=1.0)
-        state.select_control((1, 21), now=2.0)
+        state.indicator_clicked((1, 21), now=2.0)
         state.bind_learned_target(button_target, now=2.1)
         changed, mapped, key = state.observe(1, 21, 0, now=3.0)
 
