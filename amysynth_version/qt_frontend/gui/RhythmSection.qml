@@ -233,6 +233,23 @@ Item {
                 groupColor: "#f5df78"
                 idleColor: "#f7e9a8"
                 selectedColor: "#bc8410"
+                midiControlRouter: root.controller.midiPlayer
+                activityMidiTargetForLevel: function(level) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_busyness",
+                        "level": level
+                    }
+                }
+                fillMidiTargetForIndex: function(fillIndex) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_fill",
+                        "fill": fillIndex
+                    }
+                }
 
                 onActivitySelected: (level) => {
                     if (!root.midiButtonHandled({
@@ -284,6 +301,33 @@ Item {
                 groupColor: "#f8e9a1"
                 idleColor: "#faefbd"
                 selectedColor: "#cb981d"
+                midiControlRouter: root.controller.midiPlayer
+                activityMidiTargetForLevel: function(level) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_chord_activity",
+                        "level": level
+                    }
+                }
+                arpeggioMidiTarget: ({
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "chord_arpeggio"
+                })
+                rateMidiTargetForRate: function(rate) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_arpeggio_rate",
+                        "rate": rate
+                    }
+                }
+                directionMidiTarget: ({
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "chord_arpeggio_direction"
+                })
 
                 onActivitySelected: (level) => {
                     if (!root.midiButtonHandled({
@@ -347,6 +391,15 @@ Item {
                 groupColor: "#faefbd"
                 idleColor: "#fff5d1"
                 selectedColor: "#d4aa3a"
+                midiControlRouter: root.controller.midiPlayer
+                midiTargetForLevel: function(level) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_bass_activity",
+                        "level": level
+                    }
+                }
 
                 onSelected: (level) => {
                     if (!root.midiButtonHandled({
