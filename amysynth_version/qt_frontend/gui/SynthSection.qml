@@ -66,17 +66,17 @@ Item {
 
     function setControl(key, value) {
         if (root.role === "strum") {
-            root.controller.setStrumSynthControl(
+            root.controller.editStrumSynthControl(
                 key,
                 value
             )
         } else if (root.role === "bass") {
-            root.controller.setBassSynthControl(
+            root.controller.editBassSynthControl(
                 key,
                 value
             )
         } else {
-            root.controller.setChordSynthControl(
+            root.controller.editChordSynthControl(
                 key,
                 value
             )

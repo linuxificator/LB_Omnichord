@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sys
+import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -9,7 +11,14 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
-from midi_player import MidiAmyEngine, MidiPlayerBackend  # noqa: E402
+from midi_player import (  # noqa: E402
+    MidiAmyEngine,
+    MidiPlayerBackend,
+    _LinuxRawMidiReader,
+    _MidiInputTechManager,
+)
+from midi_control import NOTE_BUTTON_OFFSET, PITCH_BEND_CONTROLLER  # noqa: E402
+from midi_control import MidiControlState  # noqa: E402
 from synth_state import SynthState  # noqa: E402
 
 
@@ -51,6 +60,244 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_midi_platform_techs_are_filtered_by_runtime_platform(self) -> None:
+        cases = {
+            "linux": ("alsa_raw", "alsa_seq", "oss_midi"),
+            "darwin": ("coremidi",),
+            "win32": ("winmm",),
+            "android": ("android_midi",),
+            "freebsd": (),
+        }
+        for profile, expected in cases.items():
+            with self.subTest(profile=profile):
+                techs = _MidiInputTechManager.platform_techs(
+                    {"device_glob": "/tmp/midi-test"},
+                    profile,
+                )
+                self.assertEqual(
+                    tuple(item["key"] for item in techs),
+                    expected,
+                )
+
+        linux = _MidiInputTechManager.platform_techs(
+            {"device_glob": "/tmp/midi-test"},
+            "linux",
+        )
+        self.assertEqual(linux[0]["globs"], ["/tmp/midi-test"])
+
+    def test_linux_legacy_raw_glob_is_preserved_with_new_config(self) -> None:
+        linux = _MidiInputTechManager.platform_techs(
+            {
+                "device_glob": "/tmp/legacy-midi",
+                "alsa_raw_globs": ["/tmp/configured-midi"],
+            },
+            "linux",
+        )
+
+        self.assertEqual(
+            linux[0]["globs"],
+            ["/tmp/legacy-midi", "/tmp/configured-midi"],
+        )
+
+    def test_non_linux_profiles_expose_only_their_platform_tech(self) -> None:
+        expected = {
+            "darwin": ("coremidi", "CoreMIDI", "CoreMIDI bridge"),
+            "win32": ("winmm", "WinMM MIDI", "WinMM MIDI bridge"),
+            "android": ("android_midi", "Android MIDI", "Android MIDI bridge"),
+        }
+        for profile, (key, label, reason) in expected.items():
+            with self.subTest(profile=profile):
+                techs = _MidiInputTechManager.platform_techs({}, profile)
+                self.assertEqual(len(techs), 1)
+                self.assertEqual(techs[0]["key"], key)
+                self.assertEqual(techs[0]["label"], label)
+                self.assertEqual(techs[0]["backend"], "unsupported")
+                self.assertIn(reason, techs[0]["unsupported_reason"])
+
+    def test_midi_tech_status_marks_readable_inputs_and_activity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "midi0"
+            path.write_bytes(b"")
+            manager = _MidiInputTechManager.__new__(_MidiInputTechManager)
+            manager._enabled = True
+            manager._techs = [
+                {
+                    "key": "test_raw",
+                    "label": "Test raw",
+                    "backend": "byte_stream",
+                    "globs": [str(path)],
+                },
+                {
+                    "key": "missing_raw",
+                    "label": "Missing raw",
+                    "backend": "byte_stream",
+                    "globs": [str(Path(directory) / "missing")],
+                },
+            ]
+
+            snapshot = manager.status_snapshot({"test_raw": 20.0}, now=10.0)
+
+            self.assertEqual(snapshot[0]["state"], "activity")
+            self.assertTrue(snapshot[0]["available"])
+            self.assertEqual(snapshot[1]["state"], "unavailable")
+            self.assertFalse(snapshot[1]["available"])
+
+    def test_unsupported_platform_techs_are_visible_red_not_listened(self) -> None:
+        expected = ("darwin", "win32", "android")
+        for profile in expected:
+            with self.subTest(profile=profile):
+                with (
+                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
+                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
+                ):
+                    manager = _MidiInputTechManager(
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        {"enabled": True, "tech_profile": profile},
+                    )
+
+                snapshot = manager.status_snapshot({}, now=10.0)
+
+                raw_reader.assert_not_called()
+                seq_reader.assert_not_called()
+                self.assertEqual(len(snapshot), 1)
+                self.assertEqual(snapshot[0]["state"], "unavailable")
+                self.assertFalse(snapshot[0]["available"])
+                self.assertIn("not bundled", snapshot[0]["reason"])
+
+    def test_disabled_midi_input_starts_no_platform_readers(self) -> None:
+        for profile in ("linux", "darwin", "win32", "android"):
+            with self.subTest(profile=profile):
+                with (
+                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
+                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
+                ):
+                    manager = _MidiInputTechManager(
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        {"enabled": False, "tech_profile": profile},
+                    )
+
+                raw_reader.assert_not_called()
+                seq_reader.assert_not_called()
+                snapshot = manager.status_snapshot({}, now=10.0)
+                self.assertTrue(snapshot)
+                self.assertTrue(
+                    all(item["state"] == "unavailable" for item in snapshot)
+                )
+
+    def test_linux_midi_manager_starts_real_alsa_sequencer_listener(self) -> None:
+        with (
+            patch("midi_player._LinuxRawMidiReader") as raw_reader,
+            patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
+        ):
+            raw_reader.return_value = object()
+            seq_reader.return_value = object()
+
+            manager = _MidiInputTechManager(
+                lambda *_args: None,
+                lambda *_args: None,
+                lambda *_args: None,
+                {"enabled": True, "tech_profile": "linux"},
+            )
+
+        self.assertEqual(seq_reader.call_count, 1)
+        self.assertEqual(raw_reader.call_count, 2)
+        self.assertIn("alsa_seq", manager._listener_readers)
+
+    def test_non_linux_managers_do_not_start_raw_or_alsa_seq_readers(self) -> None:
+        for profile in ("darwin", "win32", "android"):
+            with self.subTest(profile=profile):
+                with (
+                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
+                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
+                ):
+                    manager = _MidiInputTechManager(
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        {"enabled": True, "tech_profile": profile},
+                    )
+
+                raw_reader.assert_not_called()
+                seq_reader.assert_not_called()
+                self.assertEqual(manager._listener_readers, {})
+
+    def test_alsa_sequencer_status_comes_from_running_listener(self) -> None:
+        class Listener:
+            def status_snapshot(self, activity: bool) -> dict[str, object]:
+                return {
+                    "state": "activity" if activity else "listening",
+                    "available": True,
+                    "reason": "client 128:0",
+                }
+
+        manager = _MidiInputTechManager.__new__(_MidiInputTechManager)
+        manager._enabled = True
+        manager._listener_readers = {"alsa_seq": Listener()}
+        manager._techs = [
+            {
+                "key": "alsa_seq",
+                "label": "ALSA seq",
+                "backend": "alsa_seq",
+            }
+        ]
+
+        snapshot = manager.status_snapshot({"alsa_seq": 20.0}, now=10.0)
+
+        self.assertEqual(snapshot[0]["state"], "activity")
+        self.assertTrue(snapshot[0]["available"])
+        self.assertEqual(snapshot[0]["reason"], "client 128:0")
+
+    def test_midi_tech_parsers_keep_running_status_per_stream(self) -> None:
+        notes = []
+        controls = []
+
+        def reader() -> _LinuxRawMidiReader:
+            item = _LinuxRawMidiReader.__new__(_LinuxRawMidiReader)
+            item._callback = lambda *args: notes.append(args)
+            item._control_callback = lambda *args: controls.append(args)
+            return item
+
+        first = reader()
+        second = reader()
+        state_a: dict[str, object] = {}
+        state_b: dict[str, object] = {}
+
+        first._parse_stream(bytes([0x90, 60, 100, 61, 101]), state_a)
+        second._parse_stream(bytes([0xB1, 7, 64, 74, 99]), state_b)
+        second._parse_stream(bytes([0xE1, 0x00, 0x40]), state_b)
+
+        self.assertEqual(notes, [(1, 60, 100, True), (1, 61, 101, True)])
+        self.assertEqual(
+            controls,
+            [
+                (2, 7, 64),
+                (2, 74, 99),
+                (2, PITCH_BEND_CONTROLLER, 8192),
+            ],
+        )
+
+    def test_musical_midi_notes_do_not_create_controller_buttons(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = type(
+            "Owner",
+            (),
+            {
+                "_active_row": -1,
+                "_active_root_semitone": -1,
+            },
+        )()
+        backend.channels = [99, 99, 99, 99, 99, 99]
+        backend._queue_midi_button = lambda *_args: self.fail(
+            "MIDI Note On/Off must not be treated as controller buttons"
+        )
+
+        backend.process_midi_note(1, 60, 100, True)
+        backend.process_midi_note(1, 60, 0, False)
+
     def test_cc_mapping_follows_logarithmic_visual_slider_travel(self) -> None:
         class Control:
             key = "filter_hz"
@@ -84,6 +331,230 @@ class MidiAmyEngineTests(unittest.TestCase):
         )
         self.assertEqual(middle, expected)
         self.assertNotAlmostEqual(middle, (20.0 + 20000.0) / 2.0)
+
+    def test_preset_binding_loader_accepts_new_source_types(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._midi_control_state = MidiControlState()
+        data = [
+            {
+                "channel": 1,
+                "controller": 74,
+                "target": {
+                    "kind": "master_volume",
+                },
+            },
+            {
+                "channel": 2,
+                "source_type": "pitch_bend",
+                "target": {
+                    "kind": "master_volume",
+                },
+            },
+            {
+                "channel": 3,
+                "source_type": "note_button",
+                "note": 42,
+                "target": {
+                    "kind": "button",
+                    "action": "rhythm_toggle",
+                },
+            },
+        ]
+
+        entries = backend._normalized_binding_entries("omni", data)
+
+        self.assertEqual(
+            [key for key, _target in entries],
+            [
+                (1, 74),
+                (2, PITCH_BEND_CONTROLLER),
+                (3, NOTE_BUTTON_OFFSET + 42),
+            ],
+        )
+
+    def test_midi_button_takeover_blocks_other_button_targets(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._applying_midi_control = 0
+        backend._midi_control_lock = threading.Lock()
+        backend._held_midi_button_targets = {"omni:button:rhythm_toggle"}
+
+        self.assertTrue(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "rhythm_toggle",
+                }
+            )
+        )
+        self.assertFalse(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "master_mute",
+                }
+            )
+        )
+
+        backend._held_midi_button_targets = {"omni:button:select_preset"}
+        self.assertTrue(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "select_preset",
+                    "preset": 2,
+                }
+            )
+        )
+        self.assertFalse(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "rhythm_busyness",
+                    "level": 3,
+                }
+            )
+        )
+
+        backend._held_midi_button_targets.clear()
+        self.assertFalse(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "master_mute",
+                }
+            )
+        )
+
+    def test_midi_button_takeover_groups_and_tap_actions_are_scoped(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._applying_midi_control = 0
+        backend._midi_control_lock = threading.Lock()
+        backend._held_midi_button_targets = set()
+
+        preset_one = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "select_preset",
+                "preset": 1,
+            }
+        )
+        preset_two = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "select_preset",
+                "preset": 2,
+            }
+        )
+        rate_two = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "chord_arpeggio_rate",
+                "rate": 2,
+            }
+        )
+        rate_four = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "chord_arpeggio_rate",
+                "rate": 4,
+            }
+        )
+        panic = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "panic",
+            }
+        )
+
+        self.assertIsNotNone(preset_one)
+        self.assertIsNotNone(preset_two)
+        self.assertIsNotNone(rate_two)
+        self.assertIsNotNone(rate_four)
+        self.assertIsNotNone(panic)
+        assert preset_one is not None
+        assert preset_two is not None
+        assert rate_two is not None
+        assert rate_four is not None
+        assert panic is not None
+
+        self.assertNotEqual(rate_two["id"], rate_four["id"])
+        self.assertEqual(
+            backend._button_takeover_group(preset_one),
+            backend._button_takeover_group(preset_two),
+        )
+        self.assertEqual(
+            backend._button_takeover_group(rate_two),
+            backend._button_takeover_group(rate_four),
+        )
+        self.assertIsNone(backend._button_takeover_group(panic))
+
+        backend._held_midi_button_targets.add(
+            backend._button_takeover_group(preset_one)
+        )
+        self.assertTrue(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "select_preset",
+                    "preset": 2,
+                }
+            )
+        )
+        self.assertFalse(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "panic",
+                }
+            )
+        )
+
+    def test_pitch_bend_binding_applies_center_value_immediately(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._midi_control_state = MidiControlState()
+        backend._midi_control_lock = threading.Lock()
+        backend._write_cc_test_log = lambda *_args, **_kwargs: None
+        backend._sync_blue_timer = lambda *_args, **_kwargs: None
+        backend._bump_binding_state = lambda *_args, **_kwargs: None
+        applied: list[tuple[dict[str, object], int, tuple[int, int]]] = []
+
+        def apply_target(
+            target: dict[str, object],
+            midi_value: int,
+            source_key: tuple[int, int],
+        ) -> None:
+            applied.append((dict(target), int(midi_value), source_key))
+
+        backend._apply_control_target = apply_target
+        backend._midi_control_state.select_control(
+            (1, PITCH_BEND_CONTROLLER),
+            now=1.0,
+        )
+
+        learned = backend.activateControlTarget(
+            {
+                "screen": "midi",
+                "kind": "master_volume",
+            }
+        )
+
+        self.assertTrue(learned)
+        self.assertEqual(len(applied), 1)
+        self.assertEqual(applied[0][1], 8192)
+        self.assertEqual(applied[0][2], (1, PITCH_BEND_CONTROLLER))
+        self.assertEqual(applied[0][0]["id"], "midi:master_volume")
 
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
         client = _Client()

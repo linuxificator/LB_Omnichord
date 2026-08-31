@@ -74,6 +74,12 @@ and LED states defined in `midi_control.md`; an unbound knob remains display-onl
 When the bar is full, eligible indicators follow genuine-change LRU replacement
 and the outgoing knob flashes red twice.
 
+The narrow unused gap between MIDI synth row 6 and the lower grey MIDI CC bar is
+reserved for MIDI input tech LEDs. Each visible LED has a short label such as
+`ALSA raw`, `ALSA seq` or `OSS MIDI`. Only techs relevant to the active platform
+are shown. Red means unavailable to this runtime; green means available and
+listened to; blinking green means recent incoming MIDI bytes on that tech.
+
 On the OMNI screen, MIDI learn is shown by a blinking red LED inside the large
 `MIDI` mode button, immediately to the right of its label. It is absent rather
 than grey when learn is inactive. The green binding-location LED remains on
@@ -137,9 +143,17 @@ border after a quick tap.
 
 Ordinary buttons use Qt Quick Controls button signals. Held increment/decrement
 controls use `AbstractButton.autoRepeat`; sliders use `Slider.onMoved`; MIDI
-unlink uses Qt's double-click/double-tap signals. Application code assigns the
-musical meaning after Qt has classified the input and must not infer these
-gestures with elapsed-time or movement-count thresholds.
+unlink uses Qt's double-click/double-tap signals outside the slider drag path
+for horizontal sliders. Application code assigns the musical meaning after Qt
+has classified the input and must not infer these gestures with elapsed-time or
+movement-count thresholds.
+
+Custom Qt Slider handles must expose `implicitWidth` and `implicitHeight`.
+Setting only visual `width` and `height` can leave `implicitHandleWidth` at
+zero, which makes the visible knob differ from Qt's actual drag handle.
+While `Slider.pressed` is true, Qt owns the interactive slider value. Backend
+property echoes or repeater model replacements must not force the handle back
+to an older value during that press; synchronization resumes after release.
 
 The RST/UP/DWN block left of the first two chord rows ends at the bottom of the
 second row. Its three controls are distributed evenly over that complete

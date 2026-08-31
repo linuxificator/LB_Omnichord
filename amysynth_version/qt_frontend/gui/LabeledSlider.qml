@@ -20,6 +20,8 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
+    readonly property bool traceGestures:
+        typeof sliderTrace !== "undefined" && sliderTrace
 
     readonly property bool midiBound: {
         if (root.midiControlRouter === null)
@@ -43,13 +45,13 @@ Item {
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
             return false
-        const wasBound = root.midiBound
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        // A green binding owns the value.  Its first/second tap may form the
-        // explicit unlink gesture, but that same gesture never edits it.
-        return learned || wasBound || root.midiPresetFeedback
+        // A real learn/preset-feedback gesture owns this press.  A normal
+        // green bound state must still allow mouse drag; onMoved then performs
+        // manual takeover through controlTargetMoved().
+        return learned || root.midiPresetFeedback
     }
 
     function restoreCurrentValueBinding() {
@@ -57,6 +59,35 @@ Item {
             return root.currentValue
         })
     }
+
+    function beginSliderDrag() {
+        // Break the backend-value binding while Qt owns an active slider drag.
+        // The backend may echo the edit asynchronously; keeping the binding
+        // alive during the drag can make the handle fight that older value.
+        slider.value = Number(slider.value)
+    }
+
+    function traceSlider(event, value) {
+        if (!root.traceGestures)
+            return
+        console.log(
+            "SLIDER_TRACE",
+            "labeled",
+            String(root.label),
+            event,
+            "pressed",
+            slider.pressed,
+            "value",
+            Number(slider.value),
+            "current",
+            Number(root.currentValue),
+            "eventValue",
+            Number(value)
+        )
+    }
+
+    onCurrentValueChanged:
+        root.traceSlider("currentValueChanged", root.currentValue)
 
     Text {
         anchors.left: parent.left
@@ -76,6 +107,17 @@ Item {
         font.pixelSize: 13
         font.bold: true
         elide: Text.ElideRight
+
+        TapHandler {
+            gesturePolicy: TapHandler.DragThreshold
+            onDoubleTapped: {
+                if (root.midiControlRouter !== null) {
+                    root.midiControlRouter.controlTargetDoubleTapped(
+                        root.midiTarget
+                    )
+                }
+            }
+        }
     }
 
     Slider {
@@ -94,15 +136,19 @@ Item {
         snapMode: Slider.SnapAlways
 
         onPressedChanged: {
+            root.traceSlider("pressedChanged", value)
             if (pressed) {
+                root.beginSliderDrag()
                 root.midiBindingGesture = root.beginMidiInteraction()
                 root.activated()
             } else {
+                root.restoreCurrentValueBinding()
                 root.midiBindingGesture = false
             }
         }
 
         onMoved: {
+            root.traceSlider("moved", value)
             if (root.midiBindingGesture) {
                 root.restoreCurrentValueBinding()
                 return
@@ -111,17 +157,6 @@ Item {
                 root.midiControlRouter.controlTargetMoved(root.midiTarget)
             }
             root.edited(value)
-        }
-
-        TapHandler {
-            gesturePolicy: TapHandler.DragThreshold
-            onDoubleTapped: {
-                if (root.midiControlRouter !== null) {
-                    root.midiControlRouter.controlTargetDoubleTapped(
-                        root.midiTarget
-                    )
-                }
-            }
         }
 
         background: Rectangle {
@@ -157,8 +192,10 @@ Item {
                 slider.topPadding
                 + slider.availableHeight / 2
                 - height / 2
-            width: 19
-            height: 19
+            implicitWidth: 19
+            implicitHeight: 19
+            width: implicitWidth
+            height: implicitHeight
             radius: 10
             color: {
                 if (root.midiVisualState === "preset-displaced")

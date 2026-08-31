@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
+import "physical_controls"
 
 Item {
     id: root
@@ -9,6 +10,7 @@ Item {
     property bool tuningCoupled: true
     property int activeMidiRow: 0
     property var midiControlModel: []
+    property var midiInputTechModel: backend.midiPlayer.midiInputTechs
     readonly property bool tuningMidiLocked:
         root.hostWindow.midiTuningMidiBound
         || (
@@ -322,6 +324,7 @@ Item {
     }
 
     Rectangle {
+        id: midiCcPanel
         x:
             omniButton.x
             + omniButton.width
@@ -390,39 +393,47 @@ Item {
                         }
                     }
 
-                    Rectangle {
-                        id: radioKnob
+                    Item {
+                        id: f06Control
                         anchors.horizontalCenter: parent.horizontalCenter
-                        y: 12
-                        width: 40
-                        height: 40
-                        radius: 20
-                        color: modelData.evicting ? "#d62f2f" : "#686864"
-                        border.color: "#e8e8df"
-                        border.width: 2
-                        rotation:
-                            Number(modelData.displayValue) * 270 / 127 - 135
+                        y: 9
+                        width: 52
+                        height: 52
+                        readonly property bool pitchBend:
+                            modelData.displayType === "pitch_bend"
+                        readonly property bool noteButton:
+                            modelData.displayType === "note_button"
+                            || modelData.displayType === "button"
 
-                        Rectangle {
-                            x: parent.width / 2 - 2
-                            y: 4
-                            width: 4
-                            height: 14
-                            radius: 2
-                            color: "#f2d56b"
+                        PhysicalRotary {
+                            visible: !f06Control.noteButton
+                            anchors.centerIn: parent
+                            width: 52
+                            height: 52
+                            family: 6
+                            encoder: f06Control.pitchBend
+                            from: 0
+                            to: 127
+                            value: Number(modelData.displayValue)
+                            physicalInteractive: false
+                            opacity: modelData.evicting ? 0.55 : 1.0
                         }
 
-                        Behavior on rotation {
-                            NumberAnimation { duration: 90 }
+                        PhysicalPushButton {
+                            visible: f06Control.noteButton
+                            anchors.centerIn: parent
+                            width: 58
+                            height: 42
+                            family: 6
+                            forcedDown:
+                                modelData.buttonDown && !modelData.evicting
                         }
                     }
 
                     Text {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text:
-                            "CH" + modelData.displayChannel
-                            + " CC" + modelData.displayController
+                        text: modelData.displayLabel
                         color: "#292927"
                         font.pixelSize: 11
                     }
@@ -439,6 +450,95 @@ Item {
                             modelData.channel,
                             modelData.controller
                         )
+                    }
+                }
+            }
+        }
+    }
+
+    Item {
+        id: midiInputTechPanel
+
+        readonly property int panelY:
+            root.hostWindow.rhythmY
+            + 6 * root.hostWindow.sectionHeight
+            + 5 * root.hostWindow.sectionGap
+        readonly property int panelBottom:
+            root.hostWindow.chordRowsY
+            + 3 * (
+                root.hostWindow.rowHeight
+                + root.hostWindow.rowSpacing
+            )
+
+        x: root.hostWindow.contentX
+        y: panelY
+        width:
+            Math.max(
+                0,
+                midiCcPanel.x
+                + midiCcPanel.width
+                - root.hostWindow.contentX
+            )
+        height: Math.max(0, panelBottom - panelY)
+        visible:
+            height >= 24
+            && root.midiInputTechModel.length > 0
+
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 18
+
+            Repeater {
+                model: root.midiInputTechModel
+
+                delegate: Item {
+                    required property var modelData
+
+                    width: techText.implicitWidth + 20
+                    height: 22
+
+                    Rectangle {
+                        id: techLed
+                        x: 0
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 11
+                        height: 11
+                        radius: 5.5
+                        color:
+                            modelData.state === "unavailable"
+                            ? "#c73434"
+                            : "#35b85a"
+                        border.width: 1
+                        border.color:
+                            modelData.state === "unavailable"
+                            ? "#7e1c1c"
+                            : "#1d7738"
+
+                        SequentialAnimation on opacity {
+                            running: modelData.state === "activity"
+                            loops: Animation.Infinite
+                            NumberAnimation {
+                                from: 1.0
+                                to: 0.25
+                                duration: 90
+                            }
+                            NumberAnimation {
+                                from: 0.25
+                                to: 1.0
+                                duration: 90
+                            }
+                        }
+                    }
+
+                    Text {
+                        id: techText
+                        x: 17
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: modelData.label
+                        color: "#363632"
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
                     }
                 }
             }

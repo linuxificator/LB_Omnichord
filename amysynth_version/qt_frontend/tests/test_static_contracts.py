@@ -162,6 +162,55 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("root.controller.tuningModeIndex", utility)
         self.assertNotIn("root.controller.midiStateVersion", synth)
 
+    def test_midi_button_leds_are_not_visible_in_idle_state(self) -> None:
+        led = (ROOT / "gui" / "MidiButtonLed.qml").read_text(encoding="utf-8")
+        preset = (ROOT / "gui" / "PresetResetButton.qml").read_text(
+            encoding="utf-8"
+        )
+        tap_number = (ROOT / "gui" / "TapNumber.qml").read_text(
+            encoding="utf-8"
+        )
+        screen = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+
+        self.assertIn("visible: root.midiBound || root.midiPresetFeedback", led)
+        self.assertIn("visible: root.midiBound || root.midiPresetFeedback", preset)
+        self.assertIn("root.centerMidiBound", tap_number)
+        self.assertIn("root.centerMidiPresetFeedback", tap_number)
+
+        self.assertIn('import "physical_controls"', screen)
+        self.assertIn("PhysicalRotary", screen)
+        self.assertIn("PhysicalPushButton", screen)
+        self.assertIn("encoder: f06Control.pitchBend", screen)
+
+        rotary = (
+            ROOT / "gui" / "physical_controls" / "PhysicalRotary.qml"
+        ).read_text(encoding="utf-8")
+        button = (
+            ROOT / "gui" / "physical_controls" / "PhysicalPushButton.qml"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "panel recess",
+            "mounting skirt",
+            "Calibrated tick ring",
+            "muted top bevel",
+            "physical index",
+            "Mechanical center boss",
+        ):
+            self.assertIn(required, rotary)
+        self.assertNotIn("shadow", rotary.lower())
+        self.assertNotIn("MultiEffect", rotary)
+        self.assertNotIn("QtQuick.Effects", rotary)
+        self.assertIn("* 270 / Math.max", rotary)
+        for required in (
+            "F06 bezel",
+            "physical plunger",
+            "Behavior on y",
+        ):
+            self.assertIn(required, button)
+        self.assertNotIn("shadow", button.lower())
+        self.assertNotIn("MultiEffect", button)
+        self.assertNotIn("QtQuick.Effects", button)
+
     def test_local_launcher_validates_but_never_builds_amy(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
         self.assertIn("import c_amy", launcher)
@@ -208,19 +257,28 @@ class StaticContractTests(unittest.TestCase):
             self.assertIn('"preset-incoming"', component)
             self.assertIn("running: root.midiPresetFeedback", component)
             self.assertEqual(component.count("duration: 110"), 2)
-            self.assertIn("const wasBound = root.midiBound", component)
             self.assertIn(
-                "return learned || wasBound || root.midiPresetFeedback",
+                "return learned || root.midiPresetFeedback",
                 component,
             )
+            self.assertNotIn("const wasBound = root.midiBound", component)
 
         self.assertIn("controlTargetMoved", parameter)
         self.assertIn("controlTargetMoved", labeled)
+        self.assertIn("controlTargetMoved", volume)
+        self.assertIn("controlTargetMoved", tuning)
         self.assertIn("if (root.midiBindingGesture)", parameter)
         self.assertIn("if (root.midiBindingGesture)", labeled)
         self.assertIn("root.syncSliderValue()", parameter)
         self.assertIn("slider.value = Qt.binding", labeled)
         self.assertIn("return root.currentValue", labeled)
+        self.assertIn("function beginSliderDrag()", labeled)
+        self.assertIn("root.beginSliderDrag()", labeled)
+        self.assertIn("slider.value = Number(slider.value)", labeled)
+        self.assertIn("function beginSliderDrag()", parameter)
+        self.assertIn("root.beginSliderDrag()", parameter)
+        self.assertIn("slider.value = Number(slider.value)", parameter)
+        self.assertIn("if (!slider.pressed)", parameter)
 
         combined = "\n".join(
             (ROOT / "gui" / name).read_text(encoding="utf-8")
@@ -482,6 +540,26 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("root.controller.bassRiffSelector", qml)
         self.assertIn(".setBassVoicingShift(value)", qml)
         self.assertIn(".setBassRiffSelector(value)", qml)
+        guarded_rhythm_button_actions = {
+            "rhythm_busyness": "setRhythmBusyness",
+            "rhythm_fill": "toggleRhythmFill",
+            "rhythm_chord_activity": "setRhythmChordActivity",
+            "chord_arpeggio": "toggleChordArpeggio",
+            "chord_arpeggio_rate": "setChordArpeggioRate",
+            "chord_arpeggio_direction": "toggleChordArpeggioDirection",
+            "rhythm_bass_activity": "setRhythmBassActivity",
+        }
+        for action, setter in guarded_rhythm_button_actions.items():
+            self.assertRegex(
+                qml,
+                r"(?s)root\.midiButtonHandled\(\{"
+                r".{0,250}"
+                + re.escape(f'"action": "{action}"')
+                + r".{0,250}\}\)\) \{"
+                r".{0,180}"
+                + re.escape(setter),
+                action,
+            )
         self.assertIn("controlsArea.expandedActivityWidth", qml)
         self.assertIn("5 * activityButtonWidth", qml)
         self.assertIn("2 * bassActivityWidth + 2 * activityGap", qml)
@@ -730,12 +808,81 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("onDoubleTapped:", numeric[3])
         self.assertIn("onMoved:", numeric[2])
         self.assertIn("onMoved:", numeric[3])
+        for slider_qml in numeric[2:4]:
+            self.assertIn("implicitWidth:", slider_qml)
+            self.assertIn("implicitHeight:", slider_qml)
+            slider_block = re.search(
+                r"Slider\s*\{(?P<body>.*?)(?:\n\s*handle:|\n\s*background:)",
+                slider_qml,
+                re.DOTALL,
+            )
+            self.assertIsNotNone(slider_block)
+            assert slider_block is not None
+            self.assertNotIn("TapHandler", slider_block.group("body"))
         midi_state = (ROOT / "code" / "midi_control.py").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("double_tap_window", midi_state)
         self.assertNotIn("_target_taps", midi_state)
         self.assertIn("def target_double_tapped(", midi_state)
+
+    def test_parameter_slider_live_edits_do_not_reset_repeater_models(self) -> None:
+        app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        midi_player = (ROOT / "code" / "midi_player.py").read_text(
+            encoding="utf-8"
+        )
+        synth_section = (ROOT / "gui" / "SynthSection.qml").read_text(
+            encoding="utf-8"
+        )
+        midi_synth = (ROOT / "gui" / "MidiSynthSection.qml").read_text(
+            encoding="utf-8"
+        )
+        parameter = (ROOT / "gui" / "ParameterSlider.qml").read_text(
+            encoding="utf-8"
+        )
+
+        for slot in (
+            "def editChordSynthControl(",
+            "def editStrumSynthControl(",
+            "def editBassSynthControl(",
+        ):
+            self.assertIn(slot, app_core)
+        self.assertIn("emit_controls: bool = True", app_core)
+        self.assertIn("emit_controls=False", app_core)
+        self.assertIn("if emit_controls:", app_core)
+        self.assertIn(
+            "must not republish the QML control-list model",
+            app_core,
+        )
+
+        self.assertIn("def editControl(", midi_player)
+        self.assertIn("emit_state: bool", midi_player)
+        self.assertIn("if emit_state:", midi_player)
+
+        self.assertIn("editStrumSynthControl(", synth_section)
+        self.assertIn("editBassSynthControl(", synth_section)
+        self.assertIn("editChordSynthControl(", synth_section)
+        self.assertNotIn("root.controller.setStrumSynthControl(", synth_section)
+        self.assertNotIn("root.controller.setBassSynthControl(", synth_section)
+        self.assertNotIn("root.controller.setChordSynthControl(", synth_section)
+        self.assertIn("root.controller.editControl(", midi_synth)
+        self.assertNotIn("root.controller.setControl(\n", midi_synth)
+
+        release_block = re.search(
+            r"onPressedChanged:\s*\{(?P<body>.*?)\n\s*\}\n\s*\n\s*onMoved:",
+            parameter,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(release_block)
+        assert release_block is not None
+        self.assertNotIn(
+            "} else {\n                root.syncSliderValue()",
+            release_block.group("body"),
+        )
+        self.assertIn(
+            "if (root.midiBindingGesture)\n                    root.syncSliderValue()",
+            release_block.group("body"),
+        )
 
     def test_clickable_visuals_use_qt_quick_buttons(self) -> None:
         rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(

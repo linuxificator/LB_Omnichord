@@ -196,6 +196,7 @@ Important regression tests:
 - decoupled tuning stays independent
 - local and serial AMY transports generate identical commands
 - raw-MIDI running status, Note On/Off and velocity-zero Note Off parsing
+- Pitch Bend parsing and 14-bit centered MIDI-learn mapping
 - incoming EQ/HARM/JV MIDI conversion to exact/fractional AMY notes
 - MIDI preview stays within its live voice allocation and emits no stale offs
 - OMNI and MIDI reverb controls generate commands for only their owned buses
@@ -218,11 +219,20 @@ Important regression tests:
   mapping and the owned AMY bus commands
 - MIDI CC running status updates indicators without changing musical state;
   indicators fill the available width before least-recently-used replacement
+- MIDI input tech LEDs expose only platform-relevant technologies, show red for
+  unavailable/unimplemented runtime inputs, green for readable listened-to
+  byte-stream inputs and blinking green after incoming bytes
 - MIDI CC learn permits one red controller, binds every continuous numeric
   control family one-to-one, maps logarithmic sliders over visual travel,
   protects red/blue indicators, preserves hidden instrument-specific bindings,
-  consumes bound drag/edit gestures, unlinks only on an explicit double-tap,
+  allows manual takeover through bound drag/edit gestures, unlinks explicitly
+  through double-tap/double-click controls outside slider drag handles,
   expires blue state and persists bindings in the owning MIDI or OMNI preset
+- CC-style MIDI controller-button learn binds supported app buttons, presses
+  through the same backend action as a screen tap, shows the same button LED
+  colors as sliders, scopes on/off takeover to the target's logical button
+  group, keeps tap-only actions from holding takeover state, and never treats
+  ordinary musical Note On/Off as controller buttons
 - the rhythm start arrow uses the same centered triangle geometry as bass and
   repaints on backend transport changes
 - a preset that reuses an already-bound channel/controller for another target

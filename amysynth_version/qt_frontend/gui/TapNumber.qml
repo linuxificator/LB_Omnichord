@@ -20,6 +20,7 @@ Frame {
     property color centerPanelBorderColor: root.panelBorderColor
     property var midiControlRouter: null
     property var midiTarget: ({})
+    property var centerMidiTarget: ({})
     property bool midiBindingGesture: false
 
     readonly property bool midiBound: {
@@ -37,6 +38,25 @@ Frame {
     readonly property bool midiPresetFeedback:
         root.midiVisualState === "preset-displaced"
         || root.midiVisualState === "preset-incoming"
+    readonly property string centerMidiVisualState: {
+        if (root.midiControlRouter === null)
+            return "idle"
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.controlTargetVisualState(
+            root.centerMidiTarget
+        )
+    }
+    readonly property bool centerMidiBound: {
+        if (root.midiControlRouter === null)
+            return false
+        root.midiControlRouter.bindingVersion
+        return root.midiControlRouter.isControlTargetBound(
+            root.centerMidiTarget
+        )
+    }
+    readonly property bool centerMidiPresetFeedback:
+        root.centerMidiVisualState === "preset-displaced"
+        || root.centerMidiVisualState === "preset-incoming"
 
     signal edited(int value)
     signal activated()
@@ -45,11 +65,23 @@ Frame {
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
             return false
-        const wasBound = root.midiBound
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        return learned || wasBound || root.midiPresetFeedback
+        return learned || root.midiPresetFeedback
+    }
+
+    function centerMidiButtonHandled() {
+        if (root.midiControlRouter === null)
+            return false
+        const learned = root.midiControlRouter.activateControlTarget(
+            root.centerMidiTarget
+        )
+        if (learned)
+            return true
+        return root.midiControlRouter.midiButtonTargetBlocked(
+            root.centerMidiTarget
+        )
     }
 
     padding: 4
@@ -65,6 +97,9 @@ Frame {
         if (direction === 0) {
             return
         }
+
+        if (root.midiControlRouter !== null)
+            root.midiControlRouter.controlTargetMoved(root.midiTarget)
 
         root.edited(
             root.clamp(
@@ -137,6 +172,27 @@ Frame {
         opacity: 0.96
         border.color: root.centerPanelBorderColor
         border.width: 1
+
+        Rectangle {
+            visible:
+                root.centerButtonEnabled
+                && (
+                    root.centerMidiBound
+                    || root.centerMidiPresetFeedback
+                )
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 2
+            width: 7
+            height: 7
+            radius: 4
+            color: {
+                if (root.centerMidiVisualState === "preset-displaced")
+                    return "#f22b2b"
+                if (root.centerMidiVisualState === "preset-incoming")
+                    return "#3186d7"
+                return root.centerMidiBound ? "#35b85a" : "#a5a5a0"
+            }
+        }
 
         Text {
             anchors.centerIn: parent
@@ -249,6 +305,9 @@ Frame {
         visible: root.centerButtonEnabled
         background: Item {}
         contentItem: Item {}
-        onClicked: root.centerClicked()
+        onClicked: {
+            if (!root.centerMidiButtonHandled())
+                root.centerClicked()
+        }
     }
 }

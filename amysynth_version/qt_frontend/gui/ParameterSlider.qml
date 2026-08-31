@@ -14,6 +14,8 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
+    readonly property bool traceGestures:
+        typeof sliderTrace !== "undefined" && sliderTrace
 
     readonly property bool midiBound: {
         if (root.midiControlRouter === null)
@@ -37,11 +39,10 @@ Item {
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
             return false
-        const wasBound = root.midiBound
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        return learned || wasBound || root.midiPresetFeedback
+        return learned || root.midiPresetFeedback
     }
 
     function moveMidiInteraction() {
@@ -85,7 +86,37 @@ Item {
         slider.value = controlToSlider(root.control.value)
     }
 
-    onControlChanged: syncSliderValue()
+    function beginSliderDrag() {
+        // Keep Qt's active slider drag independent from backend model refreshes.
+        // Repeater modelData can be replaced while a Python setter is still
+        // converging; during that press Qt must continue to own the handle.
+        slider.value = Number(slider.value)
+    }
+
+    function traceSlider(event, value) {
+        if (!root.traceGestures)
+            return
+        console.log(
+            "SLIDER_TRACE",
+            "parameter",
+            String(root.control.key),
+            event,
+            "pressed",
+            slider.pressed,
+            "value",
+            Number(slider.value),
+            "controlValue",
+            Number(root.control.value),
+            "eventValue",
+            Number(value)
+        )
+    }
+
+    onControlChanged: {
+        root.traceSlider("controlChanged", root.control.value)
+        if (!slider.pressed)
+            syncSliderValue()
+    }
 
     Text {
         anchors.left: parent.left
@@ -103,6 +134,17 @@ Item {
         font.pixelSize: 13
         font.bold: true
         elide: Text.ElideRight
+
+        TapHandler {
+            gesturePolicy: TapHandler.DragThreshold
+            onDoubleTapped: {
+                if (root.midiControlRouter !== null) {
+                    root.midiControlRouter.controlTargetDoubleTapped(
+                        root.midiTarget
+                    )
+                }
+            }
+        }
     }
 
     Slider {
@@ -131,15 +173,20 @@ Item {
             root.syncSliderValue()
 
         onPressedChanged: {
+            root.traceSlider("pressedChanged", value)
             if (pressed) {
+                root.beginSliderDrag()
                 root.midiBindingGesture = root.beginMidiInteraction()
                 root.activated()
             } else {
+                if (root.midiBindingGesture)
+                    root.syncSliderValue()
                 root.midiBindingGesture = false
             }
         }
 
         onMoved: {
+            root.traceSlider("moved", value)
             if (root.midiBindingGesture) {
                 root.syncSliderValue()
                 return
@@ -149,17 +196,6 @@ Item {
                 root.control.key,
                 root.sliderToControl(value)
             )
-        }
-
-        TapHandler {
-            gesturePolicy: TapHandler.DragThreshold
-            onDoubleTapped: {
-                if (root.midiControlRouter !== null) {
-                    root.midiControlRouter.controlTargetDoubleTapped(
-                        root.midiTarget
-                    )
-                }
-            }
         }
 
         background: Rectangle {
@@ -195,8 +231,10 @@ Item {
                 slider.topPadding
                 + slider.availableHeight / 2
                 - height / 2
-            width: 18
-            height: 18
+            implicitWidth: 18
+            implicitHeight: 18
+            width: implicitWidth
+            height: implicitHeight
             radius: 9
             color: {
                 if (root.midiVisualState === "preset-displaced")

@@ -30,6 +30,9 @@ Core rules:
   control indicators and the instrument-balance measurement contract.
 - `midi_control.md` is the authoritative MIDI CC learn, binding, LRU/LED and
   preset-persistence contract.
+- `CODEX_HANDOVER_EXTERNAL_CONTROLS.md` records the branch-local lessons from
+  the external-control rework: smooth Qt slider drag, backend echo boundaries,
+  MIDI input tech indicators and scoped hardware button takeover.
 
 ## Required reading route for Codex
 
@@ -64,5 +67,10 @@ When a selected document points to a more specific behavioral contract, read
 that contract too. Historical files under `qt_frontend/docs/history/` and the
 Sonic Pi tree are not startup reading unless the user explicitly asks for
 historical comparison.
+
+For continuation work on active branches, also read the repository-root
+`CODEX_HANDOFF.md` when it exists. It records current branch/release state and
+session-specific lessons learned, but it never replaces the authoritative
+design contracts listed above.
 
 When implementation and design differ, the difference must be documented before changing behavior.

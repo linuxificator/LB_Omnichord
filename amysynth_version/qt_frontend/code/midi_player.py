@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import glob
+import ctypes
 import json
 import math
 import os
@@ -11,10 +12,15 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
+from PySide6.QtGui import QGuiApplication
 
 import app_core
 from control_limits import clamp_control_value
-from midi_control import MidiControlState
+from midi_control import (
+    NOTE_BUTTON_OFFSET,
+    PITCH_BEND_CONTROLLER,
+    MidiControlState,
+)
 from synth_programs import resolve_program
 from synth_state import SynthState
 from user_data import MIDI_PRESET_DIR
@@ -56,29 +62,16 @@ def _write_json_atomic(path: Path, data: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
-class _LinuxRawMidiReader:
-    """Dependency-free ALSA raw-MIDI reader for Raspberry Pi/Linux."""
+class _MidiByteStreamParser:
+    """Parse raw MIDI bytes into the small event set the app consumes."""
 
     def __init__(
         self,
         callback: Callable[[int, int, int, bool], None],
         control_callback: Callable[[int, int, int], None],
-        device_glob: str,
-        enabled: bool,
     ) -> None:
         self._callback = callback
         self._control_callback = control_callback
-        self._glob = str(device_glob)
-        self._enabled = bool(enabled)
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-        if self._enabled:
-            self._thread = threading.Thread(
-                target=self._run,
-                name="omnichord-usb-midi",
-                daemon=True,
-            )
-            self._thread.start()
 
     @staticmethod
     def _data_length(status: int) -> int:
@@ -133,14 +126,52 @@ class _LinuxRawMidiReader:
             elif hi == 0xB0:
                 controller, value = payload
                 self._control_callback(channel, controller, value)
+            elif hi == 0xE0:
+                lsb, msb = payload
+                value = int(lsb) | (int(msb) << 7)
+                self._control_callback(channel, PITCH_BEND_CONTROLLER, value)
 
         state["running"] = running
         state["pending"] = pending
         state["sysex"] = sysex
 
+
+class _LinuxRawMidiReader(_MidiByteStreamParser):
+    """Dependency-free raw MIDI byte-stream reader for Raspberry Pi/Linux."""
+
+    def __init__(
+        self,
+        callback: Callable[[int, int, int, bool], None],
+        control_callback: Callable[[int, int, int], None],
+        device_glob: str | list[str],
+        enabled: bool,
+        activity_callback: Callable[[], None] | None = None,
+        thread_name: str = "omnichord-usb-midi",
+    ) -> None:
+        super().__init__(callback, control_callback)
+        if isinstance(device_glob, list):
+            self._globs = [str(item) for item in device_glob]
+        else:
+            self._globs = [str(device_glob)]
+        self._enabled = bool(enabled)
+        self._activity_callback = activity_callback
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        if self._enabled:
+            self._thread = threading.Thread(
+                target=self._run,
+                name=thread_name,
+                daemon=True,
+            )
+            self._thread.start()
+
     def _run(self) -> None:
         while not self._stop.is_set():
-            paths = sorted(glob.glob(self._glob))
+            paths = sorted({
+                path
+                for pattern in self._globs
+                for path in glob.glob(pattern)
+            })
             if not paths:
                 self._stop.wait(0.5)
                 continue
@@ -174,6 +205,8 @@ class _LinuxRawMidiReader:
                                 pass
                             fds.pop(fd, None)
                             continue
+                        if self._activity_callback is not None:
+                            self._activity_callback()
                         self._parse_stream(data, fds[fd][1])
                     if not fds:
                         break
@@ -188,6 +221,468 @@ class _LinuxRawMidiReader:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=1.0)
+
+
+class _AlsaSequencerMidiReader(_MidiByteStreamParser):
+    """ALSA sequencer MIDI input client visible in graph tools."""
+
+    _SND_SEQ_OPEN_INPUT = 2
+    _SND_SEQ_NONBLOCK = 0x0001
+    _SND_SEQ_PORT_CAP_WRITE = 1 << 1
+    _SND_SEQ_PORT_CAP_SUBS_WRITE = 1 << 6
+    _SND_SEQ_PORT_TYPE_MIDI_GENERIC = 1 << 1
+    _SND_SEQ_PORT_TYPE_APPLICATION = 1 << 20
+
+    def __init__(
+        self,
+        callback: Callable[[int, int, int, bool], None],
+        control_callback: Callable[[int, int, int], None],
+        activity_callback: Callable[[], None],
+        enabled: bool,
+        client_name: str = "LB Omnichord",
+        port_name: str = "MIDI In",
+    ) -> None:
+        super().__init__(callback, control_callback)
+        self._activity_callback = activity_callback
+        self._enabled = bool(enabled)
+        self._client_name = client_name.encode("utf-8")
+        self._port_name = port_name.encode("utf-8")
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._available = False
+        self._reason = "not started"
+        self._client_id: int | None = None
+        self._port_id: int | None = None
+        if self._enabled:
+            self._thread = threading.Thread(
+                target=self._run,
+                name="omnichord-midi-alsa-seq",
+                daemon=True,
+            )
+            self._thread.start()
+
+    @staticmethod
+    def _load_libasound() -> ctypes.CDLL:
+        lib = ctypes.CDLL("libasound.so.2")
+        c_void_pp = ctypes.POINTER(ctypes.c_void_p)
+
+        lib.snd_seq_open.argtypes = [
+            c_void_pp,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_int,
+        ]
+        lib.snd_seq_open.restype = ctypes.c_int
+        lib.snd_seq_close.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_close.restype = ctypes.c_int
+        lib.snd_seq_set_client_name.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+        ]
+        lib.snd_seq_set_client_name.restype = ctypes.c_int
+        lib.snd_seq_client_id.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_client_id.restype = ctypes.c_int
+        lib.snd_seq_create_simple_port.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+            ctypes.c_uint,
+        ]
+        lib.snd_seq_create_simple_port.restype = ctypes.c_int
+        lib.snd_seq_event_input_pending.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+        ]
+        lib.snd_seq_event_input_pending.restype = ctypes.c_int
+        lib.snd_seq_event_input.argtypes = [
+            ctypes.c_void_p,
+            c_void_pp,
+        ]
+        lib.snd_seq_event_input.restype = ctypes.c_int
+        lib.snd_seq_free_event.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_free_event.restype = ctypes.c_int
+        lib.snd_midi_event_new.argtypes = [
+            ctypes.c_size_t,
+            c_void_pp,
+        ]
+        lib.snd_midi_event_new.restype = ctypes.c_int
+        lib.snd_midi_event_free.argtypes = [ctypes.c_void_p]
+        lib.snd_midi_event_free.restype = None
+        lib.snd_midi_event_init.argtypes = [ctypes.c_void_p]
+        lib.snd_midi_event_init.restype = None
+        lib.snd_midi_event_decode.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_long,
+            ctypes.c_void_p,
+        ]
+        lib.snd_midi_event_decode.restype = ctypes.c_long
+        lib.snd_strerror.argtypes = [ctypes.c_int]
+        lib.snd_strerror.restype = ctypes.c_char_p
+        return lib
+
+    @staticmethod
+    def _error(lib: ctypes.CDLL, code: int) -> str:
+        raw = lib.snd_strerror(int(code))
+        return raw.decode("utf-8", errors="replace") if raw else str(code)
+
+    def _open_once(
+        self,
+        lib: ctypes.CDLL,
+    ) -> tuple[ctypes.c_void_p, ctypes.c_void_p] | None:
+        seq = ctypes.c_void_p()
+        rc = lib.snd_seq_open(
+            ctypes.byref(seq),
+            b"default",
+            self._SND_SEQ_OPEN_INPUT,
+            self._SND_SEQ_NONBLOCK,
+        )
+        if rc < 0:
+            self._reason = self._error(lib, rc)
+            return None
+        try:
+            lib.snd_seq_set_client_name(seq, self._client_name)
+            self._client_id = int(lib.snd_seq_client_id(seq))
+            self._port_id = int(
+                lib.snd_seq_create_simple_port(
+                    seq,
+                    self._port_name,
+                    self._SND_SEQ_PORT_CAP_WRITE
+                    | self._SND_SEQ_PORT_CAP_SUBS_WRITE,
+                    self._SND_SEQ_PORT_TYPE_MIDI_GENERIC
+                    | self._SND_SEQ_PORT_TYPE_APPLICATION,
+                )
+            )
+            if self._port_id < 0:
+                self._reason = self._error(lib, self._port_id)
+                lib.snd_seq_close(seq)
+                return None
+
+            decoder = ctypes.c_void_p()
+            rc = lib.snd_midi_event_new(256, ctypes.byref(decoder))
+            if rc < 0:
+                self._reason = self._error(lib, rc)
+                lib.snd_seq_close(seq)
+                return None
+            lib.snd_midi_event_init(decoder)
+            return seq, decoder
+        except Exception as exc:
+            self._reason = str(exc)
+            lib.snd_seq_close(seq)
+            return None
+
+    def _run_session(
+        self,
+        lib: ctypes.CDLL,
+        seq: ctypes.c_void_p,
+        decoder: ctypes.c_void_p,
+    ) -> None:
+        stream_state: dict[str, Any] = {}
+        buffer = ctypes.create_string_buffer(256)
+        self._available = True
+        self._reason = (
+            f"client {self._client_id}:{self._port_id}"
+            if self._client_id is not None and self._port_id is not None
+            else "listening"
+        )
+        try:
+            while not self._stop.is_set():
+                pending = int(lib.snd_seq_event_input_pending(seq, 1))
+                if pending <= 0:
+                    self._stop.wait(0.01)
+                    continue
+                while pending > 0 and not self._stop.is_set():
+                    event_ptr = ctypes.c_void_p()
+                    rc = int(lib.snd_seq_event_input(seq, ctypes.byref(event_ptr)))
+                    if rc < 0 or not event_ptr:
+                        break
+                    try:
+                        size = int(
+                            lib.snd_midi_event_decode(
+                                decoder,
+                                buffer,
+                                len(buffer),
+                                event_ptr,
+                            )
+                        )
+                    finally:
+                        lib.snd_seq_free_event(event_ptr)
+                    if size > 0:
+                        self._activity_callback()
+                        self._parse_stream(buffer.raw[:size], stream_state)
+                    pending -= 1
+        finally:
+            self._available = False
+            self._reason = "closed"
+            lib.snd_midi_event_free(decoder)
+            lib.snd_seq_close(seq)
+
+    def _run(self) -> None:
+        try:
+            lib = self._load_libasound()
+        except OSError as exc:
+            self._reason = str(exc)
+            return
+
+        while not self._stop.is_set():
+            opened = self._open_once(lib)
+            if opened is None:
+                self._stop.wait(1.0)
+                continue
+            self._run_session(lib, *opened)
+
+    def status_snapshot(
+        self,
+        activity: bool,
+    ) -> dict[str, Any]:
+        state = "activity" if self._available and activity else "listening"
+        if not self._available:
+            state = "unavailable"
+        return {
+            "state": state,
+            "available": self._available,
+            "reason": self._reason,
+        }
+
+    def close(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+
+
+class _MidiInputTechManager:
+    """Own platform MIDI input tech detection and byte-stream readers."""
+
+    ACTIVITY_SECONDS = 0.45
+
+    def __init__(
+        self,
+        callback: Callable[[int, int, int, bool], None],
+        control_callback: Callable[[int, int, int], None],
+        activity_callback: Callable[[str], None],
+        midi_cfg: dict[str, Any],
+        platform_name: str | None = None,
+    ) -> None:
+        self._callback = callback
+        self._control_callback = control_callback
+        self._activity_callback = activity_callback
+        self._midi_cfg = midi_cfg
+        self._enabled = bool(midi_cfg.get("enabled", True))
+        self._techs = self.platform_techs(
+            midi_cfg,
+            platform_name or self.current_tech_profile(midi_cfg),
+        )
+        self._readers: list[_LinuxRawMidiReader] = []
+        self._listener_readers: dict[str, _AlsaSequencerMidiReader] = {}
+
+        if self._enabled:
+            for tech in self._techs:
+                key = str(tech["key"])
+                if tech.get("backend") == "byte_stream":
+                    self._readers.append(
+                        _LinuxRawMidiReader(
+                            callback,
+                            control_callback,
+                            list(tech.get("globs", [])),
+                            True,
+                            lambda key=key: self._activity_callback(key),
+                            f"omnichord-midi-{key}",
+                        )
+                    )
+                elif tech.get("backend") == "alsa_seq":
+                    self._listener_readers[key] = _AlsaSequencerMidiReader(
+                        callback,
+                        control_callback,
+                        lambda key=key: self._activity_callback(key),
+                        True,
+                    )
+
+    @staticmethod
+    def _cfg_list(
+        midi_cfg: dict[str, Any],
+        key: str,
+        fallback: list[str],
+    ) -> list[str]:
+        value = midi_cfg.get(key)
+        if isinstance(value, list):
+            return [str(item) for item in value]
+        if isinstance(value, str) and value:
+            return [value]
+        return list(fallback)
+
+    @staticmethod
+    def current_tech_profile(midi_cfg: dict[str, Any]) -> str:
+        configured = str(midi_cfg.get("tech_profile", "")).strip()
+        if configured:
+            return configured
+        app = QGuiApplication.instance()
+        qpa = (
+            str(QGuiApplication.platformName()).casefold()
+            if app is not None
+            else ""
+        )
+        if qpa == "cocoa":
+            return "darwin"
+        if qpa == "windows":
+            return "win32"
+        if qpa == "android":
+            return "android"
+        return "linux"
+
+    @classmethod
+    def platform_techs(
+        cls,
+        midi_cfg: dict[str, Any],
+        platform_name: str,
+    ) -> list[dict[str, Any]]:
+        platform_name = str(platform_name).lower()
+        if platform_name.startswith("linux"):
+            legacy_raw_glob = str(
+                midi_cfg.get("device_glob", "/dev/snd/midiC*D*")
+            )
+            alsa_raw_globs = cls._cfg_list(
+                midi_cfg,
+                "alsa_raw_globs",
+                [legacy_raw_glob],
+            )
+            if legacy_raw_glob and legacy_raw_glob not in alsa_raw_globs:
+                alsa_raw_globs = [legacy_raw_glob] + alsa_raw_globs
+            return [
+                {
+                    "key": "alsa_raw",
+                    "label": "ALSA raw",
+                    "backend": "byte_stream",
+                    "globs": alsa_raw_globs,
+                },
+                {
+                    "key": "alsa_seq",
+                    "label": "ALSA seq",
+                    "backend": "alsa_seq",
+                    "device": "/dev/snd/seq",
+                },
+                {
+                    "key": "oss_midi",
+                    "label": "OSS MIDI",
+                    "backend": "byte_stream",
+                    "globs": cls._cfg_list(
+                        midi_cfg,
+                        "oss_midi_globs",
+                        [
+                            "/dev/midi",
+                            "/dev/midi[0-9]*",
+                            "/dev/amidi[0-9]*",
+                        ],
+                    ),
+                },
+            ]
+        if platform_name == "darwin":
+            return [
+                {
+                    "key": "coremidi",
+                    "label": "CoreMIDI",
+                    "backend": "unsupported",
+                    "unsupported_reason": (
+                        "native CoreMIDI bridge is not bundled"
+                    ),
+                }
+            ]
+        if platform_name.startswith("win"):
+            return [
+                {
+                    "key": "winmm",
+                    "label": "WinMM MIDI",
+                    "backend": "unsupported",
+                    "unsupported_reason": (
+                        "native WinMM MIDI bridge is not bundled"
+                    ),
+                }
+            ]
+        if platform_name.startswith("android"):
+            return [
+                {
+                    "key": "android_midi",
+                    "label": "Android MIDI",
+                    "backend": "unsupported",
+                    "unsupported_reason": (
+                        "native Android MIDI bridge is not bundled"
+                    ),
+                }
+            ]
+        return []
+
+    @staticmethod
+    def _glob_paths(tech: dict[str, Any]) -> list[str]:
+        return sorted({
+            path
+            for pattern in tech.get("globs", [])
+            for path in glob.glob(str(pattern))
+        })
+
+    def status_snapshot(
+        self,
+        activity_until: dict[str, float] | None = None,
+        now: float | None = None,
+    ) -> list[dict[str, Any]]:
+        activity_until = activity_until or {}
+        now = time.monotonic() if now is None else float(now)
+        items: list[dict[str, Any]] = []
+        for tech in self._techs:
+            key = str(tech["key"])
+            state = "unavailable"
+            reason = ""
+            if not self._enabled:
+                reason = "MIDI input disabled in configuration"
+            elif tech.get("backend") == "byte_stream":
+                paths = self._glob_paths(tech)
+                readable = [path for path in paths if os.access(path, os.R_OK)]
+                if readable:
+                    state = (
+                        "activity"
+                        if activity_until.get(key, 0.0) > now
+                        else "listening"
+                    )
+                    reason = ", ".join(readable[:3])
+                    if len(readable) > 3:
+                        reason += f" (+{len(readable) - 3})"
+                elif paths:
+                    reason = "device present but not readable"
+                else:
+                    reason = "no matching device"
+            else:
+                listener = self._listener_readers.get(key)
+                if listener is not None:
+                    status = listener.status_snapshot(
+                        activity_until.get(key, 0.0) > now
+                    )
+                    state = str(status["state"])
+                    reason = str(status["reason"])
+                elif tech.get("backend") == "alsa_seq":
+                    device = tech.get("device")
+                    if device and not os.path.exists(str(device)):
+                        reason = f"{device} not present"
+                    else:
+                        reason = "ALSA sequencer listener not started"
+                else:
+                    reason = str(
+                        tech.get("unsupported_reason", "not supported by this build")
+                    )
+
+            items.append(
+                {
+                    "key": key,
+                    "label": str(tech["label"]),
+                    "state": state,
+                    "available": state in ("listening", "activity"),
+                    "reason": reason,
+                }
+            )
+        return items
+
+    def close(self) -> None:
+        for reader in self._readers:
+            reader.close()
+        for reader in self._listener_readers.values():
+            reader.close()
 
 
 class MidiAmyEngine:
@@ -639,6 +1134,9 @@ class MidiPlayerBackend(QObject):
     bindingStateChanged = Signal()
     bindingLocationRequested = Signal(str, int)
     _queuedControlChange = Signal(int, int, int)
+    _queuedButtonChange = Signal(int, int, int)
+    midiInputTechsChanged = Signal()
+    _queuedMidiTechActivity = Signal(str)
 
     def __init__(
         self,
@@ -689,9 +1187,12 @@ class MidiPlayerBackend(QObject):
         self._binding_version = 0
         self._midi_control_lock = threading.Lock()
         self._applying_midi_control = 0
+        self._held_midi_button_targets: set[str] = set()
         raw_cc_log = os.environ.get("OMNICHORD_TEST_MIDI_CC_LOG", "")
         self._midi_cc_test_log = Path(raw_cc_log) if raw_cc_log else None
         self._queuedControlChange.connect(self.process_midi_control)
+        self._queuedButtonChange.connect(self.process_midi_button)
+        self._queuedMidiTechActivity.connect(self._mark_midi_tech_activity)
         self._blue_expiry_timer = QTimer(self)
         self._blue_expiry_timer.setInterval(250)
         self._blue_expiry_timer.timeout.connect(self._expire_blue_controls)
@@ -699,6 +1200,18 @@ class MidiPlayerBackend(QObject):
         self._preset_feedback_timer.setInterval(100)
         self._preset_feedback_timer.timeout.connect(
             self._expire_preset_feedback
+        )
+        self._midi_input_activity_until: dict[str, float] = {}
+        self._midi_input_tech_snapshot: list[dict[str, Any]] = []
+        self._midi_input_refresh_timer = QTimer(self)
+        self._midi_input_refresh_timer.setInterval(1000)
+        self._midi_input_refresh_timer.timeout.connect(
+            self._refresh_midi_input_techs
+        )
+        self._midi_input_activity_timer = QTimer(self)
+        self._midi_input_activity_timer.setInterval(120)
+        self._midi_input_activity_timer.timeout.connect(
+            self._refresh_midi_input_techs
         )
 
         self.engine = MidiAmyEngine(client)
@@ -712,19 +1225,18 @@ class MidiPlayerBackend(QObject):
         self._apply_all_to_engine()
 
         midi_cfg = client.config.get("midi_input", {})
-        self._reader = _LinuxRawMidiReader(
+        self._reader = _MidiInputTechManager(
             self.process_midi_note,
             self._queue_midi_control,
-            str(
-                midi_cfg.get(
-                    "device_glob",
-                    "/dev/snd/midiC*D*",
-                )
-            ),
-            bool(midi_cfg.get("enabled", True)),
+            self._queue_midi_tech_activity,
+            midi_cfg if isinstance(midi_cfg, dict) else {},
         )
+        self._refresh_midi_input_techs()
+        self._midi_input_refresh_timer.start()
 
     def close(self) -> None:
+        self._midi_input_refresh_timer.stop()
+        self._midi_input_activity_timer.stop()
         self._reader.close()
 
     @Property(int, notify=stateChanged)
@@ -792,12 +1304,56 @@ class MidiPlayerBackend(QObject):
     def masterMuted(self) -> bool:
         return self._master_muted
 
+    @Property("QVariantList", notify=midiInputTechsChanged)
+    def midiInputTechs(self) -> list[dict[str, Any]]:
+        return list(self._midi_input_tech_snapshot)
+
+    def _queue_midi_tech_activity(self, key: str) -> None:
+        self._queuedMidiTechActivity.emit(str(key))
+
+    @Slot(str)
+    def _mark_midi_tech_activity(self, key: str) -> None:
+        self._midi_input_activity_until[str(key)] = (
+            time.monotonic() + _MidiInputTechManager.ACTIVITY_SECONDS
+        )
+        self._refresh_midi_input_techs()
+        if not self._midi_input_activity_timer.isActive():
+            self._midi_input_activity_timer.start()
+
+    def _refresh_midi_input_techs(self) -> None:
+        snapshot = self._reader.status_snapshot(
+            self._midi_input_activity_until
+        )
+        if snapshot != self._midi_input_tech_snapshot:
+            self._midi_input_tech_snapshot = snapshot
+            self.midiInputTechsChanged.emit()
+        active = any(
+            item.get("state") == "activity"
+            for item in snapshot
+        )
+        if not active:
+            self._midi_input_activity_timer.stop()
+
     def _queue_midi_control(self, channel: int, controller: int, value: int) -> None:
         """Move raw-MIDI thread callbacks onto this QObject's Qt thread."""
+        key = self._midi_control_state.key(channel, controller)
         self._queuedControlChange.emit(
             max(1, min(16, int(channel))),
-            max(0, min(127, int(controller))),
-            max(0, min(127, int(value))),
+            key[1],
+            max(0, min(self._midi_control_state.value_max_for_key(key), int(value))),
+        )
+
+    def _queue_midi_button(
+        self,
+        channel: int,
+        note: int,
+        velocity: int,
+        is_on: bool,
+    ) -> None:
+        self._queuedButtonChange.emit(
+            max(1, min(16, int(channel))),
+            max(0, min(127, int(note))),
+            max(0, min(127, int(velocity))) if is_on else 0,
         )
 
     @Slot(int, int, int)
@@ -840,7 +1396,45 @@ class MidiPlayerBackend(QObject):
             self._sync_blue_timer()
             self._bump_binding_state()
         if target is not None:
-            self._apply_control_target(target, int(value))
+            if self._is_button_target(target):
+                self._apply_button_target(target, int(value) > 0)
+            else:
+                self._apply_control_target(target, int(value), control_key)
+        self._emit_binding_location_feedback(key, target)
+
+    @Slot(int, int, int)
+    def process_midi_button(self, channel: int, note: int, velocity: int) -> None:
+        controller = NOTE_BUTTON_OFFSET + max(0, min(127, int(note)))
+        control_key = self._midi_control_state.key(channel, controller)
+        with self._midi_control_lock:
+            was_blue = control_key in self._midi_control_state.blue_since
+            changed, target, key = self._midi_control_state.observe(
+                channel,
+                controller,
+                max(0, min(127, int(velocity))),
+                now=time.monotonic(),
+            )
+            if not changed or key is None:
+                return
+            self._write_cc_test_log({
+                "event": "button-change",
+                "channel": key[0],
+                "note": key[1] - NOTE_BUTTON_OFFSET,
+                "clock": self._midi_control_state.clock,
+                "mapped": target is not None,
+            })
+            blue_cleared = (
+                was_blue
+                and control_key not in self._midi_control_state.blue_since
+            )
+        if blue_cleared:
+            self._sync_blue_timer()
+            self._bump_binding_state()
+        if target is not None:
+            if self._is_button_target(target):
+                self._apply_button_target(target, int(velocity) > 0)
+            else:
+                self._apply_control_target(target, int(velocity), key)
         self._emit_binding_location_feedback(key, target)
 
     def _write_cc_test_log(self, record: dict[str, Any]) -> None:
@@ -1046,6 +1640,26 @@ class MidiPlayerBackend(QObject):
         ):
             target["id"] = f"omni:{kind}"
             return target
+        if kind == "button":
+            action = str(raw.get("action", ""))
+            if not action:
+                return None
+            target["action"] = action
+            for field in ("preset", "row", "level", "fill", "rate"):
+                if field in raw:
+                    try:
+                        target[field] = int(raw[field])
+                    except (TypeError, ValueError):
+                        return None
+            target["id"] = ":".join(
+                [screen, "button", action]
+                + [
+                    str(target[field])
+                    for field in ("preset", "row", "level", "fill", "rate")
+                    if field in target
+                ]
+            )
+            return target
         return None
 
     def _target_range(
@@ -1106,12 +1720,18 @@ class MidiPlayerBackend(QObject):
         self,
         target: dict[str, Any],
         midi_value: int,
+        source_key: tuple[int, int] | None = None,
     ) -> float | None:
         target_range = self._target_range(target)
         if target_range is None:
             return None
         minimum, maximum, step, scale = target_range
-        position = max(0.0, min(1.0, float(midi_value) / 127.0))
+        value_max = (
+            self._midi_control_state.value_max_for_key(source_key)
+            if source_key is not None
+            else 127
+        )
+        position = max(0.0, min(1.0, float(midi_value) / float(value_max)))
         if scale == "log" and minimum > 0.0:
             value = math.exp(
                 math.log(minimum)
@@ -1151,6 +1771,19 @@ class MidiPlayerBackend(QObject):
                 for item in targets
             )
 
+    @Slot("QVariantMap", result=bool)
+    def midiButtonTargetBlocked(self, raw: dict[str, Any]) -> bool:
+        if self._applying_midi_control:
+            return False
+        target = self._normalize_control_target(raw)
+        if target is None or not self._is_button_target(target):
+            return False
+        group = self._button_takeover_group(target)
+        if group is None:
+            return False
+        with self._midi_control_lock:
+            return group in self._held_midi_button_targets
+
     def _apply_midi_setter(self, setter: Any, *args: Any) -> None:
         self._applying_midi_control += 1
         try:
@@ -1162,8 +1795,9 @@ class MidiPlayerBackend(QObject):
         self,
         target: dict[str, Any],
         midi_value: int,
+        source_key: tuple[int, int] | None = None,
     ) -> None:
-        value = self._mapped_target_value(target, midi_value)
+        value = self._mapped_target_value(target, midi_value, source_key)
         if value is None:
             return
         screen = str(target["screen"])
@@ -1278,6 +1912,122 @@ class MidiPlayerBackend(QObject):
             }
         )
 
+    @staticmethod
+    def _is_button_target(target: dict[str, Any]) -> bool:
+        return str(target.get("kind", "")) == "button"
+
+    @staticmethod
+    def _button_takeover_group(target: dict[str, Any]) -> str | None:
+        screen = str(target.get("screen", ""))
+        action = str(target.get("action", ""))
+        if not screen or not action:
+            return None
+
+        # Pure tap actions must not own later screen interaction while the
+        # hardware contact is still held. They trigger once on MIDI press.
+        if action in ("panic", "store_preset", "cycle_channel"):
+            return None
+
+        # Choice groups are held as a group: while one external control owns
+        # the selection, screen taps for the other choices in the same group
+        # are ignored, but unrelated app buttons remain usable.
+        if action in (
+            "select_preset",
+            "rhythm_busyness",
+            "rhythm_chord_activity",
+            "rhythm_bass_activity",
+            "chord_arpeggio_rate",
+        ):
+            return f"{screen}:button:{action}"
+
+        # Independent toggle buttons only block their own screen target.
+        return str(target["id"])
+
+    def _apply_button_target(
+        self,
+        target: dict[str, Any],
+        pressed: bool,
+    ) -> None:
+        takeover_group = self._button_takeover_group(target)
+        with self._midi_control_lock:
+            if takeover_group is not None:
+                if pressed:
+                    self._held_midi_button_targets.add(takeover_group)
+                else:
+                    self._held_midi_button_targets.discard(takeover_group)
+        if not pressed:
+            return
+
+        action = str(target.get("action", ""))
+        screen = str(target.get("screen", ""))
+
+        if screen == "midi":
+            if action == "store_preset":
+                self._apply_midi_setter(self.storeSelectedPreset)
+            elif action == "select_preset":
+                self._apply_midi_setter(
+                    self.selectPreset,
+                    int(target.get("preset", self._selected_preset)),
+                )
+            elif action == "master_mute":
+                self._apply_midi_setter(self.toggleMasterMuted)
+            elif action == "reverb_drums":
+                self._apply_midi_setter(self.toggleReverbDrums)
+            elif action == "cycle_channel":
+                self._apply_midi_setter(
+                    self.cycleChannel,
+                    int(target.get("row", 0)),
+                )
+        elif screen == "omni":
+            if action == "store_preset":
+                self._apply_midi_setter(self.owner.storeSelectedPreset)
+            elif action == "select_preset":
+                self._apply_midi_setter(
+                    self.owner.selectPreset,
+                    int(target.get("preset", self.owner.selectedPreset)),
+                )
+            elif action == "master_mute":
+                self._apply_midi_setter(self.owner.toggleMasterMuted)
+            elif action == "reverb_drums":
+                self._apply_midi_setter(self.owner.toggleReverbDrums)
+            elif action == "panic":
+                self._apply_midi_setter(self.owner.panic)
+            elif action == "rhythm_toggle":
+                self._apply_midi_setter(self.owner.toggleRhythm)
+            elif action == "rhythm_busyness":
+                self._apply_midi_setter(
+                    self.owner.setRhythmBusyness,
+                    int(target.get("level", 0)),
+                )
+            elif action == "rhythm_chord_activity":
+                self._apply_midi_setter(
+                    self.owner.setRhythmChordActivity,
+                    int(target.get("level", 0)),
+                )
+            elif action == "rhythm_bass_activity":
+                self._apply_midi_setter(
+                    self.owner.setRhythmBassActivity,
+                    int(target.get("level", 1)),
+                )
+            elif action == "rhythm_fill":
+                self._apply_midi_setter(
+                    self.owner.toggleRhythmFill,
+                    int(target.get("fill", 0)),
+                )
+            elif action == "strum_ladder":
+                self._apply_midi_setter(self.owner.toggleStrumLadderMode)
+            elif action == "chord_arpeggio":
+                self._apply_midi_setter(self.owner.toggleChordArpeggio)
+            elif action == "chord_arpeggio_rate":
+                self._apply_midi_setter(
+                    self.owner.setChordArpeggioRate,
+                    int(target.get("rate", 1)),
+                )
+            elif action == "chord_arpeggio_direction":
+                self._apply_midi_setter(
+                    self.owner.toggleChordArpeggioDirection
+                )
+
     @Slot(int, int)
     def selectControlIndicator(self, channel: int, controller: int) -> None:
         with self._midi_control_lock:
@@ -1291,8 +2041,20 @@ class MidiPlayerBackend(QObject):
         if target is None:
             return False
         with self._midi_control_lock:
+            learned_key = self._midi_control_state.learn_key
             learned = self._midi_control_state.bind_learned_target(target)
         if learned:
+            if (
+                learned_key is not None
+                and self._midi_control_state.source_type(learned_key)
+                == "pitch_bend"
+                and not self._is_button_target(target)
+            ):
+                self._apply_control_target(
+                    target,
+                    self._midi_control_state.default_value_for_key(learned_key),
+                    learned_key,
+                )
             self._write_cc_test_log(
                 {"event": "bind", "target": target["id"]}
             )
@@ -1348,6 +2110,14 @@ class MidiPlayerBackend(QObject):
     def injectControl(self, channel: int, controller: int, value: int) -> None:
         self.process_midi_control(channel, controller, value)
 
+    @Slot(int, int)
+    def injectPitchBend(self, channel: int, value: int) -> None:
+        self.process_midi_control(channel, PITCH_BEND_CONTROLLER, value)
+
+    @Slot(int, int, int)
+    def injectButton(self, channel: int, note: int, velocity: int) -> None:
+        self.process_midi_button(channel, note, velocity)
+
     def control_bindings_snapshot(self, screen: str) -> list[dict[str, Any]]:
         with self._midi_control_lock:
             result = self._midi_control_state.serialize_bindings(screen)
@@ -1396,6 +2166,7 @@ class MidiPlayerBackend(QObject):
                     "event": "binding-location",
                     "channel": int(key[0]),
                     "controller": int(key[1]),
+                    "sourceType": self._midi_control_state.source_type(key),
                     "screen": screen,
                     "preset": preset_number,
                     "active": active_target is not None,
@@ -1463,13 +2234,28 @@ class MidiPlayerBackend(QObject):
                 if target is None:
                     continue
                 try:
-                    key = (
-                        int(raw.get("channel", 0)),
-                        int(raw.get("controller", -1)),
-                    )
+                    channel = int(raw.get("channel", 0))
+                    source_type = str(raw.get("source_type", "cc"))
+                    if source_type == "pitch_bend":
+                        controller = PITCH_BEND_CONTROLLER
+                    elif source_type == "note_button":
+                        controller = NOTE_BUTTON_OFFSET + int(raw.get("note", -1))
+                    else:
+                        controller = int(raw.get("controller", -1))
+                    key = self._midi_control_state.key(channel, controller)
                 except (TypeError, ValueError):
                     continue
-                if not 1 <= key[0] <= 16 or not 0 <= key[1] <= 127:
+                if not 1 <= key[0] <= 16:
+                    continue
+                if source_type == "pitch_bend" and key[1] != PITCH_BEND_CONTROLLER:
+                    continue
+                if source_type == "note_button" and not (
+                    NOTE_BUTTON_OFFSET <= key[1] <= NOTE_BUTTON_OFFSET + 127
+                ):
+                    continue
+                if source_type not in ("cc", "pitch_bend", "note_button"):
+                    continue
+                if source_type == "cc" and not 0 <= key[1] <= 127:
                     continue
                 entries.append((key, target))
         return entries
@@ -1750,6 +2536,20 @@ class MidiPlayerBackend(QObject):
 
     @Slot(int, str, float)
     def setControl(self, row: int, key: str, value: float) -> None:
+        self._set_control(row, key, value, emit_state=True)
+
+    @Slot(int, str, float)
+    def editControl(self, row: int, key: str, value: float) -> None:
+        self._set_control(row, key, value, emit_state=False)
+
+    def _set_control(
+        self,
+        row: int,
+        key: str,
+        value: float,
+        *,
+        emit_state: bool,
+    ) -> None:
         if not self._valid_row(row):
             return
         runtime = self._runtime(row)
@@ -1765,7 +2565,8 @@ class MidiPlayerBackend(QObject):
             return
         if runtime.set_control(key, value):
             self._configure_row(int(row))
-            self._emit_state()
+            if emit_state:
+                self._emit_state()
 
     @Slot(int, float)
     def setVolume(self, row: int, value: float) -> None:

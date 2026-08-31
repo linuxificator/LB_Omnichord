@@ -193,6 +193,7 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
                         "event": "binding-location",
                         "channel": 1,
                         "controller": 75,
+                        "sourceType": "cc",
                         "screen": "omni",
                         "preset": 2,
                         "active": False,

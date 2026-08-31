@@ -141,6 +141,36 @@ class PackagingContracts(unittest.TestCase):
         ):
             self.assertIn(f"- {suite}", regression)
 
+    def test_midi_input_tech_contracts_are_in_build_unit_suite(self) -> None:
+        runner = (FRONTEND / "tests" / "run_tests.py").read_text(
+            encoding="utf-8"
+        )
+        regression = (
+            REPOSITORY / ".github" / "workflows" / "amy-regression.yml"
+        ).read_text(encoding="utf-8")
+        release = (
+            REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+        midi_tests = (
+            FRONTEND / "tests" / "test_midi_engine.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('TESTS.glob("test_*.py")', runner)
+        self.assertIn("- unit", regression)
+        self.assertIn(
+            "python tests/run_tests.py --suite '${{ matrix.suite }}'",
+            regression,
+        )
+        self.assertIn("uses: ./.github/workflows/amy-regression.yml", release)
+        for expected in (
+            "test_midi_platform_techs_are_filtered_by_runtime_platform",
+            "test_linux_midi_manager_starts_real_alsa_sequencer_listener",
+            "test_non_linux_profiles_expose_only_their_platform_tech",
+            "test_non_linux_managers_do_not_start_raw_or_alsa_seq_readers",
+            "test_disabled_midi_input_starts_no_platform_readers",
+        ):
+            self.assertIn(expected, midi_tests)
+
     def test_screenshots_refresh_only_after_a_successful_release(self) -> None:
         release = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"

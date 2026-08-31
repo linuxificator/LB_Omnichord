@@ -15,6 +15,8 @@ Item {
     property color selectedColor: "#c79214"
     property color borderColor: "#96720f"
     property color selectedTextColor: "#fff9dd"
+    property var midiControlRouter: null
+    property var midiTargetForLevel: null
 
     signal selected(int level)
 
@@ -59,6 +61,8 @@ Item {
             model: root.levels
 
             Button {
+                id: levelButton
+
                 required property var modelData
                 required property int index
 
@@ -83,6 +87,10 @@ Item {
                 property bool selectedState:
                     root.currentLevel
                     === Number(modelData)
+                property var midiTarget:
+                    root.midiTargetForLevel === null
+                    ? ({})
+                    : root.midiTargetForLevel(Number(modelData))
 
                 font.pixelSize: 13
                 font.bold: true
@@ -113,6 +121,14 @@ Item {
                     border.color: root.borderColor
                     border.width:
                         parent.selectedState ? 2 : 1
+                }
+
+                MidiButtonLed {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 3
+                    z: 2
+                    midiControlRouter: root.midiControlRouter
+                    midiTarget: levelButton.midiTarget
                 }
 
                 onClicked:

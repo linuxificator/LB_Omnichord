@@ -5,6 +5,10 @@ import time
 from typing import Any, Iterable
 
 
+PITCH_BEND_CONTROLLER = 128
+NOTE_BUTTON_OFFSET = 256
+NOTE_BUTTON_LAST = NOTE_BUTTON_OFFSET + 127
+
 ControlKey = tuple[int, int]
 
 
@@ -43,12 +47,43 @@ class MidiControlState:
     def key(channel: int, controller: int) -> ControlKey:
         return (
             max(1, min(16, int(channel))),
-            max(0, min(127, int(controller))),
+            max(0, min(NOTE_BUTTON_LAST, int(controller))),
         )
 
     @staticmethod
     def target_id(target: dict[str, Any]) -> str:
         return str(target["id"])
+
+    @staticmethod
+    def source_type(key: ControlKey) -> str:
+        controller = int(key[1])
+        if controller == PITCH_BEND_CONTROLLER:
+            return "pitch_bend"
+        if NOTE_BUTTON_OFFSET <= controller <= NOTE_BUTTON_LAST:
+            return "note_button"
+        return "cc"
+
+    @staticmethod
+    def source_label(key: ControlKey) -> str:
+        source_type = MidiControlState.source_type(key)
+        if source_type == "pitch_bend":
+            return f"CH{key[0]} PB"
+        if source_type == "note_button":
+            return f"CH{key[0]} N{key[1] - NOTE_BUTTON_OFFSET}"
+        return f"CH{key[0]} CC{key[1]}"
+
+    @staticmethod
+    def value_max_for_key(key: ControlKey) -> int:
+        return 16383 if MidiControlState.source_type(key) == "pitch_bend" else 127
+
+    @staticmethod
+    def default_value_for_key(key: ControlKey) -> int:
+        return 8192 if MidiControlState.source_type(key) == "pitch_bend" else 0
+
+    @staticmethod
+    def display_value_for_key(key: ControlKey, value: int) -> int:
+        maximum = MidiControlState.value_max_for_key(key)
+        return int(round(max(0, min(maximum, int(value))) * 127 / maximum))
 
     def status(self, key: ControlKey) -> str:
         if self.learn_key == key:
@@ -109,10 +144,11 @@ class MidiControlState:
         )
 
     def _new_visible_item(self, key: ControlKey) -> dict[str, Any]:
+        value = int(self.values.get(key, self.default_value_for_key(key)))
         return {
             "channel": key[0],
             "controller": key[1],
-            "value": int(self.values.get(key, 0)),
+            "value": value,
             "lastSeen": int(self.clock),
             "pulse": int(self.clock),
             "replaced": 0,
@@ -166,10 +202,19 @@ class MidiControlState:
         """Record one CC packet and return a target only for a real change."""
         now = time.monotonic() if now is None else float(now)
         key = self.key(channel, controller)
-        value = max(0, min(127, int(value)))
+        source_type = self.source_type(key)
+        value = max(0, min(self.value_max_for_key(key), int(value)))
         previous = self.values.get(key)
         self.values[key] = value
-        if previous is None or previous == value:
+        if previous is None:
+            if source_type == "pitch_bend":
+                previous = self.default_value_for_key(key)
+            elif source_type == "note_button":
+                if value <= 0:
+                    return False, None, None
+            else:
+                return False, None, None
+        if previous == value:
             return False, None, None
 
         # Blue marks a recently unbound control.  Its next genuine movement
@@ -198,18 +243,38 @@ class MidiControlState:
             model = dict(item)
             key = (int(item["channel"]), int(item["controller"]))
             evicting = float(item.get("replacementUntil", 0.0)) > now
-            model["state"] = self.status(key)
-            model["evicting"] = evicting
-            model["displayChannel"] = int(
-                item.get("outgoingChannel", key[0]) if evicting else key[0]
-            )
-            model["displayController"] = int(
-                item.get("outgoingController", key[1]) if evicting else key[1]
-            )
-            model["displayValue"] = int(
+            display_key = (
+                int(item.get("outgoingChannel", key[0])),
+                int(item.get("outgoingController", key[1])),
+            ) if evicting else key
+            raw_display_value = int(
                 item.get("outgoingValue", item.get("value", 0))
                 if evicting
                 else item.get("value", 0)
+            )
+            model["state"] = self.status(key)
+            model["evicting"] = evicting
+            model["inputType"] = self.source_type(key)
+            display_type = self.source_type(display_key)
+            display_target = self.bindings.get(display_key)
+            if (
+                display_type == "cc"
+                and isinstance(display_target, dict)
+                and str(display_target.get("kind", "")) == "button"
+            ):
+                display_type = "button"
+            model["displayType"] = display_type
+            model["displayLabel"] = self.source_label(display_key)
+            model["displayChannel"] = int(display_key[0])
+            model["displayController"] = int(display_key[1])
+            model["displayValue"] = self.display_value_for_key(
+                display_key,
+                raw_display_value,
+            )
+            model["rawValue"] = int(item.get("value", 0))
+            model["buttonDown"] = (
+                display_type in ("button", "note_button")
+                and raw_display_value > 0
             )
             result.append(model)
         return result
@@ -375,15 +440,22 @@ class MidiControlState:
         return "idle"
 
     def serialize_bindings(self, screen: str) -> list[dict[str, Any]]:
-        return [
-            {
+        result: list[dict[str, Any]] = []
+        for key, target in sorted(self.bindings.items()):
+            if str(target.get("screen")) != str(screen):
+                continue
+            entry = {
                 "channel": key[0],
                 "controller": key[1],
                 "target": copy.deepcopy(target),
             }
-            for key, target in sorted(self.bindings.items())
-            if str(target.get("screen")) == str(screen)
-        ]
+            source_type = self.source_type(key)
+            if source_type != "cc":
+                entry["source_type"] = source_type
+                if source_type == "note_button":
+                    entry["note"] = key[1] - NOTE_BUTTON_OFFSET
+            result.append(entry)
+        return result
 
     def replace_screen_bindings(
         self,

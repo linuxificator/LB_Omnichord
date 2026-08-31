@@ -144,6 +144,13 @@ ApplicationWindow {
         })
     }
 
+    function midiButtonHandled(target) {
+        const learned = backend.midiPlayer.activateControlTarget(target)
+        if (learned)
+            return true
+        return backend.midiPlayer.midiButtonTargetBlocked(target)
+    }
+
     function setFullscreenMode(fullscreen) {
         if (fullscreen) {
             window.showFullScreen()
@@ -347,8 +354,20 @@ ApplicationWindow {
                         panelColor: "#5d9fd0"
                         borderColor: "#2f648c"
                         textColor: "#071c2c"
+                        midiControlRouter: backend.midiPlayer
+                        midiTarget: ({
+                            "screen": "omni",
+                            "kind": "button",
+                            "action": "strum_ladder"
+                        })
                         onClicked: {
-                            backend.toggleStrumLadderMode()
+                            if (!midiButtonHandled({
+                                "screen": "omni",
+                                "kind": "button",
+                                "action": "strum_ladder"
+                            })) {
+                                backend.toggleStrumLadderMode()
+                            }
                         }
                     }
                 }

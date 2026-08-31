@@ -14,24 +14,67 @@ Each MIDI row has:
 
 Default channels are 1-6. Duplicate channel assignments are allowed.
 
-On Linux the frontend currently reads ALSA raw-MIDI character devices directly
-from the configurable `/dev/snd/midiC*D*` glob on a background thread. It parses
-Note On, Note Off, velocity-zero Note Off, Control Change and running status.
-System real-time bytes are ignored; SysEx and Program Change are not application
+MIDI input tech selection is controlled by `midi_input.tech_profile`. The shipped
+profile is `linux`, matching the Raspberry Pi target; when the field is absent,
+the backend derives the closest profile from Qt's platform abstraction. On Linux
+the frontend reads every enabled raw byte-stream MIDI technology that this build
+can open and combines those inputs into one application MIDI stream. The
+currently implemented dependency-free readers are:
+
+- ALSA raw MIDI character devices, configured by `alsa_raw_globs` and retaining
+  the legacy `device_glob` fallback (`/dev/snd/midiC*D*`);
+- OSS-compatible raw MIDI character devices, configured by `oss_midi_globs`
+  (`/dev/midi`, `/dev/midi[0-9]*`, `/dev/amidi[0-9]*`).
+
+Each physical byte stream owns its own running-status parser state before events
+are merged. This prevents one device's partial running-status message from
+corrupting another device's input. The merged events parse Note On, Note Off,
+velocity-zero Note Off, Control Change, Pitch Bend and running status. System
+real-time bytes are ignored; SysEx and Program Change are not application
 inputs. A channel-status byte by itself creates no indicator. The first value
 seen for each channel/controller pair establishes a baseline; only a later,
-different value counts as control movement. This prevents controller-state
-snapshots sent during a VMPK channel switch from creating indicators. Actual
-CC changes drive the left-to-right, capacity-aware indicators.
-Changed Control Change values also enter the explicit MIDI-learn system defined
-in `midi_control.md`. Unbound controls remain display-only. Bound controls map
-to one numeric target and still apply through the target's normal backend/AMY
-wire path.
+different value counts as control movement. Pitch Bend is the exception to the
+zero-baseline rule: its baseline is the MIDI center value, so moving a spring
+loaded wheel or encoder away from center creates an indicator immediately.
+This prevents controller-state snapshots sent during a VMPK channel switch from
+creating indicators. Actual CC, Pitch Bend and MIDI-button changes drive the
+left-to-right, capacity-aware indicators.
+Changed MIDI control sources also enter the explicit MIDI-learn system defined
+in `midi_control.md`. Unbound controls remain display-only. Bound continuous
+sources map to one numeric target and still apply through the target's normal
+backend/AMY wire path. Bound CC-style controller buttons map to explicit
+application button targets and use the same backend actions as screen taps.
+Ordinary Note On/Off events remain musical input and do not create button-learn
+indicators; a controller that sends pads as notes needs an explicit whitelist or
+translation layer before those notes may be treated as buttons.
 Channel 0 in a row means omni/all incoming channels.
 
 ALSA Sequencer-only applications such as VMPK do not create a raw-MIDI device.
-For current local testing, load `snd-virmidi` and connect VMPK to a Virtual Raw
-MIDI port. Direct ALSA Sequencer subscription is not implemented yet.
+The frontend therefore also creates an ALSA sequencer input client named
+`LB Omnichord` with a `MIDI In` port. That port is visible in graph tools such as
+`qpwgraph`; connect MIDI graph outputs such as BLE MIDI, Midi-Bridge or Midi
+Through to that port. Incoming ALSA sequencer events are decoded back to MIDI
+bytes and enter the same merged stream as raw MIDI devices. JACK MIDI,
+CoreMIDI/macOS, WinMM/Windows and Android MIDI are common platform MIDI APIs, but
+this PySide-only build has no bundled native bridges for those APIs.
+
+## MIDI input tech indicators
+
+The MIDI screen shows platform-relevant MIDI input tech LEDs in the narrow gap
+below MIDI synth row 6 and above the grey MIDI CC indicator bar.
+
+- Red means the technology is relevant to the current platform but is not
+  available to this build at runtime: no matching device, unreadable device,
+  disabled MIDI input, or no bundled native bridge.
+- Green means the technology has at least one readable input and the app is
+  listening to it.
+- Blinking green means bytes arrived through that technology recently.
+- Technologies that are not relevant to the current platform are not shown.
+
+The Linux indicator set is ALSA raw, ALSA sequencer and OSS MIDI. ALSA raw and
+OSS MIDI become green when readable byte-stream devices exist. ALSA sequencer
+becomes green when the backend successfully creates the `LB Omnichord` sequencer
+client/port.
 
 ## Pitch handling
 

@@ -257,10 +257,11 @@ installation failed to show or release chord-key interaction correctly.
 
 - The learning touch cannot unlink the new binding in the same gesture.
 - One click on a bound target does not unlink.
-- Drag/edit gestures on a bound target are consumed and do not move or unlink
-  it. Qt's standard double-click/double-tap event is the explicit unlink
-  gesture, using platform time and distance style hints; that second gesture
-  still cannot edit the numeric value.
+- Drag/edit gestures on a bound numeric target perform manual takeover: the
+  value changes normally and the previous controller becomes blue.
+- Slider track and handle gestures are reserved for normal slider operation.
+  Explicit slider unlink uses Qt's double-click/double-tap event on the slider
+  label/value area, keeping extra pointer handlers out of the drag path.
 - The controller becomes blue and visible when capacity permits.
 - The next genuine CC movement changes a blue controller immediately into an
   ordinary grey unbound indicator. Without movement, blue expires and removes
@@ -353,6 +354,20 @@ installation failed to show or release chord-key interaction correctly.
   never selects a preset, changes screen, applies the inactive preset's value,
   or changes musical state.
 
+**MIDI-CC-14 — hardware button takeover is scoped**
+
+- MIDI CC-style button controls and pitch/note-style hardware controls that
+  are explicitly treated as controller buttons may bind to supported app
+  buttons. Ordinary musical Note On/Off input must never create controller
+  button indicators or bindings.
+- A held on/off hardware button owns only its target's logical button group.
+  Preset choices block other preset choices, activity choices block only their
+  own activity row and arpeggio-rate choices block only other arpeggio-rate
+  choices. Independent toggles block only their exact screen button.
+- Tap-only actions, including panic, store-preset and cycle-channel, trigger on
+  press but do not create held takeover state. Unrelated screen buttons remain
+  usable while any hardware button is held.
+
 Unit tests cover the state machine and mapping math. Headless frontend tests use
 simulated user actions plus simulated MIDI CC input and inspect state, preset
 JSON and AMY output. The offscreen Qt test feeds real raw-MIDI bytes, records
@@ -433,6 +448,10 @@ Expected:
 
 - Sustain zero is the left edge, not the middle of the slider.
 - The label always renders a numeric value such as `Sustain 0.00`.
+- Dragging a synth-parameter slider must not republish/reset the QML
+  `Repeater` control-list model on every movement. The live edit still updates
+  backend state and AMY immediately, but the active delegate must keep Qt's
+  mouse grab until release.
 
 **Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the control; negative values also caused the numeric text to disappear.
 

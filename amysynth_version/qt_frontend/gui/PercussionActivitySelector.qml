@@ -14,6 +14,9 @@ Item {
     property color selectedColor: "#bc8410"
     property color borderColor: "#96720f"
     property color selectedTextColor: "#fff9dd"
+    property var midiControlRouter: null
+    property var activityMidiTargetForLevel: null
+    property var fillMidiTargetForIndex: null
 
     signal activitySelected(int level)
     signal fillToggled(int fillIndex)
@@ -72,6 +75,10 @@ Item {
                     text: String(index + 1)
                     property bool selectedState:
                         root.currentLevel === index + 1
+                    property var midiTarget:
+                        root.activityMidiTargetForLevel === null
+                        ? ({})
+                        : root.activityMidiTargetForLevel(index + 1)
                     font.pixelSize: 13
                     font.bold: true
                     contentItem: Text {
@@ -89,6 +96,13 @@ Item {
                             : (activityButton.pressed ? "#e1ca6a" : root.idleColor)
                         border.color: root.borderColor
                         border.width: activityButton.selectedState ? 2 : 1
+                    }
+                    MidiButtonLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 3
+                        z: 2
+                        midiControlRouter: root.midiControlRouter
+                        midiTarget: activityButton.midiTarget
                     }
                     onClicked: root.activitySelected(index + 1)
                 }
@@ -117,6 +131,10 @@ Item {
                     property bool selectedState:
                         root.fillEnabled.length > index
                         && Boolean(root.fillEnabled[index])
+                    property var midiTarget:
+                        root.fillMidiTargetForIndex === null
+                        ? ({})
+                        : root.fillMidiTargetForIndex(index)
                     font.pixelSize: 12
                     font.bold: true
                     contentItem: Text {
@@ -134,6 +152,13 @@ Item {
                             : (fillButton.pressed ? "#e1ca6a" : root.idleColor)
                         border.color: root.borderColor
                         border.width: fillButton.selectedState ? 2 : 1
+                    }
+                    MidiButtonLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 3
+                        z: 2
+                        midiControlRouter: root.midiControlRouter
+                        midiTarget: fillButton.midiTarget
                     }
                     onClicked: root.fillToggled(index)
                 }

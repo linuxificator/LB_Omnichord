@@ -8,7 +8,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
-from midi_control import MidiControlState  # noqa: E402
+from midi_control import (  # noqa: E402
+    NOTE_BUTTON_OFFSET,
+    PITCH_BEND_CONTROLLER,
+    MidiControlState,
+)
 
 
 def target(name: str, screen: str = "midi") -> dict[str, object]:
@@ -197,6 +201,118 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertEqual(
             state.serialize_bindings("omni"),
             [{"channel": 2, "controller": 8, "target": omni_target}],
+        )
+
+    def test_pitch_bend_is_high_resolution_centered_control(self) -> None:
+        state = MidiControlState(capacity=4)
+
+        unchanged, mapped, key = state.observe(
+            1,
+            PITCH_BEND_CONTROLLER,
+            8192,
+            now=1.0,
+        )
+
+        self.assertFalse(unchanged)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+
+        changed, mapped, key = state.observe(
+            1,
+            PITCH_BEND_CONTROLLER,
+            12288,
+            now=2.0,
+        )
+
+        self.assertTrue(changed)
+        self.assertIsNone(mapped)
+        self.assertEqual(key, (1, PITCH_BEND_CONTROLLER))
+        model = state.visible_model(now=2.0)[0]
+        self.assertEqual(model["displayType"], "pitch_bend")
+        self.assertEqual(model["displayLabel"], "CH1 PB")
+        self.assertEqual(model["rawValue"], 12288)
+        self.assertGreater(model["displayValue"], 64)
+
+    def test_note_on_off_is_button_source(self) -> None:
+        state = MidiControlState(capacity=4)
+        controller = NOTE_BUTTON_OFFSET + 36
+
+        unchanged, mapped, key = state.observe(2, controller, 0, now=1.0)
+        self.assertFalse(unchanged)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+
+        changed, mapped, key = state.observe(2, controller, 100, now=2.0)
+        self.assertTrue(changed)
+        self.assertIsNone(mapped)
+        self.assertEqual(key, (2, controller))
+        model = state.visible_model(now=2.0)[0]
+        self.assertEqual(model["displayType"], "note_button")
+        self.assertEqual(model["displayLabel"], "CH2 N36")
+        self.assertTrue(model["buttonDown"])
+
+        changed, mapped, key = state.observe(2, controller, 0, now=3.0)
+        self.assertTrue(changed)
+        self.assertIsNone(mapped)
+        self.assertEqual(key, (2, controller))
+        self.assertFalse(state.visible_model(now=3.0)[0]["buttonDown"])
+
+    def test_cc_bound_to_button_target_renders_as_button(self) -> None:
+        state = MidiControlState(capacity=4)
+        button_target = {
+            "id": "omni:button:rhythm_toggle",
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle",
+        }
+
+        change(state, 21, value=127, now=1.0)
+        state.select_control((1, 21), now=2.0)
+        state.bind_learned_target(button_target, now=2.1)
+        changed, mapped, key = state.observe(1, 21, 0, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(mapped, button_target)
+        self.assertEqual(key, (1, 21))
+        model = state.visible_model(now=3.0)[0]
+        self.assertEqual(model["displayType"], "button")
+        self.assertEqual(model["displayLabel"], "CH1 CC21")
+        self.assertFalse(model["buttonDown"])
+
+    def test_non_cc_bindings_serialize_source_type(self) -> None:
+        state = MidiControlState(capacity=4)
+        button_target = {
+            "id": "omni:button:rhythm_toggle",
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle",
+        }
+        state.replace_screen_bindings(
+            "omni",
+            [
+                ((1, PITCH_BEND_CONTROLLER), target("volume", screen="omni")),
+                ((2, NOTE_BUTTON_OFFSET + 40), button_target),
+            ],
+            now=1.0,
+        )
+
+        self.assertEqual(
+            state.serialize_bindings("omni"),
+            [
+                {
+                    "channel": 1,
+                    "controller": PITCH_BEND_CONTROLLER,
+                    "target": target("volume", screen="omni"),
+                    "source_type": "pitch_bend",
+                },
+                {
+                    "channel": 2,
+                    "controller": NOTE_BUTTON_OFFSET + 40,
+                    "target": button_target,
+                    "source_type": "note_button",
+                    "note": 40,
+                },
+            ],
         )
 
     def test_preset_binding_conflict_prefers_incoming_and_expires_feedback(self) -> None:
