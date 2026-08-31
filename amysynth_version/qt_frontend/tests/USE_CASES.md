@@ -733,15 +733,21 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
   `screenshots/midi.png`.
 - The OMNI frame shows an active C-minor strum-note guide; the MIDI frame shows
   three representative CC knobs in the grey lower bar.
-- The repository README embeds those exact two files. Screenshot refreshes may
-  not use a hand-drawn or generated substitute for the actual Qt interface.
+- Release refreshes store timestamped screenshot files such as
+  `screenshots/omni-RYYYYMMDDTHHMMSS.png` and update the repository README to
+  embed those files. Screenshot refreshes may not use a hand-drawn or generated
+  substitute for the actual Qt interface.
+- Before README assets are committed, the generated PNGs must load at the
+  expected 1920x850 size and must have enough sampled color variation to reject
+  a blank or obvious error screen.
 - The capture helper continuously drains the pseudo-serial endpoint, so the
   complete startup wire stream cannot block its writer while large rhythm and
   fill libraries are installed.
 - A successful `main` release captures the exact released commit. CI commits
-  only changed screenshot PNGs and explicitly queues one full validation
-  release for that commit. Byte-identical images create neither a commit nor
-  another run, preventing a release loop.
+  only `README.md` and the new release-tagged screenshot PNGs. That
+  screenshot-only commit uses a human-readable `skip-rebuild` note plus
+  GitHub's required `skip-checks:true` trailer, so ordinary merges and pushes to
+  `main` still rebuild while screenshot refreshes do not create a release loop.
 
 **UI-03 — instrument names contain useful names only**
 

@@ -609,7 +609,6 @@ jobs:
     needs: [publish-release]
     runs-on: ubuntu-24.04
     permissions:
-      actions: write
       contents: write
 
     steps:
@@ -635,28 +634,26 @@ jobs:
       - name: Capture and validate the released interface
         run: |
           python amysynth_version/qt_frontend/capture_screenshots.py
-          python amysynth_version/qt_frontend/tools/normalize_screenshot_changes.py
+          python amysynth_version/qt_frontend/tools/update_release_screenshots.py \
+            --release-tag '${{ needs.release-metadata.outputs.tag }}'
           python amysynth_version/qt_frontend/tests/test_static_contracts.py
 
-      - name: Commit changed README screenshots and queue validation release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Commit changed README screenshots without rebuild
         run: |
-          screenshots=(
-            amysynth_version/qt_frontend/screenshots/omni.png
-            amysynth_version/qt_frontend/screenshots/midi.png
+          release_tag='${{ needs.release-metadata.outputs.tag }}'
+          changed_files=(
+            README.md
+            "amysynth_version/qt_frontend/screenshots/omni-${release_tag}.png"
+            "amysynth_version/qt_frontend/screenshots/midi-${release_tag}.png"
           )
-          if git diff --quiet -- "${screenshots[@]}"; then
+          if git diff --quiet -- "${changed_files[@]}"; then
             echo 'README screenshots already match the released interface.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- "${screenshots[@]}"
-          git commit -m 'Refresh README screenshots'
+          git add -- "${changed_files[@]}"
+          git commit -m 'Refresh README screenshots' \
+            -m 'skip-rebuild: README screenshots only' \
+            -m 'skip-checks:true'
           git push origin HEAD:main
-          # Pushes made with GITHUB_TOKEN do not start another workflow run.
-          # Dispatch explicitly so the screenshot-only commit is fully tested.
-          gh workflow run desktop-release.yml \
-            --repo "$GITHUB_REPOSITORY" \
-            --ref main

@@ -63,10 +63,13 @@ MIDI CC movements for the grey MIDI controller bar. It overwrites only
 user's presets or connect to AMY hardware.
 
 After every successful `main` release, CI runs this same capture against the
-exact released commit. When either image changed, CI creates a commit containing
-only those two PNGs and explicitly queues one complete release workflow for that
-screenshot-only commit. A byte-identical capture is a no-op, which terminates
-the cycle after that validation run.
+exact released commit. The captured PNGs must load as 1920x850 images and must
+have enough sampled color variation to rule out a blank or error screen. CI then
+stores them as release-tagged files such as `screenshots/omni-RYYYYMMDDTHHMMSS.png`
+and updates the repository README links in the same commit. That screenshot-only
+commit uses a human-readable `skip-rebuild` note plus GitHub's required
+`skip-checks:true` trailer; ordinary merges and pushes to `main` still run the
+complete release workflow.
 
 ## Synth-state architecture
 

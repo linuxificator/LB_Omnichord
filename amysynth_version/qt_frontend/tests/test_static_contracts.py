@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import struct
 import unittest
 from pathlib import Path
@@ -109,9 +110,14 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('"--capture-screenshots-dir"', capture)
         self.assertIn("select.select([master_fd]", capture)
         self.assertIn("os.read(master_fd, 65536)", capture)
-        for name in ("omni.png", "midi.png"):
-            relative = f"amysynth_version/qt_frontend/screenshots/{name}"
-            self.assertIn(relative, public_readme)
+        for screen in ("omni", "midi"):
+            match = re.search(
+                rf"amysynth_version/qt_frontend/screenshots/"
+                rf"{screen}(?:-R[0-9]{{8}}T[0-9]{{6}})?\.png",
+                public_readme,
+            )
+            self.assertIsNotNone(match, screen)
+            relative = match.group(0)
             path = repository / relative
             self.assertTrue(path.is_file(), relative)
             png = path.read_bytes()
@@ -128,6 +134,13 @@ class StaticContractTests(unittest.TestCase):
             "python amysynth_version/qt_frontend/capture_screenshots.py",
             workflow,
         )
+        self.assertIn(
+            "python amysynth_version/qt_frontend/tools/"
+            "update_release_screenshots.py",
+            workflow,
+        )
+        self.assertIn("skip-rebuild: README screenshots only", workflow)
+        self.assertIn("skip-checks:true", workflow)
 
         app_core = (ROOT / "code" / "app_core.py").read_text(
             encoding="utf-8"

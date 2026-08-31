@@ -148,7 +148,9 @@ class PackagingContracts(unittest.TestCase):
 
         self.assertIn("refresh-readme-screenshots:", release)
         self.assertIn("needs: [publish-release]", release)
-        self.assertIn("actions: write", release)
+        self.assertNotIn("validation_only:", release)
+        self.assertNotIn("inputs.validation_only", release)
+        self.assertNotIn("actions: write", release)
         self.assertIn("contents: write", release)
         self.assertIn(
             "python amysynth_version/qt_frontend/capture_screenshots.py",
@@ -156,13 +158,26 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn(
             "python amysynth_version/qt_frontend/tools/"
-            "normalize_screenshot_changes.py",
+            "update_release_screenshots.py",
+            release,
+        )
+        self.assertIn("--release-tag", release)
+        self.assertIn("README.md", release)
+        self.assertIn(
+            '"amysynth_version/qt_frontend/screenshots/'
+            'omni-${release_tag}.png"',
+            release,
+        )
+        self.assertIn(
+            '"amysynth_version/qt_frontend/screenshots/'
+            'midi-${release_tag}.png"',
             release,
         )
         self.assertIn("git diff --quiet --", release)
         self.assertIn("git push origin HEAD:main", release)
-        self.assertIn("gh workflow run desktop-release.yml", release)
-        self.assertIn("--ref main", release)
+        self.assertIn("-m 'skip-rebuild: README screenshots only'", release)
+        self.assertIn("-m 'skip-checks:true'", release)
+        self.assertNotIn("gh workflow run desktop-release.yml", release)
         self.assertEqual(
             release.count("git commit -m 'Refresh README screenshots'"),
             1,
