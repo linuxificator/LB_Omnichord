@@ -60,9 +60,7 @@ class NativeRhythmTests(unittest.TestCase):
             app.action("toggleRhythm")
             app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
 
-            deadline = time.monotonic() + 1.0
-            while time.monotonic() < deadline and app.bridge.audio_peak() == 0:
-                time.sleep(0.01)
+            produced_audio = app.bridge.render_until_audio(1.0)
 
             lines = app.bridge.lines_since(start)
             triggers = [line for line in lines if line.startswith("zQT")]
@@ -71,9 +69,8 @@ class NativeRhythmTests(unittest.TestCase):
                 all(line.split(",")[2] == "0" for line in triggers),
                 "cold Start delayed the visible percussion level by a bar",
             )
-            self.assertGreater(
-                app.bridge.audio_peak(),
-                0,
+            self.assertTrue(
+                produced_audio,
                 "visible percussion level produced no audio within one second",
             )
 
