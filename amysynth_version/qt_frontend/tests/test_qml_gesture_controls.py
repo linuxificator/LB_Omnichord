@@ -522,8 +522,14 @@ Window {
             ]
             self.assertEqual(len(sliders), 1)
             slider = sliders[0]
-            self.assertGreater(float(slider.property("implicitHandleWidth")), 0.0)
-            self.assertGreater(float(slider.property("implicitHandleHeight")), 0.0)
+            self.assertGreaterEqual(
+                float(slider.property("implicitHandleWidth")),
+                32.0,
+            )
+            self.assertGreaterEqual(
+                float(slider.property("implicitHandleHeight")),
+                32.0,
+            )
         window.deleteLater()
         component.deleteLater()
         engine.deleteLater()

@@ -261,7 +261,9 @@ installation failed to show or release chord-key interaction correctly.
   value changes normally and the previous controller becomes blue.
 - Slider track and handle gestures are reserved for normal slider operation.
   Explicit slider unlink uses Qt's double-click/double-tap event on the slider
-  label/value area, keeping extra pointer handlers out of the drag path.
+  label/value area.  Slider handles use Qt's own mouse grab semantics with
+  `preventStealing` so a parent `Flickable` cannot turn a handle drag into a
+  short tap-plus-scroll gesture.
 - The controller becomes blue and visible when capacity permits.
 - The next genuine CC movement changes a blue controller immediately into an
   ordinary grey unbound indicator. Without movement, blue expires and removes

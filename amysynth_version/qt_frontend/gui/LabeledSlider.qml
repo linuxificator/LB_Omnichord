@@ -20,6 +20,7 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
+    property bool sliderDragActive: false
 
     readonly property bool midiBound: {
         if (root.midiControlRouter === null)
@@ -63,6 +64,34 @@ Item {
         // The backend may echo the edit asynchronously; keeping the binding
         // alive during the drag can make the handle fight that older value.
         slider.value = Number(slider.value)
+    }
+
+    function applySliderValue(value) {
+        if (root.midiBindingGesture) {
+            root.restoreCurrentValueBinding()
+            return
+        }
+        if (root.midiControlRouter !== null) {
+            root.midiControlRouter.controlTargetMoved(root.midiTarget)
+        }
+        root.edited(value)
+    }
+
+    function dragValueFromHandle(mouseX, mouseY) {
+        const local = sliderHandle.mapToItem(
+            slider,
+            Number(mouseX),
+            Number(mouseY)
+        )
+        const span = Math.max(1e-9, slider.availableWidth - sliderHandle.width)
+        const position = Math.max(
+            0.0,
+            Math.min(
+                1.0,
+                (local.x - slider.leftPadding - sliderHandle.width / 2) / span
+            )
+        )
+        return slider.valueAt(position)
     }
 
     Text {
@@ -123,14 +152,7 @@ Item {
         }
 
         onMoved: {
-            if (root.midiBindingGesture) {
-                root.restoreCurrentValueBinding()
-                return
-            }
-            if (root.midiControlRouter !== null) {
-                root.midiControlRouter.controlTargetMoved(root.midiTarget)
-            }
-            root.edited(value)
+            root.applySliderValue(value)
         }
 
         background: Rectangle {
@@ -154,7 +176,8 @@ Item {
             }
         }
 
-        handle: Rectangle {
+        handle: Item {
+            id: sliderHandle
             x:
                 slider.leftPadding
                 + slider.visualPosition
@@ -166,26 +189,69 @@ Item {
                 slider.topPadding
                 + slider.availableHeight / 2
                 - height / 2
-            implicitWidth: 19
-            implicitHeight: 19
+            implicitWidth: 34
+            implicitHeight: 34
             width: implicitWidth
             height: implicitHeight
-            radius: 10
-            color: {
-                if (root.midiVisualState === "preset-displaced")
-                    return "#f22b2b"
-                if (root.midiVisualState === "preset-incoming")
-                    return "#3186d7"
-                return root.midiBound ? "#35b85a" : root.handleColor
-            }
-            border.color: root.borderColor
-            border.width: 2
 
-            SequentialAnimation on opacity {
-                running: root.midiPresetFeedback
-                loops: Animation.Infinite
-                NumberAnimation { from: 1.0; to: 0.2; duration: 110 }
-                NumberAnimation { from: 0.2; to: 1.0; duration: 110 }
+            Rectangle {
+                id: sliderKnob
+                anchors.centerIn: parent
+                width: 19
+                height: 19
+                radius: 10
+                color: {
+                    if (root.midiVisualState === "preset-displaced")
+                        return "#f22b2b"
+                    if (root.midiVisualState === "preset-incoming")
+                        return "#3186d7"
+                    return root.midiBound ? "#35b85a" : root.handleColor
+                }
+                border.color: root.borderColor
+                border.width: 2
+
+                SequentialAnimation on opacity {
+                    running: root.midiPresetFeedback
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 1.0; to: 0.2; duration: 110 }
+                    NumberAnimation { from: 0.2; to: 1.0; duration: 110 }
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.LeftButton
+                preventStealing: true
+
+                function updateSlider(mouse) {
+                    slider.value = root.dragValueFromHandle(mouse.x, mouse.y)
+                    root.applySliderValue(slider.value)
+                }
+
+                onPressed: function(mouse) {
+                    root.sliderDragActive = true
+                    root.beginSliderDrag()
+                    root.midiBindingGesture = root.beginMidiInteraction()
+                    root.activated()
+                    updateSlider(mouse)
+                }
+
+                onPositionChanged: function(mouse) {
+                    if (pressed)
+                        updateSlider(mouse)
+                }
+
+                onReleased: {
+                    root.restoreCurrentValueBinding()
+                    root.sliderDragActive = false
+                    root.midiBindingGesture = false
+                }
+
+                onCanceled: {
+                    root.restoreCurrentValueBinding()
+                    root.sliderDragActive = false
+                    root.midiBindingGesture = false
+                }
             }
         }
     }

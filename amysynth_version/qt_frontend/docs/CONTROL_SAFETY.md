@@ -43,6 +43,14 @@ manual, reset, copy, preset and nudge writes to bound numeric targets. Mapped CC
 updates enter those same setters under a narrowly scoped MIDI-authority flag;
 there is no parallel state or AMY command path.
 
+Numeric gesture classification stays in Qt/QML controls, not in Python timing
+code.  Slider double-tap unlink lives on the label/value text through
+`TapHandler`.  Slider handle drag uses a Qt `MouseArea` with `preventStealing`
+and an enlarged transparent hitbox around the existing knob, so parent
+`Flickable` containers cannot steal an active handle drag.  The backend still
+only receives ordinary edit values after the frontend control has accepted the
+gesture.
+
 ## Runtime boundary guards
 
 A first-time AMY `K...iv...` synth allocation is executed at an audio-block boundary. The host therefore inserts a configurable allocation guard (default 10 ms) before sending synth-tier commands such as bus routing, synth level, compatibility corrections or slider overrides. This prevents cold-start commands from reaching an instrument number before AMY has created it; the regression suite checks synth 4 specifically because that was observed on the ESP32-P4 as repeated `synth 4 not defined` warnings.
