@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 import sys
-import socket
 import tempfile
 import threading
 import unittest
@@ -14,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 from midi_player import (  # noqa: E402
-    _IpMidiReader,
     MidiAmyEngine,
     MidiPlayerBackend,
     _LinuxRawMidiReader,
@@ -63,33 +60,13 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
-    def test_shipped_ipmidi_config_matches_qmidictl_defaults(self) -> None:
-        config = json.loads(
-            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
-        )
-        self.assertEqual(config["config_revision"], 2)
-        self.assertNotIn("tech_profile", config["midi_input"])
-        self.assertEqual(
-            config["midi_input"]["ipmidi"],
-            {
-                "enabled": True,
-                "listeners": [
-                    {
-                        "address": "225.0.0.37",
-                        "port": 21928,
-                        "interface": "0.0.0.0",
-                    }
-                ],
-            },
-        )
-
     def test_midi_platform_techs_are_filtered_by_runtime_platform(self) -> None:
         cases = {
-            "linux": ("alsa_raw", "alsa_seq", "oss_midi", "ipmidi"),
-            "darwin": ("coremidi", "ipmidi"),
-            "win32": ("winmm", "ipmidi"),
-            "android": ("android_midi", "ipmidi"),
-            "freebsd": ("ipmidi",),
+            "linux": ("alsa_raw", "alsa_seq", "oss_midi"),
+            "darwin": ("coremidi",),
+            "win32": ("winmm",),
+            "android": ("android_midi",),
+            "freebsd": (),
         }
         for profile, expected in cases.items():
             with self.subTest(profile=profile):
@@ -107,17 +84,6 @@ class MidiAmyEngineTests(unittest.TestCase):
             "linux",
         )
         self.assertEqual(linux[0]["globs"], ["/tmp/midi-test"])
-        self.assertEqual(linux[-1]["label"], "ipMIDI")
-        self.assertEqual(
-            linux[-1]["listeners"],
-            [
-                {
-                    "address": "225.0.0.37",
-                    "port": 21928,
-                    "interface": "0.0.0.0",
-                }
-            ],
-        )
 
     def test_linux_legacy_raw_glob_is_preserved_with_new_config(self) -> None:
         linux = _MidiInputTechManager.platform_techs(
@@ -133,7 +99,7 @@ class MidiAmyEngineTests(unittest.TestCase):
             ["/tmp/legacy-midi", "/tmp/configured-midi"],
         )
 
-    def test_non_linux_profiles_add_ipmidi_to_their_native_platform_tech(self) -> None:
+    def test_non_linux_profiles_expose_only_their_platform_tech(self) -> None:
         expected = {
             "darwin": ("coremidi", "CoreMIDI", "CoreMIDI bridge"),
             "win32": ("winmm", "WinMM MIDI", "WinMM MIDI bridge"),
@@ -142,14 +108,11 @@ class MidiAmyEngineTests(unittest.TestCase):
         for profile, (key, label, reason) in expected.items():
             with self.subTest(profile=profile):
                 techs = _MidiInputTechManager.platform_techs({}, profile)
-                self.assertEqual(len(techs), 2)
+                self.assertEqual(len(techs), 1)
                 self.assertEqual(techs[0]["key"], key)
                 self.assertEqual(techs[0]["label"], label)
                 self.assertEqual(techs[0]["backend"], "unsupported")
                 self.assertIn(reason, techs[0]["unsupported_reason"])
-                self.assertEqual(techs[1]["key"], "ipmidi")
-                self.assertEqual(techs[1]["label"], "ipMIDI")
-                self.assertEqual(techs[1]["backend"], "ipmidi")
 
     def test_midi_tech_status_marks_readable_inputs_and_activity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -186,13 +149,7 @@ class MidiAmyEngineTests(unittest.TestCase):
                 with (
                     patch("midi_player._LinuxRawMidiReader") as raw_reader,
                     patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
-                    patch("midi_player._IpMidiReader") as ipmidi_reader,
                 ):
-                    ipmidi_reader.return_value.status_snapshot.return_value = {
-                        "state": "listening",
-                        "available": True,
-                        "reason": "listening on 225.0.0.37:21928",
-                    }
                     manager = _MidiInputTechManager(
                         lambda *_args: None,
                         lambda *_args: None,
@@ -204,14 +161,10 @@ class MidiAmyEngineTests(unittest.TestCase):
 
                 raw_reader.assert_not_called()
                 seq_reader.assert_not_called()
-                ipmidi_reader.assert_called_once()
-                self.assertEqual(len(snapshot), 2)
+                self.assertEqual(len(snapshot), 1)
                 self.assertEqual(snapshot[0]["state"], "unavailable")
                 self.assertFalse(snapshot[0]["available"])
                 self.assertIn("not bundled", snapshot[0]["reason"])
-                self.assertEqual(snapshot[1]["label"], "ipMIDI")
-                self.assertEqual(snapshot[1]["state"], "listening")
-                self.assertTrue(snapshot[1]["available"])
 
     def test_disabled_midi_input_starts_no_platform_readers(self) -> None:
         for profile in ("linux", "darwin", "win32", "android"):
@@ -219,7 +172,6 @@ class MidiAmyEngineTests(unittest.TestCase):
                 with (
                     patch("midi_player._LinuxRawMidiReader") as raw_reader,
                     patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
-                    patch("midi_player._IpMidiReader") as ipmidi_reader,
                 ):
                     manager = _MidiInputTechManager(
                         lambda *_args: None,
@@ -230,49 +182,19 @@ class MidiAmyEngineTests(unittest.TestCase):
 
                 raw_reader.assert_not_called()
                 seq_reader.assert_not_called()
-                ipmidi_reader.assert_not_called()
                 snapshot = manager.status_snapshot({}, now=10.0)
                 self.assertTrue(snapshot)
                 self.assertTrue(
                     all(item["state"] == "unavailable" for item in snapshot)
                 )
 
-    def test_disabled_ipmidi_stays_visible_red_without_starting_reader(self) -> None:
-        with patch("midi_player._IpMidiReader") as ipmidi_reader:
-            manager = _MidiInputTechManager(
-                lambda *_args: None,
-                lambda *_args: None,
-                lambda *_args: None,
-                {
-                    "enabled": True,
-                    "tech_profile": "freebsd",
-                    "ipmidi": {"enabled": False},
-                },
-            )
-
-        ipmidi_reader.assert_not_called()
-        self.assertEqual(
-            manager.status_snapshot({}, now=10.0),
-            [
-                {
-                    "key": "ipmidi",
-                    "label": "ipMIDI",
-                    "state": "unavailable",
-                    "available": False,
-                    "reason": "ipMIDI disabled in configuration",
-                }
-            ],
-        )
-
     def test_linux_midi_manager_starts_real_alsa_sequencer_listener(self) -> None:
         with (
             patch("midi_player._LinuxRawMidiReader") as raw_reader,
             patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
-            patch("midi_player._IpMidiReader") as ipmidi_reader,
         ):
             raw_reader.return_value = object()
             seq_reader.return_value = object()
-            ipmidi_reader.return_value = object()
 
             manager = _MidiInputTechManager(
                 lambda *_args: None,
@@ -283,9 +205,7 @@ class MidiAmyEngineTests(unittest.TestCase):
 
         self.assertEqual(seq_reader.call_count, 1)
         self.assertEqual(raw_reader.call_count, 2)
-        self.assertEqual(ipmidi_reader.call_count, 1)
         self.assertIn("alsa_seq", manager._listener_readers)
-        self.assertIn("ipmidi", manager._listener_readers)
 
     def test_non_linux_managers_do_not_start_raw_or_alsa_seq_readers(self) -> None:
         for profile in ("darwin", "win32", "android"):
@@ -293,9 +213,7 @@ class MidiAmyEngineTests(unittest.TestCase):
                 with (
                     patch("midi_player._LinuxRawMidiReader") as raw_reader,
                     patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
-                    patch("midi_player._IpMidiReader") as ipmidi_reader,
                 ):
-                    ipmidi_reader.return_value = object()
                     manager = _MidiInputTechManager(
                         lambda *_args: None,
                         lambda *_args: None,
@@ -305,135 +223,7 @@ class MidiAmyEngineTests(unittest.TestCase):
 
                 raw_reader.assert_not_called()
                 seq_reader.assert_not_called()
-                ipmidi_reader.assert_called_once()
-                self.assertEqual(
-                    tuple(manager._listener_readers),
-                    ("ipmidi",),
-                )
-
-    def test_ipmidi_listener_config_validation_and_qmidictl_payload(self) -> None:
-        listeners, errors = _IpMidiReader.normalize_listeners(
-            [
-                {
-                    "address": "225.0.0.37",
-                    "port": 21928,
-                    "interface": "0.0.0.0",
-                },
-                {"address": "127.0.0.1", "port": 0},
-            ]
-        )
-        self.assertEqual(listeners, [dict(_IpMidiReader.DEFAULT_LISTENERS[0])])
-        self.assertEqual(len(errors), 1)
-        self.assertIn("not an IPv4 multicast address", errors[0])
-
-        notes: list[tuple[object, ...]] = []
-        controls: list[tuple[object, ...]] = []
-        activity: list[bool] = []
-        reader = _IpMidiReader.__new__(_IpMidiReader)
-        reader._callback = lambda *args: notes.append(args)
-        reader._control_callback = lambda *args: controls.append(args)
-        reader._activity_callback = lambda: activity.append(True)
-        states: dict[tuple[int, str, int], dict[str, object]] = {}
-
-        # QmidiCtl sends these ordinary raw MIDI bytes as the whole UDP
-        # datagram, without an RTP-MIDI or ipMIDI header.
-        reader._consume_datagram(
-            bytes((0xB2, 74, 99)),
-            ("192.0.2.10", 40000),
-            0,
-            states,
-        )
-        # Running status remains isolated per sender when datagrams interleave.
-        reader._consume_datagram(
-            bytes((0x90, 60)),
-            ("192.0.2.11", 40001),
-            0,
-            states,
-        )
-        reader._consume_datagram(
-            bytes((100,)),
-            ("192.0.2.11", 40001),
-            0,
-            states,
-        )
-
-        self.assertEqual(controls, [(3, 74, 99)])
-        self.assertEqual(notes, [(1, 60, 100, True)])
-        self.assertEqual(len(activity), 3)
-
-    def test_ipmidi_socket_joins_configured_multicast_group_and_port(self) -> None:
-        endpoint = dict(_IpMidiReader.DEFAULT_LISTENERS[0])
-        with patch("midi_player.socket.socket") as socket_factory:
-            listener = socket_factory.return_value
-            opened = _IpMidiReader._open_listener(endpoint)
-
-        self.assertIs(opened, listener)
-        listener.bind.assert_called_once_with(("", 21928))
-        listener.setsockopt.assert_any_call(
-            socket.IPPROTO_IP,
-            socket.IP_ADD_MEMBERSHIP,
-            socket.inet_aton("225.0.0.37") + socket.inet_aton("0.0.0.0"),
-        )
-        listener.setblocking.assert_called_once_with(False)
-
-    def test_ipmidi_reader_receives_raw_midi_from_local_multicast(self) -> None:
-        try:
-            probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        except OSError as exc:
-            self.skipTest(f"UDP sockets unavailable in test sandbox: {exc}")
-        try:
-            probe.bind(("", 0))
-            port = int(probe.getsockname()[1])
-        finally:
-            probe.close()
-
-        received: list[tuple[object, ...]] = []
-        arrived = threading.Event()
-        reader = _IpMidiReader(
-            lambda *_args: None,
-            lambda *args: (received.append(args), arrived.set()),
-            lambda: None,
-            [
-                {
-                    "address": "239.255.37.28",
-                    "port": port,
-                    "interface": "127.0.0.1",
-                }
-            ],
-            True,
-        )
-        sender: socket.socket | None = None
-        try:
-            for _ in range(20):
-                if reader.status_snapshot(False)["available"]:
-                    break
-                threading.Event().wait(0.025)
-            if not reader.status_snapshot(False)["available"]:
-                self.skipTest(reader.status_snapshot(False)["reason"])
-
-            sender = socket.socket(
-                socket.AF_INET,
-                socket.SOCK_DGRAM,
-                socket.IPPROTO_UDP,
-            )
-            sender.setsockopt(
-                socket.IPPROTO_IP,
-                socket.IP_MULTICAST_IF,
-                socket.inet_aton("127.0.0.1"),
-            )
-            sender.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
-            sender.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_LOOP, 1)
-            sender.sendto(
-                bytes((0xB0, 74, 99)),
-                ("239.255.37.28", port),
-            )
-
-            self.assertTrue(arrived.wait(1.0), reader.status_snapshot(False))
-            self.assertEqual(received, [(1, 74, 99)])
-        finally:
-            if sender is not None:
-                sender.close()
-            reader.close()
+                self.assertEqual(manager._listener_readers, {})
 
     def test_alsa_sequencer_status_comes_from_running_listener(self) -> None:
         class Listener:

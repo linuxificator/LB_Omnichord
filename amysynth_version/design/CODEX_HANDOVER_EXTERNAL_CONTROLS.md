@@ -83,27 +83,12 @@ Current implemented runtime readers:
 
 - Linux ALSA raw character devices (`/dev/snd/midiC*D*` by default);
 - Linux ALSA sequencer client/port named `LB Omnichord` / `MIDI In`;
-- Linux OSS-compatible MIDI character devices where present;
-- platform-independent ipMIDI UDP/IPv4 multicast, using QmidiCtl's raw-MIDI
-  datagrams and default `225.0.0.37:21928` listener.
+- Linux OSS-compatible MIDI character devices where present.
 
 The ALSA sequencer reader is required for graph-routed applications such as
 VMPK and PipeWire graph setups visible in `qpwgraph`. Each input byte stream has
 its own running-status parser state before events are merged, so one device's
 partial MIDI message cannot corrupt another device.
-
-ipMIDI is deliberately not RTP-MIDI. QmidiCtl passes the raw MIDI message bytes
-directly as each datagram payload. `_IpMidiReader` joins every configured
-multicast endpoint, isolates running-status state per listener/sender and feeds
-the same parser callbacks as the local readers. `amy_config.json` revision 2
-adds the default endpoint to existing user configs without overwriting any
-pre-existing ipMIDI settings. The tech label is exactly `ipMIDI` on every
-platform profile. Android packages explicitly request internet, network-state,
-Wi-Fi-state and multicast-state permissions.
-Revision 2 also removes only the former shipped `tech_profile: linux` default,
-allowing packaged macOS, Windows and Android builds to select their actual
-profile. Linux/Raspberry Pi still derives `linux`; other explicit profile
-overrides are preserved.
 
 The common non-Linux MIDI APIs are deliberately represented but not pretended
 to work:
@@ -113,11 +98,10 @@ to work:
 - Android: Android MIDI.
 
 Until native bridges for those APIs are bundled, these techs are platform
-relevant and visible red/unavailable on their platform. ipMIDI can still be
-green beside them. Non-Linux profiles must not start Linux raw or ALSA
-sequencer readers. Tests cover this explicitly so future platform work can
-replace the unsupported bridge with a real reader without changing the UI
-contract.
+relevant and visible red/unavailable on their platform. They must not start the
+Linux raw or ALSA sequencer readers. Tests cover this explicitly so future
+platform work can replace the unsupported bridge with a real reader without
+changing the UI contract.
 
 LED meaning:
 

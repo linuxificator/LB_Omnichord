@@ -323,20 +323,20 @@ for the individual MIDI instruments and one for MIDI drums. See
 OMNI and MIDI each have independent header reverb state. Within either section,
 `DRM` decides whether that section's drum bus receives the same room.
 
-# MIDI input
+# Linux MIDI input
 
 The frontend reads ALSA raw-MIDI devices matching `/dev/snd/midiC*D*` by
-default. Check them with `amidi -l`. It also exposes the ALSA sequencer input
-`LB Omnichord / MIDI In`, which VMPK and graph tools such as `qpwgraph` can
-connect directly.
+default. Check them with `amidi -l`. VMPK is normally an ALSA Sequencer-only
+source and therefore needs a virtual raw bridge for the current backend:
 
-On every platform, ipMIDI listens for headerless raw MIDI UDP multicast. The
-default group and port are `225.0.0.37:21928`, matching QmidiCtl without command
-line overrides. Edit `midi_input.ipmidi.listeners` in
-`~/.omnichord/config/amy_config.json` to listen on other multicast groups,
-ports or a specific local IPv4 interface. Host firewalls must allow the chosen
-inbound UDP port. See `../design/midi.md` for the exact JSON format and security
-scope.
+```bash
+sudo modprobe snd-virmidi
+amidi -l
+aconnect -lio
+```
+
+Select a Virtual Raw MIDI ALSA output in VMPK, then start/restart Omnichord.
+Direct ALSA Sequencer subscription is not implemented.
 
 # Automated tests
 

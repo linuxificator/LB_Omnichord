@@ -104,12 +104,6 @@ named `LB Omnichord / MIDI In`. Graph tools such as `qpwgraph` can connect VMPK,
 BLE MIDI bridges and MIDI Through directly to that port. See
 `../design/midi.md`.
 
-All platform profiles also receive headerless raw MIDI over ipMIDI UDP
-multicast. The default `225.0.0.37:21928` endpoint works with QmidiCtl defaults;
-additional groups, ports and local interface addresses can be set under
-`midi_input.ipmidi.listeners` in the editable user `amy_config.json`. The MIDI
-screen shows this receive tech simply as `ipMIDI`.
-
 The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
 
 ## Regression tests

@@ -169,23 +169,6 @@ installation failed to show or release chord-key interaction correctly.
 - SysEx, CC, Program Change and real-time clock are not musical inputs in the
   current implementation.
 
-**MIDI-IP-01 — QmidiCtl/ipMIDI multicast joins the merged MIDI input**
-
-- Every platform profile exposes one tech with the exact label `ipMIDI`.
-- With no user override it joins IPv4 multicast group `225.0.0.37` on UDP port
-  `21928`, matching QmidiCtl defaults.
-- A datagram payload is interpreted directly as raw MIDI bytes; no RTP-MIDI or
-  application header is accepted or required.
-- Note, CC and Pitch Bend data use the same parser and application paths as
-  local MIDI readers; activity makes the ipMIDI LED blink green.
-- Multiple configured listeners are supported, invalid multicast addresses or
-  ports are ignored and leave a diagnostic red state when no valid listener
-  remains, and running status is isolated per UDP sender.
-- Existing user configuration is migrated to revision 2 with the default
-  listener while preserving any explicitly configured ipMIDI block. The former
-  shipped Linux profile pin is removed so packaged builds derive their real
-  platform; non-default explicit profile overrides remain authoritative.
-
 **MIDI-02 — incoming notes use active MIDI tuning**
 
 - At A=440 and C root, C4/60 remains 60 under EQ, HARM and JV.

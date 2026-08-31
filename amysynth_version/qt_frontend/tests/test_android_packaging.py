@@ -69,11 +69,6 @@ class AndroidPackagingTests(unittest.TestCase):
             self.assertEqual(app["android.archs"], "arm64-v8a")
             self.assertEqual(app["android.ndk"], "27c")
             self.assertEqual(
-                app["android.permissions"],
-                "INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,"
-                "CHANGE_WIFI_MULTICAST_STATE",
-            )
-            self.assertEqual(
                 app["android.sdk_path"], str((root / "sdk-compat").resolve())
             )
             self.assertEqual(app["p4a.commit"], P4A_COMMIT)

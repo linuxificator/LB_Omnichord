@@ -76,9 +76,8 @@ and the outgoing knob flashes red twice.
 
 The narrow unused gap between MIDI synth row 6 and the lower grey MIDI CC bar is
 reserved for MIDI input tech LEDs. Each visible LED has a short label such as
-`ALSA raw`, `ALSA seq`, `OSS MIDI` or exactly `ipMIDI`. Native techs are shown
-only on their relevant platform; the UDP multicast ipMIDI tech is shown on all
-platforms. Red means unavailable to this runtime; green means available and
+`ALSA raw`, `ALSA seq` or `OSS MIDI`. Only techs relevant to the active platform
+are shown. Red means unavailable to this runtime; green means available and
 listened to; blinking green means recent incoming MIDI bytes on that tech.
 
 On the OMNI screen, MIDI learn is shown by a blinking red LED inside the large

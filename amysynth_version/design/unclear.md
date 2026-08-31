@@ -10,11 +10,11 @@ rows, synth 11 for MIDI drums, and buses 0–10 as documented in
 `architecture.md`. The remaining work is validating/finalizing those resource
 limits and independent OMNI/MIDI room behavior in the ESP32-P4 AMY build.
 
-## MIDI device selection
+## USB MIDI
 
-ALSA raw, ALSA sequencer, OSS MIDI and ipMIDI receive paths are implemented.
-A UI selector for choosing or disabling individual local devices remains
-possible future work; current selection is configuration-driven.
+The current policy is configurable ALSA raw MIDI using `/dev/snd/midiC*D*`.
+Direct ALSA Sequencer support and a UI device selector remain possible future
+work, particularly for software sources such as VMPK.
 
 ## Live parameter changes
 
