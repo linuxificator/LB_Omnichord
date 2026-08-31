@@ -152,6 +152,81 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_midi_bound_slider_handle_drag_still_moves(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 190
+    height: 90
+    visible: true
+    property real editedValue: 0.2
+    property int editCount: 0
+
+    QtObject {
+        id: midiRouter
+        objectName: "midiRouter"
+        property int bindingVersion: 0
+        property int moveCount: 0
+        function isControlTargetBound(target) { return true }
+        function controlTargetVisualState(target) { return "bound" }
+        function activateControlTarget(target) { return false }
+        function controlTargetDoubleTapped(target) {}
+        function controlTargetMoved(target) { moveCount += 1 }
+    }
+
+    LabeledSlider {
+        x: 15
+        y: 10
+        width: 160
+        height: 70
+        fromValue: 0
+        toValue: 1
+        currentValue: window.editedValue
+        midiControlRouter: midiRouter
+        midiTarget: ({"screen": "omni", "kind": "master_volume"})
+        onEdited: (value) => {
+            window.editedValue = value
+            window.editCount += 1
+        }
+    }
+}
+""",
+        )
+        start = QPoint(52, 65)
+        end = QPoint(145, 65)
+        QTest.mousePress(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            start,
+        )
+        QCoreApplication.processEvents()
+        QTest.mouseMove(window, end, delay=20)
+        QCoreApplication.processEvents()
+        QTest.mouseRelease(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            end,
+        )
+        QCoreApplication.processEvents()
+
+        self.assertGreater(float(window.property("editedValue")), 0.5)
+        self.assertGreater(int(window.property("editCount")), 0)
+        router = window.findChild(QObject, "midiRouter")
+        self.assertIsNotNone(router)
+        assert router is not None
+        self.assertGreater(int(router.property("moveCount")), 0)
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
 
 if __name__ == "__main__":
     unittest.main()

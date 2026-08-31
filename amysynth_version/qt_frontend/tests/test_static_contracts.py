@@ -257,14 +257,16 @@ class StaticContractTests(unittest.TestCase):
             self.assertIn('"preset-incoming"', component)
             self.assertIn("running: root.midiPresetFeedback", component)
             self.assertEqual(component.count("duration: 110"), 2)
-            self.assertIn("const wasBound = root.midiBound", component)
             self.assertIn(
-                "return learned || wasBound || root.midiPresetFeedback",
+                "return learned || root.midiPresetFeedback",
                 component,
             )
+            self.assertNotIn("const wasBound = root.midiBound", component)
 
         self.assertIn("controlTargetMoved", parameter)
         self.assertIn("controlTargetMoved", labeled)
+        self.assertIn("controlTargetMoved", volume)
+        self.assertIn("controlTargetMoved", tuning)
         self.assertIn("if (root.midiBindingGesture)", parameter)
         self.assertIn("if (root.midiBindingGesture)", labeled)
         self.assertIn("root.syncSliderValue()", parameter)

@@ -43,13 +43,13 @@ Item {
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
             return false
-        const wasBound = root.midiBound
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        // A green binding owns the value.  Its first/second tap may form the
-        // explicit unlink gesture, but that same gesture never edits it.
-        return learned || wasBound || root.midiPresetFeedback
+        // A real learn/preset-feedback gesture owns this press.  A normal
+        // green bound state must still allow mouse drag; onMoved then performs
+        // manual takeover through controlTargetMoved().
+        return learned || root.midiPresetFeedback
     }
 
     function restoreCurrentValueBinding() {

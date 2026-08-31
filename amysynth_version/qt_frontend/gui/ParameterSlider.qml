@@ -37,11 +37,10 @@ Item {
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
             return false
-        const wasBound = root.midiBound
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        return learned || wasBound || root.midiPresetFeedback
+        return learned || root.midiPresetFeedback
     }
 
     function moveMidiInteraction() {
