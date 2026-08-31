@@ -782,6 +782,8 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("onMoved:", numeric[2])
         self.assertIn("onMoved:", numeric[3])
         for slider_qml in numeric[2:4]:
+            self.assertIn("implicitWidth:", slider_qml)
+            self.assertIn("implicitHeight:", slider_qml)
             slider_block = re.search(
                 r"Slider\s*\{(?P<body>.*?)(?:\n\s*handle:|\n\s*background:)",
                 slider_qml,

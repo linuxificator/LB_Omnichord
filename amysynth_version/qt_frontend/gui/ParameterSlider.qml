@@ -194,8 +194,10 @@ Item {
                 slider.topPadding
                 + slider.availableHeight / 2
                 - height / 2
-            width: 18
-            height: 18
+            implicitWidth: 18
+            implicitHeight: 18
+            width: implicitWidth
+            height: implicitHeight
             radius: 9
             color: {
                 if (root.midiVisualState === "preset-displaced")

@@ -148,6 +148,10 @@ for horizontal sliders. Application code assigns the musical meaning after Qt
 has classified the input and must not infer these gestures with elapsed-time or
 movement-count thresholds.
 
+Custom Qt Slider handles must expose `implicitWidth` and `implicitHeight`.
+Setting only visual `width` and `height` can leave `implicitHandleWidth` at
+zero, which makes the visible knob differ from Qt's actual drag handle.
+
 The RST/UP/DWN block left of the first two chord rows ends at the bottom of the
 second row. Its three controls are distributed evenly over that complete
 height.

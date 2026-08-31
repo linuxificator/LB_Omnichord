@@ -284,6 +284,72 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_custom_slider_handle_is_registered_with_qt_slider(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    width: 190
+    height: 160
+    visible: true
+
+    LabeledSlider {
+        objectName: "labeled"
+        x: 15
+        y: 10
+        width: 160
+        height: 70
+        fromValue: 0
+        toValue: 1
+        currentValue: 0.2
+    }
+
+    QtObject {
+        id: control
+        property string key: "frequency"
+        property string label: "Frequency"
+        property real value: 440
+        property real minimum: 100
+        property real maximum: 1000
+        property real step: 1
+        property int decimals: 0
+        property string unit: "Hz"
+        property string scale: "linear"
+    }
+
+    ParameterSlider {
+        objectName: "parameter"
+        x: 15
+        y: 80
+        width: 160
+        height: 70
+        control: control
+    }
+}
+""",
+        )
+        for object_name in ("labeled", "parameter"):
+            root = window.findChild(QObject, object_name)
+            self.assertIsNotNone(root)
+            assert root is not None
+            sliders = [
+                child
+                for child in root.findChildren(QObject)
+                if "Slider" in child.metaObject().className()
+                and child.metaObject().indexOfProperty("implicitHandleWidth") >= 0
+            ]
+            self.assertEqual(len(sliders), 1)
+            slider = sliders[0]
+            self.assertGreater(float(slider.property("implicitHandleWidth")), 0.0)
+            self.assertGreater(float(slider.property("implicitHandleHeight")), 0.0)
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
 
 if __name__ == "__main__":
     unittest.main()
