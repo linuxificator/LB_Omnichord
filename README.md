@@ -17,7 +17,7 @@ Originally created as a birthday gift for Luciel.
 
 ## OMNI performance screen
 
-![LB Omnichord OMNI performance screen](./amysynth_version/qt_frontend/screenshots/omni-R20260831T084122.png)
+![LB Omnichord OMNI performance screen](./amysynth_version/qt_frontend/screenshots/omni-R20260831T131346.png)
 
 The OMNI screen is the self-contained instrument: choose and voice chords,
 play the strum surface, build rhythms, and shape the independent bass, strum
@@ -27,7 +27,7 @@ the musically spelled tones available to the active chord.
 
 ## MIDI performance screen
 
-![LB Omnichord MIDI performance screen](./amysynth_version/qt_frontend/screenshots/midi-R20260831T084122.png)
+![LB Omnichord MIDI performance screen](./amysynth_version/qt_frontend/screenshots/midi-R20260831T131346.png)
 
 The MIDI screen provides six configurable parts with their own instrument,
 synthesis controls, volume, reverb and master output. Incoming MIDI can play
