@@ -8,6 +8,7 @@ import calendar
 import configparser
 import hashlib
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -126,6 +127,19 @@ def patch_buildozer_spec(
     if not parser.has_section("app") or not parser.has_section("buildozer"):
         raise ValueError("pyside6-android-deploy generated an invalid buildozer.spec")
 
+    p4a_extra_args = shlex.split(parser.get("app", "p4a.extra_args", fallback=""))
+    qt_libs_argument = "--qt-libs=" + ",".join(QT_MODULE_LOAD_ORDER)
+    qt_libs_indices = [
+        index
+        for index, argument in enumerate(p4a_extra_args)
+        if argument.startswith("--qt-libs=")
+    ]
+    if len(qt_libs_indices) != 1:
+        raise ValueError(
+            "pyside6-android-deploy generated no unique --qt-libs argument"
+        )
+    p4a_extra_args[qt_libs_indices[0]] = qt_libs_argument
+
     app_values = {
         "title": "LB Omnichord",
         "package.name": "lb_omnichord",
@@ -151,6 +165,7 @@ def patch_buildozer_spec(
         "android.debug_artifact": "apk",
         "android.release_artifact": "apk",
         "p4a.commit": P4A_COMMIT,
+        "p4a.extra_args": " ".join(p4a_extra_args),
     }
     for key, value in app_values.items():
         parser.set("app", key, value)
@@ -185,26 +200,41 @@ def pin_pyside_qt_module_order(spec_path: Path) -> None:
         parser.write(handle)
 
 
-def verify_qt_module_load_order(resources: bytes, abi: str) -> None:
-    """Require the compiled QtLoader resource array to be dependency ordered."""
+def verify_buildozer_qt_module_order(spec_path: Path) -> None:
+    """Require python-for-android's final Qt module input to be ordered."""
+
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read(spec_path, encoding="utf-8")
+    arguments = shlex.split(parser.get("app", "p4a.extra_args", fallback=""))
+    module_arguments = [
+        argument.removeprefix("--qt-libs=")
+        for argument in arguments
+        if argument.startswith("--qt-libs=")
+    ]
+    if len(module_arguments) != 1:
+        raise ValueError("buildozer.spec has no unique --qt-libs argument")
+    modules = tuple(module_arguments[0].split(","))
+    if modules != QT_MODULE_LOAD_ORDER:
+        raise ValueError(
+            "python-for-android Qt module load order is not dependency-safe: "
+            + ",".join(modules)
+        )
+
+
+def verify_qt_modules_present(resources: bytes, abi: str) -> None:
+    """Require every configured Qt module to be present in the APK resources."""
 
     tokens = [
         f"{abi};Qt6{module}_{abi}".encode("ascii")
         for module in QT_MODULE_LOAD_ORDER
     ]
-    positions = [resources.find(token) for token in tokens]
     missing = [
         QT_MODULE_LOAD_ORDER[index]
-        for index, position in enumerate(positions)
-        if position < 0
+        for index, token in enumerate(tokens)
+        if token not in resources
     ]
     if missing:
         raise ValueError(f"APK Qt loader resources omit modules {missing}")
-    if positions != sorted(positions):
-        raise ValueError(
-            "APK Qt module load order is not dependency-safe: "
-            + ",".join(QT_MODULE_LOAD_ORDER)
-        )
 
 
 def verify_inputs(aar: Path, wheel_pyside: Path, wheel_shiboken: Path, arch: str) -> None:
@@ -250,7 +280,7 @@ def verify_apk(apk: Path, architecture: str) -> None:
     forbidden = [name for name in names if "c_amy" in name or "libamy.so" in name]
     if forbidden:
         raise ValueError(f"frontend APK contains an in-process AMY binding: {forbidden}")
-    verify_qt_module_load_order(resources, abi)
+    verify_qt_modules_present(resources, abi)
 
 
 def build(args: argparse.Namespace) -> Path:
@@ -310,6 +340,7 @@ def build(args: argparse.Namespace) -> Path:
         stamp=args.release_stamp,
         sdk_path=sdk_compat,
     )
+    verify_buildozer_qt_module_order(spec)
     run([sys.executable, "-m", "buildozer", "android", args.mode], cwd=staging)
 
     candidates = sorted((staging / "bin").glob("*.apk"))

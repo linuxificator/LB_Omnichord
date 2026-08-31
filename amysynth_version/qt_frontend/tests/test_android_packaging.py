@@ -21,7 +21,8 @@ from build_android import (  # noqa: E402
     pin_pyside_qt_module_order,
     release_values,
     verify_apk,
-    verify_qt_module_load_order,
+    verify_buildozer_qt_module_order,
+    verify_qt_modules_present,
 )
 
 
@@ -42,7 +43,9 @@ class AndroidPackagingTests(unittest.TestCase):
                 "[app]\n"
                 "title = generated\n"
                 "requirements = python3,shiboken6,PySide6\n"
-                "p4a.extra_args = --qt-libs=Core\n"
+                "p4a.extra_args = --qt-libs=Gui,QuickControls2,Core "
+                "--load-local-libs=plugins_platforms_qtforandroid "
+                "--init-classes=\n"
                 "\n[buildozer]\n"
                 "bin_dir = bin\n",
                 encoding="utf-8",
@@ -81,6 +84,14 @@ class AndroidPackagingTests(unittest.TestCase):
             )
             self.assertEqual(buildozer["bin_dir"], str((root / "bin").resolve()))
             self.assertIn("json", app["source.include_exts"])
+            self.assertEqual(
+                app["p4a.extra_args"],
+                "--qt-libs="
+                + ",".join(QT_MODULE_LOAD_ORDER)
+                + " --load-local-libs=plugins_platforms_qtforandroid "
+                "--init-classes=",
+            )
+            verify_buildozer_qt_module_order(spec)
 
     def test_buildozer_sdk_compat_uses_modern_sdkmanager(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -153,7 +164,7 @@ class AndroidPackagingTests(unittest.TestCase):
                 archive.writestr("lib/x86_64/libpython3.11.so", b"correct")
             verify_apk(apk, "x86_64")
 
-    def test_apk_verifier_rejects_unsafe_qt_jni_load_order(self) -> None:
+    def test_buildozer_verifier_rejects_unsafe_qt_jni_load_order(self) -> None:
         unsafe = tuple(
             "QuickControls2"
             if module == "Quick"
@@ -162,10 +173,29 @@ class AndroidPackagingTests(unittest.TestCase):
             else module
             for module in QT_MODULE_LOAD_ORDER
         )
-        resources = self.qt_loader_resources("x86_64", unsafe)
+        with tempfile.TemporaryDirectory() as directory:
+            spec = Path(directory) / "buildozer.spec"
+            spec.write_text(
+                "[app]\n"
+                "p4a.extra_args = --qt-libs="
+                + ",".join(unsafe)
+                + " --load-local-libs=plugins_platforms_qtforandroid\n",
+                encoding="utf-8",
+            )
 
-        with self.assertRaisesRegex(ValueError, "dependency-safe"):
-            verify_qt_module_load_order(resources, "x86_64")
+            with self.assertRaisesRegex(ValueError, "dependency-safe"):
+                verify_buildozer_qt_module_order(spec)
+
+    def test_apk_verifier_rejects_a_missing_qt_module(self) -> None:
+        incomplete = tuple(
+            module for module in QT_MODULE_LOAD_ORDER if module != "Quick"
+        )
+
+        with self.assertRaisesRegex(ValueError, "omit modules.*Quick"):
+            verify_qt_modules_present(
+                self.qt_loader_resources("x86_64", incomplete),
+                "x86_64",
+            )
 
     def test_documented_toolchain_is_pinned(self) -> None:
         readme = (
