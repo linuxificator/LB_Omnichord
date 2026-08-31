@@ -30,6 +30,9 @@ Core rules:
   control indicators and the instrument-balance measurement contract.
 - `midi_control.md` is the authoritative MIDI CC learn, binding, LRU/LED and
   preset-persistence contract.
+- `CODEX_HANDOVER_EXTERNAL_CONTROLS.md` records the branch-local lessons from
+  the external-control rework: smooth Qt slider drag, backend echo boundaries,
+  MIDI input tech indicators and scoped hardware button takeover.
 
 ## Required reading route for Codex
 

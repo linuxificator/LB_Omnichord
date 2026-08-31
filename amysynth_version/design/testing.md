@@ -230,9 +230,9 @@ Important regression tests:
   expires blue state and persists bindings in the owning MIDI or OMNI preset
 - CC-style MIDI controller-button learn binds supported app buttons, presses
   through the same backend action as a screen tap, shows the same button LED
-  colors as sliders, blocks other screen button taps while an on/off MIDI
-  button is held, and never treats ordinary musical Note On/Off as controller
-  buttons
+  colors as sliders, scopes on/off takeover to the target's logical button
+  group, keeps tap-only actions from holding takeover state, and never treats
+  ordinary musical Note On/Off as controller buttons
 - the rhythm start arrow uses the same centered triangle geometry as bass and
   repaints on backend transport changes
 - a preset that reuses an already-bound channel/controller for another target

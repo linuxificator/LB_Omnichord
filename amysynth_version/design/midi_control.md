@@ -153,12 +153,14 @@ backend action as a screen tap. Releasing it clears the held state. A tap-style
 MIDI button therefore behaves like a screen tap.
 
 For on/off MIDI buttons, the pressed state is a temporary takeover of the bound
-application button. While one MIDI button target is held, screen taps on other
-button targets are ignored so the physical controller remains authoritative.
-The held target itself is allowed, and release removes the takeover. Tap-style
-MIDI buttons do not create a lasting takeover because they release immediately.
-Screen gestures needed to unlink a MIDI binding remain available through the
-normal explicit unlink path.
+application button. The takeover is scoped to the target's logical group so the
+physical controller remains authoritative without freezing unrelated UI
+buttons. Preset choices block other preset choices. Percussion, chord, bass and
+arpeggio-rate choices each block only their own choice group. Independent
+toggle buttons block only the exact screen button they own. Tap-only actions
+such as panic, store-preset and cycle-channel trigger on press but do not hold
+takeover state. Release removes the takeover. Screen gestures needed to unlink
+a MIDI binding remain available through the normal explicit unlink path.
 
 ## Controller authority
 

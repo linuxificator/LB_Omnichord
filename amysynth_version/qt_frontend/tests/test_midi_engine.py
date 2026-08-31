@@ -101,17 +101,18 @@ class MidiAmyEngineTests(unittest.TestCase):
 
     def test_non_linux_profiles_expose_only_their_platform_tech(self) -> None:
         expected = {
-            "darwin": ("coremidi", "CoreMIDI"),
-            "win32": ("winmm", "WinMM MIDI"),
-            "android": ("android_midi", "Android MIDI"),
+            "darwin": ("coremidi", "CoreMIDI", "CoreMIDI bridge"),
+            "win32": ("winmm", "WinMM MIDI", "WinMM MIDI bridge"),
+            "android": ("android_midi", "Android MIDI", "Android MIDI bridge"),
         }
-        for profile, (key, label) in expected.items():
+        for profile, (key, label, reason) in expected.items():
             with self.subTest(profile=profile):
                 techs = _MidiInputTechManager.platform_techs({}, profile)
                 self.assertEqual(len(techs), 1)
                 self.assertEqual(techs[0]["key"], key)
                 self.assertEqual(techs[0]["label"], label)
                 self.assertEqual(techs[0]["backend"], "unsupported")
+                self.assertIn(reason, techs[0]["unsupported_reason"])
 
     def test_midi_tech_status_marks_readable_inputs_and_activity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -145,16 +146,21 @@ class MidiAmyEngineTests(unittest.TestCase):
         expected = ("darwin", "win32", "android")
         for profile in expected:
             with self.subTest(profile=profile):
-                manager = _MidiInputTechManager.__new__(_MidiInputTechManager)
-                manager._enabled = True
-                manager._listener_readers = {}
-                manager._techs = _MidiInputTechManager.platform_techs(
-                    {},
-                    profile,
-                )
+                with (
+                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
+                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
+                ):
+                    manager = _MidiInputTechManager(
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        {"enabled": True, "tech_profile": profile},
+                    )
 
                 snapshot = manager.status_snapshot({}, now=10.0)
 
+                raw_reader.assert_not_called()
+                seq_reader.assert_not_called()
                 self.assertEqual(len(snapshot), 1)
                 self.assertEqual(snapshot[0]["state"], "unavailable")
                 self.assertFalse(snapshot[0]["available"])
