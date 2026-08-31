@@ -692,6 +692,10 @@ proves that hold promotion clears only root triggers and emits no immediate
   percussion activity button first.
 - The backend sends the reset, waits until it has crossed an AMY audio-block
   boundary, creates the visible level's loop at tick zero and starts transport.
+- The native PTY bridge applies the queued sequencer reset and, for a timebase
+  reset, its deferred second block boundary before accepting later serial
+  commands. This models the independently running production audio callback
+  without making the regression depend on CI thread scheduling.
 - The native regression requires non-silent rendered drum audio within one
   second. A one-bar delay or a required activity reselection is a failure.
 

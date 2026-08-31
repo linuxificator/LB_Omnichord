@@ -160,6 +160,22 @@ class SerialAmyBridge:
             assert self.amy is not None
             with self._amy_lock:
                 self.amy.send_wire(line)
+                reset_match = re.fullmatch(r"S(\d+)Z", line)
+                if reset_match:
+                    reset_flags = int(reset_match.group(1))
+                    if reset_flags & int(self.amy.RESET_SEQUENCER):
+                        # The real audio callback keeps running independently
+                        # while the application's serial writer observes its
+                        # post-reset barrier.  This test bridge receives and
+                        # renders on one thread, so an unlucky busy read loop
+                        # can otherwise ingest the later pattern triggers
+                        # before it renders the queued reset.  Process the
+                        # reset delta here; a timebase reset needs one further
+                        # block because AMY deliberately applies that part at
+                        # the following block boundary.
+                        self._render_native_block_locked()
+                        if reset_flags & int(self.amy.RESET_TIMEBASE):
+                            self._render_native_block_locked()
             self._write_native_log("WIRE", line)
 
         # In native mode a line is observable only after AMY has ingested it.
@@ -195,17 +211,20 @@ class SerialAmyBridge:
                     line = raw.decode("ascii", errors="replace")
                 self._record_line(line)
 
+    def _render_native_block_locked(self) -> None:
+        assert self.c_amy is not None
+        block = self.c_amy.render_to_list()
+        if block:
+            self._native_peak = max(
+                self._native_peak,
+                max(abs(int(sample)) for sample in block),
+            )
+
     def _render_block(self) -> None:
         if not self.native_amy:
             return
-        assert self.c_amy is not None
         with self._amy_lock:
-            block = self.c_amy.render_to_list()
-            if block:
-                self._native_peak = max(
-                    self._native_peak,
-                    max(abs(int(sample)) for sample in block),
-                )
+            self._render_native_block_locked()
 
     def reset_audio_peak(self) -> None:
         if not self.native_amy:
