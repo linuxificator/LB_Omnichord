@@ -151,6 +151,9 @@ movement-count thresholds.
 Custom Qt Slider handles must expose `implicitWidth` and `implicitHeight`.
 Setting only visual `width` and `height` can leave `implicitHandleWidth` at
 zero, which makes the visible knob differ from Qt's actual drag handle.
+While `Slider.pressed` is true, Qt owns the interactive slider value. Backend
+property echoes or repeater model replacements must not force the handle back
+to an older value during that press; synchronization resumes after release.
 
 The RST/UP/DWN block left of the first two chord rows ends at the bottom of the
 second row. Its three controls are distributed evenly over that complete

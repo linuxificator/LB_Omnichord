@@ -58,6 +58,13 @@ Item {
         })
     }
 
+    function beginSliderDrag() {
+        // Break the backend-value binding while Qt owns an active slider drag.
+        // The backend may echo the edit asynchronously; keeping the binding
+        // alive during the drag can make the handle fight that older value.
+        slider.value = Number(slider.value)
+    }
+
     Text {
         anchors.left: parent.left
         anchors.top: parent.top
@@ -106,9 +113,11 @@ Item {
 
         onPressedChanged: {
             if (pressed) {
+                root.beginSliderDrag()
                 root.midiBindingGesture = root.beginMidiInteraction()
                 root.activated()
             } else {
+                root.restoreCurrentValueBinding()
                 root.midiBindingGesture = false
             }
         }

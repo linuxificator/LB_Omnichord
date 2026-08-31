@@ -84,7 +84,17 @@ Item {
         slider.value = controlToSlider(root.control.value)
     }
 
-    onControlChanged: syncSliderValue()
+    function beginSliderDrag() {
+        // Keep Qt's active slider drag independent from backend model refreshes.
+        // Repeater modelData can be replaced while a Python setter is still
+        // converging; during that press Qt must continue to own the handle.
+        slider.value = Number(slider.value)
+    }
+
+    onControlChanged: {
+        if (!slider.pressed)
+            syncSliderValue()
+    }
 
     Text {
         anchors.left: parent.left
@@ -142,9 +152,11 @@ Item {
 
         onPressedChanged: {
             if (pressed) {
+                root.beginSliderDrag()
                 root.midiBindingGesture = root.beginMidiInteraction()
                 root.activated()
             } else {
+                root.syncSliderValue()
                 root.midiBindingGesture = false
             }
         }

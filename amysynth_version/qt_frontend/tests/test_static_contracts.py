@@ -272,6 +272,13 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("root.syncSliderValue()", parameter)
         self.assertIn("slider.value = Qt.binding", labeled)
         self.assertIn("return root.currentValue", labeled)
+        self.assertIn("function beginSliderDrag()", labeled)
+        self.assertIn("root.beginSliderDrag()", labeled)
+        self.assertIn("slider.value = Number(slider.value)", labeled)
+        self.assertIn("function beginSliderDrag()", parameter)
+        self.assertIn("root.beginSliderDrag()", parameter)
+        self.assertIn("slider.value = Number(slider.value)", parameter)
+        self.assertIn("if (!slider.pressed)", parameter)
 
         combined = "\n".join(
             (ROOT / "gui" / name).read_text(encoding="utf-8")
