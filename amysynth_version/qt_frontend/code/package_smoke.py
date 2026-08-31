@@ -123,10 +123,22 @@ def exercise_chord_input(
         Qt.KeyboardModifier.NoModifier,
         scene_position,
     )
-    QTest.qWait(
+    hold_deadline_ms = max(
         int(app.styleHints().mousePressAndHoldInterval())
-        + 100
+        + 1500,
+        3000,
     )
+    waited_ms = 0
+    while (
+        waited_ms < hold_deadline_ms
+        and not (
+            key in backend._promoted_chords
+            and int(backend.rhythmChordActivity) == 0
+        )
+    ):
+        QTest.qWait(50)
+        app.processEvents()
+        waited_ms += 50
     require(
         bool(button.property("touchActive")),
         "held QML chord lost its physical pressed state",
