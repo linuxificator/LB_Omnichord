@@ -43,9 +43,11 @@ wire path.
 Channel 0 in a row means omni/all incoming channels.
 
 ALSA Sequencer-only applications such as VMPK do not create a raw-MIDI device.
-For current local testing, load `snd-virmidi` and connect VMPK to a Virtual Raw
-MIDI port. Direct ALSA Sequencer subscription is not implemented yet because it
-is an event API rather than a byte-stream character device. JACK MIDI,
+The frontend therefore also creates an ALSA sequencer input client named
+`LB Omnichord` with a `MIDI In` port. That port is visible in graph tools such as
+`qpwgraph`; connect MIDI graph outputs such as BLE MIDI, Midi-Bridge or Midi
+Through to that port. Incoming ALSA sequencer events are decoded back to MIDI
+bytes and enter the same merged stream as raw MIDI devices. JACK MIDI,
 CoreMIDI/macOS, WinMM/Windows and Android MIDI are common platform MIDI APIs, but
 this PySide-only build has no bundled native bridges for those APIs.
 
@@ -63,8 +65,9 @@ below MIDI synth row 6 and above the grey MIDI CC indicator bar.
 - Technologies that are not relevant to the current platform are not shown.
 
 The Linux indicator set is ALSA raw, ALSA sequencer and OSS MIDI. ALSA raw and
-OSS MIDI can become green because this build has direct byte-stream readers.
-ALSA sequencer remains red until a real sequencer-client bridge exists.
+OSS MIDI become green when readable byte-stream devices exist. ALSA sequencer
+becomes green when the backend successfully creates the `LB Omnichord` sequencer
+client/port.
 
 ## Pitch handling
 

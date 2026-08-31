@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import glob
+import ctypes
 import json
 import math
 import os
@@ -57,35 +58,16 @@ def _write_json_atomic(path: Path, data: dict[str, Any]) -> None:
     tmp.replace(path)
 
 
-class _LinuxRawMidiReader:
-    """Dependency-free raw MIDI byte-stream reader for Raspberry Pi/Linux."""
+class _MidiByteStreamParser:
+    """Parse raw MIDI bytes into the small event set the app consumes."""
 
     def __init__(
         self,
         callback: Callable[[int, int, int, bool], None],
         control_callback: Callable[[int, int, int], None],
-        device_glob: str | list[str],
-        enabled: bool,
-        activity_callback: Callable[[], None] | None = None,
-        thread_name: str = "omnichord-usb-midi",
     ) -> None:
         self._callback = callback
         self._control_callback = control_callback
-        if isinstance(device_glob, list):
-            self._globs = [str(item) for item in device_glob]
-        else:
-            self._globs = [str(device_glob)]
-        self._enabled = bool(enabled)
-        self._activity_callback = activity_callback
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
-        if self._enabled:
-            self._thread = threading.Thread(
-                target=self._run,
-                name=thread_name,
-                daemon=True,
-            )
-            self._thread.start()
 
     @staticmethod
     def _data_length(status: int) -> int:
@@ -145,6 +127,36 @@ class _LinuxRawMidiReader:
         state["pending"] = pending
         state["sysex"] = sysex
 
+
+class _LinuxRawMidiReader(_MidiByteStreamParser):
+    """Dependency-free raw MIDI byte-stream reader for Raspberry Pi/Linux."""
+
+    def __init__(
+        self,
+        callback: Callable[[int, int, int, bool], None],
+        control_callback: Callable[[int, int, int], None],
+        device_glob: str | list[str],
+        enabled: bool,
+        activity_callback: Callable[[], None] | None = None,
+        thread_name: str = "omnichord-usb-midi",
+    ) -> None:
+        super().__init__(callback, control_callback)
+        if isinstance(device_glob, list):
+            self._globs = [str(item) for item in device_glob]
+        else:
+            self._globs = [str(device_glob)]
+        self._enabled = bool(enabled)
+        self._activity_callback = activity_callback
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        if self._enabled:
+            self._thread = threading.Thread(
+                target=self._run,
+                name=thread_name,
+                daemon=True,
+            )
+            self._thread.start()
+
     def _run(self) -> None:
         while not self._stop.is_set():
             paths = sorted({
@@ -203,6 +215,233 @@ class _LinuxRawMidiReader:
             self._thread.join(timeout=1.0)
 
 
+class _AlsaSequencerMidiReader(_MidiByteStreamParser):
+    """ALSA sequencer MIDI input client visible in graph tools."""
+
+    _SND_SEQ_OPEN_INPUT = 2
+    _SND_SEQ_NONBLOCK = 0x0001
+    _SND_SEQ_PORT_CAP_WRITE = 1 << 1
+    _SND_SEQ_PORT_CAP_SUBS_WRITE = 1 << 6
+    _SND_SEQ_PORT_TYPE_MIDI_GENERIC = 1 << 1
+    _SND_SEQ_PORT_TYPE_APPLICATION = 1 << 20
+
+    def __init__(
+        self,
+        callback: Callable[[int, int, int, bool], None],
+        control_callback: Callable[[int, int, int], None],
+        activity_callback: Callable[[], None],
+        enabled: bool,
+        client_name: str = "LB Omnichord",
+        port_name: str = "MIDI In",
+    ) -> None:
+        super().__init__(callback, control_callback)
+        self._activity_callback = activity_callback
+        self._enabled = bool(enabled)
+        self._client_name = client_name.encode("utf-8")
+        self._port_name = port_name.encode("utf-8")
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._available = False
+        self._reason = "not started"
+        self._client_id: int | None = None
+        self._port_id: int | None = None
+        if self._enabled:
+            self._thread = threading.Thread(
+                target=self._run,
+                name="omnichord-midi-alsa-seq",
+                daemon=True,
+            )
+            self._thread.start()
+
+    @staticmethod
+    def _load_libasound() -> ctypes.CDLL:
+        lib = ctypes.CDLL("libasound.so.2")
+        c_void_pp = ctypes.POINTER(ctypes.c_void_p)
+
+        lib.snd_seq_open.argtypes = [
+            c_void_pp,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_int,
+        ]
+        lib.snd_seq_open.restype = ctypes.c_int
+        lib.snd_seq_close.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_close.restype = ctypes.c_int
+        lib.snd_seq_set_client_name.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+        ]
+        lib.snd_seq_set_client_name.restype = ctypes.c_int
+        lib.snd_seq_client_id.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_client_id.restype = ctypes.c_int
+        lib.snd_seq_create_simple_port.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+            ctypes.c_uint,
+        ]
+        lib.snd_seq_create_simple_port.restype = ctypes.c_int
+        lib.snd_seq_event_input_pending.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_int,
+        ]
+        lib.snd_seq_event_input_pending.restype = ctypes.c_int
+        lib.snd_seq_event_input.argtypes = [
+            ctypes.c_void_p,
+            c_void_pp,
+        ]
+        lib.snd_seq_event_input.restype = ctypes.c_int
+        lib.snd_seq_free_event.argtypes = [ctypes.c_void_p]
+        lib.snd_seq_free_event.restype = ctypes.c_int
+        lib.snd_midi_event_new.argtypes = [
+            ctypes.c_size_t,
+            c_void_pp,
+        ]
+        lib.snd_midi_event_new.restype = ctypes.c_int
+        lib.snd_midi_event_free.argtypes = [ctypes.c_void_p]
+        lib.snd_midi_event_free.restype = None
+        lib.snd_midi_event_init.argtypes = [ctypes.c_void_p]
+        lib.snd_midi_event_init.restype = None
+        lib.snd_midi_event_decode.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+            ctypes.c_long,
+            ctypes.c_void_p,
+        ]
+        lib.snd_midi_event_decode.restype = ctypes.c_long
+        lib.snd_strerror.argtypes = [ctypes.c_int]
+        lib.snd_strerror.restype = ctypes.c_char_p
+        return lib
+
+    @staticmethod
+    def _error(lib: ctypes.CDLL, code: int) -> str:
+        raw = lib.snd_strerror(int(code))
+        return raw.decode("utf-8", errors="replace") if raw else str(code)
+
+    def _open_once(
+        self,
+        lib: ctypes.CDLL,
+    ) -> tuple[ctypes.c_void_p, ctypes.c_void_p] | None:
+        seq = ctypes.c_void_p()
+        rc = lib.snd_seq_open(
+            ctypes.byref(seq),
+            b"default",
+            self._SND_SEQ_OPEN_INPUT,
+            self._SND_SEQ_NONBLOCK,
+        )
+        if rc < 0:
+            self._reason = self._error(lib, rc)
+            return None
+        try:
+            lib.snd_seq_set_client_name(seq, self._client_name)
+            self._client_id = int(lib.snd_seq_client_id(seq))
+            self._port_id = int(
+                lib.snd_seq_create_simple_port(
+                    seq,
+                    self._port_name,
+                    self._SND_SEQ_PORT_CAP_WRITE
+                    | self._SND_SEQ_PORT_CAP_SUBS_WRITE,
+                    self._SND_SEQ_PORT_TYPE_MIDI_GENERIC
+                    | self._SND_SEQ_PORT_TYPE_APPLICATION,
+                )
+            )
+            if self._port_id < 0:
+                self._reason = self._error(lib, self._port_id)
+                lib.snd_seq_close(seq)
+                return None
+
+            decoder = ctypes.c_void_p()
+            rc = lib.snd_midi_event_new(256, ctypes.byref(decoder))
+            if rc < 0:
+                self._reason = self._error(lib, rc)
+                lib.snd_seq_close(seq)
+                return None
+            lib.snd_midi_event_init(decoder)
+            return seq, decoder
+        except Exception as exc:
+            self._reason = str(exc)
+            lib.snd_seq_close(seq)
+            return None
+
+    def _run_session(
+        self,
+        lib: ctypes.CDLL,
+        seq: ctypes.c_void_p,
+        decoder: ctypes.c_void_p,
+    ) -> None:
+        stream_state: dict[str, Any] = {}
+        buffer = ctypes.create_string_buffer(256)
+        self._available = True
+        self._reason = (
+            f"client {self._client_id}:{self._port_id}"
+            if self._client_id is not None and self._port_id is not None
+            else "listening"
+        )
+        try:
+            while not self._stop.is_set():
+                pending = int(lib.snd_seq_event_input_pending(seq, 1))
+                if pending <= 0:
+                    self._stop.wait(0.01)
+                    continue
+                while pending > 0 and not self._stop.is_set():
+                    event_ptr = ctypes.c_void_p()
+                    rc = int(lib.snd_seq_event_input(seq, ctypes.byref(event_ptr)))
+                    if rc < 0 or not event_ptr:
+                        break
+                    try:
+                        size = int(
+                            lib.snd_midi_event_decode(
+                                decoder,
+                                buffer,
+                                len(buffer),
+                                event_ptr,
+                            )
+                        )
+                    finally:
+                        lib.snd_seq_free_event(event_ptr)
+                    if size > 0:
+                        self._activity_callback()
+                        self._parse_stream(buffer.raw[:size], stream_state)
+                    pending -= 1
+        finally:
+            self._available = False
+            self._reason = "closed"
+            lib.snd_midi_event_free(decoder)
+            lib.snd_seq_close(seq)
+
+    def _run(self) -> None:
+        try:
+            lib = self._load_libasound()
+        except OSError as exc:
+            self._reason = str(exc)
+            return
+
+        while not self._stop.is_set():
+            opened = self._open_once(lib)
+            if opened is None:
+                self._stop.wait(1.0)
+                continue
+            self._run_session(lib, *opened)
+
+    def status_snapshot(
+        self,
+        activity: bool,
+    ) -> dict[str, Any]:
+        state = "activity" if self._available and activity else "listening"
+        if not self._available:
+            state = "unavailable"
+        return {
+            "state": state,
+            "available": self._available,
+            "reason": self._reason,
+        }
+
+    def close(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+
+
 class _MidiInputTechManager:
     """Own platform MIDI input tech detection and byte-stream readers."""
 
@@ -226,22 +465,29 @@ class _MidiInputTechManager:
             platform_name or self.current_tech_profile(midi_cfg),
         )
         self._readers: list[_LinuxRawMidiReader] = []
+        self._listener_readers: dict[str, _AlsaSequencerMidiReader] = {}
 
         if self._enabled:
             for tech in self._techs:
-                if tech.get("backend") != "byte_stream":
-                    continue
                 key = str(tech["key"])
-                self._readers.append(
-                    _LinuxRawMidiReader(
+                if tech.get("backend") == "byte_stream":
+                    self._readers.append(
+                        _LinuxRawMidiReader(
+                            callback,
+                            control_callback,
+                            list(tech.get("globs", [])),
+                            True,
+                            lambda key=key: self._activity_callback(key),
+                            f"omnichord-midi-{key}",
+                        )
+                    )
+                elif tech.get("backend") == "alsa_seq":
+                    self._listener_readers[key] = _AlsaSequencerMidiReader(
                         callback,
                         control_callback,
-                        list(tech.get("globs", [])),
-                        True,
                         lambda key=key: self._activity_callback(key),
-                        f"omnichord-midi-{key}",
+                        True,
                     )
-                )
 
     @staticmethod
     def _cfg_list(
@@ -303,12 +549,8 @@ class _MidiInputTechManager:
                 {
                     "key": "alsa_seq",
                     "label": "ALSA seq",
-                    "backend": "unsupported",
+                    "backend": "alsa_seq",
                     "device": "/dev/snd/seq",
-                    "unsupported_reason": (
-                        "ALSA sequencer is event based; this build has no "
-                        "bundled sequencer client bridge"
-                    ),
                 },
                 {
                     "key": "oss_midi",
@@ -399,9 +641,19 @@ class _MidiInputTechManager:
                 else:
                     reason = "no matching device"
             else:
-                device = tech.get("device")
-                if device and not os.path.exists(str(device)):
-                    reason = f"{device} not present"
+                listener = self._listener_readers.get(key)
+                if listener is not None:
+                    status = listener.status_snapshot(
+                        activity_until.get(key, 0.0) > now
+                    )
+                    state = str(status["state"])
+                    reason = str(status["reason"])
+                elif tech.get("backend") == "alsa_seq":
+                    device = tech.get("device")
+                    if device and not os.path.exists(str(device)):
+                        reason = f"{device} not present"
+                    else:
+                        reason = "ALSA sequencer listener not started"
                 else:
                     reason = str(
                         tech.get("unsupported_reason", "not supported by this build")
@@ -420,6 +672,8 @@ class _MidiInputTechManager:
 
     def close(self) -> None:
         for reader in self._readers:
+            reader.close()
+        for reader in self._listener_readers.values():
             reader.close()
 
 

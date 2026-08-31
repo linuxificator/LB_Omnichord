@@ -108,6 +108,50 @@ class MidiAmyEngineTests(unittest.TestCase):
             self.assertEqual(snapshot[1]["state"], "unavailable")
             self.assertFalse(snapshot[1]["available"])
 
+    def test_linux_midi_manager_starts_real_alsa_sequencer_listener(self) -> None:
+        with (
+            patch("midi_player._LinuxRawMidiReader") as raw_reader,
+            patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
+        ):
+            raw_reader.return_value = object()
+            seq_reader.return_value = object()
+
+            manager = _MidiInputTechManager(
+                lambda *_args: None,
+                lambda *_args: None,
+                lambda *_args: None,
+                {"enabled": True, "tech_profile": "linux"},
+            )
+
+        self.assertEqual(seq_reader.call_count, 1)
+        self.assertIn("alsa_seq", manager._listener_readers)
+
+    def test_alsa_sequencer_status_comes_from_running_listener(self) -> None:
+        class Listener:
+            def status_snapshot(self, activity: bool) -> dict[str, object]:
+                return {
+                    "state": "activity" if activity else "listening",
+                    "available": True,
+                    "reason": "client 128:0",
+                }
+
+        manager = _MidiInputTechManager.__new__(_MidiInputTechManager)
+        manager._enabled = True
+        manager._listener_readers = {"alsa_seq": Listener()}
+        manager._techs = [
+            {
+                "key": "alsa_seq",
+                "label": "ALSA seq",
+                "backend": "alsa_seq",
+            }
+        ]
+
+        snapshot = manager.status_snapshot({"alsa_seq": 20.0}, now=10.0)
+
+        self.assertEqual(snapshot[0]["state"], "activity")
+        self.assertTrue(snapshot[0]["available"])
+        self.assertEqual(snapshot[0]["reason"], "client 128:0")
+
     def test_midi_tech_parsers_keep_running_status_per_stream(self) -> None:
         notes = []
         controls = []
