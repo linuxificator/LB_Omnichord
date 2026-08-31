@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
+import "physical_controls"
 
 Item {
     id: root
@@ -395,171 +396,37 @@ Item {
                     Item {
                         id: f06Control
                         anchors.horizontalCenter: parent.horizontalCenter
-                        y: 12
-                        width: 40
-                        height: 40
+                        y: 9
+                        width: 52
+                        height: 52
                         readonly property bool pitchBend:
                             modelData.displayType === "pitch_bend"
                         readonly property bool noteButton:
                             modelData.displayType === "note_button"
                             || modelData.displayType === "button"
-                        readonly property color bodyColor:
-                            modelData.evicting ? "#d62f2f" : "#686864"
 
-                        Rectangle {
+                        PhysicalRotary {
                             visible: !f06Control.noteButton
                             anchors.centerIn: parent
-                            width: 40
-                            height: 40
-                            radius: 20
-                            color: "#353532"
-                            border.color: "#d8d4c8"
-                            border.width: 1
+                            width: 52
+                            height: 52
+                            family: 6
+                            encoder: f06Control.pitchBend
+                            from: 0
+                            to: 127
+                            value: Number(modelData.displayValue)
+                            physicalInteractive: false
+                            opacity: modelData.evicting ? 0.55 : 1.0
                         }
 
-                        Rectangle {
-                            id: knobSkirt
-                            visible: !f06Control.noteButton
-                            anchors.centerIn: parent
-                            width: 34
-                            height: 34
-                            radius: 17
-                            color: f06Control.bodyColor
-                            border.color: "#f0ece1"
-                            border.width: 2
-                            rotation: f06Control.pitchBend
-                                ? (Number(modelData.displayValue) - 64) * 180 / 64
-                                : Number(modelData.displayValue) * 270 / 127 - 135
-
-                            Rectangle {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                y: 3
-                                width: 4
-                                height: f06Control.pitchBend ? 10 : 14
-                                radius: 2
-                                color:
-                                    f06Control.pitchBend ? "#82d6ff" : "#f2d56b"
-                            }
-
-                            Behavior on rotation {
-                                NumberAnimation { duration: 90 }
-                            }
-                        }
-
-                        Repeater {
-                            model: 9
-                            delegate: Rectangle {
-                                visible: !f06Control.noteButton
-                                width: 2
-                                height: 5
-                                radius: 1
-                                color: "#252522"
-                                opacity: 0.55
-                                x: f06Control.width / 2 - width / 2
-                                y: 1
-                                transform: Rotation {
-                                    origin.x: 1
-                                    origin.y: f06Control.height / 2 - 1
-                                    angle: index * 30 - 120
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            visible: f06Control.pitchBend
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            y: -1
-                            width: 2
-                            height: 7
-                            radius: 1
-                            color: "#82d6ff"
-                            opacity: 0.7
-                        }
-
-                        Rectangle {
-                            visible: f06Control.noteButton
-                            width: 40
-                            height: 32
-                            x: 0
-                            y: 7
-                            radius: 6
-                            color: "#2f302d"
-                            opacity: 0.34
-                        }
-
-                        Rectangle {
+                        PhysicalPushButton {
                             visible: f06Control.noteButton
                             anchors.centerIn: parent
-                            width: 39
-                            height: 31
-                            radius: 6
-                            border.color: "#60615a"
-                            border.width: 2
-                            gradient: Gradient {
-                                GradientStop { position: 0.00; color: "#8e9088" }
-                                GradientStop { position: 0.42; color: "#5f615b" }
-                                GradientStop { position: 1.00; color: "#343531" }
-                            }
-
-                            Rectangle {
-                                id: f06ButtonCap
-                                x: 5
-                                y:
-                                    modelData.buttonDown && !modelData.evicting
-                                    ? 8
-                                    : 5
-                                width: parent.width - 10
-                                height: 18
-                                radius: 4
-                                border.color:
-                                    modelData.buttonDown && !modelData.evicting
-                                    ? "#fff6f6"
-                                    : "#efe8df"
-                                border.width: 1
-                                gradient: Gradient {
-                                    GradientStop {
-                                        position: 0.00
-                                        color:
-                                            modelData.buttonDown
-                                            && !modelData.evicting
-                                            ? "#fff1f1"
-                                            : "#f8d1c8"
-                                    }
-                                    GradientStop {
-                                        position: 0.46
-                                        color:
-                                            modelData.buttonDown
-                                            && !modelData.evicting
-                                            ? "#ff8d8d"
-                                            : "#f56f6f"
-                                    }
-                                    GradientStop {
-                                        position: 1.00
-                                        color:
-                                            modelData.buttonDown
-                                            && !modelData.evicting
-                                            ? "#c63131"
-                                            : "#d84a4a"
-                                    }
-                                }
-
-                                Behavior on y {
-                                    NumberAnimation { duration: 70 }
-                                }
-                            }
-
-                            Rectangle {
-                                x: f06ButtonCap.x + 3
-                                y: f06ButtonCap.y + 2
-                                width: f06ButtonCap.width - 6
-                                height: 3
-                                radius: 2
-                                color: "#ffffff"
-                                opacity:
-                                    modelData.buttonDown && !modelData.evicting
-                                    ? 0.72
-                                    : 0.48
-                            }
+                            width: 58
+                            height: 42
+                            family: 6
+                            forcedDown:
+                                modelData.buttonDown && !modelData.evicting
                         }
                     }
 

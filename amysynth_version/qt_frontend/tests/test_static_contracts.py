@@ -177,11 +177,34 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("root.centerMidiBound", tap_number)
         self.assertIn("root.centerMidiPresetFeedback", tap_number)
 
-        # F06-P01 button vocabulary: mounting bezel plus moving cap/plunger.
-        self.assertIn("id: f06ButtonCap", screen)
-        self.assertIn("GradientStop { position: 0.00; color: \"#8e9088\" }", screen)
-        self.assertIn("GradientStop { position: 1.00; color: \"#343531\" }", screen)
-        self.assertIn("Behavior on y", screen)
+        self.assertIn('import "physical_controls"', screen)
+        self.assertIn("PhysicalRotary", screen)
+        self.assertIn("PhysicalPushButton", screen)
+        self.assertIn("encoder: f06Control.pitchBend", screen)
+
+        rotary = (
+            ROOT / "gui" / "physical_controls" / "PhysicalRotary.qml"
+        ).read_text(encoding="utf-8")
+        button = (
+            ROOT / "gui" / "physical_controls" / "PhysicalPushButton.qml"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "panel recess",
+            "mounting skirt",
+            "Calibrated tick ring",
+            "MultiEffect",
+            "specular top highlight",
+            "physical index",
+            "Mechanical center boss",
+        ):
+            self.assertIn(required, rotary)
+        for required in (
+            "panel cutout",
+            "F06 bezel",
+            "physical plunger",
+            "Behavior on y",
+        ):
+            self.assertIn(required, button)
 
     def test_local_launcher_validates_but_never_builds_amy(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
