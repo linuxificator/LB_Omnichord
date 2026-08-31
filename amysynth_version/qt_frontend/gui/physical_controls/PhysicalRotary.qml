@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Shapes
-import QtQuick.Effects
 import "AudioHardwareStyle.js" as AudioStyle
 
 Dial {
@@ -36,7 +35,8 @@ Dial {
         )
     readonly property real capRotation:
         encoder
-        ? (Number(value) * 360 / Math.max(1, Number(to) - Number(from) + 1))
+        ? ((Number(value) - (Number(from) + Number(to)) / 2)
+            * 270 / Math.max(1e-9, Number(to) - Number(from)))
         : (-135 + normalizedValue * 270)
 
     background: Item {
@@ -59,7 +59,7 @@ Dial {
             width: control.size * 0.98
             height: width
             radius: width / 2
-            color: control.encoder ? control.s.bezel : control.s.highlight
+            color: control.encoder ? control.s.bezel : control.s.metalMid
             border.width: 1
             border.color: control.s.bezel
         }
@@ -112,24 +112,14 @@ Dial {
         y: control.capY
         rotation: control.capRotation
 
+        // 7: local/contact shadow without virtual lighting effects.
         Rectangle {
-            id: shadowSource
-            anchors.fill: capBody
+            x: 4
+            y: 6
+            width: parent.width - 4
+            height: parent.height - 2
             radius: width / 2
-            color: "white"
-            visible: false
-            layer.enabled: true
-        }
-
-        MultiEffect {
-            anchors.fill: shadowSource
-            source: shadowSource
-            shadowEnabled: true
-            shadowColor: "#88000000"
-            shadowHorizontalOffset: 2
-            shadowVerticalOffset: 4
-            shadowBlur: 0.42
-            blurMax: 12
+            color: "#33000000"
         }
 
         // 3-5: cap, depth and material shading
@@ -138,7 +128,7 @@ Dial {
             anchors.fill: parent
             radius: width / 2
             border.width: 2
-            border.color: control.s.highlight
+            border.color: control.s.bezel
             gradient: Gradient {
                 GradientStop { position: 0.00; color: control.s.capTop }
                 GradientStop { position: 0.25; color: control.s.capTop }
@@ -164,15 +154,14 @@ Dial {
                 }
             }
 
-            // 5: specular top highlight
+            // 5: muted top bevel; no white virtual-lighting patch.
             Rectangle {
                 x: parent.width * 0.16
                 y: parent.height * 0.11
                 width: parent.width * 0.47
-                height: parent.height * 0.11
+                height: 2
                 radius: height / 2
-                rotation: -18
-                color: "#55ffffff"
+                color: "#55cfc9b9"
             }
 
             // 6: physical index. Encoder uses a short notch/dot and no scale.

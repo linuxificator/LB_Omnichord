@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Effects
 import "AudioHardwareStyle.js" as AudioStyle
 
 Button {
@@ -43,27 +42,15 @@ Button {
             }
         }
 
+        // Lower/contact shadow without virtual lighting effects.
         Rectangle {
-            id: capShadowSource
-            x: parent.width * 0.17
-            y: parent.height * 0.26 + (control.physicallyDown ? 3 : 0)
-            width: parent.width * 0.66
-            height: parent.height * 0.38
-            radius: 5
-            color: "white"
-            visible: false
-            layer.enabled: true
-        }
-
-        MultiEffect {
-            anchors.fill: capShadowSource
-            source: capShadowSource
-            shadowEnabled: true
-            shadowColor: "#77000000"
-            shadowHorizontalOffset: 1
-            shadowVerticalOffset: control.physicallyDown ? 1 : 4
-            shadowBlur: 0.34
-            blurMax: 10
+            x: parent.width * 0.19
+            y: parent.height * 0.58
+            width: parent.width * 0.62
+            height: 4
+            radius: 2
+            color: "#44000000"
+            opacity: control.physicallyDown ? 0.30 : 0.55
         }
 
         // 3-5: physical plunger/cap with lamp material and highlight
@@ -89,8 +76,8 @@ Button {
                 width: parent.width - 10
                 height: 3
                 radius: 2
-                color: "#ffffff"
-                opacity: control.physicallyDown ? 0.45 : 0.76
+                color: "#e2c6bf"
+                opacity: control.physicallyDown ? 0.35 : 0.58
             }
 
             Behavior on y {

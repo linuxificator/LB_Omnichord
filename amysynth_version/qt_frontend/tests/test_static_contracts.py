@@ -192,12 +192,15 @@ class StaticContractTests(unittest.TestCase):
             "panel recess",
             "mounting skirt",
             "Calibrated tick ring",
-            "MultiEffect",
-            "specular top highlight",
+            "local/contact shadow without virtual lighting effects",
+            "muted top bevel",
             "physical index",
             "Mechanical center boss",
         ):
             self.assertIn(required, rotary)
+        self.assertNotIn("MultiEffect", rotary)
+        self.assertNotIn("QtQuick.Effects", rotary)
+        self.assertIn("* 270 / Math.max", rotary)
         for required in (
             "panel cutout",
             "F06 bezel",
@@ -205,6 +208,8 @@ class StaticContractTests(unittest.TestCase):
             "Behavior on y",
         ):
             self.assertIn(required, button)
+        self.assertNotIn("MultiEffect", button)
+        self.assertNotIn("QtQuick.Effects", button)
 
     def test_local_launcher_validates_but_never_builds_amy(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")

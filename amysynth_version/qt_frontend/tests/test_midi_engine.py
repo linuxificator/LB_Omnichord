@@ -402,6 +402,41 @@ class MidiAmyEngineTests(unittest.TestCase):
             )
         )
 
+    def test_pitch_bend_binding_applies_center_value_immediately(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._midi_control_state = MidiControlState()
+        backend._midi_control_lock = threading.Lock()
+        backend._write_cc_test_log = lambda *_args, **_kwargs: None
+        backend._sync_blue_timer = lambda *_args, **_kwargs: None
+        backend._bump_binding_state = lambda *_args, **_kwargs: None
+        applied: list[tuple[dict[str, object], int, tuple[int, int]]] = []
+
+        def apply_target(
+            target: dict[str, object],
+            midi_value: int,
+            source_key: tuple[int, int],
+        ) -> None:
+            applied.append((dict(target), int(midi_value), source_key))
+
+        backend._apply_control_target = apply_target
+        backend._midi_control_state.select_control(
+            (1, PITCH_BEND_CONTROLLER),
+            now=1.0,
+        )
+
+        learned = backend.activateControlTarget(
+            {
+                "screen": "midi",
+                "kind": "master_volume",
+            }
+        )
+
+        self.assertTrue(learned)
+        self.assertEqual(len(applied), 1)
+        self.assertEqual(applied[0][1], 8192)
+        self.assertEqual(applied[0][2], (1, PITCH_BEND_CONTROLLER))
+        self.assertEqual(applied[0][0]["id"], "midi:master_volume")
+
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
         client = _Client()
         client.config["instrument_levels"] = {"dx7_215": 0.4}

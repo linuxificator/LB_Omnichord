@@ -2014,8 +2014,20 @@ class MidiPlayerBackend(QObject):
         if target is None:
             return False
         with self._midi_control_lock:
+            learned_key = self._midi_control_state.learn_key
             learned = self._midi_control_state.bind_learned_target(target)
         if learned:
+            if (
+                learned_key is not None
+                and self._midi_control_state.source_type(learned_key)
+                == "pitch_bend"
+                and not self._is_button_target(target)
+            ):
+                self._apply_control_target(
+                    target,
+                    self._midi_control_state.default_value_for_key(learned_key),
+                    learned_key,
+                )
             self._write_cc_test_log(
                 {"event": "bind", "target": target["id"]}
             )
