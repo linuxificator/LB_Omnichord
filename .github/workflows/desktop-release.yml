@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 env:
-  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T220021
-  AMY_COMMIT: 32f3a68861a68979ceb715cf32e0322e8614365b
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260831T042456
+  AMY_COMMIT: 14240031c135fdcd76a7a3a8ec81da8ef405c4b0
 
 jobs:
   tests:

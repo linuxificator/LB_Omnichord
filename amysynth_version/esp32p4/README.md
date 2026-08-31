@@ -79,8 +79,8 @@ esp32p4/
 The checked-in project configuration was generated with ESP-IDF **6.0.2**. The CI build is pinned to the official Espressif `v6.0.2` environment.
 
 AMY is pinned to our immutable Omnichord fork release
-`releases/amy_omnichord_R20260830T220021` at commit
-`32f3a68861a68979ceb715cf32e0322e8614365b`. That release contains the nested
+`releases/amy_omnichord_R20260831T042456` at commit
+`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`. That release contains the nested
 sequencer API used by this firmware. `prepare_amy.sh` verifies that the branch
 tip and requested commit match, so it cannot silently compile against
 incompatible Shorepine `main`.

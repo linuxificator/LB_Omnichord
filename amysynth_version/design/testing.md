@@ -30,8 +30,8 @@ The maintained suites are:
 | `frontend` | headless QML/backend interaction | PySide6 and local TCP/PTY support |
 | `serial` | production pyserial output over a Linux PTY | pyserial and PTY support |
 | `presets` | factory/user preset loading and migration | PySide6 and PTY support |
-| `native-controls` | delivered wire commands and native synth state | pinned LB AMY fork |
-| `native-rhythm` | sequencer/rhythm behavior in native AMY | pinned LB AMY fork |
+| `native-controls` | delivered wire commands and native synth state | pinned tiny-bank LB AMY fork, offline renderer |
+| `native-rhythm` | sequencer/rhythm behavior in native AMY | pinned tiny-bank LB AMY fork, offline renderer |
 | `all` | all suites above, in dependency order | all requirements above |
 
 Top-level unit tests are discovered automatically. Integration suites are

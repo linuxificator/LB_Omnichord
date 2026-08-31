@@ -1,8 +1,8 @@
 # AMY release input contract
 
 Every LB Omnichord build uses AMY from the fork release branch
-`releases/amy_omnichord_R20260830T220021` at exact commit
-`32f3a68861a68979ceb715cf32e0322e8614365b`.
+`releases/amy_omnichord_R20260831T042456` at exact commit
+`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`.
 
 The branch name records the maintained AMY-for-Omnichord line. The commit SHA
 is the immutable build input: CI checks that the commit belongs to the declared
@@ -14,6 +14,12 @@ This pin is shared by native AMY regression tests, Linux and Raspberry Pi
 AppImages, the macOS application, the Windows named-pipe service, the Android
 Oboe AAR and the Android audio analyzer. Updating one platform alone is a
 contract failure.
+
+Native regressions build `AMY_PCM_BANK=tiny`, matching the release packages,
+and use the fork's `c_amy.live(audio=False, ...)` mode. This preserves the
+production sizing configuration while making the test bridge the only AMY
+clock and sample consumer; a background miniaudio callback cannot steal the
+block whose peak is being asserted.
 
 ## Updating AMY
 

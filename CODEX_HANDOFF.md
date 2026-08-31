@@ -271,8 +271,8 @@ requirement changes the architectural decision.
 ### AMY and drum-bank compatibility
 
 The release workflow pins AMY branch
-`releases/amy_omnichord_R20260830T220021` at
-`32f3a68861a68979ceb715cf32e0322e8614365b`.
+`releases/amy_omnichord_R20260831T042456` at
+`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`.
 
 - Linux and macOS install that revision directly with `AMY_PCM_BANK=tiny`;
   Linux CI rejects Gamma9001 symbols. The old local patch is gone because the
@@ -282,6 +282,9 @@ The release workflow pins AMY branch
   optional generated `drums_bin.c`.
 - At the pinned AMY revision, that selects `pcm_tiny.h` and the tiny version of
   MIDI drum patch 258 by construction.
+- Native CI explicitly builds that same tiny bank and configures CPython AMY
+  with `audio=False`. The bridge is then the sole clock/sample consumer;
+  miniaudio/ALSA cannot race deterministic `render_to_list()` assertions.
 - OMNI rhythm commands use the dedicated timing and kit catalogues under
   `music/drums`; the shipped configuration selects direct tiny-bank
   preset/native-note pairs which match Linux, macOS, Windows and ESP32-P4.
@@ -357,8 +360,8 @@ for official checkout/setup/upload/download actions being forced onto Node 24.
 The local AMY fork convention is `/home/jeroen/omnichord/amyfork/amy`.
 `origin/upstream/android-oboe` remains the historical full Android reference.
 The active LB dependency is now the cumulative release branch
-`releases/amy_omnichord_R20260830T220021`, pinned at
-`32f3a68861a68979ceb715cf32e0322e8614365b`. It combines the proven separate
+`releases/amy_omnichord_R20260831T042456`, pinned at
+`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`. It combines the proven separate
 Android `:amy`/Oboe and desktop wire-service boundaries with the generic nested
 sequencer. Nested-pattern authoring uses `zQE`, keeping every new wire
 operation under the existing `zQ` extended-control family. The abandoned

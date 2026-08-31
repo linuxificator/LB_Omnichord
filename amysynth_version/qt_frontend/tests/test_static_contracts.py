@@ -19,8 +19,8 @@ class StaticContractTests(unittest.TestCase):
         prepare = (ROOT.parent / "esp32p4" / "prepare_amy.sh").read_text(
             encoding="utf-8"
         )
-        release_branch = "releases/amy_omnichord_R20260830T220021"
-        release_commit = "32f3a68861a68979ceb715cf32e0322e8614365b"
+        release_branch = "releases/amy_omnichord_R20260831T042456"
+        release_commit = "14240031c135fdcd76a7a3a8ec81da8ef405c4b0"
 
         for contract in (workflow, prepare):
             self.assertIn("https://github.com/linuxificator/amy.git", contract)

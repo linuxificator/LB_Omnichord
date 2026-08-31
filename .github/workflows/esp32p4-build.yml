@@ -22,8 +22,8 @@ permissions:
 
 env:
   AMY_REPO: https://github.com/linuxificator/amy.git
-  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260830T220021
-  AMY_REF: 32f3a68861a68979ceb715cf32e0322e8614365b
+  AMY_RELEASE_BRANCH: releases/amy_omnichord_R20260831T042456
+  AMY_REF: 14240031c135fdcd76a7a3a8ec81da8ef405c4b0
 
 jobs:
   build:

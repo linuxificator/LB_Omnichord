@@ -42,8 +42,8 @@ A static regression test rejects reintroduction of the former parallel `SynthRun
 | `unit` | all top-level `test_*.py`: catalogue/state, MIDI engine, socket framing, migration and structural invariants | none |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
-| `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned LB AMY fork |
-| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + pinned LB AMY fork |
+| `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned tiny-bank LB AMY fork |
+| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + pinned tiny-bank LB AMY fork in deterministic offline-render mode |
 | `presets` | per-instrument session state and sparse preset save/load semantics | none/headless backend |
 | `all` | all suites sequentially; intended for local/manual use. CI runs the component suites in parallel for a PR to `main`. | mixed |
 
@@ -696,6 +696,9 @@ proves that hold promotion clears only root triggers and emits no immediate
   reset, its deferred second block boundary before accepting later serial
   commands. This models the independently running production audio callback
   without making the regression depend on CI thread scheduling.
+- Native CI compiles the same tiny PCM bank as the desktop and ESP32 packages.
+  AMY runs with `audio=False`, so only the bridge's explicit renderer advances
+  engine time or consumes samples; no ALSA/miniaudio callback races the test.
 - The native regression requires non-silent rendered drum audio within one
   second. A one-bar delay or a required activity reselection is a failure.
 
