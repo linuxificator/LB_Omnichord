@@ -65,4 +65,9 @@ that contract too. Historical files under `qt_frontend/docs/history/` and the
 Sonic Pi tree are not startup reading unless the user explicitly asks for
 historical comparison.
 
+For continuation work on active branches, also read the repository-root
+`CODEX_HANDOFF.md` when it exists. It records current branch/release state and
+session-specific lessons learned, but it never replaces the authoritative
+design contracts listed above.
+
 When implementation and design differ, the difference must be documented before changing behavior.
