@@ -15,10 +15,13 @@ from build_android import (  # noqa: E402
     APP_ID,
     P4A_COMMIT,
     PYSIDE_VERSION,
+    QT_MODULE_LOAD_ORDER,
     create_buildozer_sdk_compat,
     patch_buildozer_spec,
+    pin_pyside_qt_module_order,
     release_values,
     verify_apk,
+    verify_qt_module_load_order,
 )
 
 
@@ -100,6 +103,31 @@ class AndroidPackagingTests(unittest.TestCase):
             )
             self.assertNotEqual(resolved_manager, stale)
 
+    def test_pyside_qt_modules_are_pinned_in_dependency_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            spec = Path(directory) / "pysidedeploy.spec"
+            spec.write_text(
+                "[qt]\n"
+                "modules = Qml,QuickControls2,Core,Test,Network,Gui,Quick,OpenGL\n",
+                encoding="utf-8",
+            )
+
+            pin_pyside_qt_module_order(spec)
+
+            parser = configparser.ConfigParser(interpolation=None)
+            parser.read(spec, encoding="utf-8")
+            self.assertEqual(
+                tuple(parser.get("qt", "modules").split(",")),
+                QT_MODULE_LOAD_ORDER,
+            )
+
+    @staticmethod
+    def qt_loader_resources(abi: str, modules: tuple[str, ...]) -> bytes:
+        return b"\0".join(
+            f"{abi};Qt6{module}_{abi}".encode("ascii")
+            for module in modules
+        )
+
     def test_apk_verifier_rejects_a_python_abi_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             apk = Path(directory) / "frontend.apk"
@@ -113,6 +141,10 @@ class AndroidPackagingTests(unittest.TestCase):
                 for name in required:
                     archive.writestr(name, b"test")
                 archive.writestr("lib/x86_64/libpython3.14.so", b"wrong")
+                archive.writestr(
+                    "resources.arsc",
+                    self.qt_loader_resources("x86_64", QT_MODULE_LOAD_ORDER),
+                )
 
             with self.assertRaisesRegex(ValueError, "libpython3.11.so"):
                 verify_apk(apk, "x86_64")
@@ -120,6 +152,20 @@ class AndroidPackagingTests(unittest.TestCase):
             with zipfile.ZipFile(apk, "a") as archive:
                 archive.writestr("lib/x86_64/libpython3.11.so", b"correct")
             verify_apk(apk, "x86_64")
+
+    def test_apk_verifier_rejects_unsafe_qt_jni_load_order(self) -> None:
+        unsafe = tuple(
+            "QuickControls2"
+            if module == "Quick"
+            else "Quick"
+            if module == "QuickControls2"
+            else module
+            for module in QT_MODULE_LOAD_ORDER
+        )
+        resources = self.qt_loader_resources("x86_64", unsafe)
+
+        with self.assertRaisesRegex(ValueError, "dependency-safe"):
+            verify_qt_module_load_order(resources, "x86_64")
 
     def test_documented_toolchain_is_pinned(self) -> None:
         readme = (

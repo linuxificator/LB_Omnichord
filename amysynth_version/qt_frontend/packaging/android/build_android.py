@@ -19,6 +19,16 @@ from pathlib import Path
 PYSIDE_VERSION = "6.11.2"
 P4A_COMMIT = "3762c88c56e3443efb8eba2a02a2604b680240fd"
 APP_ID = "org.linuxificator.lb_omnichord"
+QT_MODULE_LOAD_ORDER = (
+    "Core",
+    "Gui",
+    "Network",
+    "OpenGL",
+    "Qml",
+    "Quick",
+    "QuickControls2",
+    "Test",
+)
 ARCHITECTURES = {
     "x86_64": ("x86_64", "x86_64"),
     "aarch64": ("arm64-v8a", "arm64"),
@@ -150,6 +160,53 @@ def patch_buildozer_spec(
         parser.write(handle)
 
 
+def pin_pyside_qt_module_order(spec_path: Path) -> None:
+    """Replace deployer's set-derived module order with dependency order."""
+
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read(spec_path, encoding="utf-8")
+    if not parser.has_section("qt") or not parser.has_option("qt", "modules"):
+        raise ValueError("pyside6-android-deploy generated no Qt module list")
+    modules = tuple(
+        module.strip()
+        for module in parser.get("qt", "modules").split(",")
+        if module.strip()
+    )
+    expected = set(QT_MODULE_LOAD_ORDER)
+    actual = set(modules)
+    if actual != expected:
+        raise ValueError(
+            "unexpected Qt module set: "
+            f"missing={sorted(expected - actual)}, "
+            f"extra={sorted(actual - expected)}"
+        )
+    parser.set("qt", "modules", ",".join(QT_MODULE_LOAD_ORDER))
+    with spec_path.open("w", encoding="utf-8") as handle:
+        parser.write(handle)
+
+
+def verify_qt_module_load_order(resources: bytes, abi: str) -> None:
+    """Require the compiled QtLoader resource array to be dependency ordered."""
+
+    tokens = [
+        f"{abi};Qt6{module}_{abi}".encode("ascii")
+        for module in QT_MODULE_LOAD_ORDER
+    ]
+    positions = [resources.find(token) for token in tokens]
+    missing = [
+        QT_MODULE_LOAD_ORDER[index]
+        for index, position in enumerate(positions)
+        if position < 0
+    ]
+    if missing:
+        raise ValueError(f"APK Qt loader resources omit modules {missing}")
+    if positions != sorted(positions):
+        raise ValueError(
+            "APK Qt module load order is not dependency-safe: "
+            + ",".join(QT_MODULE_LOAD_ORDER)
+        )
+
+
 def verify_inputs(aar: Path, wheel_pyside: Path, wheel_shiboken: Path, arch: str) -> None:
     wheel_arch = "android_aarch64" if arch == "aarch64" else "android_x86_64"
     for wheel, component in (
@@ -179,6 +236,7 @@ def verify_apk(apk: Path, architecture: str) -> None:
     abi, _ = ARCHITECTURES[architecture]
     with zipfile.ZipFile(apk) as archive:
         names = set(archive.namelist())
+        resources = archive.read("resources.arsc")
     required = {
         "AndroidManifest.xml",
         f"lib/{abi}/libamy_android.so",
@@ -192,6 +250,7 @@ def verify_apk(apk: Path, architecture: str) -> None:
     forbidden = [name for name in names if "c_amy" in name or "libamy.so" in name]
     if forbidden:
         raise ValueError(f"frontend APK contains an in-process AMY binding: {forbidden}")
+    verify_qt_module_load_order(resources, abi)
 
 
 def build(args: argparse.Namespace) -> Path:
@@ -206,24 +265,35 @@ def build(args: argparse.Namespace) -> Path:
     deploy = shutil.which("pyside6-android-deploy")
     if deploy is None:
         raise RuntimeError("pyside6-android-deploy is not installed")
+    deploy_command = [
+        deploy,
+        "--init",
+        "--keep-deployment-files",
+        "--name",
+        "LB_Omnichord",
+        "--wheel-pyside",
+        str(wheel_pyside),
+        "--wheel-shiboken",
+        str(wheel_shiboken),
+        "--ndk-path",
+        str(args.ndk.resolve()),
+        "--sdk-path",
+        str(args.sdk.resolve()),
+        "--extra-modules",
+        "QtQuick,QtQuickControls2,QtTest",
+    ]
+    run(deploy_command, cwd=staging)
+    pyside_spec = staging / "pysidedeploy.spec"
+    if not pyside_spec.is_file():
+        raise FileNotFoundError(
+            "pyside6-android-deploy did not create pysidedeploy.spec"
+        )
+    pin_pyside_qt_module_order(pyside_spec)
+    # Recreate recipes from the ordered list. PySide 6.11.2 otherwise derives
+    # this through sets, so QuickControls2 can be loaded before Quick and crash
+    # inside Qt's JNI_OnLoad.
     run(
-        [
-            deploy,
-            "--init",
-            "--keep-deployment-files",
-            "--name",
-            "LB_Omnichord",
-            "--wheel-pyside",
-            str(wheel_pyside),
-            "--wheel-shiboken",
-            str(wheel_shiboken),
-            "--ndk-path",
-            str(args.ndk.resolve()),
-            "--sdk-path",
-            str(args.sdk.resolve()),
-            "--extra-modules",
-            "QtQuick,QtQuickControls2,QtTest",
-        ],
+        [*deploy_command, "--config-file", str(pyside_spec)],
         cwd=staging,
     )
     sdk_compat = create_buildozer_sdk_compat(

@@ -62,7 +62,10 @@ Four repository workflows are maintained:
   builds only Android x86_64/arm64 packages, and installs the x86_64 APK in an
   emulator. That smoke drives the packaged QML tap/hold path through the
   app-private socket and verifies AMY's render samples equal the samples handed
-  to Oboe before Android joins the complete `main` release gate.
+  to Oboe before Android joins the complete `main` release gate. The package
+  builder also verifies Qt's compiled Android library array is dependency
+  ordered, with `Quick` loaded before `QuickControls2`, so JNI initialization
+  cannot depend on Python set iteration order.
 - `ESP32-P4 firmware build` builds and validates the firmware package when the
   ESP32-P4 project changes. It is a build/package check, not part of the Python
   frontend suite.

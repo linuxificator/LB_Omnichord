@@ -55,6 +55,15 @@ script rejects an AAR without both CI and production ABIs and rejects an APK
 that lacks the AMY/Oboe libraries or the matching CPython 3.11/shiboken native
 libraries. It also rejects an APK containing an in-process `c_amy` binding.
 
+PySide6 6.11.2 internally collects detected Android modules through Python
+sets, but python-for-Android writes the resulting list directly into Qt's JNI
+startup array. The build therefore makes a second deploy initialization pass
+with the explicit dependency order `Core`, `Gui`, `Network`, `OpenGL`, `Qml`,
+`Quick`, `QuickControls2`, `Test`. It then checks that same order in the
+compiled APK resource table. In particular, `Quick` must load before
+`QuickControls2`; otherwise the latter can pull in the former as an ordinary
+native dependency before its Android JNI initialization is ready.
+
 ## Volume notation
 
 LB Omnichord's UI volume values are logical amplitudes in the safe 0..1 range.
@@ -76,11 +85,12 @@ QML tap/hold smoke path, checks the private socket and separate AMY service,
 and compares the exact AMY render samples with the samples handed to Oboe.
 The emulator performs an unmeasured warm-up for python-for-Android's first-run
 asset extraction, force-stops the complete package, and only then arms AMY's
-eight-second Oboe capture for the measured launch. If Qt exits during the
-first-extraction startup race, the warm-up alone is retried up to three times;
-the measured QML/audio launch remains single-shot. After the warm-up, that
-window leaves enough margin for normal packaged frontend startup variation and
-the complete UI-driven synth attack.
+eight-second Oboe capture for the measured launch. If Qt exits during an
+unrelated first-extraction startup fault, the warm-up alone is retried up to
+three times; the deterministic library order prevents the former Qt Quick JNI
+load race. The measured QML/audio launch remains single-shot. After the
+warm-up, that window leaves enough margin for normal packaged frontend startup
+variation and the complete UI-driven synth attack.
 The readiness poll filters out verbose extraction traffic and retries a
 transient `adb logcat` read instead of confusing a host transport reset with an
 application failure; the filtered Python log must still contain no traceback.
