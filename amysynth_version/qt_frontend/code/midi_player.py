@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
+from PySide6.QtGui import QGuiApplication
 
 import app_core
 from control_limits import clamp_control_value
@@ -57,25 +58,31 @@ def _write_json_atomic(path: Path, data: dict[str, Any]) -> None:
 
 
 class _LinuxRawMidiReader:
-    """Dependency-free ALSA raw-MIDI reader for Raspberry Pi/Linux."""
+    """Dependency-free raw MIDI byte-stream reader for Raspberry Pi/Linux."""
 
     def __init__(
         self,
         callback: Callable[[int, int, int, bool], None],
         control_callback: Callable[[int, int, int], None],
-        device_glob: str,
+        device_glob: str | list[str],
         enabled: bool,
+        activity_callback: Callable[[], None] | None = None,
+        thread_name: str = "omnichord-usb-midi",
     ) -> None:
         self._callback = callback
         self._control_callback = control_callback
-        self._glob = str(device_glob)
+        if isinstance(device_glob, list):
+            self._globs = [str(item) for item in device_glob]
+        else:
+            self._globs = [str(device_glob)]
         self._enabled = bool(enabled)
+        self._activity_callback = activity_callback
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         if self._enabled:
             self._thread = threading.Thread(
                 target=self._run,
-                name="omnichord-usb-midi",
+                name=thread_name,
                 daemon=True,
             )
             self._thread.start()
@@ -140,7 +147,11 @@ class _LinuxRawMidiReader:
 
     def _run(self) -> None:
         while not self._stop.is_set():
-            paths = sorted(glob.glob(self._glob))
+            paths = sorted({
+                path
+                for pattern in self._globs
+                for path in glob.glob(pattern)
+            })
             if not paths:
                 self._stop.wait(0.5)
                 continue
@@ -174,6 +185,8 @@ class _LinuxRawMidiReader:
                                 pass
                             fds.pop(fd, None)
                             continue
+                        if self._activity_callback is not None:
+                            self._activity_callback()
                         self._parse_stream(data, fds[fd][1])
                     if not fds:
                         break
@@ -188,6 +201,226 @@ class _LinuxRawMidiReader:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=1.0)
+
+
+class _MidiInputTechManager:
+    """Own platform MIDI input tech detection and byte-stream readers."""
+
+    ACTIVITY_SECONDS = 0.45
+
+    def __init__(
+        self,
+        callback: Callable[[int, int, int, bool], None],
+        control_callback: Callable[[int, int, int], None],
+        activity_callback: Callable[[str], None],
+        midi_cfg: dict[str, Any],
+        platform_name: str | None = None,
+    ) -> None:
+        self._callback = callback
+        self._control_callback = control_callback
+        self._activity_callback = activity_callback
+        self._midi_cfg = midi_cfg
+        self._enabled = bool(midi_cfg.get("enabled", True))
+        self._techs = self.platform_techs(
+            midi_cfg,
+            platform_name or self.current_tech_profile(midi_cfg),
+        )
+        self._readers: list[_LinuxRawMidiReader] = []
+
+        if self._enabled:
+            for tech in self._techs:
+                if tech.get("backend") != "byte_stream":
+                    continue
+                key = str(tech["key"])
+                self._readers.append(
+                    _LinuxRawMidiReader(
+                        callback,
+                        control_callback,
+                        list(tech.get("globs", [])),
+                        True,
+                        lambda key=key: self._activity_callback(key),
+                        f"omnichord-midi-{key}",
+                    )
+                )
+
+    @staticmethod
+    def _cfg_list(
+        midi_cfg: dict[str, Any],
+        key: str,
+        fallback: list[str],
+    ) -> list[str]:
+        value = midi_cfg.get(key)
+        if isinstance(value, list):
+            return [str(item) for item in value]
+        if isinstance(value, str) and value:
+            return [value]
+        return list(fallback)
+
+    @staticmethod
+    def current_tech_profile(midi_cfg: dict[str, Any]) -> str:
+        configured = str(midi_cfg.get("tech_profile", "")).strip()
+        if configured:
+            return configured
+        app = QGuiApplication.instance()
+        qpa = (
+            str(QGuiApplication.platformName()).casefold()
+            if app is not None
+            else ""
+        )
+        if qpa == "cocoa":
+            return "darwin"
+        if qpa == "windows":
+            return "win32"
+        if qpa == "android":
+            return "android"
+        return "linux"
+
+    @classmethod
+    def platform_techs(
+        cls,
+        midi_cfg: dict[str, Any],
+        platform_name: str,
+    ) -> list[dict[str, Any]]:
+        platform_name = str(platform_name).lower()
+        if platform_name.startswith("linux"):
+            legacy_raw_glob = str(
+                midi_cfg.get("device_glob", "/dev/snd/midiC*D*")
+            )
+            alsa_raw_globs = cls._cfg_list(
+                midi_cfg,
+                "alsa_raw_globs",
+                [legacy_raw_glob],
+            )
+            if legacy_raw_glob and legacy_raw_glob not in alsa_raw_globs:
+                alsa_raw_globs = [legacy_raw_glob] + alsa_raw_globs
+            return [
+                {
+                    "key": "alsa_raw",
+                    "label": "ALSA raw",
+                    "backend": "byte_stream",
+                    "globs": alsa_raw_globs,
+                },
+                {
+                    "key": "alsa_seq",
+                    "label": "ALSA seq",
+                    "backend": "unsupported",
+                    "device": "/dev/snd/seq",
+                    "unsupported_reason": (
+                        "ALSA sequencer is event based; this build has no "
+                        "bundled sequencer client bridge"
+                    ),
+                },
+                {
+                    "key": "oss_midi",
+                    "label": "OSS MIDI",
+                    "backend": "byte_stream",
+                    "globs": cls._cfg_list(
+                        midi_cfg,
+                        "oss_midi_globs",
+                        [
+                            "/dev/midi",
+                            "/dev/midi[0-9]*",
+                            "/dev/amidi[0-9]*",
+                        ],
+                    ),
+                },
+            ]
+        if platform_name == "darwin":
+            return [
+                {
+                    "key": "coremidi",
+                    "label": "CoreMIDI",
+                    "backend": "unsupported",
+                    "unsupported_reason": (
+                        "native CoreMIDI bridge is not bundled"
+                    ),
+                }
+            ]
+        if platform_name.startswith("win"):
+            return [
+                {
+                    "key": "winmm",
+                    "label": "WinMM MIDI",
+                    "backend": "unsupported",
+                    "unsupported_reason": (
+                        "native WinMM MIDI bridge is not bundled"
+                    ),
+                }
+            ]
+        if platform_name.startswith("android"):
+            return [
+                {
+                    "key": "android_midi",
+                    "label": "Android MIDI",
+                    "backend": "unsupported",
+                    "unsupported_reason": (
+                        "native Android MIDI bridge is not bundled"
+                    ),
+                }
+            ]
+        return []
+
+    @staticmethod
+    def _glob_paths(tech: dict[str, Any]) -> list[str]:
+        return sorted({
+            path
+            for pattern in tech.get("globs", [])
+            for path in glob.glob(str(pattern))
+        })
+
+    def status_snapshot(
+        self,
+        activity_until: dict[str, float] | None = None,
+        now: float | None = None,
+    ) -> list[dict[str, Any]]:
+        activity_until = activity_until or {}
+        now = time.monotonic() if now is None else float(now)
+        items: list[dict[str, Any]] = []
+        for tech in self._techs:
+            key = str(tech["key"])
+            state = "unavailable"
+            reason = ""
+            if not self._enabled:
+                reason = "MIDI input disabled in configuration"
+            elif tech.get("backend") == "byte_stream":
+                paths = self._glob_paths(tech)
+                readable = [path for path in paths if os.access(path, os.R_OK)]
+                if readable:
+                    state = (
+                        "activity"
+                        if activity_until.get(key, 0.0) > now
+                        else "listening"
+                    )
+                    reason = ", ".join(readable[:3])
+                    if len(readable) > 3:
+                        reason += f" (+{len(readable) - 3})"
+                elif paths:
+                    reason = "device present but not readable"
+                else:
+                    reason = "no matching device"
+            else:
+                device = tech.get("device")
+                if device and not os.path.exists(str(device)):
+                    reason = f"{device} not present"
+                else:
+                    reason = str(
+                        tech.get("unsupported_reason", "not supported by this build")
+                    )
+
+            items.append(
+                {
+                    "key": key,
+                    "label": str(tech["label"]),
+                    "state": state,
+                    "available": state in ("listening", "activity"),
+                    "reason": reason,
+                }
+            )
+        return items
+
+    def close(self) -> None:
+        for reader in self._readers:
+            reader.close()
 
 
 class MidiAmyEngine:
@@ -639,6 +872,8 @@ class MidiPlayerBackend(QObject):
     bindingStateChanged = Signal()
     bindingLocationRequested = Signal(str, int)
     _queuedControlChange = Signal(int, int, int)
+    midiInputTechsChanged = Signal()
+    _queuedMidiTechActivity = Signal(str)
 
     def __init__(
         self,
@@ -692,6 +927,7 @@ class MidiPlayerBackend(QObject):
         raw_cc_log = os.environ.get("OMNICHORD_TEST_MIDI_CC_LOG", "")
         self._midi_cc_test_log = Path(raw_cc_log) if raw_cc_log else None
         self._queuedControlChange.connect(self.process_midi_control)
+        self._queuedMidiTechActivity.connect(self._mark_midi_tech_activity)
         self._blue_expiry_timer = QTimer(self)
         self._blue_expiry_timer.setInterval(250)
         self._blue_expiry_timer.timeout.connect(self._expire_blue_controls)
@@ -699,6 +935,18 @@ class MidiPlayerBackend(QObject):
         self._preset_feedback_timer.setInterval(100)
         self._preset_feedback_timer.timeout.connect(
             self._expire_preset_feedback
+        )
+        self._midi_input_activity_until: dict[str, float] = {}
+        self._midi_input_tech_snapshot: list[dict[str, Any]] = []
+        self._midi_input_refresh_timer = QTimer(self)
+        self._midi_input_refresh_timer.setInterval(1000)
+        self._midi_input_refresh_timer.timeout.connect(
+            self._refresh_midi_input_techs
+        )
+        self._midi_input_activity_timer = QTimer(self)
+        self._midi_input_activity_timer.setInterval(120)
+        self._midi_input_activity_timer.timeout.connect(
+            self._refresh_midi_input_techs
         )
 
         self.engine = MidiAmyEngine(client)
@@ -712,19 +960,18 @@ class MidiPlayerBackend(QObject):
         self._apply_all_to_engine()
 
         midi_cfg = client.config.get("midi_input", {})
-        self._reader = _LinuxRawMidiReader(
+        self._reader = _MidiInputTechManager(
             self.process_midi_note,
             self._queue_midi_control,
-            str(
-                midi_cfg.get(
-                    "device_glob",
-                    "/dev/snd/midiC*D*",
-                )
-            ),
-            bool(midi_cfg.get("enabled", True)),
+            self._queue_midi_tech_activity,
+            midi_cfg if isinstance(midi_cfg, dict) else {},
         )
+        self._refresh_midi_input_techs()
+        self._midi_input_refresh_timer.start()
 
     def close(self) -> None:
+        self._midi_input_refresh_timer.stop()
+        self._midi_input_activity_timer.stop()
         self._reader.close()
 
     @Property(int, notify=stateChanged)
@@ -791,6 +1038,36 @@ class MidiPlayerBackend(QObject):
     @Property(bool, notify=masterMutedChanged)
     def masterMuted(self) -> bool:
         return self._master_muted
+
+    @Property("QVariantList", notify=midiInputTechsChanged)
+    def midiInputTechs(self) -> list[dict[str, Any]]:
+        return list(self._midi_input_tech_snapshot)
+
+    def _queue_midi_tech_activity(self, key: str) -> None:
+        self._queuedMidiTechActivity.emit(str(key))
+
+    @Slot(str)
+    def _mark_midi_tech_activity(self, key: str) -> None:
+        self._midi_input_activity_until[str(key)] = (
+            time.monotonic() + _MidiInputTechManager.ACTIVITY_SECONDS
+        )
+        self._refresh_midi_input_techs()
+        if not self._midi_input_activity_timer.isActive():
+            self._midi_input_activity_timer.start()
+
+    def _refresh_midi_input_techs(self) -> None:
+        snapshot = self._reader.status_snapshot(
+            self._midi_input_activity_until
+        )
+        if snapshot != self._midi_input_tech_snapshot:
+            self._midi_input_tech_snapshot = snapshot
+            self.midiInputTechsChanged.emit()
+        active = any(
+            item.get("state") == "activity"
+            for item in snapshot
+        )
+        if not active:
+            self._midi_input_activity_timer.stop()
 
     def _queue_midi_control(self, channel: int, controller: int, value: int) -> None:
         """Move raw-MIDI thread callbacks onto this QObject's Qt thread."""

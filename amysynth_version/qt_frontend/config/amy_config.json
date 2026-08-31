@@ -27,7 +27,10 @@
   },
   "midi_input": {
     "enabled": true,
-    "device_glob": "/dev/snd/midiC*D*"
+    "tech_profile": "linux",
+    "device_glob": "/dev/snd/midiC*D*",
+    "alsa_raw_globs": ["/dev/snd/midiC*D*"],
+    "oss_midi_globs": ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"]
   },
   "default_synths": {
     "chord": "juno_004",

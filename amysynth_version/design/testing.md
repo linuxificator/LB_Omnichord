@@ -218,6 +218,9 @@ Important regression tests:
   mapping and the owned AMY bus commands
 - MIDI CC running status updates indicators without changing musical state;
   indicators fill the available width before least-recently-used replacement
+- MIDI input tech LEDs expose only platform-relevant technologies, show red for
+  unavailable/unimplemented runtime inputs, green for readable listened-to
+  byte-stream inputs and blinking green after incoming bytes
 - MIDI CC learn permits one red controller, binds every continuous numeric
   control family one-to-one, maps logarithmic sliders over visual travel,
   protects red/blue indicators, preserves hidden instrument-specific bindings,

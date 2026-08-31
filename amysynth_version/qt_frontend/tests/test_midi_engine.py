@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -9,7 +10,12 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
-from midi_player import MidiAmyEngine, MidiPlayerBackend  # noqa: E402
+from midi_player import (  # noqa: E402
+    MidiAmyEngine,
+    MidiPlayerBackend,
+    _LinuxRawMidiReader,
+    _MidiInputTechManager,
+)
 from synth_state import SynthState  # noqa: E402
 
 
@@ -51,6 +57,78 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_midi_platform_techs_are_filtered_by_runtime_platform(self) -> None:
+        linux = _MidiInputTechManager.platform_techs(
+            {"device_glob": "/tmp/midi-test"},
+            "linux",
+        )
+        self.assertEqual(
+            [item["key"] for item in linux],
+            ["alsa_raw", "alsa_seq", "oss_midi"],
+        )
+        self.assertEqual(linux[0]["globs"], ["/tmp/midi-test"])
+        self.assertEqual(
+            [item["key"] for item in _MidiInputTechManager.platform_techs({}, "darwin")],
+            ["coremidi"],
+        )
+        self.assertEqual(
+            [item["key"] for item in _MidiInputTechManager.platform_techs({}, "win32")],
+            ["winmm"],
+        )
+        self.assertEqual(
+            _MidiInputTechManager.platform_techs({}, "freebsd"),
+            [],
+        )
+
+    def test_midi_tech_status_marks_readable_inputs_and_activity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "midi0"
+            path.write_bytes(b"")
+            manager = _MidiInputTechManager.__new__(_MidiInputTechManager)
+            manager._enabled = True
+            manager._techs = [
+                {
+                    "key": "test_raw",
+                    "label": "Test raw",
+                    "backend": "byte_stream",
+                    "globs": [str(path)],
+                },
+                {
+                    "key": "missing_raw",
+                    "label": "Missing raw",
+                    "backend": "byte_stream",
+                    "globs": [str(Path(directory) / "missing")],
+                },
+            ]
+
+            snapshot = manager.status_snapshot({"test_raw": 20.0}, now=10.0)
+
+            self.assertEqual(snapshot[0]["state"], "activity")
+            self.assertTrue(snapshot[0]["available"])
+            self.assertEqual(snapshot[1]["state"], "unavailable")
+            self.assertFalse(snapshot[1]["available"])
+
+    def test_midi_tech_parsers_keep_running_status_per_stream(self) -> None:
+        notes = []
+        controls = []
+
+        def reader() -> _LinuxRawMidiReader:
+            item = _LinuxRawMidiReader.__new__(_LinuxRawMidiReader)
+            item._callback = lambda *args: notes.append(args)
+            item._control_callback = lambda *args: controls.append(args)
+            return item
+
+        first = reader()
+        second = reader()
+        state_a: dict[str, object] = {}
+        state_b: dict[str, object] = {}
+
+        first._parse_stream(bytes([0x90, 60, 100, 61, 101]), state_a)
+        second._parse_stream(bytes([0xB1, 7, 64, 74, 99]), state_b)
+
+        self.assertEqual(notes, [(1, 60, 100, True), (1, 61, 101, True)])
+        self.assertEqual(controls, [(2, 7, 64), (2, 74, 99)])
+
     def test_cc_mapping_follows_logarithmic_visual_slider_travel(self) -> None:
         class Control:
             key = "filter_hz"

@@ -74,6 +74,12 @@ and LED states defined in `midi_control.md`; an unbound knob remains display-onl
 When the bar is full, eligible indicators follow genuine-change LRU replacement
 and the outgoing knob flashes red twice.
 
+The narrow unused gap between MIDI synth row 6 and the lower grey MIDI CC bar is
+reserved for MIDI input tech LEDs. Each visible LED has a short label such as
+`ALSA raw`, `ALSA seq` or `OSS MIDI`. Only techs relevant to the active platform
+are shown. Red means unavailable to this runtime; green means available and
+listened to; blinking green means recent incoming MIDI bytes on that tech.
+
 On the OMNI screen, MIDI learn is shown by a blinking red LED inside the large
 `MIDI` mode button, immediately to the right of its label. It is absent rather
 than grey when learn is inactive. The green binding-location LED remains on
