@@ -14,6 +14,8 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
+    readonly property bool traceGestures:
+        typeof sliderTrace !== "undefined" && sliderTrace
 
     readonly property bool midiBound: {
         if (root.midiControlRouter === null)
@@ -91,7 +93,27 @@ Item {
         slider.value = Number(slider.value)
     }
 
+    function traceSlider(event, value) {
+        if (!root.traceGestures)
+            return
+        console.log(
+            "SLIDER_TRACE",
+            "parameter",
+            String(root.control.key),
+            event,
+            "pressed",
+            slider.pressed,
+            "value",
+            Number(slider.value),
+            "controlValue",
+            Number(root.control.value),
+            "eventValue",
+            Number(value)
+        )
+    }
+
     onControlChanged: {
+        root.traceSlider("controlChanged", root.control.value)
         if (!slider.pressed)
             syncSliderValue()
     }
@@ -151,6 +173,7 @@ Item {
             root.syncSliderValue()
 
         onPressedChanged: {
+            root.traceSlider("pressedChanged", value)
             if (pressed) {
                 root.beginSliderDrag()
                 root.midiBindingGesture = root.beginMidiInteraction()
@@ -162,6 +185,7 @@ Item {
         }
 
         onMoved: {
+            root.traceSlider("moved", value)
             if (root.midiBindingGesture) {
                 root.syncSliderValue()
                 return

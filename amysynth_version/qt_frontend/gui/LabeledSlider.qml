@@ -20,6 +20,8 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
+    readonly property bool traceGestures:
+        typeof sliderTrace !== "undefined" && sliderTrace
 
     readonly property bool midiBound: {
         if (root.midiControlRouter === null)
@@ -64,6 +66,28 @@ Item {
         // alive during the drag can make the handle fight that older value.
         slider.value = Number(slider.value)
     }
+
+    function traceSlider(event, value) {
+        if (!root.traceGestures)
+            return
+        console.log(
+            "SLIDER_TRACE",
+            "labeled",
+            String(root.label),
+            event,
+            "pressed",
+            slider.pressed,
+            "value",
+            Number(slider.value),
+            "current",
+            Number(root.currentValue),
+            "eventValue",
+            Number(value)
+        )
+    }
+
+    onCurrentValueChanged:
+        root.traceSlider("currentValueChanged", root.currentValue)
 
     Text {
         anchors.left: parent.left
@@ -112,6 +136,7 @@ Item {
         snapMode: Slider.SnapAlways
 
         onPressedChanged: {
+            root.traceSlider("pressedChanged", value)
             if (pressed) {
                 root.beginSliderDrag()
                 root.midiBindingGesture = root.beginMidiInteraction()
@@ -123,6 +148,7 @@ Item {
         }
 
         onMoved: {
+            root.traceSlider("moved", value)
             if (root.midiBindingGesture) {
                 root.restoreCurrentValueBinding()
                 return

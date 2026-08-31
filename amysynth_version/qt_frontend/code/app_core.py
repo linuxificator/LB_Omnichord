@@ -4389,6 +4389,13 @@ def parse_arguments() -> argparse.Namespace:
             "Write debug JSONL to this path; implies --debug."
         ),
     )
+    parser.add_argument(
+        "--slider-trace",
+        action="store_true",
+        help=(
+            "Print QML slider press/move/current-value diagnostics to stderr."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -4735,6 +4742,11 @@ def main() -> int:
     context = engine.rootContext()
 
     context.setContextProperty("backend", backend)
+    context.setContextProperty(
+        "sliderTrace",
+        bool(args.slider_trace)
+        or os.environ.get("OMNICHORD_SLIDER_TRACE") == "1",
+    )
     context.setContextProperty(
         "chordNames",
         [chord.label for chord in chords],
