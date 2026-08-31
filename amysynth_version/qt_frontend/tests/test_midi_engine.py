@@ -58,27 +58,57 @@ class _Client:
 
 class MidiAmyEngineTests(unittest.TestCase):
     def test_midi_platform_techs_are_filtered_by_runtime_platform(self) -> None:
+        cases = {
+            "linux": ("alsa_raw", "alsa_seq", "oss_midi"),
+            "darwin": ("coremidi",),
+            "win32": ("winmm",),
+            "android": ("android_midi",),
+            "freebsd": (),
+        }
+        for profile, expected in cases.items():
+            with self.subTest(profile=profile):
+                techs = _MidiInputTechManager.platform_techs(
+                    {"device_glob": "/tmp/midi-test"},
+                    profile,
+                )
+                self.assertEqual(
+                    tuple(item["key"] for item in techs),
+                    expected,
+                )
+
         linux = _MidiInputTechManager.platform_techs(
             {"device_glob": "/tmp/midi-test"},
             "linux",
         )
-        self.assertEqual(
-            [item["key"] for item in linux],
-            ["alsa_raw", "alsa_seq", "oss_midi"],
-        )
         self.assertEqual(linux[0]["globs"], ["/tmp/midi-test"])
-        self.assertEqual(
-            [item["key"] for item in _MidiInputTechManager.platform_techs({}, "darwin")],
-            ["coremidi"],
+
+    def test_linux_legacy_raw_glob_is_preserved_with_new_config(self) -> None:
+        linux = _MidiInputTechManager.platform_techs(
+            {
+                "device_glob": "/tmp/legacy-midi",
+                "alsa_raw_globs": ["/tmp/configured-midi"],
+            },
+            "linux",
         )
+
         self.assertEqual(
-            [item["key"] for item in _MidiInputTechManager.platform_techs({}, "win32")],
-            ["winmm"],
+            linux[0]["globs"],
+            ["/tmp/legacy-midi", "/tmp/configured-midi"],
         )
-        self.assertEqual(
-            _MidiInputTechManager.platform_techs({}, "freebsd"),
-            [],
-        )
+
+    def test_non_linux_profiles_expose_only_their_platform_tech(self) -> None:
+        expected = {
+            "darwin": ("coremidi", "CoreMIDI"),
+            "win32": ("winmm", "WinMM MIDI"),
+            "android": ("android_midi", "Android MIDI"),
+        }
+        for profile, (key, label) in expected.items():
+            with self.subTest(profile=profile):
+                techs = _MidiInputTechManager.platform_techs({}, profile)
+                self.assertEqual(len(techs), 1)
+                self.assertEqual(techs[0]["key"], key)
+                self.assertEqual(techs[0]["label"], label)
+                self.assertEqual(techs[0]["backend"], "unsupported")
 
     def test_midi_tech_status_marks_readable_inputs_and_activity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -108,6 +138,47 @@ class MidiAmyEngineTests(unittest.TestCase):
             self.assertEqual(snapshot[1]["state"], "unavailable")
             self.assertFalse(snapshot[1]["available"])
 
+    def test_unsupported_platform_techs_are_visible_red_not_listened(self) -> None:
+        expected = ("darwin", "win32", "android")
+        for profile in expected:
+            with self.subTest(profile=profile):
+                manager = _MidiInputTechManager.__new__(_MidiInputTechManager)
+                manager._enabled = True
+                manager._listener_readers = {}
+                manager._techs = _MidiInputTechManager.platform_techs(
+                    {},
+                    profile,
+                )
+
+                snapshot = manager.status_snapshot({}, now=10.0)
+
+                self.assertEqual(len(snapshot), 1)
+                self.assertEqual(snapshot[0]["state"], "unavailable")
+                self.assertFalse(snapshot[0]["available"])
+                self.assertIn("not bundled", snapshot[0]["reason"])
+
+    def test_disabled_midi_input_starts_no_platform_readers(self) -> None:
+        for profile in ("linux", "darwin", "win32", "android"):
+            with self.subTest(profile=profile):
+                with (
+                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
+                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
+                ):
+                    manager = _MidiInputTechManager(
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        {"enabled": False, "tech_profile": profile},
+                    )
+
+                raw_reader.assert_not_called()
+                seq_reader.assert_not_called()
+                snapshot = manager.status_snapshot({}, now=10.0)
+                self.assertTrue(snapshot)
+                self.assertTrue(
+                    all(item["state"] == "unavailable" for item in snapshot)
+                )
+
     def test_linux_midi_manager_starts_real_alsa_sequencer_listener(self) -> None:
         with (
             patch("midi_player._LinuxRawMidiReader") as raw_reader,
@@ -124,7 +195,26 @@ class MidiAmyEngineTests(unittest.TestCase):
             )
 
         self.assertEqual(seq_reader.call_count, 1)
+        self.assertEqual(raw_reader.call_count, 2)
         self.assertIn("alsa_seq", manager._listener_readers)
+
+    def test_non_linux_managers_do_not_start_raw_or_alsa_seq_readers(self) -> None:
+        for profile in ("darwin", "win32", "android"):
+            with self.subTest(profile=profile):
+                with (
+                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
+                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
+                ):
+                    manager = _MidiInputTechManager(
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        lambda *_args: None,
+                        {"enabled": True, "tech_profile": profile},
+                    )
+
+                raw_reader.assert_not_called()
+                seq_reader.assert_not_called()
+                self.assertEqual(manager._listener_readers, {})
 
     def test_alsa_sequencer_status_comes_from_running_listener(self) -> None:
         class Listener:
