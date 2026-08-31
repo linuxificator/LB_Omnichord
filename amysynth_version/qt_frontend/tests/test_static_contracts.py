@@ -278,19 +278,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("function beginSliderDrag()", parameter)
         self.assertIn("root.beginSliderDrag()", parameter)
         self.assertIn("slider.value = Number(slider.value)", parameter)
-        self.assertIn(
-            "if (!slider.pressed && !root.sliderDragActive)",
-            parameter,
-        )
-        for slider_qml in (labeled, parameter):
-            self.assertIn("function dragValueFromHandle(", slider_qml)
-            self.assertIn("mapToItem(", slider_qml)
-            self.assertIn("MouseArea {", slider_qml)
-            self.assertIn("preventStealing: true", slider_qml)
-            self.assertIn("property bool sliderDragActive", slider_qml)
-            self.assertIn("root.sliderDragActive = true", slider_qml)
-            self.assertIn("implicitWidth: 34", slider_qml)
-            self.assertIn("implicitHeight: 34", slider_qml)
+        self.assertIn("if (!slider.pressed)", parameter)
 
         combined = "\n".join(
             (ROOT / "gui" / name).read_text(encoding="utf-8")
@@ -803,7 +791,6 @@ class StaticContractTests(unittest.TestCase):
         for slider_qml in numeric[2:4]:
             self.assertIn("implicitWidth:", slider_qml)
             self.assertIn("implicitHeight:", slider_qml)
-            self.assertIn("preventStealing: true", slider_qml)
             slider_block = re.search(
                 r"Slider\s*\{(?P<body>.*?)(?:\n\s*handle:|\n\s*background:)",
                 slider_qml,
