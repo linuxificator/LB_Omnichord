@@ -781,6 +781,15 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("onDoubleTapped:", numeric[3])
         self.assertIn("onMoved:", numeric[2])
         self.assertIn("onMoved:", numeric[3])
+        for slider_qml in numeric[2:4]:
+            slider_block = re.search(
+                r"Slider\s*\{(?P<body>.*?)(?:\n\s*handle:|\n\s*background:)",
+                slider_qml,
+                re.DOTALL,
+            )
+            self.assertIsNotNone(slider_block)
+            assert slider_block is not None
+            self.assertNotIn("TapHandler", slider_block.group("body"))
         midi_state = (ROOT / "code" / "midi_control.py").read_text(
             encoding="utf-8"
         )

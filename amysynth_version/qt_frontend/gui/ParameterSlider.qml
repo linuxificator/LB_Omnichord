@@ -102,6 +102,17 @@ Item {
         font.pixelSize: 13
         font.bold: true
         elide: Text.ElideRight
+
+        TapHandler {
+            gesturePolicy: TapHandler.DragThreshold
+            onDoubleTapped: {
+                if (root.midiControlRouter !== null) {
+                    root.midiControlRouter.controlTargetDoubleTapped(
+                        root.midiTarget
+                    )
+                }
+            }
+        }
     }
 
     Slider {
@@ -148,17 +159,6 @@ Item {
                 root.control.key,
                 root.sliderToControl(value)
             )
-        }
-
-        TapHandler {
-            gesturePolicy: TapHandler.DragThreshold
-            onDoubleTapped: {
-                if (root.midiControlRouter !== null) {
-                    root.midiControlRouter.controlTargetDoubleTapped(
-                        root.midiTarget
-                    )
-                }
-            }
         }
 
         background: Rectangle {

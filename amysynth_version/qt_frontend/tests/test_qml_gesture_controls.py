@@ -135,7 +135,7 @@ Window {
 }
 """,
         )
-        point = QPoint(95, 65)
+        point = QPoint(95, 22)
         QTest.mouseDClick(
             window,
             Qt.MouseButton.LeftButton,
@@ -223,6 +223,63 @@ Window {
         self.assertIsNotNone(router)
         assert router is not None
         self.assertGreater(int(router.property("moveCount")), 0)
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
+    def test_plain_slider_handle_drag_still_moves(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 190
+    height: 90
+    visible: true
+    property real editedValue: 0.2
+    property int editCount: 0
+
+    LabeledSlider {
+        x: 15
+        y: 10
+        width: 160
+        height: 70
+        fromValue: 0
+        toValue: 1
+        currentValue: window.editedValue
+        onEdited: (value) => {
+            window.editedValue = value
+            window.editCount += 1
+        }
+    }
+}
+""",
+        )
+        start = QPoint(52, 65)
+        end = QPoint(145, 65)
+        QTest.mousePress(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            start,
+        )
+        QCoreApplication.processEvents()
+        QTest.mouseMove(window, end, delay=20)
+        QCoreApplication.processEvents()
+        QTest.mouseRelease(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            end,
+        )
+        QCoreApplication.processEvents()
+
+        self.assertGreater(float(window.property("editedValue")), 0.5)
+        self.assertGreater(int(window.property("editCount")), 0)
         window.deleteLater()
         component.deleteLater()
         engine.deleteLater()

@@ -257,10 +257,11 @@ installation failed to show or release chord-key interaction correctly.
 
 - The learning touch cannot unlink the new binding in the same gesture.
 - One click on a bound target does not unlink.
-- Drag/edit gestures on a bound target are consumed and do not move or unlink
-  it. Qt's standard double-click/double-tap event is the explicit unlink
-  gesture, using platform time and distance style hints; that second gesture
-  still cannot edit the numeric value.
+- Drag/edit gestures on a bound numeric target perform manual takeover: the
+  value changes normally and the previous controller becomes blue.
+- Slider track and handle gestures are reserved for normal slider operation.
+  Explicit slider unlink uses Qt's double-click/double-tap event on the slider
+  label/value area, keeping extra pointer handlers out of the drag path.
 - The controller becomes blue and visible when capacity permits.
 - The next genuine CC movement changes a blue controller immediately into an
   ordinary grey unbound indicator. Without movement, blue expires and removes

@@ -93,16 +93,15 @@ Bindings are globally one-to-one:
 - assigning an occupied target to another controller unbinds the old controller
   and makes that old indicator blue.
 
-A green target consumes every normal edit gesture, including slider movement,
-and remains visually synchronized to its MIDI-owned value. Qt Quick's standard
-double-click/double-tap recognition defines the explicit unlink gesture, using
-the platform style hints for time and distance instead of an application-owned
-timer. The second press may unlink, but that same gesture is still consumed and
-cannot edit the value; a later gesture may edit after ownership has been
-released. This also works for click-only numeric controls such as volume and
-tuning.
-Unlinking makes the controller LED blue and ensures that controller is visible
-when capacity allows.
+A green target remains visually synchronized to its MIDI-owned value until the
+user performs a normal edit. That edit is manual takeover: it applies the new
+value, releases the MIDI binding and makes the old controller LED blue.
+Qt Quick's standard double-click/double-tap recognition remains the explicit
+unlink gesture. For horizontal sliders it is attached to the label/value area,
+not the track or handle, so no extra pointer handler competes with Qt Slider
+dragging. For click-only numeric controls such as volume and tuning it remains
+on the control buttons. Unlinking makes the controller LED blue and ensures
+that controller is visible when capacity allows.
 The blue state is an inactivity notice, not a latch: the next genuine CC
 movement ends it immediately and leaves the controller visible as an ordinary
 unbound grey indicator. Without new movement, the blue state and its indicator
