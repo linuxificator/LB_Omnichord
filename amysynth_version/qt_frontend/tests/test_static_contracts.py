@@ -192,22 +192,22 @@ class StaticContractTests(unittest.TestCase):
             "panel recess",
             "mounting skirt",
             "Calibrated tick ring",
-            "local/contact shadow without virtual lighting effects",
             "muted top bevel",
             "physical index",
             "Mechanical center boss",
         ):
             self.assertIn(required, rotary)
+        self.assertNotIn("shadow", rotary.lower())
         self.assertNotIn("MultiEffect", rotary)
         self.assertNotIn("QtQuick.Effects", rotary)
         self.assertIn("* 270 / Math.max", rotary)
         for required in (
-            "panel cutout",
             "F06 bezel",
             "physical plunger",
             "Behavior on y",
         ):
             self.assertIn(required, button)
+        self.assertNotIn("shadow", button.lower())
         self.assertNotIn("MultiEffect", button)
         self.assertNotIn("QtQuick.Effects", button)
 

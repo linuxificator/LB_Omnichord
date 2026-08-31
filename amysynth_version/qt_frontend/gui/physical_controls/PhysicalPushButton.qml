@@ -17,17 +17,7 @@ Button {
     background: Item {
         anchors.fill: parent
 
-        // 1: panel cutout / contact shadow
-        Rectangle {
-            anchors.centerIn: parent
-            width: parent.width * 0.92
-            height: parent.height * 0.74
-            radius: 8
-            color: "#44000000"
-            y: parent.height * 0.16
-        }
-
-        // 2: F06 bezel / mounting rim
+        // 1: F06 bezel / mounting rim
         Rectangle {
             anchors.centerIn: parent
             width: parent.width * 0.90
@@ -42,18 +32,7 @@ Button {
             }
         }
 
-        // Lower/contact shadow without virtual lighting effects.
-        Rectangle {
-            x: parent.width * 0.19
-            y: parent.height * 0.58
-            width: parent.width * 0.62
-            height: 4
-            radius: 2
-            color: "#44000000"
-            opacity: control.physicallyDown ? 0.30 : 0.55
-        }
-
-        // 3-5: physical plunger/cap with lamp material and highlight
+        // 2-4: physical plunger/cap with lamp material
         Rectangle {
             id: plunger
             x: parent.width * 0.15

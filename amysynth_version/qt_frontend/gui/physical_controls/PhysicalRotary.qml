@@ -112,17 +112,7 @@ Dial {
         y: control.capY
         rotation: control.capRotation
 
-        // 7: local/contact shadow without virtual lighting effects.
-        Rectangle {
-            x: 4
-            y: 6
-            width: parent.width - 4
-            height: parent.height - 2
-            radius: width / 2
-            color: "#33000000"
-        }
-
-        // 3-5: cap, depth and material shading
+        // 3-5: cap, depth and material color
         Rectangle {
             id: capBody
             anchors.fill: parent
