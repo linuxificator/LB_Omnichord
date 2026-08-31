@@ -372,7 +372,7 @@ class MidiAmyEngineTests(unittest.TestCase):
         backend._midi_control_lock = threading.Lock()
         backend._held_midi_button_targets = {"omni:button:rhythm_toggle"}
 
-        self.assertFalse(
+        self.assertTrue(
             backend.midiButtonTargetBlocked(
                 {
                     "screen": "omni",
@@ -381,12 +381,34 @@ class MidiAmyEngineTests(unittest.TestCase):
                 }
             )
         )
-        self.assertTrue(
+        self.assertFalse(
             backend.midiButtonTargetBlocked(
                 {
                     "screen": "omni",
                     "kind": "button",
                     "action": "master_mute",
+                }
+            )
+        )
+
+        backend._held_midi_button_targets = {"omni:button:select_preset"}
+        self.assertTrue(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "select_preset",
+                    "preset": 2,
+                }
+            )
+        )
+        self.assertFalse(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "rhythm_busyness",
+                    "level": 3,
                 }
             )
         )
@@ -398,6 +420,97 @@ class MidiAmyEngineTests(unittest.TestCase):
                     "screen": "omni",
                     "kind": "button",
                     "action": "master_mute",
+                }
+            )
+        )
+
+    def test_midi_button_takeover_groups_and_tap_actions_are_scoped(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._applying_midi_control = 0
+        backend._midi_control_lock = threading.Lock()
+        backend._held_midi_button_targets = set()
+
+        preset_one = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "select_preset",
+                "preset": 1,
+            }
+        )
+        preset_two = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "select_preset",
+                "preset": 2,
+            }
+        )
+        rate_two = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "chord_arpeggio_rate",
+                "rate": 2,
+            }
+        )
+        rate_four = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "chord_arpeggio_rate",
+                "rate": 4,
+            }
+        )
+        panic = backend._normalize_control_target(
+            {
+                "screen": "omni",
+                "kind": "button",
+                "action": "panic",
+            }
+        )
+
+        self.assertIsNotNone(preset_one)
+        self.assertIsNotNone(preset_two)
+        self.assertIsNotNone(rate_two)
+        self.assertIsNotNone(rate_four)
+        self.assertIsNotNone(panic)
+        assert preset_one is not None
+        assert preset_two is not None
+        assert rate_two is not None
+        assert rate_four is not None
+        assert panic is not None
+
+        self.assertNotEqual(rate_two["id"], rate_four["id"])
+        self.assertEqual(
+            backend._button_takeover_group(preset_one),
+            backend._button_takeover_group(preset_two),
+        )
+        self.assertEqual(
+            backend._button_takeover_group(rate_two),
+            backend._button_takeover_group(rate_four),
+        )
+        self.assertIsNone(backend._button_takeover_group(panic))
+
+        backend._held_midi_button_targets.add(
+            backend._button_takeover_group(preset_one)
+        )
+        self.assertTrue(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "select_preset",
+                    "preset": 2,
+                }
+            )
+        )
+        self.assertFalse(
+            backend.midiButtonTargetBlocked(
+                {
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "panic",
                 }
             )
         )

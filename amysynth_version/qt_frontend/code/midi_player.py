@@ -1655,7 +1655,7 @@ class MidiPlayerBackend(QObject):
                 [screen, "button", action]
                 + [
                     str(target[field])
-                    for field in ("preset", "row", "level", "fill")
+                    for field in ("preset", "row", "level", "fill", "rate")
                     if field in target
                 ]
             )
@@ -1778,12 +1778,11 @@ class MidiPlayerBackend(QObject):
         target = self._normalize_control_target(raw)
         if target is None or not self._is_button_target(target):
             return False
-        target_id = str(target["id"])
+        group = self._button_takeover_group(target)
+        if group is None:
+            return False
         with self._midi_control_lock:
-            return bool(
-                self._held_midi_button_targets
-                and target_id not in self._held_midi_button_targets
-            )
+            return group in self._held_midi_button_targets
 
     def _apply_midi_setter(self, setter: Any, *args: Any) -> None:
         self._applying_midi_control += 1
@@ -1917,17 +1916,45 @@ class MidiPlayerBackend(QObject):
     def _is_button_target(target: dict[str, Any]) -> bool:
         return str(target.get("kind", "")) == "button"
 
+    @staticmethod
+    def _button_takeover_group(target: dict[str, Any]) -> str | None:
+        screen = str(target.get("screen", ""))
+        action = str(target.get("action", ""))
+        if not screen or not action:
+            return None
+
+        # Pure tap actions must not own later screen interaction while the
+        # hardware contact is still held. They trigger once on MIDI press.
+        if action in ("panic", "store_preset", "cycle_channel"):
+            return None
+
+        # Choice groups are held as a group: while one external control owns
+        # the selection, screen taps for the other choices in the same group
+        # are ignored, but unrelated app buttons remain usable.
+        if action in (
+            "select_preset",
+            "rhythm_busyness",
+            "rhythm_chord_activity",
+            "rhythm_bass_activity",
+            "chord_arpeggio_rate",
+        ):
+            return f"{screen}:button:{action}"
+
+        # Independent toggle buttons only block their own screen target.
+        return str(target["id"])
+
     def _apply_button_target(
         self,
         target: dict[str, Any],
         pressed: bool,
     ) -> None:
-        target_id = str(target["id"])
+        takeover_group = self._button_takeover_group(target)
         with self._midi_control_lock:
-            if pressed:
-                self._held_midi_button_targets.add(target_id)
-            else:
-                self._held_midi_button_targets.discard(target_id)
+            if takeover_group is not None:
+                if pressed:
+                    self._held_midi_button_targets.add(takeover_group)
+                else:
+                    self._held_midi_button_targets.discard(takeover_group)
         if not pressed:
             return
 

@@ -354,6 +354,20 @@ installation failed to show or release chord-key interaction correctly.
   never selects a preset, changes screen, applies the inactive preset's value,
   or changes musical state.
 
+**MIDI-CC-14 — hardware button takeover is scoped**
+
+- MIDI CC-style button controls and pitch/note-style hardware controls that
+  are explicitly treated as controller buttons may bind to supported app
+  buttons. Ordinary musical Note On/Off input must never create controller
+  button indicators or bindings.
+- A held on/off hardware button owns only its target's logical button group.
+  Preset choices block other preset choices, activity choices block only their
+  own activity row and arpeggio-rate choices block only other arpeggio-rate
+  choices. Independent toggles block only their exact screen button.
+- Tap-only actions, including panic, store-preset and cycle-channel, trigger on
+  press but do not create held takeover state. Unrelated screen buttons remain
+  usable while any hardware button is held.
+
 Unit tests cover the state machine and mapping math. Headless frontend tests use
 simulated user actions plus simulated MIDI CC input and inspect state, preset
 JSON and AMY output. The offscreen Qt test feeds real raw-MIDI bytes, records
