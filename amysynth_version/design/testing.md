@@ -229,7 +229,10 @@ Important regression tests:
 - the red MIDI-learn LED is visible only while blinking to the right of `MIDI`;
   the separate green binding-location LED flashes to the left of `MIDI`/`OMNI`
 - the public OMNI/MIDI screenshots are captured from the real production QML;
-  the MIDI image contains representative controller knobs in the grey CC bar
+  the MIDI image contains representative controller knobs in the grey CC bar;
+  after a successful `main` release the released commit is captured again, and
+  changed PNGs are committed alone before one explicitly queued validation
+  release; byte-identical output causes no commit and no further workflow run
 - instrument balance captures cover low/middle/high registers and report RMS,
   peak, crest factor and clipping
 - packaged macOS and Windows QML chord input observes pointer-down/up, retains

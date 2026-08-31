@@ -56,11 +56,17 @@ python capture_screenshots.py
 ```
 
 The helper runs the real frontend and QML scene through Qt's offscreen software
-renderer, uses an isolated temporary home and a pseudo-serial endpoint, selects
-C minor for the OMNI strum-note guide, and injects three representative MIDI CC
-movements for the grey MIDI controller bar. It overwrites only
+renderer, uses an isolated temporary home and a drained pseudo-serial endpoint,
+selects C minor for the OMNI strum-note guide, and injects three representative
+MIDI CC movements for the grey MIDI controller bar. It overwrites only
 `screenshots/omni.png` and `screenshots/midi.png`; it does not read or alter the
 user's presets or connect to AMY hardware.
+
+After every successful `main` release, CI runs this same capture against the
+exact released commit. When either image changed, CI creates a commit containing
+only those two PNGs and explicitly queues one complete release workflow for that
+screenshot-only commit. A byte-identical capture is a no-op, which terminates
+the cycle after that validation run.
 
 ## Synth-state architecture
 

@@ -132,6 +132,28 @@ class PackagingContracts(unittest.TestCase):
         ):
             self.assertIn(f"- {suite}", regression)
 
+    def test_screenshots_refresh_only_after_a_successful_release(self) -> None:
+        release = (
+            REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("refresh-readme-screenshots:", release)
+        self.assertIn("needs: [publish-release]", release)
+        self.assertIn("actions: write", release)
+        self.assertIn("contents: write", release)
+        self.assertIn(
+            "python amysynth_version/qt_frontend/capture_screenshots.py",
+            release,
+        )
+        self.assertIn("git diff --quiet --", release)
+        self.assertIn("git push origin HEAD:main", release)
+        self.assertIn("gh workflow run desktop-release.yml", release)
+        self.assertIn("--ref main", release)
+        self.assertEqual(
+            release.count("git commit -m 'Refresh README screenshots'"),
+            1,
+        )
+
     def test_release_names_and_assets_follow_the_timestamp_contract(self) -> None:
         release = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"

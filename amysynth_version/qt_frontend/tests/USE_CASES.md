@@ -728,6 +728,13 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
   three representative CC knobs in the grey lower bar.
 - The repository README embeds those exact two files. Screenshot refreshes may
   not use a hand-drawn or generated substitute for the actual Qt interface.
+- The capture helper continuously drains the pseudo-serial endpoint, so the
+  complete startup wire stream cannot block its writer while large rhythm and
+  fill libraries are installed.
+- A successful `main` release captures the exact released commit. CI commits
+  only changed screenshot PNGs and explicitly queues one full validation
+  release for that commit. Byte-identical images create neither a commit nor
+  another run, preventing a release loop.
 
 **UI-03 — instrument names contain useful names only**
 

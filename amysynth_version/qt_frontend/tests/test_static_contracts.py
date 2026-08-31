@@ -107,6 +107,8 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("python capture_screenshots.py", frontend_readme)
         self.assertIn('"QT_QPA_PLATFORM": "offscreen"', capture)
         self.assertIn('"--capture-screenshots-dir"', capture)
+        self.assertIn("select.select([master_fd]", capture)
+        self.assertIn("os.read(master_fd, 65536)", capture)
         for name in ("omni.png", "midi.png"):
             relative = f"amysynth_version/qt_frontend/screenshots/{name}"
             self.assertIn(relative, public_readme)
@@ -116,6 +118,16 @@ class StaticContractTests(unittest.TestCase):
             self.assertEqual(png[:8], b"\x89PNG\r\n\x1a\n", relative)
             width, height = struct.unpack(">II", png[16:24])
             self.assertEqual((width, height), (1920, 850), relative)
+
+        workflow = (
+            repository / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("refresh-readme-screenshots:", workflow)
+        self.assertIn("needs: [publish-release]", workflow)
+        self.assertIn(
+            "python amysynth_version/qt_frontend/capture_screenshots.py",
+            workflow,
+        )
 
         app_core = (ROOT / "code" / "app_core.py").read_text(
             encoding="utf-8"
