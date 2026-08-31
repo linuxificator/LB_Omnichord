@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import shutil
 from pathlib import Path
@@ -41,6 +42,32 @@ def _migrate_amy_config(source: Path, target: Path) -> None:
             and shipped_voices.get("rhythm_chord") == 7
         ):
             voices["rhythm_chord"] = 7
+
+    # Revision 2 adds the platform-independent ipMIDI receive tech. Existing
+    # user configs need the QmidiCtl-compatible default listener, while any
+    # ipMIDI values a user already supplied remain authoritative.
+    if current_revision < 2 <= shipped_revision:
+        midi_input = current.get("midi_input")
+        shipped_midi_input = shipped.get("midi_input")
+        if not isinstance(midi_input, dict):
+            if midi_input is None:
+                midi_input = {}
+                current["midi_input"] = midi_input
+        if isinstance(midi_input, dict) and isinstance(
+            shipped_midi_input,
+            dict,
+        ):
+            # Revision 1 shipped a Linux profile pin. Removing that former
+            # default lets Qt select Linux, macOS, Windows or Android at
+            # runtime; any other explicit profile remains a user override.
+            if midi_input.get("tech_profile") == "linux":
+                midi_input.pop("tech_profile", None)
+            shipped_ipmidi = shipped_midi_input.get("ipmidi")
+            if "ipmidi" not in midi_input and isinstance(
+                shipped_ipmidi,
+                dict,
+            ):
+                midi_input["ipmidi"] = copy.deepcopy(shipped_ipmidi)
 
     current["config_revision"] = shipped_revision
     target.write_text(

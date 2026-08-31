@@ -165,9 +165,13 @@ class PackagingContracts(unittest.TestCase):
         for expected in (
             "test_midi_platform_techs_are_filtered_by_runtime_platform",
             "test_linux_midi_manager_starts_real_alsa_sequencer_listener",
-            "test_non_linux_profiles_expose_only_their_platform_tech",
+            "test_non_linux_profiles_add_ipmidi_to_their_native_platform_tech",
             "test_non_linux_managers_do_not_start_raw_or_alsa_seq_readers",
             "test_disabled_midi_input_starts_no_platform_readers",
+            "test_disabled_ipmidi_stays_visible_red_without_starting_reader",
+            "test_ipmidi_listener_config_validation_and_qmidictl_payload",
+            "test_ipmidi_socket_joins_configured_multicast_group_and_port",
+            "test_ipmidi_reader_receives_raw_midi_from_local_multicast",
         ):
             self.assertIn(expected, midi_tests)
 

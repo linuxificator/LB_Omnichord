@@ -40,6 +40,9 @@ are required during a drag and why manual movement of a bound numeric control
 is now an intentional release-before-edit operation rather than an incidental
 side effect. Indicator clicks use the explicit grey/blue-to-learn,
 green-to-unlinked-blue and red-to-grey state machine documented there.
+The same handover records the platform-independent ipMIDI receive tech: raw
+QmidiCtl-compatible MIDI datagrams, default multicast `225.0.0.37:21928`,
+config revision 2 migration and the exact on-screen label `ipMIDI`.
 
 If the task touches rhythm, platform packages, Windows, Android, ESP32-P4 or
 the AMY fork, follow the additional rows in `design/README.md` before editing.

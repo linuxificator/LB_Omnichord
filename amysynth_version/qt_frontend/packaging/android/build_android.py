@@ -157,6 +157,10 @@ def patch_buildozer_spec(
         "android.archs": android_arch,
         "android.numeric_version": numeric_version,
         "android.allow_backup": "False",
+        "android.permissions": (
+            "INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,"
+            "CHANGE_WIFI_MULTICAST_STATE"
+        ),
         "android.manifest.orientation": "landscape",
         "android.add_aars": str(aar.resolve()),
         "android.add_gradle_repositories": "flatDir { dirs 'libs' }",

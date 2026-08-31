@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import glob
 import ctypes
+import ipaddress
 import json
 import math
 import os
 import select
+import socket
 import threading
 import time
 from pathlib import Path
@@ -216,6 +218,216 @@ class _LinuxRawMidiReader(_MidiByteStreamParser):
                         os.close(fd)
                     except OSError:
                         pass
+
+    def close(self) -> None:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1.0)
+
+
+class _IpMidiReader(_MidiByteStreamParser):
+    """Receive QmidiCtl/ipMIDI raw MIDI bytes over UDP multicast."""
+
+    DEFAULT_LISTENERS = (
+        {
+            "address": "225.0.0.37",
+            "port": 21928,
+            "interface": "0.0.0.0",
+        },
+    )
+
+    def __init__(
+        self,
+        callback: Callable[[int, int, int, bool], None],
+        control_callback: Callable[[int, int, int], None],
+        activity_callback: Callable[[], None],
+        listeners: Any,
+        enabled: bool,
+    ) -> None:
+        super().__init__(callback, control_callback)
+        self._activity_callback = activity_callback
+        self._enabled = bool(enabled)
+        self._listeners, self._configuration_errors = (
+            self.normalize_listeners(listeners)
+        )
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._available = False
+        self._reason = (
+            "ipMIDI disabled in configuration"
+            if not self._enabled
+            else "not started"
+        )
+        if self._enabled:
+            self._thread = threading.Thread(
+                target=self._run,
+                name="omnichord-midi-ipmidi",
+                daemon=True,
+            )
+            self._thread.start()
+
+    @classmethod
+    def normalize_listeners(
+        cls,
+        listeners: Any,
+    ) -> tuple[list[dict[str, Any]], list[str]]:
+        normalized: list[dict[str, Any]] = []
+        errors: list[str] = []
+        if not isinstance(listeners, list):
+            return [], ["ipmidi.listeners must be a JSON array"]
+        if not listeners:
+            return [], ["no ipMIDI listeners configured"]
+
+        for index, raw in enumerate(listeners):
+            if not isinstance(raw, dict):
+                errors.append(f"listener {index + 1} must be a JSON object")
+                continue
+            address = str(raw.get("address", "")).strip()
+            interface = str(raw.get("interface", "0.0.0.0")).strip()
+            try:
+                group = ipaddress.ip_address(address)
+                local_interface = ipaddress.ip_address(interface)
+            except ValueError as exc:
+                errors.append(f"listener {index + 1}: {exc}")
+                continue
+            if not isinstance(group, ipaddress.IPv4Address) or not group.is_multicast:
+                errors.append(
+                    f"listener {index + 1}: {address!r} is not an IPv4 "
+                    "multicast address"
+                )
+                continue
+            if not isinstance(local_interface, ipaddress.IPv4Address):
+                errors.append(
+                    f"listener {index + 1}: interface must be an IPv4 address"
+                )
+                continue
+            try:
+                port = int(raw.get("port", 0))
+            except (TypeError, ValueError):
+                port = 0
+            if not 1 <= port <= 65535:
+                errors.append(
+                    f"listener {index + 1}: port must be between 1 and 65535"
+                )
+                continue
+            normalized.append(
+                {
+                    "address": str(group),
+                    "port": port,
+                    "interface": str(local_interface),
+                }
+            )
+        return normalized, errors
+
+    @staticmethod
+    def _open_listener(endpoint: dict[str, Any]) -> socket.socket:
+        listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        try:
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if hasattr(socket, "SO_REUSEPORT"):
+                try:
+                    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                except OSError:
+                    # SO_REUSEPORT is not available on every Windows/Python
+                    # combination even when the constant exists.
+                    pass
+            listener.bind(("", int(endpoint["port"])))
+            membership = socket.inet_aton(str(endpoint["address"])) + socket.inet_aton(
+                str(endpoint["interface"])
+            )
+            listener.setsockopt(
+                socket.IPPROTO_IP,
+                socket.IP_ADD_MEMBERSHIP,
+                membership,
+            )
+            listener.setblocking(False)
+            return listener
+        except Exception:
+            listener.close()
+            raise
+
+    def _consume_datagram(
+        self,
+        data: bytes,
+        sender: tuple[str, int],
+        listener_id: int,
+        stream_states: dict[tuple[int, str, int], dict[str, Any]],
+    ) -> None:
+        if not data:
+            return
+        self._activity_callback()
+        key = (int(listener_id), str(sender[0]), int(sender[1]))
+        if key not in stream_states and len(stream_states) >= 128:
+            stream_states.pop(next(iter(stream_states)))
+        state = stream_states.setdefault(key, {})
+        self._parse_stream(data, state)
+
+    def _run(self) -> None:
+        sockets: dict[socket.socket, tuple[int, dict[str, Any]]] = {}
+        errors = list(self._configuration_errors)
+        try:
+            for listener_id, endpoint in enumerate(self._listeners):
+                try:
+                    opened = self._open_listener(endpoint)
+                except OSError as exc:
+                    errors.append(
+                        f"{endpoint['address']}:{endpoint['port']}: {exc}"
+                    )
+                    continue
+                sockets[opened] = (listener_id, endpoint)
+
+            if not sockets:
+                self._reason = "; ".join(errors) or "no ipMIDI listeners opened"
+                return
+
+            endpoints = ", ".join(
+                f"{endpoint['address']}:{endpoint['port']}"
+                for _, endpoint in sockets.values()
+            )
+            self._available = True
+            self._reason = f"listening on {endpoints}"
+            if errors:
+                self._reason += "; ignored " + "; ".join(errors)
+
+            stream_states: dict[
+                tuple[int, str, int],
+                dict[str, Any],
+            ] = {}
+            while not self._stop.is_set():
+                readable, _, _ = select.select(list(sockets), [], [], 0.25)
+                for listener in readable:
+                    listener_id, _ = sockets[listener]
+                    while not self._stop.is_set():
+                        try:
+                            data, sender = listener.recvfrom(65535)
+                        except BlockingIOError:
+                            break
+                        except OSError as exc:
+                            self._reason = f"ipMIDI receive failed: {exc}"
+                            self._available = False
+                            return
+                        self._consume_datagram(
+                            data,
+                            (str(sender[0]), int(sender[1])),
+                            listener_id,
+                            stream_states,
+                        )
+        except OSError as exc:
+            self._reason = f"ipMIDI listener failed: {exc}"
+        finally:
+            self._available = False
+            for listener in sockets:
+                listener.close()
+
+    def status_snapshot(self, activity: bool) -> dict[str, Any]:
+        state = "activity" if self._available and activity else "listening"
+        if not self._available:
+            state = "unavailable"
+        return {
+            "state": state,
+            "available": self._available,
+            "reason": self._reason,
+        }
 
     def close(self) -> None:
         self._stop.set()
@@ -473,7 +685,7 @@ class _MidiInputTechManager:
             platform_name or self.current_tech_profile(midi_cfg),
         )
         self._readers: list[_LinuxRawMidiReader] = []
-        self._listener_readers: dict[str, _AlsaSequencerMidiReader] = {}
+        self._listener_readers: dict[str, Any] = {}
 
         if self._enabled:
             for tech in self._techs:
@@ -494,6 +706,16 @@ class _MidiInputTechManager:
                         callback,
                         control_callback,
                         lambda key=key: self._activity_callback(key),
+                        True,
+                    )
+                elif tech.get("backend") == "ipmidi" and tech.get(
+                    "enabled", True
+                ):
+                    self._listener_readers[key] = _IpMidiReader(
+                        callback,
+                        control_callback,
+                        lambda key=key: self._activity_callback(key),
+                        tech.get("listeners", []),
                         True,
                     )
 
@@ -536,6 +758,26 @@ class _MidiInputTechManager:
         platform_name: str,
     ) -> list[dict[str, Any]]:
         platform_name = str(platform_name).lower()
+        raw_ipmidi = midi_cfg.get("ipmidi", {})
+        if raw_ipmidi is None:
+            raw_ipmidi = {}
+        ipmidi_valid = isinstance(raw_ipmidi, dict)
+        ipmidi_cfg = raw_ipmidi if ipmidi_valid else {}
+        ipmidi = {
+            "key": "ipmidi",
+            "label": "ipMIDI",
+            "backend": "ipmidi",
+            "enabled": bool(ipmidi_cfg.get("enabled", True)),
+            "listeners": ipmidi_cfg.get(
+                "listeners",
+                [dict(item) for item in _IpMidiReader.DEFAULT_LISTENERS],
+            ),
+        }
+        if not ipmidi_valid:
+            ipmidi["enabled"] = False
+            ipmidi["unsupported_reason"] = (
+                "midi_input.ipmidi must be a JSON object"
+            )
         if platform_name.startswith("linux"):
             legacy_raw_glob = str(
                 midi_cfg.get("device_glob", "/dev/snd/midiC*D*")
@@ -574,6 +816,7 @@ class _MidiInputTechManager:
                         ],
                     ),
                 },
+                ipmidi,
             ]
         if platform_name == "darwin":
             return [
@@ -584,7 +827,8 @@ class _MidiInputTechManager:
                     "unsupported_reason": (
                         "native CoreMIDI bridge is not bundled"
                     ),
-                }
+                },
+                ipmidi,
             ]
         if platform_name.startswith("win"):
             return [
@@ -595,7 +839,8 @@ class _MidiInputTechManager:
                     "unsupported_reason": (
                         "native WinMM MIDI bridge is not bundled"
                     ),
-                }
+                },
+                ipmidi,
             ]
         if platform_name.startswith("android"):
             return [
@@ -606,9 +851,10 @@ class _MidiInputTechManager:
                     "unsupported_reason": (
                         "native Android MIDI bridge is not bundled"
                     ),
-                }
+                },
+                ipmidi,
             ]
-        return []
+        return [ipmidi]
 
     @staticmethod
     def _glob_paths(tech: dict[str, Any]) -> list[str]:
@@ -632,6 +878,15 @@ class _MidiInputTechManager:
             reason = ""
             if not self._enabled:
                 reason = "MIDI input disabled in configuration"
+            elif tech.get("backend") == "ipmidi" and not tech.get(
+                "enabled", True
+            ):
+                reason = str(
+                    tech.get(
+                        "unsupported_reason",
+                        "ipMIDI disabled in configuration",
+                    )
+                )
             elif tech.get("backend") == "byte_stream":
                 paths = self._glob_paths(tech)
                 readable = [path for path in paths if os.access(path, os.R_OK)]

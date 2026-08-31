@@ -221,7 +221,10 @@ Important regression tests:
   indicators fill the available width before least-recently-used replacement
 - MIDI input tech LEDs expose only platform-relevant technologies, show red for
   unavailable/unimplemented runtime inputs, green for readable listened-to
-  byte-stream inputs and blinking green after incoming bytes
+  byte-stream inputs and blinking green after incoming bytes; every platform
+  profile additionally exposes the exact `ipMIDI` label, joins configurable
+  UDP/IPv4 multicast listeners and accepts headerless QmidiCtl raw-MIDI
+  datagrams on `225.0.0.37:21928` by default
 - MIDI CC learn permits one red controller, binds every continuous numeric
   control family one-to-one, maps logarithmic sliders over visual travel,
   protects red/blue indicators, preserves hidden instrument-specific bindings,

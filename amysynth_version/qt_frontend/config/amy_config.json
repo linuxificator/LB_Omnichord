@@ -1,5 +1,5 @@
 {
-  "config_revision": 1,
+  "config_revision": 2,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,
@@ -27,10 +27,19 @@
   },
   "midi_input": {
     "enabled": true,
-    "tech_profile": "linux",
     "device_glob": "/dev/snd/midiC*D*",
     "alsa_raw_globs": ["/dev/snd/midiC*D*"],
-    "oss_midi_globs": ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"]
+    "oss_midi_globs": ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"],
+    "ipmidi": {
+      "enabled": true,
+      "listeners": [
+        {
+          "address": "225.0.0.37",
+          "port": 21928,
+          "interface": "0.0.0.0"
+        }
+      ]
+    }
   },
   "default_synths": {
     "chord": "juno_004",
