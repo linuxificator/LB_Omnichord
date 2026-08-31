@@ -2,6 +2,12 @@ name: AMY frontend regression
 
 on:
   workflow_call:
+    inputs:
+      suite:
+        description: Test subset to run, or matrix for the full CI matrix
+        required: false
+        default: matrix
+        type: string
   pull_request:
     branches: [main]
     paths:
@@ -40,7 +46,7 @@ concurrency:
 
 jobs:
   regression-matrix:
-    if: github.event_name != 'workflow_dispatch'
+    if: inputs.suite == '' || inputs.suite == 'matrix'
     name: ${{ matrix.suite }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -110,7 +116,7 @@ jobs:
           retention-days: 14
 
   manual:
-    if: github.event_name == 'workflow_dispatch'
+    if: inputs.suite != '' && inputs.suite != 'matrix'
     name: manual-${{ inputs.suite }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35

@@ -120,6 +120,15 @@ class PackagingContracts(unittest.TestCase):
             release,
         )
         self.assertIn("workflow_call:", regression)
+        self.assertIn("default: matrix", regression)
+        self.assertIn(
+            "if: inputs.suite == '' || inputs.suite == 'matrix'",
+            regression,
+        )
+        self.assertIn(
+            "if: inputs.suite != '' && inputs.suite != 'matrix'",
+            regression,
+        )
         self.assertIn("ALSA_CONFIG_PATH:", regression)
         self.assertTrue((FRONTEND / "tests" / "alsa-null.conf").is_file())
         for suite in (
