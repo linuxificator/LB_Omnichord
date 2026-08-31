@@ -31,10 +31,11 @@ the musically spelled tones available to the active chord.
 
 The MIDI screen provides six configurable parts with their own instrument,
 synthesis controls, volume, reverb and master output. Incoming MIDI can play
-the AMY instruments. MIDI learn can bind CC knobs, pitch-bend encoders and MIDI
-note buttons directly to continuous parameters and supported button actions on
-both screens. The grey lower bar shows live F06-style controls for the MIDI
-sources being moved or pressed.
+the AMY instruments. MIDI learn can bind CC knobs, pitch-bend encoders and
+CC-style controller buttons directly to continuous parameters and supported
+button actions on both screens. Musical Note On/Off events remain note input,
+not button-learn sources. The grey lower bar shows live F06-style controls for
+the MIDI sources being moved or pressed.
 
 ## Get started
 

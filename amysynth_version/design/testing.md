@@ -227,9 +227,11 @@ Important regression tests:
   protects red/blue indicators, preserves hidden instrument-specific bindings,
   consumes bound drag/edit gestures, unlinks only on an explicit double-tap,
   expires blue state and persists bindings in the owning MIDI or OMNI preset
-- MIDI note-button learn binds supported app buttons, presses through the same
-  backend action as a screen tap, shows the same button LED colors as sliders,
-  and blocks other screen button taps while an on/off MIDI button is held
+- CC-style MIDI controller-button learn binds supported app buttons, presses
+  through the same backend action as a screen tap, shows the same button LED
+  colors as sliders, blocks other screen button taps while an on/off MIDI
+  button is held, and never treats ordinary musical Note On/Off as controller
+  buttons
 - the rhythm start arrow uses the same centered triangle geometry as bass and
   repaints on backend transport changes
 - a preset that reuses an already-bound channel/controller for another target

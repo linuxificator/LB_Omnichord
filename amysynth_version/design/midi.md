@@ -42,8 +42,11 @@ left-to-right, capacity-aware indicators.
 Changed MIDI control sources also enter the explicit MIDI-learn system defined
 in `midi_control.md`. Unbound controls remain display-only. Bound continuous
 sources map to one numeric target and still apply through the target's normal
-backend/AMY wire path. Bound MIDI note buttons map to explicit application
-button targets and use the same backend actions as screen taps.
+backend/AMY wire path. Bound CC-style controller buttons map to explicit
+application button targets and use the same backend actions as screen taps.
+Ordinary Note On/Off events remain musical input and do not create button-learn
+indicators; a controller that sends pads as notes needs an explicit whitelist or
+translation layer before those notes may be treated as buttons.
 Channel 0 in a row means omni/all incoming channels.
 
 ALSA Sequencer-only applications such as VMPK do not create a raw-MIDI device.

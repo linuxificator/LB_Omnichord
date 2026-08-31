@@ -2938,7 +2938,6 @@ class MidiPlayerBackend(QObject):
         velocity: int,
         is_on: bool,
     ) -> None:
-        self._queue_midi_button(channel, note, velocity, is_on)
         root, _ = self._chord_context()
         for row in range(MIDI_ROW_COUNT):
             configured = self.channels[row]

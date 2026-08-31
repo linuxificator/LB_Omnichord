@@ -255,7 +255,15 @@ class MidiControlState:
             model["state"] = self.status(key)
             model["evicting"] = evicting
             model["inputType"] = self.source_type(key)
-            model["displayType"] = self.source_type(display_key)
+            display_type = self.source_type(display_key)
+            display_target = self.bindings.get(display_key)
+            if (
+                display_type == "cc"
+                and isinstance(display_target, dict)
+                and str(display_target.get("kind", "")) == "button"
+            ):
+                display_type = "button"
+            model["displayType"] = display_type
             model["displayLabel"] = self.source_label(display_key)
             model["displayChannel"] = int(display_key[0])
             model["displayController"] = int(display_key[1])
@@ -265,8 +273,8 @@ class MidiControlState:
             )
             model["rawValue"] = int(item.get("value", 0))
             model["buttonDown"] = (
-                self.source_type(key) == "note_button"
-                and int(item.get("value", 0)) > 0
+                display_type in ("button", "note_button")
+                and raw_display_value > 0
             )
             result.append(model)
         return result

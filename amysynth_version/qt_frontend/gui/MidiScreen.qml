@@ -402,6 +402,7 @@ Item {
                             modelData.displayType === "pitch_bend"
                         readonly property bool noteButton:
                             modelData.displayType === "note_button"
+                            || modelData.displayType === "button"
                         readonly property color bodyColor:
                             modelData.evicting ? "#d62f2f" : "#686864"
 
@@ -478,36 +479,70 @@ Item {
                         Rectangle {
                             visible: f06Control.noteButton
                             anchors.centerIn: parent
-                            width: 36
-                            height: 36
-                            radius: 7
-                            scale:
-                                modelData.buttonDown && !modelData.evicting
-                                ? 0.92
-                                : 1.0
-                            color:
-                                modelData.buttonDown && !modelData.evicting
-                                ? "#f4d85f"
-                                : f06Control.bodyColor
-                            border.color:
-                                modelData.buttonDown && !modelData.evicting
-                                ? "#fff4a8"
-                                : "#e8e8df"
+                            width: 38
+                            height: 28
+                            radius: 5
+                            color: "#4f4f4a"
+                            border.color: "#242421"
                             border.width: 2
 
-                            Behavior on scale {
-                                NumberAnimation { duration: 70 }
+                            Rectangle {
+                                x: 4
+                                y:
+                                    modelData.buttonDown && !modelData.evicting
+                                    ? 5
+                                    : 3
+                                width: parent.width - 8
+                                height: parent.height - 8
+                                radius: 4
+                                border.color:
+                                    modelData.buttonDown && !modelData.evicting
+                                    ? "#fff6f6"
+                                    : "#f0e6d8"
+                                border.width: 1
+                                gradient: Gradient {
+                                    GradientStop {
+                                        position: 0.00
+                                        color:
+                                            modelData.buttonDown
+                                            && !modelData.evicting
+                                            ? "#fff1f1"
+                                            : "#f8d1c8"
+                                    }
+                                    GradientStop {
+                                        position: 0.46
+                                        color:
+                                            modelData.buttonDown
+                                            && !modelData.evicting
+                                            ? "#ff8d8d"
+                                            : "#f56f6f"
+                                    }
+                                    GradientStop {
+                                        position: 1.00
+                                        color:
+                                            modelData.buttonDown
+                                            && !modelData.evicting
+                                            ? "#c63131"
+                                            : "#d84a4a"
+                                    }
+                                }
+
+                                Behavior on y {
+                                    NumberAnimation { duration: 70 }
+                                }
                             }
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: "BTN"
-                                color:
+                            Rectangle {
+                                x: 6
+                                y: 5
+                                width: parent.width - 12
+                                height: 3
+                                radius: 2
+                                color: "#ffffff"
+                                opacity:
                                     modelData.buttonDown && !modelData.evicting
-                                    ? "#3c2d00"
-                                    : "#f4f0e6"
-                                font.pixelSize: 9
-                                font.bold: true
+                                    ? 0.72
+                                    : 0.48
                             }
                         }
                     }

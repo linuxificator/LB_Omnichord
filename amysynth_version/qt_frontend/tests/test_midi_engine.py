@@ -274,6 +274,24 @@ class MidiAmyEngineTests(unittest.TestCase):
             ],
         )
 
+    def test_musical_midi_notes_do_not_create_controller_buttons(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = type(
+            "Owner",
+            (),
+            {
+                "_active_row": -1,
+                "_active_root_semitone": -1,
+            },
+        )()
+        backend.channels = [99, 99, 99, 99, 99, 99]
+        backend._queue_midi_button = lambda *_args: self.fail(
+            "MIDI Note On/Off must not be treated as controller buttons"
+        )
+
+        backend.process_midi_note(1, 60, 100, True)
+        backend.process_midi_note(1, 60, 0, False)
+
     def test_cc_mapping_follows_logarithmic_visual_slider_travel(self) -> None:
         class Control:
             key = "filter_hz"

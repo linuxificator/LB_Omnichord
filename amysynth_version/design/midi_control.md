@@ -13,7 +13,9 @@ even when the controller numbers match across channels. The application also
 uses reserved internal controller numbers for non-CC sources:
 
 - controller `128` is Pitch Bend on that channel;
-- controllers `256..383` are MIDI note buttons `0..127` on that channel.
+- controllers `256..383` are reserved for explicitly whitelisted/injected MIDI
+  note-buttons. The normal performance note stream does not use these
+  identities.
 
 The first received value establishes a baseline. A repeated identical value is
 ignored. Only a later different value is genuine controller movement. This
@@ -25,9 +27,12 @@ range (`0..16383`) for numeric mapping. This makes a centered pitch-bend wheel
 or encoder neutral, while movement away from center can be learned and mapped to
 any continuous control with higher resolution than CC.
 
-MIDI note buttons use Note On as pressed and Note Off or velocity-zero Note On
-as released. A first released value is ignored; a first press creates the
-indicator. Press and release are both genuine changes after the source is known.
+CC-style controller buttons use value zero as released and any nonzero value as
+pressed. Musical Note On/Off events are not button-learn sources because the
+MIDI protocol does not reliably distinguish a keyboard key from a controller pad
+that happens to transmit notes. If a specific device needs note-transmitting
+pads as controller buttons, that requires an explicit device/config whitelist or
+translation layer before the note is admitted as a button source.
 
 ## Indicator bar and LRU behavior
 
@@ -36,9 +41,9 @@ current width. Every visible indicator preserves the existing `74x68` hit
 target and shows its source label and state LED. CC sources render as F06-style
 studio-console potentiometers rotating across 270 degrees. Pitch Bend renders
 as an F06-style encoder with a center detent and 14-bit input mapped to display
-travel. MIDI note buttons render as illuminated F06-style pushbuttons: pressed
-buttons light and depress, released/tap buttons return to the idle button
-surface.
+travel. CC sources that are bound to application button targets render as
+illuminated F06-style pushbuttons: pressed buttons light and depress,
+released/tap buttons return to the idle button surface.
 
 When the bar is full, a genuinely moving controller which is not visible takes
 the slot of the least recently moved eligible controller. Pointer interaction
@@ -130,8 +135,9 @@ the three OMNI and MIDI reverb sliders.
 
 ## Supported button targets and takeover
 
-MIDI note buttons can be learned against the supported tap/button actions on
-the OMNI and MIDI screens. Supported button targets include:
+CC-style MIDI controller buttons can be learned against the supported
+tap/button actions on the OMNI and MIDI screens. Supported button targets
+include:
 
 - OMNI/MIDI preset store and preset select;
 - OMNI/MIDI master mute;
@@ -142,10 +148,10 @@ the OMNI and MIDI screens. Supported button targets include:
   activity and APG/LDR strum-ladder mode;
 - MIDI row channel cycling.
 
-The backend treats MIDI note-button bindings as application button actions, not
-as AMY-specific behavior. Pressing a learned note button calls the same backend
-action as a screen tap. Releasing it clears the held state. A tap-style MIDI
-button therefore behaves like a screen tap.
+The backend treats MIDI button bindings as application button actions, not as
+AMY-specific behavior. Pressing a learned controller button calls the same
+backend action as a screen tap. Releasing it clears the held state. A tap-style
+MIDI button therefore behaves like a screen tap.
 
 For on/off MIDI buttons, the pressed state is a temporary takeover of the bound
 application button. While one MIDI button target is held, screen taps on other
@@ -219,7 +225,9 @@ LRU age and current source values are runtime state.
 - the optional JSON field is `midi_control_bindings`;
 - legacy CC bindings keep their existing `channel`/`controller` JSON shape;
 - Pitch Bend adds `"source_type": "pitch_bend"` and uses controller `128`;
-- MIDI note buttons add `"source_type": "note_button"` and `"note": N`;
+- explicit note-button bindings, if admitted by future device configuration,
+  add `"source_type": "note_button"` and `"note": N`; normal Note On/Off input
+  never creates these bindings by itself;
 - presets without the field load with no bindings for that screen;
 - loading a preset replaces only that screen's bindings;
 - runtime loading preserves bound numeric values according to the controller

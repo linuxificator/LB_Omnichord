@@ -257,6 +257,28 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertEqual(key, (2, controller))
         self.assertFalse(state.visible_model(now=3.0)[0]["buttonDown"])
 
+    def test_cc_bound_to_button_target_renders_as_button(self) -> None:
+        state = MidiControlState(capacity=4)
+        button_target = {
+            "id": "omni:button:rhythm_toggle",
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle",
+        }
+
+        change(state, 21, value=127, now=1.0)
+        state.select_control((1, 21), now=2.0)
+        state.bind_learned_target(button_target, now=2.1)
+        changed, mapped, key = state.observe(1, 21, 0, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(mapped, button_target)
+        self.assertEqual(key, (1, 21))
+        model = state.visible_model(now=3.0)[0]
+        self.assertEqual(model["displayType"], "button")
+        self.assertEqual(model["displayLabel"], "CH1 CC21")
+        self.assertFalse(model["buttonDown"])
+
     def test_non_cc_bindings_serialize_source_type(self) -> None:
         state = MidiControlState(capacity=4)
         button_target = {
