@@ -98,7 +98,7 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
-    def test_slider_double_tap_is_classified_by_qt(self) -> None:
+    def test_midi_bound_slider_press_without_movement_stays_bound(self) -> None:
         engine, component, window = self.create_window(
             b"""
 import QtQuick
@@ -115,12 +115,13 @@ Window {
         id: midiRouter
         objectName: "midiRouter"
         property int bindingVersion: 0
-        property int doubleTapCount: 0
+        property int manualReleaseCount: 0
         function isControlTargetBound(target) { return true }
         function controlTargetVisualState(target) { return "bound" }
         function activateControlTarget(target) { return false }
-        function controlTargetDoubleTapped(target) { doubleTapCount += 1 }
-        function controlTargetMoved(target) {}
+        function releaseControlTargetForManualEdit(target) {
+            manualReleaseCount += 1
+        }
     }
 
     LabeledSlider {
@@ -135,8 +136,16 @@ Window {
 }
 """,
         )
-        point = QPoint(95, 22)
-        QTest.mouseDClick(
+        # currentValue 0.5 places the handle at the horizontal midpoint.
+        point = QPoint(95, 65)
+        QTest.mousePress(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            point,
+        )
+        QCoreApplication.processEvents()
+        QTest.mouseRelease(
             window,
             Qt.MouseButton.LeftButton,
             Qt.KeyboardModifier.NoModifier,
@@ -147,7 +156,80 @@ Window {
         router = window.findChild(QObject, "midiRouter")
         self.assertIsNotNone(router)
         assert router is not None
-        self.assertEqual(int(router.property("doubleTapCount")), 1)
+        self.assertEqual(int(router.property("manualReleaseCount")), 0)
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
+    def test_midi_bound_slider_track_click_is_a_manual_value_edit(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 190
+    height: 90
+    visible: true
+    property real editedValue: 0.5
+    property int editCount: 0
+
+    QtObject {
+        id: midiRouter
+        objectName: "midiRouter"
+        property int bindingVersion: 0
+        property bool bound: true
+        property int manualReleaseCount: 0
+        function isControlTargetBound(target) { return bound }
+        function controlTargetVisualState(target) {
+            return bound ? "bound" : "idle"
+        }
+        function activateControlTarget(target) { return false }
+        function releaseControlTargetForManualEdit(target) {
+            if (!bound)
+                return
+            bound = false
+            bindingVersion += 1
+            manualReleaseCount += 1
+        }
+    }
+
+    LabeledSlider {
+        x: 15
+        y: 10
+        width: 160
+        height: 70
+        currentValue: window.editedValue
+        midiControlRouter: midiRouter
+        midiTarget: ({"screen": "omni", "kind": "master_volume"})
+        onEdited: (value) => {
+            window.editedValue = value
+            window.editCount += 1
+        }
+    }
+}
+""",
+        )
+        # Click well left of the 0.5 handle. Qt changes the slider value, so
+        # this is a genuine manual edit even though it is not a drag.
+        point = QPoint(45, 65)
+        QTest.mouseClick(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            point,
+        )
+        QCoreApplication.processEvents()
+
+        router = window.findChild(QObject, "midiRouter")
+        self.assertIsNotNone(router)
+        assert router is not None
+        self.assertEqual(int(router.property("manualReleaseCount")), 1)
+        self.assertGreater(int(window.property("editCount")), 0)
+        self.assertFalse(bool(router.property("bound")))
         window.deleteLater()
         component.deleteLater()
         engine.deleteLater()
@@ -167,17 +249,27 @@ Window {
     visible: true
     property real editedValue: 0.2
     property int editCount: 0
+    property string eventOrder: ""
 
     QtObject {
         id: midiRouter
         objectName: "midiRouter"
         property int bindingVersion: 0
-        property int moveCount: 0
-        function isControlTargetBound(target) { return true }
-        function controlTargetVisualState(target) { return "bound" }
+        property bool bound: true
+        property int manualReleaseCount: 0
+        function isControlTargetBound(target) { return bound }
+        function controlTargetVisualState(target) {
+            return bound ? "bound" : "idle"
+        }
         function activateControlTarget(target) { return false }
-        function controlTargetDoubleTapped(target) {}
-        function controlTargetMoved(target) { moveCount += 1 }
+        function releaseControlTargetForManualEdit(target) {
+            if (!bound)
+                return
+            bound = false
+            bindingVersion += 1
+            manualReleaseCount += 1
+            window.eventOrder += "release;"
+        }
     }
 
     LabeledSlider {
@@ -191,6 +283,7 @@ Window {
         midiControlRouter: midiRouter
         midiTarget: ({"screen": "omni", "kind": "master_volume"})
         onEdited: (value) => {
+            window.eventOrder += "edit;"
             window.editedValue = value
             window.editCount += 1
         }
@@ -222,7 +315,12 @@ Window {
         router = window.findChild(QObject, "midiRouter")
         self.assertIsNotNone(router)
         assert router is not None
-        self.assertGreater(int(router.property("moveCount")), 0)
+        self.assertEqual(int(router.property("manualReleaseCount")), 1)
+        self.assertTrue(
+            str(window.property("eventOrder")).startswith("release;edit;"),
+            str(window.property("eventOrder")),
+        )
+        self.assertFalse(bool(router.property("bound")))
         window.deleteLater()
         component.deleteLater()
         engine.deleteLater()
@@ -560,8 +658,7 @@ Window {
         function isControlTargetBound(target) { return false }
         function controlTargetVisualState(target) { return "idle" }
         function activateControlTarget(target) { return false }
-        function controlTargetDoubleTapped(target) {}
-        function controlTargetMoved(target) {}
+        function releaseControlTargetForManualEdit(target) {}
         function midiButtonTargetBlocked(target) { return false }
     }
 

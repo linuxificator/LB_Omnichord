@@ -446,7 +446,7 @@ Item {
                     }
 
                     onClicked: {
-                        backend.midiPlayer.selectControlIndicator(
+                        backend.midiPlayer.clickControlIndicator(
                             modelData.channel,
                             modelData.controller
                         )

@@ -196,20 +196,16 @@ class InstrumentBackend(OmniInstrumentBackend):
         self._midi_player.injectButton(channel, note, velocity)
 
     @Slot(int, int)
-    def selectMidiControlIndicator(self, channel: int, controller: int) -> None:
-        self._midi_player.selectControlIndicator(channel, controller)
+    def clickMidiControlIndicator(self, channel: int, controller: int) -> None:
+        self._midi_player.clickControlIndicator(channel, controller)
 
     @Slot("QVariantMap", result=bool)
     def activateMidiControlTarget(self, target: dict[str, Any]) -> bool:
         return self._midi_player.activateControlTarget(target)
 
     @Slot("QVariantMap")
-    def doubleTapMidiControlTarget(self, target: dict[str, Any]) -> None:
-        self._midi_player.controlTargetDoubleTapped(target)
-
-    @Slot("QVariantMap")
-    def moveMidiControlTarget(self, target: dict[str, Any]) -> None:
-        self._midi_player.controlTargetMoved(target)
+    def manuallyEditMidiControlTarget(self, target: dict[str, Any]) -> None:
+        self._midi_player.releaseControlTargetForManualEdit(target)
 
     @Slot(int, int)
     def setMidiSynthIndex(self, row: int, index: int) -> None:

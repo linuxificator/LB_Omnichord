@@ -73,11 +73,16 @@ Each MIDI indicator has one LED:
 | `blue` | steady blue | binding was manually removed |
 | `evicting` | red outgoing knob | old indicator is flashing before replacement |
 
-Clicking an idle, green or blue indicator makes it the single red learn
-controller. Selecting another indicator transfers the red learn state. Clicking
-the already-red indicator cancels learn and turns it off. Starting relearn from
-a green indicator removes its old binding without creating an intermediate blue
-state.
+A single click has one meaning determined by the indicator's current state:
+
+- clicking an idle grey or manually unlinked blue indicator makes it the single
+  blinking-red learn controller;
+- clicking a bound green indicator only removes that binding and makes the
+  indicator blue; it does not also start learn or steal another controller's
+  red learn selection;
+- clicking the already-red indicator cancels learn and turns it grey.
+
+Selecting another idle or blue indicator transfers the unique red learn state.
 
 ## Binding and manual unlink
 
@@ -94,14 +99,15 @@ Bindings are globally one-to-one:
   and makes that old indicator blue.
 
 A green target remains visually synchronized to its MIDI-owned value until the
-user performs a normal edit. That edit is manual takeover: it applies the new
-value, releases the MIDI binding and makes the old controller LED blue.
-Qt Quick's standard double-click/double-tap recognition remains the explicit
-unlink gesture. For horizontal sliders it is attached to the label/value area,
-not the track or handle, so no extra pointer handler competes with Qt Slider
-dragging. For click-only numeric controls such as volume and tuning it remains
-on the control buttons. Unlinking makes the controller LED blue and ensures
-that controller is visible when capacity allows.
+user performs a genuine normal UI edit. That edit is deliberate manual takeover:
+the application releases MIDI ownership first, makes the old controller LED
+blue, and then applies the mouse/touch value. For horizontal sliders this means
+an actual Qt `Slider.onMoved` value change; press/release without movement does
+not unlink. For click-only numeric controls such as volume and tuning, the first
+increment or decrement releases the binding before applying its step. There is
+no separate double-click/double-tap unlink gesture.
+
+Unlinking always makes the controller visible when capacity allows.
 The blue state is an inactivity notice, not a latch: the next genuine CC
 movement ends it immediately and leaves the controller visible as an ordinary
 unbound grey indicator. Without new movement, the blue state and its indicator
@@ -319,8 +325,9 @@ The behavior is intentionally split along existing responsibilities:
 
 - `../qt_frontend/code/midi_control.py` contains the transport-independent
   `MidiControlState` state machine for controller identity, genuine movement,
-  LRU visibility, LED states, one-to-one bindings and serialization. It receives
-  an already-classified double-tap action and owns no pointer-gesture timer.
+  LRU visibility, LED states, one-to-one bindings and serialization. Its
+  explicit indicator-click and manual-UI-edit transitions own no pointer
+  gesture timing.
 - `../qt_frontend/code/midi_player.py` owns that state, queues raw CC changes
   onto the Qt object thread, resolves target ranges, applies button targets,
   calls the existing MIDI/OMNI setters and captures/restores bound numeric
@@ -333,7 +340,7 @@ The behavior is intentionally split along existing responsibilities:
   `RainbowModeButton.qml`. `UtilitySection.qml`, `MidiUtilitySection.qml` and
   the same rainbow button render binding-location feedback. `ParameterSlider.qml`,
   `LabeledSlider.qml`, `VerticalVolume.qml` and `TapNumber.qml` implement the
-  shared bind/unlink gestures used by their owning sections.
+  shared bind/manual-takeover behavior used by their owning sections.
 - `../qt_frontend/tests/test_midi_control_bindings.py` tests the pure state
   machine; `test_midi_engine.py` tests mapping; `test_midi_cc_qt.py` tests real
   Qt/raw-MIDI indicator behavior; `test_static_contracts.py` protects QML

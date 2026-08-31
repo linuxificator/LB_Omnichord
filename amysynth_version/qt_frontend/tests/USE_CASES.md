@@ -224,11 +224,13 @@ installation failed to show or release chord-key interaction correctly.
 - Green bindings may become invisible without losing their mapping; activity
   makes a hidden binding visible again when an eligible slot exists.
 
-**MIDI-CC-03 — one red learn selection and LED state**
+**MIDI-CC-03 — one-click indicator state transitions**
 
-- Clicking an idle, green or blue indicator selects exactly one blinking red
-  learn controller.
-- Clicking another transfers red selection.
+- Clicking an idle grey or manually unlinked blue indicator selects exactly one
+  blinking red learn controller.
+- Clicking another idle/blue indicator transfers red selection.
+- Clicking a green indicator unlinks it and turns it blue; that click does not
+  also start learn or replace another indicator's red learn selection.
 - Clicking the red controller again cancels learn and turns it off.
 - The OMNI screen mirrors red learn state without exposing controller details.
 - Its red LED blinks to the right of the label inside the large `MIDI` button
@@ -256,12 +258,14 @@ installation failed to show or release chord-key interaction correctly.
 **MIDI-CC-06 — deliberate manual unlink and blue expiry**
 
 - The learning touch cannot unlink the new binding in the same gesture.
-- One click on a bound target does not unlink.
-- Drag/edit gestures on a bound numeric target perform manual takeover: the
-  value changes normally and the previous controller becomes blue.
-- Slider track and handle gestures are reserved for normal slider operation.
-  Explicit slider unlink uses Qt's double-click/double-tap event on the slider
-  label/value area, keeping extra pointer handlers out of the drag path.
+- Pressing and releasing a bound slider without changing its value does not
+  unlink.
+- The first value-changing mouse/touch drag event on a bound numeric target
+  performs manual takeover: MIDI ownership is released before the UI value is
+  applied and the previous controller becomes blue.
+- The first increment/decrement on a bound click-only numeric control follows
+  the same release-before-edit ordering.
+- There is no separate double-click/double-tap unlink gesture.
 - The controller becomes blue and visible when capacity permits.
 - The next genuine CC movement changes a blue controller immediately into an
   ordinary grey unbound indicator. Without movement, blue expires and removes

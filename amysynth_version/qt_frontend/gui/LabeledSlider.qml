@@ -20,6 +20,7 @@ Item {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
+    property bool midiManualTakeoverPending: false
     readonly property bool traceGestures:
         typeof sliderTrace !== "undefined" && sliderTrace
 
@@ -48,10 +49,18 @@ Item {
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        // A real learn/preset-feedback gesture owns this press.  A normal
-        // green bound state must still allow mouse drag; onMoved then performs
-        // manual takeover through controlTargetMoved().
+        // A real learn/preset-feedback gesture owns this press. A normal
+        // green bound state must still allow mouse/touch drag; onMoved then
+        // performs the explicit manual-takeover contract.
         return learned || root.midiPresetFeedback
+    }
+
+    function releaseMidiBindingForManualEdit() {
+        if (root.midiControlRouter !== null) {
+            root.midiControlRouter.releaseControlTargetForManualEdit(
+                root.midiTarget
+            )
+        }
     }
 
     function restoreCurrentValueBinding() {
@@ -108,16 +117,6 @@ Item {
         font.bold: true
         elide: Text.ElideRight
 
-        TapHandler {
-            gesturePolicy: TapHandler.DragThreshold
-            onDoubleTapped: {
-                if (root.midiControlRouter !== null) {
-                    root.midiControlRouter.controlTargetDoubleTapped(
-                        root.midiTarget
-                    )
-                }
-            }
-        }
     }
 
     Slider {
@@ -140,10 +139,13 @@ Item {
             if (pressed) {
                 root.beginSliderDrag()
                 root.midiBindingGesture = root.beginMidiInteraction()
+                root.midiManualTakeoverPending =
+                    !root.midiBindingGesture && root.midiBound
                 root.activated()
             } else {
                 root.restoreCurrentValueBinding()
                 root.midiBindingGesture = false
+                root.midiManualTakeoverPending = false
             }
         }
 
@@ -153,8 +155,11 @@ Item {
                 root.restoreCurrentValueBinding()
                 return
             }
-            if (root.midiControlRouter !== null) {
-                root.midiControlRouter.controlTargetMoved(root.midiTarget)
+            if (root.midiManualTakeoverPending) {
+                // Deliberately release MIDI ownership before applying the
+                // first value produced by this UI drag.
+                root.releaseMidiBindingForManualEdit()
+                root.midiManualTakeoverPending = false
             }
             root.edited(value)
         }

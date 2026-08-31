@@ -98,8 +98,11 @@ Frame {
             return
         }
 
-        if (root.midiControlRouter !== null)
-            root.midiControlRouter.controlTargetMoved(root.midiTarget)
+        if (root.midiControlRouter !== null && root.midiBound) {
+            root.midiControlRouter.releaseControlTargetForManualEdit(
+                root.midiTarget
+            )
+        }
 
         root.edited(
             root.clamp(
@@ -255,13 +258,6 @@ Frame {
             if (!root.midiBindingGesture)
                 root.step(1)
         }
-        onDoubleClicked: {
-            if (root.midiControlRouter !== null) {
-                root.midiControlRouter.controlTargetDoubleTapped(
-                    root.midiTarget
-                )
-            }
-        }
     }
 
     Button {
@@ -288,13 +284,6 @@ Frame {
         onPressed: {
             if (!root.midiBindingGesture)
                 root.step(-1)
-        }
-        onDoubleClicked: {
-            if (root.midiControlRouter !== null) {
-                root.midiControlRouter.controlTargetDoubleTapped(
-                    root.midiTarget
-                )
-            }
         }
     }
 
