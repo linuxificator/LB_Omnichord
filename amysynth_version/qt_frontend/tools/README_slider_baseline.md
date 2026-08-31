@@ -41,3 +41,14 @@ Interpretation:
   current PySide6/Qt/QML, platform plugin, compositor/input stack or environment.
 - If this minimal app works, the regression is in LB Omnichord's QML/component
   structure, not in the base Qt slider.
+
+After the plain baseline works, run the custom component baseline:
+
+```bash
+/home/jeroen/omnichord/omnichord-env/bin/python tools/custom_slider_baseline.py
+```
+
+Use the same mouse-hold-and-drag test. This version uses only
+`gui/LabeledSlider.qml`. If the plain baseline works but this custom baseline
+does not, the bug is in the custom slider component. If both work, the bug is in
+the full Omnichord layout or one of its surrounding controls.
