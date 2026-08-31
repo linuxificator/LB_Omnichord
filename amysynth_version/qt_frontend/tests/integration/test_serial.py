@@ -125,6 +125,12 @@ class SerialIntegrationTests(unittest.TestCase):
 
             fill_start = app.bridge.count()
             app.action("toggleRhythmFill", 0)
+            app.bridge.wait_for_line_match(
+                lambda line: line.startswith("zQA"),
+                "updated fill root schedule",
+                start=fill_start,
+                timeout=8.0,
+            )
             app.bridge.wait_idle(timeout=8.0)
             fill_lines = app.bridge.lines_since(fill_start)
             self.assertTrue(any(line.startswith("zQA") for line in fill_lines))
