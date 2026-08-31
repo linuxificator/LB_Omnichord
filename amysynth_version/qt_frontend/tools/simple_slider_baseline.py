@@ -9,80 +9,143 @@ mouse press-and-hold dragging of a plain Qt Quick Slider?
 
 from __future__ import annotations
 
+import argparse
+import os
+import signal
 import sys
+from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QTimer, QUrl, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuickControls2 import QQuickStyle
 
 
-QML = b"""
-import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
-import QtQuick.Window
-
-Window {
-    id: window
-    width: 640
-    height: 220
-    visible: true
-    title: "LB Omnichord simple slider baseline"
-
-    property real lastMovedValue: slider.value
-    property int moveCount: 0
-
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: 32
-        spacing: 24
-
-        Label {
-            Layout.fillWidth: true
-            text: "Plain Qt Quick Slider. Hold the round handle with the mouse and drag left/right."
-            wrapMode: Text.WordWrap
-            font.pixelSize: 16
-        }
-
-        Slider {
-            id: slider
-            Layout.fillWidth: true
-            from: 0
-            to: 100
-            value: 25
-            live: true
-
-            onMoved: {
-                window.lastMovedValue = value
-                window.moveCount += 1
-                console.log("slider moved", value, "moveCount", window.moveCount)
-            }
-        }
-
-        Label {
-            Layout.fillWidth: true
-            text: "value " + slider.value.toFixed(1)
-                  + " / moved " + window.lastMovedValue.toFixed(1)
-                  + " / move events " + window.moveCount
-            font.pixelSize: 16
-        }
-
-        Label {
-            Layout.fillWidth: true
-            text: "Expected: while the mouse button remains down, the handle follows continuous horizontal motion."
-            wrapMode: Text.WordWrap
-        }
-    }
-}
-"""
+ROOT = Path(__file__).resolve().parents[1]
+QML_FILE = ROOT / "tools" / "simple_slider_baseline.qml"
 
 
-def main() -> int:
-    app = QGuiApplication(sys.argv)
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run a minimal Qt Quick Slider baseline app.",
+    )
+    platform = parser.add_mutually_exclusive_group()
+    platform.add_argument(
+        "--x11",
+        action="store_true",
+        help="force QT_QPA_PLATFORM=xcb before creating the Qt app",
+    )
+    platform.add_argument(
+        "--wayland",
+        action="store_true",
+        help="force QT_QPA_PLATFORM=wayland before creating the Qt app",
+    )
+    parser.add_argument(
+        "--software-renderer",
+        action="store_true",
+        help="force QT_QUICK_BACKEND=software before creating the Qt app",
+    )
+    return parser.parse_args(argv)
+
+
+def configure_environment(args: argparse.Namespace) -> None:
+    if args.x11:
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
+    elif args.wayland:
+        os.environ["QT_QPA_PLATFORM"] = "wayland"
+
+    if args.software_renderer:
+        os.environ["QT_QUICK_BACKEND"] = "software"
+        os.environ.pop("QSG_RHI_BACKEND", None)
+
+    os.environ.setdefault("QSG_INFO", "1")
+
+
+def print_diagnostics(label: str) -> None:
+    print(label, file=sys.stderr, flush=True)
+    for key in (
+        "XDG_SESSION_TYPE",
+        "WAYLAND_DISPLAY",
+        "DISPLAY",
+        "QT_QPA_PLATFORM",
+        "QT_QUICK_BACKEND",
+        "QSG_RHI_BACKEND",
+        "QSG_INFO",
+    ):
+        print(
+            f"  {key}: {os.environ.get(key, '<unset>')}",
+            file=sys.stderr,
+            flush=True,
+        )
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(list(sys.argv[1:] if argv is None else argv))
+    configure_environment(args)
+    print_diagnostics("Simple slider baseline environment:")
+
+    QQuickStyle.setStyle("Basic")
+
+    app = QGuiApplication([sys.argv[0]])
+    app.setApplicationName("LB Omnichord simple slider baseline")
+
+    def quit_from_signal(signum: int, _frame: object) -> None:
+        print(
+            f"Received signal {signum}; quitting Qt event loop.",
+            file=sys.stderr,
+            flush=True,
+        )
+        app.quit()
+
+    signal.signal(signal.SIGINT, quit_from_signal)
+    signal.signal(signal.SIGTERM, quit_from_signal)
+    signal.signal(signal.SIGQUIT, quit_from_signal)
+    signal_timer = QTimer()
+    signal_timer.setInterval(200)
+    signal_timer.timeout.connect(lambda: None)
+    signal_timer.start()
+
+    print(
+        f"  Qt QPA platform after app creation: {QGuiApplication.platformName()}",
+        file=sys.stderr,
+        flush=True,
+    )
+    print(
+        f"  Loading QML: {QML_FILE}",
+        file=sys.stderr,
+        flush=True,
+    )
+
     engine = QQmlApplicationEngine()
-    engine.loadData(QML, QUrl("in-memory:simple_slider_baseline.qml"))
-    if not engine.rootObjects():
+    engine.load(QUrl.fromLocalFile(str(QML_FILE)))
+    roots = engine.rootObjects()
+    print(f"  Root objects: {len(roots)}", file=sys.stderr, flush=True)
+    if not roots:
         return 1
+
+    window = roots[0]
+    window.setProperty("visible", True)
+    show = getattr(window, "show", None)
+    if callable(show):
+        show()
+    raise_ = getattr(window, "raise_", None)
+    if callable(raise_):
+        raise_()
+    request_activate = getattr(window, "requestActivate", None)
+    if callable(request_activate):
+        request_activate()
+    window.setProperty("visibility", int(Qt.Windowed))
+    print(
+        f"  Window visible property: {window.property('visible')}",
+        file=sys.stderr,
+        flush=True,
+    )
+    print(
+        "If no window appears, retry with --x11 or --wayland to match the "
+        "main app's platform choice.",
+        file=sys.stderr,
+        flush=True,
+    )
     return app.exec()
 
 

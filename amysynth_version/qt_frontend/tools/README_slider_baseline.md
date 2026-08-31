@@ -15,6 +15,17 @@ cd /home/jeroen/omnichord/LB_Omnichord/amysynth_version/qt_frontend
 /home/jeroen/omnichord/omnichord-env/bin/python tools/simple_slider_baseline.py
 ```
 
+If no window appears, retry with an explicit platform, matching the same
+diagnostic options supported by the main app:
+
+```bash
+/home/jeroen/omnichord/omnichord-env/bin/python tools/simple_slider_baseline.py --x11
+/home/jeroen/omnichord/omnichord-env/bin/python tools/simple_slider_baseline.py --wayland
+```
+
+The baseline prints the selected Qt platform and display environment before it
+enters the Qt event loop. `Ctrl-C`, `Ctrl-\` and `kill` should now quit cleanly.
+
 Baseline check:
 
 1. Put the mouse cursor on the round slider handle.
