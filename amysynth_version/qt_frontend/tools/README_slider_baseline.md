@@ -52,3 +52,15 @@ Use the same mouse-hold-and-drag test. This version uses only
 `gui/LabeledSlider.qml`. If the plain baseline works but this custom baseline
 does not, the bug is in the custom slider component. If both work, the bug is in
 the full Omnichord layout or one of its surrounding controls.
+
+If both plain and custom baselines work, run the layout baseline:
+
+```bash
+/home/jeroen/omnichord/omnichord-env/bin/python tools/layout_slider_baseline.py
+```
+
+This adds the real app's outer shape: a `Flickable` viewport and scaled
+`contentArea`, but still no backend, AMY or MIDI. It has an immediate-echo
+slider and a delayed-echo slider. If this fails, the bug is in viewport/layout
+pointer handling. If it works, the remaining suspect is full-app runtime state
+feedback or another surrounding full-app control.
