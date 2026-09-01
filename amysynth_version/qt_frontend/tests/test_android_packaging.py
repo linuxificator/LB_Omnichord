@@ -217,8 +217,13 @@ class AndroidPackagingTests(unittest.TestCase):
         workflow = (repository / ".github" / "workflows" / "desktop-release.yml").read_text(
             encoding="utf-8"
         )
+        host_requirements = (
+            FRONTEND / "requirements-android-host.txt"
+        ).read_text(encoding="utf-8")
         self.assertIn("requirements-android.txt", workflow)
-        self.assertIn("Cython==0.29.36", workflow)
+        self.assertIn("requirements-android-host.txt", workflow)
+        self.assertIn("PySide6==6.11.2", host_requirements)
+        self.assertIn("Cython==0.29.36", host_requirements)
 
 
 if __name__ == "__main__":

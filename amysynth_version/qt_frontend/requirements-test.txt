@@ -1,0 +1,3 @@
+# Test and quality tools. T05 extends this group with selected static analyzers.
+-r requirements.txt
+numpy==2.5.2

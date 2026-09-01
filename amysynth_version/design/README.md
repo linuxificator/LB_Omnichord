@@ -93,6 +93,7 @@ Then add every row that matches the task:
 
 | Task area | Additional required reading |
 | --- | --- |
+| Python dependencies, build tools or release inputs | `CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md`, `../qt_frontend/docs/DEPENDENCIES.md`, `../qt_frontend/packaging/AMY_RELEASE.md` |
 | Qt/QML layout, interaction or screen behavior | `gui.md`, `ui_behavior_reference.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |
 | MIDI input, MIDI screen or CC learn | `midi.md`, `midi_control.md`, `presets.md`, `sound_balance.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Presets, user state or migration | `presets.md`, `sound_balance.md`, `../qt_frontend/tests/USE_CASES.md` |

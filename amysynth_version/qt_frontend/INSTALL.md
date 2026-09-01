@@ -291,11 +291,11 @@ implemented.
 ### Build the native package
 
 Install Python 3.12, CMake and either Visual Studio 2026 or Visual Studio 2022
-with the C++ build workload. Install the frontend requirements and PyInstaller,
+with the C++ build workload. Install the declared build requirements,
 check out the pinned compatible AMY fork, then run from this directory:
 
 ```powershell
-python -m pip install -r requirements.txt pyinstaller==6.22.2
+python -m pip install -r requirements-build.txt
 $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 .\packaging\build_windows.ps1
 ```

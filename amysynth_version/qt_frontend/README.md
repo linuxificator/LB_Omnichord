@@ -23,7 +23,11 @@ AMY work.
 - `capture_screenshots.py` — deterministic offscreen capture of those real QML screens
 - `tests/` — unit, headless, serial and native-AMY regression tests plus fixtures
 - `rpi/` — Raspberry Pi startup/autostart helpers
-- `docs/` — ESP32-P4 notes, screenshots and historical implementation notes
+- `docs/` — active platform, dependency and behavior contracts plus historical implementation notes
+
+Runtime, test, build and Android-host dependency ownership is documented in
+[DEPENDENCIES.md](docs/DEPENDENCIES.md). Install a named requirements group;
+do not copy package/version literals from workflow files.
 
 For Raspberry Pi installation, UART wiring, 1,000,000-baud 8N1 serial configuration, direct transport testing and startup instructions, see `README_rpi.md`.
 

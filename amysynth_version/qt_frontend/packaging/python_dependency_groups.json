@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "recorded": "2026-09-01",
+  "requirement_groups": {
+    "runtime": "requirements.txt",
+    "build": "requirements-build.txt",
+    "test_quality": "requirements-test.txt",
+    "android_host": "requirements-android-host.txt"
+  },
+  "direct_imports": {
+    "PySide6": {
+      "distribution": "PySide6",
+      "owner": "runtime",
+      "used_by": ["runtime", "tests", "diagnostics", "release tools"]
+    },
+    "serial": {
+      "distribution": "pyserial",
+      "owner": "runtime",
+      "used_by": ["runtime", "tests"]
+    },
+    "numpy": {
+      "distribution": "numpy",
+      "owner": "test_quality",
+      "used_by": ["native instrument-balance renderer"]
+    },
+    "amy": {
+      "component_exception": "lb_amy",
+      "used_by": ["local AMY service", "native tests"]
+    },
+    "c_amy": {
+      "component_exception": "lb_amy",
+      "used_by": ["local AMY service", "native tests"]
+    }
+  },
+  "invoked_python_tools": {
+    "PyInstaller": {
+      "distribution": "PyInstaller",
+      "owner": "build"
+    },
+    "Cython": {
+      "distribution": "Cython",
+      "owner": "android_host"
+    }
+  },
+  "component_exceptions": {
+    "lb_amy": {
+      "repository": "https://github.com/linuxificator/amy.git",
+      "release_branch": "releases/amy_omnichord_R20260831T042456",
+      "commit": "14240031c135fdcd76a7a3a8ec81da8ef405c4b0",
+      "python_pcm_bank": "tiny",
+      "contract": "packaging/AMY_RELEASE.md"
+    }
+  }
+}

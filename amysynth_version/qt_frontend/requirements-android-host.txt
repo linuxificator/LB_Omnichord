@@ -1,0 +1,5 @@
+# Host-side PySide6 Android deployment inputs. Target wheels are separately
+# pinned by filename and SHA-256 in desktop-release.yml.
+-r requirements.txt
+PySide6==6.11.2
+Cython==0.29.36
