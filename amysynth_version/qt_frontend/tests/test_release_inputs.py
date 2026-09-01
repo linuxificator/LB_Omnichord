@@ -95,6 +95,31 @@ class ReleaseInputTests(unittest.TestCase):
                         inputs=self.inputs,
                     )
 
+    def test_workflow_separates_publishable_packages_from_build_evidence(self) -> None:
+        workflow = (
+            FRONTEND.parents[1] / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+
+        def step(name: str) -> str:
+            marker = f"      - name: {name}\n"
+            start = workflow.index(marker)
+            end = workflow.find("\n      - name:", start + len(marker))
+            return workflow[start:] if end < 0 else workflow[start:end]
+
+        for platform in ("Linux", "macOS", "Windows", "Android"):
+            package_step = step(f"Upload {platform} package")
+            evidence_step = step(f"Upload {platform} package evidence")
+            self.assertNotIn(".package-audit.json", package_step)
+            self.assertNotIn(".qml-imports.json", package_step)
+            self.assertNotIn(".pyside-prune.json", package_step)
+            self.assertIn("retention-days: 2", package_step)
+            self.assertIn(".package-audit.json", evidence_step)
+            self.assertIn("retention-days: 14", evidence_step)
+
+        publish_step = step("Download all validated packages")
+        self.assertIn("pattern: package-*", publish_step)
+        self.assertNotIn("evidence-*", publish_step)
+
     def test_github_environment_exports_the_same_amy_identity(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "github-env"

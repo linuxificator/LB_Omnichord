@@ -155,17 +155,25 @@ jobs:
           package_name="$(basename "$package")"
           (cd dist && sha256sum "$package_name" > "$package_name.sha256")
 
-      - name: Upload release assets
+      - name: Upload Linux package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: package-${{ matrix.platform }}
           path: |
             amysynth_version/qt_frontend/dist/*.AppImage
-            amysynth_version/qt_frontend/dist/*.sha256
+            amysynth_version/qt_frontend/dist/*.AppImage.sha256
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Upload Linux package evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-${{ matrix.platform }}
+          path: |
             amysynth_version/qt_frontend/dist/*.AppImage.package-audit.json
             amysynth_version/qt_frontend/dist/*.AppImage.qml-imports.json
           if-no-files-found: error
-          retention-days: 2
+          retention-days: 14
 
   macos-dmg:
     if: >-
@@ -268,17 +276,25 @@ jobs:
           package_name="$(basename "$package")"
           (cd dist && shasum -a 256 "$package_name" > "$package_name.sha256")
 
-      - name: Upload release assets
+      - name: Upload macOS package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: package-macOS-arm64
           path: |
             amysynth_version/qt_frontend/dist/*.dmg
-            amysynth_version/qt_frontend/dist/*.sha256
+            amysynth_version/qt_frontend/dist/*.dmg.sha256
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Upload macOS package evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-macOS-arm64
+          path: |
             amysynth_version/qt_frontend/dist/*.dmg.package-audit.json
             amysynth_version/qt_frontend/dist/*.dmg.qml-imports.json
           if-no-files-found: error
-          retention-days: 2
+          retention-days: 14
 
   windows-native:
     if: >-
@@ -363,10 +379,18 @@ jobs:
           path: |
             amysynth_version/qt_frontend/dist/*.zip
             amysynth_version/qt_frontend/dist/*.zip.sha256
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Upload Windows package evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-Windows-x86_64
+          path: |
             amysynth_version/qt_frontend/dist/*.zip.package-audit.json
             amysynth_version/qt_frontend/dist/*.zip.qml-imports.json
           if-no-files-found: error
-          retention-days: 2
+          retention-days: 14
 
   android-packages:
     if: >-
@@ -518,10 +542,18 @@ jobs:
           path: |
             amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk
             amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk.sha256
+          if-no-files-found: error
+          retention-days: 2
+
+      - name: Upload Android package evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evidence-${{ matrix.artifact_name }}
+          path: |
             amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk.package-audit.json
             amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk.pyside-prune.json
           if-no-files-found: error
-          retention-days: 2
+          retention-days: 14
 
   android-emulator:
     if: >-

@@ -30,6 +30,11 @@ Owner: five-platform build and release supply-chain boundary
   `release-manifest.json` with package sizes/hashes, source SHA, AMY identity,
   declared-input hashes and component evidence. Only manifest-listed files
   are uploaded, and the final GitHub asset-name set is compared exactly.
+- Platform jobs keep their publishable package/checksum pair in `package-*`
+  Actions artifacts and their package-audit, QML-import and Android-wheel
+  pruning reports in separate `evidence-*` artifacts retained for 14 days.
+  The publisher downloads only `package-*`; diagnostic evidence therefore
+  cannot accidentally broaden or break the exact release asset set.
 
 ## Compatibility and proof
 
@@ -68,6 +73,11 @@ still must not be described as proof that the artifact has no vulnerabilities.
 - A wildcard upload can publish stale files even if each build job succeeded.
   Exact pre-publication enumeration and post-publication comparison are both
   needed because they protect different boundaries.
+- Exact release validation must run on a package-only staging boundary. Build
+  reports are valuable retained evidence, but co-locating them with packages
+  makes a correct exact-set validator reject a valid build. Named artifact
+  separation preserves both invariants without adding ignore rules to the
+  release manifest.
 
 ## Follow-up task effects
 
