@@ -67,7 +67,7 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertEqual(second["synth_patches"]["juno_000"], 0)
         self.assertEqual(load_amy_config(self.shipped_path), second)
 
-    def test_revision_one_legacy_patch_extension_is_deterministic(self) -> None:
+    def test_legacy_patch_extension_is_deterministic(self) -> None:
         old = copy.deepcopy(self.shipped)
         old["synth_patches"] = {"external_patch": 300}
         with tempfile.TemporaryDirectory() as directory:
@@ -99,7 +99,10 @@ class ResolvedConfigTests(unittest.TestCase):
 
     def test_missing_required_sections_are_reported_together(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            path = self.write_config(Path(directory), {"config_revision": 1})
+            path = self.write_config(
+                Path(directory),
+                {"config_revision": CONFIG_SCHEMA_REVISION},
+            )
             with self.assertRaises(ConfigValidationError) as caught:
                 load_resolved_amy_config(path)
         paths = {issue.path for issue in caught.exception.issues}
@@ -192,7 +195,7 @@ class ResolvedConfigTests(unittest.TestCase):
             with self.assertRaises(ConfigValidationError) as caught:
                 load_resolved_amy_config(path)
             self.assertEqual(caught.exception.issues[0].path, "$.config_revision")
-            self.assertIn("unsupported revision 99", str(caught.exception))
+            self.assertIn("newer than supported", str(caught.exception))
 
 
 if __name__ == "__main__":

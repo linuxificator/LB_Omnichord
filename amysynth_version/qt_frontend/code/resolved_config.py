@@ -11,9 +11,15 @@ from typing import Any, Literal, cast
 
 import fastjsonschema  # type: ignore[import-untyped]
 
+from config_migrations import (
+    CURRENT_CONFIG_REVISION,
+    ConfigMigrationError,
+    migrate_config_document,
+)
+
 
 CHORD_VOICE_CAPACITY = 7
-CONFIG_SCHEMA_REVISION = 1
+CONFIG_SCHEMA_REVISION = CURRENT_CONFIG_REVISION
 ConfigSourceKind = Literal["shipped", "user", "external"]
 JsonObject = dict[str, Any]
 SchemaValidator = Callable[[Any], Any]
@@ -522,11 +528,30 @@ def load_resolved_amy_config(
                 )
             ]
         ) from exc
+    return resolve_amy_config_data(
+        loaded,
+        source_path=source_path,
+        source_kind=source_kind,
+    )
+
+
+def resolve_amy_config_data(
+    loaded: object,
+    *,
+    source_path: Path,
+    source_kind: ConfigSourceKind | None = None,
+) -> ResolvedAmyConfig:
+    """Migrate, validate and freeze one already-decoded config document."""
+
     if not isinstance(loaded, dict):
         raise ConfigValidationError(
             [ConfigIssue("$", "must contain a JSON object")]
         )
-    data = cast(JsonObject, loaded)
+    try:
+        migration = migrate_config_document(cast(JsonObject, loaded))
+    except ConfigMigrationError as exc:
+        raise ConfigValidationError([ConfigIssue(exc.path, exc.detail)]) from exc
+    data = migration.data
     revision = _validate_structure(data, source_path)
     issues = _domain_issues(data)
     if issues:

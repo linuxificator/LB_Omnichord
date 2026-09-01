@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import stat
 import sys
 import tempfile
 import unittest
@@ -74,21 +75,31 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             root = Path(directory)
             shipped = root / "shipped"
             shipped.mkdir()
-            (shipped / "amy_config.json").write_text('{"serial": 1}', encoding="utf-8")
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
+            (shipped / "amy_config.json").write_text(
+                json.dumps(shipped_config),
+                encoding="utf-8",
+            )
             original = user_data.USER_CONFIG_DIR
             try:
                 user_data.USER_CONFIG_DIR = root / "user"
-                with mock.patch.object(
-                    user_data.shutil,
-                    "copy2",
-                    side_effect=AssertionError("metadata copy is not portable"),
-                ):
-                    selected = user_data.ensure_user_configs(shipped)
+                selected = user_data.ensure_user_configs(shipped)
                 target = selected / "amy_config.json"
-                self.assertEqual(json.loads(target.read_text())["serial"], 1)
-                target.write_text('{"serial": 2}', encoding="utf-8")
+                self.assertEqual(
+                    json.loads(target.read_text())["serial"]["baud"],
+                    1_000_000,
+                )
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
+                edited = json.loads(target.read_text(encoding="utf-8"))
+                edited["serial"]["baud"] = 230_400
+                target.write_text(json.dumps(edited), encoding="utf-8")
                 user_data.ensure_user_configs(shipped)
-                self.assertEqual(json.loads(target.read_text())["serial"], 2)
+                self.assertEqual(
+                    json.loads(target.read_text())["serial"]["baud"],
+                    230_400,
+                )
             finally:
                 user_data.USER_CONFIG_DIR = original
 
@@ -97,37 +108,34 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             root = Path(directory)
             shipped = root / "shipped"
             shipped.mkdir()
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
             (shipped / "amy_config.json").write_text(
-                json.dumps({
-                    "config_revision": 1,
-                    "serial": {"baud": 1_000_000},
-                    "voices": {"manual_chord": 7, "rhythm_chord": 7},
-                }),
-                encoding="utf-8",
+                json.dumps(shipped_config), encoding="utf-8"
             )
             original = user_data.USER_CONFIG_DIR
             try:
                 user_data.USER_CONFIG_DIR = root / "user"
                 user_data.USER_CONFIG_DIR.mkdir()
                 target = user_data.USER_CONFIG_DIR / "amy_config.json"
-                target.write_text(
-                    json.dumps({
-                        "serial": {"baud": 230_400},
-                        "voices": {
-                            "manual_chord": 7,
-                            "rhythm_chord": 4,
-                        },
-                        "custom": "preserved",
-                    }),
-                    encoding="utf-8",
-                )
+                legacy = json.loads(json.dumps(shipped_config))
+                legacy.pop("config_revision")
+                legacy["serial"]["baud"] = 230_400
+                legacy["voices"]["rhythm_chord"] = 4
+                legacy["midi_input"]["tech_profile"] = "linux"
+                target.write_text(json.dumps(legacy), encoding="utf-8")
 
                 user_data.ensure_user_configs(shipped)
                 migrated = json.loads(target.read_text(encoding="utf-8"))
-                self.assertEqual(migrated["config_revision"], 1)
+                self.assertEqual(migrated["config_revision"], 2)
                 self.assertEqual(migrated["voices"]["rhythm_chord"], 7)
                 self.assertEqual(migrated["serial"]["baud"], 230_400)
-                self.assertEqual(migrated["custom"], "preserved")
+                self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")
+                previous = json.loads(
+                    target.with_suffix(".json.previous").read_text(encoding="utf-8")
+                )
+                self.assertEqual(previous, legacy)
 
                 # The revision makes the migration idempotent: later edits
                 # are authoritative and are never repeatedly rewritten.

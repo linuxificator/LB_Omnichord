@@ -17,6 +17,7 @@ from resolved_config import (
     TransportConfig,
     VoiceCapacities,
     load_resolved_amy_config,
+    resolve_amy_config_data,
 )
 
 
@@ -41,4 +42,5 @@ __all__ = (
     "VoiceCapacities",
     "load_amy_config",
     "load_resolved_amy_config",
+    "resolve_amy_config_data",
 )

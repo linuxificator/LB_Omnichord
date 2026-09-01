@@ -8,8 +8,9 @@ Last verified: 2026-09-01
 ## Authority and revision
 
 `qt_frontend/config/amy_config.json` is the shipped configuration authority.
-It declares `config_revision`; revision 1 is structurally defined by
-`config/schema/amy_config_v1.schema.json`. Unknown keys inside stable objects,
+It declares `config_revision`; current revision 2 is structurally defined by
+`config/schema/amy_config_v2.schema.json`. Historical revision 1 remains
+packaged so its contract is inspectable. Unknown keys inside stable objects,
 missing required values and wrong types are startup errors. Required operational
 values must not reappear as consumer fallbacks.
 
@@ -37,16 +38,34 @@ T11/T12 move consumers to narrow typed sections and then remove this transition.
 
 ## Source and provenance
 
-The shipped file is copied once to the per-user configuration directory. The
-user file has startup priority and is never silently deep-merged with new
-defaults. The resolved object records its actual path, source kind, shipped
-baseline, changed JSON paths and fields whose final value belongs to a runtime
-platform adapter. `midi_input.tech_profile: auto` is platform-derived; an
-explicit value is a diagnostic override.
+The shipped file is atomically seeded once to the per-user configuration
+directory with private file permissions. The user file has startup priority
+and is never silently deep-merged with new defaults. For now it remains a full
+editable document: provenance identifies the paths that are true overrides,
+but changing storage to an override-only document is deferred until T11/T12
+provide an explicit composition seam. That avoids silently redefining existing
+user data during migration.
 
-Revision-by-revision migration runs before validation. Revision 1 remains the
-current accepted revision in T09; T10 owns atomic migration, recovery and the
-next revision. Unsupported revisions fail explicitly rather than being guessed.
+The resolved object records its actual path, source kind, shipped baseline,
+changed JSON paths and fields whose final value belongs to a runtime platform
+adapter. `midi_input.tech_profile: auto` is platform-derived; an explicit value
+is a diagnostic override.
+
+Revision-by-revision migration runs on an isolated copy before full structural
+and domain validation. Only a valid result is atomically persisted. Revision 0
+to 1 raises the former shipped four-voice rhythm-chord default to seven;
+revision 1 to 2 replaces the former shipped Linux MIDI profile with `auto`.
+Because revision-1 full documents cannot distinguish that old default from an
+intentional diagnostic selection, a user who deliberately forced `linux` must
+reapply it after migration. Future and malformed revisions fail at
+`$.config_revision` rather than being guessed.
+
+`JsonStore` writes a flushed same-directory temporary file, replaces the
+current document and retains one `.previous` version after successful updates.
+If final replacement fails, it restores the previous current document; corrupt
+input is reported with its path and is never overwritten. File replacement is
+atomic where the host filesystem implements the standard rename contract.
+Directory syncing is best-effort on platforms/filesystems that support it.
 
 ## Dependency and package rule
 

@@ -42,6 +42,14 @@ class AndroidPackagingTests(unittest.TestCase):
                     / "amy_config_v1.schema.json"
                 ).is_file()
             )
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
+                    / "amy_config_v2.schema.json"
+                ).is_file()
+            )
 
     def test_release_stamp_maps_to_android_version_without_overflow(self) -> None:
         version, numeric = release_values("R20260830123456")
