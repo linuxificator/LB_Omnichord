@@ -18,6 +18,19 @@ Changing transport must not change behavior.
 
 No GUI code may directly call AMY synthesis APIs.
 
+## Local wire framing
+
+AMY reserves 1024 bytes for a message including its terminating NUL, so every
+local IPC request is limited to 1023 printable ASCII bytes including its final
+`Z`. Packet-preserving Unix IPC carries exactly one validated request per
+packet. Unix stream and Windows named-pipe IPC use one LF-terminated request;
+CRLF is accepted and normalized. Empty stream records are ignored.
+
+Malformed, non-ASCII, overlong, non-`Z`-terminated or connection-truncated
+records are rejected before they reach AMY. Stream buffering is capped while a
+record is incomplete. This local/private boundary is defense in depth and must
+not change any valid command or its ordering.
+
 ## Bus master volume
 
 The transport implements section master volume with AMY's final bus-volume

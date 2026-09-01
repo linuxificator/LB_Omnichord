@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from unix_wire_socket import listen_unix_wire_socket
+from wire_frames import LfWireFrameParser, validate_wire_request
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -96,22 +97,22 @@ def main() -> int:
                 continue
             with client:
                 client.settimeout(0.25)
-                buffered = b""
+                frame_parser = LfWireFrameParser() if stream_transport else None
                 while running:
                     try:
                         packet = client.recv(4096)
                     except TimeoutError:
                         continue
                     if not packet:
+                        if frame_parser is not None:
+                            frame_parser.finish()
                         break
                     if not stream_transport:
-                        amy.send_wire(packet.decode("ascii"))
+                        amy.send_wire(validate_wire_request(packet))
                         continue
-                    buffered += packet
-                    while b"\n" in buffered:
-                        request, buffered = buffered.split(b"\n", 1)
-                        if request:
-                            amy.send_wire(request.decode("ascii"))
+                    assert frame_parser is not None
+                    for request in frame_parser.feed(packet):
+                        amy.send_wire(request)
     finally:
         server.close()
         remove_stale_socket(args.socket)

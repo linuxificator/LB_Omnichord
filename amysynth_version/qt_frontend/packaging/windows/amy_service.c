@@ -12,7 +12,7 @@
 
 #include "amy.h"
 
-#define SERVICE_MAX_LINE (MAX_MESSAGE_LEN * 2)
+#define SERVICE_MAX_LINE MAX_MESSAGE_LEN
 #define SERVICE_PIPE_PATH 256
 
 // AMY's example helpers reference this platform hook.  The native service

@@ -50,6 +50,7 @@ uses the same stream framing as macOS:
 
 - one complete AMY wire request per record;
 - every wire request ends in `Z`;
+- at most 1023 request bytes including that final `Z`;
 - one LF byte terminates each stream record;
 - partial or multiple `ReadFile()` results are buffered and split on LF;
 - no AMY-specific Python or C API crosses the process boundary.
