@@ -52,6 +52,7 @@ def check_shipped_json(frontend: Path) -> None:
 
 
 _MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+_FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
 def check_markdown_file(path: Path) -> None:
@@ -200,6 +201,21 @@ def check_workflow_dependency_installs(workflows: list[Path]) -> None:
                 raise QualityError(f"undeclared workflow pip install: {path}: {line}")
 
 
+def check_workflow_action_pins(workflows: list[Path]) -> None:
+    action = re.compile(r"^\s*(?:-\s*)?uses:\s*([^\s#]+)", re.MULTILINE)
+    for path in workflows:
+        for reference in action.findall(path.read_text(encoding="utf-8")):
+            if reference.startswith("./"):
+                continue
+            if "@" not in reference:
+                raise QualityError(f"workflow action has no revision: {path}: {reference}")
+            revision = reference.rsplit("@", 1)[1]
+            if not _FULL_SHA.fullmatch(revision):
+                raise QualityError(
+                    f"workflow action is not pinned to a full SHA: {path}: {reference}"
+                )
+
+
 def load_policy(path: Path) -> dict[str, Any]:
     value = load_json(path)
     if not isinstance(value, dict) or value.get("schema_version") != 1:
@@ -219,5 +235,8 @@ def run_repository_checks(repository: Path, frontend: Path, policy_path: Path) -
         frontend / "packaging" / "python_dependency_groups.json",
     )
     check_workflow_dependency_installs(
+        sorted((repository / ".github" / "workflows").glob("*.yml"))
+    )
+    check_workflow_action_pins(
         sorted((repository / ".github" / "workflows").glob("*.yml"))
     )

@@ -9,6 +9,12 @@ Every LB Omnichord build uses AMY from the fork release branch
 `releases/amy_omnichord_R20260831T042456` at exact commit
 `14240031c135fdcd76a7a3a8ec81da8ef405c4b0`.
 
+The machine authority for those values is `release_inputs.json` beside this
+document. Workflows and the ESP32 preparation script load it through
+`release_inputs.py`; they must not repeat a fallback branch or commit literal.
+The same manifest also names the exact five release packages and reviewed
+desktop Python constraint inputs.
+
 The branch name records the maintained AMY-for-Omnichord line. The commit SHA
 is the immutable build input: CI checks that the commit belongs to the declared
 branch, checks it out by SHA, verifies `HEAD`, and writes both values into every
@@ -36,7 +42,8 @@ block whose peak is being asserted.
    work. Include the fork's internal `work/codex_info` handoff material only on
    the internal release branch, never on a branch offered upstream.
 4. Run the AMY native and platform tests, then update the branch and SHA
-   together in both LB workflow files, this contract, and the platform docs.
+   together in `release_inputs.json`, this contract, and the platform docs.
+   The workflow/static tests reject reintroducing copies of the active pin.
 5. Run all LB regression and package gates. Publication remains blocked until
    every supported platform succeeds.
 

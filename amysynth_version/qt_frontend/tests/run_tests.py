@@ -175,9 +175,9 @@ def _repository_commit() -> str:
 
 
 def _amy_commit() -> str:
-    manifest = ROOT / "packaging" / "python_dependency_groups.json"
+    manifest = ROOT / "packaging" / "release_inputs.json"
     value = json.loads(manifest.read_text(encoding="utf-8"))
-    return str(value["component_exceptions"]["lb_amy"]["commit"])
+    return str(value["amy"]["commit"])
 
 
 def _finalize_coverage(directory: Path) -> ScriptResult:

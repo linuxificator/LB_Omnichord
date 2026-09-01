@@ -2,6 +2,7 @@
   "schema_version": 1,
   "recorded": "2026-09-01",
   "requirement_groups": {
+    "portable": "requirements-portable.txt",
     "runtime": "requirements.txt",
     "build": "requirements-build.txt",
     "test_quality": "requirements-test.txt",
@@ -65,10 +66,7 @@
   },
   "component_exceptions": {
     "lb_amy": {
-      "repository": "https://github.com/linuxificator/amy.git",
-      "release_branch": "releases/amy_omnichord_R20260831T042456",
-      "commit": "14240031c135fdcd76a7a3a8ec81da8ef405c4b0",
-      "python_pcm_bank": "tiny",
+      "release_inputs": "packaging/release_inputs.json",
       "contract": "packaging/AMY_RELEASE.md"
     }
   }

@@ -66,6 +66,10 @@ class DependencyDeclarationTests(unittest.TestCase):
             for name, relative in groups.items()
         }
         self.assertEqual(
+            resolved["portable"],
+            {"pyserial", "fastjsonschema"},
+        )
+        self.assertEqual(
             resolved["runtime"],
             {"pyside6", "pyserial", "fastjsonschema"},
         )
@@ -83,6 +87,7 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "ruff",
                 "mypy",
                 "types-pyserial",
+                "coverage",
             },
         )
         self.assertEqual(
@@ -120,11 +125,12 @@ class DependencyDeclarationTests(unittest.TestCase):
         self.assertNotIn("cython==0.29.36", release.casefold())
 
         amy = self.manifest["component_exceptions"]["lb_amy"]
-        for workflow in (regression, release):
-            self.assertIn(f"AMY_RELEASE_BRANCH: {amy['release_branch']}", workflow)
-            self.assertIn(f"AMY_COMMIT: {amy['commit']}", workflow)
-        self.assertIn(f"AMY_RELEASE_BRANCH: {amy['release_branch']}", esp32)
-        self.assertIn(f"AMY_REF: {amy['commit']}", esp32)
+        release_inputs = FRONTEND / amy["release_inputs"]
+        self.assertTrue(release_inputs.is_file())
+        for workflow in (regression, release, esp32):
+            self.assertIn("packaging/release_inputs.py", workflow)
+            self.assertNotIn("AMY_RELEASE_BRANCH:", workflow)
+            self.assertNotRegex(workflow, r"AMY_(?:COMMIT|REF): [0-9a-f]{40}")
 
 
 if __name__ == "__main__":

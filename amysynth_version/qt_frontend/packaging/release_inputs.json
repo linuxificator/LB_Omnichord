@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "recorded": "2026-09-01",
+  "amy": {
+    "repository": "https://github.com/linuxificator/amy.git",
+    "release_branch": "releases/amy_omnichord_R20260831T042456",
+    "commit": "14240031c135fdcd76a7a3a8ec81da8ef405c4b0",
+    "pcm_bank": "tiny"
+  },
+  "python": {
+    "desktop": "3.12",
+    "direct_runtime": {
+      "pyserial": "3.5",
+      "fastjsonschema": "2.22.2"
+    },
+    "direct_build": {
+      "PyInstaller": "6.22.2"
+    },
+    "constraints": {
+      "desktop_current": "packaging/constraints/desktop-current.txt",
+      "raspberrypi_aarch64": "packaging/constraints/raspberrypi-aarch64.txt",
+      "android_host_pyside": "6.11.2"
+    },
+    "component_evidence": [
+      {"name": "PySide6", "versions": ["6.7.3", "6.10.3", "6.11.2"], "license": "LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only", "source": "https://code.qt.io/cgit/pyside/pyside-setup.git/"},
+      {"name": "pyserial", "versions": ["3.5"], "license": "BSD-3-Clause", "source": "https://github.com/pyserial/pyserial"},
+      {"name": "fastjsonschema", "versions": ["2.22.2"], "license": "BSD-3-Clause", "source": "https://github.com/horejsek/python-fastjsonschema"},
+      {"name": "PyInstaller", "versions": ["6.22.2"], "license": "GPL-2.0-or-later WITH Bootloader-exception", "source": "https://github.com/pyinstaller/pyinstaller"},
+      {"name": "altgraph", "versions": ["0.17.5"], "license": "MIT", "source": "https://github.com/ronaldoussoren/altgraph"},
+      {"name": "packaging", "versions": ["26.3"], "license": "Apache-2.0 OR BSD-2-Clause", "source": "https://github.com/pypa/packaging"},
+      {"name": "pyinstaller-hooks-contrib", "versions": ["2026.6"], "license": "GPL-2.0-or-later WITH Bootloader-exception", "source": "https://github.com/pyinstaller/pyinstaller-hooks-contrib"},
+      {"name": "setuptools", "versions": ["84.0.0"], "license": "MIT", "source": "https://github.com/pypa/setuptools"},
+      {"name": "macholib", "versions": ["1.16.4"], "license": "MIT", "source": "https://github.com/ronaldoussoren/macholib"},
+      {"name": "pefile", "versions": ["2024.8.26"], "license": "MIT", "source": "https://github.com/erocarrera/pefile"},
+      {"name": "pywin32-ctypes", "versions": ["0.2.3"], "license": "BSD-3-Clause", "source": "https://github.com/enthought/pywin32-ctypes"}
+    ]
+  },
+  "declared_input_hashes": {
+    "requirements-portable.txt": "ac5a2844ba4e4b422ada7601534941737b468d84844e878c7e73b72103add9d1",
+    "requirements.txt": "e402ad6424600a24c816dc1c2303a2f92635e6adaddb6d3152ce09c82cd8a1da",
+    "requirements-build.txt": "816c7f59d6b8eac729c12540d8ddc12c47595be0e4601d4c5757134c450336b8",
+    "packaging/constraints/desktop-current.txt": "31b259bea5a578654276fd92d771f664f3883775d5f436a62e10c043f5b808be",
+    "packaging/constraints/raspberrypi-aarch64.txt": "dd6ff070e8b053d55ecba118341944f82ef3710e2075e40719247e33170c2c6f"
+  },
+  "release_packages": [
+    {"platform": "linux-x86_64", "suffix": "Linux-x86_64.AppImage"},
+    {"platform": "raspberrypi-aarch64", "suffix": "RaspberryPi-aarch64.AppImage"},
+    {"platform": "macos-arm64", "suffix": "macOS-arm64.dmg"},
+    {"platform": "windows-x86_64", "suffix": "Windows-x86_64.zip"},
+    {"platform": "android-arm64", "suffix": "Android-arm64.apk"}
+  ]
+}

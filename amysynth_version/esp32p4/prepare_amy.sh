@@ -3,9 +3,10 @@ set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPONENT_DIR="$PROJECT_DIR/components/amy"
-AMY_REPO="${AMY_REPO:-https://github.com/linuxificator/amy.git}"
-AMY_RELEASE_BRANCH="${AMY_RELEASE_BRANCH:-releases/amy_omnichord_R20260831T042456}"
-AMY_REF="${AMY_REF:-14240031c135fdcd76a7a3a8ec81da8ef405c4b0}"
+RELEASE_INPUTS="$PROJECT_DIR/../qt_frontend/packaging/release_inputs.py"
+AMY_REPO="${AMY_REPO:-$(python3 "$RELEASE_INPUTS" amy-values --field repository)}"
+AMY_RELEASE_BRANCH="${AMY_RELEASE_BRANCH:-$(python3 "$RELEASE_INPUTS" amy-values --field release_branch)}"
+AMY_REF="${AMY_REF:-$(python3 "$RELEASE_INPUTS" amy-values --field commit)}"
 
 rm -rf "$COMPONENT_DIR"
 mkdir -p "$(dirname "$COMPONENT_DIR")"

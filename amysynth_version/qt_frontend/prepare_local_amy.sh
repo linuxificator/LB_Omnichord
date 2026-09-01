@@ -3,6 +3,8 @@ set -euo pipefail
 
 frontend_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd -- "$frontend_dir/../.." && pwd)"
+release_inputs="$frontend_dir/packaging/release_inputs.py"
+amy_pcm_bank="$(python3 "$release_inputs" amy-values --field pcm_bank)"
 venv_dir="${OMNICHORD_VENV:-$repo_dir/../omnichord-env}"
 amy_root="${OMNICHORD_AMY_ROOT:-$repo_dir/../amyfork/amy}"
 
@@ -15,12 +17,12 @@ if [[ ! -f "$amy_root/setup.py" ]]; then
     exit 1
 fi
 if ! grep -q "AMY_PCM_BANK" "$amy_root/setup.py"; then
-    echo "AMY checkout does not support AMY_PCM_BANK=tiny" >&2
+    echo "AMY checkout does not support AMY_PCM_BANK=$amy_pcm_bank" >&2
     exit 1
 fi
 
 . "$venv_dir/bin/activate"
-AMY_PCM_BANK=tiny python -m pip install \
+AMY_PCM_BANK="$amy_pcm_bank" python -m pip install \
     --no-deps \
     --force-reinstall \
     --no-cache-dir \
@@ -31,4 +33,4 @@ if nm -D "$amy_so" | grep -E 'gamma9001|amy_set_gamma' >/dev/null; then
     echo "AMY verification failed: Gamma9001 symbols are still present" >&2
     exit 1
 fi
-echo "AMY installed with ESP32-compatible tiny PCM bank: $amy_so"
+echo "AMY installed with ESP32-compatible $amy_pcm_bank PCM bank: $amy_so"

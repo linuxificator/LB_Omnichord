@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import unittest
 from pathlib import Path
@@ -39,14 +40,21 @@ class PackagingContracts(unittest.TestCase):
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml",
             REPOSITORY / ".github" / "workflows" / "amy-regression.yml",
         ]
-        release_branch = "releases/amy_omnichord_R20260831T042456"
-        release_commit = "14240031c135fdcd76a7a3a8ec81da8ef405c4b0"
+        release_inputs = json.loads(
+            (FRONTEND / "packaging" / "release_inputs.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        release_branch = release_inputs["amy"]["release_branch"]
+        release_commit = release_inputs["amy"]["commit"]
+        pcm_bank = release_inputs["amy"]["pcm_bank"]
 
         for workflow_path in workflows:
             workflow = workflow_path.read_text(encoding="utf-8")
-            self.assertIn(f"AMY_RELEASE_BRANCH: {release_branch}", workflow)
-            self.assertIn(f"AMY_COMMIT: {release_commit}", workflow)
-            self.assertIn("merge-base --is-ancestor", workflow)
+            self.assertIn("packaging/release_inputs.py", workflow)
+            self.assertIn("packaging/checkout_amy.py", workflow)
+            self.assertNotIn(release_branch, workflow)
+            self.assertNotIn(release_commit, workflow)
             self.assertNotIn(
                 "25213785696dd40e6cce59ab428e560a410d240f",
                 workflow,
@@ -56,11 +64,19 @@ class PackagingContracts(unittest.TestCase):
                 workflow,
             )
 
+        checkout_helper = (
+            FRONTEND / "packaging" / "checkout_amy.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"merge-base",', checkout_helper)
+        self.assertIn('"--is-ancestor",', checkout_helper)
+        self.assertIn('"rev-parse", "HEAD"', checkout_helper)
+
         release = workflows[0].read_text(encoding="utf-8")
         self.assertIn("## Build provenance", release)
         self.assertIn("\\`$AMY_RELEASE_BRANCH\\`", release)
         self.assertIn("\\`$AMY_COMMIT\\`", release)
-        self.assertIn("AMY_PCM_BANK=tiny", release)
+        self.assertEqual(pcm_bank, "tiny")
+        self.assertIn('AMY_PCM_BANK="$AMY_PCM_BANK"', release)
         self.assertNotIn("amy-tiny-bank.patch", release)
         self.assertFalse(
             (FRONTEND / "packaging" / "amy-tiny-bank.patch").exists()
@@ -251,6 +267,12 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('echo "tag=R${instant}"', release)
         self.assertIn('echo "stamp=R${instant/T/}"', release)
         self.assertIn("gh release create", release)
+        self.assertIn("release-manifest.json", release)
+        self.assertIn("release_inputs.py", release)
+        self.assertIn("release-manifest", release)
+        self.assertIn("published-assets.txt", release)
+        self.assertIn("diff -u expected-assets.txt published-assets.txt", release)
+        self.assertNotIn("gh release create \"$RELEASE_TAG\" dist/*", release)
         self.assertIn("Linux-x86_64.AppImage", release)
         self.assertIn("RaspberryPi-aarch64.AppImage", release)
         self.assertIn("macOS-arm64.dmg", release)

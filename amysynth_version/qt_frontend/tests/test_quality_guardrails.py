@@ -19,6 +19,7 @@ from repository_checks import (  # noqa: E402
     check_import_boundaries,
     check_markdown_file,
     check_workflow_dependency_installs,
+    check_workflow_action_pins,
     load_json,
     parse_python,
     run_repository_checks,
@@ -109,6 +110,25 @@ class QualityGuardrailFixtureTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(QualityError, "package/version literal"):
                 check_workflow_dependency_installs([path])
+
+    def test_mutable_workflow_action_fixture_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "workflow.yml"
+            path.write_text(
+                "steps:\n  - uses: actions/checkout@v4\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(QualityError, "not pinned to a full SHA"):
+                check_workflow_action_pins([path])
+
+            path.write_text(
+                "steps:\n"
+                "  - uses: actions/checkout@"
+                "11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2\n"
+                "  - uses: ./.github/workflows/local.yml\n",
+                encoding="utf-8",
+            )
+            check_workflow_action_pins([path])
 
     def test_repository_baseline_passes(self) -> None:
         repository = FRONTEND.parents[1]

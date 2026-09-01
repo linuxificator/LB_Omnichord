@@ -89,7 +89,10 @@ Four repository workflows are maintained:
   calls the complete regression matrix and, only after all suites pass, builds
   and validates Linux x86_64, Raspberry Pi aarch64, macOS arm64 and native
   Windows x86_64 packages plus the Android arm64 APK. One timestamped
-  tag/release contains all five packages and their SHA-256 files. The dedicated
+  tag/release contains all five packages, their SHA-256 files and an exact
+  `release-manifest.json`. The manifest verifier rejects missing or extra
+  package/checksum files before publication; the final GitHub asset-name list
+  is compared with the manifest after upload. The dedicated
   `testing/windows_smoke`
   branch builds only the Windows job without publishing; `main` retains the
   complete gated release. The native package/smoke job runs on the current

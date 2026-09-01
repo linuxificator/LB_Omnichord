@@ -18,13 +18,15 @@ class StaticContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         prepare = (ROOT.parent / "esp32p4" / "prepare_amy.sh").read_text(encoding="utf-8")
-        release_branch = "releases/amy_omnichord_R20260831T042456"
-        release_commit = "14240031c135fdcd76a7a3a8ec81da8ef405c4b0"
+        release_inputs = json.loads(
+            (ROOT / "packaging" / "release_inputs.json").read_text(encoding="utf-8")
+        )
 
+        self.assertRegex(release_inputs["amy"]["commit"], r"^[0-9a-f]{40}$")
         for contract in (workflow, prepare):
-            self.assertIn("https://github.com/linuxificator/amy.git", contract)
-            self.assertIn(release_branch, contract)
-            self.assertIn(release_commit, contract)
+            self.assertIn("release_inputs.py", contract)
+            self.assertNotIn(release_inputs["amy"]["release_branch"], contract)
+            self.assertNotIn(release_inputs["amy"]["commit"], contract)
         self.assertNotIn("AMY_REF:-main", prepare)
         self.assertIn("release branch and immutable commit do not match", prepare)
 

@@ -45,6 +45,16 @@ values and read-only mappings; they do not retain a mutable parsed JSON tree.
 count and creation process for every bass/drum catalogue without becoming a
 second runtime data authority.
 
+Release construction has one machine-readable input authority:
+`qt_frontend/packaging/release_inputs.json`. It identifies the immutable AMY
+commit, PCM bank, reviewed Python constraint files and the exact five package
+shapes. A shared checkout helper proves that the detached AMY commit belongs
+to its declared release branch. Publication accepts exactly those five
+packages and their five canonical SHA-256 files, embeds dependency and source
+evidence in `release-manifest.json`, and compares the final GitHub asset names
+with that manifest. This provides input/output traceability; runner images and
+native toolchains mean byte-identical reproducibility is not claimed.
+
 Backend constructors establish in-memory invariants only. The composition root
 calls the public, idempotent `initialize()` phase after the complete concrete
 facade exists; preset filesystem I/O, cross-facade binding restoration and MIDI

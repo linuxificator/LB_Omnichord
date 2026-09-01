@@ -9,7 +9,8 @@ Last verified: 2026-09-01
 
 | Group | Source | Current direct intent | Consumers |
 | --- | --- | --- | --- |
-| Portable runtime | `requirements.txt` | `PySide6>=6.6`, `pyserial>=3.5`, `fastjsonschema==2.22.2` | Linux x86_64, Raspberry Pi aarch64, macOS arm64, Windows x86_64 and the staged Android app |
+| Portable pure Python | `requirements-portable.txt` | `pyserial==3.5`, `fastjsonschema==2.22.2` | every frontend target |
+| Desktop runtime intent | `requirements.txt` | portable group plus `PySide6>=6.6,<6.11` | Linux x86_64, Raspberry Pi aarch64, macOS arm64 and Windows x86_64 |
 | Desktop build | `requirements-build.txt` | runtime group plus `PyInstaller==6.22.2` | Linux/Raspberry Pi AppImage, macOS DMG and Windows zip jobs |
 | Test and quality | `requirements-test.txt` | runtime group, NumPy 2.5.2, Ruff 0.16.5, mypy 2.3.1, coverage.py 7.15.4 and pyserial stubs | local and reusable regression/quality jobs |
 | Android host | `requirements-android-host.txt` | runtime group, `PySide6==6.11.2`, `Cython==0.29.36` | the Linux host that runs `pyside6-android-deploy` |
@@ -17,6 +18,16 @@ Last verified: 2026-09-01
 An included `-r requirements.txt` means the runtime file remains the single
 authority for shared direct dependencies. A workflow must install a named
 requirements group instead of repeating a Python package/version literal.
+
+Release resolution is stricter than runtime intent. Linux x86_64, macOS arm64
+and Windows x86_64 use `packaging/constraints/desktop-current.txt` (PySide6
+6.10.3); Raspberry Pi uses `raspberrypi-aarch64.txt` (PySide6 6.7.3). Qt moved
+its aarch64 wheel baseline to `manylinux_2_39` after that line, which is not
+installable on the Ubuntu 22.04/glibc 2.35 Pi builder. Android's deployment
+host remains a separate exact PySide6 6.11.2 toolchain and consumes only the
+portable pure-Python target group. `packaging/release_inputs.json` hashes the
+reviewed requirement/constraint files and records versions, licenses and
+sources; publication embeds that evidence in `release-manifest.json`.
 
 ## Direct-import inventory
 
@@ -95,9 +106,9 @@ build and emulator gate are mandatory.
 - ESP32-P4 uses ESP-IDF 6.0.2.
 - AppImage tool/runtime downloads are architecture-specific and SHA-256
   verified in the release workflow.
-- Workflow actions, runner images and system packages are platform build
-  inputs recorded in the workflow. T24 will add resolved manifests and
-  provenance; T04 does not change their versions.
+- Workflow actions are pinned to reviewed full commit SHAs and Dependabot may
+  propose reviewed updates. Runner images and system packages remain named
+  platform build inputs; byte-reproducibility is not claimed.
 
 ## Change rule
 
