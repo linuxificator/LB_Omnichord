@@ -166,8 +166,17 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("refs/heads/integration/android_build", release)
         self.assertGreaterEqual(
-            release.count("if: github.ref == 'refs/heads/main'"),
-            3,
+            release.count("github.event_name == 'workflow_dispatch'"),
+            5,
+        )
+        self.assertIn(
+            "publish-release:\n    if: github.ref == 'refs/heads/main'",
+            release,
+        )
+        self.assertIn(
+            "refresh-readme-screenshots:\n"
+            "    if: github.ref == 'refs/heads/main'",
+            release,
         )
         self.assertIn("needs.tests.result == 'success'", release)
         self.assertIn(
