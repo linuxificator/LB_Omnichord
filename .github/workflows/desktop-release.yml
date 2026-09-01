@@ -15,6 +15,7 @@ permissions:
 jobs:
   tests:
     if: >-
+      github.event_name == 'workflow_dispatch' ||
       github.ref == 'refs/heads/main' ||
       github.ref == 'refs/heads/integration/android_build'
     uses: ./.github/workflows/amy-regression.yml
@@ -357,6 +358,7 @@ jobs:
 
   android-packages:
     if: >-
+      github.event_name == 'workflow_dispatch' ||
       github.ref == 'refs/heads/main' ||
       github.ref == 'refs/heads/integration/android_build'
     needs: [tests, release-metadata]
@@ -491,11 +493,14 @@ jobs:
           path: |
             amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk
             amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk.sha256
+            amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk.package-audit.json
+            amysynth_version/qt_frontend/dist/*Android-${{ matrix.output_arch }}.apk.pyside-prune.json
           if-no-files-found: error
           retention-days: 2
 
   android-emulator:
     if: >-
+      github.event_name == 'workflow_dispatch' ||
       github.ref == 'refs/heads/main' ||
       github.ref == 'refs/heads/integration/android_build'
     needs: [android-packages]

@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 FRONTEND = Path(__file__).resolve().parents[1]
@@ -25,9 +26,51 @@ from build_android import (  # noqa: E402
     verify_buildozer_qt_module_order,
     verify_qt_modules_present,
 )
+from prune_pyside_wheel import native_closure, qml_module_for  # noqa: E402
 
 
 class AndroidPackagingTests(unittest.TestCase):
+    def test_pruner_follows_native_dependencies_instead_of_guessing(self) -> None:
+        libraries = {
+            "root.so": Path("/wheel/root.so"),
+            "dependency.so": Path("/wheel/dependency.so"),
+            "unrelated.so": Path("/wheel/unrelated.so"),
+        }
+
+        def dependencies(_readelf: str, path: Path) -> tuple[str, ...]:
+            return ("dependency.so",) if path.name == "root.so" else ()
+
+        with patch("prune_pyside_wheel.needed_libraries", side_effect=dependencies):
+            self.assertEqual(
+                native_closure(
+                    roots=("root.so",),
+                    libraries=libraries,
+                    readelf="readelf",
+                ),
+                frozenset({"root.so", "dependency.so"}),
+            )
+
+    def test_pruner_assigns_qml_files_to_the_nearest_module(self) -> None:
+        modules = frozenset(
+            {
+                "QtQuick/Controls",
+                "QtQuick/Controls/Basic",
+                "QtQuick/Controls/Material",
+            }
+        )
+        self.assertEqual(
+            qml_module_for(
+                "PySide6/Qt/qml/QtQuick/Controls/Basic/Button.qml", modules
+            ),
+            "QtQuick/Controls/Basic",
+        )
+        self.assertEqual(
+            qml_module_for(
+                "PySide6/Qt/qml/QtQuick/Controls/Material/Button.qml", modules
+            ),
+            "QtQuick/Controls/Material",
+        )
+
     def test_staged_frontend_includes_versioned_config_schema(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             staging = Path(directory) / "staging"
@@ -273,6 +316,13 @@ class AndroidPackagingTests(unittest.TestCase):
         self.assertIn("requirements-android-host.txt", workflow)
         self.assertIn("PySide6==6.11.2", host_requirements)
         self.assertIn("Cython==0.29.36", host_requirements)
+        build_source = (
+            FRONTEND / "packaging" / "android" / "build_android.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("prune_wheel(", build_source)
+        self.assertIn("package_audit.py", build_source)
+        self.assertIn(".pyside-prune.json", workflow)
+        self.assertIn(".package-audit.json", workflow)
 
 
 if __name__ == "__main__":

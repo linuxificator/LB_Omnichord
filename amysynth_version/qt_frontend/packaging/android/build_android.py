@@ -16,6 +16,8 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
+from prune_pyside_wheel import prune_wheel
+
 
 PYSIDE_VERSION = "6.11.2"
 P4A_COMMIT = "3762c88c56e3443efb8eba2a02a2604b680240fd"
@@ -292,6 +294,17 @@ def build(args: argparse.Namespace) -> Path:
     wheel_pyside = args.wheel_pyside.resolve()
     wheel_shiboken = args.wheel_shiboken.resolve()
     verify_inputs(aar, wheel_pyside, wheel_shiboken, args.arch)
+
+    derived_inputs = staging.parent / f"{staging.name}-derived-inputs"
+    derived_inputs.mkdir(parents=True, exist_ok=True)
+    pruned_pyside = derived_inputs / wheel_pyside.name
+    prune_report = derived_inputs / "pyside-wheel-prune.json"
+    prune_wheel(
+        source=wheel_pyside,
+        output=pruned_pyside,
+        report=prune_report,
+    )
+    wheel_pyside = pruned_pyside
     stage_frontend(frontend, staging)
 
     deploy = shutil.which("pyside6-android-deploy")
@@ -361,6 +374,22 @@ def build(args: argparse.Namespace) -> Path:
     output.with_suffix(output.suffix + ".sha256").write_text(
         f"{digest}  {output.name}\n",
         encoding="ascii",
+    )
+    prune_evidence = output.with_suffix(output.suffix + ".pyside-prune.json")
+    shutil.copy2(prune_report, prune_evidence)
+    package_audit = output.with_suffix(output.suffix + ".package-audit.json")
+    run(
+        [
+            sys.executable,
+            str(frontend / "packaging" / "package_audit.py"),
+            "--platform",
+            f"Android-{platform_arch}",
+            "--package",
+            str(output),
+            "--output",
+            str(package_audit),
+        ],
+        cwd=frontend,
     )
     print(f"Android package: {output}", flush=True)
     return output

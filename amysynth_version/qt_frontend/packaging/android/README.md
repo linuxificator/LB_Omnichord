@@ -56,6 +56,19 @@ script rejects an AAR without both CI and production ABIs and rejects an APK
 that lacks the AMY/Oboe libraries or the matching CPython 3.11/shiboken native
 libraries. It also rejects an APK containing an in-process `c_amy` binding.
 
+The official, SHA-256-pinned PySide6 Android wheel is a complete Qt for Python
+SDK and is much larger than this application needs. After verification,
+`prune_pyside_wheel.py` derives a valid wheel containing only the reviewed
+Python bindings, the Basic-style QML module graph, the Android platform and
+network-information plugins, required jars, and the complete recursive native
+`DT_NEEDED` closure. It rewrites wheel `RECORD`, records both wheel hashes and
+the retained native inventory, and never modifies the downloaded source
+wheel. The final APK is audited again and the workflow retains both JSON
+reports with the package. A manually dispatched release workflow performs the
+same regression, x86_64 emulator and arm64 packaging gates on the selected
+branch without publishing a release; this is the validation route for changes
+to the package policy.
+
 PySide6 6.11.2 internally collects detected Android modules through Python
 sets, but python-for-Android writes the resulting list directly into Qt's JNI
 startup array. The build therefore makes a second deploy initialization pass
