@@ -1,6 +1,6 @@
 # Codex handover: package size and build slimming
 
-Status: implemented; final hosted all-platform validation in progress
+Status: implemented and hosted all-platform validation passed
 Owner: frontend release packaging
 Recorded: 2026-09-01
 Branch: `rework/code_quality`
@@ -58,6 +58,15 @@ pinned to `actions/cache` commit
 `0400d5f644dc74513175e3cd8d07132dd4860809`. Staging preserves only its
 `.buildozer` cache and recreates all application/deployment inputs.
 
+Hosted final-package tests exposed two unrelated assumptions which source-only
+tests had missed. Fresh-user Windows startup reached an unconditional Unix
+`os.fchmod`; descriptor permissions and directory fsync now live in
+`filesystem_platform_adapters.py`, while atomic replace and file fsync remain
+portable core behavior. The first reduced Android emulator package reached
+QML, AMY and Oboe but the acceptance hook showed that `QtTest` imports the
+`QtWidgets` Python binding. The manifest now retains that binding and its ELF
+closure without adding Widgets to the product UI or JNI startup list.
+
 `tools/clean_package_outputs.py` is dry-run by default and can delete only the
 exact ignored `qt_frontend/build` and `qt_frontend/dist` roots. It refuses a
 symlink or non-directory at either location. No file below those roots is
@@ -75,8 +84,9 @@ tracked; release retention remains GitHub's responsibility rather than Git's.
   uses the ordinary AMY socket transport instead of an unrelated unused AMY
   pseudo-terminal; it passed ten consecutive local runs before the hosted run;
 - the ignored local output cleanup removed 2,075,167,508 bytes in total;
-- the final non-publishing all-platform workflow is the remaining acceptance
-  gate; add its package sizes and run identity here when it completes.
+- final non-publishing all-platform run `33554564363` passed Linux x86_64,
+  Raspberry Pi aarch64, macOS arm64, Windows x86_64, both Android package
+  builds and the Android QML/socket/AMY/Oboe exact-sample emulator gate.
 
 ## Measured release baseline
 
@@ -89,6 +99,25 @@ Release `R20260831T210652` published these compressed packages:
 | Raspberry Pi aarch64 AppImage | 195,176,968 | 186.1 |
 | macOS arm64 DMG | 178,225,454 | 170.0 |
 | Windows x86_64 zip | 176,145,364 | 168.0 |
+
+## Final validated package sizes
+
+Non-publishing workflow run `33554564363` passed every regression and package
+gate at code commit `e2670b2`. Publication was correctly skipped because the
+run targeted `rework/code_quality`, not `main`.
+
+| Platform | Baseline bytes | Validated bytes | Reduction |
+| --- | ---: | ---: | ---: |
+| Android arm64 APK | 158,133,682 | 65,622,659 | 58.50% |
+| Linux x86_64 AppImage | 205,273,592 | 98,896,376 | 51.82% |
+| Raspberry Pi aarch64 AppImage | 195,176,968 | 92,441,096 | 52.64% |
+| macOS arm64 DMG | 178,225,454 | 54,524,494 | 69.41% |
+| Windows x86_64 zip | 176,145,364 | 57,754,711 | 67.21% |
+
+The x86_64 emulator APK is 66,944,450 bytes. Every package includes separate
+QML/policy audit evidence in its workflow artifact. The arm64/x86 Android
+packages additionally include their source/output wheel hashes and retained
+native-library inventory.
 
 The locally retained Linux AppImage with the same package shape is 196 MiB
 compressed and 573 MiB extracted. Its extracted PySide6 tree is 429 MiB. The
@@ -145,7 +174,7 @@ Portable Python directly needs these PySide modules:
 - `QtQml`;
 - `QtQuick`;
 - `QtQuickControls2`;
-- `QtTest` only for the packaged acceptance path.
+- `QtTest` only for the packaged acceptance path;
 - `QtWidgets` only as the binding imported transitively by that `QtTest`
   acceptance path.
 
