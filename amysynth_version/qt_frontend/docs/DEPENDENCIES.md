@@ -11,7 +11,7 @@ Last verified: 2026-09-01
 | --- | --- | --- | --- |
 | Portable runtime | `requirements.txt` | `PySide6>=6.6`, `pyserial>=3.5` | Linux x86_64, Raspberry Pi aarch64, macOS arm64, Windows x86_64 and the staged Android app |
 | Desktop build | `requirements-build.txt` | runtime group plus `PyInstaller==6.22.2` | Linux/Raspberry Pi AppImage, macOS DMG and Windows zip jobs |
-| Test and quality | `requirements-test.txt` | runtime group plus `numpy==2.5.2` for native balance rendering | local and reusable regression jobs; T05 owns analyzer additions |
+| Test and quality | `requirements-test.txt` | runtime group, NumPy 2.5.2, Ruff 0.16.5, mypy 2.3.1 and pyserial stubs | local and reusable regression/quality jobs |
 | Android host | `requirements-android-host.txt` | runtime group, `PySide6==6.11.2`, `Cython==0.29.36` | the Linux host that runs `pyside6-android-deploy` |
 
 An included `-r requirements.txt` means the runtime file remains the single
@@ -31,9 +31,10 @@ The machine-readable inventory is
 | `amy`, `c_amy` | pinned LB AMY component exception | AMY release contract | native service and native integration tests require the fork build, not an unqualified PyPI dependency |
 
 Every other direct Python import currently resolves to the standard library or
-a repository module. `PyInstaller` and `Cython` are invoked build tools rather
-than imports in portable application code, but are declared in their owning
-groups for the same reproducibility reason.
+a repository module. `PyInstaller`, `Cython`, Ruff and mypy are invoked tools
+rather than imports in portable application code, but are declared in their
+owning groups for the same reproducibility reason. `types-pyserial` supplies
+static metadata only.
 
 No application or launcher installs Python packages at runtime.
 

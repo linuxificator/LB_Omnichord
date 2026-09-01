@@ -12,6 +12,9 @@ on:
     branches: [main]
     paths:
       - 'amysynth_version/qt_frontend/**'
+      - 'amysynth_version/design/**'
+      - '.editorconfig'
+      - '.gitattributes'
       - '.github/workflows/amy-regression.yml'
   workflow_dispatch:
     inputs:
@@ -21,6 +24,7 @@ on:
         default: unit
         type: choice
         options:
+          - quality
           - unit
           - frontend
           - serial
@@ -54,6 +58,7 @@ jobs:
       fail-fast: false
       matrix:
         suite:
+          - quality
           - unit
           - frontend
           - serial

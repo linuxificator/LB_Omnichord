@@ -1,5 +1,10 @@
 # AMY release input contract
 
+Status: authoritative external-component release contract
+Owner: AMY fork integration and five-platform packaging
+Applies to: native tests, desktop services, Android Oboe and ESP32-P4
+Last verified: 2026-09-01
+
 Every LB Omnichord build uses AMY from the fork release branch
 `releases/amy_omnichord_R20260831T042456` at exact commit
 `14240031c135fdcd76a7a3a8ec81da8ef405c4b0`.

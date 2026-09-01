@@ -40,6 +40,18 @@
     "Cython": {
       "distribution": "Cython",
       "owner": "android_host"
+    },
+    "ruff": {
+      "distribution": "ruff",
+      "owner": "test_quality"
+    },
+    "mypy": {
+      "distribution": "mypy",
+      "owner": "test_quality"
+    },
+    "types-pyserial": {
+      "distribution": "types-pyserial",
+      "owner": "test_quality"
     }
   },
   "component_exceptions": {

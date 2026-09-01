@@ -14,3 +14,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T02 | `T02_CANONICAL_DRUM_DATA.md` | complete |
 | T03 | `T03_TOOL_LAYOUT_HYGIENE.md` | complete |
 | T04 | `T04_DEPENDENCY_INVENTORY.md` | complete |
+| T05 | `T05_QUALITY_GUARDRAILS.md` | complete |

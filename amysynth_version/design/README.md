@@ -78,7 +78,7 @@ small, behavior-preserving phase:
 
 ## Required reading route for Codex
 
-`AGENTS.md` requires Codex to use this route at the start of every active-AMY
+`../../AGENTS.md` requires Codex to use this route at the start of every active-AMY
 session. Read selected files in full rather than relying on search excerpts.
 
 Always read these baseline contracts:
@@ -116,7 +116,7 @@ Sonic Pi tree are not startup reading unless the user explicitly asks for
 historical comparison.
 
 For continuation work on active branches, also read the repository-root
-`CODEX_HANDOFF.md` when it exists. It records current branch/release state and
+`../../CODEX_HANDOFF.md` when it exists. It records current branch/release state and
 session-specific lessons learned, but it never replaces the authoritative
 design contracts listed above.
 

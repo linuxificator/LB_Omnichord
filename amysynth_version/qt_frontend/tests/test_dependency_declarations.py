@@ -70,7 +70,15 @@ class DependencyDeclarationTests(unittest.TestCase):
             resolved["build"], {"pyside6", "pyserial", "pyinstaller"}
         )
         self.assertEqual(
-            resolved["test_quality"], {"pyside6", "pyserial", "numpy"}
+            resolved["test_quality"],
+            {
+                "pyside6",
+                "pyserial",
+                "numpy",
+                "ruff",
+                "mypy",
+                "types-pyserial",
+            },
         )
         self.assertEqual(
             resolved["android_host"], {"pyside6", "pyserial", "cython"}
@@ -83,6 +91,11 @@ class DependencyDeclarationTests(unittest.TestCase):
             owner = record["owner"]
             distribution = record["distribution"].casefold().replace("_", "-")
             self.assertIn(distribution, resolved[owner], import_root)
+
+        for tool, record in self.manifest["invoked_python_tools"].items():
+            owner = record["owner"]
+            distribution = record["distribution"].casefold().replace("_", "-")
+            self.assertIn(distribution, resolved[owner], tool)
 
     def test_workflows_consume_declared_groups_and_shared_amy_pin(self) -> None:
         regression = (

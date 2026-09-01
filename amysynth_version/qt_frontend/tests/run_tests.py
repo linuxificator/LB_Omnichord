@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 
 SUITES: dict[str, tuple[Path, ...]] = {
+    "quality": (
+        TESTS / "run_quality.py",
+    ),
     # Every top-level test_*.py file is a dependency-free/unit contract. Auto
     # discovery prevents a new unit test from silently being omitted locally
     # and in CI, as happened with the MIDI engine and socket tests.
@@ -35,6 +38,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
 }
 ALL_ORDER = (
+    "quality",
     "unit",
     "frontend",
     "serial",

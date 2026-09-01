@@ -31,6 +31,7 @@ The maintained suites are:
 
 | Suite | Scope | Extra requirement |
 | --- | --- | --- |
+| `quality` | compileall, shipped JSON, Markdown/status/routing, import/dependency boundaries, Ruff and mypy ratchets | declared test/quality requirements; no AMY/audio/display |
 | `unit` | all top-level `tests/test_*.py` contracts | none beyond frontend dependencies |
 | `frontend` | headless QML/backend interaction | PySide6 and local TCP/PTY support |
 | `serial` | production pyserial output over a Linux PTY | pyserial and PTY support |
@@ -38,6 +39,21 @@ The maintained suites are:
 | `native-controls` | delivered wire commands and native synth state | pinned tiny-bank LB AMY fork, offline renderer |
 | `native-rhythm` | sequencer/rhythm behavior in native AMY | pinned tiny-bank LB AMY fork, offline renderer |
 | `all` | all suites above, in dependency order | all requirements above |
+
+The quality suite is deliberately non-mutating. Ruff checks a small
+correctness-critical rule set and does not format source. Mypy compares current
+legacy diagnostics by file/error-code with
+`tests/quality/mypy_legacy_baseline.json`; the total and every bucket may only
+decrease. A new production module is absent from that legacy list and must pass
+`mypy --strict --follow-imports=skip`. Do not regenerate the baseline to make a
+new error pass: fix the error, or document and review an intentional baseline
+change as code-quality work.
+
+Run the fast gate directly with:
+
+```bash
+python tests/run_quality.py
+```
 
 Top-level unit tests are discovered automatically. Integration suites are
 listed explicitly because their process, PTY and native-engine requirements
@@ -48,7 +64,7 @@ is intentionally ignored by Git.
 
 Four repository workflows are maintained:
 
-- `AMY frontend regression` runs the six component suites in parallel for AMY
+- `AMY frontend regression` runs the quality gate and six component suites in parallel for AMY
   frontend pull requests, is reused as the test gate of the release workflow,
   and accepts a selected suite or `all` through manual dispatch. Native jobs
   install the AMY fork at the commit pinned in the workflow and record that SHA
