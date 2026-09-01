@@ -25,6 +25,8 @@ from application_composition import (  # noqa: E402
     load_application_resources,
 )
 from config_loader import load_resolved_amy_config  # noqa: E402
+from package_test_hooks import PackageTestHooks  # noqa: E402
+from runtime_platform_adapters import RuntimeOverrides  # noqa: E402
 
 
 ADDRESSES = (
@@ -114,6 +116,14 @@ class ApplicationCompositionTests(unittest.TestCase):
             socket_client=client_factory("socket"),
             local_client=client_factory("local"),
             midi_input_port=lambda _sink, _config: None,
+            private_files_dir=lambda: root / "private",
+            resolve_package_runtime=lambda **kwargs: RuntimeOverrides(
+                kwargs["amy_socket"],
+                kwargs["amy_local_name"],
+                kwargs["package_smoke_test"],
+            ),
+            package_test_hooks=lambda enabled: PackageTestHooks(enabled, None),
+            display_diagnostics=lambda qpa: (f"QPA {qpa}",),
             backend=backend_factory,
         )
 

@@ -49,19 +49,24 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn(release_commit, contract)
         self.assertIn("every supported platform succeeds", contract)
 
-    def test_platform_logic_is_limited_to_one_startup_preamble(self) -> None:
+    def test_platform_logic_is_limited_to_runtime_adapters(self) -> None:
         core = (FRONTEND / "code" / "app_core.py").read_text(
             encoding="utf-8"
         )
         architecture = (
             REPOSITORY / "amysynth_version" / "design" / "architecture.md"
         ).read_text(encoding="utf-8")
+        runtime_adapter = (
+            FRONTEND / "code" / "runtime_platform_adapters.py"
+        ).read_text(encoding="utf-8")
 
-        self.assertEqual(core.count('casefold() != "android"'), 1)
+        self.assertNotIn('casefold() != "android"', core)
+        self.assertEqual(runtime_adapter.count('casefold() != "android"'), 1)
         self.assertNotIn("sys.platform", core)
         self.assertNotIn("platform.system", core)
-        self.assertRegex(architecture, r"single\s+startup preamble")
-        self.assertIn("Asset-root discovery", architecture)
+        self.assertIn("named adapters supplied by the", architecture)
+        self.assertIn("single composition root", architecture)
+        self.assertRegex(architecture, r"Asset-root\s+discovery")
 
     def test_release_is_gated_by_complete_reusable_test_workflow(self) -> None:
         release = (
@@ -270,7 +275,10 @@ class PackagingContracts(unittest.TestCase):
             FRONTEND / "packaging" / "windows" / "LB_Omnichord.cmd"
         ).read_text(encoding="utf-8")
         main = (FRONTEND / "code" / "main.py").read_text(encoding="utf-8")
-        core = (FRONTEND / "code" / "app_core.py").read_text(
+        windows_adapter = (
+            FRONTEND / "code" / "windows_launcher.py"
+        ).read_text(encoding="utf-8")
+        runtime_paths = (FRONTEND / "code" / "runtime_paths.py").read_text(
             encoding="utf-8"
         )
         service = (
@@ -317,11 +325,13 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("-ExecutionPolicy Bypass", click_launcher)
         self.assertIn('"%~dp0run_windows.ps1" %*', click_launcher)
         self.assertIn("pause", click_launcher)
-        self.assertIn("if sys.stdout is None:", main)
-        self.assertIn("if sys.stderr is None:", main)
-        self.assertIn("fatal-error", main)
-        self.assertIn("resolve_frontend_asset_root", core)
-        self.assertIn('Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS")', core)
+        self.assertIn("prepare_windowed_console_streams()", main)
+        self.assertIn("guarded_package_main(main)", main)
+        self.assertIn("if sys.stdout is None:", windows_adapter)
+        self.assertIn("if sys.stderr is None:", windows_adapter)
+        self.assertIn("fatal-error", windows_adapter)
+        self.assertIn("resolve_frontend_asset_root", runtime_paths)
+        self.assertIn('getattr(sys, "_MEIPASS", None)', runtime_paths)
         self.assertIn("amy_add_message", service)
         self.assertIn("run_self_test", service)
         self.assertIn("amy_simple_fill_buffer", service)

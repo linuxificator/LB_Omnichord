@@ -11,6 +11,8 @@ from config_loader import (
     apply_transport_overrides,
 )
 from midi_input import MidiInputPortFactory
+from package_test_hooks import PackageTestHooks
+from runtime_platform_adapters import RuntimeOverrides
 
 
 Checkpoint = Callable[[str], None]
@@ -30,6 +32,18 @@ class ClientFactory(Protocol):
 
 class BackendFactory(Protocol):
     def __call__(self, **kwargs: Any) -> Any: ...
+
+
+class RuntimeResolver(Protocol):
+    def __call__(
+        self,
+        *,
+        platform_name: str,
+        private_files_dir: Path,
+        amy_socket: str | None,
+        amy_local_name: str | None,
+        package_smoke_test: bool,
+    ) -> RuntimeOverrides: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +81,10 @@ class ApplicationDependencies:
     socket_client: ClientFactory
     local_client: ClientFactory
     midi_input_port: MidiInputPortFactory
+    private_files_dir: Callable[[], Path]
+    resolve_package_runtime: RuntimeResolver
+    package_test_hooks: Callable[[bool], PackageTestHooks]
+    display_diagnostics: Callable[[str], tuple[str, ...]]
     backend: BackendFactory
 
 

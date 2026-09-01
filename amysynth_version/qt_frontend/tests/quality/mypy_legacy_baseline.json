@@ -3,7 +3,7 @@
   "tool": "mypy",
   "tool_version": "2.3.1",
   "recorded": "2026-09-01",
-  "total_errors": 43,
+  "total_errors": 42,
   "known_production_modules": [
     "code/amy_serial.py",
     "code/amy_transport.py",
@@ -33,7 +33,7 @@
     {"file": "code/amy_transport.py", "code": "var-annotated", "count": 2},
     {"file": "code/app_core.py", "code": "arg-type", "count": 12},
     {"file": "code/app_core.py", "code": "assignment", "count": 1},
-    {"file": "code/app_core.py", "code": "attr-defined", "count": 2},
+    {"file": "code/app_core.py", "code": "attr-defined", "count": 1},
     {"file": "code/app_core.py", "code": "call-overload", "count": 2},
     {"file": "code/app_core.py", "code": "index", "count": 1},
     {"file": "code/app_core.py", "code": "operator", "count": 4},

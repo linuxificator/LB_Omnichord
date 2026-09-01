@@ -17,7 +17,6 @@ from typing import Any, Literal
 from PySide6.QtCore import (
     QObject,
     Property,
-    QStandardPaths,
     QTimer,
     QUrl,
     Signal,
@@ -40,34 +39,13 @@ from drum_patterns import (
     DrumRhythm,
     load_drum_pattern_catalog,
 )
+from runtime_paths import production_frontend_asset_root
 from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
 
-ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
-
-
-def resolve_frontend_asset_root(
-    code_dir: Path,
-    packaged_root: Path | None = None,
-) -> Path:
-    """Find assets in source, frozen, or Android's flat staged layout."""
-
-    code_dir = Path(code_dir)
-    if all((code_dir / name).is_dir() for name in ASSET_DIRECTORIES):
-        return code_dir
-    if packaged_root is not None:
-        return Path(packaged_root)
-    return code_dir.parent
-
-
 CODE_DIR = Path(__file__).resolve().parent
-# PyInstaller exposes its data root as ``sys._MEIPASS``. Android's p4a stage
-# instead puts modules and data directories beside each other under ``app``.
-FRONTEND_DIR = resolve_frontend_asset_root(
-    CODE_DIR,
-    Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else None,
-)
+FRONTEND_DIR = production_frontend_asset_root(CODE_DIR)
 GUI_DIR = FRONTEND_DIR / "gui"
 CONFIG_DIR = FRONTEND_DIR / "config"
 INSTRUMENT_DIR = FRONTEND_DIR / "instruments"
@@ -4435,42 +4413,6 @@ def parse_arguments(
     return parser.parse_args(arguments)
 
 
-ANDROID_SMOKE_ENABLE = "lb-android-package-smoke.enable"
-ANDROID_SMOKE_STATUS = "lb-android-package-smoke.status"
-
-
-def configure_android_runtime(
-    args: argparse.Namespace,
-    *,
-    platform_name: str,
-    files_dir: Path,
-) -> Path | None:
-    """Select Android's private AMY socket and consume the CI smoke marker.
-
-    The AMY AAR and the Qt activity share one application UID.  Qt's Android
-    HomeLocation is Android's app-private files directory, which is also where
-    the AAR publishes ``amy.sock``.  Explicit command-line transports remain
-    authoritative for diagnostics and source-tree tests.
-    """
-
-    if str(platform_name).casefold() != "android":
-        return None
-
-    files_dir = Path(files_dir)
-    if not args.amy_socket and not args.amy_local_name:
-        args.amy_socket = str(files_dir / "amy.sock")
-
-    marker = files_dir / ANDROID_SMOKE_ENABLE
-    if not marker.is_file():
-        return None
-
-    marker.unlink()
-    status = files_dir / ANDROID_SMOKE_STATUS
-    status.unlink(missing_ok=True)
-    args.package_smoke_test = True
-    return status
-
-
 def run_application(
     args: argparse.Namespace,
     dependencies: ApplicationDependencies,
@@ -4480,16 +4422,10 @@ def run_application(
             "--package-smoke-test and --capture-screenshots-dir are exclusive"
         )
 
-    smoke_status_value = os.environ.get("OMNICHORD_PACKAGE_SMOKE_STATUS")
-    smoke_status = Path(smoke_status_value) if smoke_status_value else None
+    package_hooks = dependencies.package_test_hooks(bool(args.package_smoke_test))
 
     def smoke_checkpoint(label: str) -> None:
-        if not args.package_smoke_test or smoke_status is None:
-            return
-        smoke_status.parent.mkdir(parents=True, exist_ok=True)
-        with smoke_status.open("a", encoding="utf-8") as handle:
-            handle.write(f"{label}\n")
-            handle.flush()
+        package_hooks.checkpoint(label)
 
     smoke_checkpoint("frontend-entered")
 
@@ -4544,57 +4480,26 @@ def run_application(
     app.setApplicationName("Qt Omnichord")
     smoke_checkpoint("qgui-created")
 
-    android_smoke_status = configure_android_runtime(
-        args,
+    runtime = dependencies.resolve_package_runtime(
         platform_name=QGuiApplication.platformName(),
-        files_dir=Path(
-            QStandardPaths.writableLocation(QStandardPaths.HomeLocation)
-        ),
+        private_files_dir=dependencies.private_files_dir(),
+        amy_socket=args.amy_socket,
+        amy_local_name=args.amy_local_name,
+        package_smoke_test=bool(args.package_smoke_test),
     )
-    if android_smoke_status is not None:
-        smoke_status = android_smoke_status
+    args.amy_socket = runtime.amy_socket
+    args.amy_local_name = runtime.amy_local_name
+    args.package_smoke_test = runtime.package_smoke_test
+    package_hooks = package_hooks.redirected(
+        enabled=runtime.package_smoke_test,
+        status=runtime.smoke_status,
+    )
     smoke_checkpoint("android-runtime-configured")
 
-    print(
-        "Qt Omnichord display diagnostics:",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  QPA platform: {QGuiApplication.platformName()}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  XDG_SESSION_TYPE: {os.environ.get('XDG_SESSION_TYPE', '<unset>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  WAYLAND_DISPLAY: {os.environ.get('WAYLAND_DISPLAY', '<unset>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  DISPLAY: {os.environ.get('DISPLAY', '<unset>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  QT_QPA_PLATFORM: {os.environ.get('QT_QPA_PLATFORM', '<auto>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  QT_QUICK_BACKEND: {os.environ.get('QT_QUICK_BACKEND', '<default>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  QSG_RHI_BACKEND: {os.environ.get('QSG_RHI_BACKEND', '<default>')}",
-        file=sys.stderr,
-        flush=True,
-    )
+    for diagnostic in dependencies.display_diagnostics(
+        QGuiApplication.platformName()
+    ):
+        print(diagnostic, file=sys.stderr, flush=True)
     smoke_checkpoint("display-diagnostics-written")
 
     def transport_notice(

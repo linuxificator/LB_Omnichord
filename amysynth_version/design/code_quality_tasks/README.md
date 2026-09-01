@@ -23,3 +23,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T11 | `T11_EXPLICIT_COMPOSITION_ROOT.md` | complete |
 | T12 | `T12_SINGLE_CONFIG_AUTHORITY.md` | complete |
 | T13 | `T13_MIDI_PLATFORM_EVENT_BOUNDARY.md` | complete |
+| T14 | `T14_RUNTIME_PLATFORM_ADAPTERS.md` | complete |

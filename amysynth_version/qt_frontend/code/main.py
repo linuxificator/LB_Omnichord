@@ -1,19 +1,9 @@
 from __future__ import annotations
 
-import os
-import sys
 from argparse import Namespace
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, cast
-
-# PyInstaller's Windows `--windowed` bootloader deliberately supplies no
-# console streams. Install harmless sinks before importing modules which write
-# diagnostics during application startup.
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w", encoding="utf-8")
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w", encoding="utf-8")
 
 import app_core
 from application_composition import (
@@ -27,11 +17,19 @@ from catalog_extensions import load_synth_catalog as load_extended_synth_catalog
 from config_loader import load_amy_config, load_resolved_amy_config
 from midi_integration import InstrumentBackend
 from midi_platform_adapters import production_midi_input_port
+from package_test_hooks import PackageTestHooks
 from program_amy import (
     ProgramAmyLocalClient,
     ProgramAmySerialClient,
     ProgramAmySocketClient,
 )
+from runtime_diagnostics import display_diagnostic_lines
+from runtime_paths import qt_private_files_dir
+from runtime_platform_adapters import resolve_package_runtime
+from windows_launcher import guarded_package_main, prepare_windowed_console_streams
+
+
+prepare_windowed_console_streams()
 
 
 # Explicit compatibility exports for the supported headless integration
@@ -81,6 +79,10 @@ def production_dependencies(
         socket_client=cast(ClientFactory, ProgramAmySocketClient),
         local_client=cast(ClientFactory, ProgramAmyLocalClient),
         midi_input_port=production_midi_input_port,
+        private_files_dir=qt_private_files_dir,
+        resolve_package_runtime=resolve_package_runtime,
+        package_test_hooks=PackageTestHooks.from_environment,
+        display_diagnostics=display_diagnostic_lines,
         backend=cast(BackendFactory, InstrumentBackend),
     )
 
@@ -99,17 +101,7 @@ def main(
 
 
 def _guarded_main() -> int:
-    if not os.environ.get("OMNICHORD_PACKAGE_SMOKE_STATUS"):
-        return main()
-    try:
-        return main()
-    except Exception as exc:
-        # A --windowed PyInstaller executable otherwise displays an error
-        # dialog that cannot be dismissed on a headless CI runner.
-        status = Path(os.environ["OMNICHORD_PACKAGE_SMOKE_STATUS"])
-        with status.open("a", encoding="utf-8") as handle:
-            handle.write(f"fatal-error {type(exc).__name__}: {exc}\n")
-        return 1
+    return guarded_package_main(main)
 
 
 if __name__ == "__main__":

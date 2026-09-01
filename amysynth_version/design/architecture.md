@@ -59,18 +59,20 @@ fork's Android service and decoupled hello-world reference.
 
 The Android APK packages that service as an AAR. Its unexported lifecycle
 provider starts a separate `:amy` process under the application's UID; Oboe owns
-audio there. Qt resolves Android's actual app-private files directory with
-`QStandardPaths` and connects to `amy.sock` without importing AMY, loading JNI
-or taking over service lifecycle. The pinned Android AMY host profile provides
-the complete 336-oscillator/11-bus application capacity.
+audio there. A runtime-path adapter resolves Android's actual app-private files
+directory with `QStandardPaths`; a separate package-runtime adapter selects
+`amy.sock` and consumes the CI smoke marker. The portable startup runner only
+applies the resulting immutable values and never imports AMY, loads JNI or
+takes over service lifecycle. The pinned Android AMY host profile provides the
+complete 336-oscillator/11-bus application capacity.
 
-Platform-specific code is not permitted in the Qt application beyond a single
-startup preamble when platform facilities make it unavoidable. Android uses
-that exception only to select the app-private socket path and consume the CI
-smoke marker; Windows transport selection is capability-driven. Packaging,
-service lifecycle, Oboe/AAudio, named-pipe and operating-system build logic all
-remain outside the portable Qt behavior. Asset-root discovery is based on the
-packaged directory layout rather than an operating-system name.
+Platform-specific decisions are confined to named adapters supplied by the
+single composition root. Android private paths/markers, Linux/XDG display
+diagnostics and Windows windowed-console/fatal-smoke handling are not present in
+`app_core.py`. Packaging, service lifecycle, Oboe/AAudio, named-pipe and
+operating-system build logic remain outside portable Qt behavior. Asset-root
+discovery is based on packaged directory layout rather than an operating-system
+name. AST/source guards reject platform details returning to the portable core.
 
 The native Windows service/package is now built by the Windows packaging
 script as an experimental zip: `amy_service.exe` is compiled against the
