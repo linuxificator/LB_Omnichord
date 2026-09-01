@@ -101,6 +101,19 @@ validated config, adapters, services and QObject facade explicitly.
 Proof: alternate test composition uses the same constructors; mypy monkey-
 patch errors disappear; entry-point tests remain unchanged.
 
+### Q1.5a Isolate platform adapters
+
+Apply `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md`: keep one identical
+Omnichord core and move native/platform decisions into small imported or
+injected adapter modules selected once during composition. Start with MIDI
+input discovery/readers and the demonstrated Linux-profile defect; then
+runtime paths/test hooks and concrete AMY byte sinks.
+
+Proof: an AST/import boundary rejects platform branches and native imports in
+the portable core; fake-port core tests run without probing the host; all five
+packages select the expected adapters from the real shipped configuration and
+retain identical musical/QML/wire behavior.
+
 ### Q1.6 Freeze public QML facade contract
 
 Add semantic QObject introspection and behavior tests for intended properties,
@@ -217,13 +230,14 @@ Keep branches narrow. An example sequence:
 1. `fix/midi-tech-profile-config`
 2. `rework/versioned-config-schema`
 3. `rework/explicit-composition`
-4. `rework/midi-event-thread-boundary`
-5. `rework/transport-health-bounds`
-6. `rework/pure-command-plans`
-7. `rework/domain-state-boundaries`
-8. `rework/qml-control-primitives`
-9. `rework/test-quality-gates`
-10. `automation/release-provenance`
+4. `rework/platform-adapter-boundary`
+5. `rework/midi-event-thread-boundary`
+6. `rework/transport-health-bounds`
+7. `rework/pure-command-plans`
+8. `rework/domain-state-boundaries`
+9. `rework/qml-control-primitives`
+10. `rework/test-quality-gates`
+11. `automation/release-provenance`
 
 The user may choose a different grouping. Do not merge several phases merely
 because they appear in one roadmap.

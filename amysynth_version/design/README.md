@@ -48,6 +48,9 @@ small, behavior-preserving phase:
   validation, migration and duplicated defaults;
 - `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md` — dependency direction,
   composition, state ownership and incremental component boundaries;
+- `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md` — one identical
+  platform-neutral Omnichord core with platform-specific behavior isolated in
+  imported/injected adapter modules;
 - `CODEX_HANDOVER_PYTHON_MODULARITY_AND_TYPES.md` — Python hotspots, typing,
   public interfaces, errors and tooling;
 - `CODEX_HANDOVER_QML_UI_ARCHITECTURE.md` — QML responsibilities, reusable
@@ -94,6 +97,7 @@ Then add every row that matches the task:
 | ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |
 | Architecture, code quality or refactoring | `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md`, the relevant dedicated audit handover, `CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md`, plus every owning subsystem contract touched by the proposed change |
+| Platform-dependent application code or adapter extraction | `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md`, `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md`, `CODEX_HANDOVER_PORTABILITY_RELEASE_AND_SECURITY.md`, plus the platform/package contracts selected above |
 
 When a selected document points to a more specific behavioral contract, read
 that contract too. Historical files under `qt_frontend/docs/history/` and the
