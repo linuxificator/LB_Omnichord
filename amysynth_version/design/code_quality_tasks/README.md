@@ -11,3 +11,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | Task | Result handover | Status |
 | --- | --- | --- |
 | T01 | `T01_DOCUMENT_AUTHORITY.md` | complete |
+| T02 | `T02_CANONICAL_DRUM_DATA.md` | complete |

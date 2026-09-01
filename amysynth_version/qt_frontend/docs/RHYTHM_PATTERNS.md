@@ -151,11 +151,13 @@ longer fire while the sequencer is paused.
 
 ## Assets and regression gates
 
-Runtime assets live below `music/drums/`; the files below
-`design/rhythm_rework/new_patterns/` remain their design source. Every desktop
-packager copies the full `music` tree, Android stages it recursively, and the
-package self-test explicitly requires the drum timing, continuation and tiny
-mapping files.
+Runtime assets below `music/drums/` are the single canonical executable and
+design data source. The historical design handovers remain below
+`design/rhythm_rework/new_patterns/`; their machine-readable
+`canonical_drum_data_manifest.json` links each discussed file to the runtime
+tree and records its reviewed SHA-256. Every desktop packager copies the full
+`music` tree, Android stages it recursively, and the package self-test
+explicitly requires the drum timing, continuation and tiny mapping files.
 
 Unit tests validate every catalogue entry, all kit mappings, exact complete
 activity-level selection, all 270 preloaded definitions, the 64-event limit,

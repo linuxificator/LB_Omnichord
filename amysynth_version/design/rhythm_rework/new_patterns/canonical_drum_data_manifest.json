@@ -1,0 +1,42 @@
+{
+  "manifest_revision": 1,
+  "canonical_root": "../../../qt_frontend/music/drums",
+  "files": [
+    {
+      "name": "drum_activity_instruments_gamma9001.json",
+      "sha256": "21143a689ad45bbea751b81659c594ce71179b95da53f932ebeef5755d27696d"
+    },
+    {
+      "name": "drum_activity_instruments_general_midi.json",
+      "sha256": "ceb11d87ed6af53ea605b81d1baebbb737031d558282ea1c190e2a86077c22c1"
+    },
+    {
+      "name": "drum_activity_instruments_tiny.json",
+      "sha256": "b0e2ac46e50613fc400016a07508ab6260bfd6e672d230cfb95ff8bb14ea562e"
+    },
+    {
+      "name": "drum_activity_timing.json",
+      "sha256": "91b01030832ee7cd4d470bb5671fe04a2875966efa99f1cfb92a673e4158196c"
+    },
+    {
+      "name": "drum_fill_continuation_roles.json",
+      "sha256": "4faf22e95ce42ee564158fcfd25588117278513baee0944d2c2e069b229059b3"
+    },
+    {
+      "name": "drum_fills_instruments_gamma9001.json",
+      "sha256": "64d10e616efd1f37a3f9841f6e4a0fc34d9893a6c42fc1de797211ddadf4a191"
+    },
+    {
+      "name": "drum_fills_instruments_general_midi.json",
+      "sha256": "67df87f7ed540f0359363e471e5130725a89d48e30e5898049874848ae3e5438"
+    },
+    {
+      "name": "drum_fills_instruments_tiny.json",
+      "sha256": "089856e64ab7a3cd5244f9ac0da000b31a52f82fafc38a5294a10fceb39488be"
+    },
+    {
+      "name": "drum_fills_timing.json",
+      "sha256": "c9cef2ab4afda67042a03d630408e2d58d5e6fcab81ccc47caea79663092b527"
+    }
+  ]
+}
