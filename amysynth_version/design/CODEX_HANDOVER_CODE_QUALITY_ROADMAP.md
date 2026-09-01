@@ -13,6 +13,10 @@ ordinary Git history.
 This roadmap does not authorize implementation. Future work should select one
 phase/task, reread its owning contracts and obtain normal user direction.
 
+The concrete dependency-aware execution order, task prerequisites and proof are
+maintained in `CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md`. Use that handover
+to select the next task; this roadmap remains the shorter phase-level view.
+
 ## Priority terminology
 
 - P0: demonstrated current correctness/portability issue.

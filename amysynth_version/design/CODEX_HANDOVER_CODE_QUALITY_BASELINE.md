@@ -35,6 +35,7 @@ does not propose LB-specific changes to Shorepine AMY.
 | Portability, release integrity and security | `CODEX_HANDOVER_PORTABILITY_RELEASE_AND_SECURITY.md` |
 | Documentation and repository hygiene | `CODEX_HANDOVER_DOCUMENTATION_AND_REPOSITORY_HYGIENE.md` |
 | Prioritized, incremental execution plan | `CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md` |
+| Dependency-aware concrete task queue | `CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md` |
 
 ## Method
 
