@@ -18,9 +18,6 @@
     "rhythm",
     "performance",
     "amy_max_oscs",
-    "amy_max_patterns",
-    "amy_max_pattern_tags",
-    "amy_max_pattern_instances",
     "amy_max_buses",
     "debug",
     "patch_compatibility",
@@ -72,7 +69,7 @@
     "midi_input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "tech_profile", "device_glob", "alsa_raw_globs", "oss_midi_globs"],
+      "required": ["enabled", "device_glob"],
       "properties": {
         "enabled": {"type": "boolean"},
         "tech_profile": {"type": "string", "minLength": 1},
@@ -106,7 +103,7 @@
     "drums": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kit", "velocity_gain", "sample_map"],
+      "required": ["velocity_gain", "sample_map"],
       "properties": {
         "kit": {"enum": ["tiny", "gamma9001", "general_midi"]},
         "velocity_gain": {"type": "number", "exclusiveMinimum": 0, "maximum": 20},

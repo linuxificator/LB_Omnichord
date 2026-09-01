@@ -42,6 +42,7 @@ def self_test() -> int:
         APP_ROOT / "config" / "schema" / "amy_config_v1.schema.json",
         APP_ROOT / "config" / "schema" / "amy_config_v2.schema.json",
         APP_ROOT / "config" / "schema" / "amy_config_v3.schema.json",
+        APP_ROOT / "config" / "schema" / "amy_config_v4.schema.json",
         APP_ROOT / "config" / "defaults.json",
         APP_ROOT / "gui" / "Main.qml",
         APP_ROOT / "instruments" / "synths.json",

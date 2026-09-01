@@ -8,9 +8,11 @@ Last verified: 2026-09-01
 ## Authority and revision
 
 `qt_frontend/config/amy_config.json` is the shipped configuration authority.
-It declares `config_revision`; current revision 3 is structurally defined by
-`config/schema/amy_config_v3.schema.json`. Historical revisions 1 and 2 remain
-packaged so their contracts are inspectable. Unknown keys inside stable objects,
+It declares `config_revision`; current revision 4 is structurally defined by
+`config/schema/amy_config_v4.schema.json`. Historical revisions 1–3 remain
+packaged so their contracts are inspectable; the three pattern capacities are
+optional there, as are the later MIDI discovery fields and drum-kit identity;
+all are required from revision 4 onward. Unknown keys inside stable objects,
 missing required values and wrong types are startup errors. Required operational
 values must not reappear as consumer fallbacks.
 
@@ -65,6 +67,15 @@ Revision 2 to 3 adds the previously hardcoded contiguous pattern layout:
 fills 0–935, chord one-shots 936–999 and drum bases 1000–1023. Validation
 requires these ranges to be contiguous and to end exactly at
 `amy_max_patterns`.
+Revision 3 to 4 repairs the pattern-capacity contract added after the earlier
+revision-3 release: it adds missing `amy_max_patterns`,
+`amy_max_pattern_tags` and `amy_max_pattern_instances` values while preserving
+any values already present. The same revision completes the portable MIDI
+discovery lists and infers the missing drum-kit identity from a recognized
+legacy tiny, Gamma9001 or General MIDI sample map; an unknown map fails with a
+path-specific error instead of being mislabeled. These are versioned historical
+migration values, not runtime fallbacks; structural and domain validation still
+reject invalid custom capacities.
 Because revision-1 full documents cannot distinguish that old default from an
 intentional diagnostic selection, a user who deliberately forced `linux` must
 reapply it after migration. Future and malformed revisions fail at

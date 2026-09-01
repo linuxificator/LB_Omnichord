@@ -1,5 +1,5 @@
 {
-  "config_revision": 3,
+  "config_revision": 4,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,

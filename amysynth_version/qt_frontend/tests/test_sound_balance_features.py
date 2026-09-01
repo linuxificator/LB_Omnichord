@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 import app_core  # noqa: E402
+from config_migrations import CURRENT_CONFIG_REVISION  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
 from midi_input import (  # noqa: E402
     MidiByteStreamParser,
@@ -133,7 +134,9 @@ class SoundBalanceFeatureTests(unittest.TestCase):
 
                 user_data.ensure_user_configs(shipped)
                 migrated = json.loads(target.read_text(encoding="utf-8"))
-                self.assertEqual(migrated["config_revision"], 3)
+                self.assertEqual(
+                    migrated["config_revision"], CURRENT_CONFIG_REVISION
+                )
                 self.assertEqual(migrated["voices"]["rhythm_chord"], 7)
                 self.assertEqual(migrated["serial"]["baud"], 230_400)
                 self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")
@@ -150,6 +153,69 @@ class SoundBalanceFeatureTests(unittest.TestCase):
                 self.assertEqual(
                     json.loads(target.read_text())["voices"]["rhythm_chord"],
                     8,
+                )
+            finally:
+                user_data.USER_CONFIG_DIR = original
+
+    def test_revision_two_user_config_gains_pattern_capacities_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shipped = root / "shipped"
+            shipped.mkdir()
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
+            (shipped / "amy_config.json").write_text(
+                json.dumps(shipped_config), encoding="utf-8"
+            )
+            original = user_data.USER_CONFIG_DIR
+            try:
+                user_data.USER_CONFIG_DIR = root / "user"
+                user_data.USER_CONFIG_DIR.mkdir()
+                target = user_data.USER_CONFIG_DIR / "amy_config.json"
+                legacy = json.loads(json.dumps(shipped_config))
+                legacy["config_revision"] = 2
+                legacy["serial"]["baud"] = 230_400
+                legacy["rhythm"].pop("pattern_ranges")
+                for key in (
+                    "amy_max_patterns",
+                    "amy_max_pattern_tags",
+                    "amy_max_pattern_instances",
+                ):
+                    legacy.pop(key)
+                legacy["midi_input"].pop("tech_profile")
+                legacy["midi_input"].pop("alsa_raw_globs")
+                legacy["midi_input"].pop("oss_midi_globs")
+                legacy["drums"].pop("kit")
+                target.write_text(json.dumps(legacy), encoding="utf-8")
+
+                user_data.ensure_user_configs(shipped)
+
+                migrated = json.loads(target.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    migrated["config_revision"], CURRENT_CONFIG_REVISION
+                )
+                self.assertEqual(migrated["amy_max_patterns"], 1024)
+                self.assertEqual(migrated["amy_max_pattern_tags"], 64)
+                self.assertEqual(migrated["amy_max_pattern_instances"], 32)
+                self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")
+                self.assertEqual(
+                    migrated["midi_input"]["alsa_raw_globs"],
+                    [legacy["midi_input"]["device_glob"]],
+                )
+                self.assertEqual(
+                    migrated["midi_input"]["oss_midi_globs"],
+                    ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"],
+                )
+                self.assertEqual(migrated["drums"]["kit"], "tiny")
+                self.assertEqual(migrated["serial"]["baud"], 230_400)
+                self.assertEqual(
+                    json.loads(
+                        target.with_suffix(".json.previous").read_text(
+                            encoding="utf-8"
+                        )
+                    ),
+                    legacy,
                 )
             finally:
                 user_data.USER_CONFIG_DIR = original

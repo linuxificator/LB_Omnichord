@@ -38,7 +38,9 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(legacy, before)
         self.assertEqual(migrated.source_revision, 0)
         self.assertEqual(migrated.target_revision, CURRENT_CONFIG_REVISION)
-        self.assertEqual(migrated.data["config_revision"], 3)
+        self.assertEqual(
+            migrated.data["config_revision"], CURRENT_CONFIG_REVISION
+        )
         self.assertEqual(migrated.data["voices"]["rhythm_chord"], 7)
         self.assertEqual(migrated.data["midi_input"]["tech_profile"], "auto")
         self.assertEqual(migrated.data["serial"]["baud"], 230_400)
@@ -97,6 +99,101 @@ class ConfigMigrationTests(unittest.TestCase):
             migrated.changed_paths,
             ("$.rhythm.pattern_ranges", "$.config_revision"),
         )
+
+    def test_revision_three_adds_missing_pattern_capacities(self) -> None:
+        legacy = copy.deepcopy(self.shipped)
+        legacy["config_revision"] = 3
+        for key in (
+            "amy_max_patterns",
+            "amy_max_pattern_tags",
+            "amy_max_pattern_instances",
+        ):
+            legacy.pop(key)
+
+        migrated = migrate_config_document(legacy)
+
+        self.assertEqual(migrated.data["config_revision"], 4)
+        self.assertEqual(migrated.data["amy_max_patterns"], 1024)
+        self.assertEqual(migrated.data["amy_max_pattern_tags"], 64)
+        self.assertEqual(migrated.data["amy_max_pattern_instances"], 32)
+        self.assertEqual(
+            migrated.changed_paths,
+            (
+                "$.amy_max_patterns",
+                "$.amy_max_pattern_tags",
+                "$.amy_max_pattern_instances",
+                "$.config_revision",
+            ),
+        )
+        resolved = resolve_amy_config_data(
+            migrated.data,
+            source_path=self.shipped_path,
+            source_kind="user",
+        )
+        self.assertEqual(resolved.capacities.max_patterns, 1024)
+        self.assertEqual(resolved.capacities.max_pattern_tags, 64)
+        self.assertEqual(resolved.capacities.max_pattern_instances, 32)
+
+    def test_historical_schemas_make_revision_four_capacities_optional(self) -> None:
+        capacity_keys = {
+            "amy_max_patterns",
+            "amy_max_pattern_tags",
+            "amy_max_pattern_instances",
+        }
+        schema_root = ROOT / "config" / "schema"
+        for revision in (1, 2, 3, 4):
+            schema = json.loads(
+                (schema_root / f"amy_config_v{revision}.schema.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            required = set(schema["required"])
+            with self.subTest(revision=revision):
+                if revision < 4:
+                    self.assertTrue(capacity_keys.isdisjoint(required))
+                else:
+                    self.assertTrue(capacity_keys.issubset(required))
+                midi_required = set(schema["properties"]["midi_input"]["required"])
+                drum_required = set(schema["properties"]["drums"]["required"])
+                added_midi = {"tech_profile", "alsa_raw_globs", "oss_midi_globs"}
+                if revision < 4:
+                    self.assertTrue(added_midi.isdisjoint(midi_required))
+                    self.assertNotIn("kit", drum_required)
+                else:
+                    self.assertTrue(added_midi.issubset(midi_required))
+                    self.assertIn("kit", drum_required)
+
+    def test_revision_four_infers_gamma_and_general_midi_kits(self) -> None:
+        gamma = copy.deepcopy(self.shipped)
+        gamma["config_revision"] = 3
+        gamma["drums"].pop("kit")
+        gamma["drums"]["sample_map"]["bd_haus"] = {"preset": 0, "note": 60}
+        gamma["drums"]["sample_map"]["drum_snare_hard"] = {
+            "preset": 12,
+            "note": 45,
+        }
+        self.assertEqual(
+            migrate_config_document(gamma).data["drums"]["kit"],
+            "gamma9001",
+        )
+
+        general_midi = copy.deepcopy(self.shipped)
+        general_midi["config_revision"] = 3
+        general_midi["drums"].pop("kit")
+        for sample in general_midi["drums"]["sample_map"].values():
+            sample["preset"] = 258
+        self.assertEqual(
+            migrate_config_document(general_midi).data["drums"]["kit"],
+            "general_midi",
+        )
+
+    def test_revision_four_rejects_an_unknown_legacy_drum_map(self) -> None:
+        unknown = copy.deepcopy(self.shipped)
+        unknown["config_revision"] = 3
+        unknown["drums"].pop("kit")
+        unknown["drums"]["sample_map"]["bd_haus"] = {"preset": 99, "note": 1}
+        with self.assertRaisesRegex(ConfigMigrationError, "cannot infer"):
+            migrate_config_document(unknown)
 
     def test_current_revision_is_idempotent(self) -> None:
         migrated = migrate_config_document(self.shipped)

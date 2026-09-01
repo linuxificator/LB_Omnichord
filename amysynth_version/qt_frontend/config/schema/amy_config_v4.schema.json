@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://linuxificator.github.io/lb-omnichord/schema/amy_config_v1.schema.json",
-  "title": "LB Omnichord AMY configuration revision 1",
+  "$id": "https://linuxificator.github.io/lb-omnichord/schema/amy_config_v4.schema.json",
+  "title": "LB Omnichord AMY configuration revision 4",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,13 +18,16 @@
     "rhythm",
     "performance",
     "amy_max_oscs",
+    "amy_max_patterns",
+    "amy_max_pattern_tags",
+    "amy_max_pattern_instances",
     "amy_max_buses",
     "debug",
     "patch_compatibility",
     "buses"
   ],
   "properties": {
-    "config_revision": {"type": "integer", "const": 1},
+    "config_revision": {"type": "integer", "const": 4},
     "serial": {
       "type": "object",
       "additionalProperties": false,
@@ -69,7 +72,7 @@
     "midi_input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "device_glob"],
+      "required": ["enabled", "tech_profile", "device_glob", "alsa_raw_globs", "oss_midi_globs"],
       "properties": {
         "enabled": {"type": "boolean"},
         "tech_profile": {"type": "string", "minLength": 1},
@@ -103,7 +106,7 @@
     "drums": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["velocity_gain", "sample_map"],
+      "required": ["kit", "velocity_gain", "sample_map"],
       "properties": {
         "kit": {"enum": ["tiny", "gamma9001", "general_midi"]},
         "velocity_gain": {"type": "number", "exclusiveMinimum": 0, "maximum": 20},
@@ -131,7 +134,8 @@
         "max_rhythm_chord_notes",
         "sequencer_reset_guard_ms",
         "max_sequencer_tags",
-        "tag_ranges"
+        "tag_ranges",
+        "pattern_ranges"
       ],
       "properties": {
         "chord_gate_beats": {"type": "number", "exclusiveMinimum": 0, "maximum": 8},
@@ -147,6 +151,16 @@
             "drums": {"$ref": "#/definitions/tag_range"},
             "bass": {"$ref": "#/definitions/tag_range"},
             "chords": {"$ref": "#/definitions/tag_range"}
+          }
+        },
+        "pattern_ranges": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fills", "chords", "drum_bases"],
+          "properties": {
+            "fills": {"$ref": "#/definitions/tag_range"},
+            "chords": {"$ref": "#/definitions/tag_range"},
+            "drum_bases": {"$ref": "#/definitions/tag_range"}
           }
         }
       }
