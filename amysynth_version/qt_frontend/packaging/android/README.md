@@ -77,6 +77,9 @@ with the explicit dependency order `Core`, `Gui`, `Network`, `OpenGL`, `Qml`,
 compiled APK resource table. In particular, `Quick` must load before
 `QuickControls2`; otherwise the latter can pull in the former as an ordinary
 native dependency before its Android JNI initialization is ready.
+`QtWidgets` is retained as a Python binding because the packaged acceptance
+path's `QtTest` binding imports it transitively; it is not an extra JNI startup
+module or a product UI framework.
 
 ## Volume notation
 

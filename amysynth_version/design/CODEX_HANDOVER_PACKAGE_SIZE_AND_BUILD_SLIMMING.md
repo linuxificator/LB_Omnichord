@@ -44,8 +44,10 @@ Android first verifies the unchanged official target-wheel SHA-256, then
 `packaging/android/prune_pyside_wheel.py` creates a separate valid wheel. It
 uses the reviewed bindings/QML/platform roots and recursively follows actual
 ELF `DT_NEEDED` entries. For the official arm64 6.11.2 input this reduced the
-wheel from 83,924,266 to 20,935,122 bytes (75.1%) while retaining 40 native
-libraries and all 11 reviewed QML modules. It rewrites wheel `RECORD`; the
+wheel from 83,924,266 to 22,860,307 bytes (72.8%) while retaining 41 native
+libraries and all 11 reviewed QML modules. The extra retained binding is
+`QtWidgets`, imported transitively by the packaged `QtTest` acceptance path.
+It rewrites wheel `RECORD`; the
 source/output hashes and retained native inventory are package evidence. The
 APK receives a second nested-bundle content audit.
 
@@ -144,6 +146,8 @@ Portable Python directly needs these PySide modules:
 - `QtQuick`;
 - `QtQuickControls2`;
 - `QtTest` only for the packaged acceptance path.
+- `QtWidgets` only as the binding imported transitively by that `QtTest`
+  acceptance path.
 
 Android additionally loads `OpenGL` explicitly. The product QML imports only
 QtQuick, QtQuick.Controls, QtQuick.Window and QtQuick.Shapes. Application

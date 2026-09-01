@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import configparser
+import json
 import sys
 import tempfile
 import unittest
@@ -341,6 +342,14 @@ class AndroidPackagingTests(unittest.TestCase):
         self.assertIn(".package-audit.json", workflow)
         self.assertIn("actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809", workflow)
         self.assertIn("android-p4a-v1-", workflow)
+        manifest = json.loads(
+            (FRONTEND / "packaging" / "qt_runtime_manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn("PySide6.QtWidgets", manifest["python_modules"])
+        self.assertIn("PySide6.QtOpenGL", manifest["python_modules"])
+        self.assertNotIn("Widgets", manifest["android_load_order"])
 
 
 if __name__ == "__main__":

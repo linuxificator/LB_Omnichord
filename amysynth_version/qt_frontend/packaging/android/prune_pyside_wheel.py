@@ -132,7 +132,12 @@ def prune_wheel(
                 raise ValueError(f"duplicate Android native library name {basename}")
             libraries[basename] = native_dir / name
 
-        binding_roots = {f"Qt{module}.abi3.so" for module in modules}
+        binding_modules = {
+            name.removeprefix("PySide6.Qt")
+            for name in manifest["python_modules"]
+            if name.startswith("PySide6.Qt")
+        }
+        binding_roots = {f"Qt{module}.abi3.so" for module in binding_modules}
         binding_roots.add("libpyside6.abi3.so")
         if "Qml" in modules:
             binding_roots.add("libpyside6qml.abi3.so")
