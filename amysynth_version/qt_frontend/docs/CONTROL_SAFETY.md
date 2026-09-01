@@ -1,5 +1,10 @@
 # Synth control safety policy
 
+Status: authoritative synth-control safety contract
+Owner: Qt control limits and AMY command validation
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 The Qt frontend exposes musical controls in physical/display units, but those controls ultimately modify real-time DSP parameters in AMY. Catalogue ranges therefore are not merely UI hints: every user-editable value has a deliberately bounded application range and the same hard envelope is enforced again at the AMY serial receiver.
 
 The shared hard limits live in `code/control_limits.py`. Catalogue entries may narrow a hard range, but may not widen it. `SynthState` clamps UI and preset input, and `AmySerialClient` clamps received sparse parameter state before it reaches AMY. Non-finite values are rejected.

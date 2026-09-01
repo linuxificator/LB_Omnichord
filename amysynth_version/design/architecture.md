@@ -1,5 +1,10 @@
 # Architecture
 
+Status: authoritative architecture contract
+Owner: application/process/transport architecture
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Main data flow
 
 The frontend architecture is:

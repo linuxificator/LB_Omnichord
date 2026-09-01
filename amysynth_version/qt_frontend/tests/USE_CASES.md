@@ -1,5 +1,10 @@
 # AMY Omnichord regression catalogue
 
+Status: authoritative executable regression-scenario contract
+Owner: frontend integration/native/package tests
+Applies to: active `amysynth_version/qt_frontend` implementation
+Last verified: 2026-09-01
+
 This file is the executable-test contract for the active `amysynth_version/qt_frontend` application. The Sonic Pi version is frozen and is intentionally outside this test plan.
 
 The application has three observable layers:

@@ -1,5 +1,10 @@
 # Installation
 
+Status: authoritative installation/launch guide
+Owner: frontend runtime and packaging
+Applies to: active source and released package layouts
+Last verified: 2026-09-01
+
 This document covers the three runtime layouts for the AMY version of LB
 Omnichord:
 
@@ -325,18 +330,19 @@ OMNI and MIDI each have independent header reverb state. Within either section,
 
 # Linux MIDI input
 
-The frontend reads ALSA raw-MIDI devices matching `/dev/snd/midiC*D*` by
-default. Check them with `amidi -l`. VMPK is normally an ALSA Sequencer-only
-source and therefore needs a virtual raw bridge for the current backend:
+The frontend reads ALSA raw-MIDI devices matching `/dev/snd/midiC*D*` and also
+creates an ALSA Sequencer input named `LB Omnichord` with port `MIDI In`.
+Check raw devices with `amidi -l` and sequencer ports with `aconnect -lio` or
+`qpwgraph`. VMPK can connect directly to the Omnichord sequencer port; a virtual
+raw bridge is not required.
 
 ```bash
-sudo modprobe snd-virmidi
-amidi -l
 aconnect -lio
 ```
 
-Select a Virtual Raw MIDI ALSA output in VMPK, then start/restart Omnichord.
-Direct ALSA Sequencer subscription is not implemented.
+Start Omnichord, then select or connect `LB Omnichord / MIDI In` as VMPK's
+ALSA Sequencer output. Use `snd-virmidi` only when deliberately testing the raw
+MIDI reader rather than for ordinary VMPK input.
 
 # Automated tests
 

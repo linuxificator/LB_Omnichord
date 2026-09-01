@@ -1,5 +1,10 @@
 # Preset Design
 
+Status: authoritative preset ownership/persistence contract
+Owner: OMNI and MIDI preset subsystems
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Separation
 
 OMNI and MIDI presets are separate files and separate code paths.

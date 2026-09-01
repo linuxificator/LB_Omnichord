@@ -1,5 +1,10 @@
 # Unclear items and conflicts
 
+Status: active open-items register; not authoritative over subsystem contracts
+Owner: design index (`README.md`)
+Applies to: unresolved active `amysynth_version` questions only
+Last verified: 2026-09-01
+
 Resolved decisions have been moved to their authoritative design documents.
 This file contains only genuinely open work.
 
@@ -10,11 +15,13 @@ rows, synth 11 for MIDI drums, and buses 0–10 as documented in
 `architecture.md`. The remaining work is validating/finalizing those resource
 limits and independent OMNI/MIDI room behavior in the ESP32-P4 AMY build.
 
-## USB MIDI
+## MIDI input selection and non-Linux native bridges
 
-The current policy is configurable ALSA raw MIDI using `/dev/snd/midiC*D*`.
-Direct ALSA Sequencer support and a UI device selector remain possible future
-work, particularly for software sources such as VMPK.
+Linux ALSA raw and ALSA Sequencer input are implemented as documented in
+`midi.md`; VMPK can connect directly to `LB Omnichord / MIDI In`. Remaining
+possible work is an explicit UI device selector and maintained native
+CoreMIDI, WinMM and Android MIDI adapters. `midi.md` owns current capability
+status.
 
 ## Live parameter changes
 

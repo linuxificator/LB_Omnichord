@@ -1,5 +1,10 @@
 # Native Windows architecture and status
 
+Status: authoritative native Windows architecture/status contract
+Owner: Windows package, launcher, transport and native service
+Applies to: experimental native Windows release path
+Last verified: 2026-09-01
+
 ## Decision
 
 Windows is a native target. Running the Linux AppImage through WSL2/WSLg is
@@ -98,7 +103,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
 | Native Windows frontend transport | The launcher supplies a unique Windows named-pipe name; `QLocalSocket` sends LF-framed requests without opening a network port. |
 | Windows package/release | CI builds an experimental portable zip with separate service/frontend executables and bundled dependencies. It performs an offline native AMY render test and starts the unpacked double-click launcher, offscreen Qt/QML frontend and named-pipe service end to end; no physical validation yet for pointer hardware, audio or MIDI. |
-| Windows MIDI input | Not implemented; the current reader is Linux ALSA raw MIDI only. |
+| Windows MIDI input | Not implemented; Linux currently has ALSA raw, ALSA Sequencer and OSS readers, while no maintained WinMM adapter is bundled yet. |
 
 The Windows build script selects the newest supported Visual Studio CMake
 generator installed on the host (currently Visual Studio 2026 in the Windows

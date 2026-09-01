@@ -1,5 +1,10 @@
 # MIDI Design
 
+Status: authoritative MIDI input and routing contract
+Owner: MIDI input/player subsystem
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Routing
 
 USB MIDI input is received on the Raspberry Pi and translated into AMY wire commands.

@@ -1,5 +1,10 @@
 # GUI Design
 
+Status: authoritative GUI structure contract
+Owner: Qt/QML user interface
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Screens
 
 The application has two main views:

@@ -73,6 +73,8 @@ small, behavior-preserving phase:
 - `CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md` — dependency-aware ordered
   implementation queue, including prerequisites, scope and proof for the first
   25 tasks.
+- `code_quality_tasks/README.md` — actual T01-T25 result handovers, verification
+  evidence and newly discovered follow-up work.
 
 ## Required reading route for Codex
 

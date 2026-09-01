@@ -1,5 +1,10 @@
 # AMY Interface Design
 
+Status: authoritative AMY wire/transport boundary contract
+Owner: AMY command and transport integration
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Wire command boundary
 
 The Qt application produces AMY wire commands only.

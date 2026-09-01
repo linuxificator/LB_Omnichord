@@ -1,5 +1,10 @@
 # Testing Design
 
+Status: authoritative test and release validation contract
+Owner: frontend test/release architecture
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 Tests are based on the executable use cases in
 `../qt_frontend/tests/USE_CASES.md`. The Sonic Pi implementation is frozen
 legacy material and is outside these tests and workflows.

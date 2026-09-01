@@ -1,5 +1,10 @@
 # Sound Balance, User Storage and Performance Controls
 
+Status: authoritative balance/storage/control contract
+Owner: performance controls and user storage
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## User-writable data
 
 The active user root is `~/.omnichord`. OMNI presets live in

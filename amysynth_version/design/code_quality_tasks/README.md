@@ -1,0 +1,13 @@
+# Code-quality task result handovers
+
+Status: active execution record
+Owner: `rework/code_quality`
+Applies to: T01-T25 from `../CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md`
+
+Each completed task has one result handover in this directory. The result
+records actual changes, verification, deviations, new findings and follow-up
+work. These files do not replace the authoritative subsystem contracts.
+
+| Task | Result handover | Status |
+| --- | --- | --- |
+| T01 | `T01_DOCUMENT_AUTHORITY.md` | complete |
