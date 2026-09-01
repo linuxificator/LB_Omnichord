@@ -350,6 +350,10 @@ def compose_application_graph(
         debug_file=args.debug_file,
         midi_input_port_factory=dependencies.midi_input_port,
     )
+    # Constructors establish object invariants only. Preset I/O, cross-facade
+    # wiring and MIDI reader startup begin after the complete concrete object
+    # exists, so base construction never dispatches to subclass overrides.
+    backend.initialize()
     return ApplicationGraph(
         resolved_config=resolved,
         client_selection=selection,

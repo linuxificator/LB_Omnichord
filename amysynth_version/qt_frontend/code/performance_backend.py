@@ -39,8 +39,6 @@ class InstrumentBackend(app_core.InstrumentBackend):
     chordArpeggioChanged = Signal()
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # Base construction loads a preset through virtual methods, so these
-        # fields must exist before super().__init__() starts.
         self._chord_gate_state = CHORD_GATE_OFF
         self._bass_voicing_shift = 0
         self._bass_riff_selector = 1

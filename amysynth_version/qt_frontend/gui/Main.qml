@@ -288,87 +288,30 @@ ApplicationWindow {
             scale: viewport.fittedScale
             transformOrigin: Item.TopLeft
 
-            Item {
-                id: birthdayTitle
-
+            OmniTitleSection {
                 x: 0
                 y: 0
                 width: contentArea.implicitWidth
                 height: window.sectionHeight
-                visible:
-                    window.titleHeight > 0
-
-                Text {
-                    x: window.omniTitleX
-                    y: 0
-                    width: window.omniTitleWidth
-                    height: parent.height
-
-                    text: headerTitleText
-                    color: "#493a38"
-
-                    font.family: headerTitleFont
-                    font.pixelSize:
-                        Math.max(
-                            14,
-                            window.titleHeight * 0.62
-                        )
-                    font.weight: Font.Medium
-
-                    horizontalAlignment:
-                        Text.AlignHCenter
-                    verticalAlignment:
-                        Text.AlignVCenter
-
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                }
-
-                Rectangle {
-                    id: strumModePanel
-
-                    x:
-                        window.strumX
-                        - window.presetRowHeight
-                    anchors.bottom: parent.bottom
-                    width:
-                        window.presetRowHeight
-                        + window.strumWidth
-                    height: window.presetRowHeight
-                    color: "#dcecf7"
-                    radius: 12
-                    border.color: "#8bb9d8"
-
-                    PresetResetButton {
-                        anchors.left: parent.left
-                        anchors.leftMargin:
-                            (
-                                window.presetRowHeight
-                                - width
-                            ) / 2
-                        anchors.verticalCenter:
-                            parent.verticalCenter
-                        width: 48
-                        height: 48
-                        text: window.strumLadderMode ? "LDR" : "APG"
-                        panelColor: "#5d9fd0"
-                        borderColor: "#2f648c"
-                        textColor: "#071c2c"
-                        midiControlRouter: backend.midiPlayer
-                        midiTarget: ({
-                            "screen": "omni",
-                            "kind": "button",
-                            "action": "strum_ladder"
-                        })
-                        onClicked: {
-                            if (!midiButtonHandled({
-                                "screen": "omni",
-                                "kind": "button",
-                                "action": "strum_ladder"
-                            })) {
-                                backend.toggleStrumLadderMode()
-                            }
-                        }
+                visible: window.titleHeight > 0
+                titleText: headerTitleText
+                titleFont: headerTitleFont
+                titleHeight: window.titleHeight
+                titleX: window.omniTitleX
+                titleWidth: window.omniTitleWidth
+                strumPanelX: window.strumX - window.presetRowHeight
+                presetRowHeight: window.presetRowHeight
+                strumWidth: window.strumWidth
+                ladderMode: window.strumLadderMode
+                midiControlRouter: backend.midiPlayer
+                onStrumModeToggleRequested: {
+                    const target = {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "strum_ladder"
+                    }
+                    if (!window.midiButtonHandled(target)) {
+                        backend.toggleStrumLadderMode()
                     }
                 }
             }
@@ -567,9 +510,7 @@ ApplicationWindow {
                 }
             }
 
-            Item {
-                id: strumNoteGuide
-
+            StrumNoteGuide {
                 x:
                     window.volumeX
                     + window.volumeWidth
@@ -580,61 +521,7 @@ ApplicationWindow {
                 height:
                     window.strumSynthY
                     - y
-
-                readonly property real markerSize:
-                    Math.min(34, width - 4)
-                readonly property real verticalMargin: 5
-
-                Repeater {
-                    id: strumNoteRepeater
-                    model: backend.strumNoteNames
-
-                    delegate: Rectangle {
-                        required property var modelData
-                        required property int index
-
-                        width: strumNoteGuide.markerSize
-                        height: width
-                        radius: width / 2
-                        x:
-                            (
-                                strumNoteGuide.width
-                                - width
-                            ) / 2
-                        y: {
-                            const availableHeight =
-                                strumNoteGuide.height
-                                - 2
-                                    * strumNoteGuide.verticalMargin
-                                - height
-                            if (strumNoteRepeater.count <= 1)
-                                return (
-                                    strumNoteGuide.height
-                                    - height
-                                ) / 2
-                            return strumNoteGuide.verticalMargin
-                                + index
-                                    * availableHeight
-                                    / (strumNoteRepeater.count - 1)
-                        }
-
-                        color: "#dcecf7"
-                        border.color: "#8bb9d8"
-                        border.width: 1
-
-                        Text {
-                            anchors.fill: parent
-                            text: String(modelData)
-                            color: "#08243d"
-                            font.pixelSize: 15
-                            font.bold: true
-                            horizontalAlignment:
-                                Text.AlignHCenter
-                            verticalAlignment:
-                                Text.AlignVCenter
-                        }
-                    }
-                }
+                noteModel: backend.strumNoteNames
             }
 
             PresetResetButton {

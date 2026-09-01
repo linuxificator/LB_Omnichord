@@ -30,3 +30,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T18 | `T18_MUSICAL_STATE_SNAPSHOTS.md` | complete |
 | T19 | `T19_PRESET_BINDING_SERVICES.md` | complete |
 | T20 | `T20_FOCUSED_QML_PRIMITIVES.md` | complete |
+| T21 | `T21_VIEW_FACADES_AND_INITIALIZATION.md` | complete |

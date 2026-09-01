@@ -99,7 +99,10 @@ class ApplicationCompositionTests(unittest.TestCase):
 
         def backend_factory(**kwargs: Any) -> SimpleNamespace:
             backend_calls.append(kwargs)
-            return SimpleNamespace(send_initial_state=lambda: None)
+            return SimpleNamespace(
+                initialize=lambda: None,
+                send_initial_state=lambda: None,
+            )
 
         unused = lambda _path: {}  # noqa: E731
         return ApplicationDependencies(

@@ -972,9 +972,15 @@ class InstrumentBackend(QObject):
         self._master_muted = False
         self._bass_running = bool(transport["bass_running"])
 
-        self._chord_synth = self._make_synth_runtime(default_chord_synth_index)
-        self._strum_synth = self._make_synth_runtime(default_strum_synth_index)
-        self._bass_synth = self._make_synth_runtime(default_bass_synth_index)
+        self._chord_synth = InstrumentBackend._make_synth_runtime(
+            self, default_chord_synth_index
+        )
+        self._strum_synth = InstrumentBackend._make_synth_runtime(
+            self, default_strum_synth_index
+        )
+        self._bass_synth = InstrumentBackend._make_synth_runtime(
+            self, default_bass_synth_index
+        )
 
         rhythm_key_to_index = {rhythm.key: index for index, rhythm in enumerate(rhythms)}
         selected_rhythm_key = str(defaults["rhythm"]["selected"])
@@ -1027,8 +1033,15 @@ class InstrumentBackend(QObject):
         self._promoted_chords: set[tuple[int, int]] = set()
         self._chord_activity_hold_override = False
 
+        self._initialized = False
+
+    def initialize(self) -> None:
+        """Perform preset I/O after the complete concrete facade is built."""
+        if self._initialized:
+            return
         self._ensure_preset_storage()
         self._load_startup_preset()
+        self._initialized = True
 
     def _debug(
         self,

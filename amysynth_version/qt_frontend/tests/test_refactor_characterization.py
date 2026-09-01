@@ -113,6 +113,51 @@ class RefactorCharacterizationTests(unittest.TestCase):
             with self.subTest(loader=loader.__module__):
                 self.assertEqual(loader(ROOT / "config" / "amy_config.json"), expected)
 
+    def test_extensible_facade_constructors_do_not_dispatch_to_self(self) -> None:
+        for file_name in ("app_core.py", "performance_backend.py"):
+            path = CODE / file_name
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            facade = next(
+                node
+                for node in tree.body
+                if isinstance(node, ast.ClassDef) and node.name == "InstrumentBackend"
+            )
+            constructor = next(
+                node
+                for node in facade.body
+                if isinstance(node, ast.FunctionDef) and node.name == "__init__"
+            )
+            self_dispatch = [
+                node.func.attr
+                for node in ast.walk(constructor)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "self"
+            ]
+            self.assertEqual(self_dispatch, [], file_name)
+
+        composition = (CODE / "application_composition.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("backend.initialize()", composition)
+
+        for file_name, class_name in (
+            ("midi_integration.py", "InstrumentBackend"),
+            ("midi_player.py", "MidiPlayerBackend"),
+        ):
+            path = CODE / file_name
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            concrete = next(
+                node
+                for node in tree.body
+                if isinstance(node, ast.ClassDef) and node.name == class_name
+            )
+            decorator_names = {
+                node.id for node in concrete.decorator_list if isinstance(node, ast.Name)
+            }
+            self.assertIn("final", decorator_names, file_name)
+
     def test_headless_entrypoint_uses_the_shared_composition_graph(self) -> None:
         path = ROOT / "tests" / "integration" / "headless_app.py"
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

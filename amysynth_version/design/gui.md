@@ -170,6 +170,13 @@ primitive must not contain OMNI/MIDI musical policy. The two strum surfaces
 share only clamped vertical pointer normalization, and utility screens share
 only their passive section background.
 
+`Main.qml` remains the top-level window/layout facade, while complete title and
+strum-note-guide sections live in `OmniTitleSection.qml` and
+`StrumNoteGuide.qml`. Child components emit semantic requests such as
+`strumModeToggleRequested`; the root resolves global navigation/MIDI-learn
+policy and calls the backend. Extracted sections do not reach through the root
+to invoke unrelated backend functions.
+
 The RST/UP/DWN block left of the first two chord rows ends at the bottom of the
 second row. Its three controls are distributed evenly over that complete
 height.

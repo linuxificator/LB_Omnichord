@@ -36,6 +36,15 @@ an alternate composition root and must not select concrete client or backend
 classes. Tests may replace the narrow factories with fake ports without
 patching module symbols.
 
+Backend constructors establish in-memory invariants only. The composition root
+calls the public, idempotent `initialize()` phase after the complete concrete
+facade exists; preset filesystem I/O, cross-facade binding restoration and MIDI
+reader startup begin there. Extensible base constructors do not dispatch
+through `self` to overridable methods. The production MIDI integration facade
+and independent MIDI player are explicitly final; the two internal OMNI
+inheritance layers remain because each still has characterized behavioral
+overrides.
+
 AMY command construction has a pure planning boundary. `amy_parameter_plan`
 is the single implementation of shared Juno/DX7 parameter semantics for OMNI
 and MIDI. `rhythm_command_plan` compiles typed bass, chord/arpeggio, drum,

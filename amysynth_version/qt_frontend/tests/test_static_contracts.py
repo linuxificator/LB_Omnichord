@@ -621,11 +621,11 @@ class StaticContractTests(unittest.TestCase):
                 r": \"#8e6bab\"",
             )
 
-        self.assertIn("anchors.bottom: parent.bottom", main)
-        mode_panel_start = main.index("id: strumModePanel")
-        mode_panel_end = main.index("ReverbPanel {", mode_panel_start)
-        mode_panel = main[mode_panel_start:mode_panel_end]
-        self.assertIn("height: window.presetRowHeight", mode_panel)
+        mode_panel = (ROOT / "gui" / "OmniTitleSection.qml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("anchors.bottom: parent.bottom", mode_panel)
+        self.assertIn("height: root.presetRowHeight", mode_panel)
         self.assertIn("anchors.verticalCenter:", mode_panel)
         self.assertIn("width: 48", mode_panel)
         self.assertIn("height: 48", mode_panel)
@@ -674,11 +674,16 @@ class StaticContractTests(unittest.TestCase):
     def test_midi_title_uses_the_omni_title_geometry(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        title = (ROOT / "gui" / "OmniTitleSection.qml").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("readonly property int omniTitleX", main)
         self.assertIn("readonly property int omniTitleWidth", main)
-        self.assertIn("x: window.omniTitleX", main)
-        self.assertIn("width: window.omniTitleWidth", main)
+        self.assertIn("titleX: window.omniTitleX", main)
+        self.assertIn("titleWidth: window.omniTitleWidth", main)
+        self.assertIn("x: root.titleX", title)
+        self.assertIn("width: root.titleWidth", title)
         self.assertIn("x: root.hostWindow.omniTitleX", midi)
         self.assertIn("width: root.hostWindow.omniTitleWidth", midi)
 
@@ -890,15 +895,16 @@ class StaticContractTests(unittest.TestCase):
 
     def test_strum_note_guide_occupies_the_omni_side_gap(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
-        guide_start = qml.index("id: strumNoteGuide")
-        guide_end = qml.index("PresetResetButton {", guide_start)
-        guide = qml[guide_start:guide_end]
+        guide = (ROOT / "gui" / "StrumNoteGuide.qml").read_text(
+            encoding="utf-8"
+        )
 
-        self.assertIn("window.volumeX", guide)
-        self.assertIn("+ window.volumeWidth", guide)
-        self.assertIn("window.strumX", guide)
-        self.assertIn("window.strumSynthY", guide)
-        self.assertIn("model: backend.strumNoteNames", guide)
+        self.assertIn("StrumNoteGuide {", qml)
+        self.assertIn("window.volumeX", qml)
+        self.assertIn("+ window.volumeWidth", qml)
+        self.assertIn("window.strumX", qml)
+        self.assertIn("window.strumSynthY", qml)
+        self.assertIn("noteModel: backend.strumNoteNames", qml)
         self.assertIn('color: "#dcecf7"', guide)
         self.assertIn("Math.min(34, width - 4)", guide)
 

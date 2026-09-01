@@ -6,7 +6,7 @@ import os
 import threading
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, final
 
 from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
 
@@ -373,6 +373,7 @@ class MidiAmyEngine:
         self.configure_drum_synth()
 
 
+@final
 class MidiPlayerBackend(QObject):
     """Independent MIDI-player state, presets, USB input and AMY routing."""
 
