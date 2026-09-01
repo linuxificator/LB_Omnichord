@@ -77,6 +77,16 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("\\`$AMY_COMMIT\\`", release)
         self.assertEqual(pcm_bank, "gamma9001")
         self.assertIn('AMY_PCM_BANK="$AMY_PCM_BANK"', release)
+        for workflow_path in workflows:
+            workflow = workflow_path.read_text(encoding="utf-8")
+            self.assertIn("amy_set_gamma9001_pcm", workflow)
+            self.assertIn("gamma9001_pcm_data", workflow)
+        shipped_config = json.loads(
+            (FRONTEND / "config" / "amy_config.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(shipped_config["drums"]["kit"], pcm_bank)
         self.assertNotIn("amy-tiny-bank.patch", release)
         self.assertFalse(
             (FRONTEND / "packaging" / "amy-tiny-bank.patch").exists()
@@ -333,6 +343,9 @@ class PackagingContracts(unittest.TestCase):
         service = (
             FRONTEND / "packaging" / "windows" / "amy_service.c"
         ).read_text(encoding="utf-8")
+        cmake = (
+            FRONTEND / "packaging" / "windows" / "CMakeLists.txt"
+        ).read_text(encoding="utf-8")
         self.assertIn("windows-native:", workflow)
         self.assertIn("windows-native,", workflow)
         self.assertIn("amy_service.exe", build)
@@ -387,6 +400,11 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("AMY named-pipe connect failed:", service)
         self.assertIn("AMY named-pipe read failed:", service)
         self.assertIn("AMY service smoke passed:", service)
+        self.assertIn("GAMMA9001=1", cmake)
+        self.assertIn("gamma9001-blob-c", cmake)
+        self.assertIn("${GAMMA9001_PCM_C}", cmake)
+        self.assertIn("amy_set_gamma9001_pcm(gamma9001_pcm_data)", service)
+        self.assertEqual(service.count("configure_pcm_bank();"), 2)
         self.assertIn("runs-on: windows-2025", workflow)
         self.assertIn(
             '& "$root\\LB_Omnichord.cmd" -Windowed -SmokeTest',

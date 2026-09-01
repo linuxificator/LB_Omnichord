@@ -12,6 +12,10 @@
 
 #include "amy.h"
 
+#ifdef GAMMA9001
+extern const int16_t gamma9001_pcm_data[];
+#endif
+
 #define SERVICE_MAX_LINE MAX_MESSAGE_LEN
 #define SERVICE_PIPE_PATH 256
 
@@ -25,6 +29,12 @@ static volatile LONG g_running = 1;
 static int g_offline_render = 0;
 static uint64_t g_wire_records = 0;
 static uint64_t g_nonzero_samples = 0;
+
+static void configure_pcm_bank(void) {
+#ifdef GAMMA9001
+    amy_set_gamma9001_pcm(gamma9001_pcm_data);
+#endif
+}
 
 static BOOL WINAPI console_handler(DWORD type) {
     if (type == CTRL_C_EVENT || type == CTRL_BREAK_EVENT ||
@@ -61,6 +71,7 @@ static int run_self_test(void) {
     config.max_pattern_tags = 64;
     config.max_pattern_instances = 32;
 
+    configure_pcm_bank();
     amy_start(config);
     amy_add_message("v0w0f440a1n69l1Z");
 
@@ -203,6 +214,7 @@ static int run_service(
     if (!SetConsoleCtrlHandler(console_handler, TRUE)) goto cleanup;
 
     // Publish readiness only after both the local pipe and AMY exist.
+    configure_pcm_bank();
     amy_start(config);
     if (publish_ready_file(ready_file, pipe_name) < 0) {
         amy_stop();

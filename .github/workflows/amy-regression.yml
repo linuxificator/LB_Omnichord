@@ -96,6 +96,9 @@ jobs:
           python amysynth_version/qt_frontend/packaging/checkout_amy.py \
             --destination /tmp/amy-lb
           AMY_PCM_BANK="$AMY_PCM_BANK" python -m pip install /tmp/amy-lb
+          amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
+          nm -D "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null
+          nm -D "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null
           mkdir -p amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}
           git -C /tmp/amy-lb rev-parse HEAD \
             > amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}/amy_commit.txt
@@ -170,6 +173,9 @@ jobs:
           python amysynth_version/qt_frontend/packaging/checkout_amy.py \
             --destination /tmp/amy-lb
           AMY_PCM_BANK="$AMY_PCM_BANK" python -m pip install /tmp/amy-lb
+          amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
+          nm -D "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null
+          nm -D "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null
           mkdir -p amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}
           git -C /tmp/amy-lb rev-parse HEAD \
             > amysynth_version/qt_frontend/test-artifacts/${{ inputs.suite }}/amy_commit.txt

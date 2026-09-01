@@ -100,7 +100,7 @@ and [Qt for Python deployment](https://doc.qt.io/qtforpython-6/deployment/index.
 | Linux desktop | Separate Python AMY service and Qt process over `AF_UNIX/SOCK_SEQPACKET`. |
 | macOS desktop | Separate Python AMY service and Qt process over LF-framed `AF_UNIX/SOCK_STREAM`. |
 | Raspberry Pi + ESP32-P4 | Qt sends LF-delimited wire requests over UART to an independent AMY target. |
-| Android | `integration/android_build` packages PySide6 with the AAR from the pinned `releases/amy_omnichord_R20260831T042456` AMY fork commit. The frontend uses the private socket only; the AAR owns the separate `:amy`/Oboe process. Emulator package/QML/audio validation is a release gate, while physical validation remains outstanding. |
+| Android | `integration/android_build` packages PySide6 with the Gamma9001 AAR from the exact AMY release manifest. The frontend uses the private socket only; the AAR owns the separate `:amy`/Oboe process. Emulator package/QML/audio validation is a release gate, while physical validation remains outstanding. |
 | Native AMY on Windows | The fork builds the AMY C/miniaudio core; this repository now builds a separate `amy_service.exe` wrapper against that fork. |
 | Native Windows frontend transport | The launcher supplies a unique Windows named-pipe name; `QLocalSocket` sends LF-framed requests without opening a network port. |
 | Windows package/release | CI builds an experimental portable zip with separate service/frontend executables and bundled dependencies. It performs an offline native AMY render test and starts the unpacked double-click launcher, offscreen Qt/QML frontend and named-pipe service end to end; no physical validation yet for pointer hardware, audio or MIDI. |
@@ -119,20 +119,18 @@ native-runner package validation, not a physical Windows audio/MIDI test.
 
 ## PCM/drum compatibility
 
-All supported targets must give PCM preset numbers 0–18 the same meaning. The
+All hosted targets must give PCM preset numbers 0–18 the same meaning. The
 Windows service is built from pinned AMY release branch
-`releases/amy_omnichord_R20260831T042456` at commit
-`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`. Its CMake target compiles `amy.c`
-and `pcm.c` without defining `GAMMA9001` and without linking the optional
-Gamma9001 `drums_bin.c`. The pinned source consequently includes `pcm_tiny.h`,
-including the tiny-bank mapping for MIDI drum patch 258.
+`releases/amy_omnichord_R20260901T201533` at commit
+`7c34aa514f10c33f02692f735166d65f4e20374a`. Its CMake target defines
+`GAMMA9001`, generates and links `drums_bin.c`, and registers the linked data
+before both self-test and service `amy_start()` calls.
 
-This is equivalent to the explicit `AMY_PCM_BANK=tiny` used by the Linux and
-macOS Python-extension builds. That environment variable belongs to AMY's
-`setup.py` path and is not required by the native Windows CMake path. Defining
-`GAMMA9001` or adding `drums_bin.c` on Windows would change the meaning of the
-direct rhythm presets in `config/amy_config.json` and produce different drum
-sounds for the same wire commands.
+This is equivalent to the explicit `AMY_PCM_BANK=gamma9001` used by Linux,
+Raspberry Pi and macOS Python-extension builds and to the pinned Android AAR.
+The environment variable belongs to AMY's `setup.py` path; Windows reaches the
+same bank through its native CMake target. ESP32-P4 remains a separately
+declared Tiny-bank target until a Gamma9001 flash/storage profile exists.
 
 The current Windows AMY service profile is not yet a low-latency baseline: the
 fork's host defaults are 44.1 kHz and 256 samples, its Windows backend tries
@@ -195,7 +193,7 @@ service's standalone offline self-test. Its packaged end-to-end smoke delivered
 209 real wire commands through the named pipe and observed 13,138 nonzero
 rendered samples. These counts are evidence for that run, not fixed golden
 values. The current smoke proves that PCM rendering is non-silent; it does not
-yet identify every tiny-bank drum sample acoustically.
+yet identify every Gamma9001 drum sample acoustically.
 
 `WSL_APPIMAGE_TESTING.md` remains only an optional experiment for the Linux
 artifact, not the Windows implementation plan or release gate.

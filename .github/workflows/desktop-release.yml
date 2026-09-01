@@ -85,17 +85,15 @@ jobs:
             -c "amysynth_version/qt_frontend/packaging/constraints/${{ matrix.constraints }}" \
             -r amysynth_version/qt_frontend/requirements-build.txt
 
-      - name: Install pinned AMY with ESP32-compatible drum bank
+      - name: Install pinned AMY with Gamma9001 drum bank
         run: |
           python amysynth_version/qt_frontend/packaging/checkout_amy.py \
             --destination /tmp/amy-lb
           AMY_PCM_BANK="$AMY_PCM_BANK" \
             python -m pip install --no-cache-dir /tmp/amy-lb
           amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
-          if nm -D "$amy_so" | grep -Eq 'gamma9001|amy_set_gamma'; then
-            echo 'AMY was built with the wrong PCM bank' >&2
-            exit 1
-          fi
+          nm -D "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null
+          nm -D "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null
 
       - name: Download verified AppImage tools
         env:
@@ -198,12 +196,15 @@ jobs:
             -c amysynth_version/qt_frontend/packaging/constraints/desktop-current.txt \
             -r amysynth_version/qt_frontend/requirements-build.txt
 
-      - name: Install pinned AMY with ESP32-compatible drum bank
+      - name: Install pinned AMY with Gamma9001 drum bank
         run: |
           python amysynth_version/qt_frontend/packaging/checkout_amy.py \
             --destination /tmp/amy-lb
           AMY_PCM_BANK="$AMY_PCM_BANK" \
             python -m pip install --no-cache-dir /tmp/amy-lb
+          amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
+          nm -gU "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null
+          nm -gU "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null
 
       - name: Build and validate DMG
         working-directory: amysynth_version/qt_frontend

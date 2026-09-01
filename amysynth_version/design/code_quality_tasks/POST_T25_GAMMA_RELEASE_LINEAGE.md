@@ -64,3 +64,20 @@ The release pipeline must fail when any of these disagree:
 
 This release correction is intentionally split from the platform-build commit
 so Git history remains a useful diagnostic boundary.
+
+## Verification completed
+
+The pinned AMY release passed its C tests, Android service contract, PCM-bank
+build contract, offline Python render and Unix-socket integration. In the LB
+branch, `tests/drum_kit_audio_smoke.py gamma9001` rendered all 62 distinct
+catalogue realizations non-silent. `tests/run_tests.py --suite all` then passed
+the quality gate, every unit/frontend/serial/preset suite and both native AMY
+suites against exact AMY commit
+`7c34aa514f10c33f02692f735166d65f4e20374a`.
+
+The full upstream `amy.test` numerical golden suite was also attempted locally.
+Its Gamma-specific PCM checks passed, but that compiler/Python environment
+still reported 43 very-low-level legacy golden deviations (mostly -95 to
+-99 dB). This is recorded rather than being misrepresented as a clean full
+AMY golden run; the release integration gates named above are the passing
+evidence used here.

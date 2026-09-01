@@ -150,8 +150,8 @@ omit the `T`. The release page has separate sections and downloads for:
 
 Each package has a matching `.sha256` asset. All timestamps are UTC.
 
-Every package contains the Qt frontend and supported AMY fork with the tiny PCM
-drum bank. At runtime they remain separate processes connected by the
+Every package contains the Qt frontend and supported AMY fork with the
+Gamma9001 PCM drum bank. At runtime they remain separate processes connected by the
 platform's private local transport. The Pi build requires 64-bit Raspberry Pi
 OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG is Apple
 Silicon-only and ad-hoc signed, but it is not signed with an Apple Developer ID

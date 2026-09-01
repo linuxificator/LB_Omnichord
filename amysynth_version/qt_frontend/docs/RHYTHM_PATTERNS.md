@@ -107,8 +107,8 @@ No bus-mixer extension is used or required.
 Timing and sound choice are separate assets. `drums.kit` in
 `config/amy_config.json` selects one of:
 
-- `tiny` (default): AMY's tiny PCM bank;
-- `gamma9001`: AMY compiled with the Gamma9001 bank;
+- `gamma9001` (hosted-release default): AMY compiled with the Gamma9001 bank;
+- `tiny`: AMY's compact PCM bank, retained for the separate ESP32-P4 target;
 - `general_midi`: AMY's engine-side patch-258 drum-note map.
 
 `general_midi` describes familiar drum-note assignments, but remains AMY audio:
@@ -117,11 +117,11 @@ the kit requires restarting the AMY service/frontend so the stored library is
 rebuilt consistently. The tests prove that all three mappings resolve every
 role without changing any timing.
 
-The published packages intentionally use the compact `tiny` bank. Local use of
-`gamma9001`, and complete coverage of `general_midi` patch 258, require the
-default Gamma-enabled CPython AMY build from the pinned release commit. Build
-that variant without setting `AMY_PCM_BANK`; `prepare_local_amy.sh` deliberately
-sets `AMY_PCM_BANK=tiny` because it prepares the release-compatible default.
+The hosted packages intentionally use Gamma9001. `prepare_local_amy.sh` reads
+the exact bank, release branch and commit from `packaging/release_inputs.json`,
+builds that source with `AMY_PCM_BANK=gamma9001`, and requires both the
+registration and linked PCM-data symbols. The ESP32-P4 firmware remains Tiny
+until its separate storage profile can support Gamma9001.
 The repeatable native audio checks are:
 
 ```sh
@@ -157,7 +157,8 @@ design data source. The historical design handovers remain below
 `canonical_drum_data_manifest.json` links each discussed file to the runtime
 tree and records its reviewed SHA-256. Every desktop packager copies the full
 `music` tree, Android stages it recursively, and the package self-test
-explicitly requires the drum timing, continuation and tiny mapping files.
+explicitly requires the drum timing, continuation and both supported direct
+mapping files.
 
 Loading is intentionally staged: a versioned schema first rejects structural
 or version drift, the typed loader then checks each row's musical constraints,

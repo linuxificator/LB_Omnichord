@@ -17,7 +17,7 @@ Omnichord:
 
 The Raspberry Pi/UART path has been exercised on the project hardware. The
 Linux two-process socket path has also been exercised with working audio,
-multibus routing and the ESP32-compatible tiny drum bank. The published x86_64
+multibus routing and the Gamma9001 drum bank. The published x86_64
 AppImage was downloaded from GitHub Releases and physically validated with
 working UI and audio on Linux on 2026-08-24. Release `R20260824T212125` also
 passed native packaged-runtime validation for Linux x64, Linux aarch64 and
@@ -149,24 +149,24 @@ Start both processes with:
 ./run_local.sh --windowed
 ```
 
-Install the pinned nested-sequencer/tiny-bank AMY release into the environment
+Install the pinned nested-sequencer/Gamma9001 AMY release into the environment
 used by the service. The Qt process remains independent of AMY.
 `OMNICHORD_VENV` can override the launcher's
 default `../omnichord-env`; `OMNICHORD_AMY_SOCKET` can override
 `~/.omnichord/amy.sock`; and `OMNICHORD_AMY_ROOT` can override the expected AMY
 checkout at `../amyfork/amy`.
 
-The ESP32-P4 drum mapping uses AMY's tiny PCM bank. Prepare the local AMY fork
-with the same bank before first use (and after rebuilding AMY):
+Prepare the local AMY fork with the hosted Gamma9001 bank before first use (and
+after rebuilding AMY):
 
 ```bash
 ./prepare_local_amy.sh
 ```
 
-This invokes the fork's `AMY_PCM_BANK=tiny` build option and verifies that the
-installed extension does not contain Gamma9001 symbols. Without this explicit
-choice, Linux presets 0–18 refer to a different TR-808 table and the same wire
-commands produce congas/tones in place of hats and snares.
+This reads the exact branch, commit and bank from `packaging/release_inputs.json`,
+invokes `AMY_PCM_BANK=gamma9001`, and verifies that the installed extension
+contains both Gamma9001 registration and PCM-data symbols. A bank/map mismatch
+can accept every wire command while producing unrelated drum timbres.
 
 ## Linux
 
@@ -189,8 +189,8 @@ python3 -m venv .venv
 
 Place the project AMY fork at `../amyfork/amy` relative to the LB_Omnichord
 repository, or set `OMNICHORD_AMY_ROOT`. Then run
-`./prepare_local_amy.sh`; a generic upstream/Gamma9001 build is not compatible
-with the shipped drum mapping.
+`./prepare_local_amy.sh`; a generic or differently pinned AMY build is not
+compatible with the supported release contract.
 
 Run the frontend:
 
@@ -220,8 +220,8 @@ python3 -m venv .venv
 ```
 
 Use the same project AMY fork and `prepare_local_amy.sh` process described for
-Linux. The fork must support the bus count and `AMY_PCM_BANK=tiny`; installing a
-generic Gamma9001 build changes the drum preset meanings.
+Linux. The fork must support the bus count and the exact Gamma9001 profile
+declared by `release_inputs.json`.
 
 Then run:
 
@@ -275,10 +275,10 @@ The supervisor gives each run a unique private pipe name. Qt connects with
 `CreateNamedPipeA` and rejects remote clients. No TCP port is opened and AMY is
 not linked into the frontend.
 
-The Windows service is built with AMY's built-in tiny PCM bank, matching Linux,
-macOS and ESP32-P4 drum preset numbering. Do not substitute a Gamma9001 AMY
-build: presets 0–18 then name different samples and the rhythm section changes
-sound for the same commands.
+The Windows service is built with Gamma9001, matching Linux, Raspberry Pi,
+macOS and Android. Its CMake target generates, links and registers the PCM blob;
+using a Tiny service with the shipped Gamma map is a release-blocking mismatch.
+ESP32-P4 remains a separately declared Tiny-bank firmware target.
 
 The package is currently experimental. GitHub's Windows Server 2025 job proves
 native compilation, offline non-silent PCM rendering, frozen QML/assets,
@@ -301,8 +301,8 @@ $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 ```
 
 The zip and checksum are written below `dist`. The release workflow pins both
-AMY fork branch `releases/amy_omnichord_R20260831T042456` and commit
-`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`; local release candidates must use
+AMY fork branch `releases/amy_omnichord_R20260901T201533` and commit
+`7c34aa514f10c33f02692f735166d65f4e20374a`; local release candidates must use
 that exact commit unless the shared release contract and its compatibility
 tests are deliberately updated together.
 

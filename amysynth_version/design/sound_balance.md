@@ -137,7 +137,10 @@ using its catalogue defaults and production wire commands. Captures must record
 RMS, peak, crest factor and clipping per register. Corrections belong in the
 catalogue or the narrow `patch_compatibility` table and must remain compatible
 with the ESP32-P4 tiny-bank AMY build. A control must not be used as a level
-correction when a broken filter/envelope range is the actual cause.
+correction when a broken filter/envelope range is the actual cause. Synth
+patch corrections are bank-independent; drum measurements use the exact
+Gamma9001 hosted-release profile. ESP32-P4 remains a separately verified Tiny
+target.
 
 The host-native reference sweep completed on 2026-08-25: 124 WAV files, each
 containing MIDI notes 40, 60 and 84, were rendered. The final pass contained no

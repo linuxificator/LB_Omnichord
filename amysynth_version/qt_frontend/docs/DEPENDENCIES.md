@@ -63,8 +63,8 @@ provenance, not portable frontend runtime intent.
 
 All synthesis targets use
 `https://github.com/linuxificator/amy.git`, release branch
-`releases/amy_omnichord_R20260831T042456`, immutable commit
-`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`. CI proves that the commit belongs
+`releases/amy_omnichord_R20260901T201533`, immutable commit
+`7c34aa514f10c33f02692f735166d65f4e20374a`. CI proves that the commit belongs
 to the declared branch before using it.
 
 This is intentionally not a normal Python requirement. It supplies the C AMY
@@ -73,10 +73,11 @@ service, the Android Oboe service AAR and the ESP32-P4 component. It also owns
 LB-required sequencer behavior and therefore must advance as one tested release
 input across all platforms.
 
-Python/native test and desktop service builds select the tiny PCM bank with
-`AMY_PCM_BANK=tiny` where `setup.py` is used. Windows, Android and ESP32 build
-the same pinned source through their native build definitions; their exact
-options and verification are owned by
+Python/native test and hosted desktop service builds select Gamma9001 with
+`AMY_PCM_BANK=gamma9001` where `setup.py` is used. Windows and Android generate,
+link and register the same Gamma data through native build definitions. ESP32
+uses the same source lineage but remains an explicitly declared Tiny-bank
+target until its storage profile changes. Exact options and verification are owned by
 [`AMY_RELEASE.md`](../packaging/AMY_RELEASE.md) and the
 platform documentation. ESP32-P4 additionally defines `AMY_SHARED_REVERB=1`.
 Never update only one consumer.
