@@ -152,6 +152,20 @@ equivalent behavior change.
 
 Never create one giant formatting commit mixed with extraction.
 
+### Q2.2a Declare and qualify external dependencies
+
+Apply `CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md`: keep portable runtime
+dependencies authoritative in `requirements.txt`, move build/test tools out of
+workflow literals into explicit dependency sources, and require a dated
+maintenance/adoption/platform/license/security assessment for every new
+package. Prefer mature external functionality over substantial reinvention,
+but reject obscure, inactive or incomplete-platform dependencies.
+
+Proof: AST-based import/declaration and workflow-drift tests pass; every
+portable dependency installs and exercises its used API on all five platforms;
+the release manifest records resolved versions/hashes/licenses; replacing local
+code retains behavior and removes the superseded implementation.
+
 ### Q2.3 Split giant facade responsibilities
 
 Use the strangler method:

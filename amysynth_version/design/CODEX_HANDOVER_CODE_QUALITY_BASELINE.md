@@ -26,6 +26,7 @@ does not propose LB-specific changes to Shorepine AMY.
 | Configuration ownership and DRY | `CODEX_HANDOVER_CONFIGURATION_AND_DRY.md` |
 | Component boundaries and dependency direction | `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md` |
 | Platform-neutral core and concrete platform adapters | `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md` |
+| External dependency selection and reuse | `CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md` |
 | Python modularity, readability and typing | `CODEX_HANDOVER_PYTHON_MODULARITY_AND_TYPES.md` |
 | QML/UI structure and interaction ownership | `CODEX_HANDOVER_QML_UI_ARCHITECTURE.md` |
 | Musical domain and dataset quality | `CODEX_HANDOVER_MUSICAL_DOMAIN_AND_DATA.md` |
