@@ -97,7 +97,13 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
                 text=True,
             )
             try:
-                time.sleep(1.0)
+                deadline = time.monotonic() + 10.0
+                while time.monotonic() < deadline and process.poll() is None:
+                    if log.is_file() and '"event":"layout"' in log.read_text(
+                        encoding="utf-8"
+                    ):
+                        break
+                    time.sleep(0.05)
 
                 def change(controller: int, start: int = 0) -> None:
                     os.write(
@@ -105,16 +111,18 @@ class MidiCcQtIntegrationTests(unittest.TestCase):
                         bytes((0xB0, controller, start, 0xB0, controller, start + 1)),
                     )
 
-                change(74, 0)
-                change(75, 0)
-                for controller in range(32):
-                    change(controller)
-                time.sleep(0.5)
-                change(0, 1)  # make CC0 newest before forcing another replacement
-                change(99)
-                time.sleep(0.5)
+                if process.poll() is None and log.is_file():
+                    change(74, 0)
+                    change(75, 0)
+                    for controller in range(32):
+                        change(controller)
+                    time.sleep(0.5)
+                    change(0, 1)  # make CC0 newest before forcing another replacement
+                    change(99)
+                    time.sleep(0.5)
             finally:
-                process.terminate()
+                if process.poll() is None:
+                    process.terminate()
                 output, _ = process.communicate(timeout=3)
                 os.close(midi_master)
                 os.close(midi_slave)
