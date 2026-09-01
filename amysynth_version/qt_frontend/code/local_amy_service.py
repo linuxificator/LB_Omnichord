@@ -2,12 +2,12 @@
 from __future__ import annotations
 
 import argparse
-import json
 import signal
 import stat
 import sys
 from pathlib import Path
 
+from config_loader import load_resolved_amy_config
 from unix_wire_socket import listen_unix_wire_socket
 from wire_frames import LfWireFrameParser, validate_wire_request
 
@@ -35,23 +35,20 @@ def remove_stale_socket(path: Path) -> None:
 
 def main() -> int:
     args = parse_arguments()
-    with args.config.expanduser().open("r", encoding="utf-8") as handle:
-        config = json.load(handle)
+    config = load_resolved_amy_config(args.config.expanduser())
     max_buses = int(
-        config.get("amy_max_buses", 11)
+        config.capacities.max_buses
         if args.max_buses is None
         else args.max_buses
     )
     max_oscs = int(
-        config.get("amy_max_oscs", 336)
+        config.capacities.max_oscs
         if args.max_oscs is None
         else args.max_oscs
     )
-    max_patterns = int(config.get("amy_max_patterns", 1024))
-    max_pattern_tags = int(config.get("amy_max_pattern_tags", 64))
-    max_pattern_instances = int(
-        config.get("amy_max_pattern_instances", 32)
-    )
+    max_patterns = config.capacities.max_patterns
+    max_pattern_tags = config.capacities.max_pattern_tags
+    max_pattern_instances = config.capacities.max_pattern_instances
     if max_buses < 11:
         raise ValueError("LB Omnichord requires at least 11 AMY buses")
     args.socket = args.socket.expanduser().resolve()

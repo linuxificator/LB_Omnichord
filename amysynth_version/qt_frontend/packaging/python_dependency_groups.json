@@ -18,6 +18,11 @@
       "owner": "runtime",
       "used_by": ["runtime", "tests"]
     },
+    "fastjsonschema": {
+      "distribution": "fastjsonschema",
+      "owner": "runtime",
+      "used_by": ["versioned startup configuration validation"]
+    },
     "numpy": {
       "distribution": "numpy",
       "owner": "test_quality",

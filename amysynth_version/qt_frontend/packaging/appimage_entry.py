@@ -52,6 +52,7 @@ def self_test() -> int:
     required = (
         APP_ROOT / "licence.txt",
         CONFIG_PATH,
+        APP_ROOT / "config" / "schema" / "amy_config_v1.schema.json",
         APP_ROOT / "config" / "defaults.json",
         APP_ROOT / "gui" / "Main.qml",
         APP_ROOT / "instruments" / "synths.json",

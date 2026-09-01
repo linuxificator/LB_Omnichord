@@ -9,7 +9,7 @@ Last verified: 2026-09-01
 
 | Group | Source | Current direct intent | Consumers |
 | --- | --- | --- | --- |
-| Portable runtime | `requirements.txt` | `PySide6>=6.6`, `pyserial>=3.5` | Linux x86_64, Raspberry Pi aarch64, macOS arm64, Windows x86_64 and the staged Android app |
+| Portable runtime | `requirements.txt` | `PySide6>=6.6`, `pyserial>=3.5`, `fastjsonschema==2.22.2` | Linux x86_64, Raspberry Pi aarch64, macOS arm64, Windows x86_64 and the staged Android app |
 | Desktop build | `requirements-build.txt` | runtime group plus `PyInstaller==6.22.2` | Linux/Raspberry Pi AppImage, macOS DMG and Windows zip jobs |
 | Test and quality | `requirements-test.txt` | runtime group, NumPy 2.5.2, Ruff 0.16.5, mypy 2.3.1 and pyserial stubs | local and reusable regression/quality jobs |
 | Android host | `requirements-android-host.txt` | runtime group, `PySide6==6.11.2`, `Cython==0.29.36` | the Linux host that runs `pyside6-android-deploy` |
@@ -27,6 +27,7 @@ The machine-readable inventory is
 | --- | --- | --- | --- |
 | `PySide6` | `PySide6` | runtime | Qt Core/GUI/QML/Quick/Test/Network APIs used by the app, tests, diagnostics and screenshot tooling |
 | `serial` | `pyserial` | runtime | UART transport is an enabled portable application capability |
+| `fastjsonschema` | `fastjsonschema` | runtime | versioned JSON Schema validation before opening runtime resources; pure-Python universal package |
 | `numpy` | `numpy` | test and quality | `instrument_balance.py` directly renders and measures native AMY output; declaring it removes reliance on AMY's transitive unpinned requirement |
 | `amy`, `c_amy` | pinned LB AMY component exception | AMY release contract | native service and native integration tests require the fork build, not an unqualified PyPI dependency |
 
@@ -75,6 +76,8 @@ runtime intent:
   ABI in `desktop-release.yml`;
 - the `requirements-android.txt` shipped inside that exact PySide6 host
   distribution, used as Qt's authoritative deployer/buildozer dependency set;
+- the portable pure-Python `fastjsonschema==2.22.2` target requirement, copied
+  from `requirements.txt` into the generated Buildozer target recipe;
 - python-for-Android commit
   `3762c88c56e3443efb8eba2a02a2604b680240fd`;
 - Java 17, Gradle 8.13, Android platform 36, build-tools 35.0.0, NDK

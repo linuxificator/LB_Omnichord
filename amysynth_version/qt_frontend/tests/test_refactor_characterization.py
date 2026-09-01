@@ -18,6 +18,7 @@ from PySide6.QtCore import QMetaMethod  # noqa: E402
 import app_core  # noqa: E402
 import amy_serial  # noqa: E402
 import config_loader  # noqa: E402
+import local_amy_service  # noqa: E402
 import main  # noqa: E402
 from midi_control import PITCH_BEND_CONTROLLER  # noqa: E402
 from midi_integration import InstrumentBackend  # noqa: E402
@@ -97,6 +98,10 @@ class RefactorCharacterizationTests(unittest.TestCase):
         self.assertIs(amy_serial.load_amy_config, canonical)
         self.assertIs(main.load_amy_config, canonical)
         self.assertIs(app_core.load_amy_config, canonical)
+        self.assertIs(
+            local_amy_service.load_resolved_amy_config,
+            config_loader.load_resolved_amy_config,
+        )
 
         expected = canonical(ROOT / "config" / "amy_config.json")
         for loader in (

@@ -65,15 +65,20 @@ class DependencyDeclarationTests(unittest.TestCase):
             name: requirement_names(FRONTEND / relative)
             for name, relative in groups.items()
         }
-        self.assertEqual(resolved["runtime"], {"pyside6", "pyserial"})
         self.assertEqual(
-            resolved["build"], {"pyside6", "pyserial", "pyinstaller"}
+            resolved["runtime"],
+            {"pyside6", "pyserial", "fastjsonschema"},
+        )
+        self.assertEqual(
+            resolved["build"],
+            {"pyside6", "pyserial", "fastjsonschema", "pyinstaller"},
         )
         self.assertEqual(
             resolved["test_quality"],
             {
                 "pyside6",
                 "pyserial",
+                "fastjsonschema",
                 "numpy",
                 "ruff",
                 "mypy",
@@ -81,7 +86,8 @@ class DependencyDeclarationTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            resolved["android_host"], {"pyside6", "pyserial", "cython"}
+            resolved["android_host"],
+            {"pyside6", "pyserial", "fastjsonschema", "cython"},
         )
 
         for import_root, record in self.manifest["direct_imports"].items():

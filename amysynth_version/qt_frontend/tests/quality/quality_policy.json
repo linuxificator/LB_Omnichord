@@ -4,6 +4,7 @@
     "amysynth_version/design/principles.md",
     "amysynth_version/design/architecture.md",
     "amysynth_version/design/behavior.md",
+    "amysynth_version/design/configuration.md",
     "amysynth_version/design/testing.md",
     "amysynth_version/design/gui.md",
     "amysynth_version/design/ui_behavior_reference.md",

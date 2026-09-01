@@ -18,3 +18,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T06 | `T06_REFACTOR_CHARACTERIZATION.md` | complete |
 | T07 | `T07_MIDI_PLATFORM_PROFILE.md` | complete |
 | T08 | `T08_BOUNDED_WIRE_FRAMES.md` | complete |
+| T09 | `T09_VERSIONED_TYPED_CONFIG.md` | complete |

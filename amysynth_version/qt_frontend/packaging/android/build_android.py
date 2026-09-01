@@ -147,7 +147,9 @@ def patch_buildozer_spec(
         "source.include_exts": SOURCE_EXTENSIONS,
         "source.exclude_dirs": "deployment,__pycache__",
         "version": version,
-        "requirements": "python3,shiboken6,PySide6,pyserial",
+        "requirements": (
+            "python3,shiboken6,PySide6,pyserial,fastjsonschema==2.22.2"
+        ),
         "orientation": "landscape",
         "fullscreen": "1",
         "android.api": "36",

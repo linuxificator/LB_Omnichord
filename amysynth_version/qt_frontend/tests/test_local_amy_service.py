@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import signal
 import sys
 import tempfile
@@ -71,14 +70,8 @@ class LocalAmyServiceTests(unittest.TestCase):
             root = Path(directory)
             config_path = root / "amy_config.json"
             config_path.write_text(
-                json.dumps(
-                    {
-                        "amy_max_buses": 11,
-                        "amy_max_oscs": 336,
-                        "amy_max_patterns": 1024,
-                        "amy_max_pattern_tags": 64,
-                        "amy_max_pattern_instances": 32,
-                    }
+                (ROOT / "config" / "amy_config.json").read_text(
+                    encoding="utf-8"
                 ),
                 encoding="utf-8",
             )

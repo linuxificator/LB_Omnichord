@@ -20,6 +20,7 @@ from build_android import (  # noqa: E402
     patch_buildozer_spec,
     pin_pyside_qt_module_order,
     release_values,
+    stage_frontend,
     verify_apk,
     verify_buildozer_qt_module_order,
     verify_qt_modules_present,
@@ -27,6 +28,21 @@ from build_android import (  # noqa: E402
 
 
 class AndroidPackagingTests(unittest.TestCase):
+    def test_staged_frontend_includes_versioned_config_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            staging = Path(directory) / "staging"
+            stage_frontend(FRONTEND, staging)
+
+            self.assertTrue((staging / "resolved_config.py").is_file())
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
+                    / "amy_config_v1.schema.json"
+                ).is_file()
+            )
+
     def test_release_stamp_maps_to_android_version_without_overflow(self) -> None:
         version, numeric = release_values("R20260830123456")
         self.assertEqual(version, "2026.8.30")
@@ -73,6 +89,7 @@ class AndroidPackagingTests(unittest.TestCase):
             )
             self.assertEqual(app["p4a.commit"], P4A_COMMIT)
             self.assertIn("pyserial", app["requirements"])
+            self.assertIn("fastjsonschema==2.22.2", app["requirements"])
             self.assertEqual(app["android.add_aars"], str(aar.resolve()))
             self.assertEqual(
                 app["android.add_gradle_repositories"], "flatDir { dirs 'libs' }"

@@ -28,6 +28,8 @@ Core rules:
   Detailed executable scenarios live in `../qt_frontend/tests/USE_CASES.md`.
 - `sound_balance.md` defines user storage/config overrides, strum modes, MIDI
   control indicators and the instrument-balance measurement contract.
+- `configuration.md` defines versioned startup configuration, typed resolution,
+  provenance, validation and migration boundaries.
 - `midi_control.md` is the authoritative MIDI CC learn, binding, LRU/LED and
   preset-persistence contract.
 - `CODEX_HANDOVER_EXTERNAL_CONTROLS.md` records the branch-local lessons from
@@ -97,6 +99,7 @@ Then add every row that matches the task:
 | Qt/QML layout, interaction or screen behavior | `gui.md`, `ui_behavior_reference.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |
 | MIDI input, MIDI screen or CC learn | `midi.md`, `midi_control.md`, `presets.md`, `sound_balance.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Presets, user state or migration | `presets.md`, `sound_balance.md`, `../qt_frontend/tests/USE_CASES.md` |
+| Startup configuration, schema or config migration | `configuration.md`, `CODEX_HANDOVER_CONFIGURATION_AND_DRY.md`, `../qt_frontend/docs/DEPENDENCIES.md` |
 | Rhythm, tempo or sequencer behavior | `rhythm_bahavior.md`, `../qt_frontend/docs/SEQUENCER_TAGS.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Tuning, pitch or note conversion | `tuning.md`, `use_cases.md`, `../qt_frontend/tests/USE_CASES.md` |
 | AMY commands, sockets, serial or buses | `amy_interface.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |

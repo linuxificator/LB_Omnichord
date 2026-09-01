@@ -19,6 +19,7 @@
     "amy_serial.load_amy_config",
     "main.load_amy_config",
     "app_core.load_amy_config",
+    "local_amy_service.load_resolved_amy_config",
     "tests/integration/headless_app.py"
   ],
   "wire_contract_tests": [
