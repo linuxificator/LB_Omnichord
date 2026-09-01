@@ -75,7 +75,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("## Build provenance", release)
         self.assertIn("\\`$AMY_RELEASE_BRANCH\\`", release)
         self.assertIn("\\`$AMY_COMMIT\\`", release)
-        self.assertEqual(pcm_bank, "tiny")
+        self.assertEqual(pcm_bank, "gamma9001")
         self.assertIn('AMY_PCM_BANK="$AMY_PCM_BANK"', release)
         self.assertNotIn("amy-tiny-bank.patch", release)
         self.assertFalse(

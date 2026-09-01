@@ -39,3 +39,5 @@ work. These files do not replace the authoritative subsystem contracts.
 Post-plan regression fixes:
 
 - `POST_T25_CONFIG_REVISION_4.md` — legacy pattern-capacity migration.
+- `POST_T25_GAMMA_RELEASE_LINEAGE.md` — restore and prove the Gamma9001
+  hosted-release profile after its feature branch was not merged to main.

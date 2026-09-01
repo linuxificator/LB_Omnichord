@@ -12,6 +12,8 @@ sys.path.insert(0, str(ROOT / "code"))
 
 from config_migrations import (  # noqa: E402
     CURRENT_CONFIG_REVISION,
+    REVISION_FIVE_GAMMA9001_MAP,
+    REVISION_FOUR_SHIPPED_TINY_MAP,
     ConfigMigrationError,
     migrate_config_document,
 )
@@ -112,7 +114,9 @@ class ConfigMigrationTests(unittest.TestCase):
 
         migrated = migrate_config_document(legacy)
 
-        self.assertEqual(migrated.data["config_revision"], 4)
+        self.assertEqual(
+            migrated.data["config_revision"], CURRENT_CONFIG_REVISION
+        )
         self.assertEqual(migrated.data["amy_max_patterns"], 1024)
         self.assertEqual(migrated.data["amy_max_pattern_tags"], 64)
         self.assertEqual(migrated.data["amy_max_pattern_instances"], 32)
@@ -141,7 +145,7 @@ class ConfigMigrationTests(unittest.TestCase):
             "amy_max_pattern_instances",
         }
         schema_root = ROOT / "config" / "schema"
-        for revision in (1, 2, 3, 4):
+        for revision in (1, 2, 3, 4, 5):
             schema = json.loads(
                 (schema_root / f"amy_config_v{revision}.schema.json").read_text(
                     encoding="utf-8"
@@ -194,6 +198,59 @@ class ConfigMigrationTests(unittest.TestCase):
         unknown["drums"]["sample_map"]["bd_haus"] = {"preset": 99, "note": 1}
         with self.assertRaisesRegex(ConfigMigrationError, "cannot infer"):
             migrate_config_document(unknown)
+
+    def test_revision_five_repairs_the_published_tiny_default(self) -> None:
+        released = copy.deepcopy(self.shipped)
+        released["config_revision"] = 4
+        released["drums"]["kit"] = "tiny"
+        released["drums"]["sample_map"] = copy.deepcopy(
+            REVISION_FOUR_SHIPPED_TINY_MAP
+        )
+
+        migrated = migrate_config_document(released)
+
+        self.assertEqual(migrated.data["config_revision"], 5)
+        self.assertEqual(migrated.data["drums"]["kit"], "gamma9001")
+        self.assertEqual(
+            migrated.data["drums"]["sample_map"],
+            REVISION_FIVE_GAMMA9001_MAP,
+        )
+        self.assertEqual(
+            migrated.changed_paths,
+            ("$.drums.kit", "$.drums.sample_map", "$.config_revision"),
+        )
+
+    def test_revision_five_preserves_existing_gamma_and_general_midi(self) -> None:
+        for kit in ("gamma9001", "general_midi"):
+            existing = copy.deepcopy(self.shipped)
+            existing["config_revision"] = 4
+            existing["drums"]["kit"] = kit
+            if kit == "general_midi":
+                for sample in existing["drums"]["sample_map"].values():
+                    sample["preset"] = 258
+            before = copy.deepcopy(existing["drums"])
+
+            migrated = migrate_config_document(existing)
+
+            with self.subTest(kit=kit):
+                self.assertEqual(migrated.data["drums"], before)
+                self.assertEqual(
+                    migrated.changed_paths, ("$.config_revision",)
+                )
+
+    def test_revision_five_rejects_a_custom_tiny_mapping(self) -> None:
+        custom = copy.deepcopy(self.shipped)
+        custom["config_revision"] = 4
+        custom["drums"]["kit"] = "tiny"
+        custom["drums"]["sample_map"] = copy.deepcopy(
+            REVISION_FOUR_SHIPPED_TINY_MAP
+        )
+        custom["drums"]["sample_map"]["perc_snap"]["note"] = 93
+
+        with self.assertRaisesRegex(
+            ConfigMigrationError, "custom Tiny mapping"
+        ):
+            migrate_config_document(custom)
 
     def test_current_revision_is_idempotent(self) -> None:
         migrated = migrate_config_document(self.shipped)

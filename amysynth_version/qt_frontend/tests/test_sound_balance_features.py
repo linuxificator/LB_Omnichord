@@ -207,7 +207,7 @@ class SoundBalanceFeatureTests(unittest.TestCase):
                     migrated["midi_input"]["oss_midi_globs"],
                     ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"],
                 )
-                self.assertEqual(migrated["drums"]["kit"], "tiny")
+                self.assertEqual(migrated["drums"]["kit"], "gamma9001")
                 self.assertEqual(migrated["serial"]["baud"], 230_400)
                 self.assertEqual(
                     json.loads(

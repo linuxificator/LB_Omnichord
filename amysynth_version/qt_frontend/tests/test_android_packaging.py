@@ -63,6 +63,14 @@ class AndroidPackagingTests(unittest.TestCase):
                     staging
                     / "config"
                     / "schema"
+                    / "amy_config_v5.schema.json"
+                ).is_file()
+            )
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
                     / "amy_config_v2.schema.json"
                 ).is_file()
             )

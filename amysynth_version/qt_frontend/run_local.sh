@@ -17,8 +17,9 @@ fi
 # validate its PCM-bank contract here; never build or install AMY while
 # launching the wire-protocol client and service processes.
 amy_extension="$(python -c 'import c_amy; print(c_amy.__file__)')"
-if nm -D "$amy_extension" | grep -E 'gamma9001|amy_set_gamma' >/dev/null; then
-    echo "AMY service has the incompatible Gamma9001 PCM bank: $amy_extension" >&2
+if ! nm -D "$amy_extension" | grep 'amy_set_gamma9001_pcm' >/dev/null \
+    || ! nm -D "$amy_extension" | grep 'gamma9001_pcm_data' >/dev/null; then
+    echo "AMY service does not contain the required Gamma9001 PCM bank: $amy_extension" >&2
     echo "Provision the service separately with ./prepare_local_amy.sh before launching." >&2
     exit 1
 fi

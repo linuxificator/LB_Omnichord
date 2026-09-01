@@ -6,8 +6,8 @@ Applies to: native tests, desktop services, Android Oboe and ESP32-P4
 Last verified: 2026-09-01
 
 Every LB Omnichord build uses AMY from the fork release branch
-`releases/amy_omnichord_R20260831T042456` at exact commit
-`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`.
+`releases/amy_omnichord_R20260901T201533` at exact commit
+`7c34aa514f10c33f02692f735166d65f4e20374a`.
 
 The machine authority for those values is `release_inputs.json` beside this
 document. Workflows and the ESP32 preparation script load it through
@@ -26,11 +26,16 @@ AppImages, the macOS application, the Windows named-pipe service, the Android
 Oboe AAR and the Android audio analyzer. Updating one platform alone is a
 contract failure.
 
-Native regressions build `AMY_PCM_BANK=tiny`, matching the release packages,
+Native regressions build `AMY_PCM_BANK=gamma9001`, matching the hosted release
+packages. They require both the Gamma9001 registration and linked-data symbols,
 and use the fork's `c_amy.live(audio=False, ...)` mode. This preserves the
 production sizing configuration while making the test bridge the only AMY
 clock and sample consumer; a background miniaudio callback cannot steal the
 block whose peak is being asserted.
+
+The ESP32-P4 image remains a separately declared Tiny-bank target until its
+flash/storage profile can hold Gamma9001. That hardware exception must never be
+used to silently select Tiny for Linux, Raspberry Pi, macOS, Windows or Android.
 
 ## Updating AMY
 

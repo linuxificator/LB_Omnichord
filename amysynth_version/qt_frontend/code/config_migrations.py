@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 4
+CURRENT_CONFIG_REVISION = 5
 JsonObject = dict[str, Any]
 
 
@@ -22,6 +22,43 @@ REVISION_FOUR_OSS_MIDI_GLOBS = (
     "/dev/midi[0-9]*",
     "/dev/amidi[0-9]*",
 )
+
+# Revision 4 was published with this Tiny profile even though the hosted
+# product line had already selected Gamma9001.  Keep both maps here as an
+# immutable migration contract: runtime code must continue to consume the
+# resolved configuration rather than duplicate either mapping.
+REVISION_FOUR_SHIPPED_TINY_MAP = {
+    "bd_haus": {"preset": 1, "note": 39},
+    "drum_bass_hard": {"preset": 1, "note": 39},
+    "drum_bass_soft": {"preset": 1, "note": 39},
+    "drum_snare_hard": {"preset": 2, "note": 45},
+    "drum_snare_soft": {"preset": 5, "note": 41},
+    "drum_cymbal_closed": {"preset": 6, "note": 53},
+    "drum_cymbal_pedal": {"preset": 7, "note": 61},
+    "drum_cymbal_open": {"preset": 7, "note": 56},
+    "drum_tom_hi_soft": {"preset": 8, "note": 73},
+    "drum_tom_mid_soft": {"preset": 8, "note": 63},
+    "drum_tom_lo_soft": {"preset": 8, "note": 61},
+    "elec_tick": {"preset": 4, "note": 51},
+    "perc_bell": {"preset": 10, "note": 69},
+    "perc_snap": {"preset": 9, "note": 94},
+}
+REVISION_FIVE_GAMMA9001_MAP = {
+    "bd_haus": {"preset": 0, "note": 60},
+    "drum_bass_hard": {"preset": 2, "note": 60},
+    "drum_bass_soft": {"preset": 0, "note": 60},
+    "drum_snare_hard": {"preset": 12, "note": 45},
+    "drum_snare_soft": {"preset": 14, "note": 41},
+    "drum_cymbal_closed": {"preset": 9, "note": 60},
+    "drum_cymbal_pedal": {"preset": 9, "note": 57},
+    "drum_cymbal_open": {"preset": 10, "note": 60},
+    "drum_tom_hi_soft": {"preset": 17, "note": 70},
+    "drum_tom_mid_soft": {"preset": 17, "note": 67},
+    "drum_tom_lo_soft": {"preset": 16, "note": 61},
+    "elec_tick": {"preset": 15, "note": 90},
+    "perc_bell": {"preset": 18, "note": 66},
+    "perc_snap": {"preset": 3, "note": 60},
+}
 
 
 def _sample_pair(sample_map: object, name: str) -> tuple[int, int] | None:
@@ -177,6 +214,30 @@ def _revision_three_to_four(data: JsonObject) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def _revision_four_to_five(data: JsonObject) -> tuple[str, ...]:
+    drums = data.get("drums")
+    if not isinstance(drums, dict):
+        raise ConfigMigrationError(
+            "$.drums",
+            "must be an object before revision 4 can migrate",
+        )
+    changed: list[str] = []
+    kit = drums.get("kit")
+    if kit == "tiny":
+        if drums.get("sample_map") != REVISION_FOUR_SHIPPED_TINY_MAP:
+            raise ConfigMigrationError(
+                "$.drums.sample_map",
+                "custom Tiny mapping cannot be migrated automatically to the "
+                "Gamma9001 release profile",
+            )
+        drums["kit"] = "gamma9001"
+        drums["sample_map"] = copy.deepcopy(REVISION_FIVE_GAMMA9001_MAP)
+        changed.extend(("$.drums.kit", "$.drums.sample_map"))
+    data["config_revision"] = 5
+    changed.append("$.config_revision")
+    return tuple(changed)
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
@@ -185,6 +246,7 @@ MIGRATIONS: dict[int, Migration] = {
     1: _revision_one_to_two,
     2: _revision_two_to_three,
     3: _revision_three_to_four,
+    4: _revision_four_to_five,
 }
 
 

@@ -8,8 +8,8 @@ Last verified: 2026-09-01
 ## Authority and revision
 
 `qt_frontend/config/amy_config.json` is the shipped configuration authority.
-It declares `config_revision`; current revision 4 is structurally defined by
-`config/schema/amy_config_v4.schema.json`. Historical revisions 1–3 remain
+It declares `config_revision`; current revision 5 is structurally defined by
+`config/schema/amy_config_v5.schema.json`. Historical revisions 1–4 remain
 packaged so their contracts are inspectable; the three pattern capacities are
 optional there, as are the later MIDI discovery fields and drum-kit identity;
 all are required from revision 4 onward. Unknown keys inside stable objects,
@@ -76,6 +76,13 @@ legacy tiny, Gamma9001 or General MIDI sample map; an unknown map fails with a
 path-specific error instead of being mislabeled. These are versioned historical
 migration values, not runtime fallbacks; structural and domain validation still
 reject invalid custom capacities.
+Revision 4 to 5 restores the intended Gamma9001 hosted-release profile. The
+exact Tiny sample map published by revision 4 is migrated atomically to the
+reviewed Gamma9001 map. Existing Gamma9001 and General MIDI selections are
+preserved. A customized Tiny map fails with a path-specific error because
+silently translating user-authored timbres would be data loss. The ESP32-P4
+firmware remains a separately declared Tiny-bank target; it does not change the
+desktop/mobile configuration contract.
 Because revision-1 full documents cannot distinguish that old default from an
 intentional diagnostic selection, a user who deliberately forced `linux` must
 reapply it after migration. Future and malformed revisions fail at
