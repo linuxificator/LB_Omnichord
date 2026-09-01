@@ -28,3 +28,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T16 | `T16_TRANSPORT_HEALTH_BOUNDS.md` | complete |
 | T17 | `T17_BOUNDED_APPLICATION_SCHEDULER.md` | complete |
 | T18 | `T18_MUSICAL_STATE_SNAPSHOTS.md` | complete |
+| T19 | `T19_PRESET_BINDING_SERVICES.md` | complete |

@@ -129,6 +129,18 @@ OMNI's chord catalogue, row selection or intonation-table fields. The snapshot
 does not transfer synth ownership: OMNI remains responsible for synths 0–4 and
 MIDI for synths 5–11, with note lifetime managed by their existing owners.
 
+OMNI preset dictionaries cross into application state through the pure
+`preset_plan.py` boundary. It normalizes chord rows, levels, effects, rhythm
+settings and tuning into frozen values without importing Qt or performing I/O;
+the OMNI facade remains the owner that applies those values in the existing
+side-effect order and separately loads synth-role state. OMNI and MIDI preset
+files remain independent and both use `JsonStore` for recoverable atomic
+writes. MIDI learn, bind, unlink, takeover, hidden-control retention and
+per-screen persistence remain one `MidiControlState` machine. The
+`MidiBindingService` supplies its synchronization, normalized persistence
+entries and detached immutable presentation snapshots; QML consumes semantic
+state and does not decide transitions from indicator colors.
+
 That guarantee also requires identical built-in PCM preset numbering. Local
 Linux AMY is built with `AMY_PCM_BANK=tiny`, matching ESP32-P4. Gamma9001 uses a
 different meaning for PCM presets 0–18 and must not be selected for this

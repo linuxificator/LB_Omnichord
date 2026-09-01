@@ -939,13 +939,21 @@ class StaticContractTests(unittest.TestCase):
     def test_apg_ldr_button_uses_backend_preset_state(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        tree = ast.parse(backend)
+        preset_compilers = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "compile_omni_preset_plan"
+        ]
         self.assertIn(
             "property bool strumLadderMode: backend.strumLadderMode",
             qml,
         )
         self.assertIn("backend.toggleStrumLadderMode()", qml)
         self.assertIn('"strum_mode": "LDR"', backend)
-        self.assertIn('data.get("strum_mode", "APG")', backend)
+        self.assertEqual(len(preset_compilers), 1)
 
     def test_strum_note_guide_occupies_the_omni_side_gap(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
