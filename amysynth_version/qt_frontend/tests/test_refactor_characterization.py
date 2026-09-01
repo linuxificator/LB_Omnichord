@@ -26,6 +26,7 @@ from midi_player import (  # noqa: E402
     _MidiByteStreamParser,
     _MidiInputTechManager,
 )
+from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
 
 
 MANIFEST_PATH = Path(__file__).with_name("characterization_contracts.json")
@@ -123,18 +124,27 @@ class RefactorCharacterizationTests(unittest.TestCase):
         )
         midi_config = config["midi_input"]
         expected = {
-            "linux": ("alsa_raw", "alsa_seq", "oss_midi"),
-            "darwin": ("coremidi",),
-            "win32": ("winmm",),
-            "android": ("android_midi",),
-            "freebsd": (),
+            ("wayland", "linux"): (
+                "linux",
+                ("alsa_raw", "alsa_seq", "oss_midi"),
+            ),
+            ("cocoa", "darwin"): ("darwin", ("coremidi",)),
+            ("windows", "win32"): ("win32", ("winmm",)),
+            ("android", "android"): ("android", ("android_midi",)),
+            ("offscreen", "freebsd14"): ("freebsd14", ()),
         }
         original = copy.deepcopy(config)
-        for profile, keys in expected.items():
-            with self.subTest(profile=profile):
+        for (qpa, runtime), (profile, keys) in expected.items():
+            with self.subTest(qpa=qpa, runtime=runtime):
+                resolved = resolve_midi_tech_profile(
+                    midi_config["tech_profile"],
+                    qpa,
+                    runtime,
+                )
+                self.assertEqual(resolved, profile)
                 techs = _MidiInputTechManager.platform_techs(
                     midi_config,
-                    profile,
+                    resolved,
                 )
                 self.assertEqual(
                     tuple(str(item["key"]) for item in techs),

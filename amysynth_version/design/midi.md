@@ -19,12 +19,15 @@ Each MIDI row has:
 
 Default channels are 1-6. Duplicate channel assignments are allowed.
 
-MIDI input tech selection is controlled by `midi_input.tech_profile`. The shipped
-profile is `linux`, matching the Raspberry Pi target; when the field is absent,
-the backend derives the closest profile from Qt's platform abstraction. On Linux
-the frontend reads every enabled raw byte-stream MIDI technology that this build
-can open and combines those inputs into one application MIDI stream. The
-currently implemented dependency-free readers are:
+MIDI input tech selection is controlled by `midi_input.tech_profile`. The
+shipped value is `auto`: ordinary packages derive the closest profile from
+Qt's platform abstraction and Python's runtime platform. A non-`auto` value is
+a deliberate test or diagnostic override, not a platform default for a
+release. This keeps one common configuration portable across Linux, macOS,
+Windows and Android packages. On Linux the frontend reads every enabled raw
+byte-stream MIDI technology that this build can open and combines those inputs
+into one application MIDI stream. The currently implemented dependency-free
+readers are:
 
 - ALSA raw MIDI character devices, configured by `alsa_raw_globs` and retaining
   the legacy `device_glob` fallback (`/dev/snd/midiC*D*`);

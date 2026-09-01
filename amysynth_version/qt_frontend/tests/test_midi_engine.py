@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 import threading
@@ -19,6 +20,7 @@ from midi_player import (  # noqa: E402
 )
 from midi_control import NOTE_BUTTON_OFFSET, PITCH_BEND_CONTROLLER  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
+from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
 from synth_state import SynthState  # noqa: E402
 
 
@@ -60,6 +62,37 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_shipped_midi_profile_is_auto_and_resolves_per_package(self) -> None:
+        config = json.loads(
+            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
+        configured = config["midi_input"]["tech_profile"]
+        self.assertEqual(configured, "auto")
+
+        cases = (
+            ("wayland", "linux", "linux"),
+            ("cocoa", "darwin", "darwin"),
+            ("windows", "win32", "win32"),
+            ("android", "android", "android"),
+            ("offscreen", "freebsd14", "freebsd14"),
+        )
+        for qpa, runtime, expected in cases:
+            with self.subTest(qpa=qpa, runtime=runtime):
+                self.assertEqual(
+                    resolve_midi_tech_profile(configured, qpa, runtime),
+                    expected,
+                )
+
+    def test_explicit_midi_profile_remains_a_diagnostic_override(self) -> None:
+        self.assertEqual(
+            resolve_midi_tech_profile("linux", "windows", "win32"),
+            "linux",
+        )
+        self.assertEqual(
+            resolve_midi_tech_profile("DARWIN", "wayland", "linux"),
+            "darwin",
+        )
+
     def test_midi_platform_techs_are_filtered_by_runtime_platform(self) -> None:
         cases = {
             "linux": ("alsa_raw", "alsa_seq", "oss_midi"),

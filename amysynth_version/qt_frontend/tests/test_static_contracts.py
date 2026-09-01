@@ -902,8 +902,20 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn("MouseArea {", indicator)
 
     def test_runtime_ui_does_not_branch_on_operating_system_names(self) -> None:
+        quality_policy = json.loads(
+            (ROOT / "tests" / "quality" / "quality_policy.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        platform_adapters = set(
+            quality_policy["direct_platform_access_allowlist"]
+        )
         runtime_files = [
-            *sorted((ROOT / "code").glob("*.py")),
+            *sorted(
+                path
+                for path in (ROOT / "code").glob("*.py")
+                if path.name not in platform_adapters
+            ),
             *sorted((ROOT / "gui").glob("*.qml")),
         ]
         forbidden = (

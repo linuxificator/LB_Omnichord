@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, Callable
 
 from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
-from PySide6.QtGui import QGuiApplication
 
 import app_core
 from control_limits import clamp_control_value
@@ -21,6 +20,7 @@ from midi_control import (
     PITCH_BEND_CONTROLLER,
     MidiControlState,
 )
+from midi_platform_profile import current_midi_tech_profile
 from synth_programs import resolve_program
 from synth_state import SynthState
 from user_data import MIDI_PRESET_DIR
@@ -512,22 +512,9 @@ class _MidiInputTechManager:
 
     @staticmethod
     def current_tech_profile(midi_cfg: dict[str, Any]) -> str:
-        configured = str(midi_cfg.get("tech_profile", "")).strip()
-        if configured:
-            return configured
-        app = QGuiApplication.instance()
-        qpa = (
-            str(QGuiApplication.platformName()).casefold()
-            if app is not None
-            else ""
+        return current_midi_tech_profile(
+            midi_cfg.get("tech_profile", "auto")
         )
-        if qpa == "cocoa":
-            return "darwin"
-        if qpa == "windows":
-            return "win32"
-        if qpa == "android":
-            return "android"
-        return "linux"
 
     @classmethod
     def platform_techs(

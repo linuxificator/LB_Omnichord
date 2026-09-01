@@ -27,7 +27,7 @@
   },
   "midi_input": {
     "enabled": true,
-    "tech_profile": "linux",
+    "tech_profile": "auto",
     "device_glob": "/dev/snd/midiC*D*",
     "alsa_raw_globs": ["/dev/snd/midiC*D*"],
     "oss_midi_globs": ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"]
