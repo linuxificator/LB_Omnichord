@@ -82,7 +82,6 @@ class SerialAmyBridge:
         os.set_blocking(self.master_fd, False)
 
         self.lines: list[str] = []
-        self.line_times: list[float] = []
         self.raw_chunks: list[bytes] = []
         self._buffer = bytearray()
         self._line_condition = threading.Condition()
@@ -185,8 +184,7 @@ class SerialAmyBridge:
         # transport-start event it was supposedly waiting for.
         with self._line_condition:
             self.lines.append(line)
-            self.line_times.append(time.monotonic())
-            self._last_rx = self.line_times[-1]
+            self._last_rx = time.monotonic()
             self._line_condition.notify_all()
         with self._serial_log_path.open("a", encoding="utf-8") as handle:
             handle.write(line + "\n")
@@ -288,10 +286,6 @@ class SerialAmyBridge:
     def lines_since(self, start: int) -> list[str]:
         with self._line_condition:
             return list(self.lines[start:])
-
-    def timed_lines(self) -> list[tuple[str, float]]:
-        with self._line_condition:
-            return list(zip(self.lines, self.line_times))
 
     def wait_for_lines(
         self,
@@ -504,6 +498,29 @@ class HeadlessApp:
         if not result.get("ok"):
             raise AssertionError(f"query {name} failed: {result}")
         return result.get("result")
+
+    def wait_for_frontend_log(
+        self,
+        needle: str,
+        *,
+        timeout: float = 5.0,
+    ) -> str:
+        """Wait until the asynchronous transport log contains ``needle``."""
+
+        deadline = time.monotonic() + timeout
+        latest = ""
+        while time.monotonic() < deadline:
+            try:
+                latest = self.frontend_log.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                latest = ""
+            if needle in latest:
+                return latest
+            time.sleep(0.01)
+        raise AssertionError(
+            f"frontend transport log did not contain {needle!r}; log was:\n"
+            + latest
+        )
 
     def copy_frontend_log(self) -> None:
         if self.frontend_log.exists():

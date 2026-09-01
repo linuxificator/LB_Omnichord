@@ -647,8 +647,7 @@ class SerialIntegrationTests(unittest.TestCase):
     def test_cold_start_guards_synth4_and_reverb_zero_is_exact(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=10.0)
-            records = app.bridge.timed_lines()
-            lines = [line for line, _ in records]
+            lines = app.bridge.lines_since(0)
 
             # Four isolated buses: drums 0 are dry by default; bass/strum/chord
             # buses also start at user reverb level zero. Liveness/damping are
@@ -657,22 +656,35 @@ class SerialIntegrationTests(unittest.TestCase):
                 self.assertIn(f"y{bus}h0,0.5,0.5Z", lines)
             self.assertFalse(any("h0.001" in line for line in lines))
 
-            k4_index = next(
-                i for i, line in enumerate(lines)
+            # The PTY may coalesce writes that were physically separated by a
+            # scheduler delay when its reader thread is descheduled. Verify
+            # the application's ordered transport decisions here; the
+            # scheduler unit test measures the actual sink-write separation.
+            allocation = next(
+                line
+                for line in lines
                 if line.startswith("K")
                 and "i4iv" in line
                 and "iy3if8Z" in line
             )
-            next_synth4_index = next(
-                i for i in range(k4_index + 1, len(lines))
-                if "i4" in lines[i]
+            routed = "i4iy3Z"
+            transport_log = app.wait_for_frontend_log(
+                f"TX-HIGH      {routed}",
+                timeout=5.0,
             )
-            elapsed = records[next_synth4_index][1] - records[k4_index][1]
-            self.assertGreaterEqual(
-                elapsed,
-                0.008,
-                f"synth 4 post-allocation command arrived after only {elapsed:.4f}s",
+            allocation_offset = transport_log.index(
+                f"TX-HIGH      {allocation}"
             )
+            guard_offset = transport_log.index(
+                "GUARD        sleep 10.0 ms",
+                allocation_offset,
+            )
+            routed_offset = transport_log.index(
+                f"TX-HIGH      {routed}",
+                allocation_offset,
+            )
+            self.assertLess(allocation_offset, guard_offset)
+            self.assertLess(guard_offset, routed_offset)
 
             # User reverb applies to bass/strum/chords, never drums unless DRM
             # is explicitly enabled.

@@ -31,6 +31,7 @@ class _SinkProbe:
 
     def __init__(self, *, block_first: bool = False, fail: bool = False) -> None:
         self.payloads: list[bytes] = []
+        self.write_times: list[float] = []
         self.open_count = 0
         self.close_count = 0
         self.started = threading.Event()
@@ -43,6 +44,7 @@ class _SinkProbe:
 
     def write(self, payload: bytes) -> None:
         self.payloads.append(payload)
+        self.write_times.append(time.monotonic())
         self.started.set()
         if self.block_first and len(self.payloads) == 1:
             self.release.wait(2.0)
@@ -90,6 +92,25 @@ class TransportCharacterizationTests(unittest.TestCase):
             [b"firstZ\n", b"safetyZ\n", b"currentZ\n"],
         )
         self.assertGreaterEqual(scheduler.health.coalesced_stale, 1)
+
+    def test_guard_separates_physical_sink_writes(self) -> None:
+        sink = _SinkProbe()
+        scheduler = CommandScheduler(sink, name="guard-test")
+        scheduler.high("allocation")
+        scheduler.delay(0.010)
+        scheduler.high("post-allocation")
+        scheduler.close()
+
+        self.assertEqual(
+            sink.payloads,
+            [b"allocationZ\n", b"post-allocationZ\n"],
+        )
+        elapsed = sink.write_times[1] - sink.write_times[0]
+        self.assertGreaterEqual(
+            elapsed,
+            0.008,
+            f"guard separated sink writes by only {elapsed:.4f}s",
+        )
 
     def test_critical_overload_is_explicit_and_replaceable_work_is_bounded(self) -> None:
         sink = _SinkProbe(block_first=True)

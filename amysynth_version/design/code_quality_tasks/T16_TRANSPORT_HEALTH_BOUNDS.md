@@ -36,6 +36,12 @@ Owner: AMY command delivery and debug logging
   close. Real Unix `SEQPACKET`/stream and QLocalSocket tests prove the existing
   packet/framing contracts.
 - Debug tests prove rotation and visible non-blocking queue loss.
+- The allocation-guard proof is split at the correct boundaries: the serial
+  integration test verifies that startup places a 10 ms guard between synth 4
+  allocation and its next command, while a scheduler test measures the two
+  physical sink writes around a guard. A PTY read timestamp is deliberately
+  not used for write timing because the kernel may return separately timed
+  writes in one buffered read after reader-thread scheduling latency.
 - Existing sequencer tag tests retain ordering and cancellation expectations.
 - Both new modules pass strict mypy. Whole-project quality passes with 37/42
   legacy mypy errors (five below the ceiling) and 18 strict modules. The full
