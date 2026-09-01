@@ -49,6 +49,13 @@ from musical_state import (
     tune_note,
     tuning_note_offset,
 )
+from json_store import JsonStore
+from preset_plan import (
+    ChordRowPreset,
+    EffectsPreset,
+    RhythmSettingPreset,
+    compile_omni_preset_plan,
+)
 from runtime_paths import production_frontend_asset_root
 from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
@@ -1773,17 +1780,7 @@ class InstrumentBackend(QObject):
         path: Path,
         data: dict[str, Any],
     ) -> None:
-        temporary = path.with_suffix(path.suffix + ".tmp")
-        temporary.write_text(
-            json.dumps(
-                data,
-                indent=2,
-                ensure_ascii=False,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        temporary.replace(path)
+        JsonStore(path).write(data)
 
     def _preset_snapshot(self) -> dict[str, Any]:
         synth_roles: dict[str, Any] = {}
@@ -2114,277 +2111,85 @@ class InstrumentBackend(QObject):
                     self._row_octave_indexes[self._active_row],
                 )
         self._reset_presettable_state_to_defaults()
-        self._strum_ladder_mode = str(data.get("strum_mode", "APG")).upper() == "LDR"
-
-        suffix_to_index = {chord.suffix: index for index, chord in enumerate(self._chords)}
-        octave_to_index = {name: index for index, name in enumerate(OCTAVE_NAMES)}
-
-        rows = data.get("chord_rows", [])
-
-        if isinstance(rows, list) and len(rows) == ROW_COUNT:
-            for row_index, row in enumerate(rows):
-                if not isinstance(row, dict):
-                    continue
-
-                chord_key = str(
-                    row.get(
-                        "chord",
-                        self._chords[self._row_chord_indexes[row_index]].suffix,
-                    )
+        plan = compile_omni_preset_plan(
+            data,
+            chord_suffixes=tuple(chord.suffix for chord in self._chords),
+            chord_inversion_counts=tuple(len(chord.inversions) for chord in self._chords),
+            octave_names=OCTAVE_NAMES,
+            default_rows=tuple(
+                ChordRowPreset(
+                    self._row_chord_indexes[index],
+                    self._row_octave_indexes[index],
+                    self._row_inversion_indexes[index],
                 )
-                octave_key = str(
-                    row.get(
-                        "octave",
-                        OCTAVE_NAMES[self._row_octave_indexes[row_index]],
-                    )
+                for index in range(ROW_COUNT)
+            ),
+            default_volumes=(
+                self._chord_volume,
+                self._strum_volume,
+                self._bass_volume,
+                self._percussion_volume,
+            ),
+            default_effects=EffectsPreset(
+                self._reverb_level,
+                self._reverb_liveness,
+                self._reverb_damping,
+                self._reverb_drums,
+            ),
+            default_bass_running=self._bass_running,
+            rhythm_keys=tuple(rhythm.key for rhythm in self._rhythms),
+            default_selected_rhythm_index=self._rhythm.selected_index,
+            default_rhythm_settings=tuple(
+                RhythmSettingPreset(
+                    self._rhythm.tempo_by_rhythm[index],
+                    self._rhythm.busyness_by_rhythm[index],
+                    self._rhythm.chord_activity_by_rhythm[index],
+                    self._rhythm.bass_activity_by_rhythm[index],
+                    tuple(self._rhythm.fill_order_by_rhythm[index]),
+                    self._rhythm.fill_density_index_by_rhythm[index],
                 )
-
-                if chord_key in suffix_to_index:
-                    self._row_chord_indexes[row_index] = suffix_to_index[chord_key]
-
-                if octave_key in octave_to_index:
-                    self._row_octave_indexes[row_index] = octave_to_index[octave_key]
-
-                chord = self._chords[self._row_chord_indexes[row_index]]
-                inversion_count = len(chord.inversions)
-                self._row_inversion_indexes[row_index] = (
-                    int(row.get("inversion", 0)) % inversion_count
-                )
+                for index in range(len(self._rhythms))
+            ),
+            fill_density_bars=FILL_DENSITY_BARS,
+            tuning_modes=TUNING_MODE_NAMES,
+            default_tuning_mode_index=self._tuning_mode_index,
+            default_tuning_reference_hz=self._tuning_reference,
+            reverb_level_max=REVERB_LEVEL_MAX,
+        )
+        self._strum_ladder_mode = plan.strum_ladder_mode
+        for index, row in enumerate(plan.chord_rows):
+            self._row_chord_indexes[index] = row.chord_index
+            self._row_octave_indexes[index] = row.octave_index
+            self._row_inversion_indexes[index] = row.inversion_index
 
         synth_data = data.get("synths", {})
-
         if isinstance(synth_data, dict):
             for role in ("chord", "strum", "bass"):
                 role_data = synth_data.get(role, {})
                 if isinstance(role_data, dict):
                     self._runtime(role).load_preset(role_data)
 
-        volumes = data.get("volumes", {})
-
-        if isinstance(volumes, dict):
-            self._chord_volume = max(
-                0.0,
-                min(
-                    1.0,
-                    float(
-                        volumes.get(
-                            "chord",
-                            self._chord_volume,
-                        )
-                    ),
-                ),
-            )
-            self._strum_volume = max(
-                0.0,
-                min(
-                    1.0,
-                    float(
-                        volumes.get(
-                            "strum",
-                            self._strum_volume,
-                        )
-                    ),
-                ),
-            )
-            self._bass_volume = max(
-                0.0,
-                min(
-                    1.0,
-                    float(
-                        volumes.get(
-                            "bass",
-                            self._bass_volume,
-                        )
-                    ),
-                ),
-            )
-            self._percussion_volume = max(
-                0.0,
-                min(
-                    1.0,
-                    float(
-                        volumes.get(
-                            "percussion",
-                            self._percussion_volume,
-                        )
-                    ),
-                ),
-            )
-
-        effects = data.get("effects", {})
-        if not isinstance(effects, dict):
-            effects = {}
-        default_effects = self._defaults.get("effects", {})
-        legacy_main = effects.get("main_reverb", default_effects.get("reverb_level", 0.0))
-        legacy_drum = effects.get("percussion_reverb", 0.0)
-        self._reverb_level = max(
-            0.0,
-            min(
-                REVERB_LEVEL_MAX,
-                float(effects.get("reverb_level", legacy_main)),
-            ),
-        )
-        self._reverb_liveness = max(
-            0.0,
-            min(
-                1.0,
-                float(effects.get("reverb_liveness", default_effects.get("reverb_liveness", 0.5))),
-            ),
-        )
-        self._reverb_damping = max(
-            0.0,
-            min(
-                1.0,
-                float(effects.get("reverb_damping", default_effects.get("reverb_damping", 0.5))),
-            ),
-        )
-        self._reverb_drums = bool(effects.get("reverb_drums", float(legacy_drum) > 0.0))
-
-        transport = data.get(
-            "transport",
-            {},
-        )
-
-        if isinstance(transport, dict):
-            self._bass_running = bool(
-                transport.get(
-                    "bass_running",
-                    self._bass_running,
-                )
-            )
-
-        rhythm_data = data.get(
-            "rhythm",
-            {},
-        )
-
-        if isinstance(rhythm_data, dict):
-            rhythm_key_to_index = {rhythm.key: index for index, rhythm in enumerate(self._rhythms)}
-
-            selected_key = str(
-                rhythm_data.get(
-                    "selected",
-                    self._selected_rhythm().key,
-                )
-            )
-
-            if selected_key in rhythm_key_to_index:
-                self._rhythm.selected_index = rhythm_key_to_index[selected_key]
-
-            settings = rhythm_data.get(
-                "settings",
-                {},
-            )
-
-            if isinstance(settings, dict):
-                for index, rhythm in enumerate(self._rhythms):
-                    stored = settings.get(
-                        rhythm.key,
-                        {},
-                    )
-
-                    if not isinstance(
-                        stored,
-                        dict,
-                    ):
-                        continue
-
-                    self._rhythm.tempo_by_rhythm[index] = max(
-                        40.0,
-                        min(
-                            200.0,
-                            float(
-                                stored.get(
-                                    "tempo",
-                                    self._rhythm.tempo_by_rhythm[index],
-                                )
-                            ),
-                        ),
-                    )
-                    self._rhythm.busyness_by_rhythm[index] = max(
-                        1,
-                        min(
-                            5,
-                            int(
-                                stored.get(
-                                    "percussion_activity",
-                                    self._rhythm.busyness_by_rhythm[index],
-                                )
-                            ),
-                        ),
-                    )
-                    raw_order = stored.get(
-                        "fill_order",
-                        self._rhythm.fill_order_by_rhythm[index],
-                    )
-                    if isinstance(raw_order, list):
-                        self._rhythm.fill_order_by_rhythm[index] = list(
-                            dict.fromkeys(
-                                fill_index
-                                for fill_index in (int(value) for value in raw_order)
-                                if 0 <= fill_index < 5
-                            )
-                        )
-                    raw_density = int(
-                        stored.get(
-                            "fill_density_bars",
-                            FILL_DENSITY_BARS[self._rhythm.fill_density_index_by_rhythm[index]],
-                        )
-                    )
-                    if raw_density in FILL_DENSITY_BARS:
-                        self._rhythm.fill_density_index_by_rhythm[index] = FILL_DENSITY_BARS.index(
-                            raw_density
-                        )
-                    self._rhythm.chord_activity_by_rhythm[index] = max(
-                        1,
-                        min(
-                            4,
-                            int(
-                                stored.get(
-                                    "chord_activity",
-                                    self._rhythm.chord_activity_by_rhythm[index],
-                                )
-                            ),
-                        ),
-                    )
-                    self._rhythm.bass_activity_by_rhythm[index] = max(
-                        1,
-                        min(
-                            5,
-                            int(
-                                stored.get(
-                                    "bass_activity",
-                                    self._rhythm.bass_activity_by_rhythm[index],
-                                )
-                            ),
-                        ),
-                    )
-
-        tuning = data.get("tuning", {})
-
-        if isinstance(tuning, dict):
-            mode = str(
-                tuning.get(
-                    "mode",
-                    TUNING_MODE_NAMES[self._tuning_mode_index],
-                )
-            )
-
-            if mode in TUNING_MODE_NAMES:
-                self._tuning_mode_index = TUNING_MODE_NAMES.index(mode)
-
-            self._tuning_reference = max(
-                415,
-                min(
-                    466,
-                    int(
-                        tuning.get(
-                            "reference_hz",
-                            self._tuning_reference,
-                        )
-                    ),
-                ),
-            )
+        (
+            self._chord_volume,
+            self._strum_volume,
+            self._bass_volume,
+            self._percussion_volume,
+        ) = plan.volumes
+        self._reverb_level = plan.effects.level
+        self._reverb_liveness = plan.effects.liveness
+        self._reverb_damping = plan.effects.damping
+        self._reverb_drums = plan.effects.drums
+        self._bass_running = plan.bass_running
+        self._rhythm.selected_index = plan.selected_rhythm_index
+        for index, setting in enumerate(plan.rhythm_settings):
+            self._rhythm.tempo_by_rhythm[index] = setting.tempo
+            self._rhythm.busyness_by_rhythm[index] = setting.percussion_activity
+            self._rhythm.chord_activity_by_rhythm[index] = setting.chord_activity
+            self._rhythm.bass_activity_by_rhythm[index] = setting.bass_activity
+            self._rhythm.fill_order_by_rhythm[index] = list(setting.fill_order)
+            self._rhythm.fill_density_index_by_rhythm[index] = setting.fill_density_index
+        self._tuning_mode_index = plan.tuning_mode_index
+        self._tuning_reference = int(plan.tuning_reference_hz)
         self._stop_pitch_bend()
         self._pitch_bend_offset_hz = 0.0
         self._stop_tempo_nudge()

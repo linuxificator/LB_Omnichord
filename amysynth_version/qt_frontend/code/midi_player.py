@@ -14,11 +14,13 @@ import app_core
 from application_scheduler import MonotonicScheduler
 from amy_parameter_plan import compile_parameter_commands
 from control_limits import clamp_control_value
+from json_store import JsonStore
 from midi_control import (
     NOTE_BUTTON_OFFSET,
     PITCH_BEND_CONTROLLER,
     MidiControlState,
 )
+from midi_binding_service import MidiBindingService
 from midi_input import (
     MIDI_INPUT_ACTIVITY_SECONDS,
     MidiInputEvent,
@@ -68,13 +70,7 @@ class _QueuedMidiInputEventRelay:
 
 
 def _write_json_atomic(path: Path, data: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    tmp.replace(path)
+    JsonStore(path).write(data)
 
 
 class MidiAmyEngine:
@@ -436,9 +432,13 @@ class MidiPlayerBackend(QObject):
         self._master_volume = 1.0
         self._master_muted = False
         self._midi_control_state = MidiControlState(capacity=17)
+        self._midi_control_lock = threading.Lock()
+        self._midi_binding_service = MidiBindingService(
+            self._midi_control_state,
+            self._midi_control_lock,
+        )
         self._preset_binding_locations: dict[tuple[int, int], tuple[tuple[str, int], ...]] = {}
         self._binding_version = 0
-        self._midi_control_lock = threading.Lock()
         self._applying_midi_control = 0
         self._held_midi_button_targets: set[str] = set()
         raw_cc_log = os.environ.get("OMNICHORD_TEST_MIDI_CC_LOG", "")
@@ -1360,13 +1360,24 @@ class MidiPlayerBackend(QObject):
         self.process_midi_button(channel, note, velocity)
 
     def control_bindings_snapshot(self, screen: str) -> list[dict[str, Any]]:
-        with self._midi_control_lock:
-            result = self._midi_control_state.serialize_bindings(screen)
+        result = self._binding_service().serialize(screen)
         for entry in result:
             target = entry.get("target")
             if isinstance(target, dict):
                 target.pop("id", None)
         return result
+
+    def _binding_service(self) -> MidiBindingService:
+        service = getattr(self, "_midi_binding_service", None)
+        if service is not None and service.state is self._midi_control_state:
+            return service
+        lock = getattr(self, "_midi_control_lock", None)
+        if lock is None:
+            lock = threading.Lock()
+            self._midi_control_lock = lock
+        service = MidiBindingService(self._midi_control_state, lock)
+        self._midi_binding_service = service
+        return service
 
     def _selected_preset_for_screen(self, screen: str) -> int:
         if str(screen) == "midi":
@@ -1454,45 +1465,12 @@ class MidiPlayerBackend(QObject):
         screen: str,
         data: Any,
     ) -> list[tuple[tuple[int, int], dict[str, Any]]]:
-        entries: list[tuple[tuple[int, int], dict[str, Any]]] = []
-        if isinstance(data, list):
-            for raw in data:
-                if not isinstance(raw, dict):
-                    continue
-                target_data = raw.get("target")
-                if not isinstance(target_data, dict):
-                    continue
-                target_data = dict(target_data)
-                target_data["screen"] = str(screen)
-                target = self._normalize_control_target(target_data)
-                if target is None:
-                    continue
-                try:
-                    channel = int(raw.get("channel", 0))
-                    source_type = str(raw.get("source_type", "cc"))
-                    if source_type == "pitch_bend":
-                        controller = PITCH_BEND_CONTROLLER
-                    elif source_type == "note_button":
-                        controller = NOTE_BUTTON_OFFSET + int(raw.get("note", -1))
-                    else:
-                        controller = int(raw.get("controller", -1))
-                    key = self._midi_control_state.key(channel, controller)
-                except (TypeError, ValueError):
-                    continue
-                if not 1 <= key[0] <= 16:
-                    continue
-                if source_type == "pitch_bend" and key[1] != PITCH_BEND_CONTROLLER:
-                    continue
-                if source_type == "note_button" and not (
-                    NOTE_BUTTON_OFFSET <= key[1] <= NOTE_BUTTON_OFFSET + 127
-                ):
-                    continue
-                if source_type not in ("cc", "pitch_bend", "note_button"):
-                    continue
-                if source_type == "cc" and not 0 <= key[1] <= 127:
-                    continue
-                entries.append((key, target))
-        return entries
+        entries = self._binding_service().normalize_entries(
+            screen,
+            data,
+            self._normalize_control_target,
+        )
+        return MidiBindingService.as_state_entries(entries)
 
     def capture_bound_control_values(
         self,
@@ -1660,12 +1638,13 @@ class MidiPlayerBackend(QObject):
                         self.owner._bass_riff_context = self.owner._current_bass_riff_context()
 
     def replace_control_bindings(self, screen: str, data: Any) -> None:
-        entries = self._normalized_binding_entries(screen, data)
-        with self._midi_control_lock:
-            self._midi_control_state.replace_screen_bindings(
-                str(screen),
-                entries,
-            )
+        service = self._binding_service()
+        entries = service.normalize_entries(
+            screen,
+            data,
+            self._normalize_control_target,
+        )
+        service.replace_screen(screen, entries)
         self._sync_blue_timer()
         self._sync_preset_feedback_timer()
         self._bump_binding_state()
@@ -1709,8 +1688,7 @@ class MidiPlayerBackend(QObject):
     @Slot(int, result="QVariantList")
     def commonControls(self, row: int) -> list[dict[str, Any]]:
         if int(row) == -1:
-            with self._midi_control_lock:
-                return self._midi_control_state.visible_model()
+            return self._binding_service().presentation().qml_model()
         if not self._valid_row(row):
             return []
         return self._runtime(row).control_model("common")
