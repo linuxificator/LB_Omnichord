@@ -13,12 +13,14 @@ class InstrumentBackend(OmniInstrumentBackend):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._pending_omni_control_bindings: Any = []
+        midi_input_port_factory = kwargs.pop("midi_input_port_factory")
         super().__init__(*args, **kwargs)
         self._syncing_tuning = False
         self._midi_player = MidiPlayerBackend(
             owner=self,
             synths=tuple(self._synths),
             client=self._client,
+            midi_input_port_factory=midi_input_port_factory,
         )
         self._midi_player.stateChanged.connect(self.midiStateChanged)
         self._midi_player.tuningChanged.connect(self.midiTuningChanged)

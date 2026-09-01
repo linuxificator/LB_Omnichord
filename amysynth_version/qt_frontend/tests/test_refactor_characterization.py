@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import copy
 import hashlib
 import json
 import sys
@@ -21,12 +20,15 @@ import config_loader  # noqa: E402
 import local_amy_service  # noqa: E402
 import main  # noqa: E402
 from midi_control import PITCH_BEND_CONTROLLER  # noqa: E402
-from midi_integration import InstrumentBackend  # noqa: E402
-from midi_player import (  # noqa: E402
-    MidiPlayerBackend,
-    _MidiByteStreamParser,
-    _MidiInputTechManager,
+from midi_input import (  # noqa: E402
+    MidiByteStreamParser,
+    MidiByteStreamState,
+    MidiInputEvent,
+    OrderedMidiInputEmitter,
 )
+from midi_integration import InstrumentBackend  # noqa: E402
+from midi_platform_adapters import midi_input_technologies  # noqa: E402
+from midi_player import MidiPlayerBackend  # noqa: E402
 from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
 
 
@@ -130,10 +132,10 @@ class RefactorCharacterizationTests(unittest.TestCase):
         )
 
     def test_unmodified_shipped_config_resolves_for_five_profiles(self) -> None:
-        config = config_loader.load_amy_config(
+        config = config_loader.load_resolved_amy_config(
             ROOT / "config" / "amy_config.json"
         )
-        midi_config = config["midi_input"]
+        midi_config = config.midi_input
         expected = {
             ("wayland", "linux"): (
                 "linux",
@@ -144,51 +146,56 @@ class RefactorCharacterizationTests(unittest.TestCase):
             ("android", "android"): ("android", ("android_midi",)),
             ("offscreen", "freebsd14"): ("freebsd14", ()),
         }
-        original = copy.deepcopy(config)
         for (qpa, runtime), (profile, keys) in expected.items():
             with self.subTest(qpa=qpa, runtime=runtime):
                 resolved = resolve_midi_tech_profile(
-                    midi_config["tech_profile"],
+                    midi_config.configured_profile,
                     qpa,
                     runtime,
                 )
                 self.assertEqual(resolved, profile)
-                techs = _MidiInputTechManager.platform_techs(
+                techs = midi_input_technologies(
                     midi_config,
                     resolved,
                 )
                 self.assertEqual(
-                    tuple(str(item["key"]) for item in techs),
+                    tuple(item.key for item in techs),
                     keys,
                 )
-                self.assertEqual(config, original)
 
     def test_midi_stream_normalization_is_characterized(self) -> None:
-        notes: list[tuple[int, int, int, bool]] = []
-        controls: list[tuple[int, int, int]] = []
-        parser = _MidiByteStreamParser(
-            lambda *event: notes.append(event),
-            lambda *event: controls.append(event),
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(
+            OrderedMidiInputEmitter(events.append),
+            "characterization",
         )
-        state: dict[str, object] = {}
+        state = MidiByteStreamState()
 
         # Split packets, running status, Note On velocity zero, real-time bytes,
         # SysEx suppression, CC and 14-bit pitch bend are all common adapter
         # inputs. The normalized output is the portable behavior to preserve.
-        parser._parse_stream(bytes([0x91, 60]), state)
-        parser._parse_stream(bytes([100, 61, 0, 0xF8]), state)
-        parser._parse_stream(bytes([0xF0, 1, 2, 0xF7]), state)
-        parser._parse_stream(bytes([0xB2, 74, 99, 0xE2, 0, 64]), state)
+        parser.feed(bytes([0x91, 60]), state)
+        parser.feed(bytes([100, 61, 0, 0xF8]), state)
+        parser.feed(bytes([0xF0, 1, 2, 0xF7]), state)
+        parser.feed(bytes([0xB2, 74, 99, 0xE2, 0, 64]), state)
 
         self.assertEqual(
-            notes,
+            [
+                (event.channel, event.data, event.value, event.is_on)
+                for event in events
+                if event.kind == "note"
+            ],
             [
                 (2, 60, 100, True),
                 (2, 61, 0, False),
             ],
         )
         self.assertEqual(
-            controls,
+            [
+                (event.channel, event.data, event.value)
+                for event in events
+                if event.kind == "control"
+            ],
             [
                 (3, 74, 99),
                 (3, PITCH_BEND_CONTROLLER, 8192),

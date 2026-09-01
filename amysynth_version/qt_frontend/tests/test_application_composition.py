@@ -113,6 +113,7 @@ class ApplicationCompositionTests(unittest.TestCase):
             serial_client=client_factory("serial"),
             socket_client=client_factory("socket"),
             local_client=client_factory("local"),
+            midi_input_port=lambda _sink, _config: None,
             backend=backend_factory,
         )
 
@@ -171,6 +172,10 @@ class ApplicationCompositionTests(unittest.TestCase):
 
         self.assertEqual([kind for kind, _kwargs in calls], ["serial"])
         self.assertIs(graph.client, backend_calls[0]["client"])
+        self.assertIs(
+            backend_calls[0]["midi_input_port_factory"],
+            dependencies.midi_input_port,
+        )
         self.assertEqual(graph.resolved_config.transport.serial_port, "COM7")
         self.assertEqual(graph.resolved_config.transport.serial_baud, 230_400)
         self.assertEqual(

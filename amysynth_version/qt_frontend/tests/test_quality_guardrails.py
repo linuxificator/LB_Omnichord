@@ -121,7 +121,7 @@ class QualityGuardrailFixtureTests(unittest.TestCase):
             (QUALITY / "mypy_legacy_baseline.json").read_text(encoding="utf-8")
         )
         self.assertEqual(baseline["tool_version"], "2.3.1")
-        self.assertEqual(baseline["total_errors"], 46)
+        self.assertEqual(baseline["total_errors"], 43)
 
 
 if __name__ == "__main__":

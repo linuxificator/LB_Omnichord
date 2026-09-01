@@ -24,7 +24,7 @@
   ],
   "platform_import_allowlist": {
     "ctypes": [
-      "midi_player.py"
+      "midi_linux.py"
     ]
   },
   "direct_platform_access_allowlist": [

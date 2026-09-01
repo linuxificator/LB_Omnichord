@@ -13,8 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 import app_core  # noqa: E402
-import midi_player  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
+from midi_input import (  # noqa: E402
+    MidiByteStreamParser,
+    MidiByteStreamState,
+    MidiInputEvent,
+    OrderedMidiInputEmitter,
+)
 import user_data  # noqa: E402
 import instrument_balance  # noqa: E402
 
@@ -150,24 +155,20 @@ class SoundBalanceFeatureTests(unittest.TestCase):
                 user_data.USER_CONFIG_DIR = original
 
     def test_midi_running_status_parses_control_changes(self) -> None:
-        notes = []
-        controls = []
-        reader = midi_player._LinuxRawMidiReader.__new__(midi_player._LinuxRawMidiReader)
-        reader._callback = lambda *args: notes.append(args)
-        reader._control_callback = lambda *args: controls.append(args)
-        state = {}
-        reader._parse_stream(bytes([0xB2, 7, 10, 74, 99]), state)
-        self.assertEqual(controls, [(3, 7, 10), (3, 74, 99)])
-        self.assertEqual(notes, [])
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(OrderedMidiInputEmitter(events.append), "test")
+        parser.feed(bytes([0xB2, 7, 10, 74, 99]), MidiByteStreamState())
+        self.assertEqual(
+            [(event.channel, event.data, event.value) for event in events],
+            [(3, 7, 10), (3, 74, 99)],
+        )
+        self.assertTrue(all(event.kind == "control" for event in events))
 
     def test_midi_channel_status_without_cc_data_adds_no_indicator(self) -> None:
-        controls = []
-        reader = midi_player._LinuxRawMidiReader.__new__(midi_player._LinuxRawMidiReader)
-        reader._callback = lambda *_args: None
-        reader._control_callback = lambda *args: controls.append(args)
-        state = {}
-        reader._parse_stream(bytes([0xB0, 0xB1, 0xB2]), state)
-        self.assertEqual(controls, [])
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(OrderedMidiInputEmitter(events.append), "test")
+        parser.feed(bytes([0xB0, 0xB1, 0xB2]), MidiByteStreamState())
+        self.assertEqual(events, [])
 
     def test_midi_indicators_fill_capacity_before_lru_replacement(self) -> None:
         state = MidiControlState(capacity=17)

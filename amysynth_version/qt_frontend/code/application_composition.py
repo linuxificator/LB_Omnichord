@@ -10,6 +10,7 @@ from config_loader import (
     ResolvedAmyConfig,
     apply_transport_overrides,
 )
+from midi_input import MidiInputPortFactory
 
 
 Checkpoint = Callable[[str], None]
@@ -65,6 +66,7 @@ class ApplicationDependencies:
     serial_client: ClientFactory
     socket_client: ClientFactory
     local_client: ClientFactory
+    midi_input_port: MidiInputPortFactory
     backend: BackendFactory
 
 
@@ -328,6 +330,7 @@ def compose_application_graph(
         panic_address=args.panic_address,
         debug_enabled=bool(args.debug or args.debug_file is not None),
         debug_file=args.debug_file,
+        midi_input_port_factory=dependencies.midi_input_port,
     )
     return ApplicationGraph(
         resolved_config=resolved,

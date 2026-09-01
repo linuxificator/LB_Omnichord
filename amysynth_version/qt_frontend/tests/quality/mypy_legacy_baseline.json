@@ -3,7 +3,7 @@
   "tool": "mypy",
   "tool_version": "2.3.1",
   "recorded": "2026-09-01",
-  "total_errors": 46,
+  "total_errors": 43,
   "known_production_modules": [
     "code/amy_serial.py",
     "code/amy_transport.py",
@@ -41,8 +41,7 @@
     {"file": "code/midi_integration.py", "code": "override", "count": 2},
     {"file": "code/midi_integration.py", "code": "return-value", "count": 5},
     {"file": "code/midi_player.py", "code": "arg-type", "count": 2},
-    {"file": "code/midi_player.py", "code": "assignment", "count": 3},
-    {"file": "code/midi_player.py", "code": "misc", "count": 2},
+    {"file": "code/midi_player.py", "code": "assignment", "count": 2},
     {"file": "code/midi_player.py", "code": "union-attr", "count": 1},
     {"file": "code/performance_backend.py", "code": "arg-type", "count": 2}
   ]

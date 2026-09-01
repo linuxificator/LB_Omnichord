@@ -57,6 +57,26 @@ indicators; a controller that sends pads as notes needs an explicit whitelist or
 translation layer before those notes may be treated as buttons.
 Channel 0 in a row means omni/all incoming channels.
 
+Native readers never call the MIDI QObject or musical engine. Every reader
+normalizes input to one frozen `MidiInputEvent` value. A lock-protected sequence
+number gives events from simultaneous readers one total order; the application
+composition root supplies a small `MidiInputPort` to the common backend, and a
+single Qt signal queues that stream onto the backend's owning thread. Notes,
+controls, explicitly translated buttons and activity all use this same
+boundary. The receiver also drains by sequence number, so delayed delivery
+cannot invert a note and control event. Ordinary native adapters intentionally
+emit notes rather than buttons; button events exist for an explicit future
+translation adapter, not for automatic keyboard-note classification.
+
+The portable MIDI player imports no native API and probes no device path. The
+Linux adapter owns raw-device discovery, ALSA `ctypes` calls, reader threads and
+their start/status/close lifecycle. Package composition selects that adapter
+once. macOS, Windows and Android currently receive adapters with the same
+lifecycle/status contract that explicitly report their unbundled native
+technology as unavailable. Unsupported is capability data, not a startup
+exception. `close()` is idempotent, closes the event emitter before native
+readers, and therefore prevents callbacks after shutdown begins.
+
 ALSA Sequencer-only applications such as VMPK do not create a raw-MIDI device.
 The frontend therefore also creates an ALSA sequencer input client named
 `LB Omnichord` with a `MIDI In` port. That port is visible in graph tools such as

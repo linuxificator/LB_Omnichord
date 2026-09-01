@@ -26,6 +26,7 @@ from bass_riffs import load_bass_riff_catalog
 from catalog_extensions import load_synth_catalog as load_extended_synth_catalog
 from config_loader import load_amy_config, load_resolved_amy_config
 from midi_integration import InstrumentBackend
+from midi_platform_adapters import production_midi_input_port
 from program_amy import (
     ProgramAmyLocalClient,
     ProgramAmySerialClient,
@@ -79,6 +80,7 @@ def production_dependencies(
         serial_client=cast(ClientFactory, ProgramAmySerialClient),
         socket_client=cast(ClientFactory, ProgramAmySocketClient),
         local_client=cast(ClientFactory, ProgramAmyLocalClient),
+        midi_input_port=production_midi_input_port,
         backend=cast(BackendFactory, InstrumentBackend),
     )
 
