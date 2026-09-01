@@ -78,6 +78,9 @@ small, behavior-preserving phase:
 - `CODEX_HANDOVER_POST_T25_REMAINING_WORK.md` — the post-T25 continuation
   queue, explicitly separated into technical implementation and
   decision/evidence work.
+- `CODEX_HANDOVER_PACKAGE_SIZE_AND_BUILD_SLIMMING.md` — measured five-platform
+  package bloat, the Qt/QML runtime allowlist, Android build-cost findings,
+  size/audit gates and the deliberately deferred production-signing boundary.
 - `code_quality_tasks/README.md` — actual T01-T25 result handovers, verification
   evidence and newly discovered follow-up work.
 
