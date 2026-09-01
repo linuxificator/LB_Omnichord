@@ -21,6 +21,7 @@ from build_android import (  # noqa: E402
     patch_buildozer_spec,
     pin_pyside_qt_module_order,
     release_values,
+    reset_staging_directory,
     stage_frontend,
     verify_apk,
     verify_buildozer_qt_module_order,
@@ -30,6 +31,21 @@ from prune_pyside_wheel import native_closure, qml_module_for  # noqa: E402
 
 
 class AndroidPackagingTests(unittest.TestCase):
+    def test_staging_reset_preserves_only_the_p4a_build_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            cache_file = staging / ".buildozer" / "cached-object"
+            stale_source = staging / "stale.py"
+            cache_file.parent.mkdir(parents=True)
+            cache_file.write_text("compiled", encoding="utf-8")
+            stale_source.write_text("stale", encoding="utf-8")
+
+            reset_staging_directory(staging, FRONTEND)
+
+            self.assertEqual(cache_file.read_text(encoding="utf-8"), "compiled")
+            self.assertFalse(stale_source.exists())
+
     def test_pruner_follows_native_dependencies_instead_of_guessing(self) -> None:
         libraries = {
             "root.so": Path("/wheel/root.so"),
@@ -323,6 +339,8 @@ class AndroidPackagingTests(unittest.TestCase):
         self.assertIn("package_audit.py", build_source)
         self.assertIn(".pyside-prune.json", workflow)
         self.assertIn(".package-audit.json", workflow)
+        self.assertIn("actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809", workflow)
+        self.assertIn("android-p4a-v1-", workflow)
 
 
 if __name__ == "__main__":

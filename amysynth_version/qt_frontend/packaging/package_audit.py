@@ -127,11 +127,14 @@ def audit(
         members, manifest["forbidden_runtime_fragments"]
     )
     package_bytes = package.stat().st_size if package is not None else None
+    configured_budget = manifest.get("package_size_budgets_bytes", {}).get(platform)
+    budget = max_package_bytes if max_package_bytes is not None else configured_budget
     report: dict[str, object] = {
         "schema_version": 1,
         "platform": platform,
         "package": package.name if package is not None else None,
         "package_bytes": package_bytes,
+        "package_budget_bytes": budget,
         "member_count": len(members),
         "member_bytes": sum(member.size for member in members),
         "qt_inventory": qt_inventory(members),
@@ -147,13 +150,13 @@ def audit(
     output.write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    if max_package_bytes is not None:
+    if budget is not None:
         if package_bytes is None:
             raise ValueError("a compressed-size budget requires --package")
-        if package_bytes > max_package_bytes:
+        if package_bytes > budget:
             raise ValueError(
                 f"{package.name} is {package_bytes} bytes; budget is "
-                f"{max_package_bytes} bytes"
+                f"{budget} bytes"
             )
     if violations:
         examples = ", ".join(

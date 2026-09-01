@@ -27,8 +27,8 @@ app_dir="$build_root/AppDir"
 pyinstaller_dist="$build_root/pyinstaller-dist"
 pyinstaller_work="$build_root/pyinstaller-work"
 output="$output_dir/LB_Omnichord.${release_stamp}.${platform_name}.AppImage"
-qml_evidence="$build_root/qml-imports.json"
-package_audit="$build_root/package-audit.json"
+qml_evidence="$output.qml-imports.json"
+package_audit="$output.package-audit.json"
 
 rm -rf "$build_root"
 mkdir -p \

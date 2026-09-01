@@ -52,9 +52,19 @@ def reset_staging_directory(path: Path, frontend: Path) -> None:
         raise ValueError("Android staging directory must be outside the frontend tree")
     if resolved == resolved.parent or len(resolved.parts) < 3:
         raise ValueError(f"refusing unsafe Android staging directory {resolved}")
+    build_cache = resolved / ".buildozer"
+    preserved_cache = resolved.with_name(f"{resolved.name}-preserved-build-cache")
+    if preserved_cache.exists():
+        shutil.rmtree(preserved_cache)
+    if build_cache.exists():
+        if build_cache.is_symlink() or not build_cache.is_dir():
+            raise ValueError(f"unsafe Android build cache {build_cache}")
+        build_cache.rename(preserved_cache)
     if resolved.exists():
         shutil.rmtree(resolved)
     resolved.mkdir(parents=True)
+    if preserved_cache.exists():
+        preserved_cache.rename(build_cache)
 
 
 def stage_frontend(frontend: Path, staging: Path) -> None:

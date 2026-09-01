@@ -22,8 +22,31 @@ from qt_runtime_policy import (  # noqa: E402
 sys.path.insert(0, str(PACKAGING))
 from appimage_entry import packaged_asset_root  # noqa: E402
 
+sys.path.insert(0, str(FRONTEND / "tools"))
+from clean_package_outputs import clean  # noqa: E402
+
 
 class PackageSizePolicyTests(unittest.TestCase):
+    def test_package_cleanup_is_dry_run_by_default_and_exact_when_enabled(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            frontend = Path(directory) / "qt_frontend"
+            kept = frontend / "code" / "main.py"
+            build_file = frontend / "build" / "cache.bin"
+            dist_file = frontend / "dist" / "old.AppImage"
+            for path in (kept, build_file, dist_file):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"data")
+
+            dry_run = clean(frontend, delete=False)
+            self.assertEqual(sum(item[1] for item in dry_run), 2)
+            self.assertTrue(build_file.exists())
+            self.assertTrue(dist_file.exists())
+
+            clean(frontend, delete=True)
+            self.assertFalse((frontend / "build").exists())
+            self.assertFalse((frontend / "dist").exists())
+            self.assertTrue(kept.exists())
+
     def test_packaged_asset_root_accepts_pyinstaller_internal_layout(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -128,6 +151,23 @@ class PackageSizePolicyTests(unittest.TestCase):
                     tree=None,
                     max_package_bytes=1,
                 )
+
+    def test_manifest_budget_is_used_when_no_override_is_given(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            package = root / "test.zip"
+            report = root / "report.json"
+            with zipfile.ZipFile(package, "w") as archive:
+                archive.writestr("payload.bin", b"small")
+
+            evidence = audit(
+                platform="Linux-x86_64",
+                output=report,
+                package=package,
+                tree=None,
+                max_package_bytes=None,
+            )
+            self.assertEqual(evidence["package_budget_bytes"], 105_000_000)
 
 
 if __name__ == "__main__":
