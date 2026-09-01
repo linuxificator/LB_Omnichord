@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import sys
 import unittest
 from pathlib import Path
@@ -70,8 +71,24 @@ class BassRiffCatalogTests(unittest.TestCase):
             )
 
     def test_riff_loader_never_depends_on_legacy_bass_levels(self) -> None:
-        source = (CODE / "bass_riffs.py").read_text(encoding="utf-8")
-        self.assertNotIn("bass_levels", source)
+        path = CODE / "bass_riffs.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        referenced_names = {
+            node.id for node in ast.walk(tree) if isinstance(node, ast.Name)
+        }
+        referenced_attributes = {
+            node.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Attribute)
+        }
+        self.assertNotIn("bass_levels", referenced_names | referenced_attributes)
+
+    def test_catalogue_indexes_are_immutable_after_construction(self) -> None:
+        riff = self.catalog.riffs[0]
+        with self.assertRaises(TypeError):
+            self.catalog._by_id[riff.riff_id] = riff
+        with self.assertRaises(TypeError):
+            self.catalog._by_context[("new", "context")] = (riff,)
 
 
 if __name__ == "__main__":

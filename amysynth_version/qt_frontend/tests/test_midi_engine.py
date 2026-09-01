@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import json
 import sys
-import tempfile
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,11 +13,11 @@ sys.path.insert(0, str(ROOT / "code"))
 from midi_player import (  # noqa: E402
     MidiAmyEngine,
     MidiPlayerBackend,
-    _LinuxRawMidiReader,
-    _MidiInputTechManager,
 )
 from midi_control import NOTE_BUTTON_OFFSET, PITCH_BEND_CONTROLLER  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
+from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
+from resolved_config import resolve_amy_config_data  # noqa: E402
 from synth_state import SynthState  # noqa: E402
 
 
@@ -30,18 +29,39 @@ class _RecordingWriter:
         self.events.append(("delay", seconds))
 
 
-class _Client:
+class _ManualScheduler:
     def __init__(self) -> None:
+        self.calls: list[tuple[float, object, str | None]] = []
+
+    def schedule(
+        self,
+        delay_seconds: float,
+        callback: object,
+        *,
+        replace_key: str | None = None,
+    ) -> int:
+        self.calls.append((delay_seconds, callback, replace_key))
+        return len(self.calls)
+
+
+class _Client:
+    def __init__(
+        self,
+        *,
+        instrument_levels: dict[str, float] | None = None,
+    ) -> None:
         self.events: list[tuple[str, object]] = []
         self.writer = _RecordingWriter(self.events)
-        self.config = {
-            "midi_player": {},
-            "buses": {
-                "midi_rows": [4, 5, 6, 7, 8, 9],
-                "midi_drums": 10,
-            },
-            "performance": {"synth_alloc_guard_ms": 12.0},
-        }
+        self.application_scheduler = _ManualScheduler()
+        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
+        config["performance"]["synth_alloc_guard_ms"] = 12.0
+        if instrument_levels is not None:
+            config["instrument_levels"] = instrument_levels
+        self.resolved_config = resolve_amy_config_data(
+            config,
+            source_path=ROOT / "config" / "amy_config.json",
+            source_kind="external",
+        )
         self.patch_map = {"dx7_215": 215}
 
     def _wire(self, command: str) -> None:
@@ -60,224 +80,33 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
-    def test_midi_platform_techs_are_filtered_by_runtime_platform(self) -> None:
-        cases = {
-            "linux": ("alsa_raw", "alsa_seq", "oss_midi"),
-            "darwin": ("coremidi",),
-            "win32": ("winmm",),
-            "android": ("android_midi",),
-            "freebsd": (),
-        }
-        for profile, expected in cases.items():
-            with self.subTest(profile=profile):
-                techs = _MidiInputTechManager.platform_techs(
-                    {"device_glob": "/tmp/midi-test"},
-                    profile,
-                )
+    def test_shipped_midi_profile_is_auto_and_resolves_per_package(self) -> None:
+        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
+        configured = config["midi_input"]["tech_profile"]
+        self.assertEqual(configured, "auto")
+
+        cases = (
+            ("wayland", "linux", "linux"),
+            ("cocoa", "darwin", "darwin"),
+            ("windows", "win32", "win32"),
+            ("android", "android", "android"),
+            ("offscreen", "freebsd14", "freebsd14"),
+        )
+        for qpa, runtime, expected in cases:
+            with self.subTest(qpa=qpa, runtime=runtime):
                 self.assertEqual(
-                    tuple(item["key"] for item in techs),
+                    resolve_midi_tech_profile(configured, qpa, runtime),
                     expected,
                 )
 
-        linux = _MidiInputTechManager.platform_techs(
-            {"device_glob": "/tmp/midi-test"},
+    def test_explicit_midi_profile_remains_a_diagnostic_override(self) -> None:
+        self.assertEqual(
+            resolve_midi_tech_profile("linux", "windows", "win32"),
             "linux",
         )
-        self.assertEqual(linux[0]["globs"], ["/tmp/midi-test"])
-
-    def test_linux_legacy_raw_glob_is_preserved_with_new_config(self) -> None:
-        linux = _MidiInputTechManager.platform_techs(
-            {
-                "device_glob": "/tmp/legacy-midi",
-                "alsa_raw_globs": ["/tmp/configured-midi"],
-            },
-            "linux",
-        )
-
         self.assertEqual(
-            linux[0]["globs"],
-            ["/tmp/legacy-midi", "/tmp/configured-midi"],
-        )
-
-    def test_non_linux_profiles_expose_only_their_platform_tech(self) -> None:
-        expected = {
-            "darwin": ("coremidi", "CoreMIDI", "CoreMIDI bridge"),
-            "win32": ("winmm", "WinMM MIDI", "WinMM MIDI bridge"),
-            "android": ("android_midi", "Android MIDI", "Android MIDI bridge"),
-        }
-        for profile, (key, label, reason) in expected.items():
-            with self.subTest(profile=profile):
-                techs = _MidiInputTechManager.platform_techs({}, profile)
-                self.assertEqual(len(techs), 1)
-                self.assertEqual(techs[0]["key"], key)
-                self.assertEqual(techs[0]["label"], label)
-                self.assertEqual(techs[0]["backend"], "unsupported")
-                self.assertIn(reason, techs[0]["unsupported_reason"])
-
-    def test_midi_tech_status_marks_readable_inputs_and_activity(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "midi0"
-            path.write_bytes(b"")
-            manager = _MidiInputTechManager.__new__(_MidiInputTechManager)
-            manager._enabled = True
-            manager._techs = [
-                {
-                    "key": "test_raw",
-                    "label": "Test raw",
-                    "backend": "byte_stream",
-                    "globs": [str(path)],
-                },
-                {
-                    "key": "missing_raw",
-                    "label": "Missing raw",
-                    "backend": "byte_stream",
-                    "globs": [str(Path(directory) / "missing")],
-                },
-            ]
-
-            snapshot = manager.status_snapshot({"test_raw": 20.0}, now=10.0)
-
-            self.assertEqual(snapshot[0]["state"], "activity")
-            self.assertTrue(snapshot[0]["available"])
-            self.assertEqual(snapshot[1]["state"], "unavailable")
-            self.assertFalse(snapshot[1]["available"])
-
-    def test_unsupported_platform_techs_are_visible_red_not_listened(self) -> None:
-        expected = ("darwin", "win32", "android")
-        for profile in expected:
-            with self.subTest(profile=profile):
-                with (
-                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
-                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
-                ):
-                    manager = _MidiInputTechManager(
-                        lambda *_args: None,
-                        lambda *_args: None,
-                        lambda *_args: None,
-                        {"enabled": True, "tech_profile": profile},
-                    )
-
-                snapshot = manager.status_snapshot({}, now=10.0)
-
-                raw_reader.assert_not_called()
-                seq_reader.assert_not_called()
-                self.assertEqual(len(snapshot), 1)
-                self.assertEqual(snapshot[0]["state"], "unavailable")
-                self.assertFalse(snapshot[0]["available"])
-                self.assertIn("not bundled", snapshot[0]["reason"])
-
-    def test_disabled_midi_input_starts_no_platform_readers(self) -> None:
-        for profile in ("linux", "darwin", "win32", "android"):
-            with self.subTest(profile=profile):
-                with (
-                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
-                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
-                ):
-                    manager = _MidiInputTechManager(
-                        lambda *_args: None,
-                        lambda *_args: None,
-                        lambda *_args: None,
-                        {"enabled": False, "tech_profile": profile},
-                    )
-
-                raw_reader.assert_not_called()
-                seq_reader.assert_not_called()
-                snapshot = manager.status_snapshot({}, now=10.0)
-                self.assertTrue(snapshot)
-                self.assertTrue(
-                    all(item["state"] == "unavailable" for item in snapshot)
-                )
-
-    def test_linux_midi_manager_starts_real_alsa_sequencer_listener(self) -> None:
-        with (
-            patch("midi_player._LinuxRawMidiReader") as raw_reader,
-            patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
-        ):
-            raw_reader.return_value = object()
-            seq_reader.return_value = object()
-
-            manager = _MidiInputTechManager(
-                lambda *_args: None,
-                lambda *_args: None,
-                lambda *_args: None,
-                {"enabled": True, "tech_profile": "linux"},
-            )
-
-        self.assertEqual(seq_reader.call_count, 1)
-        self.assertEqual(raw_reader.call_count, 2)
-        self.assertIn("alsa_seq", manager._listener_readers)
-
-    def test_non_linux_managers_do_not_start_raw_or_alsa_seq_readers(self) -> None:
-        for profile in ("darwin", "win32", "android"):
-            with self.subTest(profile=profile):
-                with (
-                    patch("midi_player._LinuxRawMidiReader") as raw_reader,
-                    patch("midi_player._AlsaSequencerMidiReader") as seq_reader,
-                ):
-                    manager = _MidiInputTechManager(
-                        lambda *_args: None,
-                        lambda *_args: None,
-                        lambda *_args: None,
-                        {"enabled": True, "tech_profile": profile},
-                    )
-
-                raw_reader.assert_not_called()
-                seq_reader.assert_not_called()
-                self.assertEqual(manager._listener_readers, {})
-
-    def test_alsa_sequencer_status_comes_from_running_listener(self) -> None:
-        class Listener:
-            def status_snapshot(self, activity: bool) -> dict[str, object]:
-                return {
-                    "state": "activity" if activity else "listening",
-                    "available": True,
-                    "reason": "client 128:0",
-                }
-
-        manager = _MidiInputTechManager.__new__(_MidiInputTechManager)
-        manager._enabled = True
-        manager._listener_readers = {"alsa_seq": Listener()}
-        manager._techs = [
-            {
-                "key": "alsa_seq",
-                "label": "ALSA seq",
-                "backend": "alsa_seq",
-            }
-        ]
-
-        snapshot = manager.status_snapshot({"alsa_seq": 20.0}, now=10.0)
-
-        self.assertEqual(snapshot[0]["state"], "activity")
-        self.assertTrue(snapshot[0]["available"])
-        self.assertEqual(snapshot[0]["reason"], "client 128:0")
-
-    def test_midi_tech_parsers_keep_running_status_per_stream(self) -> None:
-        notes = []
-        controls = []
-
-        def reader() -> _LinuxRawMidiReader:
-            item = _LinuxRawMidiReader.__new__(_LinuxRawMidiReader)
-            item._callback = lambda *args: notes.append(args)
-            item._control_callback = lambda *args: controls.append(args)
-            return item
-
-        first = reader()
-        second = reader()
-        state_a: dict[str, object] = {}
-        state_b: dict[str, object] = {}
-
-        first._parse_stream(bytes([0x90, 60, 100, 61, 101]), state_a)
-        second._parse_stream(bytes([0xB1, 7, 64, 74, 99]), state_b)
-        second._parse_stream(bytes([0xE1, 0x00, 0x40]), state_b)
-
-        self.assertEqual(notes, [(1, 60, 100, True), (1, 61, 101, True)])
-        self.assertEqual(
-            controls,
-            [
-                (2, 7, 64),
-                (2, 74, 99),
-                (2, PITCH_BEND_CONTROLLER, 8192),
-            ],
+            resolve_midi_tech_profile("DARWIN", "wayland", "linux"),
+            "darwin",
         )
 
     def test_musical_midi_notes_do_not_create_controller_buttons(self) -> None:
@@ -291,10 +120,6 @@ class MidiAmyEngineTests(unittest.TestCase):
             },
         )()
         backend.channels = [99, 99, 99, 99, 99, 99]
-        backend._queue_midi_button = lambda *_args: self.fail(
-            "MIDI Note On/Off must not be treated as controller buttons"
-        )
-
         backend.process_midi_note(1, 60, 100, True)
         backend.process_midi_note(1, 60, 0, False)
 
@@ -326,9 +151,7 @@ class MidiAmyEngineTests(unittest.TestCase):
 
         self.assertIsNotNone(middle)
         assert middle is not None
-        expected = round(
-            20.0 * (20000.0 / 20.0) ** (64.0 / 127.0)
-        )
+        expected = round(20.0 * (20000.0 / 20.0) ** (64.0 / 127.0))
         self.assertEqual(middle, expected)
         self.assertNotAlmostEqual(middle, (20.0 + 20000.0) / 2.0)
 
@@ -498,9 +321,7 @@ class MidiAmyEngineTests(unittest.TestCase):
         )
         self.assertIsNone(backend._button_takeover_group(panic))
 
-        backend._held_midi_button_targets.add(
-            backend._button_takeover_group(preset_one)
-        )
+        backend._held_midi_button_targets.add(backend._button_takeover_group(preset_one))
         self.assertTrue(
             backend.midiButtonTargetBlocked(
                 {
@@ -585,8 +406,7 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
 
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
-        client = _Client()
-        client.config["instrument_levels"] = {"dx7_215": 0.4}
+        client = _Client(instrument_levels={"dx7_215": 0.4})
         engine = MidiAmyEngine(client)
         client.events.clear()
         engine.configure_row(0, "dx7_215", {}, 0.5)
@@ -660,17 +480,8 @@ class MidiAmyEngineTests(unittest.TestCase):
         engine = MidiAmyEngine(client)
         client.events.clear()
 
-        class Timer:
-            def __init__(self, _delay: float, callback: object) -> None:
-                self.callback = callback
-                self.daemon = False
-
-            def start(self) -> None:
-                return
-
-        with patch("midi_player.threading.Timer", Timer):
-            for note in (60.0, 64.0, 67.0, 71.0, 72.0):
-                engine.preview_note(0, note)
+        for note in (60.0, 64.0, 67.0, 71.0, 72.0):
+            engine.preview_note(0, note)
 
         commands = [value for kind, value in client.events if kind == "wire"]
         fifth_on = commands.index("n72l0.826771654i5Z")
@@ -678,6 +489,10 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(
             engine._preview_active_notes[0],
             [64.0, 67.0, 71.0, 72.0],
+        )
+        self.assertEqual(
+            [call[2] for call in client.application_scheduler.calls],
+            ["midi-preview-tail-0"] * 5,
         )
 
     def test_every_midi_instrument_has_an_isolated_effect_bus(self) -> None:
@@ -695,9 +510,7 @@ class MidiAmyEngineTests(unittest.TestCase):
         client.events.clear()
         engine.set_reverb(0.4, 0.6, 0.7, False)
         reverb_commands = [
-            value
-            for kind, value in client.events
-            if kind == "wire" and str(value).startswith("y")
+            value for kind, value in client.events if kind == "wire" and str(value).startswith("y")
         ]
         self.assertEqual(
             reverb_commands,

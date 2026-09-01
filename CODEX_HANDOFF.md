@@ -1,4 +1,4 @@
-# Codex session handoff — AMY/LB Omnichord state for external-control work
+# Codex session handoff — AMY/LB Omnichord state and code-quality audit
 
 Updated: 2026-08-31.
 
@@ -9,9 +9,11 @@ automation work. It supplements `AGENTS.md` and the authoritative design
 contracts under `amysynth_version/design/`; it does not override either of
 them or the current user's request.
 
-The branch intended for the next work is `rework/external_controls` in
+The branch intended for analysis/continuation is `rework/code_quality` in
 `linuxificator/LB_Omnichord`. It was created from current `origin/main`
-commit `c8d462205173ea32651a71bb8c153955381d9b43`.
+commit `c46b93b607722dd429ac54cab163deb61801632a`, the screenshot-only follow-up
+to successful full release `R20260831T210652`. The audit changes documentation
+only and does not authorize product refactoring.
 
 ## Mandatory startup route
 
@@ -41,6 +43,13 @@ is now an intentional release-before-edit operation rather than an incidental
 side effect. Indicator clicks use the explicit grey/blue-to-learn,
 green-to-unlinked-blue and red-to-grey state machine documented there.
 
+For code-quality/refactoring work, start at
+`amysynth_version/design/CODEX_HANDOVER_CODE_QUALITY_BASELINE.md`, read the
+dedicated handover for the selected boundary and then
+`CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md`. Each future implementation must still
+read the authoritative subsystem contracts and obtain normal user direction;
+analysis findings are not a behavioral specification.
+
 If the task touches rhythm, platform packages, Windows, Android, ESP32-P4 or
 the AMY fork, follow the additional rows in `design/README.md` before editing.
 
@@ -49,21 +58,29 @@ the AMY fork, follow the additional rows in `design/README.md` before editing.
 ### LB Omnichord
 
 - Own origin: `git@github.com:linuxificator/LB_Omnichord.git`.
-- Current `main`: `c8d462205173ea32651a71bb8c153955381d9b43`
+- Current `main`: `c46b93b607722dd429ac54cab163deb61801632a`
   (`Refresh README screenshots`).
-- Latest successful full release: `R20260831T084122`, produced by GitHub
-  Actions run `33374072847`.
-- The preceding run `33372709995` built and published `R20260831T082359`, but
+- Latest successful full release: `R20260831T210652`, produced from merge
+  commit `50118fb18c952a27c64a77a6486527a64559ebb5` by GitHub Actions run
+  `33439634074`. All six regression groups and all five platform builds,
+  publication and screenshot refresh passed. The release contains exactly five
+  packages and five SHA-256 companion files.
+- Branch `rework/external_controls` was merged into `main` by
+  `50118fb18c952a27c64a77a6486527a64559ebb5`. It is retained as branch history;
+  continuation analysis now belongs on `rework/code_quality`.
+- Historical run `33372709995` built and published `R20260831T082359`, but
   its screenshot-refresh job failed because `refresh-readme-screenshots` did
   not include `release-metadata` in `needs`, so the release tag output was out
   of scope. Commit `026272d` fixed that by making the dependency explicit.
 - Branch `feature/drum_fills` ended at
   `57f627ac060bc4cb3d84298ea313211ec1232226`
   (`Remove obsolete rhythm rework task`) and has been merged into `main`.
-- Branch `features/gamma9001` ended at
+- Historical branch `features/gamma9001` ended at
   `067e7437b85b1613783160f764b1042de14bce07`
   (`Make native wire waits ingestion-aware`) and remains a separate
-  Gamma9001 experiment, not the published-package default.
+  Gamma9001 implementation. It was not merged into `main`; configuration
+  revision 5 and AMY release `R20260901T201533` restore it as the hosted
+  published-package default on `rework/code_quality`.
 
 ### AMY fork
 
@@ -77,14 +94,18 @@ Relevant fork branches and exact commits:
 - `origin/upstream/nested_sequencer`:
   `4de6d4ffd58964edd519eb14b2dc0046663ed1d1`
   (`Document arpeggio one-shot use case`).
-- Tiny-bank LB release branch:
+- Historical Tiny-bank LB release branch:
   `origin/releases/amy_omnichord_R20260831T042456` at
   `14240031c135fdcd76a7a3a8ec81da8ef405c4b0`
   (`Support deterministic offline live configuration`).
-- Gamma9001 LB release branch:
+- Historical Gamma9001 LB release branch:
   `origin/releases/amy_omnichord_R20260831T001253` at
   `00157856312de89f6dc293f90efb1889f0ceff23`
   (`Register Gamma9001 PCM in Android service`).
+- Current hosted Gamma9001 LB release branch:
+  `origin/releases/amy_omnichord_R20260901T201533` at
+  `7c34aa514f10c33f02692f735166d65f4e20374a`
+  (`Record unified Gamma9001 Omnichord release`).
 
 On 2026-08-31, `gh pr list --repo shorepine/amy --state all --head
 linuxificator:upstream/amy_socket_api_xtra` and the same command for
@@ -291,19 +312,19 @@ Manual chord ownership remains separate:
 
 ## Drum banks and Gamma9001
 
-The published default remains the tiny PCM bank because it matches ESP32-P4 and
-the current cross-platform release contract.
+The hosted published default is Gamma9001. ESP32-P4 remains a separately
+declared Tiny-bank firmware target because its current flash/storage profile
+does not contain the Gamma9001 blob.
 
 Supported concepts:
 
-- `tiny`: compact built-in PCM bank; used by published LB packages and ESP32-P4
-  compatibility.
+- `tiny`: compact built-in PCM bank; used by the current ESP32-P4 target.
 - `gamma9001`: AMY built with Gamma9001 sample data and GM-mapped kit patches.
 - `general_midi`: AMY's patch-258 drum-note map; it is still AMY audio, not
   external MIDI output.
 
 Do not assume the same wire preset/note means the same sound across tiny and
-Gamma9001 builds. A Gamma9001 experiment must use an AMY release branch built
+Gamma9001 builds. A Gamma9001 release must use an AMY release branch built
 for Gamma9001 on all locally hosted targets being tested. On Android that means
 defining `GAMMA9001`, generating/linking the Gamma9001 blob with AMY's
 `gamma9001-blob-c` generator, and verifying that presets 0..18 select the full
@@ -415,5 +436,6 @@ Recommended first steps:
   callback boundary.
 - The optional AMY onset gate is not implemented and must not be added to the
   already-offered nested-sequencer work without a separate explicit request.
-- Gamma9001 remains an experiment for LB unless the full release contract is
-  deliberately changed away from tiny-bank compatibility.
+- Gamma9001 is the hosted LB release contract. Do not change it independently
+  on only one package target; the exact AMY pin, compiled symbols and revision-5
+  drum map must move together.

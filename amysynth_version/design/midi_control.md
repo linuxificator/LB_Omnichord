@@ -1,5 +1,10 @@
 # MIDI Control Learn and Binding
 
+Status: authoritative MIDI control/binding contract
+Owner: MIDI control subsystem
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 This document is the behavioral contract for MIDI Control Change, Pitch Bend and
 MIDI-button indicators, MIDI-learn bindings, preset ownership and the
 corresponding OMNI status LED. It resolves the implementation notes in

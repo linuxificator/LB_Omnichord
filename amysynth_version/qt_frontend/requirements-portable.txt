@@ -1,0 +1,3 @@
+# Pure-Python requirements shared by desktop runtime and the Android target.
+pyserial==3.5
+fastjsonschema==2.22.2

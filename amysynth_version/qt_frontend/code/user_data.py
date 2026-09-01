@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-import json
-import shutil
 from pathlib import Path
+
+from config_migrations import CURRENT_CONFIG_REVISION, migrate_config_document
+from json_store import JsonStore
+from resolved_config import ConfigIssue, ConfigValidationError, resolve_amy_config_data
 
 
 USER_ROOT = Path.home() / ".omnichord"
@@ -12,41 +14,52 @@ USER_CONFIG_DIR = USER_ROOT / "config"
 
 
 def _migrate_amy_config(source: Path, target: Path) -> None:
-    """Apply narrowly-scoped migrations while preserving user overrides."""
-    try:
-        shipped = json.loads(source.read_text(encoding="utf-8"))
-        current = json.loads(target.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        # The authoritative loader will report an unreadable/invalid config.
-        # Never replace such a file behind the user's back.
-        return
-    if not isinstance(shipped, dict) or not isinstance(current, dict):
-        return
+    """Validate an explicit migration before atomically persisting it."""
 
-    shipped_revision = int(shipped.get("config_revision", 0))
-    current_revision = int(current.get("config_revision", 0))
-    if current_revision >= shipped_revision:
-        return
-
-    # Revision 1 raised the automatic chord pool for seven-note arpeggios.
-    # Migrate only the former shipped default. Any other explicit value is a
-    # user choice and is left for config_loader's capacity validation.
-    if current_revision < 1 <= shipped_revision:
-        voices = current.get("voices")
-        shipped_voices = shipped.get("voices")
-        if (
-            isinstance(voices, dict)
-            and isinstance(shipped_voices, dict)
-            and voices.get("rhythm_chord") == 4
-            and shipped_voices.get("rhythm_chord") == 7
-        ):
-            voices["rhythm_chord"] = 7
-
-    current["config_revision"] = shipped_revision
-    target.write_text(
-        json.dumps(current, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
+    shipped = JsonStore(source).read()
+    if not isinstance(shipped, dict):
+        raise ConfigValidationError(
+            [ConfigIssue("$", "shipped config must contain a JSON object")]
+        )
+    shipped_migration = migrate_config_document(shipped)
+    if shipped_migration.source_revision != CURRENT_CONFIG_REVISION:
+        raise ConfigValidationError(
+            [
+                ConfigIssue(
+                    "$.config_revision",
+                    "shipped config must declare the current revision",
+                )
+            ]
+        )
+    shipped_resolved = resolve_amy_config_data(
+        shipped,
+        source_path=source,
+        source_kind="shipped",
     )
+    if shipped_resolved.revision != CURRENT_CONFIG_REVISION:
+        raise ConfigValidationError(
+            [
+                ConfigIssue(
+                    "$.config_revision",
+                    "shipped configuration did not resolve to the current revision",
+                )
+            ]
+        )
+
+    store = JsonStore(target)
+    current = store.read()
+    if not isinstance(current, dict):
+        raise ConfigValidationError(
+            [ConfigIssue("$", "must contain a JSON object")]
+        )
+    migration = migrate_config_document(current)
+    resolve_amy_config_data(
+        migration.data,
+        source_path=target,
+        source_kind="user",
+    )
+    if migration.changed:
+        store.write(migration.data)
 
 
 def migrate_user_layout() -> None:
@@ -83,9 +96,7 @@ def ensure_user_configs(shipped_config_dir: Path) -> Path:
     for source in Path(shipped_config_dir).glob("*.json"):
         target = USER_CONFIG_DIR / source.name
         if not target.exists():
-            # Shipped JSON is application content, not a file-metadata backup.
-            # Some valid private filesystems reject copied xattrs/timestamps.
-            shutil.copyfile(source, target)
+            JsonStore(target).write(JsonStore(source).read())
         if source.name == "amy_config.json":
             _migrate_amy_config(source, target)
     return USER_CONFIG_DIR

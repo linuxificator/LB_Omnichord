@@ -1,5 +1,10 @@
 # Testing Design
 
+Status: authoritative test and release validation contract
+Owner: frontend test/release architecture
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 Tests are based on the executable use cases in
 `../qt_frontend/tests/USE_CASES.md`. The Sonic Pi implementation is frozen
 legacy material and is outside these tests and workflows.
@@ -26,24 +31,56 @@ The maintained suites are:
 
 | Suite | Scope | Extra requirement |
 | --- | --- | --- |
+| `quality` | compileall, shipped JSON, Markdown/status/routing, import/dependency boundaries, Ruff and mypy ratchets | declared test/quality requirements; no AMY/audio/display |
 | `unit` | all top-level `tests/test_*.py` contracts | none beyond frontend dependencies |
 | `frontend` | headless QML/backend interaction | PySide6 and local TCP/PTY support |
 | `serial` | production pyserial output over a Linux PTY | pyserial and PTY support |
 | `presets` | factory/user preset loading and migration | PySide6 and PTY support |
-| `native-controls` | delivered wire commands and native synth state | pinned tiny-bank LB AMY fork, offline renderer |
-| `native-rhythm` | sequencer/rhythm behavior in native AMY | pinned tiny-bank LB AMY fork, offline renderer |
+| `native-controls` | delivered wire commands and native synth state | pinned Gamma9001 LB AMY fork, offline renderer |
+| `native-rhythm` | sequencer/rhythm behavior in native AMY | pinned Gamma9001 LB AMY fork, offline renderer |
 | `all` | all suites above, in dependency order | all requirements above |
+
+The quality suite is deliberately non-mutating. Ruff checks a small
+correctness-critical rule set and does not format source. Mypy compares current
+legacy diagnostics by file/error-code with
+`tests/quality/mypy_legacy_baseline.json`; the total and every bucket may only
+decrease. A new production module is absent from that legacy list and must pass
+`mypy --strict --follow-imports=skip`. Do not regenerate the baseline to make a
+new error pass: fix the error, or document and review an intentional baseline
+change as code-quality work.
+
+Run the fast gate directly with:
+
+```bash
+python tests/run_quality.py
+```
+
+Every `run_tests.py` invocation atomically writes a versioned JSON report with
+the selected suite, each isolated script's status/duration, total duration,
+repository commit and pinned AMY commit. CI uploads it even when a script
+fails. `--coverage` uses coverage.py's subprocess patch and parallel data
+files, then combines them into navigational branch data without a global
+percentage threshold. The reusable workflow applies this selectively to the
+pure/unit suite; native/package tests remain acceptance evidence rather than
+being distorted to raise a coverage number.
 
 Top-level unit tests are discovered automatically. Integration suites are
 listed explicitly because their process, PTY and native-engine requirements
 differ. `test-artifacts/<suite>/` is recreated for every suite invocation and
 is intentionally ignored by Git.
 
+Musical catalogue tests exercise four separate failure boundaries: versioned
+schema shape, row-local musical constraints, cross-catalogue references and
+immutable constructed indexes. `test_catalogue_provenance.py` additionally
+verifies the committed byte hashes and declared item counts. A catalogue edit
+must therefore deliberately update its provenance record; merely accepting a
+new shape at runtime is not sufficient review evidence.
+
 ## GitHub Actions
 
 Four repository workflows are maintained:
 
-- `AMY frontend regression` runs the six component suites in parallel for AMY
+- `AMY frontend regression` runs the quality gate and six component suites in parallel for AMY
   frontend pull requests, is reused as the test gate of the release workflow,
   and accepts a selected suite or `all` through manual dispatch. Native jobs
   install the AMY fork at the commit pinned in the workflow and record that SHA
@@ -52,7 +89,13 @@ Four repository workflows are maintained:
   calls the complete regression matrix and, only after all suites pass, builds
   and validates Linux x86_64, Raspberry Pi aarch64, macOS arm64 and native
   Windows x86_64 packages plus the Android arm64 APK. One timestamped
-  tag/release contains all five packages and their SHA-256 files. The dedicated
+  tag/release contains all five packages, their SHA-256 files and an exact
+  `release-manifest.json`. It also publishes a release-level SPDX 2.3 SBOM and
+  retained Sigstore bundles. GitHub signs build-provenance and SBOM
+  attestations for the exact five manifest digests; the workflow verifies both
+  predicates independently before publication. The manifest verifier rejects missing or extra
+  package/checksum files before publication; the final GitHub asset-name list
+  is compared with the manifest after upload. The dedicated
   `testing/windows_smoke`
   branch builds only the Windows job without publishing; `main` retains the
   complete gated release. The native package/smoke job runs on the current
@@ -82,6 +125,14 @@ The Windows zip is built and exercised on Windows Server 2025 build 26100 with
 the newest supported installed Visual Studio generator. Diagnostics are
 retained for 14 days where a workflow produces artifacts.
 
+The README screenshot refresh retains the newest three release-tagged OMNI and
+MIDI image pairs in Git. Filenames remain directly traceable to a release;
+older images remain recoverable from Git history instead of accumulating in
+the branch tip. The untagged capture baselines remain committed. Every new
+pair must still pass PNG decoding, exact-dimension and visual-density checks
+before README promotion, so retention never weakens the crash/error-image
+sanity gate.
+
 ## Desktop release naming and contents
 
 Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
@@ -93,9 +144,11 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 - Windows asset: `LB_Omnichord.R20260824223000.Windows-x86_64.zip`
 - Android asset: `LB_Omnichord.R20260824223000.Android-arm64.apk`
 - one matching `.sha256` file for each package
+- `release-manifest.json`, one `LB_Omnichord.<stamp>.spdx.json` and two
+  retained Sigstore attestation bundles
 
 The AppImages bundle PySide6, the frontend assets and the pinned AMY release
-built with the ESP32-compatible tiny PCM bank. The executable starts AMY
+built with the Gamma9001 PCM bank. The executable starts AMY
 as a separate child process. Unix IPC selects the best endpoint capability:
 packet-preserving `SOCK_SEQPACKET` where accepted, otherwise newline-framed
 `SOCK_STREAM`. The runtime has no OS-name branch for this choice. Packaging
@@ -105,9 +158,9 @@ one process.
 The Windows zip also preserves two processes: frozen `LB_Omnichord.exe`
 connects through `QLocalSocket` to a private named pipe owned by native
 `amy_service.exe`. The package launcher supplies a unique pipe name and owns
-process cleanup. Windows CMake builds pinned AMY without `GAMMA9001` or the
-optional `drums_bin.c`, so it selects the same built-in tiny PCM preset map as
-Linux, macOS and ESP32-P4.
+process cleanup. Windows CMake builds pinned AMY with `GAMMA9001`, generates
+and links `drums_bin.c`, and registers it before AMY starts, matching Linux,
+Raspberry Pi, macOS and Android.
 
 The Android APK likewise preserves two processes. The PySide6 activity is a
 wire-only client, while an unexported AAR provider starts AMY/Oboe in `:amy`.
@@ -246,7 +299,8 @@ Important regression tests:
   the MIDI image contains representative controller knobs in the grey CC bar;
   after a successful `main` release the released commit is captured again, and
   changed PNGs are committed alone before one explicitly queued validation
-  release; byte-identical output causes no commit and no further workflow run
+  release; byte-identical output causes no commit and no further workflow run;
+  the branch tip retains exactly the newest three release-tagged pairs
 - instrument balance captures cover low/middle/high registers and report RMS,
   peak, crest factor and clipping
 - packaged macOS and Windows QML chord input observes pointer-down/up, retains

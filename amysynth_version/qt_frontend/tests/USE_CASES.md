@@ -1,5 +1,10 @@
 # AMY Omnichord regression catalogue
 
+Status: authoritative executable regression-scenario contract
+Owner: frontend integration/native/package tests
+Applies to: active `amysynth_version/qt_frontend` implementation
+Last verified: 2026-09-01
+
 This file is the executable-test contract for the active `amysynth_version/qt_frontend` application. The Sonic Pi version is frozen and is intentionally outside this test plan.
 
 The application has three observable layers:
@@ -42,8 +47,8 @@ A static regression test rejects reintroduction of the former parallel `SynthRun
 | `unit` | all top-level `test_*.py`: catalogue/state, MIDI engine, socket framing, migration and structural invariants | none |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
-| `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned tiny-bank LB AMY fork |
-| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + pinned tiny-bank LB AMY fork in deterministic offline-render mode |
+| `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned Gamma9001 LB AMY fork |
+| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + pinned Gamma9001 LB AMY fork in deterministic offline-render mode |
 | `presets` | per-instrument session state and sparse preset save/load semantics | none/headless backend |
 | `all` | all suites sequentially; intended for local/manual use. CI runs the component suites in parallel for a PR to `main`. | mixed |
 
@@ -719,7 +724,9 @@ proves that hold promotion clears only root triggers and emits no immediate
   reset, its deferred second block boundary before accepting later serial
   commands. This models the independently running production audio callback
   without making the regression depend on CI thread scheduling.
-- Native CI compiles the same tiny PCM bank as the desktop and ESP32 packages.
+- Native CI compiles the same Gamma9001 PCM bank as the hosted packages and
+  proves its registration and linked-data symbols. ESP32-P4 is a separately
+  declared Tiny-bank target.
   AMY runs with `audio=False`, so only the bridge's explicit renderer advances
   engine time or consumes samples; no ALSA/miniaudio callback races the test.
 - The native regression requires non-silent rendered drum audio within one

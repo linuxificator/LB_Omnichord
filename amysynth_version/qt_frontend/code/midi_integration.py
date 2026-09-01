@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, final
 
 from PySide6.QtCore import QObject, Property, Slot
 
@@ -8,17 +8,26 @@ from midi_player import MIDI_PRESET_COUNT, MidiPlayerBackend
 from performance_backend import InstrumentBackend as OmniInstrumentBackend
 
 
+@final
 class InstrumentBackend(OmniInstrumentBackend):
     """Narrow integration seam between Omnichord and independent MIDI player."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._pending_omni_control_bindings: Any = []
+        self._midi_input_port_factory = kwargs.pop("midi_input_port_factory")
         super().__init__(*args, **kwargs)
         self._syncing_tuning = False
+        self._midi_player: MidiPlayerBackend
+
+    def initialize(self) -> None:
+        if getattr(self, "_midi_player", None) is not None:
+            return
+        super().initialize()
         self._midi_player = MidiPlayerBackend(
             owner=self,
             synths=tuple(self._synths),
             client=self._client,
+            midi_input_port_factory=self._midi_input_port_factory,
         )
         self._midi_player.stateChanged.connect(self.midiStateChanged)
         self._midi_player.tuningChanged.connect(self.midiTuningChanged)

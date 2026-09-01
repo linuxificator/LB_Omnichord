@@ -36,6 +36,37 @@ class ReleaseScreenshotTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "visually sparse"):
                 helper.validate_screenshot(path)
 
+    def test_retention_keeps_three_latest_tagged_images_per_screen(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="omnichord-screenshots-") as raw:
+            directory = Path(raw)
+            tags = (
+                "R20260828T010101",
+                "R20260829T010101",
+                "R20260830T010101",
+                "R20260831T010101",
+            )
+            for screen in ("omni", "midi"):
+                for tag in tags:
+                    (directory / f"{screen}-{tag}.png").write_bytes(tag.encode())
+                (directory / f"{screen}.png").write_bytes(b"capture")
+            unrelated = directory / "notes.png"
+            unrelated.write_bytes(b"unrelated")
+
+            removed = helper.prune_release_screenshots(directory)
+
+            self.assertEqual(len(removed), 2)
+            self.assertFalse(
+                (directory / f"omni-{tags[0]}.png").exists()
+            )
+            self.assertFalse(
+                (directory / f"midi-{tags[0]}.png").exists()
+            )
+            for screen in ("omni", "midi"):
+                self.assertTrue((directory / f"{screen}.png").exists())
+                for tag in tags[1:]:
+                    self.assertTrue((directory / f"{screen}-{tag}.png").exists())
+            self.assertTrue(unrelated.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

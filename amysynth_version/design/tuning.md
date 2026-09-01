@@ -1,5 +1,10 @@
 # Tuning Design
 
+Status: authoritative tuning contract
+Owner: shared OMNI/MIDI tuning subsystem
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Runtime state
 
 Tuning coupling is runtime UI state and is not stored in presets.

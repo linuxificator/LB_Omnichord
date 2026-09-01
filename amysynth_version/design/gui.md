@@ -1,5 +1,10 @@
 # GUI Design
 
+Status: authoritative GUI structure contract
+Owner: Qt/QML user interface
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Screens
 
 The application has two main views:
@@ -155,6 +160,22 @@ zero, which makes the visible knob differ from Qt's actual drag handle.
 While `Slider.pressed` is true, Qt owns the interactive slider value. Backend
 property echoes or repeater model replacements must not force the handle back
 to an older value during that press; synchronization resumes after release.
+
+`BindableSlider.qml` is the single implementation of that native horizontal
+slider interaction, visual-position mapping and semantic MIDI binding
+presentation. `LabeledSlider.qml` and `ParameterSlider.qml` remain separate
+domain/display wrappers and supply their own value formatting and conversion.
+Both fill and handle derive from the same native `Slider.visualPosition`; the
+primitive must not contain OMNI/MIDI musical policy. The two strum surfaces
+share only clamped vertical pointer normalization, and utility screens share
+only their passive section background.
+
+`Main.qml` remains the top-level window/layout facade, while complete title and
+strum-note-guide sections live in `OmniTitleSection.qml` and
+`StrumNoteGuide.qml`. Child components emit semantic requests such as
+`strumModeToggleRequested`; the root resolves global navigation/MIDI-learn
+policy and calls the backend. Extracted sections do not reach through the root
+to invoke unrelated backend functions.
 
 The RST/UP/DWN block left of the first two chord rows ends at the bottom of the
 second row. Its three controls are distributed evenly over that complete

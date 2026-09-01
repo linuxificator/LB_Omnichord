@@ -1,5 +1,10 @@
 # Design Principles
 
+Status: authoritative baseline contract
+Owner: application architecture
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Wire protocol boundary
 
 The Qt application only produces AMY wire commands. It must never depend on whether AMY runs locally or on ESP32.

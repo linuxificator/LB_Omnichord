@@ -28,8 +28,11 @@ def build_plan() -> list[dict[str, object]]:
     compatibility = config.get("patch_compatibility", {})
     instrument_levels = config.get("instrument_levels", {})
     from amy_transport import AmySerialClient
+    from config_loader import load_resolved_amy_config
     command_builder = AmySerialClient.__new__(AmySerialClient)
-    command_builder.config = config
+    command_builder.resolved_config = load_resolved_amy_config(
+        ROOT / "config" / "amy_config.json"
+    )
     command_builder.patch_map = {
         **{f"juno_{patch:03d}": patch for patch in range(128)},
         **{f"dx7_{patch:03d}": patch for patch in range(128, 256)},

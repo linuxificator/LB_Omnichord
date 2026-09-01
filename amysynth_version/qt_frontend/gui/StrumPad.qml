@@ -1,4 +1,5 @@
 import QtQuick
+import "PointerNormalization.js" as PointerNormalization
 
 Item {
     id: root
@@ -9,9 +10,7 @@ Item {
     property bool gestureActive: false
 
     function normalizedY(y) {
-        if (root.height <= 0)
-            return 0.5
-        return Math.max(0.0, Math.min(1.0, y / root.height))
+        return PointerNormalization.verticalUnit(y, root.height)
     }
 
     Rectangle {

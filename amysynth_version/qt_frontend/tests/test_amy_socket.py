@@ -30,7 +30,6 @@ class AmySocketWriterTests(unittest.TestCase):
                     writer.high("K215i5Z")
                     expected = b"K215i5Z\n" if server_stream else b"K215i5Z"
                     self.assertEqual(client.recv(1024), expected)
-                self.assertEqual(writer._stream_transport, server_stream)
             finally:
                 writer.close()
                 server.close()

@@ -23,7 +23,11 @@ AMY work.
 - `capture_screenshots.py` — deterministic offscreen capture of those real QML screens
 - `tests/` — unit, headless, serial and native-AMY regression tests plus fixtures
 - `rpi/` — Raspberry Pi startup/autostart helpers
-- `docs/` — ESP32-P4 notes, screenshots and historical implementation notes
+- `docs/` — active platform, dependency and behavior contracts plus historical implementation notes
+
+Runtime, test, build and Android-host dependency ownership is documented in
+[DEPENDENCIES.md](docs/DEPENDENCIES.md). Install a named requirements group;
+do not copy package/version literals from workflow files.
 
 For Raspberry Pi installation, UART wiring, 1,000,000-baud 8N1 serial configuration, direct transport testing and startup instructions, see `README_rpi.md`.
 
@@ -146,8 +150,8 @@ omit the `T`. The release page has separate sections and downloads for:
 
 Each package has a matching `.sha256` asset. All timestamps are UTC.
 
-Every package contains the Qt frontend and supported AMY fork with the tiny PCM
-drum bank. At runtime they remain separate processes connected by the
+Every package contains the Qt frontend and supported AMY fork with the
+Gamma9001 PCM drum bank. At runtime they remain separate processes connected by the
 platform's private local transport. The Pi build requires 64-bit Raspberry Pi
 OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG is Apple
 Silicon-only and ad-hoc signed, but it is not signed with an Apple Developer ID

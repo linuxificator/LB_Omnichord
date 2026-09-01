@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Collection
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
+
+from catalog_schema import read_versioned_catalog
 
 
 @dataclass(frozen=True)
@@ -33,7 +35,9 @@ class BassRiffCatalog:
 
     def __init__(self, riffs: Collection[BassRiffDefinition]) -> None:
         self.riffs = tuple(sorted(riffs, key=lambda riff: riff.index))
-        self._by_id = {riff.riff_id: riff for riff in self.riffs}
+        self._by_id = MappingProxyType(
+            {riff.riff_id: riff for riff in self.riffs}
+        )
         by_context: dict[tuple[str, str], list[BassRiffDefinition]] = {}
         for riff in self.riffs:
             for rhythm_id in riff.compatible_rhythms:
@@ -41,10 +45,12 @@ class BassRiffCatalog:
                     by_context.setdefault(
                         (rhythm_id, chord_suffix), []
                     ).append(riff)
-        self._by_context = {
-            context: tuple(sorted(values, key=lambda riff: riff.index))
-            for context, values in by_context.items()
-        }
+        self._by_context = MappingProxyType(
+            {
+                context: tuple(sorted(values, key=lambda riff: riff.index))
+                for context, values in by_context.items()
+            }
+        )
 
     def candidates(
         self,
@@ -71,25 +77,14 @@ def _required_int(value: Any, field: str) -> int:
     return value
 
 
-def load_bass_riff_catalog(
-    path: Path,
-    *,
-    rhythm_ids: Collection[str],
-    chord_suffixes: Collection[str],
-) -> BassRiffCatalog:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict) or raw.get("schema_version") != 1:
-        raise ValueError("unsupported bass riff catalogue schema")
-
-    known_rhythms = {str(value) for value in rhythm_ids}
-    known_chords = {str(value) for value in chord_suffixes}
-    if not known_rhythms or not known_chords:
-        raise ValueError("bass riff catalogue requires rhythm and chord IDs")
-
-    scale_rows = _required_list(raw.get("scale_vocabulary"), "scale_vocabulary")
+def _validate_declared_references(
+    raw: Any,
+    known_rhythms: set[str],
+    known_chords: set[str],
+) -> set[str]:
     known_scales = {
         str(row["id"])
-        for row in scale_rows
+        for row in _required_list(raw.get("scale_vocabulary"), "scale_vocabulary")
         if isinstance(row, dict) and row.get("id")
     }
     declared_rhythms = {
@@ -106,6 +101,49 @@ def load_bass_riff_catalog(
         raise ValueError("bass riff rhythm IDs do not match rhythms.json")
     if declared_chords != known_chords:
         raise ValueError("bass riff chord IDs do not match chords.csv")
+    return known_scales
+
+
+def _validate_context_coverage(
+    catalog: BassRiffCatalog,
+    known_rhythms: set[str],
+    known_chords: set[str],
+) -> None:
+    missing = [
+        (rhythm_id, chord_suffix)
+        for rhythm_id in sorted(known_rhythms)
+        for chord_suffix in sorted(known_chords)
+        if len(catalog.candidates(rhythm_id, chord_suffix)) < 3
+    ]
+    if missing:
+        raise ValueError(
+            "bass riff catalogue has fewer than three candidates for "
+            f"{missing[0][0]!r}/{missing[0][1]!r}"
+        )
+
+
+def load_bass_riff_catalog(
+    path: Path,
+    *,
+    rhythm_ids: Collection[str],
+    chord_suffixes: Collection[str],
+) -> BassRiffCatalog:
+    raw = read_versioned_catalog(
+        path,
+        "bass_riffs_v1.schema.json",
+        schema_directory=path.parent / "schema",
+    )
+
+    known_rhythms = {str(value) for value in rhythm_ids}
+    known_chords = {str(value) for value in chord_suffixes}
+    if not known_rhythms or not known_chords:
+        raise ValueError("bass riff catalogue requires rhythm and chord IDs")
+
+    known_scales = _validate_declared_references(
+        raw,
+        known_rhythms,
+        known_chords,
+    )
 
     riffs: list[BassRiffDefinition] = []
     indexes: set[int] = set()
@@ -219,17 +257,7 @@ def load_bass_riff_catalog(
         )
 
     catalog = BassRiffCatalog(riffs)
-    missing = [
-        (rhythm_id, chord_suffix)
-        for rhythm_id in sorted(known_rhythms)
-        for chord_suffix in sorted(known_chords)
-        if len(catalog.candidates(rhythm_id, chord_suffix)) < 3
-    ]
-    if missing:
-        raise ValueError(
-            "bass riff catalogue has fewer than three candidates for "
-            f"{missing[0][0]!r}/{missing[0][1]!r}"
-        )
+    _validate_context_coverage(catalog, known_rhythms, known_chords)
     return catalog
 
 

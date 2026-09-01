@@ -6,9 +6,14 @@ $buildRoot = Join-Path $frontend "build\windows"
 $dist = Join-Path $frontend "dist"
 $stamp = if ($env:OMNICHORD_RELEASE_STAMP) { $env:OMNICHORD_RELEASE_STAMP } else { "RDEV" }
 $amyRoot = if ($env:OMNICHORD_AMY_ROOT) { $env:OMNICHORD_AMY_ROOT } else { Join-Path $buildRoot "amy" }
+$zip = Join-Path $dist "LB_Omnichord.$stamp.Windows-x86_64.zip"
 
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $buildRoot, $dist
 New-Item -ItemType Directory -Force -Path $buildRoot, $dist | Out-Null
+
+python (Join-Path $frontend "packaging\qt_runtime_policy.py") `
+    --qml-root (Join-Path $frontend "gui") `
+    --output "$zip.qml-imports.json"
 
 $cmakeHelp = cmake --help
 $generator = @("Visual Studio 18 2026", "Visual Studio 17 2022") |
@@ -26,6 +31,7 @@ $pyDist = Join-Path $buildRoot "pyinstaller"
 python -m PyInstaller --noconfirm --clean --windowed --onedir `
     --name LB_Omnichord --distpath $pyDist --workpath (Join-Path $buildRoot "pyinstaller-work") `
     --specpath $buildRoot --paths (Join-Path $frontend "code") `
+    --additional-hooks-dir (Join-Path $frontend "packaging\pyinstaller_hooks") `
     --hidden-import package_smoke --hidden-import PySide6.QtTest `
     --add-data "$(Join-Path $frontend 'licence.txt');." `
     --add-data "$(Join-Path $frontend 'config');config" `
@@ -40,9 +46,13 @@ Copy-Item -Recurse -Force (Join-Path $pyDist "LB_Omnichord\*") $packageRoot
 Copy-Item -Force (Join-Path $buildRoot "amy-build\Release\amy_service.exe") $packageRoot
 Copy-Item -Force (Join-Path $PSScriptRoot "windows\run_windows.ps1") $packageRoot
 Copy-Item -Force (Join-Path $PSScriptRoot "windows\LB_Omnichord.cmd") $packageRoot
-$zip = Join-Path $dist "LB_Omnichord.$stamp.Windows-x86_64.zip"
 Compress-Archive -Path (Join-Path $packageRoot "*") -DestinationPath $zip
 Get-FileHash $zip -Algorithm SHA256 | ForEach-Object {
     "$($_.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($zip))"
 } | Set-Content -Encoding ascii "$zip.sha256"
+python (Join-Path $frontend "packaging\package_audit.py") `
+    --platform Windows-x86_64 `
+    --tree $packageRoot `
+    --package $zip `
+    --output "$zip.package-audit.json"
 Write-Output $zip

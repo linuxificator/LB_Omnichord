@@ -15,7 +15,9 @@ Repository read-only reference:
 - current AMY config: `amysynth_version/qt_frontend/config/amy_config.json`
 - current sequencer allocation: `amysynth_version/qt_frontend/docs/SEQUENCER_TAGS.md`
 
-The delivered data set consists of **eight JSON files**:
+The delivered data set consists of **eight canonical JSON files** under
+`../../../qt_frontend/music/drums/`. Exact reviewed hashes and relative paths
+are recorded in `canonical_drum_data_manifest.json`:
 
 ### Drum activity
 

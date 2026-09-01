@@ -27,12 +27,18 @@ app_dir="$build_root/AppDir"
 pyinstaller_dist="$build_root/pyinstaller-dist"
 pyinstaller_work="$build_root/pyinstaller-work"
 output="$output_dir/LB_Omnichord.${release_stamp}.${platform_name}.AppImage"
+qml_evidence="$output.qml-imports.json"
+package_audit="$output.package-audit.json"
 
 rm -rf "$build_root"
 mkdir -p \
     "$app_dir/usr/lib/LB_Omnichord" \
     "$app_dir/usr/share/applications" \
     "$output_dir"
+
+python "$frontend_dir/packaging/qt_runtime_policy.py" \
+    --qml-root "$frontend_dir/gui" \
+    --output "$qml_evidence"
 
 python -m PyInstaller \
     --noconfirm \
@@ -43,6 +49,7 @@ python -m PyInstaller \
     --workpath "$pyinstaller_work" \
     --specpath "$build_root" \
     --paths "$frontend_dir/code" \
+    --additional-hooks-dir "$frontend_dir/packaging/pyinstaller_hooks" \
     --hidden-import c_amy \
     --collect-all amy \
     --add-data "$frontend_dir/licence.txt:." \
@@ -76,4 +83,9 @@ if [[ -n "$runtime_file" ]]; then
 fi
 ARCH="$appimage_arch" "$appimage_tool" "${runtime_args[@]}" "$app_dir" "$output"
 chmod +x "$output"
+python "$frontend_dir/packaging/package_audit.py" \
+    --platform "$platform_name" \
+    --tree "$app_dir" \
+    --package "$output" \
+    --output "$package_audit"
 printf '%s\n' "$output"

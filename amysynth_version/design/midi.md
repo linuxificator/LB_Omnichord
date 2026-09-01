@@ -1,5 +1,10 @@
 # MIDI Design
 
+Status: authoritative MIDI input and routing contract
+Owner: MIDI input/player subsystem
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Routing
 
 USB MIDI input is received on the Raspberry Pi and translated into AMY wire commands.
@@ -14,12 +19,15 @@ Each MIDI row has:
 
 Default channels are 1-6. Duplicate channel assignments are allowed.
 
-MIDI input tech selection is controlled by `midi_input.tech_profile`. The shipped
-profile is `linux`, matching the Raspberry Pi target; when the field is absent,
-the backend derives the closest profile from Qt's platform abstraction. On Linux
-the frontend reads every enabled raw byte-stream MIDI technology that this build
-can open and combines those inputs into one application MIDI stream. The
-currently implemented dependency-free readers are:
+MIDI input tech selection is controlled by `midi_input.tech_profile`. The
+shipped value is `auto`: ordinary packages derive the closest profile from
+Qt's platform abstraction and Python's runtime platform. A non-`auto` value is
+a deliberate test or diagnostic override, not a platform default for a
+release. This keeps one common configuration portable across Linux, macOS,
+Windows and Android packages. On Linux the frontend reads every enabled raw
+byte-stream MIDI technology that this build can open and combines those inputs
+into one application MIDI stream. The currently implemented dependency-free
+readers are:
 
 - ALSA raw MIDI character devices, configured by `alsa_raw_globs` and retaining
   the legacy `device_glob` fallback (`/dev/snd/midiC*D*`);
@@ -48,6 +56,26 @@ Ordinary Note On/Off events remain musical input and do not create button-learn
 indicators; a controller that sends pads as notes needs an explicit whitelist or
 translation layer before those notes may be treated as buttons.
 Channel 0 in a row means omni/all incoming channels.
+
+Native readers never call the MIDI QObject or musical engine. Every reader
+normalizes input to one frozen `MidiInputEvent` value. A lock-protected sequence
+number gives events from simultaneous readers one total order; the application
+composition root supplies a small `MidiInputPort` to the common backend, and a
+single Qt signal queues that stream onto the backend's owning thread. Notes,
+controls, explicitly translated buttons and activity all use this same
+boundary. The receiver also drains by sequence number, so delayed delivery
+cannot invert a note and control event. Ordinary native adapters intentionally
+emit notes rather than buttons; button events exist for an explicit future
+translation adapter, not for automatic keyboard-note classification.
+
+The portable MIDI player imports no native API and probes no device path. The
+Linux adapter owns raw-device discovery, ALSA `ctypes` calls, reader threads and
+their start/status/close lifecycle. Package composition selects that adapter
+once. macOS, Windows and Android currently receive adapters with the same
+lifecycle/status contract that explicitly report their unbundled native
+technology as unavailable. Unsupported is capability data, not a startup
+exception. `close()` is idempotent, closes the event emitter before native
+readers, and therefore prevents callbacks after shutdown begins.
 
 ALSA Sequencer-only applications such as VMPK do not create a raw-MIDI device.
 The frontend therefore also creates an ALSA sequencer input client named

@@ -1,5 +1,10 @@
 # Omnichord Rhythm Behavior
 
+Status: authoritative rhythm/tempo/continuity contract
+Owner: OMNI rhythm subsystem
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 This document defines the required behavior of the Omnichord rhythm/drum subsystem. It is a behavioral contract for the GUI, backend, AMY wire-command generation, presets, and regression tests.
 
 The central rule is:

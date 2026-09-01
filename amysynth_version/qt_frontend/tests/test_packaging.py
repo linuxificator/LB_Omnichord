@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import unittest
 from pathlib import Path
@@ -10,19 +11,50 @@ REPOSITORY = FRONTEND.parents[1]
 
 
 class PackagingContracts(unittest.TestCase):
+    def test_catalogue_schemas_and_provenance_ship_on_every_platform(self) -> None:
+        appimage = (
+            FRONTEND / "packaging" / "build_appimage.sh"
+        ).read_text(encoding="utf-8")
+        macos = (
+            FRONTEND / "packaging" / "build_macos_dmg.sh"
+        ).read_text(encoding="utf-8")
+        windows = (
+            FRONTEND / "packaging" / "build_windows.ps1"
+        ).read_text(encoding="utf-8")
+        android = (
+            FRONTEND / "packaging" / "android" / "build_android.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('--add-data "$frontend_dir/music:music"', appimage)
+        self.assertIn('--add-data "$frontend_dir/music:music"', macos)
+        self.assertIn("'music');music", windows)
+        self.assertIn('ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")', android)
+        self.assertTrue((FRONTEND / "music" / "catalogue_provenance.json").is_file())
+        self.assertEqual(
+            len(tuple((FRONTEND / "music" / "schema").glob("*.schema.json"))),
+            5,
+        )
+
     def test_every_platform_uses_one_amy_release_branch_and_commit(self) -> None:
         workflows = [
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml",
             REPOSITORY / ".github" / "workflows" / "amy-regression.yml",
         ]
-        release_branch = "releases/amy_omnichord_R20260831T042456"
-        release_commit = "14240031c135fdcd76a7a3a8ec81da8ef405c4b0"
+        release_inputs = json.loads(
+            (FRONTEND / "packaging" / "release_inputs.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        release_branch = release_inputs["amy"]["release_branch"]
+        release_commit = release_inputs["amy"]["commit"]
+        pcm_bank = release_inputs["amy"]["pcm_bank"]
 
         for workflow_path in workflows:
             workflow = workflow_path.read_text(encoding="utf-8")
-            self.assertIn(f"AMY_RELEASE_BRANCH: {release_branch}", workflow)
-            self.assertIn(f"AMY_COMMIT: {release_commit}", workflow)
-            self.assertIn("merge-base --is-ancestor", workflow)
+            self.assertIn("packaging/release_inputs.py", workflow)
+            self.assertIn("packaging/checkout_amy.py", workflow)
+            self.assertNotIn(release_branch, workflow)
+            self.assertNotIn(release_commit, workflow)
             self.assertNotIn(
                 "25213785696dd40e6cce59ab428e560a410d240f",
                 workflow,
@@ -32,11 +64,29 @@ class PackagingContracts(unittest.TestCase):
                 workflow,
             )
 
+        checkout_helper = (
+            FRONTEND / "packaging" / "checkout_amy.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"merge-base",', checkout_helper)
+        self.assertIn('"--is-ancestor",', checkout_helper)
+        self.assertIn('"rev-parse", "HEAD"', checkout_helper)
+
         release = workflows[0].read_text(encoding="utf-8")
         self.assertIn("## Build provenance", release)
         self.assertIn("\\`$AMY_RELEASE_BRANCH\\`", release)
         self.assertIn("\\`$AMY_COMMIT\\`", release)
-        self.assertIn("AMY_PCM_BANK=tiny", release)
+        self.assertEqual(pcm_bank, "gamma9001")
+        self.assertIn('AMY_PCM_BANK="$AMY_PCM_BANK"', release)
+        for workflow_path in workflows:
+            workflow = workflow_path.read_text(encoding="utf-8")
+            self.assertIn("amy_set_gamma9001_pcm", workflow)
+            self.assertIn("gamma9001_pcm_data", workflow)
+        shipped_config = json.loads(
+            (FRONTEND / "config" / "amy_config.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(shipped_config["drums"]["kit"], pcm_bank)
         self.assertNotIn("amy-tiny-bank.patch", release)
         self.assertFalse(
             (FRONTEND / "packaging" / "amy-tiny-bank.patch").exists()
@@ -49,19 +99,24 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn(release_commit, contract)
         self.assertIn("every supported platform succeeds", contract)
 
-    def test_platform_logic_is_limited_to_one_startup_preamble(self) -> None:
+    def test_platform_logic_is_limited_to_runtime_adapters(self) -> None:
         core = (FRONTEND / "code" / "app_core.py").read_text(
             encoding="utf-8"
         )
         architecture = (
             REPOSITORY / "amysynth_version" / "design" / "architecture.md"
         ).read_text(encoding="utf-8")
+        runtime_adapter = (
+            FRONTEND / "code" / "runtime_platform_adapters.py"
+        ).read_text(encoding="utf-8")
 
-        self.assertEqual(core.count('casefold() != "android"'), 1)
+        self.assertNotIn('casefold() != "android"', core)
+        self.assertEqual(runtime_adapter.count('casefold() != "android"'), 1)
         self.assertNotIn("sys.platform", core)
         self.assertNotIn("platform.system", core)
-        self.assertRegex(architecture, r"single\s+startup preamble")
-        self.assertIn("Asset-root discovery", architecture)
+        self.assertIn("named adapters supplied by the", architecture)
+        self.assertIn("single composition root", architecture)
+        self.assertRegex(architecture, r"Asset-root\s+discovery")
 
     def test_release_is_gated_by_complete_reusable_test_workflow(self) -> None:
         release = (
@@ -111,8 +166,17 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("refs/heads/integration/android_build", release)
         self.assertGreaterEqual(
-            release.count("if: github.ref == 'refs/heads/main'"),
-            3,
+            release.count("github.event_name == 'workflow_dispatch'"),
+            5,
+        )
+        self.assertIn(
+            "publish-release:\n    if: github.ref == 'refs/heads/main'",
+            release,
+        )
+        self.assertIn(
+            "refresh-readme-screenshots:\n"
+            "    if: github.ref == 'refs/heads/main'",
+            release,
         )
         self.assertIn("needs.tests.result == 'success'", release)
         self.assertIn(
@@ -152,7 +216,7 @@ class PackagingContracts(unittest.TestCase):
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
         ).read_text(encoding="utf-8")
         midi_tests = (
-            FRONTEND / "tests" / "test_midi_engine.py"
+            FRONTEND / "tests" / "test_midi_input_adapters.py"
         ).read_text(encoding="utf-8")
 
         self.assertIn('TESTS.glob("test_*.py")', runner)
@@ -163,11 +227,11 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("uses: ./.github/workflows/amy-regression.yml", release)
         for expected in (
-            "test_midi_platform_techs_are_filtered_by_runtime_platform",
-            "test_linux_midi_manager_starts_real_alsa_sequencer_listener",
-            "test_non_linux_profiles_expose_only_their_platform_tech",
-            "test_non_linux_managers_do_not_start_raw_or_alsa_seq_readers",
-            "test_disabled_midi_input_starts_no_platform_readers",
+            "test_package_profiles_select_only_their_capability_data",
+            "test_enabled_linux_port_starts_two_raw_and_one_sequencer_reader",
+            "test_unavailable_adapters_share_lifecycle_and_status_contract",
+            "test_disabled_linux_port_starts_no_native_readers",
+            "test_qt_boundary_drains_out_of_order_delivery_before_dispatch",
         ):
             self.assertIn(expected, midi_tests)
 
@@ -193,16 +257,8 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("--release-tag", release)
         self.assertIn("README.md", release)
-        self.assertIn(
-            '"amysynth_version/qt_frontend/screenshots/'
-            'omni-${release_tag}.png"',
-            release,
-        )
-        self.assertIn(
-            '"amysynth_version/qt_frontend/screenshots/'
-            'midi-${release_tag}.png"',
-            release,
-        )
+        self.assertIn("amysynth_version/qt_frontend/screenshots", release)
+        self.assertIn('git add -A -- "${changed_files[@]}"', release)
         self.assertIn("git diff --quiet --", release)
         self.assertIn("git push origin HEAD:main", release)
         self.assertIn("-m 'skip-rebuild: README screenshots only'", release)
@@ -222,6 +278,23 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('echo "tag=R${instant}"', release)
         self.assertIn('echo "stamp=R${instant/T/}"', release)
         self.assertIn("gh release create", release)
+        self.assertIn("release-manifest.json", release)
+        self.assertIn("release_sbom.py", release)
+        self.assertIn("https://spdx.dev/Document/v2.3", release)
+        self.assertIn("actions/attest@", release)
+        self.assertEqual(release.count("actions/attest@"), 2)
+        self.assertIn("gh attestation verify", release)
+        self.assertIn("provenance.sigstore.json", release)
+        self.assertIn("sbom.sigstore.json", release)
+        self.assertIn("id-token: write", release)
+        self.assertIn("attestations: write", release)
+        self.assertEqual(release.count("id-token: write"), 1)
+        self.assertEqual(release.count("attestations: write"), 1)
+        self.assertIn("release_inputs.py", release)
+        self.assertIn("release-manifest", release)
+        self.assertIn("published-assets.txt", release)
+        self.assertIn("diff -u expected-assets.txt published-assets.txt", release)
+        self.assertNotIn("gh release create \"$RELEASE_TAG\" dist/*", release)
         self.assertIn("Linux-x86_64.AppImage", release)
         self.assertIn("RaspberryPi-aarch64.AppImage", release)
         self.assertIn("macOS-arm64.dmg", release)
@@ -270,11 +343,17 @@ class PackagingContracts(unittest.TestCase):
             FRONTEND / "packaging" / "windows" / "LB_Omnichord.cmd"
         ).read_text(encoding="utf-8")
         main = (FRONTEND / "code" / "main.py").read_text(encoding="utf-8")
-        core = (FRONTEND / "code" / "app_core.py").read_text(
+        windows_adapter = (
+            FRONTEND / "code" / "windows_launcher.py"
+        ).read_text(encoding="utf-8")
+        runtime_paths = (FRONTEND / "code" / "runtime_paths.py").read_text(
             encoding="utf-8"
         )
         service = (
             FRONTEND / "packaging" / "windows" / "amy_service.c"
+        ).read_text(encoding="utf-8")
+        cmake = (
+            FRONTEND / "packaging" / "windows" / "CMakeLists.txt"
         ).read_text(encoding="utf-8")
         self.assertIn("windows-native:", workflow)
         self.assertIn("windows-native,", workflow)
@@ -317,17 +396,24 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("-ExecutionPolicy Bypass", click_launcher)
         self.assertIn('"%~dp0run_windows.ps1" %*', click_launcher)
         self.assertIn("pause", click_launcher)
-        self.assertIn("if sys.stdout is None:", main)
-        self.assertIn("if sys.stderr is None:", main)
-        self.assertIn("fatal-error", main)
-        self.assertIn("resolve_frontend_asset_root", core)
-        self.assertIn('Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS")', core)
+        self.assertIn("prepare_windowed_console_streams()", main)
+        self.assertIn("guarded_package_main(main)", main)
+        self.assertIn("if sys.stdout is None:", windows_adapter)
+        self.assertIn("if sys.stderr is None:", windows_adapter)
+        self.assertIn("fatal-error", windows_adapter)
+        self.assertIn("resolve_frontend_asset_root", runtime_paths)
+        self.assertIn('getattr(sys, "_MEIPASS", None)', runtime_paths)
         self.assertIn("amy_add_message", service)
         self.assertIn("run_self_test", service)
         self.assertIn("amy_simple_fill_buffer", service)
         self.assertIn("AMY named-pipe connect failed:", service)
         self.assertIn("AMY named-pipe read failed:", service)
         self.assertIn("AMY service smoke passed:", service)
+        self.assertIn("GAMMA9001=1", cmake)
+        self.assertIn("gamma9001-blob-c", cmake)
+        self.assertIn("${GAMMA9001_PCM_C}", cmake)
+        self.assertIn("amy_set_gamma9001_pcm(gamma9001_pcm_data)", service)
+        self.assertEqual(service.count("configure_pcm_bank();"), 2)
         self.assertIn("runs-on: windows-2025", workflow)
         self.assertIn(
             '& "$root\\LB_Omnichord.cmd" -Windowed -SmokeTest',
@@ -343,7 +429,11 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('"--amy-service"', entry)
         self.assertIn('"--amy-socket"', entry)
         self.assertIn("local_amy_service.main()", entry)
-        self.assertIn("configure_frontend_asset_paths(app_core)", entry)
+        self.assertIn(
+            'frontend_arguments = ["--amy-socket", str(socket), *arguments]',
+            entry,
+        )
+        self.assertIn("main.main(frontend_arguments, asset_root=APP_ROOT)", entry)
         for asset in (
             "drum_activity_timing.json",
             "drum_fills_timing.json",
@@ -356,7 +446,7 @@ class PackagingContracts(unittest.TestCase):
             "drum_fills_instruments_general_midi.json",
         ):
             self.assertIn(asset, entry)
-        self.assertLess(entry.index("import app_core"), entry.index("import main"))
+        self.assertNotIn("core.FRONTEND_DIR =", entry)
         self.assertNotIn("amy.live(", entry)
 
     def test_release_stamp_validation_matches_asset_format(self) -> None:

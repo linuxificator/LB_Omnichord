@@ -14,14 +14,12 @@ CODE = FRONTEND / "code"
 sys.path.insert(0, str(CODE))
 
 from amy_serial import (  # noqa: E402
-    CHORD_PATTERN_CAPACITY,
-    CHORD_PATTERN_START,
-    DRUM_BASE_PATTERN_START,
     AmySerialClient,
     _TaggedSequencerLane,
     _compact_repeating_events,
 )
 from drum_patterns import load_drum_pattern_catalog  # noqa: E402
+from config_loader import load_resolved_amy_config  # noqa: E402
 
 
 class _WriterProbe:
@@ -43,6 +41,9 @@ class SequencerTagTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.config = json.loads(
             (FRONTEND / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
+        cls.resolved_config = load_resolved_amy_config(
+            FRONTEND / "config" / "amy_config.json"
         )
         cls.rhythms = json.loads(
             (FRONTEND / "music" / "rhythms.json").read_text(encoding="utf-8")
@@ -123,10 +124,16 @@ class SequencerTagTests(unittest.TestCase):
                             bank_size,
                             (str(rhythm["id"]), source_level, note_count),
                         )
-                    self.assertLessEqual(bank_size, CHORD_PATTERN_CAPACITY)
+                    self.assertLessEqual(bank_size, 64)
                     for rate in range(1, 5):
                         client = AmySerialClient.__new__(AmySerialClient)
-                        client.config = self.config
+                        client.resolved_config = self.resolved_config
+                        client._pattern_ranges = {
+                            name: (start, count)
+                            for name, start, count in (
+                                self.resolved_config.layout.sequencer_pattern_ranges
+                            )
+                        }
                         client.synth_id = {"rhythm_chord": 4}
                         client.rhythm_chord_enabled = True
                         client.chord_notes = [
@@ -154,9 +161,9 @@ class SequencerTagTests(unittest.TestCase):
                             len(pattern_ids), velocity_count * note_count
                         )
                         self.assertTrue(all(
-                            CHORD_PATTERN_START
+                            936
                             <= pattern
-                            < DRUM_BASE_PATTERN_START
+                            < 1000
                             for pattern in pattern_ids
                         ))
                         self.assertLessEqual(
@@ -268,11 +275,12 @@ class SequencerTagTests(unittest.TestCase):
 
     def test_arpeggio_uses_all_notes_wraps_and_reverses(self) -> None:
         client = AmySerialClient.__new__(AmySerialClient)
-        client.config = {
-            "rhythm": {
-                "chord_gate_beats": 0.72,
-                "max_rhythm_chord_notes": 4,
-            }
+        client.resolved_config = self.resolved_config
+        client._pattern_ranges = {
+            name: (start, count)
+            for name, start, count in (
+                self.resolved_config.layout.sequencer_pattern_ranges
+            )
         }
         client.synth_id = {"rhythm_chord": 4}
         client.rhythm_chord_enabled = True

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import configparser
+import json
 import sys
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 FRONTEND = Path(__file__).resolve().parents[1]
@@ -20,13 +22,119 @@ from build_android import (  # noqa: E402
     patch_buildozer_spec,
     pin_pyside_qt_module_order,
     release_values,
+    reset_staging_directory,
+    stage_frontend,
     verify_apk,
     verify_buildozer_qt_module_order,
     verify_qt_modules_present,
 )
+from prune_pyside_wheel import native_closure, qml_module_for  # noqa: E402
 
 
 class AndroidPackagingTests(unittest.TestCase):
+    def test_staging_reset_preserves_only_the_p4a_build_cache(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            staging = root / "staging"
+            cache_file = staging / ".buildozer" / "cached-object"
+            stale_source = staging / "stale.py"
+            cache_file.parent.mkdir(parents=True)
+            cache_file.write_text("compiled", encoding="utf-8")
+            stale_source.write_text("stale", encoding="utf-8")
+
+            reset_staging_directory(staging, FRONTEND)
+
+            self.assertEqual(cache_file.read_text(encoding="utf-8"), "compiled")
+            self.assertFalse(stale_source.exists())
+
+    def test_pruner_follows_native_dependencies_instead_of_guessing(self) -> None:
+        libraries = {
+            "root.so": Path("/wheel/root.so"),
+            "dependency.so": Path("/wheel/dependency.so"),
+            "unrelated.so": Path("/wheel/unrelated.so"),
+        }
+
+        def dependencies(_readelf: str, path: Path) -> tuple[str, ...]:
+            return ("dependency.so",) if path.name == "root.so" else ()
+
+        with patch("prune_pyside_wheel.needed_libraries", side_effect=dependencies):
+            self.assertEqual(
+                native_closure(
+                    roots=("root.so",),
+                    libraries=libraries,
+                    readelf="readelf",
+                ),
+                frozenset({"root.so", "dependency.so"}),
+            )
+
+    def test_pruner_assigns_qml_files_to_the_nearest_module(self) -> None:
+        modules = frozenset(
+            {
+                "QtQuick/Controls",
+                "QtQuick/Controls/Basic",
+                "QtQuick/Controls/Material",
+            }
+        )
+        self.assertEqual(
+            qml_module_for(
+                "PySide6/Qt/qml/QtQuick/Controls/Basic/Button.qml", modules
+            ),
+            "QtQuick/Controls/Basic",
+        )
+        self.assertEqual(
+            qml_module_for(
+                "PySide6/Qt/qml/QtQuick/Controls/Material/Button.qml", modules
+            ),
+            "QtQuick/Controls/Material",
+        )
+
+    def test_staged_frontend_includes_versioned_config_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            staging = Path(directory) / "staging"
+            stage_frontend(FRONTEND, staging)
+
+            self.assertTrue((staging / "resolved_config.py").is_file())
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
+                    / "amy_config_v1.schema.json"
+                ).is_file()
+            )
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
+                    / "amy_config_v3.schema.json"
+                ).is_file()
+            )
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
+                    / "amy_config_v4.schema.json"
+                ).is_file()
+            )
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
+                    / "amy_config_v5.schema.json"
+                ).is_file()
+            )
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
+                    / "amy_config_v2.schema.json"
+                ).is_file()
+            )
+
     def test_release_stamp_maps_to_android_version_without_overflow(self) -> None:
         version, numeric = release_values("R20260830123456")
         self.assertEqual(version, "2026.8.30")
@@ -73,6 +181,7 @@ class AndroidPackagingTests(unittest.TestCase):
             )
             self.assertEqual(app["p4a.commit"], P4A_COMMIT)
             self.assertIn("pyserial", app["requirements"])
+            self.assertIn("fastjsonschema==2.22.2", app["requirements"])
             self.assertEqual(app["android.add_aars"], str(aar.resolve()))
             self.assertEqual(
                 app["android.add_gradle_repositories"], "flatDir { dirs 'libs' }"
@@ -217,8 +326,30 @@ class AndroidPackagingTests(unittest.TestCase):
         workflow = (repository / ".github" / "workflows" / "desktop-release.yml").read_text(
             encoding="utf-8"
         )
+        host_requirements = (
+            FRONTEND / "requirements-android-host.txt"
+        ).read_text(encoding="utf-8")
         self.assertIn("requirements-android.txt", workflow)
-        self.assertIn("Cython==0.29.36", workflow)
+        self.assertIn("requirements-android-host.txt", workflow)
+        self.assertIn("PySide6==6.11.2", host_requirements)
+        self.assertIn("Cython==0.29.36", host_requirements)
+        build_source = (
+            FRONTEND / "packaging" / "android" / "build_android.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("prune_wheel(", build_source)
+        self.assertIn("package_audit.py", build_source)
+        self.assertIn(".pyside-prune.json", workflow)
+        self.assertIn(".package-audit.json", workflow)
+        self.assertIn("actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809", workflow)
+        self.assertIn("android-p4a-v1-", workflow)
+        manifest = json.loads(
+            (FRONTEND / "packaging" / "qt_runtime_manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn("PySide6.QtWidgets", manifest["python_modules"])
+        self.assertIn("PySide6.QtOpenGL", manifest["python_modules"])
+        self.assertNotIn("Widgets", manifest["android_load_order"])
 
 
 if __name__ == "__main__":

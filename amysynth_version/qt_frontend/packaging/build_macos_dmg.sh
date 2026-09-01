@@ -15,9 +15,15 @@ pyinstaller_dist="$build_root/pyinstaller-dist"
 pyinstaller_work="$build_root/pyinstaller-work"
 app_bundle="$pyinstaller_dist/LB_Omnichord.app"
 output="$output_dir/LB_Omnichord.${release_stamp}.macOS-arm64.dmg"
+qml_evidence="$output.qml-imports.json"
+package_audit="$output.package-audit.json"
 
 rm -rf "$build_root"
 mkdir -p "$output_dir"
+
+python "$frontend_dir/packaging/qt_runtime_policy.py" \
+    --qml-root "$frontend_dir/gui" \
+    --output "$qml_evidence"
 
 python -m PyInstaller \
     --noconfirm \
@@ -30,6 +36,7 @@ python -m PyInstaller \
     --workpath "$pyinstaller_work" \
     --specpath "$build_root" \
     --paths "$frontend_dir/code" \
+    --additional-hooks-dir "$frontend_dir/packaging/pyinstaller_hooks" \
     --hidden-import c_amy \
     --hidden-import package_smoke \
     --hidden-import PySide6.QtTest \
@@ -48,4 +55,9 @@ hdiutil create \
     -format UDZO \
     -srcfolder "$app_bundle" \
     "$output"
+python "$frontend_dir/packaging/package_audit.py" \
+    --platform macOS-arm64 \
+    --tree "$app_bundle" \
+    --package "$output" \
+    --output "$package_audit"
 printf '%s\n' "$output"

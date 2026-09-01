@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import app_core
 
@@ -10,12 +11,12 @@ PHYSICAL_STRINGS_KEY = "physical_strings"
 
 
 def load_synth_catalog(
-    original_loader: Callable[[Path], tuple[list[Any], int, int, int]],
+    original_loader: Callable[[Path], tuple[Sequence[Any], int, int, int]],
     path: Path,
 ) -> tuple[list[Any], int, int, int]:
     synths, chord_default, strum_default, bass_default = original_loader(path)
+    synths = list(synths)
     if not any(synth.key == PHYSICAL_STRINGS_KEY for synth in synths):
-        synths = list(synths)
         synths.append(
             app_core.SynthDefinition(
                 key=PHYSICAL_STRINGS_KEY,

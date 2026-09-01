@@ -1,0 +1,7 @@
+# Test and quality tools; never packaged with the application.
+-r requirements.txt
+numpy==2.5.2
+ruff==0.16.5
+mypy==2.3.1
+types-pyserial==3.5.0.20260712
+coverage==7.15.4

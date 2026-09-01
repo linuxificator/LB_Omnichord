@@ -2,11 +2,11 @@
 
 ## Scope
 
-This handover accompanies:
+This historical handover accompanies the canonical runtime file
+`../../../qt_frontend/music/drums/drum_fill_continuation_roles.json`.
 
-`drum_fill_continuation_roles.json`
-
-It extends the previously prepared kit-independent drum data:
+It extends the canonical kit-independent drum data under
+`../../../qt_frontend/music/drums/`:
 
 - `drum_activity_timing.json`
 - `drum_activity_instruments_tiny.json`
@@ -17,7 +17,9 @@ It extends the previously prepared kit-independent drum data:
 - `drum_fills_instruments_gamma9001.json`
 - `drum_fills_instruments_general_midi.json`
 
-This task is **information/design only**. No GitHub files were changed.
+The original task was information/design only. The data was subsequently
+integrated and the runtime tree is now the single authority. Exact reviewed
+hashes are recorded in `canonical_drum_data_manifest.json`.
 
 Repository context checked read-only:
 

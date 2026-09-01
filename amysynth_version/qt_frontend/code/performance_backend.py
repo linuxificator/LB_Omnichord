@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import Any
 
 from PySide6.QtCore import Property, Signal, Slot
@@ -12,6 +13,7 @@ from performance_logic import (
     roll_bass_voicing,
     roll_chord_indexes,
 )
+from musical_state import OmniPerformanceSnapshot, PerformanceStateSnapshot
 
 
 CHORD_GATE_ON = 1
@@ -37,8 +39,6 @@ class InstrumentBackend(app_core.InstrumentBackend):
     chordArpeggioChanged = Signal()
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # Base construction loads a preset through virtual methods, so these
-        # fields must exist before super().__init__() starts.
         self._chord_gate_state = CHORD_GATE_OFF
         self._bass_voicing_shift = 0
         self._bass_riff_selector = 1
@@ -78,6 +78,20 @@ class InstrumentBackend(app_core.InstrumentBackend):
                 self.strumSynthStateChanged.emit()
             else:
                 self.bassSynthStateChanged.emit()
+
+    def performance_snapshot(self) -> OmniPerformanceSnapshot:
+        snapshot = super().performance_snapshot()
+        return replace(
+            snapshot,
+            performance=PerformanceStateSnapshot(
+                chord_gate_state=self._chord_gate_state,
+                bass_voicing_shift=self._bass_voicing_shift,
+                chord_arpeggio_enabled=self._chord_arpeggio_enabled,
+                chord_arpeggio_rate=self._chord_arpeggio_rate,
+                chord_arpeggio_descending=self._chord_arpeggio_descending,
+                bass_notes=tuple(self._current_bass_notes()),
+            ),
+        )
 
     def _set_chord_gate_state(self, state: int, *, emit: bool = True) -> bool:
         state = max(CHORD_GATE_ON, min(CHORD_GATE_OFF, int(state)))
@@ -259,9 +273,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
         if self._current_bass_riff_context() != self._bass_riff_context:
             self._reconcile_bass_riff_context(
                 preserve_riff_id=(
-                    self._active_bass_riff_id
-                    if self._bass_riff_is_playing()
-                    else None
+                    self._active_bass_riff_id if self._bass_riff_is_playing() else None
                 )
             )
         riff = self._bass_riffs.by_id(self._active_bass_riff_id)
@@ -277,9 +289,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
             "events": [
                 {
                     **event,
-                    "note": self._tuned_note(
-                        event["note"], self._active_root_semitone
-                    ),
+                    "note": self._tuned_note(event["note"], self._active_root_semitone),
                 }
                 for event in events
             ],
@@ -292,9 +302,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
         payload["chord_arpeggio"] = {
             "enabled": self._chord_arpeggio_enabled,
             "notes_per_beat": self._chord_arpeggio_rate,
-            "direction": (
-                "down" if self._chord_arpeggio_descending else "up"
-            ),
+            "direction": ("down" if self._chord_arpeggio_descending else "up"),
         }
         return payload
 
@@ -329,9 +337,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
                 self._current_bass_notes(),
                 self._active_root_semitone,
             ),
-            "play_now": bool(
-                play_now and self._chord_gate_state == CHORD_GATE_ON
-            ),
+            "play_now": bool(play_now and self._chord_gate_state == CHORD_GATE_ON),
             "rhythm_running": bool(self._rhythm_running),
             "rhythm_chord_enabled": self._chord_gate_enabled(),
             "bass_riff": self._current_bass_riff_payload(),
@@ -392,9 +398,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Slot()
     def toggleChordArpeggioDirection(self) -> None:
-        self._chord_arpeggio_descending = (
-            not self._chord_arpeggio_descending
-        )
+        self._chord_arpeggio_descending = not self._chord_arpeggio_descending
         self.chordArpeggioChanged.emit()
         if self._chord_arpeggio_enabled:
             self._send_rhythm_config()
@@ -407,9 +411,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Slot(float)
     def setBassVoicingShift(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "bass_voicing"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "bass_voicing"}):
             return
         shifted = clamp_bass_voicing_shift(
             value,
@@ -424,9 +426,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Slot(float)
     def setBassRiffSelector(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "bass_riff_selector"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "bass_riff_selector"}):
             return
         candidates = self._available_bass_riffs()
         if not candidates:
@@ -456,9 +456,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
         """Expose AMY reverb wet-return gain through 3.0."""
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "reverb_level"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "reverb_level"}):
             return
         clamped = max(0.0, min(REVERB_LEVEL_MAX, float(value)))
         if abs(clamped - self._reverb_level) < 0.0001:
@@ -476,11 +474,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
         previous_index = self._rhythm.selected_index
         if rhythm_index == previous_index:
             return
-        preserve_riff_id = (
-            self._active_bass_riff_id
-            if self._bass_riff_is_playing()
-            else None
-        )
+        preserve_riff_id = self._active_bass_riff_id if self._bass_riff_is_playing() else None
         live_controls = (
             self._rhythm.tempo_by_rhythm[previous_index],
             self._rhythm.busyness_by_rhythm[previous_index],
@@ -532,9 +526,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
         self._bass_riff_selector = self._default_bass_riff_selector()
         self._active_bass_riff_id = None
         self._bass_riff_context = None
-        self._chord_arpeggio_enabled = bool(
-            rhythm.get("chord_arpeggio_enabled", False)
-        )
+        self._chord_arpeggio_enabled = bool(rhythm.get("chord_arpeggio_enabled", False))
         self._chord_arpeggio_rate = max(
             CHORD_ARPEGGIO_RATE_MIN,
             min(
@@ -543,8 +535,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
             ),
         )
         self._chord_arpeggio_descending = (
-            str(rhythm.get("chord_arpeggio_direction", "up")).lower()
-            == "down"
+            str(rhythm.get("chord_arpeggio_direction", "up")).lower() == "down"
         )
         effects = self._defaults.get("effects", {})
         self._reverb_level = max(
@@ -563,16 +554,8 @@ class InstrumentBackend(app_core.InstrumentBackend):
             if rhythm_was_running
             else None
         )
-        live_bass_voicing = (
-            self._bass_voicing_shift
-            if rhythm_was_running
-            else None
-        )
-        live_bass_riff_id = (
-            self._active_bass_riff_id
-            if self._bass_riff_is_playing()
-            else None
-        )
+        live_bass_voicing = self._bass_voicing_shift if rhythm_was_running else None
+        live_bass_riff_id = self._active_bass_riff_id if self._bass_riff_is_playing() else None
         super()._apply_preset_data(data)
         self._rhythm_running = rhythm_was_running
         rhythm = data.get("rhythm", {})
@@ -607,11 +590,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
                 str(
                     rhythm.get(
                         "chord_arpeggio_direction",
-                        (
-                            "down"
-                            if self._chord_arpeggio_descending
-                            else "up"
-                        ),
+                        ("down" if self._chord_arpeggio_descending else "up"),
                     )
                 ).lower()
                 == "down"
@@ -657,9 +636,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
         rhythm["bass_riff_selector"] = self._bass_riff_selector
         rhythm["chord_arpeggio_enabled"] = self._chord_arpeggio_enabled
         rhythm["chord_arpeggio_rate"] = self._chord_arpeggio_rate
-        rhythm["chord_arpeggio_direction"] = (
-            "down" if self._chord_arpeggio_descending else "up"
-        )
+        rhythm["chord_arpeggio_direction"] = "down" if self._chord_arpeggio_descending else "up"
         return snapshot
 
     def _emit_full_preset_state(self) -> None:
