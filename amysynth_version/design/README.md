@@ -75,6 +75,9 @@ small, behavior-preserving phase:
 - `CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md` — dependency-aware ordered
   implementation queue, including prerequisites, scope and proof for the first
   25 tasks.
+- `CODEX_HANDOVER_POST_T25_REMAINING_WORK.md` — the post-T25 continuation
+  queue, explicitly separated into technical implementation and
+  decision/evidence work.
 - `code_quality_tasks/README.md` — actual T01-T25 result handovers, verification
   evidence and newly discovered follow-up work.
 
@@ -109,7 +112,7 @@ Then add every row that matches the task:
 | ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |
 | Architecture, code quality or refactoring | `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md`, the relevant dedicated audit handover, `CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md`, plus every owning subsystem contract touched by the proposed change |
-| Selecting or executing the next code-quality task | `CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md`, its cited detailed handovers and every owning subsystem contract listed for that task |
+| Selecting or executing the next code-quality task | `CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md`, `CODEX_HANDOVER_POST_T25_REMAINING_WORK.md`, its cited detailed handovers and every owning subsystem contract listed for that task |
 | Platform-dependent application code or adapter extraction | `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md`, `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md`, `CODEX_HANDOVER_PORTABILITY_RELEASE_AND_SECURITY.md`, plus the platform/package contracts selected above |
 | Python dependency, third-party library or local-versus-external implementation choice | `CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md`, `CODEX_HANDOVER_PORTABILITY_RELEASE_AND_SECURITY.md`, `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md`, plus the owning subsystem contract |
 

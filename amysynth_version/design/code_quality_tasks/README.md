@@ -41,3 +41,9 @@ Post-plan regression fixes:
 - `POST_T25_CONFIG_REVISION_4.md` — legacy pattern-capacity migration.
 - `POST_T25_GAMMA_RELEASE_LINEAGE.md` — restore and prove the Gamma9001
   hosted-release profile after its feature branch was not merged to main.
+
+Continuation planning:
+
+- `../CODEX_HANDOVER_POST_T25_REMAINING_WORK.md` — 11 technical tasks and four
+  explicitly separated decision/evidence tasks; none are started merely by
+  being listed.
