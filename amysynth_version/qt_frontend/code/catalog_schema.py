@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from functools import cache
 from pathlib import Path
 from typing import Any, Protocol, cast
 
@@ -13,17 +12,18 @@ class SchemaValidator(Protocol):
     def __call__(self, value: Any) -> Any: ...
 
 
-SCHEMA_DIRECTORY = Path(__file__).resolve().parent.parent / "music" / "schema"
-
-
-@cache
-def _validator(schema_name: str) -> SchemaValidator:
-    path = SCHEMA_DIRECTORY / schema_name
+def _validator(schema_path: Path) -> SchemaValidator:
+    path = Path(schema_path)
     schema = json.loads(path.read_text(encoding="utf-8"))
     return cast(SchemaValidator, fastjsonschema.compile(schema))
 
 
-def read_versioned_catalog(path: Path, schema_name: str) -> Mapping[str, Any]:
+def read_versioned_catalog(
+    path: Path,
+    schema_name: str,
+    *,
+    schema_directory: Path,
+) -> Mapping[str, Any]:
     """Read and shape-validate a catalogue before domain parsing begins."""
     source = Path(path)
     try:
@@ -31,7 +31,7 @@ def read_versioned_catalog(path: Path, schema_name: str) -> Mapping[str, Any]:
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"cannot read catalogue {source}: {exc}") from exc
     try:
-        validated = _validator(schema_name)(raw)
+        validated = _validator(Path(schema_directory) / schema_name)(raw)
     except fastjsonschema.JsonSchemaException as exc:
         location = ".".join(str(part) for part in exc.path)
         raise ValueError(

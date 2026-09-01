@@ -12,7 +12,36 @@ import time
 from pathlib import Path
 
 
-APP_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
+
+
+def packaged_asset_root(
+    meipass: object | None = None,
+    executable: Path | None = None,
+) -> Path:
+    """Resolve both PyInstaller root and `_internal` onedir layouts."""
+
+    packaged = meipass if meipass is not None else getattr(sys, "_MEIPASS", None)
+    executable_path = executable or Path(sys.executable)
+    candidates = []
+    if packaged is not None:
+        root = Path(str(packaged))
+        candidates.extend((root, root / "_internal"))
+    candidates.extend(
+        (
+            executable_path.resolve().parent / "_internal",
+            executable_path.resolve().parent,
+            Path(__file__).resolve().parents[1],
+            Path(__file__).resolve().parent,
+        )
+    )
+    for candidate in candidates:
+        if all((candidate / name).is_dir() for name in ASSET_DIRECTORIES):
+            return candidate
+    raise RuntimeError("packaged frontend assets are unavailable")
+
+
+APP_ROOT = packaged_asset_root()
 CONFIG_PATH = APP_ROOT / "config" / "amy_config.json"
 
 
@@ -115,8 +144,9 @@ def run_frontend(arguments: list[str]) -> int:
 
         main = import_frontend()
 
-        sys.argv = [sys.argv[0], "--amy-socket", str(socket), *arguments]
-        return int(main.main(arguments, asset_root=APP_ROOT))
+        frontend_arguments = ["--amy-socket", str(socket), *arguments]
+        sys.argv = [sys.argv[0], *frontend_arguments]
+        return int(main.main(frontend_arguments, asset_root=APP_ROOT))
     finally:
         stop_service()
         socket.unlink(missing_ok=True)

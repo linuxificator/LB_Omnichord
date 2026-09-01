@@ -128,7 +128,11 @@ def load_bass_riff_catalog(
     rhythm_ids: Collection[str],
     chord_suffixes: Collection[str],
 ) -> BassRiffCatalog:
-    raw = read_versioned_catalog(path, "bass_riffs_v1.schema.json")
+    raw = read_versioned_catalog(
+        path,
+        "bass_riffs_v1.schema.json",
+        schema_directory=path.parent / "schema",
+    )
 
     known_rhythms = {str(value) for value in rhythm_ids}
     known_chords = {str(value) for value in chord_suffixes}

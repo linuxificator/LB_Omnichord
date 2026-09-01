@@ -101,7 +101,11 @@ class DrumPatternCatalog:
 
 
 def _read(path: Path, schema_name: str) -> Mapping[str, Any]:
-    return read_versioned_catalog(path, schema_name)
+    return read_versioned_catalog(
+        path,
+        schema_name,
+        schema_directory=path.parent.parent / "schema",
+    )
 
 
 def _event(raw: Any, *, period_ticks: int, source: str) -> DrumEvent:

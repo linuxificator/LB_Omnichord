@@ -74,6 +74,7 @@ class CatalogueProvenanceTests(unittest.TestCase):
                 read_versioned_catalog(
                     target,
                     "drum_activity_v1.schema.json",
+                    schema_directory=ROOT / "music" / "schema",
                 )
 
 

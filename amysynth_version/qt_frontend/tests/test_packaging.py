@@ -420,7 +420,11 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('"--amy-service"', entry)
         self.assertIn('"--amy-socket"', entry)
         self.assertIn("local_amy_service.main()", entry)
-        self.assertIn("main.main(arguments, asset_root=APP_ROOT)", entry)
+        self.assertIn(
+            'frontend_arguments = ["--amy-socket", str(socket), *arguments]',
+            entry,
+        )
+        self.assertIn("main.main(frontend_arguments, asset_root=APP_ROOT)", entry)
         for asset in (
             "drum_activity_timing.json",
             "drum_fills_timing.json",

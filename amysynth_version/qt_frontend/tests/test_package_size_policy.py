@@ -19,8 +19,39 @@ from qt_runtime_policy import (  # noqa: E402
     validate_source_imports,
 )
 
+sys.path.insert(0, str(PACKAGING))
+from appimage_entry import packaged_asset_root  # noqa: E402
+
 
 class PackageSizePolicyTests(unittest.TestCase):
+    def test_packaged_asset_root_accepts_pyinstaller_internal_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            internal = root / "_internal"
+            for name in ("config", "gui", "instruments", "music"):
+                (internal / name).mkdir(parents=True)
+            self.assertEqual(
+                packaged_asset_root(meipass=root, executable=root / "app"),
+                internal,
+            )
+
+    def test_catalog_schema_location_is_supplied_by_the_catalog_owner(self) -> None:
+        catalogue_schema = (FRONTEND / "code" / "catalog_schema.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("SCHEMA_DIRECTORY", catalogue_schema)
+        self.assertIn("schema_directory: Path", catalogue_schema)
+
+        drum_patterns = (FRONTEND / "code" / "drum_patterns.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('schema_directory=path.parent.parent / "schema"', drum_patterns)
+
+        bass_riffs = (FRONTEND / "code" / "bass_riffs.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('schema_directory=path.parent / "schema"', bass_riffs)
+
     def test_source_qml_imports_match_the_reviewed_runtime_surface(self) -> None:
         manifest = load_manifest()
         validate_source_imports(FRONTEND / "gui", manifest)
@@ -31,6 +62,27 @@ class PackageSizePolicyTests(unittest.TestCase):
         self.assertEqual(manifest["quick_controls_style"], "Basic")
         self.assertIn("QtQuick/Controls/Basic", manifest["qml_modules"])
         self.assertNotIn("QtQuick/Controls/Material", manifest["qml_modules"])
+
+    def test_every_desktop_builder_uses_the_local_qml_hook_and_audit(self) -> None:
+        builders = (
+            PACKAGING / "build_appimage.sh",
+            PACKAGING / "build_macos_dmg.sh",
+            PACKAGING / "build_windows.ps1",
+        )
+        for builder in builders:
+            source = builder.read_text(encoding="utf-8")
+            self.assertIn("pyinstaller_hooks", source, builder.name)
+            self.assertIn("qt_runtime_policy.py", source, builder.name)
+            self.assertIn("package_audit.py", source, builder.name)
+        qml_hook = PACKAGING / "pyinstaller_hooks" / "hook-PySide6.QtQml.py"
+        qml_source = qml_hook.read_text(encoding="utf-8")
+        self.assertIn('manifest["qml_modules"]', qml_source)
+        self.assertNotIn("collect_qtqml_files", qml_source)
+        self.assertIn('"/qmltooling/"', qml_source)
+        gui_hook = PACKAGING / "pyinstaller_hooks" / "hook-PySide6.QtGui.py"
+        gui_source = gui_hook.read_text(encoding="utf-8")
+        self.assertIn('"/imageformats/"', gui_source)
+        self.assertIn('"virtualkeyboard"', gui_source)
 
     def test_audit_writes_evidence_and_rejects_forbidden_qt_content(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -9,6 +9,11 @@
     "android_host": "requirements-android-host.txt"
   },
   "direct_imports": {
+    "PyInstaller": {
+      "distribution": "PyInstaller",
+      "owner": "build",
+      "used_by": ["package-size collection hooks"]
+    },
     "PySide6": {
       "distribution": "PySide6",
       "owner": "runtime",
