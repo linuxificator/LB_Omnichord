@@ -12,7 +12,7 @@ CODE = ROOT / "code"
 if str(CODE) not in sys.path:
     sys.path.insert(0, str(CODE))
 
-from config_loader import load_amy_config  # noqa: E402
+from config_loader import load_amy_config, load_resolved_amy_config  # noqa: E402
 from synth_programs import resolve_program  # noqa: E402
 
 
@@ -48,7 +48,7 @@ class ProgramArchitectureTests(unittest.TestCase):
                 load_amy_config(path)
 
     def test_rom_programs_are_derived_from_stable_keys(self) -> None:
-        config = load_amy_config(ROOT / "config" / "amy_config.json")
+        config = load_resolved_amy_config(ROOT / "config" / "amy_config.json")
         juno = resolve_program("juno_036", config)
         dx7 = resolve_program("dx7_143", config)
         self.assertIsNotNone(juno)
@@ -57,7 +57,7 @@ class ProgramArchitectureTests(unittest.TestCase):
         self.assertEqual((dx7.kind, dx7.patch, dx7.oscs_per_voice), ("rom_patch", 143, 8))
 
     def test_physical_strings_is_a_real_karplus_strong_program(self) -> None:
-        config = load_amy_config(ROOT / "config" / "amy_config.json")
+        config = load_resolved_amy_config(ROOT / "config" / "amy_config.json")
         program = resolve_program("physical_strings", config)
         self.assertIsNotNone(program)
         self.assertEqual(program.kind, "karplus_strong")

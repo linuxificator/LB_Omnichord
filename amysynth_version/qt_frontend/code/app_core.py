@@ -35,7 +35,7 @@ from application_composition import (
 )
 from bass_riffs import BassRiffCatalog, load_bass_riff_catalog
 from control_limits import bounded_control_range, clamp_control_value
-from config_loader import ResolvedAmyConfig, load_amy_config
+from config_loader import ResolvedAmyConfig
 from drum_patterns import (
     DrumRhythm,
     load_drum_pattern_catalog,

@@ -21,3 +21,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T09 | `T09_VERSIONED_TYPED_CONFIG.md` | complete |
 | T10 | `T10_CONFIG_MIGRATIONS_JSON_STORE.md` | complete |
 | T11 | `T11_EXPLICIT_COMPOSITION_ROOT.md` | complete |
+| T12 | `T12_SINGLE_CONFIG_AUTHORITY.md` | complete |

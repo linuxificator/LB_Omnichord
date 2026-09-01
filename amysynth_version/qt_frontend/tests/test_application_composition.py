@@ -177,7 +177,11 @@ class ApplicationCompositionTests(unittest.TestCase):
             graph.resolved_config.provenance.runtime_override_paths,
             ("$.serial.port", "$.serial.baud"),
         )
-        self.assertEqual(calls[0][1]["config"]["serial"]["baud"], 230_400)
+        self.assertIsNone(calls[0][1]["config"])
+        self.assertIs(
+            calls[0][1]["resolved_config"],
+            graph.resolved_config,
+        )
 
     def test_transport_selection_constructs_only_the_selected_fake_port(self) -> None:
         calls: list[tuple[str, dict[str, Any]]] = []

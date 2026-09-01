@@ -677,21 +677,15 @@ class MidiAmyEngine:
 
     def __init__(self, client: Any) -> None:
         self.client = client
-        cfg = client.config
-        midi_cfg = cfg.get("midi_player", {})
-        buses = cfg.get("buses", {})
-        self.row_synths = tuple(
-            int(x)
-            for x in midi_cfg.get("synth_ids", [5, 6, 7, 8, 9, 10])
-        )
+        resolved = client.resolved_config
+        self.row_synths = resolved.layout.midi_synth_ids
         if len(self.row_synths) != MIDI_ROW_COUNT:
             raise ValueError("midi_player.synth_ids must contain six synth IDs")
-        self.drum_synth = int(midi_cfg.get("drum_synth_id", 11))
-        self.voices = int(midi_cfg.get("voices_per_synth", 4))
-        self.drum_voices = int(midi_cfg.get("drum_voices", 8))
-        raw_row_buses = buses.get("midi_rows", [4, 5, 6, 7, 8, 9])
-        self.row_buses = tuple(int(bus) for bus in raw_row_buses)
-        self.drum_bus = int(buses.get("midi_drums", 10))
+        self.drum_synth = resolved.layout.midi_drum_synth_id
+        self.voices = resolved.capacities.voices.midi_per_synth
+        self.drum_voices = resolved.capacities.voices.midi_drums
+        self.row_buses = resolved.layout.midi_row_buses
+        self.drum_bus = resolved.layout.midi_drum_bus
         if (
             len(self.row_buses) != MIDI_ROW_COUNT
             or len(set(self.row_buses)) != MIDI_ROW_COUNT
@@ -720,11 +714,9 @@ class MidiAmyEngine:
         return self.client._f(value)
 
     def balanced_volume(self, key: str, volume: float) -> float:
-        levels = self.client.config.get("instrument_levels", {})
-        multiplier = (
-            max(0.0, float(levels.get(str(key), 1.0)))
-            if isinstance(levels, dict)
-            else 1.0
+        multiplier = max(
+            0.0,
+            self.client.resolved_config.instrument_level(str(key)),
         )
         return float(volume) * multiplier
 
@@ -738,12 +730,7 @@ class MidiAmyEngine:
         delay = getattr(writer, "delay", None)
         if not callable(delay):
             return
-        guard_ms = float(
-            self.client.config.get("performance", {}).get(
-                "synth_alloc_guard_ms",
-                10.0,
-            )
-        )
+        guard_ms = self.client.resolved_config.performance.synth_alloc_guard_ms
         delay(max(0.0, guard_ms) / 1000.0)
 
     def _route(self, synth: int, bus: int) -> None:
@@ -903,7 +890,7 @@ class MidiAmyEngine:
         synth = self.row_synths[row]
         bus = self.row_buses[row]
         self.silence_row(row)
-        program = resolve_program(str(key), self.client.config)
+        program = resolve_program(str(key), self.client.resolved_config)
         patch = self._patch(key)
 
         if program is not None and not program.is_rom_patch:
@@ -1040,12 +1027,7 @@ class MidiAmyEngine:
             )
             active.append(float(note))
 
-        tail_ms = float(
-            self.client.config.get("performance", {}).get(
-                "strum_tail_ms",
-                450.0,
-            )
-        )
+        tail_ms = self.client.resolved_config.performance.strum_tail_ms
 
         def release() -> None:
             with self._preview_lock:
@@ -1070,20 +1052,18 @@ class MidiAmyEngine:
         sample_name = GM_DRUM_SAMPLE.get(int(midi_note))
         if sample_name is None:
             return
-        hit = self.client.config["drums"]["sample_map"].get(sample_name)
-        if not isinstance(hit, dict):
+        hit = self.client.resolved_config.drums.sample(sample_name)
+        if hit is None:
             return
         level = max(0.0, min(1.0, int(velocity) / 127.0))
-        gain = float(
-            self.client.config["drums"].get("velocity_gain", 5.0)
-        )
+        gain = self.client.resolved_config.drums.velocity_gain
         amp = (
             level
             * gain
             * max(0.0, min(1.0, float(row_volume)))
         )
         self._wire(
-            f"p{int(hit['preset'])}n{self._f(float(hit['note']))}"
+            f"p{hit.preset}n{self._f(float(hit.note))}"
             f"l{self._f(amp)}i{self.drum_synth}Z"
         )
 
@@ -1211,12 +1191,19 @@ class MidiPlayerBackend(QObject):
         self.syncFromOmni()
         self._apply_all_to_engine()
 
-        midi_cfg = client.config.get("midi_input", {})
+        midi = client.resolved_config.midi_input
+        midi_cfg = {
+            "enabled": midi.enabled,
+            "tech_profile": midi.configured_profile,
+            "device_glob": midi.device_glob,
+            "alsa_raw_globs": list(midi.alsa_raw_globs),
+            "oss_midi_globs": list(midi.oss_midi_globs),
+        }
         self._reader = _MidiInputTechManager(
             self.process_midi_note,
             self._queue_midi_control,
             self._queue_midi_tech_activity,
-            midi_cfg if isinstance(midi_cfg, dict) else {},
+            midi_cfg,
         )
         self._refresh_midi_input_techs()
         self._midi_input_refresh_timer.start()

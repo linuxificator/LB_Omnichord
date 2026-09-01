@@ -8,9 +8,9 @@ Last verified: 2026-09-01
 ## Authority and revision
 
 `qt_frontend/config/amy_config.json` is the shipped configuration authority.
-It declares `config_revision`; current revision 2 is structurally defined by
-`config/schema/amy_config_v2.schema.json`. Historical revision 1 remains
-packaged so its contract is inspectable. Unknown keys inside stable objects,
+It declares `config_revision`; current revision 3 is structurally defined by
+`config/schema/amy_config_v3.schema.json`. Historical revisions 1 and 2 remain
+packaged so their contracts are inspectable. Unknown keys inside stable objects,
 missing required values and wrong types are startup errors. Required operational
 values must not reappear as consumer fallbacks.
 
@@ -28,13 +28,17 @@ before serial, MIDI, socket or AMY resources are created.
 - MIDI input and whether its platform profile is derived or overridden;
 - voice and AMY runtime capacities;
 - synth, bus and sequencer-tag layout;
+- contiguous fill/chord/drum-base sequencer-pattern ownership;
+- synth defaults, drum kit/gain/sample map, rhythm/performance timing;
+- synth programs/patches, optional balance levels and patch corrections;
 - debug settings;
 - source/default/override/platform provenance.
 
-Existing consumers temporarily receive a fresh mutable compatibility dictionary
-from `load_amy_config`. The view preserves the derived 256-entry Juno/DX7 patch
-map but cannot mutate the frozen resolved object or another consumer's view.
-T11/T12 move consumers to narrow typed sections and then remove this transition.
+Production consumers receive only the typed object/sections. `load_amy_config`
+remains an explicit external compatibility API and returns a fresh mutable JSON
+view; it is not used to construct the application graph. The view preserves the
+derived 256-entry Juno/DX7 patch map but cannot mutate typed state or another
+view.
 
 ## Source and provenance
 
@@ -57,6 +61,10 @@ Revision-by-revision migration runs on an isolated copy before full structural
 and domain validation. Only a valid result is atomically persisted. Revision 0
 to 1 raises the former shipped four-voice rhythm-chord default to seven;
 revision 1 to 2 replaces the former shipped Linux MIDI profile with `auto`.
+Revision 2 to 3 adds the previously hardcoded contiguous pattern layout:
+fills 0–935, chord one-shots 936–999 and drum bases 1000–1023. Validation
+requires these ranges to be contiguous and to end exactly at
+`amy_max_patterns`.
 Because revision-1 full documents cannot distinguish that old default from an
 intentional diagnostic selection, a user who deliberately forced `linux` must
 reapply it after migration. Future and malformed revisions fail at

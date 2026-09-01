@@ -93,7 +93,6 @@ class ClientSelection:
 @dataclass(frozen=True, slots=True)
 class ApplicationGraph:
     resolved_config: ResolvedAmyConfig
-    compatibility_config: dict[str, Any]
     client_selection: ClientSelection
     client: CommandClient
     backend: Any
@@ -228,22 +227,28 @@ def _create_client(
     selection: ClientSelection,
     dependencies: ApplicationDependencies,
     *,
-    config: dict[str, Any],
+    resolved: ResolvedAmyConfig,
     addresses: dict[str, str],
 ) -> CommandClient:
     if selection.kind == "local":
         return dependencies.local_client(
-            config=config,
+            config=None,
             addresses=addresses,
             server_name=selection.endpoint,
+            resolved_config=resolved,
         )
     if selection.kind == "socket":
         return dependencies.socket_client(
-            config=config,
+            config=None,
             addresses=addresses,
             socket_path=selection.endpoint,
+            resolved_config=resolved,
         )
-    return dependencies.serial_client(config=config, addresses=addresses)
+    return dependencies.serial_client(
+        config=None,
+        addresses=addresses,
+        resolved_config=resolved,
+    )
 
 
 def compose_application_graph(
@@ -269,7 +274,6 @@ def compose_application_graph(
         serial_port=args.serial_port,
         serial_baud=args.serial_baud,
     )
-    compatibility = resolved.compatibility_dict()
     _checkpoint(checkpoint, "amy-config-loaded")
     selection = select_client(args)
     if transport_notice is not None:
@@ -281,7 +285,7 @@ def compose_application_graph(
     client = _create_client(
         selection,
         dependencies,
-        config=compatibility,
+        resolved=resolved,
         addresses=address_map(args),
     )
     if selection.kind == "local":
@@ -327,7 +331,6 @@ def compose_application_graph(
     )
     return ApplicationGraph(
         resolved_config=resolved,
-        compatibility_config=compatibility,
         client_selection=selection,
         client=client,
         backend=backend,

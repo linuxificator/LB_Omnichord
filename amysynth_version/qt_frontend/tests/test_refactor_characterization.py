@@ -97,7 +97,7 @@ class RefactorCharacterizationTests(unittest.TestCase):
         canonical = config_loader.load_amy_config
         self.assertIs(amy_serial.load_amy_config, canonical)
         self.assertIs(main.load_amy_config, canonical)
-        self.assertIs(app_core.load_amy_config, canonical)
+        self.assertFalse(hasattr(app_core, "load_amy_config"))
         self.assertIs(
             local_amy_service.load_resolved_amy_config,
             config_loader.load_resolved_amy_config,
@@ -107,7 +107,6 @@ class RefactorCharacterizationTests(unittest.TestCase):
         for loader in (
             amy_serial.load_amy_config,
             main.load_amy_config,
-            app_core.load_amy_config,
         ):
             with self.subTest(loader=loader.__module__):
                 self.assertEqual(loader(ROOT / "config" / "amy_config.json"), expected)

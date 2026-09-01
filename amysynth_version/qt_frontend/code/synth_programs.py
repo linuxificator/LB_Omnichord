@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from config_loader import ResolvedAmyConfig
 
 
 @dataclass(frozen=True)
@@ -25,14 +25,11 @@ class SynthProgram:
         return self.kind == "rom_patch" and self.patch is not None
 
 
-def resolve_program(key: str, config: dict[str, Any]) -> SynthProgram | None:
+def resolve_program(key: str, config: ResolvedAmyConfig) -> SynthProgram | None:
     key = str(key)
 
-    raw_programs = config.get("synth_programs", {})
-    if isinstance(raw_programs, dict) and key in raw_programs:
-        raw = raw_programs[key]
-        if not isinstance(raw, dict):
-            raise ValueError(f"synth program {key!r} must be an object")
+    raw = config.synth_program(key)
+    if raw is not None:
         kind = str(raw.get("type", "")).strip().lower()
         if kind == "karplus_strong":
             return SynthProgram(
@@ -91,12 +88,10 @@ def resolve_program(key: str, config: dict[str, Any]) -> SynthProgram | None:
     return None
 
 
-def maximum_program_oscs_per_voice(config: dict[str, Any]) -> int:
+def maximum_program_oscs_per_voice(config: ResolvedAmyConfig) -> int:
     maximum = 8  # Existing DX7 programs.
-    raw_programs = config.get("synth_programs", {})
-    if isinstance(raw_programs, dict):
-        for key in raw_programs:
-            program = resolve_program(str(key), config)
-            if program is not None:
-                maximum = max(maximum, program.oscs_per_voice)
+    for key in config.synth_program_keys():
+        program = resolve_program(key, config)
+        if program is not None:
+            maximum = max(maximum, program.oscs_per_voice)
     return maximum

@@ -16,7 +16,6 @@ sys.path.insert(0, str(CODE))
 
 from amy_transport import (  # noqa: E402
     AMY_PPQ,
-    DRUM_BASE_INSTANCE_TAG_START,
     AmySerialClient,
     _TaggedSequencerLane,
     _resolve_drum_catalog_directory,
@@ -25,6 +24,7 @@ from drum_patterns import (  # noqa: E402
     KIT_FAMILIES,
     load_drum_pattern_catalog,
 )
+from config_loader import load_resolved_amy_config  # noqa: E402
 
 
 class _WriterProbe:
@@ -44,10 +44,19 @@ class DrumPatternTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
+        cls.resolved_config = load_resolved_amy_config(
+            FRONTEND / "config" / "amy_config.json"
+        )
 
     def client(self) -> AmySerialClient:
         client = AmySerialClient.__new__(AmySerialClient)
-        client.config = self.config
+        client.resolved_config = self.resolved_config
+        client._pattern_ranges = {
+            name: (start, count)
+            for name, start, count in (
+                self.resolved_config.layout.sequencer_pattern_ranges
+            )
+        }
         client.drum_catalog = self.catalog
         client.drum_kit = "tiny"
         client.synth_id = {"drums": 0}
@@ -279,7 +288,7 @@ class DrumPatternTests(unittest.TestCase):
         length = fill.duration_ticks // 2
         for role in client._drum_roles:
             tag = (
-                DRUM_BASE_INSTANCE_TAG_START
+                1000
                 + client._drum_role_index[role]
             )
             mute_commands = [

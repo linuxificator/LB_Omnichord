@@ -128,7 +128,7 @@ class SoundBalanceFeatureTests(unittest.TestCase):
 
                 user_data.ensure_user_configs(shipped)
                 migrated = json.loads(target.read_text(encoding="utf-8"))
-                self.assertEqual(migrated["config_revision"], 2)
+                self.assertEqual(migrated["config_revision"], 3)
                 self.assertEqual(migrated["voices"]["rhythm_chord"], 7)
                 self.assertEqual(migrated["serial"]["baud"], 230_400)
                 self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")

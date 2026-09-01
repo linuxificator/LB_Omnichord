@@ -10,10 +10,14 @@ from resolved_config import (
     ConfigProvenance,
     ConfigValidationError,
     DebugConfig,
+    DrumRuntimeConfig,
     MidiInputConfig,
     ResolvedAmyConfig,
     RuntimeCapacities,
+    PerformanceTimingConfig,
+    RhythmRuntimeConfig,
     SynthBusLayout,
+    SynthDefaults,
     TransportConfig,
     VoiceCapacities,
     apply_transport_overrides,
@@ -23,7 +27,7 @@ from resolved_config import (
 
 
 def load_amy_config(path: Path) -> dict[str, Any]:
-    """Return the isolated legacy view of validated, typed configuration."""
+    """Explicit compatibility API returning an isolated validated JSON view."""
 
     return load_resolved_amy_config(path).compatibility_dict()
 
@@ -35,10 +39,14 @@ __all__ = (
     "ConfigProvenance",
     "ConfigValidationError",
     "DebugConfig",
+    "DrumRuntimeConfig",
     "MidiInputConfig",
     "ResolvedAmyConfig",
     "RuntimeCapacities",
+    "PerformanceTimingConfig",
+    "RhythmRuntimeConfig",
     "SynthBusLayout",
+    "SynthDefaults",
     "TransportConfig",
     "VoiceCapacities",
     "apply_transport_overrides",

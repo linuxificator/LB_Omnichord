@@ -1,5 +1,5 @@
 {
-  "config_revision": 2,
+  "config_revision": 3,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,
@@ -83,6 +83,11 @@
       "drums": {"start": 0, "count": 56},
       "bass": {"start": 56, "count": 56},
       "chords": {"start": 112, "count": 140}
+    },
+    "pattern_ranges": {
+      "fills": {"start": 0, "count": 936},
+      "chords": {"start": 936, "count": 64},
+      "drum_bases": {"start": 1000, "count": 24}
     }
   },
   "performance": {

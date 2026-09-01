@@ -89,6 +89,7 @@ class SynthBusLayout:
     midi_row_buses: tuple[int, ...]
     midi_drum_bus: int
     sequencer_tag_ranges: tuple[tuple[str, int, int], ...]
+    sequencer_pattern_ranges: tuple[tuple[str, int, int], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +97,46 @@ class DebugConfig:
     log_amy_commands: bool
     amy_command_log: str
     log_logical_events: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SynthDefaults:
+    chord: str
+    strum: str
+    bass: str
+
+
+@dataclass(frozen=True, slots=True)
+class DrumRuntimeConfig:
+    kit: str
+    velocity_gain: float
+    sample_map: tuple[tuple[str, "DrumSampleConfig"], ...]
+
+    def sample(self, name: str) -> DrumSampleConfig | None:
+        return next((sample for key, sample in self.sample_map if key == name), None)
+
+
+@dataclass(frozen=True, slots=True)
+class DrumSampleConfig:
+    preset: int
+    note: int
+
+
+@dataclass(frozen=True, slots=True)
+class RhythmRuntimeConfig:
+    chord_gate_beats: float
+    bass_gate_beats: float
+    max_rhythm_chord_notes: int
+    sequencer_reset_guard_ms: float
+    max_sequencer_tags: int
+
+
+@dataclass(frozen=True, slots=True)
+class PerformanceTimingConfig:
+    strum_gate_ms: float
+    one_shot_chord_gate_ms: float
+    strum_tail_ms: float
+    synth_alloc_guard_ms: float
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,8 +157,16 @@ class ResolvedAmyConfig:
     capacities: RuntimeCapacities
     layout: SynthBusLayout
     debug: DebugConfig
+    synth_defaults: SynthDefaults
+    drums: DrumRuntimeConfig
+    rhythm: RhythmRuntimeConfig
+    performance: PerformanceTimingConfig
+    synth_patches: tuple[tuple[str, int], ...]
+    instrument_levels: tuple[tuple[str, float], ...]
     provenance: ConfigProvenance
     _compatibility_json: str = field(repr=False, compare=False)
+    _synth_programs_json: str = field(repr=False, compare=False)
+    _patch_compatibility_json: str = field(repr=False, compare=False)
 
     def compatibility_dict(self) -> JsonObject:
         """Return an isolated mutable view for transitional legacy consumers."""
@@ -126,6 +175,26 @@ class ResolvedAmyConfig:
         if not isinstance(value, dict):
             raise RuntimeError("resolved configuration compatibility view is invalid")
         return cast(JsonObject, value)
+
+    def synth_program(self, key: str) -> JsonObject | None:
+        programs = json.loads(self._synth_programs_json)
+        raw = programs.get(key)
+        return cast(JsonObject, raw) if isinstance(raw, dict) else None
+
+    def synth_program_keys(self) -> tuple[str, ...]:
+        programs = json.loads(self._synth_programs_json)
+        return tuple(sorted(str(key) for key in programs))
+
+    def patch_compatibility(self, patch: int) -> JsonObject | None:
+        entries = json.loads(self._patch_compatibility_json)
+        raw = entries.get(str(patch))
+        return cast(JsonObject, raw) if isinstance(raw, dict) else None
+
+    def instrument_level(self, key: str) -> float:
+        return next(
+            (level for name, level in self.instrument_levels if name == key),
+            1.0,
+        )
 
 
 def _json_path(parts: list[object] | tuple[object, ...]) -> str:
@@ -318,6 +387,28 @@ def _domain_issues(data: JsonObject) -> list[ConfigIssue]:
             )
         occupied.update(current)
 
+    pattern_ranges = cast(dict[str, Any], rhythm["pattern_ranges"])
+    expected_start = 0
+    for name in ("fills", "chords", "drum_bases"):
+        item = cast(dict[str, Any], pattern_ranges[name])
+        start = int(item["start"])
+        count = int(item["count"])
+        if start != expected_start:
+            issues.append(
+                ConfigIssue(
+                    f"$.rhythm.pattern_ranges.{name}.start",
+                    f"must be {expected_start} so pattern ranges are contiguous",
+                )
+            )
+        expected_start = start + count
+    if expected_start != int(data["amy_max_patterns"]):
+        issues.append(
+            ConfigIssue(
+                "$.amy_max_patterns",
+                "must equal the end of rhythm.pattern_ranges.drum_bases",
+            )
+        )
+
     if int(data["amy_max_pattern_tags"]) < 64:
         issues.append(
             ConfigIssue(
@@ -437,7 +528,15 @@ def _to_resolved(
     buses = cast(dict[str, Any], data["buses"])
     rhythm = cast(dict[str, Any], data["rhythm"])
     tag_ranges = cast(dict[str, Any], rhythm["tag_ranges"])
+    pattern_ranges = cast(dict[str, Any], rhythm["pattern_ranges"])
     debug = cast(dict[str, Any], data["debug"])
+    defaults = cast(dict[str, Any], data["default_synths"])
+    drums = cast(dict[str, Any], data["drums"])
+    performance = cast(dict[str, Any], data["performance"])
+    sample_map = cast(dict[str, Any], drums["sample_map"])
+    instrument_levels = cast(dict[str, Any], data["instrument_levels"])
+    synth_programs = cast(dict[str, Any], data["synth_programs"])
+    patch_compatibility = cast(dict[str, Any], data["patch_compatibility"])
 
     compatibility = copy.deepcopy(data)
     compatibility["synth_patches"] = _legacy_patch_map(data)
@@ -491,15 +590,72 @@ def _to_resolved(
                 )
                 for name in ("drums", "bass", "chords")
             ),
+            sequencer_pattern_ranges=tuple(
+                (
+                    name,
+                    int(cast(dict[str, Any], pattern_ranges[name])["start"]),
+                    int(cast(dict[str, Any], pattern_ranges[name])["count"]),
+                )
+                for name in ("fills", "chords", "drum_bases")
+            ),
         ),
         debug=DebugConfig(
             log_amy_commands=bool(debug["log_amy_commands"]),
             amy_command_log=str(debug["amy_command_log"]),
             log_logical_events=bool(debug["log_logical_events"]),
         ),
+        synth_defaults=SynthDefaults(
+            chord=str(defaults["chord"]),
+            strum=str(defaults["strum"]),
+            bass=str(defaults["bass"]),
+        ),
+        drums=DrumRuntimeConfig(
+            kit=str(drums["kit"]),
+            velocity_gain=float(drums["velocity_gain"]),
+            sample_map=tuple(
+                (
+                    str(name),
+                    DrumSampleConfig(
+                        preset=int(cast(dict[str, Any], sample)["preset"]),
+                        note=int(cast(dict[str, Any], sample)["note"]),
+                    ),
+                )
+                for name, sample in sorted(sample_map.items())
+            ),
+        ),
+        rhythm=RhythmRuntimeConfig(
+            chord_gate_beats=float(rhythm["chord_gate_beats"]),
+            bass_gate_beats=float(rhythm["bass_gate_beats"]),
+            max_rhythm_chord_notes=int(rhythm["max_rhythm_chord_notes"]),
+            sequencer_reset_guard_ms=float(rhythm["sequencer_reset_guard_ms"]),
+            max_sequencer_tags=int(rhythm["max_sequencer_tags"]),
+        ),
+        performance=PerformanceTimingConfig(
+            strum_gate_ms=float(performance["strum_gate_ms"]),
+            one_shot_chord_gate_ms=float(
+                performance["one_shot_chord_gate_ms"]
+            ),
+            strum_tail_ms=float(performance["strum_tail_ms"]),
+            synth_alloc_guard_ms=float(performance["synth_alloc_guard_ms"]),
+        ),
+        synth_patches=tuple(sorted(_legacy_patch_map(data).items())),
+        instrument_levels=tuple(
+            (str(name), float(level))
+            for name, level in sorted(instrument_levels.items())
+        ),
         provenance=provenance,
         _compatibility_json=json.dumps(
             compatibility,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        _synth_programs_json=json.dumps(
+            synth_programs,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        _patch_compatibility_json=json.dumps(
+            patch_compatibility,
             ensure_ascii=False,
             separators=(",", ":"),
         ),

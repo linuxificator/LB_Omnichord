@@ -13,6 +13,7 @@ from typing import Any
 import serial
 
 from control_limits import clamp_control_value
+from config_loader import DebugConfig, ResolvedAmyConfig, resolve_amy_config_data
 from drum_patterns import (
     DrumFill,
     DrumPatternCatalog,
@@ -27,11 +28,6 @@ RESET_ALL_OSCS = 8192
 RESET_TIMEBASE = 16384
 RESET_ALL_NOTES = 131072
 SYNTH_FLAGS_NO_NOTE_WARNINGS = 8
-DRUM_BASE_PATTERN_START = 1000
-DRUM_BASE_INSTANCE_TAG_START = 1000
-DRUM_PATTERN_CAPACITY = 1024
-CHORD_PATTERN_START = 936
-CHORD_PATTERN_CAPACITY = DRUM_BASE_PATTERN_START - CHORD_PATTERN_START
 
 
 def _resolve_drum_catalog_directory(
@@ -109,215 +105,6 @@ def _compact_repeating_events(
     return compacted
 
 
-DEFAULT_CONFIG: dict[str, Any] = {'serial': {'port': '/dev/serial0', 'baud': 1000000, 'write_timeout': 0.5},
- 'synth_ids': {'drums': 0, 'bass': 1, 'strum': 2, 'manual_chord': 3, 'rhythm_chord': 4},
- 'voices': {'drums': 4, 'bass': 1, 'strum': 2, 'manual_chord': 7, 'rhythm_chord': 7},
- 'default_synths': {'chord': 'juno_004', 'strum': 'juno_028', 'bass': 'dx7_143'},
- 'buses': {'main': 0, 'percussion': 1},
- 'drums': {'kit': 'tiny',
-           'velocity_gain': 5.0,
-           'sample_map': {'bd_haus': {'preset': 1, 'note': 39},
-                          'drum_bass_hard': {'preset': 1, 'note': 39},
-                          'drum_bass_soft': {'preset': 1, 'note': 39},
-                          'drum_snare_hard': {'preset': 2, 'note': 45},
-                          'drum_snare_soft': {'preset': 5, 'note': 41},
-                          'drum_cymbal_closed': {'preset': 6, 'note': 53},
-                          'drum_cymbal_pedal': {'preset': 7, 'note': 61},
-                          'drum_cymbal_open': {'preset': 7, 'note': 56},
-                          'drum_tom_hi_soft': {'preset': 8, 'note': 73},
-                          'drum_tom_mid_soft': {'preset': 8, 'note': 63},
-                          'drum_tom_lo_soft': {'preset': 8, 'note': 61},
-                          'elec_tick': {'preset': 4, 'note': 51},
-                          'perc_bell': {'preset': 10, 'note': 69},
-                          'perc_snap': {'preset': 9, 'note': 94}}},
- 'rhythm': {'chord_gate_beats': 0.72,
-            'bass_gate_beats': 0.3,
-            'max_rhythm_chord_notes': 4,
-            'max_sequencer_items': 256,
-            'sequencer_reset_guard_ms': 10.0},
- 'performance': {'strum_gate_ms': 800, 'one_shot_chord_gate_ms': 650, 'strum_tail_ms': 450},
- 'synth_patches': {'juno_000': 0,
-                   'juno_001': 1,
-                   'juno_002': 2,
-                   'juno_003': 3,
-                   'juno_004': 4,
-                   'juno_005': 5,
-                   'juno_006': 6,
-                   'juno_007': 7,
-                   'juno_008': 8,
-                   'juno_009': 9,
-                   'juno_010': 10,
-                   'juno_011': 11,
-                   'juno_012': 12,
-                   'juno_013': 13,
-                   'juno_014': 14,
-                   'juno_015': 15,
-                   'juno_016': 16,
-                   'juno_017': 17,
-                   'juno_018': 18,
-                   'juno_019': 19,
-                   'juno_020': 20,
-                   'juno_021': 21,
-                   'juno_022': 22,
-                   'juno_023': 23,
-                   'juno_024': 24,
-                   'juno_025': 25,
-                   'juno_026': 26,
-                   'juno_027': 27,
-                   'juno_028': 28,
-                   'juno_029': 29,
-                   'juno_030': 30,
-                   'juno_031': 31,
-                   'juno_032': 32,
-                   'juno_033': 33,
-                   'juno_034': 34,
-                   'juno_035': 35,
-                   'juno_036': 36,
-                   'juno_037': 37,
-                   'juno_038': 38,
-                   'juno_040': 40,
-                   'juno_041': 41,
-                   'juno_042': 42,
-                   'juno_047': 47,
-                   'juno_048': 48,
-                   'juno_049': 49,
-                   'juno_050': 50,
-                   'juno_051': 51,
-                   'juno_052': 52,
-                   'juno_053': 53,
-                   'juno_054': 54,
-                   'juno_055': 55,
-                   'juno_056': 56,
-                   'juno_064': 64,
-                   'juno_065': 65,
-                   'juno_066': 66,
-                   'juno_067': 67,
-                   'juno_068': 68,
-                   'juno_069': 69,
-                   'juno_070': 70,
-                   'juno_072': 72,
-                   'juno_073': 73,
-                   'juno_074': 74,
-                   'juno_075': 75,
-                   'juno_076': 76,
-                   'juno_077': 77,
-                   'juno_080': 80,
-                   'juno_082': 82,
-                   'juno_083': 83,
-                   'juno_086': 86,
-                   'juno_087': 87,
-                   'juno_088': 88,
-                   'juno_089': 89,
-                   'juno_090': 90,
-                   'juno_091': 91,
-                   'juno_093': 93,
-                   'juno_094': 94,
-                   'juno_095': 95,
-                   'juno_096': 96,
-                   'juno_097': 97,
-                   'juno_098': 98,
-                   'juno_100': 100,
-                   'juno_101': 101,
-                   'juno_102': 102,
-                   'juno_104': 104,
-                   'juno_105': 105,
-                   'juno_107': 107,
-                   'juno_108': 108,
-                   'juno_109': 109,
-                   'juno_111': 111,
-                   'juno_112': 112,
-                   'juno_113': 113,
-                   'juno_114': 114,
-                   'juno_115': 115,
-                   'juno_116': 116,
-                   'juno_118': 118,
-                   'juno_119': 119,
-                   'juno_120': 120,
-                   'juno_121': 121,
-                   'juno_122': 122,
-                   'juno_123': 123,
-                   'juno_125': 125,
-                   'juno_127': 127,
-                   'dx7_128': 128,
-                   'dx7_133': 133,
-                   'dx7_138': 138,
-                   'dx7_143': 143,
-                   'dx7_148': 148,
-                   'dx7_154': 154,
-                   'dx7_160': 160,
-                   'dx7_166': 166,
-                   'dx7_172': 172,
-                   'dx7_178': 178,
-                   'dx7_184': 184,
-                   'dx7_190': 190,
-                   'dx7_196': 196,
-                   'dx7_202': 202,
-                   'dx7_213': 213,
-                   'dx7_214': 214,
-                   'dx7_215': 215,
-                   'dx7_216': 216,
-                   'dx7_244': 244,
-                   'dx7_246': 246,
-                   'juno_057': 57},
- 'amy_max_oscs': 120,
- 'debug': {'log_amy_commands': True,
-           'amy_command_log': '~/.omnichord/amy_debug.log',
-           'log_logical_events': True},
- 'patch_compatibility': {'57': {'label': 'Juno A82 Resonance Funk',
-                                'reason': 'All Juno sound-source amplitudes are zero; add a small '
-                                          'noise excitation so the resonant VCF has input.',
-                                'juno_noise_amp': 0.05},
-                         '68': {'label': 'Juno B15 Harpsichord 1',
-                                'reason': 'Factory patch requests 71265 Hz cutoff and Q 11.2; '
-                                          'constrain the P4 fixed-point filter to a stable bright '
-                                          'range.',
-                                'juno_filter_hz': 6000.0,
-                                'juno_resonance': 4.0},
-                         '89': {'label': 'Juno B26 Harpsichord 2',
-                                'reason': 'Factory filter base is at the unsafe top edge; keep the P4 filter stable.',
-                                'juno_filter_hz': 6000.0},
-                         '48': {'label': 'Juno A71 Sweep I',
-                                'reason': 'Factory filter base is at the previous 18 kHz UI limit; keep below safety ceiling.',
-                                'juno_filter_hz': 9000.0},
-                         '74': {'label': 'Juno B23 Orchestral Pad',
-                                'reason': 'Factory patch sets gather/output osc amp const to zero; '
-                                          'AMY skips rendering when amp const is zero.',
-                                'juno_output_amp': 1.0}}}
-
-
-def _deep_merge(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in base.items():
-        if isinstance(value, dict):
-            result[key] = _deep_merge(value, {})
-        elif isinstance(value, list):
-            result[key] = list(value)
-        else:
-            result[key] = value
-
-    for key, value in extra.items():
-        if (
-            key in result
-            and isinstance(result[key], dict)
-            and isinstance(value, dict)
-        ):
-            result[key] = _deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
-def load_amy_config(path: Path) -> dict[str, Any]:
-    if path.exists():
-        with path.open("r", encoding="utf-8") as handle:
-            user = json.load(handle)
-        if not isinstance(user, dict):
-            raise ValueError(f"{path} must contain a JSON object")
-    else:
-        user = {}
-    return _deep_merge(DEFAULT_CONFIG, user)
-
-
 class _DebugLog:
     """Asynchronous append-only AMY transport debug log.
 
@@ -326,19 +113,15 @@ class _DebugLog:
     low-impact thread owns the file and writes the records.
     """
 
-    def __init__(self, config: dict[str, Any]) -> None:
-        debug = config.get("debug", {})
-        self.enabled = bool(debug.get("log_amy_commands", False))
-        self.log_logical = bool(debug.get("log_logical_events", False))
+    def __init__(self, config: DebugConfig) -> None:
+        self.enabled = config.log_amy_commands
+        self.log_logical = config.log_logical_events
         self.path: Path | None = None
         self._queue: queue.SimpleQueue[str | None] | None = None
         self._thread: threading.Thread | None = None
 
         if self.enabled:
-            path = Path(str(debug.get(
-                "amy_command_log",
-                "~/.omnichord/amy_debug.log",
-            ))).expanduser()
+            path = Path(config.amy_command_log).expanduser()
             path.parent.mkdir(parents=True, exist_ok=True)
             self.path = path
             self._queue = queue.SimpleQueue()
@@ -752,57 +535,61 @@ class AmySerialClient:
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: dict[str, Any] | None,
         addresses: dict[str, str],
         *,
         writer_factory: Any | None = None,
+        resolved_config: ResolvedAmyConfig | None = None,
     ) -> None:
-        self.config = config
+        if resolved_config is None:
+            if config is None:
+                raise ValueError("config or resolved_config is required")
+            resolved_config = resolve_amy_config_data(
+                config,
+                source_path=(
+                    Path(__file__).resolve().parent.parent
+                    / "config"
+                    / "amy_config.json"
+                ),
+                source_kind="external",
+            )
+        self.resolved_config = resolved_config
         self.addr = addresses
 
-        self.debug_log = _DebugLog(config)
+        self.debug_log = _DebugLog(resolved_config.debug)
         if self.debug_log.path is not None:
             print(
                 f"AMY command log: {self.debug_log.path}",
                 flush=True,
             )
         if writer_factory is None:
-            serial_cfg = config["serial"]
             self.writer = _SerialWriter(
-                str(serial_cfg["port"]),
-                int(serial_cfg["baud"]),
-                float(serial_cfg.get("write_timeout", 0.5)),
+                resolved_config.transport.serial_port,
+                resolved_config.transport.serial_baud,
+                resolved_config.transport.serial_write_timeout,
                 self.debug_log,
             )
         else:
             self.writer = writer_factory(self.debug_log)
 
-        ids = config["synth_ids"]
-        self.synth_id = {
-            "drums": int(ids["drums"]),
-            "bass": int(ids["bass"]),
-            "strum": int(ids["strum"]),
-            "manual_chord": int(ids["manual_chord"]),
-            "rhythm_chord": int(ids["rhythm_chord"]),
-        }
-        voices = config["voices"]
+        self.synth_id = dict(resolved_config.layout.role_synth_ids)
+        voices = resolved_config.capacities.voices
         self.voice_count = {
-            "drums": int(voices["drums"]),
-            "bass": int(voices["bass"]),
-            "strum": int(voices["strum"]),
-            "manual_chord": int(voices["manual_chord"]),
-            "rhythm_chord": int(voices["rhythm_chord"]),
+            "drums": voices.drums,
+            "bass": voices.bass,
+            "strum": voices.strum,
+            "manual_chord": voices.manual_chord,
+            "rhythm_chord": voices.rhythm_chord,
         }
 
-        defaults = config.get("default_synths", {})
         self.selected_synth = {
-            "chord": str(defaults.get("chord", "juno_004")),
-            "strum": str(defaults.get("strum", "juno_028")),
-            "bass": str(defaults.get("bass", "dx7_143")),
+            "chord": resolved_config.synth_defaults.chord,
+            "strum": resolved_config.synth_defaults.strum,
+            "bass": resolved_config.synth_defaults.bass,
         }
         self.patch_map = {
             str(key): int(value)
-            for key, value in config["synth_patches"].items()
+            for key, value in resolved_config.synth_patches
         }
         self.synth_params: dict[str, dict[str, float]] = {
             "chord": {}, "strum": {}, "bass": {}
@@ -816,13 +603,7 @@ class AmySerialClient:
             "bass": 0.5,
             "drums": 0.5,
         }
-        buses = config.get("buses", {})
-        self.bus_id = {
-            "drums": int(buses.get("drums", 0)),
-            "bass": int(buses.get("bass", 1)),
-            "strum": int(buses.get("strum", 2)),
-            "chord": int(buses.get("chord", 3)),
-        }
+        self.bus_id = dict(resolved_config.layout.role_buses)
         bus_values = tuple(self.bus_id.values())
         if (
             len(set(bus_values)) != 4
@@ -854,9 +635,7 @@ class AmySerialClient:
                 )
             )
         )
-        self.drum_kit = str(
-            config.get("drums", {}).get("kit", "tiny")
-        )
+        self.drum_kit = resolved_config.drums.kit
         if self.drum_kit not in self.drum_catalog.kits:
             raise ValueError(
                 f"unknown drums.kit {self.drum_kit!r}; expected "
@@ -868,22 +647,30 @@ class AmySerialClient:
             for level in rhythm.levels
             for event in level
         }))
-        if DRUM_BASE_PATTERN_START + len(self._drum_roles) > DRUM_PATTERN_CAPACITY:
+        self._pattern_ranges = {
+            name: (start, count)
+            for name, start, count in resolved_config.layout.sequencer_pattern_ranges
+        }
+        _, drum_pattern_count = self._pattern_ranges["drum_bases"]
+        if len(self._drum_roles) > drum_pattern_count:
             raise ValueError("logical drum roles exceed reserved AMY pattern slots")
         self._drum_role_index = {
             role: index for index, role in enumerate(self._drum_roles)
         }
 
-        tag_config = config.get("rhythm", {}).get("tag_ranges", {})
-        max_tags = int(config.get("rhythm", {}).get("max_sequencer_tags", 256))
+        tag_config = {
+            name: (start, count)
+            for name, start, count in resolved_config.layout.sequencer_tag_ranges
+        }
+        max_tags = resolved_config.rhythm.max_sequencer_tags
         self._sequencer_lanes: dict[str, _TaggedSequencerLane] = {}
         occupied: set[int] = set()
         for lane_name in ("drums", "bass", "chords"):
-            raw_range = tag_config.get(lane_name, {})
+            start, count = tag_config[lane_name]
             lane = _TaggedSequencerLane(
                 lane_name,
-                int(raw_range.get("start", -1)),
-                int(raw_range.get("count", 0)),
+                start,
+                count,
                 self.writer,
             )
             if lane.end > max_tags:
@@ -917,7 +704,7 @@ class AmySerialClient:
                 + self.voice_count["rhythm_chord"]
             )
         )
-        max_oscs = int(config.get("amy_max_oscs", 120))
+        max_oscs = resolved_config.capacities.max_oscs
         if worst_case_oscs > max_oscs:
             raise ValueError(
                 f"AMY voice configuration can require {worst_case_oscs} "
@@ -971,10 +758,7 @@ class AmySerialClient:
             role,
             fill=fill,
         )
-        gain = max(
-            0.0,
-            float(self.config.get("drums", {}).get("velocity_gain", 5.0)),
-        )
+        gain = max(0.0, self.resolved_config.drums.velocity_gain)
         level = max(0.0, min(1.0, float(velocity) / 127.0)) * gain
         preset = "" if sound.preset is None else f"p{sound.preset}"
         return (
@@ -982,10 +766,10 @@ class AmySerialClient:
             f"l{self._f(level)}i{self.synth_id['drums']}"
         )
 
-    @staticmethod
-    def _fill_pattern_id(fill: DrumFill) -> int:
-        pattern = int(fill.index) - 1
-        if not 0 <= pattern < CHORD_PATTERN_START:
+    def _fill_pattern_id(self, fill: DrumFill) -> int:
+        start, count = self._pattern_ranges["fills"]
+        pattern = start + int(fill.index) - 1
+        if not start <= pattern < start + count:
             raise ValueError(
                 f"fill {fill.fill_id!r} has unsupported index {fill.index}"
             )
@@ -1008,10 +792,8 @@ class AmySerialClient:
             for role in self._drum_roles:
                 if role in fill.continue_roles:
                     continue
-                instance_tag = (
-                    DRUM_BASE_INSTANCE_TAG_START
-                    + self._drum_role_index[role]
-                )
+                drum_base, _ = self._pattern_ranges["drum_bases"]
+                instance_tag = drum_base + self._drum_role_index[role]
                 commands.append(
                     f"zQE{pattern},0,{length},{tag}"
                     f"zQM{instance_tag},{length}Z"
@@ -1025,7 +807,7 @@ class AmySerialClient:
                     f"{self._drum_hit_body(rhythm_id, event.role, event.velocity, fill=True)}Z"
                 )
                 tag += 1
-            if tag > 64:
+            if tag > self.resolved_config.capacities.max_pattern_tags:
                 raise ValueError(
                     f"fill {fill.fill_id!r} needs {tag} AMY pattern tags"
                 )
@@ -1108,8 +890,8 @@ class AmySerialClient:
         the factory K command, so the original patch remains the source of all
         other settings.  Values live in amy_config.json for easy testing.
         """
-        raw = self.config.get("patch_compatibility", {}).get(str(patch), {})
-        if not isinstance(raw, dict):
+        raw = self.resolved_config.patch_compatibility(patch)
+        if raw is None:
             return []
         out: list[str] = []
         if "juno_noise_amp" in raw:
@@ -1228,11 +1010,7 @@ class AmySerialClient:
             )
             self._configured_synths.add(synth)
 
-            guard_ms = float(
-                self.config.get("performance", {}).get(
-                    "synth_alloc_guard_ms", 10.0
-                )
-            )
+            guard_ms = self.resolved_config.performance.synth_alloc_guard_ms
             self.writer.delay(max(0.0, guard_ms) / 1000.0)
         self._apply_patch_compatibility(patch, synth)
         self._route_synth_bus(synth)
@@ -1251,11 +1029,7 @@ class AmySerialClient:
             # next patch transaction out of the same audio-block burst.  This
             # is especially important during startup/preset restore, where the
             # chord, strum and bass patches are otherwise queued back-to-back.
-            guard_ms = float(
-                self.config.get("performance", {}).get(
-                    "synth_alloc_guard_ms", 10.0
-                )
-            )
+            guard_ms = self.resolved_config.performance.synth_alloc_guard_ms
             self.writer.delay(max(0.0, guard_ms) / 1000.0)
 
     def _configure_synth(self, role: str) -> None:
@@ -1611,11 +1385,8 @@ class AmySerialClient:
             self._wire(f"i{synth}iV{self._f(output_level)}Z")
 
     def _instrument_level(self, role: str) -> float:
-        levels = self.config.get("instrument_levels", {})
-        if not isinstance(levels, dict):
-            return 1.0
         key = self.selected_synth.get(role, "")
-        return max(0.0, float(levels.get(key, 1.0)))
+        return max(0.0, self.resolved_config.instrument_level(key))
 
     # ------------------------------------------------------------------
     # Manual chord voice (synth 3)
@@ -1699,7 +1470,7 @@ class AmySerialClient:
             self._note_off_later(
                 synth,
                 None,
-                float(self.config["performance"]["one_shot_chord_gate_ms"]),
+                self.resolved_config.performance.one_shot_chord_gate_ms,
             )
 
         # Chord and bass are independent tagged sequencer lanes. Updating
@@ -1748,7 +1519,8 @@ class AmySerialClient:
             return [], []
 
         period = self._rhythm_period_ticks()
-        rhythm_cfg = self.config["rhythm"]
+        rhythm_cfg = self.resolved_config.rhythm
+        chord_pattern_start, chord_pattern_count = self._pattern_ranges["chords"]
         chord_synth = self.synth_id["rhythm_chord"]
         velocity_values = sorted({
             max(0.0, min(1.0, float(event.get("amp", 1.0))))
@@ -1760,10 +1532,10 @@ class AmySerialClient:
         }
         note_count = len(self.chord_notes)
         required_patterns = len(velocity_values) * (1 + 4 * note_count)
-        if required_patterns > CHORD_PATTERN_CAPACITY:
+        if required_patterns > chord_pattern_count:
             raise ValueError(
                 f"chord one-shots need {required_patterns} AMY patterns; "
-                f"reserved capacity is {CHORD_PATTERN_CAPACITY}"
+                f"reserved capacity is {chord_pattern_count}"
             )
 
         commands: list[str] = []
@@ -1777,16 +1549,16 @@ class AmySerialClient:
         if not arpeggio_enabled:
             max_notes = max(
                 1,
-                int(rhythm_cfg.get("max_rhythm_chord_notes", 4)),
+                rhythm_cfg.max_rhythm_chord_notes,
             )
             rhythm_notes = self.chord_notes[:max_notes]
             gate = max(
                 1,
-                round(float(rhythm_cfg["chord_gate_beats"]) * AMY_PPQ),
+                round(rhythm_cfg.chord_gate_beats * AMY_PPQ),
             )
             length = gate + 1
             for velocity_index, velocity in enumerate(velocity_values):
-                pattern = CHORD_PATTERN_START + velocity_index
+                pattern = chord_pattern_start + velocity_index
                 commands.append(f"zQB{pattern},{length}Z")
                 for tag, note in enumerate(rhythm_notes):
                     commands.append(
@@ -1806,7 +1578,7 @@ class AmySerialClient:
                     min(1.0, float(event.get("amp", 1.0))),
                 )
                 pattern = (
-                    CHORD_PATTERN_START
+                    chord_pattern_start
                     + velocity_slots[self._f(velocity)]
                 )
                 occurrences.append((tick, f"zQT{pattern},0,0"))
@@ -1819,12 +1591,12 @@ class AmySerialClient:
         step = max(1, round(AMY_PPQ / rate))
         gate = max(
             1,
-            round(float(rhythm_cfg["chord_gate_beats"]) * step),
+            round(rhythm_cfg.chord_gate_beats * step),
         )
         length = gate + 1
         rate_stride = len(velocity_values) * note_count
         rate_base = (
-            CHORD_PATTERN_START
+            chord_pattern_start
             + len(velocity_values)
             + (rate - 1) * rate_stride
         )
@@ -1868,7 +1640,7 @@ class AmySerialClient:
             return []
 
         period = self._rhythm_period_ticks()
-        rhythm_cfg = self.config["rhythm"]
+        rhythm_cfg = self.resolved_config.rhythm
         events: list[tuple[int, int, str]] = []
 
         if lane_name == "drums":
@@ -1920,7 +1692,7 @@ class AmySerialClient:
                 return []
             gate = max(
                 1,
-                round(float(rhythm_cfg["bass_gate_beats"]) * AMY_PPQ),
+                round(rhythm_cfg.bass_gate_beats * AMY_PPQ),
             )
             for event in config.get("bass_events", []):
                 degree = int(event.get("degree", 0))
@@ -1980,8 +1752,9 @@ class AmySerialClient:
         quantum = self._drum_quantum() if use_live_quantization else 0
         commands: list[str] = []
         for role_index, role in enumerate(self._drum_roles):
-            pattern = DRUM_BASE_PATTERN_START + role_index
-            instance_tag = DRUM_BASE_INSTANCE_TAG_START + role_index
+            drum_base, _ = self._pattern_ranges["drum_bases"]
+            pattern = drum_base + role_index
+            instance_tag = drum_base + role_index
             events = by_role.get(role, [])
             if not events:
                 if self.rhythm_running:
@@ -2397,9 +2170,7 @@ class AmySerialClient:
             self._wire(f"n{self._f(note)}l1i{synth}Z")
             self._strum_active_notes.append(note)
 
-        tail_ms = float(
-            self.config.get("performance", {}).get("strum_tail_ms", 450)
-        )
+        tail_ms = self.resolved_config.performance.strum_tail_ms
 
         def tail_release() -> None:
             with self._strum_lock:
@@ -2535,13 +2306,15 @@ class AmySocketClient(AmySerialClient):
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: dict[str, Any] | None,
         addresses: dict[str, str],
         socket_path: str,
+        resolved_config: ResolvedAmyConfig | None = None,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
+            resolved_config=resolved_config,
             writer_factory=lambda debug_log: _UnixSocketWriter(
                 socket_path,
                 debug_log,
@@ -2554,13 +2327,15 @@ class AmyLocalClient(AmySerialClient):
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: dict[str, Any] | None,
         addresses: dict[str, str],
         server_name: str,
+        resolved_config: ResolvedAmyConfig | None = None,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
+            resolved_config=resolved_config,
             writer_factory=lambda debug_log: _QtLocalSocketWriter(
                 server_name,
                 debug_log,

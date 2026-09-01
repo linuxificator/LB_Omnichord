@@ -21,6 +21,7 @@ from midi_player import (  # noqa: E402
 from midi_control import NOTE_BUTTON_OFFSET, PITCH_BEND_CONTROLLER  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
 from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
+from resolved_config import resolve_amy_config_data  # noqa: E402
 from synth_state import SynthState  # noqa: E402
 
 
@@ -33,17 +34,24 @@ class _RecordingWriter:
 
 
 class _Client:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        instrument_levels: dict[str, float] | None = None,
+    ) -> None:
         self.events: list[tuple[str, object]] = []
         self.writer = _RecordingWriter(self.events)
-        self.config = {
-            "midi_player": {},
-            "buses": {
-                "midi_rows": [4, 5, 6, 7, 8, 9],
-                "midi_drums": 10,
-            },
-            "performance": {"synth_alloc_guard_ms": 12.0},
-        }
+        config = json.loads(
+            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
+        config["performance"]["synth_alloc_guard_ms"] = 12.0
+        if instrument_levels is not None:
+            config["instrument_levels"] = instrument_levels
+        self.resolved_config = resolve_amy_config_data(
+            config,
+            source_path=ROOT / "config" / "amy_config.json",
+            source_kind="external",
+        )
         self.patch_map = {"dx7_215": 215}
 
     def _wire(self, command: str) -> None:
@@ -618,8 +626,7 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
 
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
-        client = _Client()
-        client.config["instrument_levels"] = {"dx7_215": 0.4}
+        client = _Client(instrument_levels={"dx7_215": 0.4})
         engine = MidiAmyEngine(client)
         client.events.clear()
         engine.configure_row(0, "dx7_215", {}, 0.5)

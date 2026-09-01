@@ -27,6 +27,7 @@ class ConfigMigrationTests(unittest.TestCase):
     def test_revision_zero_runs_every_transform_without_mutating_input(self) -> None:
         legacy = copy.deepcopy(self.shipped)
         legacy.pop("config_revision")
+        legacy["rhythm"].pop("pattern_ranges")
         legacy["voices"]["rhythm_chord"] = 4
         legacy["midi_input"]["tech_profile"] = "linux"
         legacy["serial"]["baud"] = 230_400
@@ -37,7 +38,7 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(legacy, before)
         self.assertEqual(migrated.source_revision, 0)
         self.assertEqual(migrated.target_revision, CURRENT_CONFIG_REVISION)
-        self.assertEqual(migrated.data["config_revision"], 2)
+        self.assertEqual(migrated.data["config_revision"], 3)
         self.assertEqual(migrated.data["voices"]["rhythm_chord"], 7)
         self.assertEqual(migrated.data["midi_input"]["tech_profile"], "auto")
         self.assertEqual(migrated.data["serial"]["baud"], 230_400)
@@ -47,6 +48,7 @@ class ConfigMigrationTests(unittest.TestCase):
                 "$.voices.rhythm_chord",
                 "$.config_revision",
                 "$.midi_input.tech_profile",
+                "$.rhythm.pattern_ranges",
             ),
         )
         resolved = resolve_amy_config_data(
@@ -60,6 +62,7 @@ class ConfigMigrationTests(unittest.TestCase):
     def test_revision_one_repairs_old_platform_default(self) -> None:
         legacy = copy.deepcopy(self.shipped)
         legacy["config_revision"] = 1
+        legacy["rhythm"].pop("pattern_ranges")
         legacy["midi_input"]["tech_profile"] = "linux"
 
         migrated = migrate_config_document(legacy)
@@ -68,7 +71,31 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(migrated.data["midi_input"]["tech_profile"], "auto")
         self.assertEqual(
             migrated.changed_paths,
-            ("$.midi_input.tech_profile", "$.config_revision"),
+            (
+                "$.midi_input.tech_profile",
+                "$.config_revision",
+                "$.rhythm.pattern_ranges",
+            ),
+        )
+
+    def test_revision_two_adds_the_validated_pattern_layout(self) -> None:
+        legacy = copy.deepcopy(self.shipped)
+        legacy["config_revision"] = 2
+        legacy["rhythm"].pop("pattern_ranges")
+
+        migrated = migrate_config_document(legacy)
+
+        self.assertEqual(
+            migrated.data["rhythm"]["pattern_ranges"],
+            {
+                "fills": {"start": 0, "count": 936},
+                "chords": {"start": 936, "count": 64},
+                "drum_bases": {"start": 1000, "count": 24},
+            },
+        )
+        self.assertEqual(
+            migrated.changed_paths,
+            ("$.rhythm.pattern_ranges", "$.config_revision"),
         )
 
     def test_current_revision_is_idempotent(self) -> None:

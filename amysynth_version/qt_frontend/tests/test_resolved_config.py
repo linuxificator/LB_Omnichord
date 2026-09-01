@@ -47,6 +47,10 @@ class ResolvedConfigTests(unittest.TestCase):
             resolved.layout.sequencer_tag_ranges,
             (("drums", 0, 56), ("bass", 56, 56), ("chords", 112, 140)),
         )
+        self.assertEqual(
+            resolved.layout.sequencer_pattern_ranges,
+            (("fills", 0, 936), ("chords", 936, 64), ("drum_bases", 1000, 24)),
+        )
         self.assertEqual(resolved.provenance.source_kind, "shipped")
         self.assertEqual(
             resolved.provenance.platform_derived_paths,
@@ -151,6 +155,22 @@ class ResolvedConfigTests(unittest.TestCase):
             }.issubset(paths),
             paths,
         )
+
+    def test_pattern_ranges_must_be_contiguous_and_end_at_capacity(self) -> None:
+        invalid = copy.deepcopy(self.shipped)
+        invalid["rhythm"]["pattern_ranges"]["chords"]["start"] = 935
+        invalid["amy_max_patterns"] = 1025
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ConfigValidationError) as caught:
+                load_resolved_amy_config(
+                    self.write_config(Path(directory), invalid)
+                )
+
+        paths = {issue.path for issue in caught.exception.issues}
+        self.assertIn("$.rhythm.pattern_ranges.chords.start", paths)
+        self.assertIn("$.rhythm.pattern_ranges.drum_bases.start", paths)
+        self.assertIn("$.amy_max_patterns", paths)
 
     def test_bad_config_fails_before_transport_is_opened(self) -> None:
         invalid = copy.deepcopy(self.shipped)

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 2
+CURRENT_CONFIG_REVISION = 3
 JsonObject = dict[str, Any]
 
 
@@ -66,12 +66,29 @@ def _revision_one_to_two(data: JsonObject) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def _revision_two_to_three(data: JsonObject) -> tuple[str, ...]:
+    rhythm = data.get("rhythm")
+    if not isinstance(rhythm, dict):
+        raise ConfigMigrationError(
+            "$.rhythm",
+            "must be an object before revision 2 can migrate",
+        )
+    rhythm["pattern_ranges"] = {
+        "fills": {"start": 0, "count": 936},
+        "chords": {"start": 936, "count": 64},
+        "drum_bases": {"start": 1000, "count": 24},
+    }
+    data["config_revision"] = 3
+    return ("$.rhythm.pattern_ranges", "$.config_revision")
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
 MIGRATIONS: dict[int, Migration] = {
     0: _revision_zero_to_one,
     1: _revision_one_to_two,
+    2: _revision_two_to_three,
 }
 
 
