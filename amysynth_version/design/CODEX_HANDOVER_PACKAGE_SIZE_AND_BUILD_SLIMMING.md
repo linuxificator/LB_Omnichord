@@ -1,6 +1,6 @@
 # Codex handover: package size and build slimming
 
-Status: measured analysis and implementation plan
+Status: implemented; final hosted all-platform validation in progress
 Owner: frontend release packaging
 Recorded: 2026-09-01
 Branch: `rework/code_quality`
@@ -19,6 +19,62 @@ This work must preserve the existing architecture: the portable Qt frontend
 remains a wire-only process, and AMY remains a separate service/target. Package
 slimming must not link or import AMY into the frontend and must not weaken the
 five-platform package/runtime tests.
+
+## Implemented state
+
+The machine-readable policy is `packaging/qt_runtime_manifest.json`. Source QML
+imports are scanned and compared with its reviewed allowlist. Every package is
+then audited by `packaging/package_audit.py`; the JSON evidence records package
+size, the largest members, Qt inventory and forbidden-family matches. The
+budgets are deliberately above the first observed reduced outputs but below
+the former complete-SDK packages, so restoring the old collection behavior
+fails the build.
+
+Desktop PyInstaller builds use local `QtQml` and `QtGui` collection hooks. The
+first reduced Linux x86_64 AppImage is 89,643,512 bytes, down from 205,273,592
+bytes in the measured release (56.3% smaller). Its package self-test passes and
+an offscreen final-bundle launch reaches the packaged QML application over the
+separate AMY Unix-socket service. During that final-image test a pre-existing
+hidden schema-path dependency was exposed: catalog validation computed an
+asset path from `__file__`. Schema ownership is now explicit, and the frozen
+entrypoint forwards both the generated AMY socket argument and its resolved
+asset root through the normal application composition boundary.
+
+Android first verifies the unchanged official target-wheel SHA-256, then
+`packaging/android/prune_pyside_wheel.py` creates a separate valid wheel. It
+uses the reviewed bindings/QML/platform roots and recursively follows actual
+ELF `DT_NEEDED` entries. For the official arm64 6.11.2 input this reduced the
+wheel from 83,924,266 to 20,935,122 bytes (75.1%) while retaining 40 native
+libraries and all 11 reviewed QML modules. It rewrites wheel `RECORD`; the
+source/output hashes and retained native inventory are package evidence. The
+APK receives a second nested-bundle content audit.
+
+The release workflow now supports a non-publishing manual all-platform run on
+the selected branch. Normal push and publication rules are unchanged. Android
+also has pip caching and an ABI-specific immutable python-for-Android cache,
+pinned to `actions/cache` commit
+`0400d5f644dc74513175e3cd8d07132dd4860809`. Staging preserves only its
+`.buildozer` cache and recreates all application/deployment inputs.
+
+`tools/clean_package_outputs.py` is dry-run by default and can delete only the
+exact ignored `qt_frontend/build` and `qt_frontend/dist` roots. It refuses a
+symlink or non-directory at either location. No file below those roots is
+tracked; release retention remains GitHub's responsibility rather than Git's.
+
+## Validation ledger
+
+- the complete local frontend test runner passes;
+- all local quality guardrails pass, including the mypy ratchet;
+- the final reduced Linux PyInstaller tree passes package self-test and starts
+  the actual QML application against the separate AMY socket service;
+- the official arm64 wheel was pruned, `RECORD`-checked and ZIP-verified;
+- hosted unit run `33552227475` passes at commit `3282569`;
+- the MIDI raw-input/QML integration test now waits for real QML readiness and
+  uses the ordinary AMY socket transport instead of an unrelated unused AMY
+  pseudo-terminal; it passed ten consecutive local runs before the hosted run;
+- the ignored local output cleanup removed 2,075,167,508 bytes in total;
+- the final non-publishing all-platform workflow is the remaining acceptance
+  gate; add its package sizes and run identity here when it completes.
 
 ## Measured release baseline
 
@@ -130,9 +186,12 @@ relevant pinned input instead.
 
 ## Local build and dist directories
 
-At audit time `qt_frontend/build` occupied approximately 1.1 GiB and
+At initial audit time `qt_frontend/build` occupied approximately 1.1 GiB and
 `qt_frontend/dist` approximately 965 MiB. `dist` held five development
-AppImages of about 193 MiB each. Both directories are ignored by
+AppImages of about 193 MiB each. Further package trials changed the local
+figures to 791,604,052 bytes in `build` (1,546 files) and 1,283,563,456
+bytes in `dist` (eight AppImages) immediately before cleanup. Both directories
+are ignored by
 `qt_frontend/.gitignore`; `git ls-files` reports no tracked files below them.
 They consume local disk but do not enlarge Git history or the GitHub checkout.
 
@@ -183,6 +242,9 @@ artifact.
    using complete immutable keys. Preserve two-ABI emulator/release coverage.
 8. Add a safe local output-cleanup tool and keep ignored build/dist output out
    of source/release manifests.
+
+Items 1 through 8 are implemented. Item 6 deliberately means preserving the
+existing signing boundary, not adding signing credentials.
 
 ## Acceptance criteria
 
