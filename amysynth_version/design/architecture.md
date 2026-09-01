@@ -121,6 +121,14 @@ user event creates a new timer thread. Transport `delay` records are only
 ordered device/reset allocation guards on the existing writer worker, not a
 second application timer service.
 
+Tuning, active-chord identity and live-performance context cross the OMNI/MIDI
+boundary only as frozen values from `musical_state.py`. That pure module owns
+reference/bend clamping, key-dependent intonation and chord pitch-class
+derivation. MIDI may read `performance_snapshot()` but must not reach into
+OMNI's chord catalogue, row selection or intonation-table fields. The snapshot
+does not transfer synth ownership: OMNI remains responsible for synths 0–4 and
+MIDI for synths 5–11, with note lifetime managed by their existing owners.
+
 That guarantee also requires identical built-in PCM preset numbering. Local
 Linux AMY is built with `AMY_PCM_BANK=tiny`, matching ESP32-P4. Gamma9001 uses a
 different meaning for PCM presets 0–18 and must not be selected for this

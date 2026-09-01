@@ -25,6 +25,7 @@ from midi_input import (
     MidiInputPort,
     MidiInputPortFactory,
 )
+from musical_state import TuningSnapshot, tune_note
 from synth_programs import resolve_program
 from synth_state import SynthState
 from user_data import MIDI_PRESET_DIR
@@ -2145,20 +2146,22 @@ class MidiPlayerBackend(QObject):
                 self._bend_timer.start()
 
     def _chord_context(self) -> tuple[int, set[int]]:
-        if self.owner._active_row >= 0 and self.owner._active_root_semitone >= 0:
-            root = int(self.owner._active_root_semitone)
-            chord = self.owner._chords[self.owner._row_chord_indexes[self.owner._active_row]]
-            return root, {(root + interval) % 12 for interval in chord.intervals}
-        return 0, {0, 4, 7}
+        chord = self.owner.performance_snapshot().chord
+        return chord.root_semitone, set(chord.pitch_classes)
 
     def _tune(self, note: int | float, root: int) -> float:
-        reference_offset = 12.0 * math.log2(self._effective_local_reference() / 440.0)
-        mode = app_core.TUNING_MODE_NAMES[self._tuning_mode_index]
-        factor = 1.0
-        if mode in self.owner._intonation_tables:
-            note_pc = int(math.floor(float(note) + 0.5)) % 12
-            factor = self.owner._intonation_tables[mode][root % 12][note_pc]
-        return float(note) + reference_offset + 12.0 * math.log2(factor)
+        owner_tuning = self.owner.performance_snapshot().tuning
+        tuning = (
+            owner_tuning
+            if self._tuning_coupled
+            else TuningSnapshot(
+                mode=app_core.TUNING_MODE_NAMES[self._tuning_mode_index],
+                reference_hz=self._tuning_reference,
+                bend_offset_hz=self._bend_offset,
+                intonation_tables=owner_tuning.intonation_tables,
+            )
+        )
+        return tune_note(tuning, note, root)
 
     def process_midi_note(
         self,
@@ -2167,7 +2170,7 @@ class MidiPlayerBackend(QObject):
         velocity: int,
         is_on: bool,
     ) -> None:
-        root, _ = self._chord_context()
+        root: int | None = None
         for row in range(MIDI_ROW_COUNT):
             configured = self.channels[row]
             if configured not in (0, int(channel)):
@@ -2181,6 +2184,8 @@ class MidiPlayerBackend(QObject):
                     )
                 continue
             if is_on:
+                if root is None:
+                    root, _ = self._chord_context()
                 self.engine.note_on(
                     row,
                     int(channel),

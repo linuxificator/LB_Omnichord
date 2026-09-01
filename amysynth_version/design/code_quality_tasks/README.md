@@ -27,3 +27,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T15 | `T15_PURE_COMMAND_PLANS.md` | complete |
 | T16 | `T16_TRANSPORT_HEALTH_BOUNDS.md` | complete |
 | T17 | `T17_BOUNDED_APPLICATION_SCHEDULER.md` | complete |
+| T18 | `T18_MUSICAL_STATE_SNAPSHOTS.md` | complete |
