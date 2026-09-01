@@ -4,7 +4,7 @@ import copy
 import json
 import re
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -105,6 +105,7 @@ class ConfigProvenance:
     shipped_baseline_path: Path | None
     user_override_paths: tuple[str, ...]
     platform_derived_paths: tuple[str, ...]
+    runtime_override_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -558,3 +559,45 @@ def resolve_amy_config_data(
         raise ConfigValidationError(issues)
     provenance = _provenance(source_path, data, source_kind)
     return _to_resolved(data, revision, provenance)
+
+
+def apply_transport_overrides(
+    resolved: ResolvedAmyConfig,
+    *,
+    serial_port: str | None = None,
+    serial_baud: int | None = None,
+) -> ResolvedAmyConfig:
+    """Return a resolved config with explicit CLI transport provenance."""
+
+    if serial_port is None and serial_baud is None:
+        return resolved
+    compatibility = resolved.compatibility_dict()
+    serial = cast(dict[str, Any], compatibility["serial"])
+    paths = list(resolved.provenance.runtime_override_paths)
+    transport = resolved.transport
+    if serial_port is not None:
+        serial["port"] = serial_port
+        transport = replace(transport, serial_port=serial_port)
+        paths.append("$.serial.port")
+    if serial_baud is not None:
+        if serial_baud < 1200:
+            raise ConfigValidationError(
+                [ConfigIssue("$.serial.baud", "CLI override must be at least 1200")]
+            )
+        serial["baud"] = serial_baud
+        transport = replace(transport, serial_baud=serial_baud)
+        paths.append("$.serial.baud")
+    provenance = replace(
+        resolved.provenance,
+        runtime_override_paths=tuple(dict.fromkeys(paths)),
+    )
+    return replace(
+        resolved,
+        transport=transport,
+        provenance=provenance,
+        _compatibility_json=json.dumps(
+            compatibility,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+    )

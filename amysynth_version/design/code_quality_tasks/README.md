@@ -20,3 +20,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T08 | `T08_BOUNDED_WIRE_FRAMES.md` | complete |
 | T09 | `T09_VERSIONED_TYPED_CONFIG.md` | complete |
 | T10 | `T10_CONFIG_MIGRATIONS_JSON_STORE.md` | complete |
+| T11 | `T11_EXPLICIT_COMPOSITION_ROOT.md` | complete |

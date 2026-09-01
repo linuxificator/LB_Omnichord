@@ -11,6 +11,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any, Literal
 
 from PySide6.QtCore import (
@@ -25,14 +26,16 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
-from amy_serial import (
-    AmyLocalClient,
-    AmySerialClient,
-    AmySocketClient,
-    load_amy_config,
+from application_composition import (
+    ApplicationDependencies,
+    ClientSelection,
+    CommandClient,
+    compose_application_graph,
+    load_application_resources,
 )
 from bass_riffs import BassRiffCatalog, load_bass_riff_catalog
 from control_limits import bounded_control_range, clamp_control_value
+from config_loader import ResolvedAmyConfig, load_amy_config
 from drum_patterns import (
     DrumRhythm,
     load_drum_pattern_catalog,
@@ -922,7 +925,7 @@ class InstrumentBackend(QObject):
         default_strum_synth_index: int,
         default_bass_synth_index: int,
         defaults: dict[str, Any],
-        client: AmySerialClient,
+        client: CommandClient,
         chord_state_address: str,
         chord_manual_address: str,
         chord_amp_address: str,
@@ -4205,7 +4208,11 @@ class InstrumentBackend(QObject):
             )
 
 
-def parse_arguments() -> argparse.Namespace:
+def parse_arguments(
+    arguments: Sequence[str] | None = None,
+    *,
+    default_config_path: Path | None = None,
+) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Qt Quick Omnichord using native AMY commands over serial"
@@ -4214,7 +4221,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--amy-config",
         type=Path,
-        default=CONFIG_DIR / "amy_config.json",
+        default=default_config_path or CONFIG_DIR / "amy_config.json",
         help="AMY serial/backend JSON configuration file.",
     )
     parser.add_argument(
@@ -4425,7 +4432,7 @@ def parse_arguments() -> argparse.Namespace:
             "Print QML slider press/move/current-value diagnostics to stderr."
         ),
     )
-    return parser.parse_args()
+    return parser.parse_args(arguments)
 
 
 ANDROID_SMOKE_ENABLE = "lb-android-package-smoke.enable"
@@ -4464,8 +4471,10 @@ def configure_android_runtime(
     return status
 
 
-def main() -> int:
-    args = parse_arguments()
+def run_application(
+    args: argparse.Namespace,
+    dependencies: ApplicationDependencies,
+) -> int:
     if args.package_smoke_test and args.capture_screenshots_dir is not None:
         raise ValueError(
             "--package-smoke-test and --capture-screenshots-dir are exclusive"
@@ -4486,7 +4495,7 @@ def main() -> int:
 
     migrate_user_layout()
     smoke_checkpoint("user-layout-migrated")
-    user_config_dir = ensure_user_configs(CONFIG_DIR)
+    user_config_dir = ensure_user_configs(dependencies.paths.config)
     smoke_checkpoint("user-config-ready")
 
     # These Qt choices must be made before the first application/window is
@@ -4508,79 +4517,25 @@ def main() -> int:
     os.environ.setdefault("QSG_INFO", "1")
     smoke_checkpoint("renderer-environment-ready")
 
-    defaults = load_defaults(user_config_dir / "defaults.json")
-    smoke_checkpoint("defaults-loaded")
-    chords = load_chords(MUSIC_DIR / "chords.csv")
-    smoke_checkpoint("chords-loaded")
-    (
-        synths,
-        legacy_chord_synth_index,
-        legacy_strum_synth_index,
-        legacy_bass_synth_index,
-    ) = load_synth_catalog(INSTRUMENT_DIR / "synths.json")
-    smoke_checkpoint("synth-catalog-loaded")
-    rhythms = load_rhythm_catalog(MUSIC_DIR / "rhythms.json")
-    smoke_checkpoint("rhythm-catalog-loaded")
-    bass_riffs = load_bass_riff_catalog(
-        MUSIC_DIR / "omnichord_bass_riffs.json",
-        rhythm_ids=(rhythm.key for rhythm in rhythms),
-        chord_suffixes=(chord.suffix for chord in chords),
-    )
-    smoke_checkpoint("bass-riff-catalog-loaded")
-    title_config = load_title_config(
-        user_config_dir / "title.json"
-    )
-    smoke_checkpoint("title-config-loaded")
-    intonation_eq = load_intonation_table(
-        MUSIC_DIR / "intonation_eq.json"
-    )
-    smoke_checkpoint("equal-intonation-loaded")
-    intonation_harm = load_intonation_table(
-        MUSIC_DIR / "intonation_harm.json"
-    )
-    smoke_checkpoint("harmonic-intonation-loaded")
-    intonation_jv = load_intonation_table(
-        MUSIC_DIR / "intonation_jv.json"
-    )
-    smoke_checkpoint("just-intonation-loaded")
-
-    # Startup synth selections are controlled by defaults.json.
-    # Unknown keys fall back to the catalogue defaults.
-    synth_index_by_key = {
-        synth.key: index
-        for index, synth in enumerate(synths)
-    }
-
-    def startup_synth_index(
-        role: str,
-        fallback_index: int,
-    ) -> int:
-        raw_key = str(
-            defaults.get("synths", {}).get(role, "")
-        )
-        index = synth_index_by_key.get(raw_key)
-        if index is not None:
-            return index
-
-        fallback_key = synths[fallback_index].key
+    def synth_fallback_notice(role: str, requested: str, fallback: str) -> None:
         print(
-            f"Warning: unknown {role} synth {raw_key!r} "
-            f"in defaults.json; using {fallback_key!r}",
+            f"Warning: unknown {role} synth {requested!r} "
+            f"in defaults.json; using {fallback!r}",
             file=sys.stderr,
             flush=True,
         )
-        return fallback_index
 
-    default_chord_synth_index = startup_synth_index(
-        "chord", legacy_chord_synth_index
+    resources = load_application_resources(
+        dependencies,
+        user_config_dir=user_config_dir,
+        checkpoint=smoke_checkpoint,
+        synth_fallback_notice=synth_fallback_notice,
     )
-    default_strum_synth_index = startup_synth_index(
-        "strum", legacy_strum_synth_index
-    )
-    default_bass_synth_index = startup_synth_index(
-        "bass", legacy_bass_synth_index
-    )
-    smoke_checkpoint("startup-synths-selected")
+    defaults = resources.defaults
+    chords = resources.chords
+    synths = resources.synths
+    rhythms = resources.rhythms
+    title_config = resources.title
 
     QQuickStyle.setStyle("Basic")
     smoke_checkpoint("quick-style-selected")
@@ -4642,130 +4597,32 @@ def main() -> int:
     )
     smoke_checkpoint("display-diagnostics-written")
 
-    amy_config_path = args.amy_config.expanduser().resolve()
-    smoke_checkpoint("amy-config-path-resolved")
-    if amy_config_path == (CONFIG_DIR / "amy_config.json").resolve():
-        amy_config_path = user_config_dir / "amy_config.json"
-    smoke_checkpoint("amy-config-path-selected")
-    amy_config = load_amy_config(amy_config_path)
-    smoke_checkpoint("amy-config-loaded")
-    if args.serial_port is not None:
-        amy_config["serial"]["port"] = args.serial_port
-    if args.serial_baud is not None:
-        amy_config["serial"]["baud"] = args.serial_baud
+    def transport_notice(
+        selection: ClientSelection,
+        resolved: ResolvedAmyConfig,
+    ) -> None:
+        if selection.kind == "local":
+            message = f"AMY backend: Qt local IPC {selection.endpoint}"
+        elif selection.kind == "socket":
+            message = f"AMY backend: external socket {selection.endpoint}"
+        else:
+            message = (
+                "AMY serial backend: "
+                f"{resolved.transport.serial_port} @ "
+                f"{resolved.transport.serial_baud} baud"
+            )
+        print(message, file=sys.stderr, flush=True)
 
-    address_map = {
-        "chord_state": args.chord_state_address,
-        "manual_chord": args.chord_manual_address,
-        "chord_amp": args.chord_amp_address,
-        "strum_amp": args.strum_amp_address,
-        "bass_amp": args.bass_amp_address,
-        "percussion_amp": args.percussion_amp_address,
-        "reverb": args.reverb_address,
-        "master_volume": args.master_volume_address,
-        "chord_synth": args.chord_synth_address,
-        "chord_params": args.chord_params_address,
-        "strum_synth": args.strum_synth_address,
-        "strum_params": args.strum_params_address,
-        "bass_synth": args.bass_synth_address,
-        "bass_params": args.bass_params_address,
-        "bass_running": args.bass_running_address,
-        "strum_note": args.strum_note_address,
-        "rhythm_config": args.rhythm_config_address,
-        "rhythm_running": args.rhythm_running_address,
-        "rhythm_chord_enabled": args.rhythm_chord_enabled_address,
-        "panic": args.panic_address,
-    }
-
-    if args.amy_socket and args.amy_local_name:
-        raise ValueError("select either --amy-socket or --amy-local-name")
-
-    if args.amy_local_name:
-        print(
-            f"AMY backend: Qt local IPC {args.amy_local_name}",
-            file=sys.stderr,
-            flush=True,
-        )
-        smoke_checkpoint("amy-local-connect-started")
-        amy_client = AmyLocalClient(
-            config=amy_config,
-            addresses=address_map,
-            server_name=args.amy_local_name,
-        )
-        smoke_checkpoint("amy-local-connected")
-    elif args.amy_socket:
-        print(
-            f"AMY backend: external socket {args.amy_socket}",
-            file=sys.stderr,
-            flush=True,
-        )
-        smoke_checkpoint("amy-socket-connect-started")
-        amy_client = AmySocketClient(
-            config=amy_config,
-            addresses=address_map,
-            socket_path=str(Path(args.amy_socket).expanduser()),
-        )
-        smoke_checkpoint("amy-socket-connected")
-    else:
-        print(
-            "AMY serial backend: "
-            f"{amy_config['serial']['port']} @ "
-            f"{amy_config['serial']['baud']} baud",
-            file=sys.stderr,
-            flush=True,
-        )
-        amy_client = AmySerialClient(
-            config=amy_config,
-            addresses=address_map,
-        )
-
-    backend = InstrumentBackend(
-        chords=chords,
-        synths=synths,
-        rhythms=rhythms,
-        bass_riffs=bass_riffs,
-        intonation_eq=intonation_eq,
-        intonation_harm=intonation_harm,
-        intonation_jv=intonation_jv,
-        default_chord_synth_index=(
-            default_chord_synth_index
-        ),
-        default_strum_synth_index=(
-            default_strum_synth_index
-        ),
-        default_bass_synth_index=(
-            default_bass_synth_index
-        ),
-        defaults=defaults,
-        client=amy_client,
-        chord_state_address=args.chord_state_address,
-        chord_manual_address=args.chord_manual_address,
-        chord_amp_address=args.chord_amp_address,
-        strum_amp_address=args.strum_amp_address,
-        bass_amp_address=args.bass_amp_address,
-        percussion_amp_address=args.percussion_amp_address,
-        reverb_address=args.reverb_address,
-        master_volume_address=args.master_volume_address,
-        chord_synth_address=args.chord_synth_address,
-        chord_params_address=args.chord_params_address,
-        strum_synth_address=args.strum_synth_address,
-        strum_params_address=args.strum_params_address,
-        bass_synth_address=args.bass_synth_address,
-        bass_params_address=args.bass_params_address,
-        bass_running_address=args.bass_running_address,
-        strum_note_address=args.strum_note_address,
-        rhythm_config_address=args.rhythm_config_address,
-        rhythm_running_address=args.rhythm_running_address,
-        rhythm_chord_enabled_address=(
-            args.rhythm_chord_enabled_address
-        ),
-        panic_address=args.panic_address,
-        debug_enabled=(
-            args.debug
-            or args.debug_file is not None
-        ),
-        debug_file=args.debug_file,
+    graph = compose_application_graph(
+        args,
+        dependencies,
+        resources,
+        user_config_dir=user_config_dir,
+        checkpoint=smoke_checkpoint,
+        transport_notice=transport_notice,
     )
+    amy_client = graph.client
+    backend = graph.backend
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
@@ -4836,7 +4693,7 @@ def main() -> int:
     )
 
     engine.load(
-        QUrl.fromLocalFile(str(GUI_DIR / "Main.qml"))
+        QUrl.fromLocalFile(str(dependencies.paths.gui / "Main.qml"))
     )
     smoke_checkpoint("qml-load-returned")
 
@@ -4964,7 +4821,3 @@ def main() -> int:
     del backend
 
     return exit_code
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

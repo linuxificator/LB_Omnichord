@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "code"))
 from config_loader import (  # noqa: E402
     CONFIG_SCHEMA_REVISION,
     ConfigValidationError,
+    apply_transport_overrides,
     load_amy_config,
     load_resolved_amy_config,
 )
@@ -196,6 +197,30 @@ class ResolvedConfigTests(unittest.TestCase):
                 load_resolved_amy_config(path)
             self.assertEqual(caught.exception.issues[0].path, "$.config_revision")
             self.assertIn("newer than supported", str(caught.exception))
+
+    def test_cli_transport_overrides_are_typed_isolated_and_provenanced(self) -> None:
+        original = load_resolved_amy_config(self.shipped_path)
+        overridden = apply_transport_overrides(
+            original,
+            serial_port="COM7",
+            serial_baud=230_400,
+        )
+
+        self.assertEqual(original.transport.serial_port, "/dev/serial0")
+        self.assertEqual(original.transport.serial_baud, 1_000_000)
+        self.assertEqual(overridden.transport.serial_port, "COM7")
+        self.assertEqual(overridden.transport.serial_baud, 230_400)
+        self.assertEqual(
+            overridden.provenance.runtime_override_paths,
+            ("$.serial.port", "$.serial.baud"),
+        )
+        compatibility = overridden.compatibility_dict()
+        self.assertEqual(compatibility["serial"]["port"], "COM7")
+        self.assertEqual(compatibility["serial"]["baud"], 230_400)
+
+        with self.assertRaises(ConfigValidationError) as caught:
+            apply_transport_overrides(original, serial_baud=300)
+        self.assertEqual(caught.exception.issues[0].path, "$.serial.baud")
 
 
 if __name__ == "__main__":

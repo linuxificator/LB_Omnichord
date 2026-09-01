@@ -49,7 +49,9 @@ user data during migration.
 The resolved object records its actual path, source kind, shipped baseline,
 changed JSON paths and fields whose final value belongs to a runtime platform
 adapter. `midi_input.tech_profile: auto` is platform-derived; an explicit value
-is a diagnostic override.
+is a diagnostic override. Command-line serial port/baud overrides create a new
+frozen transport section and are recorded separately as runtime override paths;
+they never mutate the validated compatibility document in place.
 
 Revision-by-revision migration runs on an isolated copy before full structural
 and domain validation. Only a valid result is atomically persisted. Revision 0

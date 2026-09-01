@@ -112,7 +112,7 @@ class RefactorCharacterizationTests(unittest.TestCase):
             with self.subTest(loader=loader.__module__):
                 self.assertEqual(loader(ROOT / "config" / "amy_config.json"), expected)
 
-    def test_headless_entrypoint_imports_public_loader_compatibility_api(self) -> None:
+    def test_headless_entrypoint_uses_the_shared_composition_graph(self) -> None:
         path = ROOT / "tests" / "integration" / "headless_app.py"
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         imports = {
@@ -121,7 +121,14 @@ class RefactorCharacterizationTests(unittest.TestCase):
             if isinstance(node, ast.ImportFrom)
             for alias in node.names
         }
-        self.assertIn(("amy_serial", "load_amy_config"), imports)
+        self.assertIn(
+            ("application_composition", "compose_application_graph"),
+            imports,
+        )
+        self.assertIn(
+            ("application_composition", "load_application_resources"),
+            imports,
+        )
 
     def test_unmodified_shipped_config_resolves_for_five_profiles(self) -> None:
         config = config_loader.load_amy_config(

@@ -21,6 +21,21 @@ transport
 separate AMY service / ESP32-P4
 ```
 
+`code/main.py` is the sole production composition root. It resolves immutable
+frontend asset paths and supplies one `ApplicationDependencies` bundle to the
+portable startup runner. The bundle explicitly names typed config resolution,
+catalogue loaders, serial/socket/local command-client factories and the QObject
+facade factory. Source, AppImage and Android use this same constructor graph;
+the AppImage passes its asset root as data and never assigns into imported
+module globals. Headless integration uses the same resource/config/client/
+backend constructors with its test control port added outside the product graph.
+
+`app_core.run_application` retains Qt startup ordering and QML context
+publication while accepting the already selected dependency bundle. It is not
+an alternate composition root and must not select concrete client or backend
+classes. Tests may replace the narrow factories with fake ports without
+patching module symbols.
+
 The Qt application must not import AMY, call AMY synthesis APIs, or manage the
 AMY service lifetime. It only produces AMY wire messages. Unix local IPC
 prefers an `AF_UNIX` `SOCK_SEQPACKET` endpoint and falls back by capability to

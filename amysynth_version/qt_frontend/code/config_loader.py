@@ -16,6 +16,7 @@ from resolved_config import (
     SynthBusLayout,
     TransportConfig,
     VoiceCapacities,
+    apply_transport_overrides,
     load_resolved_amy_config,
     resolve_amy_config_data,
 )
@@ -40,6 +41,7 @@ __all__ = (
     "SynthBusLayout",
     "TransportConfig",
     "VoiceCapacities",
+    "apply_transport_overrides",
     "load_amy_config",
     "load_resolved_amy_config",
     "resolve_amy_config_data",

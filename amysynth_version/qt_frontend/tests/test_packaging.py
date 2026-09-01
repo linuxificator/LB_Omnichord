@@ -343,7 +343,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('"--amy-service"', entry)
         self.assertIn('"--amy-socket"', entry)
         self.assertIn("local_amy_service.main()", entry)
-        self.assertIn("configure_frontend_asset_paths(app_core)", entry)
+        self.assertIn("main.main(arguments, asset_root=APP_ROOT)", entry)
         for asset in (
             "drum_activity_timing.json",
             "drum_fills_timing.json",
@@ -356,7 +356,7 @@ class PackagingContracts(unittest.TestCase):
             "drum_fills_instruments_general_midi.json",
         ):
             self.assertIn(asset, entry)
-        self.assertLess(entry.index("import app_core"), entry.index("import main"))
+        self.assertNotIn("core.FRONTEND_DIR =", entry)
         self.assertNotIn("amy.live(", entry)
 
     def test_release_stamp_validation_matches_asset_format(self) -> None:
