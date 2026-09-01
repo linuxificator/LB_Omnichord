@@ -51,9 +51,13 @@ commit, PCM bank, reviewed Python constraint files and the exact five package
 shapes. A shared checkout helper proves that the detached AMY commit belongs
 to its declared release branch. Publication accepts exactly those five
 packages and their five canonical SHA-256 files, embeds dependency and source
-evidence in `release-manifest.json`, and compares the final GitHub asset names
-with that manifest. This provides input/output traceability; runner images and
-native toolchains mean byte-identical reproducibility is not claimed.
+evidence in `release-manifest.json`, generates an SPDX 2.3 release graph and
+signs build-provenance/SBOM attestations for the five package digests. CI
+independently verifies both predicates before publication and compares the
+final GitHub asset names with the manifest plus evidence set. This provides
+input/output traceability; runner images and native toolchains mean
+byte-identical reproducibility is not claimed. Platform publisher signing is a
+separate deferred threat/distribution decision, not implied by provenance.
 
 Backend constructors establish in-memory invariants only. The composition root
 calls the public, idempotent `initialize()` phase after the complete concrete

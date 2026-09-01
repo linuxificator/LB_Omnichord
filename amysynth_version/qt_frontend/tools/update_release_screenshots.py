@@ -21,6 +21,7 @@ SCREENS = {
     "omni": "LB Omnichord OMNI performance screen",
     "midi": "LB Omnichord MIDI performance screen",
 }
+RETAIN_RELEASES = 3
 
 
 def relative(path: Path) -> str:
@@ -84,6 +85,25 @@ def update_readme(release_tag: str, targets: dict[str, Path]) -> None:
     readme.write_text(text, encoding="utf-8")
 
 
+def prune_release_screenshots(
+    directory: Path = SCREENSHOT_DIR,
+    *,
+    retain: int = RETAIN_RELEASES,
+) -> tuple[Path, ...]:
+    if retain < 1:
+        raise ValueError("at least one release screenshot must be retained")
+    removed: list[Path] = []
+    for screen in SCREENS:
+        pattern = re.compile(rf"^{re.escape(screen)}-R[0-9]{{8}}T[0-9]{{6}}\.png$")
+        releases = sorted(
+            path for path in directory.iterdir() if pattern.fullmatch(path.name)
+        )
+        for obsolete in releases[:-retain]:
+            obsolete.unlink()
+            removed.append(obsolete)
+    return tuple(removed)
+
+
 def promote_screenshots(release_tag: str) -> None:
     if not re.fullmatch(r"R[0-9]{8}T[0-9]{6}", release_tag):
         raise RuntimeError(
@@ -101,6 +121,7 @@ def promote_screenshots(release_tag: str) -> None:
         restore_committed_file(captured)
 
     update_readme(release_tag, targets)
+    prune_release_screenshots()
 
 
 def parse_arguments() -> argparse.Namespace:

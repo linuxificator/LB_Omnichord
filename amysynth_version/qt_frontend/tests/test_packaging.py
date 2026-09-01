@@ -238,16 +238,8 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("--release-tag", release)
         self.assertIn("README.md", release)
-        self.assertIn(
-            '"amysynth_version/qt_frontend/screenshots/'
-            'omni-${release_tag}.png"',
-            release,
-        )
-        self.assertIn(
-            '"amysynth_version/qt_frontend/screenshots/'
-            'midi-${release_tag}.png"',
-            release,
-        )
+        self.assertIn("amysynth_version/qt_frontend/screenshots", release)
+        self.assertIn('git add -A -- "${changed_files[@]}"', release)
         self.assertIn("git diff --quiet --", release)
         self.assertIn("git push origin HEAD:main", release)
         self.assertIn("-m 'skip-rebuild: README screenshots only'", release)
@@ -268,6 +260,17 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('echo "stamp=R${instant/T/}"', release)
         self.assertIn("gh release create", release)
         self.assertIn("release-manifest.json", release)
+        self.assertIn("release_sbom.py", release)
+        self.assertIn("https://spdx.dev/Document/v2.3", release)
+        self.assertIn("actions/attest@", release)
+        self.assertEqual(release.count("actions/attest@"), 2)
+        self.assertIn("gh attestation verify", release)
+        self.assertIn("provenance.sigstore.json", release)
+        self.assertIn("sbom.sigstore.json", release)
+        self.assertIn("id-token: write", release)
+        self.assertIn("attestations: write", release)
+        self.assertEqual(release.count("id-token: write"), 1)
+        self.assertEqual(release.count("attestations: write"), 1)
         self.assertIn("release_inputs.py", release)
         self.assertIn("release-manifest", release)
         self.assertIn("published-assets.txt", release)

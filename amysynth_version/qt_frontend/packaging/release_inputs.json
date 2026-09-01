@@ -23,6 +23,9 @@
     },
     "component_evidence": [
       {"name": "PySide6", "versions": ["6.7.3", "6.10.3", "6.11.2"], "license": "LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only", "source": "https://code.qt.io/cgit/pyside/pyside-setup.git/"},
+      {"name": "PySide6_Addons", "versions": ["6.7.3", "6.10.3", "6.11.2"], "license": "LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only", "source": "https://code.qt.io/cgit/pyside/pyside-setup.git/"},
+      {"name": "PySide6_Essentials", "versions": ["6.7.3", "6.10.3", "6.11.2"], "license": "LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only", "source": "https://code.qt.io/cgit/pyside/pyside-setup.git/"},
+      {"name": "shiboken6", "versions": ["6.7.3", "6.10.3", "6.11.2"], "license": "LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only", "source": "https://code.qt.io/cgit/pyside/pyside-setup.git/"},
       {"name": "pyserial", "versions": ["3.5"], "license": "BSD-3-Clause", "source": "https://github.com/pyserial/pyserial"},
       {"name": "fastjsonschema", "versions": ["2.22.2"], "license": "BSD-3-Clause", "source": "https://github.com/horejsek/python-fastjsonschema"},
       {"name": "PyInstaller", "versions": ["6.22.2"], "license": "GPL-2.0-or-later WITH Bootloader-exception", "source": "https://github.com/pyinstaller/pyinstaller"},

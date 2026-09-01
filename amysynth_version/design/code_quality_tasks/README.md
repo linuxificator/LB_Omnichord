@@ -34,3 +34,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T22 | `T22_CATALOGUE_SCHEMA_PROVENANCE.md` | complete |
 | T23 | `T23_TEST_REPORTS_AND_COVERAGE.md` | complete |
 | T24 | `T24_EXACT_RELEASE_INPUTS.md` | complete |
+| T25 | `T25_RELEASE_PROVENANCE_RETENTION_SIGNING.md` | complete |

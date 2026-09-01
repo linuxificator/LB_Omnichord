@@ -28,6 +28,10 @@ host remains a separate exact PySide6 6.11.2 toolchain and consumes only the
 portable pure-Python target group. `packaging/release_inputs.json` hashes the
 reviewed requirement/constraint files and records versions, licenses and
 sources; publication embeds that evidence in `release-manifest.json`.
+The release-level SPDX 2.3 document relates every platform package digest to
+its applicable PySide6 line, portable Python runtime dependencies, AMY commit
+and desktop build dependency. It is component evidence, not an assertion that
+runner images, system packages and every native SDK file are byte-reproducible.
 
 ## Direct-import inventory
 
@@ -109,6 +113,11 @@ build and emulator gate are mandatory.
 - Workflow actions are pinned to reviewed full commit SHAs and Dependabot may
   propose reviewed updates. Runner images and system packages remain named
   platform build inputs; byte-reproducibility is not claimed.
+
+Consumer hash, provenance and SBOM verification commands are maintained in
+[`RELEASE_VERIFICATION.md`](../packaging/RELEASE_VERIFICATION.md). Application
+publisher signing is deliberately separate; its current deferred decision and
+required controls are in [`SIGNING_DECISION.md`](../packaging/SIGNING_DECISION.md).
 
 ## Change rule
 

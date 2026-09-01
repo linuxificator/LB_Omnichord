@@ -555,6 +555,8 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout released source metadata
@@ -585,6 +587,47 @@ jobs:
             --source-commit "$GITHUB_SHA" \
             --output release-manifest.json
 
+      - name: Generate release SPDX SBOM and attestation subjects
+        env:
+          RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+        run: |
+          sbom="LB_Omnichord.${RELEASE_STAMP}.spdx.json"
+          python3 amysynth_version/qt_frontend/packaging/release_sbom.py \
+            --manifest release-manifest.json \
+            --output "$sbom"
+          jq -r '.packages[] | "\(.sha256)  \(.file)"' \
+            release-manifest.json > release-subjects.sha256
+
+      - name: Attest five-package build provenance
+        id: provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: release-subjects.sha256
+
+      - name: Attest five-package SPDX SBOM
+        id: sbom
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: release-subjects.sha256
+          sbom-path: LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.spdx.json
+
+      - name: Preserve and independently verify signed attestations
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+        run: |
+          cp '${{ steps.provenance.outputs.bundle-path }}' \
+            "LB_Omnichord.${RELEASE_STAMP}.provenance.sigstore.json"
+          cp '${{ steps.sbom.outputs.bundle-path }}' \
+            "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
+          while read -r package; do
+            gh attestation verify "dist/$package" \
+              --repo "$GITHUB_REPOSITORY"
+            gh attestation verify "dist/$package" \
+              --repo "$GITHUB_REPOSITORY" \
+              --predicate-type https://spdx.dev/Document/v2.3
+          done < <(jq -r '.packages[].file' release-manifest.json)
+
       - name: Create tag and five-platform GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -593,6 +636,12 @@ jobs:
         run: |
           mapfile -t release_assets < <(
             jq -r '.packages[] | .file, .checksum_file' release-manifest.json
+          )
+          evidence_assets=(
+            release-manifest.json
+            "LB_Omnichord.${RELEASE_STAMP}.spdx.json"
+            "LB_Omnichord.${RELEASE_STAMP}.provenance.sigstore.json"
+            "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
           )
           linux_file="LB_Omnichord.${RELEASE_STAMP}.Linux-x86_64.AppImage"
           pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
@@ -640,19 +689,21 @@ jobs:
             echo '## Build provenance'
             echo
             echo "AMY fork release: \`$AMY_RELEASE_BRANCH\` at immutable build commit \`$AMY_COMMIT\`."
+            echo
+            echo 'Each package has signed GitHub build-provenance and SPDX 2.3 SBOM attestations. Download the package and verify it with `gh attestation verify PACKAGE --repo linuxificator/LB_Omnichord`; add `--predicate-type https://spdx.dev/Document/v2.3` to verify and inspect the SBOM attestation.'
           } > release-notes.md
           for index in "${!release_assets[@]}"; do
             release_assets[$index]="dist/${release_assets[$index]}"
           done
           gh release create "$RELEASE_TAG" \
-            "${release_assets[@]}" release-manifest.json \
+            "${release_assets[@]}" "${evidence_assets[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "$RELEASE_TAG" \
             --notes-file release-notes.md
           {
             jq -r '.packages[] | .file, .checksum_file' release-manifest.json
-            echo release-manifest.json
+            printf '%s\n' "${evidence_assets[@]}"
           } | sort > expected-assets.txt
           gh release view "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
@@ -703,8 +754,7 @@ jobs:
           release_tag='${{ needs.release-metadata.outputs.tag }}'
           changed_files=(
             README.md
-            "amysynth_version/qt_frontend/screenshots/omni-${release_tag}.png"
-            "amysynth_version/qt_frontend/screenshots/midi-${release_tag}.png"
+            amysynth_version/qt_frontend/screenshots
           )
           if git diff --quiet -- "${changed_files[@]}"; then
             echo 'README screenshots already match the released interface.'
@@ -712,7 +762,7 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- "${changed_files[@]}"
+          git add -A -- "${changed_files[@]}"
           git commit -m 'Refresh README screenshots' \
             -m 'skip-rebuild: README screenshots only' \
             -m 'skip-checks:true'

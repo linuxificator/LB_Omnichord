@@ -90,7 +90,10 @@ Four repository workflows are maintained:
   and validates Linux x86_64, Raspberry Pi aarch64, macOS arm64 and native
   Windows x86_64 packages plus the Android arm64 APK. One timestamped
   tag/release contains all five packages, their SHA-256 files and an exact
-  `release-manifest.json`. The manifest verifier rejects missing or extra
+  `release-manifest.json`. It also publishes a release-level SPDX 2.3 SBOM and
+  retained Sigstore bundles. GitHub signs build-provenance and SBOM
+  attestations for the exact five manifest digests; the workflow verifies both
+  predicates independently before publication. The manifest verifier rejects missing or extra
   package/checksum files before publication; the final GitHub asset-name list
   is compared with the manifest after upload. The dedicated
   `testing/windows_smoke`
@@ -122,6 +125,14 @@ The Windows zip is built and exercised on Windows Server 2025 build 26100 with
 the newest supported installed Visual Studio generator. Diagnostics are
 retained for 14 days where a workflow produces artifacts.
 
+The README screenshot refresh retains the newest three release-tagged OMNI and
+MIDI image pairs in Git. Filenames remain directly traceable to a release;
+older images remain recoverable from Git history instead of accumulating in
+the branch tip. The untagged capture baselines remain committed. Every new
+pair must still pass PNG decoding, exact-dimension and visual-density checks
+before README promotion, so retention never weakens the crash/error-image
+sanity gate.
+
 ## Desktop release naming and contents
 
 Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
@@ -133,6 +144,8 @@ Release timestamps are UTC. A main update at `2026-08-24 22:30:00 UTC` creates:
 - Windows asset: `LB_Omnichord.R20260824223000.Windows-x86_64.zip`
 - Android asset: `LB_Omnichord.R20260824223000.Android-arm64.apk`
 - one matching `.sha256` file for each package
+- `release-manifest.json`, one `LB_Omnichord.<stamp>.spdx.json` and two
+  retained Sigstore attestation bundles
 
 The AppImages bundle PySide6, the frontend assets and the pinned AMY release
 built with the ESP32-compatible tiny PCM bank. The executable starts AMY
@@ -286,7 +299,8 @@ Important regression tests:
   the MIDI image contains representative controller knobs in the grey CC bar;
   after a successful `main` release the released commit is captured again, and
   changed PNGs are committed alone before one explicitly queued validation
-  release; byte-identical output causes no commit and no further workflow run
+  release; byte-identical output causes no commit and no further workflow run;
+  the branch tip retains exactly the newest three release-tagged pairs
 - instrument balance captures cover low/middle/high registers and report RMS,
   peak, crest factor and clipping
 - packaged macOS and Windows QML chord input observes pointer-down/up, retains
