@@ -36,6 +36,15 @@ an alternate composition root and must not select concrete client or backend
 classes. Tests may replace the narrow factories with fake ports without
 patching module symbols.
 
+AMY command construction has a pure planning boundary. `amy_parameter_plan`
+is the single implementation of shared Juno/DX7 parameter semantics for OMNI
+and MIDI. `rhythm_command_plan` compiles typed bass, chord/arpeggio, drum,
+fill and tagged-lane inputs into immutable wire-command plans. Those modules
+perform no I/O and import no Qt, serial or socket code. `AmySerialClient` owns
+current application state and submits the resulting plans; writers alone own
+framing, ordering, cancellation and delivery. OMNI- or MIDI-specific policy
+is passed explicitly instead of being inferred by the pure compilers.
+
 The Qt application must not import AMY, call AMY synthesis APIs, or manage the
 AMY service lifetime. It only produces AMY wire messages. Unix local IPC
 prefers an `AF_UNIX` `SOCK_SEQPACKET` endpoint and falls back by capability to

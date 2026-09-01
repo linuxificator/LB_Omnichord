@@ -11,6 +11,7 @@ from typing import Any
 from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
 
 import app_core
+from amy_parameter_plan import compile_parameter_commands
 from control_limits import clamp_control_value
 from midi_control import (
     NOTE_BUTTON_OFFSET,
@@ -170,106 +171,14 @@ class MidiAmyEngine:
         synth: int,
         params: dict[str, float],
     ) -> list[str]:
-        p = {str(k): float(v) for k, v in params.items()}
-        out: list[str] = []
-
-        def nonneg(name: str) -> float | None:
-            value = p.get(name)
-            if value is None or value < 0:
-                return None
-            return clamp_control_value(name, float(value))
-
-        if 0 <= patch <= 127:
-            cutoff = nonneg("filter_hz")
-            resonance = nonneg("resonance")
-            lfo = nonneg("lfo_hz")
-            vibrato = nonneg("vibrato_depth")
-            vcf_lfo = nonneg("filter_lfo_depth")
-            pulse = nonneg("pulse_width")
-            pwm = nonneg("pwm_depth")
-            porta = nonneg("portamento_ms")
-            attack = nonneg("attack_ms")
-            decay = nonneg("decay_ms")
-            sustain = nonneg("sustain")
-            release = nonneg("release_ms")
-            if cutoff is not None:
-                out.append(f"v0F{self._f(cutoff)}i{synth}Z")
-            if resonance is not None:
-                out.append(f"v0R{self._f(resonance)}i{synth}Z")
-            if lfo is not None:
-                out.append(f"v1f{self._f(lfo)}i{synth}Z")
-            if vibrato is not None:
-                depth = max(0.0, min(0.05, vibrato))
-                for osc in (2, 3, 4):
-                    out.append(
-                        f"v{osc}f,,,,,{self._f(depth)}i{synth}Z"
-                    )
-            if vcf_lfo is not None:
-                out.append(f"v0F,,,,,{self._f(vcf_lfo)}i{synth}Z")
-            if pulse is not None:
-                duty = max(0.05, min(0.95, pulse))
-                out.append(f"v2d{self._f(duty)}i{synth}Z")
-            if pwm is not None:
-                depth = max(0.0, min(0.45, pwm))
-                out.append(f"v2d,,,,,{self._f(depth)}i{synth}Z")
-            if porta is not None:
-                ms = max(0, int(round(porta)))
-                for osc in (2, 3, 4):
-                    out.append(f"v{osc}m{ms}i{synth}Z")
-            if any(v is not None for v in (attack, decay, sustain, release)):
-                fields = [
-                    self._f(attack) if attack is not None else "",
-                    "",
-                    self._f(decay) if decay is not None else "",
-                    (
-                        self._f(max(0.0, min(1.0, sustain)))
-                        if sustain is not None
-                        else ""
-                    ),
-                    self._f(release) if release is not None else "",
-                    "",
-                ]
-                out.append(f"v0A{','.join(fields)}i{synth}Z")
-
-        elif 128 <= patch <= 255:
-            algorithm = nonneg("algorithm")
-            feedback = nonneg("feedback")
-            lfo = nonneg("lfo_hz")
-            vibrato = nonneg("vibrato_depth")
-            porta = nonneg("portamento_ms")
-            if algorithm is not None:
-                value = max(1, min(32, int(round(algorithm))))
-                out.append(f"v0o{value}i{synth}Z")
-            if feedback is not None:
-                value = max(0.0, min(1.0, feedback))
-                out.append(f"v0b{self._f(value)}i{synth}Z")
-            if lfo is not None:
-                out.append(f"v1f{self._f(lfo)}i{synth}Z")
-            if vibrato is not None:
-                value = max(0.0, min(0.05, vibrato))
-                out.append(f"v0f,,,,,{self._f(value)}i{synth}Z")
-            if porta is not None:
-                out.append(
-                    f"v0m{max(0, int(round(porta)))}i{synth}Z"
-                )
-            attack = nonneg("attack_ms")
-            decay = nonneg("decay_ms")
-            sustain = nonneg("sustain")
-            release = nonneg("release_ms")
-            if any(v is not None for v in (attack, decay, sustain, release)):
-                a = 0.0 if attack is None else attack
-                d = 0.0 if decay is None else decay
-                s = (
-                    1.0
-                    if sustain is None
-                    else max(0.0, min(1.0, sustain))
-                )
-                r = 60000.0 if release is None else release
-                out.append(
-                    f"v0a,,,1A{self._f(a)},1,{self._f(d)},"
-                    f"{self._f(s)},{self._f(r)},0i{synth}Z"
-                )
-        return out
+        """Compile the same patch controls used by the native AMY backend."""
+        return list(
+            compile_parameter_commands(
+                patch=patch,
+                synth=synth,
+                parameters=params,
+            )
+        )
 
     def silence_row(self, row: int) -> None:
         if row not in self._configured_rows:

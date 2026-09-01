@@ -392,6 +392,9 @@ class StaticContractTests(unittest.TestCase):
         transport_py = (ROOT / "code" / "amy_transport.py").read_text(
             encoding="utf-8"
         )
+        rhythm_plan_py = (ROOT / "code" / "rhythm_command_plan.py").read_text(
+            encoding="utf-8"
+        )
         state_py = (ROOT / "code" / "synth_state.py").read_text(encoding="utf-8")
 
         self.assertIn("class SynthState:", state_py)
@@ -421,8 +424,12 @@ class StaticContractTests(unittest.TestCase):
             transport_py,
         )
         self.assertIn("def _chord_pattern_plan(", transport_py)
-        self.assertIn('f"zQT{pattern},0,0"', transport_py)
-        self.assertIn('f"zQE{pattern},{gate},0,1"', transport_py)
+        self.assertIn("compile_chord_pattern_plan(", transport_py)
+        self.assertIn('f"zQT{pattern},0,0"', rhythm_plan_py)
+        self.assertIn(
+            'f"zQE{pattern},{gate},0,1n{format_amy_float(note)}l0i{synth}Z"',
+            rhythm_plan_py,
+        )
 
         # Rhythm is now independent tagged lanes. Reintroducing the previous
         # whole-sequencer rebuild helpers would again make lane-local edits able

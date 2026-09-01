@@ -13,11 +13,23 @@ from typing import Any
 import serial
 
 from control_limits import clamp_control_value
+from amy_parameter_plan import compile_parameter_commands
 from config_loader import DebugConfig, ResolvedAmyConfig, resolve_amy_config_data
 from drum_patterns import (
     DrumFill,
     DrumPatternCatalog,
     load_drum_pattern_catalog,
+)
+from rhythm_command_plan import (
+    compact_repeating_events,
+    compile_bass_events,
+    compile_chord_pattern_plan,
+    compile_drum_activity_commands,
+    compile_fill_definition,
+    compile_fill_schedule_commands,
+    compile_tagged_lane,
+    drum_quantum,
+    fill_occurrences,
 )
 from unix_wire_socket import connect_unix_wire_socket
 
@@ -46,63 +58,13 @@ def _resolve_drum_catalog_directory(
     return module_directory / "music" / "drums"
 
 
-def _period_divisors(period: int) -> tuple[int, ...]:
-    """Return every positive divisor in deterministic ascending order."""
-    period = max(1, int(period))
-    lower: list[int] = []
-    upper: list[int] = []
-    for candidate in range(1, math.isqrt(period) + 1):
-        if period % candidate:
-            continue
-        lower.append(candidate)
-        paired = period // candidate
-        if paired != candidate:
-            upper.append(paired)
-    return tuple(lower + list(reversed(upper)))
-
-
 def _compact_repeating_events(
     occurrences: list[tuple[int, str]],
     bar_period: int,
 ) -> list[tuple[int, int, str]]:
-    """Encode an exact circular event set using the fewest obvious periods.
+    """Compatibility alias for tests and callers using the former location."""
 
-    A single AMY sequencer tag can repeat on a shorter period when every
-    occurrence of that residue is present in the full rhythm cycle.  Folding
-    those exact repetitions keeps dense arpeggios inside the existing chord
-    lane without changing their audible tick set or allocating more tags.
-    """
-    bar_period = max(1, int(bar_period))
-    ticks_by_body: dict[str, set[int]] = {}
-    for tick, body in occurrences:
-        ticks_by_body.setdefault(str(body), set()).add(
-            int(tick) % bar_period
-        )
-
-    divisors = _period_divisors(bar_period)
-    compacted: list[tuple[int, int, str]] = []
-    for body, source_ticks in ticks_by_body.items():
-        remaining = set(source_ticks)
-        while remaining:
-            best_period = bar_period
-            best_residue = min(remaining)
-            best_cycle = {best_residue}
-            for candidate_period in divisors:
-                for residue in sorted(
-                    {tick % candidate_period for tick in remaining}
-                ):
-                    cycle = set(
-                        range(residue, bar_period, candidate_period)
-                    )
-                    if cycle.issubset(remaining) and len(cycle) > len(
-                        best_cycle
-                    ):
-                        best_period = candidate_period
-                        best_residue = residue
-                        best_cycle = cycle
-            compacted.append((best_residue, best_period, body))
-            remaining.difference_update(best_cycle)
-    return compacted
+    return compact_repeating_events(occurrences, bar_period)
 
 
 class _DebugLog:
@@ -470,44 +432,19 @@ class _TaggedSequencerLane:
     def end(self) -> int:
         return self.start + self.count
 
-    def _event_command(
-        self,
-        index: int,
-        event: tuple[int, int, str],
-    ) -> str:
-        tick, period, body = event
-        tag = self.start + int(index)
-        period_value = max(1, int(period))
-        tick_value = max(0, int(tick)) % period_value
-        body = str(body)
-        if body.endswith("Z"):
-            body = body[:-1]
-        return f"H{tick_value},{period_value},{tag}{body}Z"
-
     def commands(
         self,
         events: list[tuple[int, int, str]],
     ) -> list[str]:
-        if len(events) > self.count:
-            raise ValueError(
-                f"sequencer lane {self.name} requires {len(events)} tags; "
-                f"range capacity is {self.count}"
-            )
-
-        previous_high_water = self.high_water
-        self.high_water = max(self.high_water, len(events))
-        commands: list[str] = []
-
-        for index, event in enumerate(events):
-            commands.append(self._event_command(index, event))
-
-        # Clear tags no longer used by the new pattern. Keep using the maximum
-        # ever occupied slot so an interrupted earlier update cannot leave a
-        # stale event beyond the current event count.
-        for index in range(len(events), max(previous_high_water, self.high_water)):
-            commands.append(f"H0,0,{self.start + index}Z")
-
-        return commands
+        plan = compile_tagged_lane(
+            name=self.name,
+            start=self.start,
+            count=self.count,
+            previous_high_water=self.high_water,
+            events=events,
+        )
+        self.high_water = plan.high_water
+        return list(plan.commands)
 
     def enqueue(self, events: list[tuple[int, int, str]]) -> None:
         generation = self.writer.new_low_generation(self.name)
@@ -784,34 +721,21 @@ class AmySerialClient:
         }
         for _, (rhythm_id, fill) in sorted(fills.items()):
             pattern = self._fill_pattern_id(fill)
-            length = fill.duration_ticks // 2
-            commands = [f"zQB{pattern},{length}Z"]
-            tag = 0
-            # Mutes are stored in the fill itself. AMY treats them as a
-            # pre-pass, so an onset on the fill's first tick cannot leak.
-            for role in self._drum_roles:
-                if role in fill.continue_roles:
-                    continue
-                drum_base, _ = self._pattern_ranges["drum_bases"]
-                instance_tag = drum_base + self._drum_role_index[role]
-                commands.append(
-                    f"zQE{pattern},0,{length},{tag}"
-                    f"zQM{instance_tag},{length}Z"
-                )
-                tag += 1
-            for event in fill.events:
-                event_tick = event.tick // 2
-                event_period = length if event_tick == 0 else 0
-                commands.append(
-                    f"zQE{pattern},{event_tick},{event_period},{tag}"
-                    f"{self._drum_hit_body(rhythm_id, event.role, event.velocity, fill=True)}Z"
-                )
-                tag += 1
-            if tag > self.resolved_config.capacities.max_pattern_tags:
+            drum_base, _ = self._pattern_ranges["drum_bases"]
+            commands = compile_fill_definition(
+                rhythm_id=rhythm_id,
+                fill=fill,
+                pattern=pattern,
+                roles=self._drum_roles,
+                role_indexes=self._drum_role_index,
+                drum_pattern_start=drum_base,
+                hit_body=self._drum_hit_body,
+            )
+            tag_count = len(commands) - 2
+            if tag_count > self.resolved_config.capacities.max_pattern_tags:
                 raise ValueError(
-                    f"fill {fill.fill_id!r} needs {tag} AMY pattern tags"
+                    f"fill {fill.fill_id!r} needs {tag_count} AMY pattern tags"
                 )
-            commands.append(f"zQC{pattern}Z")
             for command in commands:
                 self._wire(command)
 
@@ -1085,158 +1009,17 @@ class AmySerialClient:
     ) -> list[str]:
         """Build engine-relevant control commands for one synth.
 
-        Missing controls leave the current patch value alone.  Negative values
-        are accepted only as a legacy "unset" sentinel and are never exposed
-        by the current UI.  When parameter_keys is provided, emit commands
-        only for those controls so moving one slider cannot resend unrelated
-        filter/LFO/envelope settings.
-
-        Juno: osc0 is VCF/VCA gather, osc1 is the LFO, osc2 pulse,
-        osc3 saw, osc4 sub.  DX7: osc0 is ALGO output, osc1 is its LFO.
+        The pure compiler owns patch semantics and selective-update behavior;
+        this adapter only supplies current application state.
         """
-        patch = self._patch(role)
-        params = self.synth_params[role]
-        commands: list[str] = []
-
-        def nonneg(name: str) -> float | None:
-            if parameter_keys is not None and name not in parameter_keys:
-                return None
-            value = params.get(name)
-            if value is None or value < 0:
-                return None
-            return clamp_control_value(name, float(value))
-
-        lfo_hz = nonneg("lfo_hz")
-        portamento = nonneg("portamento_ms")
-
-        if 0 <= patch <= 127:  # Juno
-            cutoff = nonneg("filter_hz")
-            if cutoff is not None:
-                cutoff = clamp_control_value("filter_hz", cutoff)
-                commands.append(f"v0F{self._f(cutoff)}i{synth}Z")
-
-            resonance = nonneg("resonance")
-            if resonance is not None:
-                resonance = clamp_control_value("resonance", resonance)
-                commands.append(f"v0R{self._f(resonance)}i{synth}Z")
-
-            if lfo_hz is not None:
-                commands.append(
-                    f"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z"
-                )
-
-            # Merely changing LFO frequency is inaudible when the patch has
-            # zero modulation depth.  These controls explicitly route osc1
-            # into the parameters the Juno architecture actually uses.
-            vibrato = nonneg("vibrato_depth")
-            if vibrato is not None:
-                depth = max(0.0, min(0.05, vibrato))
-                for osc in (2, 3, 4):
-                    commands.append(f"v{osc}f,,,,,{self._f(depth)}i{synth}Z")
-
-            vcf_lfo = nonneg("filter_lfo_depth")
-            if vcf_lfo is not None:
-                depth = clamp_control_value("filter_lfo_depth", vcf_lfo)
-                commands.append(f"v0F,,,,,{self._f(depth)}i{synth}Z")
-
-            pulse_width = nonneg("pulse_width")
-            if pulse_width is not None:
-                duty = max(0.05, min(0.95, pulse_width))
-                commands.append(f"v2d{self._f(duty)}i{synth}Z")
-
-            pwm_depth = nonneg("pwm_depth")
-            if pwm_depth is not None:
-                depth = max(0.0, min(0.45, pwm_depth))
-                commands.append(f"v2d,,,,,{self._f(depth)}i{synth}Z")
-
-            if portamento is not None:
-                ms = max(0, int(round(portamento)))
-                for osc in (2, 3, 4):
-                    commands.append(f"v{osc}m{ms}i{synth}Z")
-
-            attack = nonneg("attack_ms")
-            decay = nonneg("decay_ms")
-            sustain = nonneg("sustain")
-            release = nonneg("release_ms")
-            if any(v is not None for v in (attack, decay, sustain, release)):
-                fields = [
-                    self._f(attack) if attack is not None else "",
-                    "",
-                    self._f(decay) if decay is not None else "",
-                    self._f(max(0.0, min(1.0, sustain)))
-                    if sustain is not None else "",
-                    self._f(release) if release is not None else "",
-                    "",
-                ]
-                commands.append(f"v0A{','.join(fields)}i{synth}Z")
-
-        elif 128 <= patch <= 255:  # DX7 / ALGO
-            algorithm = nonneg("algorithm")
-            if algorithm is not None:
-                algorithm_i = max(1, min(32, int(round(algorithm))))
-                commands.append(f"v0o{algorithm_i}i{synth}Z")
-
-            feedback = nonneg("feedback")
-            if feedback is not None:
-                commands.append(
-                    f"v0b{self._f(max(0.0, min(1.0, feedback)))}i{synth}Z"
-                )
-
-            if lfo_hz is not None:
-                commands.append(
-                    f"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z"
-                )
-
-            vibrato = nonneg("vibrato_depth")
-            if vibrato is not None:
-                depth = max(0.0, min(0.05, vibrato))
-                commands.append(f"v0f,,,,,{self._f(depth)}i{synth}Z")
-
-            if portamento is not None:
-                commands.append(
-                    f"v0m{max(0, int(round(portamento)))}i{synth}Z"
-                )
-
-            # This is a global ALGO-output ADSR layered on top of the DX7
-            # operators' native envelopes.  The native operator envelopes are
-            # intentionally left intact.  If any ADSR member changed, resend
-            # the complete global envelope because it belongs to us rather than
-            # to the factory DX7 operator patch.
-            adsr_keys = {
-                "attack_ms", "decay_ms", "sustain", "release_ms"
-            }
-            if (
-                parameter_keys is None
-                or bool(parameter_keys & adsr_keys)
-            ):
-                def current_nonneg(name: str) -> float | None:
-                    value = params.get(name)
-                    if value is None or value < 0:
-                        return None
-                    return clamp_control_value(name, float(value))
-
-                attack = current_nonneg("attack_ms")
-                decay = current_nonneg("decay_ms")
-                sustain = current_nonneg("sustain")
-                release = current_nonneg("release_ms")
-                if any(
-                    v is not None
-                    for v in (attack, decay, sustain, release)
-                ):
-                    a = 0.0 if attack is None else max(0.0, attack)
-                    d = 0.0 if decay is None else max(0.0, decay)
-                    sus = (
-                        1.0
-                        if sustain is None
-                        else max(0.0, min(1.0, sustain))
-                    )
-                    r = 60000.0 if release is None else max(0.0, release)
-                    commands.append(
-                        f"v0a,,,1A{self._f(a)},1,{self._f(d)},{self._f(sus)},"
-                        f"{self._f(r)},0i{synth}Z"
-                    )
-
-        return commands
+        return list(
+            compile_parameter_commands(
+                patch=self._patch(role),
+                synth=synth,
+                parameters=self.synth_params[role],
+                selected_keys=parameter_keys,
+            )
+        )
 
     def _adsr_is_active(self, role: str) -> bool:
         params = self.synth_params[role]
@@ -1493,237 +1276,54 @@ class AmySerialClient:
     def _chord_pattern_plan(
         self,
     ) -> tuple[list[str], list[tuple[int, int, str]]]:
-        """Build short note-owner patterns and their repeating root triggers.
+        """Build note-owner patterns and repeating root triggers.
 
-        Every arpeggio note is an untagged one-shot child. Its immutable AMY
-        definition owns both the onset and the matching release, so replacing
-        a root schedule can remove future old-rate onsets without shortening
-        a note which is already sounding. The four rate families occupy
-        disjoint pattern ids; a /2 -> /4 change never rewrites a live /2
-        definition.
+        The pure planner keeps each note's matching release in its immutable
+        one-shot pattern. Replacing a root schedule therefore cannot shorten
+        an already-sounding arpeggio note.
         """
-        config = self.rhythm_config
-        if (
-            not isinstance(config, dict)
-            or not self.rhythm_chord_enabled
-            or not self.chord_notes
-        ):
-            return [], []
-
-        source_events = [
-            event
-            for event in config.get("chord_events", [])
-            if isinstance(event, dict)
-        ]
-        if not source_events:
-            return [], []
-
-        period = self._rhythm_period_ticks()
         rhythm_cfg = self.resolved_config.rhythm
-        chord_pattern_start, chord_pattern_count = self._pattern_ranges["chords"]
-        chord_synth = self.synth_id["rhythm_chord"]
-        velocity_values = sorted({
-            max(0.0, min(1.0, float(event.get("amp", 1.0))))
-            for event in source_events
-        })
-        velocity_slots = {
-            self._f(velocity): index
-            for index, velocity in enumerate(velocity_values)
-        }
-        note_count = len(self.chord_notes)
-        required_patterns = len(velocity_values) * (1 + 4 * note_count)
-        if required_patterns > chord_pattern_count:
-            raise ValueError(
-                f"chord one-shots need {required_patterns} AMY patterns; "
-                f"reserved capacity is {chord_pattern_count}"
-            )
-
-        commands: list[str] = []
-        occurrences: list[tuple[int, str]] = []
-        arpeggio = config.get("chord_arpeggio", {})
-        arpeggio_enabled = (
-            isinstance(arpeggio, dict)
-            and bool(arpeggio.get("enabled", False))
+        pattern_start, pattern_count = self._pattern_ranges["chords"]
+        plan = compile_chord_pattern_plan(
+            config=self.rhythm_config,
+            enabled=self.rhythm_chord_enabled,
+            chord_notes=self.chord_notes,
+            max_chord_notes=rhythm_cfg.max_rhythm_chord_notes,
+            chord_gate_beats=rhythm_cfg.chord_gate_beats,
+            pattern_start=pattern_start,
+            pattern_count=pattern_count,
+            synth=self.synth_id["rhythm_chord"],
+            ppq=AMY_PPQ,
         )
-
-        if not arpeggio_enabled:
-            max_notes = max(
-                1,
-                rhythm_cfg.max_rhythm_chord_notes,
-            )
-            rhythm_notes = self.chord_notes[:max_notes]
-            gate = max(
-                1,
-                round(rhythm_cfg.chord_gate_beats * AMY_PPQ),
-            )
-            length = gate + 1
-            for velocity_index, velocity in enumerate(velocity_values):
-                pattern = chord_pattern_start + velocity_index
-                commands.append(f"zQB{pattern},{length}Z")
-                for tag, note in enumerate(rhythm_notes):
-                    commands.append(
-                        f"zQE{pattern},0,{length},{tag}"
-                        f"n{self._f(note)}l{self._f(velocity)}i{chord_synth}Z"
-                    )
-                commands.append(
-                    f"zQE{pattern},{gate},0,{len(rhythm_notes)}"
-                    f"l0i{chord_synth}Z"
-                )
-                commands.append(f"zQC{pattern}Z")
-
-            for event in source_events:
-                tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
-                velocity = max(
-                    0.0,
-                    min(1.0, float(event.get("amp", 1.0))),
-                )
-                pattern = (
-                    chord_pattern_start
-                    + velocity_slots[self._f(velocity)]
-                )
-                occurrences.append((tick, f"zQT{pattern},0,0"))
-            return commands, _compact_repeating_events(occurrences, period)
-
-        rate = max(
-            1,
-            min(4, int(arpeggio.get("notes_per_beat", 1))),
-        )
-        step = max(1, round(AMY_PPQ / rate))
-        gate = max(
-            1,
-            round(rhythm_cfg.chord_gate_beats * step),
-        )
-        length = gate + 1
-        rate_stride = len(velocity_values) * note_count
-        rate_base = (
-            chord_pattern_start
-            + len(velocity_values)
-            + (rate - 1) * rate_stride
-        )
-        for velocity_index, velocity in enumerate(velocity_values):
-            for note_index, note in enumerate(self.chord_notes):
-                pattern = (
-                    rate_base + velocity_index * note_count + note_index
-                )
-                commands.extend((
-                    f"zQB{pattern},{length}Z",
-                    f"zQE{pattern},0,{length},0"
-                    f"n{self._f(note)}l{self._f(velocity)}i{chord_synth}Z",
-                    f"zQE{pattern},{gate},0,1"
-                    f"n{self._f(note)}l0i{chord_synth}Z",
-                    f"zQC{pattern}Z",
-                ))
-
-        note_indexes = list(range(note_count))
-        if str(arpeggio.get("direction", "up")).lower() == "down":
-            note_indexes.reverse()
-        for event in source_events:
-            start_tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
-            velocity = max(
-                0.0,
-                min(1.0, float(event.get("amp", 1.0))),
-            )
-            velocity_index = velocity_slots[self._f(velocity)]
-            for sequence_index, note_index in enumerate(note_indexes):
-                pattern = (
-                    rate_base + velocity_index * note_count + note_index
-                )
-                occurrences.append((
-                    start_tick + sequence_index * step,
-                    f"zQT{pattern},0,0",
-                ))
-        return commands, _compact_repeating_events(occurrences, period)
+        return list(plan.definitions), list(plan.triggers)
 
     def _lane_events(self, lane_name: str) -> list[tuple[int, int, str]]:
-        config = self.rhythm_config
-        if not config:
-            return []
-
-        period = self._rhythm_period_ticks()
-        rhythm_cfg = self.resolved_config.rhythm
-        events: list[tuple[int, int, str]] = []
-
         if lane_name == "drums":
-            # Percussion uses AMY's nested-pattern store. The root H lane is
-            # reserved only for zQA fill triggers.
+            # Percussion uses nested patterns; this lane carries fill triggers.
             return []
-
         if lane_name == "bass":
-            if not self.bass_running:
-                return []
-            bass_synth = self.synth_id["bass"]
-            if str(config.get("bass_mode", "activity")) == "riff":
-                riff = self.bass_riff
-                if not isinstance(riff, dict):
-                    return []
-                ppq = max(1, int(riff.get("ppq", AMY_PPQ)))
-                phrase_ticks = max(1, int(riff.get("phrase_ticks", ppq)))
-                riff_period = max(1, round(phrase_ticks * AMY_PPQ / ppq))
-                for event in riff.get("events", []):
-                    if not isinstance(event, dict):
-                        continue
-                    tick = round(float(event.get("tick", 0)) * AMY_PPQ / ppq)
-                    duration = max(
-                        1,
-                        round(
-                            float(event.get("duration_ticks", 1))
-                            * AMY_PPQ
-                            / ppq
-                        ),
-                    )
-                    note = float(event.get("note", 36.0))
-                    velocity = max(
-                        0.0,
-                        min(1.0, float(event.get("velocity", 0)) / 127.0),
-                    )
-                    events.append((
-                        tick,
-                        riff_period,
-                        f"n{self._f(note)}l{self._f(velocity)}i{bass_synth}",
-                    ))
-                    events.append((
-                        tick + duration,
-                        riff_period,
-                        f"n{self._f(note)}l0i{bass_synth}",
-                    ))
-                return events
-
-            if not self.bass_notes:
-                return []
-            gate = max(
-                1,
-                round(rhythm_cfg.bass_gate_beats * AMY_PPQ),
+            rhythm_cfg = self.resolved_config.rhythm
+            return list(
+                compile_bass_events(
+                    config=self.rhythm_config,
+                    running=self.bass_running,
+                    bass_notes=self.bass_notes,
+                    bass_riff=self.bass_riff,
+                    synth=self.synth_id["bass"],
+                    bass_gate_beats=rhythm_cfg.bass_gate_beats,
+                    ppq=AMY_PPQ,
+                )
             )
-            for event in config.get("bass_events", []):
-                degree = int(event.get("degree", 0))
-                note = self.bass_notes[degree % len(self.bass_notes)]
-                tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
-                velocity = max(0.0, min(1.0, float(event.get("amp", 1.0))))
-                events.append((
-                    tick,
-                    period,
-                    f"n{self._f(note)}l{self._f(velocity)}i{bass_synth}",
-                ))
-                events.append((
-                    tick + gate,
-                    period,
-                    f"n{self._f(note)}l0i{bass_synth}",
-                ))
-            return events
-
         if lane_name == "chords":
             return self._chord_pattern_plan()[1]
-
         raise KeyError(lane_name)
 
     def _drum_quantum(self) -> int:
         config = self.rhythm_config
         if not isinstance(config, dict):
             return 0
-        rhythm = self.drum_catalog.rhythm(str(config.get("id", "")))
-        return max(
-            1,
-            (rhythm.period_ticks // rhythm.period_bars) // 2,
+        return drum_quantum(
+            self.drum_catalog.rhythm(str(config.get("id", "")))
         )
 
     def _drum_activity_commands(
@@ -1735,77 +1335,35 @@ class AmySerialClient:
         if not isinstance(config, dict):
             return []
         rhythm = self.drum_catalog.rhythm(str(config.get("id", "")))
-        level_index = max(
-            0,
-            min(4, int(config.get("percussion_activity", 1)) - 1),
-        )
-        by_role: dict[str, list[Any]] = {}
-        for event in rhythm.levels[level_index]:
-            by_role.setdefault(event.role, []).append(event)
-
-        length = rhythm.period_ticks // 2
         use_live_quantization = (
             self.rhythm_running
             if quantize_live is None
             else bool(quantize_live)
         )
-        quantum = self._drum_quantum() if use_live_quantization else 0
-        commands: list[str] = []
-        for role_index, role in enumerate(self._drum_roles):
-            drum_base, _ = self._pattern_ranges["drum_bases"]
-            pattern = drum_base + role_index
-            instance_tag = drum_base + role_index
-            events = by_role.get(role, [])
-            if not events:
-                if self.rhythm_running:
-                    commands.append(f"zQS{instance_tag},{quantum}Z")
-                continue
-            commands.append(f"zQB{pattern},{length}Z")
-            for tag, event in enumerate(events):
-                event_tick = event.tick // 2
-                event_period = length if event_tick == 0 else 0
-                commands.append(
-                    f"zQE{pattern},{event_tick},{event_period},{tag}"
-                    f"{self._drum_hit_body(rhythm.rhythm_id, role, event.velocity, fill=False)}Z"
-                )
-            commands.append(f"zQC{pattern}Z")
-            if self.rhythm_running:
-                commands.append(
-                    f"zQT{pattern},1,{quantum},{instance_tag}Z"
-                )
-        return commands
+        drum_base, _ = self._pattern_ranges["drum_bases"]
+        return list(
+            compile_drum_activity_commands(
+                rhythm=rhythm,
+                percussion_activity=int(
+                    config.get("percussion_activity", 1)
+                ),
+                roles=self._drum_roles,
+                pattern_start=drum_base,
+                rhythm_running=self.rhythm_running,
+                quantize_live=use_live_quantization,
+                hit_body=self._drum_hit_body,
+            )
+        )
 
     @staticmethod
     def _fill_occurrences(
         order: list[int],
         fills: tuple[DrumFill, ...],
     ) -> list[tuple[DrumFill, int]]:
-        if not order:
-            return []
-        position = 0
-        start_indexes = {index: 0 for index in order}
-        seen: set[tuple[int, tuple[int, ...]]] = set()
-        occurrences: list[tuple[DrumFill, int]] = []
-        while True:
-            signature = (
-                position,
-                tuple(start_indexes[index] for index in order),
-            )
-            if signature in seen:
-                break
-            seen.add(signature)
-            local_index = order[position]
-            fill = fills[local_index]
-            allowed_index = start_indexes[local_index]
-            occurrences.append((
-                fill,
-                fill.allowed_start_beats[allowed_index],
-            ))
-            start_indexes[local_index] = (
-                allowed_index + 1
-            ) % len(fill.allowed_start_beats)
-            position = (position + 1) % len(order)
-        return occurrences
+        return [
+            (fill, start)
+            for fill, start in fill_occurrences(order, fills)
+        ]
 
     def _fill_schedule_commands(
         self,
@@ -1818,48 +1376,35 @@ class AmySerialClient:
         rhythm = self.drum_catalog.rhythm(str(config.get("id", "")))
         raw_order = config.get("fill_order", [])
         order = (
-            list(dict.fromkeys(
-                int(value)
-                for value in raw_order
-                if 0 <= int(value) < len(rhythm.fills)
-            ))
+            list(
+                dict.fromkeys(
+                    int(value)
+                    for value in raw_order
+                    if 0 <= int(value) < len(rhythm.fills)
+                )
+            )
             if isinstance(raw_order, list)
             else []
         )
-        occurrences = self._fill_occurrences(order, rhythm.fills)
-        density_bars = max(1, int(config.get("fill_density_bars", 32)))
-        bar_ticks = self._drum_quantum()
-        period = max(1, len(occurrences) * density_bars * bar_ticks)
         lane = self._sequencer_lanes["drums"]
-        previous_high_water = lane.high_water
-        if len(occurrences) > lane.count:
-            raise ValueError(
-                f"fill cycle needs {len(occurrences)} root tags; "
-                f"drum range has {lane.count}"
-            )
-        lane.high_water = max(lane.high_water, len(occurrences))
         use_live_quantization = (
             self.rhythm_running
             if quantize_live is None
             else bool(quantize_live)
         )
-        quantum = bar_ticks if use_live_quantization else 0
-        commands: list[str] = []
-        for occurrence_index, (fill, start_beat) in enumerate(occurrences):
-            offset = (
-                occurrence_index * density_bars * bar_ticks
-                + (start_beat - 1) * (fill.beat_unit_ticks // 2)
-            )
-            commands.append(
-                f"zQA{self._fill_pattern_id(fill)},0,{offset},"
-                f"{period},{quantum},{lane.start + occurrence_index}Z"
-            )
-        for index in range(
-            len(occurrences),
-            max(previous_high_water, lane.high_water),
-        ):
-            commands.append(f"H0,0,{lane.start + index}Z")
-        return commands
+        plan = compile_fill_schedule_commands(
+            fills=rhythm.fills,
+            order=order,
+            density_bars=int(config.get("fill_density_bars", 32)),
+            bar_ticks=self._drum_quantum(),
+            lane_start=lane.start,
+            lane_count=lane.count,
+            previous_high_water=lane.high_water,
+            quantize_live=use_live_quantization,
+            pattern_id=self._fill_pattern_id,
+        )
+        lane.high_water = plan.high_water
+        return list(plan.commands)
 
     def _drum_commands(
         self,
