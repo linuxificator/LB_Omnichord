@@ -102,6 +102,17 @@ Supported transports:
 
 The same user action must result in the same AMY wire command stream regardless of transport.
 
+All three concrete transports are byte sinks composed with one bounded command
+scheduler; Unix and Qt local transports do not inherit serial behavior. The
+scheduler gives critical commands strict priority and rejects critical
+overload explicitly. Rhythm-plan work is replaceable by lane generation and
+may be coalesced or drop its oldest queued record at its documented hard
+capacity. Immutable health reports expose lifecycle, terminal failure, queue
+depth/high-water, coalescing, replaceable drops and shutdown timeout. The sink
+is opened, written and closed by the same worker; a timed-out close never
+closes a resource still used by a live worker. Debug logging is a separate
+bounded, non-blocking queue with one rotated predecessor and visible loss.
+
 That guarantee also requires identical built-in PCM preset numbering. Local
 Linux AMY is built with `AMY_PCM_BANK=tiny`, matching ESP32-P4. Gamma9001 uses a
 different meaning for PCM presets 0–18 and must not be selected for this

@@ -55,12 +55,12 @@ Recommendation:
 This is a correctness fix first, performance decision second. Measure MIDI
 latency before introducing a more complex real-time queue.
 
-## Finding R2 — transport queues are unbounded
+## Finding R2 — transport queues were unbounded (resolved by T16)
 
-`_SerialWriter`, `_UnixSocketWriter` and `_QtLocalSocketWriter` use unbounded
-deques for high/low work. `_DebugLog` uses unbounded `queue.SimpleQueue`.
-During device stalls or a command burst, memory and latency can grow without an
-observable limit. The debug log is enabled by shipped config and is append-only.
+`_SerialWriter`, `_UnixSocketWriter` and `_QtLocalSocketWriter` formerly used
+unbounded deques, while `_DebugLog` used `queue.SimpleQueue`. T16 replaced them
+with one bounded scheduler, concrete byte sinks and a bounded rotating debug
+queue. See `code_quality_tasks/T16_TRANSPORT_HEALTH_BOUNDS.md` for proof.
 
 Recommendation:
 

@@ -10,8 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import serial
-
 from control_limits import clamp_control_value
 from amy_parameter_plan import compile_parameter_commands
 from config_loader import DebugConfig, ResolvedAmyConfig, resolve_amy_config_data
@@ -31,7 +29,13 @@ from rhythm_command_plan import (
     drum_quantum,
     fill_occurrences,
 )
-from unix_wire_socket import connect_unix_wire_socket
+from transport_scheduler import (
+    CommandScheduler,
+    TransportFailed,
+    TransportHealth,
+    encode_command,
+)
+from transport_sinks import QtLocalByteSink, SerialByteSink, UnixByteSink
 
 
 AMY_PPQ = 48
@@ -40,6 +44,8 @@ RESET_ALL_OSCS = 8192
 RESET_TIMEBASE = 16384
 RESET_ALL_NOTES = 131072
 SYNTH_FLAGS_NO_NOTE_WARNINGS = 8
+DEBUG_LOG_QUEUE_CAPACITY = 2048
+DEBUG_LOG_MAX_BYTES = 4 * 1024 * 1024
 
 
 def _resolve_drum_catalog_directory(
@@ -79,14 +85,15 @@ class _DebugLog:
         self.enabled = config.log_amy_commands
         self.log_logical = config.log_logical_events
         self.path: Path | None = None
-        self._queue: queue.SimpleQueue[str | None] | None = None
+        self._queue: queue.Queue[str | None] | None = None
         self._thread: threading.Thread | None = None
+        self.dropped_records = 0
 
         if self.enabled:
             path = Path(config.amy_command_log).expanduser()
             path.parent.mkdir(parents=True, exist_ok=True)
             self.path = path
-            self._queue = queue.SimpleQueue()
+            self._queue = queue.Queue(maxsize=DEBUG_LOG_QUEUE_CAPACITY)
             self._thread = threading.Thread(
                 target=self._run,
                 name="amy-debug-log",
@@ -98,6 +105,10 @@ class _DebugLog:
     def _run(self) -> None:
         if self.path is None or self._queue is None:
             return
+        if self.path.exists() and self.path.stat().st_size >= DEBUG_LOG_MAX_BYTES:
+            rotated = self.path.with_suffix(self.path.suffix + ".1")
+            rotated.unlink(missing_ok=True)
+            self.path.replace(rotated)
         with self.path.open("a", encoding="utf-8", buffering=1) as handle:
             while True:
                 line = self._queue.get()
@@ -110,296 +121,112 @@ class _DebugLog:
         if not self.enabled or self._queue is None:
             return
         stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
-        self._queue.put(f"{stamp} {kind:<12} {text}\n")
+        try:
+            self._queue.put_nowait(f"{stamp} {kind:<12} {text}\n")
+        except queue.Full:
+            self.dropped_records += 1
 
     def close(self) -> None:
         if self._queue is None or self._thread is None:
             return
-        self._queue.put(None)
+        try:
+            self._queue.put_nowait(None)
+        except queue.Full:
+            self._queue.get_nowait()
+            self.dropped_records += 1
+            self._queue.put_nowait(None)
         self._thread.join(timeout=1.0)
         self._queue = None
         self._thread = None
 
 
-class _SerialWriter:
-    """Priority UART writer with independently cancelable low-priority lanes."""
+class _ScheduledWriter:
+    """Compatibility facade over the shared scheduler and one byte sink."""
 
-    def __init__(self, port: str, baud: int, write_timeout: float, debug_log: _DebugLog | None = None) -> None:
-        from collections import deque
-
-        self.debug_log = debug_log
-        self.serial = serial.Serial(
-            port=port,
-            baudrate=int(baud),
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=0,
-            write_timeout=float(write_timeout),
+    def __init__(
+        self,
+        sink: Any,
+        *,
+        thread_name: str,
+        debug_log: _DebugLog | None,
+    ) -> None:
+        self._scheduler = CommandScheduler(
+            sink,
+            name=thread_name,
+            recorder=debug_log,
         )
-        self._high = deque()
-        self._low = deque()
-        self._lane_generation: dict[str, int] = {}
-        self._closed = False
-        self._condition = threading.Condition()
-        self._thread = threading.Thread(
-            target=self._run,
-            name="amy-uart-writer",
-            daemon=True,
-        )
-        self._thread.start()
 
     @staticmethod
     def _line(command: str) -> bytes:
-        command = command.strip()
-        if not command.endswith("Z"):
-            command += "Z"
-        return (command + "\n").encode("ascii")
+        return encode_command(command, b"\n")
 
     def new_low_generation(self, lane: str) -> int:
-        lane = str(lane)
-        with self._condition:
-            generation = self._lane_generation.get(lane, 0) + 1
-            self._lane_generation[lane] = generation
-            self._condition.notify_all()
-            return generation
+        return self._scheduler.new_low_generation(lane)
 
     def invalidate_all_low(self) -> None:
-        with self._condition:
-            for lane in list(self._lane_generation):
-                self._lane_generation[lane] += 1
-            self._low.clear()
-            self._condition.notify_all()
+        self._scheduler.invalidate_all_low()
 
     def high(self, command: str) -> None:
-        with self._condition:
-            if self._closed:
-                return
-            self._high.append(("command", command, 0.0))
-            self._condition.notify()
+        self._scheduler.high(command)
+
+    def high_many(self, commands: list[str] | tuple[str, ...]) -> None:
+        self._scheduler.high_many(commands)
 
     def delay(self, delay_seconds: float) -> None:
-        """Insert a host-side guard before later high-priority commands."""
-        with self._condition:
-            if self._closed:
-                return
-            self._high.append((
-                "delay",
-                None,
-                max(0.0, float(delay_seconds)),
-            ))
-            self._condition.notify()
+        self._scheduler.delay(delay_seconds)
 
     def low(self, lane: str, generation: int, command: str) -> None:
-        with self._condition:
-            if self._closed:
-                return
-            self._low.append((str(lane), int(generation), command))
-            self._condition.notify()
+        self._scheduler.low(lane, generation, command)
 
-    def _write(self, command: str, lane: str) -> None:
-        if self.debug_log is not None:
-            self.debug_log.write(f"TX-{lane}", command.strip())
-        self.serial.write(self._line(command))
-
-    def _run(self) -> None:
-        while True:
-            item_kind: str | None = None
-            command: str | None = None
-            delay_seconds = 0.0
-            output_lane = "HIGH"
-
-            with self._condition:
-                while True:
-                    if self._closed and not self._high and not self._low:
-                        return
-
-                    if self._high:
-                        item_kind, command, delay_seconds = self._high.popleft()
-                        break
-
-                    # Drop stale lane generations without touching UART. This
-                    # scan is intentionally cheap: there are only three rhythm
-                    # lanes plus the occasional full-rhythm transaction lane.
-                    while self._low:
-                        low_lane, generation, low_command = self._low.popleft()
-                        if generation != self._lane_generation.get(low_lane, 0):
-                            continue
-                        item_kind = "command"
-                        command = low_command
-                        output_lane = "LOW"
-                        break
-
-                    if item_kind is not None:
-                        break
-
-                    self._condition.wait()
-
-            if item_kind == "delay":
-                if self.debug_log is not None:
-                    self.debug_log.write(
-                        "GUARD", f"sleep {delay_seconds * 1000.0:.1f} ms"
-                    )
-                time.sleep(delay_seconds)
-                continue
-
-            if item_kind == "command" and command is not None:
-                self._write(command, output_lane)
+    @property
+    def health(self) -> TransportHealth:
+        return self._scheduler.health
 
     def close(self) -> None:
-        with self._condition:
-            if self._closed:
-                return
-            # Do not call invalidate_all_low() while already holding this
-            # non-reentrant Condition lock.
-            for lane in list(self._lane_generation):
-                self._lane_generation[lane] += 1
-            self._low.clear()
-            self._closed = True
-            self._condition.notify_all()
-
-        self._thread.join(timeout=1.0)
-        self.serial.close()
+        self._scheduler.close()
 
 
-class _UnixSocketWriter(_SerialWriter):
-    """Priority writer for a separately managed local AMY service."""
+class _SerialWriter(_ScheduledWriter):
+    def __init__(
+        self,
+        port: str,
+        baud: int,
+        write_timeout: float,
+        debug_log: _DebugLog | None = None,
+    ) -> None:
+        super().__init__(
+            SerialByteSink(port, baud, write_timeout),
+            thread_name="amy-uart-writer",
+            debug_log=debug_log,
+        )
 
+
+class _UnixSocketWriter(_ScheduledWriter):
     def __init__(
         self,
         socket_path: str,
         debug_log: _DebugLog | None = None,
     ) -> None:
-        from collections import deque
-
-        self.debug_log = debug_log
-        # Prefer packet-preserving local IPC and fall back to an LF-framed
-        # stream when that socket mode is unavailable. The choice follows the
-        # actual endpoint capability rather than an operating-system name.
-        self.socket, self._stream_transport = connect_unix_wire_socket(
-            str(socket_path),
-            timeout=5.0,
+        super().__init__(
+            UnixByteSink(socket_path),
+            thread_name="amy-socket-writer",
+            debug_log=debug_log,
         )
-        self.serial = self.socket
-        self._high = deque()
-        self._low = deque()
-        self._lane_generation: dict[str, int] = {}
-        self._closed = False
-        self._condition = threading.Condition()
-        self._thread = threading.Thread(
-            target=self._run,
-            name="amy-socket-writer",
-            daemon=True,
-        )
-        self._thread.start()
-
-    def _write(self, command: str, lane: str) -> None:
-        command = command.strip()
-        if not command.endswith("Z"):
-            command += "Z"
-        if self.debug_log is not None:
-            self.debug_log.write(f"TX-{lane}", command)
-        framing = "\n" if self._stream_transport else ""
-        self.socket.sendall((command + framing).encode("ascii"))
-
-    def close(self) -> None:
-        super().close()
 
 
-class _QtLocalSocketWriter(_SerialWriter):
-    """LF-framed Qt local IPC writer used by the native Windows package.
-
-    QLocalSocket maps this name to a Windows named pipe.  The object is
-    created, connected, written and closed on the existing dedicated writer
-    thread so its QObject thread affinity is never crossed.
-    """
+class _QtLocalSocketWriter(_ScheduledWriter):
+    """QLocalSocket sink created, used and closed on its scheduler thread."""
 
     def __init__(
         self,
         server_name: str,
         debug_log: _DebugLog | None = None,
     ) -> None:
-        from collections import deque
-
-        self.debug_log = debug_log
-        self.server_name = str(server_name)
-        self._high = deque()
-        self._low = deque()
-        self._lane_generation: dict[str, int] = {}
-        self._closed = False
-        self._condition = threading.Condition()
-        self._connect_complete = threading.Event()
-        self._connect_error: BaseException | None = None
-        self._local_socket: Any | None = None
-        self._thread = threading.Thread(
-            target=self._run,
-            name="amy-local-writer",
-            daemon=True,
+        super().__init__(
+            QtLocalByteSink(server_name),
+            thread_name="amy-local-writer",
+            debug_log=debug_log,
         )
-        self._thread.start()
-
-        if not self._connect_complete.wait(5.5):
-            with self._condition:
-                self._closed = True
-                self._condition.notify_all()
-            self._thread.join(timeout=1.0)
-            raise TimeoutError(
-                f"timed out connecting to local AMY service {self.server_name!r}"
-            )
-        if self._connect_error is not None:
-            raise ConnectionError(str(self._connect_error)) from self._connect_error
-
-    def _run(self) -> None:
-        from PySide6.QtNetwork import QLocalSocket
-
-        local_socket = QLocalSocket()
-        self._local_socket = local_socket
-        try:
-            local_socket.connectToServer(self.server_name)
-            if not local_socket.waitForConnected(5000):
-                raise ConnectionError(local_socket.errorString())
-            self._connect_complete.set()
-            super()._run()
-        except BaseException as exc:
-            self._connect_error = exc
-            with self._condition:
-                self._closed = True
-                self._high.clear()
-                self._low.clear()
-                self._condition.notify_all()
-        finally:
-            local_socket.close()
-            self._connect_complete.set()
-
-    def _write(self, command: str, lane: str) -> None:
-        command = command.strip()
-        if not command.endswith("Z"):
-            command += "Z"
-        if self.debug_log is not None:
-            self.debug_log.write(f"TX-{lane}", command)
-        payload = (command + "\n").encode("ascii")
-        local_socket = self._local_socket
-        if local_socket is None:
-            raise ConnectionError("local AMY socket is not connected")
-        if local_socket.write(payload) != len(payload):
-            raise OSError(local_socket.errorString())
-        deadline = time.monotonic() + 5.0
-        while local_socket.bytesToWrite() > 0:
-            remaining_ms = max(1, int((deadline - time.monotonic()) * 1000))
-            if time.monotonic() >= deadline or not local_socket.waitForBytesWritten(
-                remaining_ms
-            ):
-                raise TimeoutError(local_socket.errorString())
-
-    def close(self) -> None:
-        with self._condition:
-            if not self._closed:
-                for lane in list(self._lane_generation):
-                    self._lane_generation[lane] += 1
-                self._low.clear()
-                self._closed = True
-                self._condition.notify_all()
-        self._thread.join(timeout=1.0)
 
 
 class _TaggedSequencerLane:
@@ -418,7 +245,7 @@ class _TaggedSequencerLane:
         name: str,
         start: int,
         count: int,
-        writer: _SerialWriter,
+        writer: _ScheduledWriter,
     ) -> None:
         self.name = str(name)
         self.start = int(start)
@@ -483,11 +310,7 @@ class AmySerialClient:
                 raise ValueError("config or resolved_config is required")
             resolved_config = resolve_amy_config_data(
                 config,
-                source_path=(
-                    Path(__file__).resolve().parent.parent
-                    / "config"
-                    / "amy_config.json"
-                ),
+                source_path=(Path(__file__).resolve().parent.parent / "config" / "amy_config.json"),
                 source_kind="external",
             )
         self.resolved_config = resolved_config
@@ -508,6 +331,7 @@ class AmySerialClient:
             )
         else:
             self.writer = writer_factory(self.debug_log)
+        self._transport_failure_reported = False
 
         self.synth_id = dict(resolved_config.layout.role_synth_ids)
         voices = resolved_config.capacities.voices
@@ -524,16 +348,9 @@ class AmySerialClient:
             "strum": resolved_config.synth_defaults.strum,
             "bass": resolved_config.synth_defaults.bass,
         }
-        self.patch_map = {
-            str(key): int(value)
-            for key, value in resolved_config.synth_patches
-        }
-        self.synth_params: dict[str, dict[str, float]] = {
-            "chord": {}, "strum": {}, "bass": {}
-        }
-        self._adsr_override_active = {
-            "chord": False, "strum": False, "bass": False
-        }
+        self.patch_map = {str(key): int(value) for key, value in resolved_config.synth_patches}
+        self.synth_params: dict[str, dict[str, float]] = {"chord": {}, "strum": {}, "bass": {}}
+        self._adsr_override_active = {"chord": False, "strum": False, "bass": False}
         self.volume = {
             "chord": 0.5,
             "strum": 0.5,
@@ -542,13 +359,8 @@ class AmySerialClient:
         }
         self.bus_id = dict(resolved_config.layout.role_buses)
         bus_values = tuple(self.bus_id.values())
-        if (
-            len(set(bus_values)) != 4
-            or any(bus < 0 or bus > 3 for bus in bus_values)
-        ):
-            raise ValueError(
-                "drums, bass, strum and chord must use four distinct AMY buses 0..3"
-            )
+        if len(set(bus_values)) != 4 or any(bus < 0 or bus > 3 for bus in bus_values):
+            raise ValueError("drums, bass, strum and chord must use four distinct AMY buses 0..3")
         self.master_volume = 1.0
         self.reverb = {
             "level": 0.0,
@@ -567,23 +379,24 @@ class AmySerialClient:
         self._scheduled_rhythm_id: str | None = None
         self.drum_catalog: DrumPatternCatalog = load_drum_pattern_catalog(
             _resolve_drum_catalog_directory(
-                packaged_root=(
-                    Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else None
-                )
+                packaged_root=(Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else None)
             )
         )
         self.drum_kit = resolved_config.drums.kit
         if self.drum_kit not in self.drum_catalog.kits:
             raise ValueError(
-                f"unknown drums.kit {self.drum_kit!r}; expected "
-                "tiny, gamma9001 or general_midi"
+                f"unknown drums.kit {self.drum_kit!r}; expected tiny, gamma9001 or general_midi"
             )
-        self._drum_roles = tuple(sorted({
-            event.role
-            for rhythm in self.drum_catalog.rhythms.values()
-            for level in rhythm.levels
-            for event in level
-        }))
+        self._drum_roles = tuple(
+            sorted(
+                {
+                    event.role
+                    for rhythm in self.drum_catalog.rhythms.values()
+                    for level in rhythm.levels
+                    for event in level
+                }
+            )
+        )
         self._pattern_ranges = {
             name: (start, count)
             for name, start, count in resolved_config.layout.sequencer_pattern_ranges
@@ -591,9 +404,7 @@ class AmySerialClient:
         _, drum_pattern_count = self._pattern_ranges["drum_bases"]
         if len(self._drum_roles) > drum_pattern_count:
             raise ValueError("logical drum roles exceed reserved AMY pattern slots")
-        self._drum_role_index = {
-            role: index for index, role in enumerate(self._drum_roles)
-        }
+        self._drum_role_index = {role: index for index, role in enumerate(self._drum_roles)}
 
         tag_config = {
             name: (start, count)
@@ -618,28 +429,21 @@ class AmySerialClient:
             tags = set(range(lane.start, lane.end))
             overlap = tags & occupied
             if overlap:
-                raise ValueError(
-                    f"sequencer tag ranges overlap at {min(overlap)}"
-                )
+                raise ValueError(f"sequencer tag ranges overlap at {min(overlap)}")
             occupied |= tags
             self._sequencer_lanes[lane_name] = lane
 
         self._configured_synths: set[int] = set()
-        self._synth_generation: dict[int, int] = {
-            synth: 0 for synth in self.synth_id.values()
-        }
+        self._synth_generation: dict[int, int] = {synth: 0 for synth in self.synth_id.values()}
 
         # Conservative oscillator-budget guard.  Every synth in the shipped
         # catalogue is Juno (6 oscs/voice) or DX7 (8 oscs/voice).  Drums use
         # one PCM osc per voice in v3.2.
-        worst_case_oscs = (
-            self.voice_count["drums"]
-            + 8 * (
-                self.voice_count["bass"]
-                + self.voice_count["strum"]
-                + self.voice_count["manual_chord"]
-                + self.voice_count["rhythm_chord"]
-            )
+        worst_case_oscs = self.voice_count["drums"] + 8 * (
+            self.voice_count["bass"]
+            + self.voice_count["strum"]
+            + self.voice_count["manual_chord"]
+            + self.voice_count["rhythm_chord"]
         )
         max_oscs = resolved_config.capacities.max_oscs
         if worst_case_oscs > max_oscs:
@@ -675,7 +479,14 @@ class AmySerialClient:
         self._preload_drum_library()
 
     def _wire(self, command: str) -> None:
-        self.writer.high(command)
+        try:
+            self.writer.high(command)
+        except TransportFailed as exc:
+            # A failed device must be visible, but it must not abort the Qt
+            # event batch that delivered unrelated MIDI/UI state changes.
+            if not self._transport_failure_reported:
+                print(f"AMY transport failed: {exc}", flush=True)
+                self._transport_failure_reported = True
 
     @staticmethod
     def _f(value: float) -> str:
@@ -698,18 +509,13 @@ class AmySerialClient:
         gain = max(0.0, self.resolved_config.drums.velocity_gain)
         level = max(0.0, min(1.0, float(velocity) / 127.0)) * gain
         preset = "" if sound.preset is None else f"p{sound.preset}"
-        return (
-            f"{preset}n{self._f(float(sound.note))}"
-            f"l{self._f(level)}i{self.synth_id['drums']}"
-        )
+        return f"{preset}n{self._f(float(sound.note))}l{self._f(level)}i{self.synth_id['drums']}"
 
     def _fill_pattern_id(self, fill: DrumFill) -> int:
         start, count = self._pattern_ranges["fills"]
         pattern = start + int(fill.index) - 1
         if not start <= pattern < start + count:
-            raise ValueError(
-                f"fill {fill.fill_id!r} has unsupported index {fill.index}"
-            )
+            raise ValueError(f"fill {fill.fill_id!r} has unsupported index {fill.index}")
         return pattern
 
     def _preload_drum_library(self) -> None:
@@ -733,11 +539,14 @@ class AmySerialClient:
             )
             tag_count = len(commands) - 2
             if tag_count > self.resolved_config.capacities.max_pattern_tags:
-                raise ValueError(
-                    f"fill {fill.fill_id!r} needs {tag_count} AMY pattern tags"
-                )
-            for command in commands:
-                self._wire(command)
+                raise ValueError(f"fill {fill.fill_id!r} needs {tag_count} AMY pattern tags")
+            writer = getattr(self, "writer", None)
+            high_many = getattr(writer, "high_many", None)
+            if callable(high_many):
+                high_many(commands)
+            else:
+                for command in commands:
+                    self._wire(command)
 
     def _bump_synth_generation(self, synth: int) -> None:
         self._synth_generation[synth] = self._synth_generation.get(synth, 0) + 1
@@ -805,9 +614,7 @@ class AmySerialClient:
             return f"if{SYNTH_FLAGS_NO_NOTE_WARNINGS}"
         return ""
 
-    def _patch_compatibility_commands(
-        self, patch: int, synth: int
-    ) -> list[str]:
+    def _patch_compatibility_commands(self, patch: int, synth: int) -> list[str]:
         """Small target-side corrections for known factory-patch edge cases.
 
         These do not replace the AMY patches.  They are sent immediately after
@@ -929,9 +736,7 @@ class AmySerialClient:
             # Put the bus in the allocation/patch event itself. Many Juno ROM
             # patches contain bus FX; without iy here those startup FX briefly
             # (and persistently) land on default bus 0 before a later route.
-            self._wire(
-                f"K{patch}i{synth}iv{voices}iy{bus}{flag_fields}Z"
-            )
+            self._wire(f"K{patch}i{synth}iv{voices}iy{bus}{flag_fields}Z")
             self._configured_synths.add(synth)
 
             guard_ms = self.resolved_config.performance.synth_alloc_guard_ms
@@ -1024,8 +829,7 @@ class AmySerialClient:
     def _adsr_is_active(self, role: str) -> bool:
         params = self.synth_params[role]
         return any(
-            params.get(key, -1.0) >= 0
-            for key in ("attack_ms", "decay_ms", "sustain", "release_ms")
+            params.get(key, -1.0) >= 0 for key in ("attack_ms", "decay_ms", "sustain", "release_ms")
         )
 
     def _sync_synth_params(
@@ -1036,9 +840,7 @@ class AmySerialClient:
     ) -> None:
         targets = self._role_synth_ids(role) if synth_ids is None else synth_ids
         for synth in targets:
-            for command in self._param_commands_for_synth(
-                role, synth, parameter_keys
-            ):
+            for command in self._param_commands_for_synth(role, synth, parameter_keys):
                 self._wire(command)
 
     def _apply_supported_params(
@@ -1322,9 +1124,7 @@ class AmySerialClient:
         config = self.rhythm_config
         if not isinstance(config, dict):
             return 0
-        return drum_quantum(
-            self.drum_catalog.rhythm(str(config.get("id", "")))
-        )
+        return drum_quantum(self.drum_catalog.rhythm(str(config.get("id", ""))))
 
     def _drum_activity_commands(
         self,
@@ -1336,17 +1136,13 @@ class AmySerialClient:
             return []
         rhythm = self.drum_catalog.rhythm(str(config.get("id", "")))
         use_live_quantization = (
-            self.rhythm_running
-            if quantize_live is None
-            else bool(quantize_live)
+            self.rhythm_running if quantize_live is None else bool(quantize_live)
         )
         drum_base, _ = self._pattern_ranges["drum_bases"]
         return list(
             compile_drum_activity_commands(
                 rhythm=rhythm,
-                percussion_activity=int(
-                    config.get("percussion_activity", 1)
-                ),
+                percussion_activity=int(config.get("percussion_activity", 1)),
                 roles=self._drum_roles,
                 pattern_start=drum_base,
                 rhythm_running=self.rhythm_running,
@@ -1360,10 +1156,7 @@ class AmySerialClient:
         order: list[int],
         fills: tuple[DrumFill, ...],
     ) -> list[tuple[DrumFill, int]]:
-        return [
-            (fill, start)
-            for fill, start in fill_occurrences(order, fills)
-        ]
+        return [(fill, start) for fill, start in fill_occurrences(order, fills)]
 
     def _fill_schedule_commands(
         self,
@@ -1378,9 +1171,7 @@ class AmySerialClient:
         order = (
             list(
                 dict.fromkeys(
-                    int(value)
-                    for value in raw_order
-                    if 0 <= int(value) < len(rhythm.fills)
+                    int(value) for value in raw_order if 0 <= int(value) < len(rhythm.fills)
                 )
             )
             if isinstance(raw_order, list)
@@ -1388,9 +1179,7 @@ class AmySerialClient:
         )
         lane = self._sequencer_lanes["drums"]
         use_live_quantization = (
-            self.rhythm_running
-            if quantize_live is None
-            else bool(quantize_live)
+            self.rhythm_running if quantize_live is None else bool(quantize_live)
         )
         plan = compile_fill_schedule_commands(
             fills=rhythm.fills,
@@ -1415,13 +1204,17 @@ class AmySerialClient:
     ) -> list[str]:
         commands: list[str] = []
         if activity:
-            commands.extend(self._drum_activity_commands(
-                quantize_live=quantize_live,
-            ))
+            commands.extend(
+                self._drum_activity_commands(
+                    quantize_live=quantize_live,
+                )
+            )
         if fills:
-            commands.extend(self._fill_schedule_commands(
-                quantize_live=quantize_live,
-            ))
+            commands.extend(
+                self._fill_schedule_commands(
+                    quantize_live=quantize_live,
+                )
+            )
         return commands
 
     @staticmethod
@@ -1437,16 +1230,8 @@ class AmySerialClient:
             "bass_mode",
             "bass_riff",
         }
-        old_shared = {
-            key: value
-            for key, value in old_config.items()
-            if key not in bass_fields
-        }
-        new_shared = {
-            key: value
-            for key, value in new_config.items()
-            if key not in bass_fields
-        }
+        old_shared = {key: value for key, value in old_config.items() if key not in bass_fields}
+        new_shared = {key: value for key, value in new_config.items() if key not in bass_fields}
         return old_shared == new_shared
 
     @staticmethod
@@ -1461,16 +1246,8 @@ class AmySerialClient:
             "chord_events",
             "chord_arpeggio",
         }
-        old_shared = {
-            key: value
-            for key, value in old_config.items()
-            if key not in chord_fields
-        }
-        new_shared = {
-            key: value
-            for key, value in new_config.items()
-            if key not in chord_fields
-        }
+        old_shared = {key: value for key, value in old_config.items() if key not in chord_fields}
+        new_shared = {key: value for key, value in new_config.items() if key not in chord_fields}
         return old_shared == new_shared
 
     @staticmethod
@@ -1481,10 +1258,9 @@ class AmySerialClient:
         if not isinstance(old_config, dict) or old_config == new_config:
             return False
         fields = {"busyness", "percussion_activity"}
-        return (
-            {key: value for key, value in old_config.items() if key not in fields}
-            == {key: value for key, value in new_config.items() if key not in fields}
-        )
+        return {key: value for key, value in old_config.items() if key not in fields} == {
+            key: value for key, value in new_config.items() if key not in fields
+        }
 
     @staticmethod
     def _only_fill_config_changed(
@@ -1494,10 +1270,9 @@ class AmySerialClient:
         if not isinstance(old_config, dict) or old_config == new_config:
             return False
         fields = {"fill_order", "fill_density_bars"}
-        return (
-            {key: value for key, value in old_config.items() if key not in fields}
-            == {key: value for key, value in new_config.items() if key not in fields}
-        )
+        return {key: value for key, value in old_config.items() if key not in fields} == {
+            key: value for key, value in new_config.items() if key not in fields
+        }
 
     @staticmethod
     def _only_tempo_config_changed(
@@ -1506,10 +1281,9 @@ class AmySerialClient:
     ) -> bool:
         if not isinstance(old_config, dict) or old_config == new_config:
             return False
-        return (
-            {key: value for key, value in old_config.items() if key != "tempo"}
-            == {key: value for key, value in new_config.items() if key != "tempo"}
-        )
+        return {key: value for key, value in old_config.items() if key != "tempo"} == {
+            key: value for key, value in new_config.items() if key != "tempo"
+        }
 
     def _replace_lane(self, lane_name: str) -> None:
         lane = self._sequencer_lanes[lane_name]
@@ -1551,12 +1325,14 @@ class AmySerialClient:
 
         commands: list[str] = []
         try:
-            commands.extend(self._drum_commands(
-                # Explicit Start has just reset the timebase and must begin at
-                # tick zero. Only replacements on a running transport wait for
-                # the next whole-bar boundary.
-                quantize_live=False if resume_transport else None,
-            ))
+            commands.extend(
+                self._drum_commands(
+                    # Explicit Start has just reset the timebase and must begin at
+                    # tick zero. Only replacements on a running transport wait for
+                    # the next whole-bar boundary.
+                    quantize_live=False if resume_transport else None,
+                )
+            )
         except ValueError as exc:
             print(f"AMY rhythm warning: {exc}", flush=True)
             return
@@ -1605,25 +1381,13 @@ class AmySerialClient:
             return
 
         old_config = self.rhythm_config
-        bass_only_changed = self._only_bass_config_changed(
-            old_config, new_config
-        )
-        chord_only_changed = self._only_chord_config_changed(
-            old_config, new_config
-        )
-        drum_only_changed = self._only_drum_activity_changed(
-            old_config, new_config
-        )
-        fill_only_changed = self._only_fill_config_changed(
-            old_config, new_config
-        )
-        tempo_only_changed = self._only_tempo_config_changed(
-            old_config, new_config
-        )
+        bass_only_changed = self._only_bass_config_changed(old_config, new_config)
+        chord_only_changed = self._only_chord_config_changed(old_config, new_config)
+        drum_only_changed = self._only_drum_activity_changed(old_config, new_config)
+        fill_only_changed = self._only_fill_config_changed(old_config, new_config)
+        tempo_only_changed = self._only_tempo_config_changed(old_config, new_config)
         old_id = (
-            str(self.rhythm_config.get("id", ""))
-            if isinstance(self.rhythm_config, dict)
-            else ""
+            str(self.rhythm_config.get("id", "")) if isinstance(self.rhythm_config, dict) else ""
         )
         new_id = str(new_config.get("id", ""))
         style_changed = bool(old_id) and old_id != new_id
@@ -1696,8 +1460,7 @@ class AmySerialClient:
             # AMY matches stolen/forgotten notes by rounded MIDI note.  If the
             # same pitch is re-entered, explicitly release the old instance.
             duplicate_index = next(
-                (i for i, n in enumerate(self._strum_active_notes)
-                 if int(round(n)) == midi_key),
+                (i for i, n in enumerate(self._strum_active_notes) if int(round(n)) == midi_key),
                 None,
             )
             if duplicate_index is not None:
