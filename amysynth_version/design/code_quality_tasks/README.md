@@ -12,3 +12,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | --- | --- | --- |
 | T01 | `T01_DOCUMENT_AUTHORITY.md` | complete |
 | T02 | `T02_CANONICAL_DRUM_DATA.md` | complete |
+| T03 | `T03_TOOL_LAYOUT_HYGIENE.md` | complete |

@@ -1,4 +1,9 @@
-# Simple slider baseline
+# Slider diagnostics
+
+These programs are interactive, read-only diagnostics. They may observe and
+print Qt behavior, but must not modify repository files, generated assets or
+user configuration. They are deliberately excluded from packaged production
+applications.
 
 `simple_slider_baseline.py` is a diagnostic app for the slider-drag regression.
 
@@ -12,15 +17,15 @@ main app:
 
 ```bash
 cd /home/jeroen/omnichord/LB_Omnichord/amysynth_version/qt_frontend
-/home/jeroen/omnichord/omnichord-env/bin/python tools/simple_slider_baseline.py
+/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/simple_slider_baseline.py
 ```
 
 If no window appears, retry with an explicit platform, matching the same
 diagnostic options supported by the main app:
 
 ```bash
-/home/jeroen/omnichord/omnichord-env/bin/python tools/simple_slider_baseline.py --x11
-/home/jeroen/omnichord/omnichord-env/bin/python tools/simple_slider_baseline.py --wayland
+/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/simple_slider_baseline.py --x11
+/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/simple_slider_baseline.py --wayland
 ```
 
 The baseline prints the selected Qt platform and display environment before it
@@ -45,7 +50,7 @@ Interpretation:
 After the plain baseline works, run the custom component baseline:
 
 ```bash
-/home/jeroen/omnichord/omnichord-env/bin/python tools/custom_slider_baseline.py
+/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/custom_slider_baseline.py
 ```
 
 Use the same mouse-hold-and-drag test. This version uses only
@@ -56,7 +61,7 @@ the full Omnichord layout or one of its surrounding controls.
 If both plain and custom baselines work, run the layout baseline:
 
 ```bash
-/home/jeroen/omnichord/omnichord-env/bin/python tools/layout_slider_baseline.py
+/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/layout_slider_baseline.py
 ```
 
 This adds the real app's outer shape: a `Flickable` viewport and scaled

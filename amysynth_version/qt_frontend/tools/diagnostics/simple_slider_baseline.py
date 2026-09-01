@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Minimal baseline for LB Omnichord's custom LabeledSlider.
+"""Minimal PySide6/QML slider baseline.
 
-Use this after `simple_slider_baseline.py` works.  It keeps the same
-Python/PySide6/QML stack, but replaces the plain Qt Quick Slider with the
-repository's `gui/LabeledSlider.qml` component.  It still avoids the real
-backend, AMY, MIDI routing, `Main.qml`, scaling layout and release packaging.
+This diagnostic intentionally avoids all LB Omnichord backend, AMY, MIDI,
+custom controls, scaling helpers and application layout.  It answers one
+question: does the current Python/PySide6/Qt/QML stack on this machine support
+mouse press-and-hold dragging of a plain Qt Quick Slider?
 """
 
 from __future__ import annotations
@@ -21,13 +21,13 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
 
-ROOT = Path(__file__).resolve().parents[1]
-QML_FILE = ROOT / "tools" / "custom_slider_baseline.qml"
+ROOT = Path(__file__).resolve().parents[2]
+QML_FILE = Path(__file__).with_suffix(".qml")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run a minimal LB LabeledSlider baseline app.",
+        description="Run a minimal Qt Quick Slider baseline app.",
     )
     platform = parser.add_mutually_exclusive_group()
     platform.add_argument(
@@ -82,12 +82,12 @@ def print_diagnostics(label: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(list(sys.argv[1:] if argv is None else argv))
     configure_environment(args)
-    print_diagnostics("Custom slider baseline environment:")
+    print_diagnostics("Simple slider baseline environment:")
 
     QQuickStyle.setStyle("Basic")
 
     app = QGuiApplication([sys.argv[0]])
-    app.setApplicationName("LB Omnichord custom slider baseline")
+    app.setApplicationName("LB Omnichord simple slider baseline")
 
     def quit_from_signal(signum: int, _frame: object) -> None:
         print(
@@ -117,7 +117,6 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     engine = QQmlApplicationEngine()
-    engine.addImportPath(str(ROOT / "gui"))
     engine.load(QUrl.fromLocalFile(str(QML_FILE)))
     roots = engine.rootObjects()
     print(f"  Root objects: {len(roots)}", file=sys.stderr, flush=True)
@@ -137,6 +136,12 @@ def main(argv: list[str] | None = None) -> int:
         request_activate()
     print(
         f"  Window visible property: {window.property('visible')}",
+        file=sys.stderr,
+        flush=True,
+    )
+    print(
+        "If no window appears, retry with --x11 or --wayland to match the "
+        "main app's platform choice.",
         file=sys.stderr,
         flush=True,
     )

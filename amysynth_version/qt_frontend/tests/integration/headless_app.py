@@ -9,11 +9,13 @@ from PySide6.QtCore import QCoreApplication
 
 ROOT = Path(__file__).resolve().parents[2]
 CODE_DIR = ROOT / "code"
+TEST_SUPPORT_DIR = ROOT / "tests" / "support"
 sys.path.insert(0, str(CODE_DIR))
+sys.path.insert(0, str(TEST_SUPPORT_DIR))
 
 import main as omnichord  # noqa: E402
 from amy_serial import AmySerialClient, load_amy_config  # noqa: E402
-from test_control import TestControlServer  # noqa: E402
+from control_server import TestControlServer  # noqa: E402
 
 
 def main() -> int:

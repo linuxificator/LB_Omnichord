@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
-"""Minimal PySide6/QML slider baseline.
+"""Baseline for LB LabeledSlider inside a Main.qml-like viewport.
 
-This diagnostic intentionally avoids all LB Omnichord backend, AMY, MIDI,
-custom controls, scaling helpers and application layout.  It answers one
-question: does the current Python/PySide6/Qt/QML stack on this machine support
-mouse press-and-hold dragging of a plain Qt Quick Slider?
+This keeps AMY, MIDI and the backend out of the process, but adds the two
+layout features that the real app wraps around every control:
+
+- an outer `Flickable`;
+- a scaled `contentArea` with `transformOrigin: Item.TopLeft`.
+
+If `simple_slider_baseline.py` and `custom_slider_baseline.py` both work but
+this one fails, the regression is in pointer handling through the app viewport.
+If all three work, the remaining suspect is runtime state feedback from the
+full backend.
 """
 
 from __future__ import annotations
@@ -21,13 +27,13 @@ from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
 
-ROOT = Path(__file__).resolve().parents[1]
-QML_FILE = ROOT / "tools" / "simple_slider_baseline.qml"
+ROOT = Path(__file__).resolve().parents[2]
+QML_FILE = Path(__file__).with_suffix(".qml")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run a minimal Qt Quick Slider baseline app.",
+        description="Run a Main-layout-like LB LabeledSlider baseline app.",
     )
     platform = parser.add_mutually_exclusive_group()
     platform.add_argument(
@@ -82,12 +88,12 @@ def print_diagnostics(label: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(list(sys.argv[1:] if argv is None else argv))
     configure_environment(args)
-    print_diagnostics("Simple slider baseline environment:")
+    print_diagnostics("Layout slider baseline environment:")
 
     QQuickStyle.setStyle("Basic")
 
     app = QGuiApplication([sys.argv[0]])
-    app.setApplicationName("LB Omnichord simple slider baseline")
+    app.setApplicationName("LB Omnichord layout slider baseline")
 
     def quit_from_signal(signum: int, _frame: object) -> None:
         print(
@@ -117,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     engine = QQmlApplicationEngine()
+    engine.addImportPath(str(ROOT / "gui"))
     engine.load(QUrl.fromLocalFile(str(QML_FILE)))
     roots = engine.rootObjects()
     print(f"  Root objects: {len(roots)}", file=sys.stderr, flush=True)
@@ -136,12 +143,6 @@ def main(argv: list[str] | None = None) -> int:
         request_activate()
     print(
         f"  Window visible property: {window.property('visible')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        "If no window appears, retry with --x11 or --wayland to match the "
-        "main app's platform choice.",
         file=sys.stderr,
         flush=True,
     )
