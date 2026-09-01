@@ -65,15 +65,11 @@ Item {
     }
 
     // Orange area deliberately ends at the tuning tap-control.
-    Rectangle {
-        x: -root.leftExtension
+    SectionBackground {
         y: 0
-        width: root.leftExtension + root.tuningX + root.tuningWidth
-        height: root.tuningRowHeight
-        radius: 12
-        color: "#f4c77f"
-        border.color: "#bd7517"
-        border.width: 1
+        leftExtension: root.leftExtension
+        contentWidth: root.tuningX + root.tuningWidth
+        frameHeight: root.tuningRowHeight
     }
 
     TuningLinkButton {

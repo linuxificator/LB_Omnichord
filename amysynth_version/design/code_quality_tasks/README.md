@@ -29,3 +29,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T17 | `T17_BOUNDED_APPLICATION_SCHEDULER.md` | complete |
 | T18 | `T18_MUSICAL_STATE_SNAPSHOTS.md` | complete |
 | T19 | `T19_PRESET_BINDING_SERVICES.md` | complete |
+| T20 | `T20_FOCUSED_QML_PRIMITIVES.md` | complete |

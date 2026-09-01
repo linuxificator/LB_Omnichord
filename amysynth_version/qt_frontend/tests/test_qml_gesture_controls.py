@@ -626,6 +626,64 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_shared_slider_fill_and_handle_use_native_visual_position(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    width: 220
+    height: 90
+    visible: true
+
+    LabeledSlider {
+        objectName: "mappedSlider"
+        x: 20
+        y: 10
+        width: 180
+        height: 70
+        label: "Tempo"
+        fromValue: 0
+        toValue: 100
+        currentValue: 25
+    }
+}
+""",
+        )
+        root = window.findChild(QObject, "mappedSlider")
+        self.assertIsNotNone(root)
+        assert root is not None
+        slider = root.findChild(QObject, "nativeSlider")
+        track = root.findChild(QObject, "sliderTrack")
+        fill = root.findChild(QObject, "sliderFill")
+        handle = root.findChild(QObject, "sliderHandle")
+        self.assertIsNotNone(slider)
+        self.assertIsNotNone(track)
+        self.assertIsNotNone(fill)
+        self.assertIsNotNone(handle)
+        assert slider is not None
+        assert track is not None
+        assert fill is not None
+        assert handle is not None
+
+        visual = float(slider.property("visualPosition"))
+        self.assertAlmostEqual(visual, 0.25, places=6)
+        self.assertAlmostEqual(
+            float(fill.property("width")),
+            visual * float(track.property("width")),
+            places=5,
+        )
+        expected_handle_x = float(slider.property("leftPadding")) + visual * (
+            float(slider.property("availableWidth")) - float(handle.property("width"))
+        )
+        self.assertAlmostEqual(float(handle.property("x")), expected_handle_x, places=5)
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
     def test_reverb_panel_slider_drag_works_in_real_panel_layout(self) -> None:
         engine, component, window = self.create_window(
             b"""

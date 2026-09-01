@@ -14,12 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class StaticContractTests(unittest.TestCase):
     def test_esp32_build_uses_the_immutable_omnichord_amy_release(self) -> None:
         repository = ROOT.parents[1]
-        workflow = (
-            repository / ".github" / "workflows" / "esp32p4-build.yml"
-        ).read_text(encoding="utf-8")
-        prepare = (ROOT.parent / "esp32p4" / "prepare_amy.sh").read_text(
+        workflow = (repository / ".github" / "workflows" / "esp32p4-build.yml").read_text(
             encoding="utf-8"
         )
+        prepare = (ROOT.parent / "esp32p4" / "prepare_amy.sh").read_text(encoding="utf-8")
         release_branch = "releases/amy_omnichord_R20260831T042456"
         release_commit = "14240031c135fdcd76a7a3a8ec81da8ef405c4b0"
 
@@ -98,9 +96,7 @@ class StaticContractTests(unittest.TestCase):
         repository = ROOT.parents[1]
         public_readme = (repository / "README.md").read_text(encoding="utf-8")
         frontend_readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        capture = (ROOT / "capture_screenshots.py").read_text(
-            encoding="utf-8"
-        )
+        capture = (ROOT / "capture_screenshots.py").read_text(encoding="utf-8")
 
         self.assertIn("https://github.com/linuxificator/amy", public_readme)
         self.assertIn("https://github.com/shorepine/amy", public_readme)
@@ -125,9 +121,9 @@ class StaticContractTests(unittest.TestCase):
             width, height = struct.unpack(">II", png[16:24])
             self.assertEqual((width, height), (1920, 850), relative)
 
-        workflow = (
-            repository / ".github" / "workflows" / "desktop-release.yml"
-        ).read_text(encoding="utf-8")
+        workflow = (repository / ".github" / "workflows" / "desktop-release.yml").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("refresh-readme-screenshots:", workflow)
         self.assertIn("needs: [publish-release, release-metadata]", workflow)
         self.assertIn(
@@ -135,28 +131,21 @@ class StaticContractTests(unittest.TestCase):
             workflow,
         )
         self.assertIn(
-            "python amysynth_version/qt_frontend/tools/"
-            "update_release_screenshots.py",
+            "python amysynth_version/qt_frontend/tools/update_release_screenshots.py",
             workflow,
         )
         self.assertIn("skip-rebuild: README screenshots only", workflow)
         self.assertIn("skip-checks:true", workflow)
 
-        app_core = (ROOT / "code" / "app_core.py").read_text(
-            encoding="utf-8"
-        )
+        app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
         self.assertIn("(2, 7, 104)", app_core)
 
     def test_midi_qml_uses_its_own_bindable_metaobject(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
         self.assertIn("PySide6>=6.6", requirements)
         screen = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
-        synth = (ROOT / "gui" / "MidiSynthSection.qml").read_text(
-            encoding="utf-8"
-        )
-        utility = (ROOT / "gui" / "MidiUtilitySection.qml").read_text(
-            encoding="utf-8"
-        )
+        synth = (ROOT / "gui" / "MidiSynthSection.qml").read_text(encoding="utf-8")
+        utility = (ROOT / "gui" / "MidiUtilitySection.qml").read_text(encoding="utf-8")
         self.assertIn("controller: backend.midiPlayer", screen)
         self.assertIn("root.controller.stateVersion", synth)
         self.assertIn("root.controller.tuningModeIndex", utility)
@@ -164,12 +153,8 @@ class StaticContractTests(unittest.TestCase):
 
     def test_midi_button_leds_are_not_visible_in_idle_state(self) -> None:
         led = (ROOT / "gui" / "MidiButtonLed.qml").read_text(encoding="utf-8")
-        preset = (ROOT / "gui" / "PresetResetButton.qml").read_text(
-            encoding="utf-8"
-        )
-        tap_number = (ROOT / "gui" / "TapNumber.qml").read_text(
-            encoding="utf-8"
-        )
+        preset = (ROOT / "gui" / "PresetResetButton.qml").read_text(encoding="utf-8")
+        tap_number = (ROOT / "gui" / "TapNumber.qml").read_text(encoding="utf-8")
         screen = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
 
         self.assertIn("visible: root.midiBound || root.midiPresetFeedback", led)
@@ -182,12 +167,12 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("PhysicalPushButton", screen)
         self.assertIn("encoder: f06Control.pitchBend", screen)
 
-        rotary = (
-            ROOT / "gui" / "physical_controls" / "PhysicalRotary.qml"
-        ).read_text(encoding="utf-8")
-        button = (
-            ROOT / "gui" / "physical_controls" / "PhysicalPushButton.qml"
-        ).read_text(encoding="utf-8")
+        rotary = (ROOT / "gui" / "physical_controls" / "PhysicalRotary.qml").read_text(
+            encoding="utf-8"
+        )
+        button = (ROOT / "gui" / "physical_controls" / "PhysicalPushButton.qml").read_text(
+            encoding="utf-8"
+        )
         for required in (
             "panel recess",
             "mounting skirt",
@@ -232,20 +217,13 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("+ root.hostWindow.volumeWidth", qml)
 
     def test_every_numeric_control_family_supports_midi_learn(self) -> None:
-        parameter = (ROOT / "gui" / "ParameterSlider.qml").read_text(
-            encoding="utf-8"
-        )
-        labeled = (ROOT / "gui" / "LabeledSlider.qml").read_text(
-            encoding="utf-8"
-        )
-        volume = (ROOT / "gui" / "VerticalVolume.qml").read_text(
-            encoding="utf-8"
-        )
-        tuning = (ROOT / "gui" / "TapNumber.qml").read_text(
-            encoding="utf-8"
-        )
-        numeric_components = (parameter, labeled, volume, tuning)
-        for component in numeric_components:
+        parameter = (ROOT / "gui" / "ParameterSlider.qml").read_text(encoding="utf-8")
+        labeled = (ROOT / "gui" / "LabeledSlider.qml").read_text(encoding="utf-8")
+        volume = (ROOT / "gui" / "VerticalVolume.qml").read_text(encoding="utf-8")
+        tuning = (ROOT / "gui" / "TapNumber.qml").read_text(encoding="utf-8")
+        slider = (ROOT / "gui" / "BindableSlider.qml").read_text(encoding="utf-8")
+        policy_components = (slider, volume, tuning)
+        for component in policy_components:
             self.assertIn("activateControlTarget", component)
             self.assertIn("releaseControlTargetForManualEdit", component)
             self.assertIn("controlTargetVisualState", component)
@@ -264,23 +242,19 @@ class StaticContractTests(unittest.TestCase):
             )
             self.assertNotIn("const wasBound = root.midiBound", component)
 
-        numeric_combined = "\n".join(numeric_components)
+        numeric_combined = "\n".join((parameter, labeled, *policy_components))
         self.assertNotIn("controlTargetDoubleTapped", numeric_combined)
         self.assertNotIn("controlTargetMoved", numeric_combined)
-        self.assertIn("if (root.midiBindingGesture)", parameter)
-        self.assertIn("if (root.midiBindingGesture)", labeled)
-        self.assertIn("midiManualTakeoverPending", parameter)
-        self.assertIn("midiManualTakeoverPending", labeled)
-        self.assertIn("root.syncSliderValue()", parameter)
-        self.assertIn("slider.value = Qt.binding", labeled)
-        self.assertIn("return root.currentValue", labeled)
-        self.assertIn("function beginSliderDrag()", labeled)
-        self.assertIn("root.beginSliderDrag()", labeled)
-        self.assertIn("slider.value = Number(slider.value)", labeled)
-        self.assertIn("function beginSliderDrag()", parameter)
-        self.assertIn("root.beginSliderDrag()", parameter)
-        self.assertIn("slider.value = Number(slider.value)", parameter)
-        self.assertIn("if (!slider.pressed)", parameter)
+        self.assertEqual(parameter.count("BindableSlider {"), 1)
+        self.assertEqual(labeled.count("BindableSlider {"), 1)
+        self.assertIn("if (root.midiBindingGesture)", slider)
+        self.assertIn("midiManualTakeoverPending", slider)
+        self.assertIn("slider.value = Qt.binding", slider)
+        self.assertIn("return root.currentValue", slider)
+        self.assertIn("function beginSliderDrag()", slider)
+        self.assertIn("root.beginSliderDrag()", slider)
+        self.assertIn("slider.value = Number(slider.value)", slider)
+        self.assertIn("if (!slider.pressed)", slider)
 
         combined = "\n".join(
             (ROOT / "gui" / name).read_text(encoding="utf-8")
@@ -311,9 +285,7 @@ class StaticContractTests(unittest.TestCase):
     def test_midi_control_states_and_omni_learn_led_are_rendered(self) -> None:
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
         omni = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
-        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
-            encoding="utf-8"
-        )
+        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(encoding="utf-8")
         for state in ("learn", "bound", "blue"):
             self.assertIn(f'modelData.state === "{state}"', midi)
         self.assertIn("modelData.evicting", midi)
@@ -334,34 +306,25 @@ class StaticContractTests(unittest.TestCase):
         symlinks = [
             str(path.relative_to(ROOT))
             for path in ROOT.rglob("*")
-            if path.is_symlink()
-            and not generated_roots.intersection(path.relative_to(ROOT).parts)
+            if path.is_symlink() and not generated_roots.intersection(path.relative_to(ROOT).parts)
         ]
         self.assertEqual(symlinks, [], f"unexpected symlinks: {symlinks}")
 
     def test_tuba_watermark_is_canonical_gui_asset(self) -> None:
-        qml = (ROOT / "gui" / "InstrumentWatermarks.qml").read_text(
-            encoding="utf-8"
-        )
+        qml = (ROOT / "gui" / "InstrumentWatermarks.qml").read_text(encoding="utf-8")
         png = ROOT / "gui" / "tuba_watermark.png"
         self.assertTrue(png.is_file())
         self.assertIn('source: "tuba_watermark.png"', qml)
 
     def test_parameter_slider_always_formats_numeric_value(self) -> None:
-        qml = (ROOT / "gui" / "ParameterSlider.qml").read_text(
-            encoding="utf-8"
-        )
+        qml = (ROOT / "gui" / "ParameterSlider.qml").read_text(encoding="utf-8")
         self.assertIn("formattedValue", qml)
         self.assertIn("Math.log", qml)
         self.assertIn("Math.exp", qml)
         self.assertIn("midiNoteName", qml)
 
     def test_catalogue_uses_physical_ranges_and_clean_labels(self) -> None:
-        data = json.loads(
-            (ROOT / "instruments" / "synths.json").read_text(
-                encoding="utf-8"
-            )
-        )
+        data = json.loads((ROOT / "instruments" / "synths.json").read_text(encoding="utf-8"))
         synths = data["synths"]
         self.assertEqual(len(synths), 123)
         for synth in synths:
@@ -383,18 +346,10 @@ class StaticContractTests(unittest.TestCase):
     def test_synth_state_has_one_frontend_and_one_receiver_path(self) -> None:
         entry_py = (ROOT / "code" / "main.py").read_text(encoding="utf-8")
         core_py = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
-        perf_py = (ROOT / "code" / "performance_backend.py").read_text(
-            encoding="utf-8"
-        )
-        public_amy_py = (ROOT / "code" / "amy_serial.py").read_text(
-            encoding="utf-8"
-        )
-        transport_py = (ROOT / "code" / "amy_transport.py").read_text(
-            encoding="utf-8"
-        )
-        rhythm_plan_py = (ROOT / "code" / "rhythm_command_plan.py").read_text(
-            encoding="utf-8"
-        )
+        perf_py = (ROOT / "code" / "performance_backend.py").read_text(encoding="utf-8")
+        public_amy_py = (ROOT / "code" / "amy_serial.py").read_text(encoding="utf-8")
+        transport_py = (ROOT / "code" / "amy_transport.py").read_text(encoding="utf-8")
+        rhythm_plan_py = (ROOT / "code" / "rhythm_command_plan.py").read_text(encoding="utf-8")
         state_py = (ROOT / "code" / "synth_state.py").read_text(encoding="utf-8")
 
         self.assertIn("class SynthState:", state_py)
@@ -471,9 +426,7 @@ class StaticContractTests(unittest.TestCase):
         gate_start = qml.index("id: chordGateButton")
         gate_end = qml.index("RainbowModeButton {", gate_start)
         gate = qml[gate_start:gate_end]
-        activity_selector = (
-            ROOT / "gui" / "ActivitySelector.qml"
-        ).read_text(encoding="utf-8")
+        activity_selector = (ROOT / "gui" / "ActivitySelector.qml").read_text(encoding="utf-8")
         self.assertIn("backend.chordGateState === 1", gate)
         for color in (
             '"#fff9dd"',
@@ -511,28 +464,22 @@ class StaticContractTests(unittest.TestCase):
     def test_rhythm_activity_groups_keep_equal_button_columns(self) -> None:
         qml = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
         self.assertEqual(qml.count("\n            ActivitySelector {"), 1)
-        self.assertEqual(
-            qml.count("\n            PercussionActivitySelector {"), 1
-        )
+        self.assertEqual(qml.count("\n            PercussionActivitySelector {"), 1)
         self.assertEqual(qml.count("\n            ChordActivitySelector {"), 1)
-        percussion = (
-            ROOT / "gui" / "PercussionActivitySelector.qml"
-        ).read_text(encoding="utf-8")
+        percussion = (ROOT / "gui" / "PercussionActivitySelector.qml").read_text(encoding="utf-8")
         self.assertIn("model: 5", percussion)
         self.assertIn('text: "F" + String(index + 1)', percussion)
         self.assertIn("root.fillToggled(index)", percussion)
         self.assertIn(
             "width: controlsArea.bassActivityWidth",
-            qml[qml.index("PercussionActivitySelector {"):],
+            qml[qml.index("PercussionActivitySelector {") :],
         )
         self.assertIn('label: "bass activity"', qml)
         self.assertIn('label: "fill density"', qml)
         for label in ('"/32"', '"/16"', '"/8"', '"/1"'):
             self.assertIn(label, qml)
         self.assertNotIn("levels: [0, 1, 2, 3, 4]", qml)
-        activity_selector = (
-            ROOT / "gui" / "ActivitySelector.qml"
-        ).read_text(encoding="utf-8")
+        activity_selector = (ROOT / "gui" / "ActivitySelector.qml").read_text(encoding="utf-8")
         self.assertIn("property var levels: [1, 2, 3, 4]", activity_selector)
         self.assertIn("property var levelLabels: []", activity_selector)
         self.assertIn("height: 29", activity_selector)
@@ -562,11 +509,8 @@ class StaticContractTests(unittest.TestCase):
             self.assertRegex(
                 qml,
                 r"(?s)root\.midiButtonHandled\(\{"
-                r".{0,250}"
-                + re.escape(f'"action": "{action}"')
-                + r".{0,250}\}\)\) \{"
-                r".{0,180}"
-                + re.escape(setter),
+                r".{0,250}" + re.escape(f'"action": "{action}"') + r".{0,250}\}\)\) \{"
+                r".{0,180}" + re.escape(setter),
                 action,
             )
         self.assertIn("controlsArea.expandedActivityWidth", qml)
@@ -574,13 +518,11 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("2 * bassActivityWidth + 2 * activityGap", qml)
         self.assertEqual(qml.count("x: controlsArea.bassColumnX"), 2)
 
-        chord = (
-            ROOT / "gui" / "ChordActivitySelector.qml"
-        ).read_text(encoding="utf-8")
+        chord = (ROOT / "gui" / "ChordActivitySelector.qml").read_text(encoding="utf-8")
         self.assertIn('text: "chord activity"', chord)
         self.assertIn('text: index < 4 ? String(index + 1) : "A"', chord)
         self.assertIn('? "/" + String(index + 1)', chord)
-        self.assertIn(': root.directionLabel', chord)
+        self.assertIn(": root.directionLabel", chord)
         self.assertIn("model: 5", chord)
         self.assertEqual(chord.count("Button {"), 2)
         self.assertNotIn("MouseArea {", chord)
@@ -592,12 +534,8 @@ class StaticContractTests(unittest.TestCase):
     def test_reverb_header_uses_wide_horizontal_sliders(self) -> None:
         panel = (ROOT / "gui" / "ReverbPanel.qml").read_text(encoding="utf-8")
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
-        midi_backend = (ROOT / "code" / "midi_player.py").read_text(
-            encoding="utf-8"
-        )
-        omni_backend = (ROOT / "code" / "app_core.py").read_text(
-            encoding="utf-8"
-        )
+        midi_backend = (ROOT / "code" / "midi_player.py").read_text(encoding="utf-8")
+        omni_backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
         self.assertIn("id: controlsRow", panel)
         self.assertEqual(panel.count("LabeledSlider {"), 3)
         self.assertNotIn("VerticalVolume {", panel)
@@ -611,9 +549,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('label: "DAMP"', panel)
         self.assertIn("property int reverbPanelWidth: 572", main)
 
-        midi_integration = (
-            ROOT / "code" / "midi_integration.py"
-        ).read_text(encoding="utf-8")
+        midi_integration = (ROOT / "code" / "midi_integration.py").read_text(encoding="utf-8")
         self.assertIn("@Property(QObject, constant=True)", midi_integration)
 
     def test_utility_header_uses_two_aligned_visual_rows(self) -> None:
@@ -698,9 +634,7 @@ class StaticContractTests(unittest.TestCase):
     def test_brown_master_controls_are_independent_and_right_aligned(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
-        tap_number = (ROOT / "gui" / "TapNumber.qml").read_text(
-            encoding="utf-8"
-        )
+        tap_number = (ROOT / "gui" / "TapNumber.qml").read_text(encoding="utf-8")
         utilities = tuple(
             (ROOT / "gui" / name).read_text(encoding="utf-8")
             for name in ("UtilitySection.qml", "MidiUtilitySection.qml")
@@ -730,7 +664,7 @@ class StaticContractTests(unittest.TestCase):
             self.assertIn('panelColor: "#b58a63"', utility)
             self.assertIn('fillColor: "#704323"', utility)
             self.assertIn('? "UMT" : "MUT"', utility)
-            self.assertIn('centerPanelColor:', utility)
+            self.assertIn("centerPanelColor:", utility)
             self.assertIn('root.controller.masterMuted ? "#111111" : "#ffffff"', utility)
             self.assertIn(f'"screen": "{screen_name}"', utility)
             self.assertIn('"kind": "master_volume"', utility)
@@ -774,11 +708,9 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn("RELEASE_GRACE", backend)
 
         chord_start = qml.index(
-            "objectName:\n                                        \"chordButton_\""
+            'objectName:\n                                        "chordButton_"'
         )
-        chord_end = qml.index(
-            "Repeater {\n                                model: octaveNames"
-        )
+        chord_end = qml.index("Repeater {\n                                model: octaveNames")
         chord_buttons = qml[chord_start:chord_end]
         self.assertIn("TapHandler {", chord_buttons)
         self.assertIn("gesturePolicy:", chord_buttons)
@@ -800,7 +732,8 @@ class StaticContractTests(unittest.TestCase):
                 "ParameterSlider.qml",
             )
         ]
-        combined = "\n".join(numeric)
+        slider = (ROOT / "gui" / "BindableSlider.qml").read_text(encoding="utf-8")
+        combined = "\n".join((*numeric, slider))
         for marker in (
             "Date.now()",
             "holdDelayMs",
@@ -813,42 +746,53 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("autoRepeat: true", numeric[1])
         self.assertNotIn("onDoubleClicked:", combined)
         self.assertNotIn("onDoubleTapped:", combined)
-        self.assertIn("onMoved:", numeric[2])
-        self.assertIn("onMoved:", numeric[3])
-        for slider_qml in numeric[2:4]:
-            self.assertIn("implicitWidth:", slider_qml)
-            self.assertIn("implicitHeight:", slider_qml)
-            slider_block = re.search(
-                r"Slider\s*\{(?P<body>.*?)(?:\n\s*handle:|\n\s*background:)",
-                slider_qml,
-                re.DOTALL,
-            )
-            self.assertIsNotNone(slider_block)
-            assert slider_block is not None
-            self.assertNotIn("TapHandler", slider_block.group("body"))
-        midi_state = (ROOT / "code" / "midi_control.py").read_text(
-            encoding="utf-8"
+        self.assertEqual(numeric[2].count("BindableSlider {"), 1)
+        self.assertEqual(numeric[3].count("BindableSlider {"), 1)
+        self.assertIn("onMoved:", slider)
+        self.assertIn("implicitWidth:", slider)
+        self.assertIn("implicitHeight:", slider)
+        slider_block = re.search(
+            r"Slider\s*\{(?P<body>.*?)(?:\n\s*handle:|\n\s*background:)",
+            slider,
+            re.DOTALL,
         )
+        self.assertIsNotNone(slider_block)
+        assert slider_block is not None
+        self.assertNotIn("TapHandler", slider_block.group("body"))
+        midi_state = (ROOT / "code" / "midi_control.py").read_text(encoding="utf-8")
         self.assertNotIn("double_tap_window", midi_state)
         self.assertNotIn("_target_taps", midi_state)
         self.assertNotIn("def target_double_tapped(", midi_state)
         self.assertIn("def indicator_clicked(", midi_state)
         self.assertIn("def release_target_for_manual_edit(", midi_state)
 
+    def test_focused_qml_primitives_are_shared_without_domain_policy(self) -> None:
+        bindable = (ROOT / "gui" / "BindableSlider.qml").read_text(encoding="utf-8")
+        section = (ROOT / "gui" / "SectionBackground.qml").read_text(encoding="utf-8")
+        pointer = (ROOT / "gui" / "PointerNormalization.js").read_text(encoding="utf-8")
+        utility = (ROOT / "gui" / "UtilitySection.qml").read_text(encoding="utf-8")
+        midi_utility = (ROOT / "gui" / "MidiUtilitySection.qml").read_text(encoding="utf-8")
+        strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
+        midi_strum = (ROOT / "gui" / "MidiStrumPad.qml").read_text(encoding="utf-8")
+
+        self.assertIn("slider.visualPosition", bindable)
+        self.assertIn("Accessible.name:", bindable)
+        self.assertNotIn("omni", bindable.lower())
+        self.assertNotIn("midiPreview", bindable)
+        self.assertEqual(utility.count("SectionBackground {"), 1)
+        self.assertEqual(midi_utility.count("SectionBackground {"), 1)
+        self.assertIn("function verticalUnit(y, height)", pointer)
+        self.assertIn("PointerNormalization.verticalUnit", strum)
+        self.assertIn("PointerNormalization.verticalUnit", midi_strum)
+        self.assertNotIn("controller", section)
+
     def test_parameter_slider_live_edits_do_not_reset_repeater_models(self) -> None:
         app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
-        midi_player = (ROOT / "code" / "midi_player.py").read_text(
-            encoding="utf-8"
-        )
-        synth_section = (ROOT / "gui" / "SynthSection.qml").read_text(
-            encoding="utf-8"
-        )
-        midi_synth = (ROOT / "gui" / "MidiSynthSection.qml").read_text(
-            encoding="utf-8"
-        )
-        parameter = (ROOT / "gui" / "ParameterSlider.qml").read_text(
-            encoding="utf-8"
-        )
+        midi_player = (ROOT / "code" / "midi_player.py").read_text(encoding="utf-8")
+        synth_section = (ROOT / "gui" / "SynthSection.qml").read_text(encoding="utf-8")
+        midi_synth = (ROOT / "gui" / "MidiSynthSection.qml").read_text(encoding="utf-8")
+        parameter = (ROOT / "gui" / "ParameterSlider.qml").read_text(encoding="utf-8")
+        slider = (ROOT / "gui" / "BindableSlider.qml").read_text(encoding="utf-8")
 
         for slot in (
             "def editChordSynthControl(",
@@ -879,24 +823,19 @@ class StaticContractTests(unittest.TestCase):
 
         release_block = re.search(
             r"onPressedChanged:\s*\{(?P<body>.*?)\n\s*\}\n\s*\n\s*onMoved:",
-            parameter,
+            slider,
             re.DOTALL,
         )
         self.assertIsNotNone(release_block)
         assert release_block is not None
-        self.assertNotIn(
-            "} else {\n                root.syncSliderValue()",
-            release_block.group("body"),
-        )
         self.assertIn(
-            "if (root.midiBindingGesture)\n                    root.syncSliderValue()",
+            "root.synchronizeFromBackend()",
             release_block.group("body"),
         )
+        self.assertIn("currentValue: root.controlToSlider(root.control.value)", parameter)
 
     def test_clickable_visuals_use_qt_quick_buttons(self) -> None:
-        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
-            encoding="utf-8"
-        )
+        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(encoding="utf-8")
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
         self.assertTrue(rainbow.lstrip().startswith("import QtQuick"))
         self.assertIn("\nButton {\n", rainbow)
@@ -910,18 +849,12 @@ class StaticContractTests(unittest.TestCase):
 
     def test_runtime_ui_does_not_branch_on_operating_system_names(self) -> None:
         quality_policy = json.loads(
-            (ROOT / "tests" / "quality" / "quality_policy.json").read_text(
-                encoding="utf-8"
-            )
+            (ROOT / "tests" / "quality" / "quality_policy.json").read_text(encoding="utf-8")
         )
-        platform_adapters = set(
-            quality_policy["direct_platform_access_allowlist"]
-        )
+        platform_adapters = set(quality_policy["direct_platform_access_allowlist"])
         runtime_files = [
             *sorted(
-                path
-                for path in (ROOT / "code").glob("*.py")
-                if path.name not in platform_adapters
+                path for path in (ROOT / "code").glob("*.py") if path.name not in platform_adapters
             ),
             *sorted((ROOT / "gui").glob("*.qml")),
         ]
@@ -970,9 +903,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("Math.min(34, width - 4)", guide)
 
     def test_rainbow_mode_button_text_is_large_and_centered(self) -> None:
-        qml = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
-            encoding="utf-8"
-        )
+        qml = (ROOT / "gui" / "RainbowModeButton.qml").read_text(encoding="utf-8")
         self.assertIn("font.pixelSize: height * 0.55", qml)
         self.assertNotIn("anchors.horizontalCenterOffset", qml)
         self.assertIn("width: root.width", qml)
@@ -984,12 +915,8 @@ class StaticContractTests(unittest.TestCase):
     def test_hidden_preset_binding_leds_are_wired_to_location_feedback(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
-        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(
-            encoding="utf-8"
-        )
-        led = (ROOT / "gui" / "MidiBindingLocationLed.qml").read_text(
-            encoding="utf-8"
-        )
+        rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(encoding="utf-8")
+        led = (ROOT / "gui" / "MidiBindingLocationLed.qml").read_text(encoding="utf-8")
         utilities = tuple(
             (ROOT / "gui" / name).read_text(encoding="utf-8")
             for name in ("UtilitySection.qml", "MidiUtilitySection.qml")
@@ -1028,9 +955,7 @@ class StaticContractTests(unittest.TestCase):
     def test_midi_owned_tempo_and_tuning_nudges_are_grey_and_disabled(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
-        button = (ROOT / "gui" / "PresetResetButton.qml").read_text(
-            encoding="utf-8"
-        )
+        button = (ROOT / "gui" / "PresetResetButton.qml").read_text(encoding="utf-8")
         compact_button = " ".join(button.split())
         self.assertEqual(main.count("enabled: !window.omniTuningLocked"), 2)
         self.assertEqual(main.count("enabled: !window.rhythmTempoMidiBound"), 2)
@@ -1056,9 +981,7 @@ class StaticContractTests(unittest.TestCase):
             },
         )
         self.assertGreaterEqual(config["amy_max_buses"], 11)
-        transport_py = (ROOT / "code" / "amy_transport.py").read_text(
-            encoding="utf-8"
-        )
+        transport_py = (ROOT / "code" / "amy_transport.py").read_text(encoding="utf-8")
         self.assertIn('self.bus_id["strum"]', transport_py)
         self.assertIn('self.bus_id["chord"]', transport_py)
         self.assertIn(
@@ -1068,9 +991,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("self._apply_reverb_bus(bus)", transport_py)
 
     def test_silent_factory_juno_patches_get_explicit_excitation(self) -> None:
-        config = json.loads(
-            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
-        )
+        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
         compatibility = config["patch_compatibility"]
         for patch in ("57", "109"):
             self.assertGreater(
