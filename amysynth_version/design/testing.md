@@ -55,6 +55,15 @@ Run the fast gate directly with:
 python tests/run_quality.py
 ```
 
+Every `run_tests.py` invocation atomically writes a versioned JSON report with
+the selected suite, each isolated script's status/duration, total duration,
+repository commit and pinned AMY commit. CI uploads it even when a script
+fails. `--coverage` uses coverage.py's subprocess patch and parallel data
+files, then combines them into navigational branch data without a global
+percentage threshold. The reusable workflow applies this selectively to the
+pure/unit suite; native/package tests remain acceptance evidence rather than
+being distorted to raise a coverage number.
+
 Top-level unit tests are discovered automatically. Integration suites are
 listed explicitly because their process, PTY and native-engine requirements
 differ. `test-artifacts/<suite>/` is recreated for every suite invocation and

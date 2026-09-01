@@ -37,6 +37,48 @@ def change(
 
 
 class MidiControlStateTests(unittest.TestCase):
+    def test_deterministic_transition_sequences_preserve_state_invariants(self) -> None:
+        for capacity in range(1, 6):
+            state = MidiControlState(capacity=capacity)
+            for step in range(1, 41):
+                channel = 1 + step % 16
+                controller = (step * 17) % 128
+                value = (step * 29) % 128
+                state.observe(channel, controller, value, now=float(step))
+                key = state.key(channel, controller)
+                if step % 7 == 0:
+                    state.indicator_clicked(key, now=step + 0.1)
+                if step % 11 == 0 and state.learn_key is not None:
+                    state.bind_learned_target(
+                        target(f"property-{step % 4}"),
+                        now=step + 0.2,
+                    )
+
+                visible_keys = [
+                    (int(item["channel"]), int(item["controller"]))
+                    for item in state.controls
+                ]
+                self.assertLessEqual(len(visible_keys), capacity)
+                self.assertEqual(len(visible_keys), len(set(visible_keys)))
+                self.assertLessEqual(int(state.learn_key is not None), 1)
+                self.assertEqual(
+                    set(state._target_to_control.values()),
+                    set(state.bindings),
+                )
+                self.assertEqual(
+                    set(state._target_to_control),
+                    {
+                        state.target_id(binding)
+                        for binding in state.bindings.values()
+                    },
+                )
+                for control_key, observed in state.values.items():
+                    self.assertGreaterEqual(observed, 0)
+                    self.assertLessEqual(
+                        observed,
+                        state.value_max_for_key(control_key),
+                    )
+
     def test_true_lru_and_outgoing_red_replacement_model(self) -> None:
         state = MidiControlState(capacity=3)
         change(state, 10, now=1.0)

@@ -32,3 +32,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T20 | `T20_FOCUSED_QML_PRIMITIVES.md` | complete |
 | T21 | `T21_VIEW_FACADES_AND_INITIALIZATION.md` | complete |
 | T22 | `T22_CATALOGUE_SCHEMA_PROVENANCE.md` | complete |
+| T23 | `T23_TEST_REPORTS_AND_COVERAGE.md` | complete |

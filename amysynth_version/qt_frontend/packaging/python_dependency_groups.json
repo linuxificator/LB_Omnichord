@@ -57,6 +57,10 @@
     "types-pyserial": {
       "distribution": "types-pyserial",
       "owner": "test_quality"
+    },
+    "coverage": {
+      "distribution": "coverage",
+      "owner": "test_quality"
     }
   },
   "component_exceptions": {

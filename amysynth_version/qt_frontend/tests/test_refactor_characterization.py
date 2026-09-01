@@ -137,10 +137,21 @@ class RefactorCharacterizationTests(unittest.TestCase):
             ]
             self.assertEqual(self_dispatch, [], file_name)
 
-        composition = (CODE / "application_composition.py").read_text(
-            encoding="utf-8"
+        composition_path = CODE / "application_composition.py"
+        composition = ast.parse(
+            composition_path.read_text(encoding="utf-8"),
+            filename=str(composition_path),
         )
-        self.assertIn("backend.initialize()", composition)
+        initialization_calls = [
+            node
+            for node in ast.walk(composition)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "initialize"
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "backend"
+        ]
+        self.assertEqual(len(initialization_calls), 1)
 
         for file_name, class_name in (
             ("midi_integration.py", "InstrumentBackend"),

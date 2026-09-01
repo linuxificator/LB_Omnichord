@@ -111,14 +111,22 @@ jobs:
         env:
           ALSA_CONFIG_PATH: ${{ github.workspace }}/amysynth_version/qt_frontend/tests/alsa-null.conf
           OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
-        run: python tests/run_tests.py --suite '${{ matrix.suite }}'
+        run: |
+          coverage_args=()
+          if [[ '${{ matrix.suite }}' == 'unit' ]]; then
+            coverage_args+=(--coverage)
+          fi
+          python tests/run_tests.py --suite '${{ matrix.suite }}' "${coverage_args[@]}"
 
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: amy-regression-${{ matrix.suite }}
-          path: amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}
+          path: |
+            amysynth_version/qt_frontend/test-artifacts/${{ matrix.suite }}
+            amysynth_version/qt_frontend/test-artifacts/test-report-${{ matrix.suite }}.json
+            amysynth_version/qt_frontend/test-artifacts/coverage-${{ matrix.suite }}
           if-no-files-found: ignore
           retention-days: 14
 
@@ -173,7 +181,12 @@ jobs:
         env:
           ALSA_CONFIG_PATH: ${{ github.workspace }}/amysynth_version/qt_frontend/tests/alsa-null.conf
           OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
-        run: python tests/run_tests.py --suite '${{ inputs.suite }}'
+        run: |
+          coverage_args=()
+          if [[ '${{ inputs.suite }}' == 'unit' ]]; then
+            coverage_args+=(--coverage)
+          fi
+          python tests/run_tests.py --suite '${{ inputs.suite }}' "${coverage_args[@]}"
 
       - name: Upload diagnostics
         if: always()
