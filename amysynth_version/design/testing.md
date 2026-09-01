@@ -60,6 +60,13 @@ listed explicitly because their process, PTY and native-engine requirements
 differ. `test-artifacts/<suite>/` is recreated for every suite invocation and
 is intentionally ignored by Git.
 
+Musical catalogue tests exercise four separate failure boundaries: versioned
+schema shape, row-local musical constraints, cross-catalogue references and
+immutable constructed indexes. `test_catalogue_provenance.py` additionally
+verifies the committed byte hashes and declared item counts. A catalogue edit
+must therefore deliberately update its provenance record; merely accepting a
+new shape at runtime is not sufficient review evidence.
+
 ## GitHub Actions
 
 Four repository workflows are maintained:

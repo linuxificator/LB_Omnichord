@@ -127,6 +127,18 @@ class DrumPatternTests(unittest.TestCase):
                 for event in fill.events:
                     self.assertLess(event.tick, fill.duration_ticks)
 
+    def test_catalogue_and_nested_kit_indexes_are_immutable(self) -> None:
+        with self.assertRaises(TypeError):
+            self.catalog.rhythms["new"] = self.catalog.rhythm("pop_8")
+        tiny = self.catalog.kits["tiny"]
+        with self.assertRaises(TypeError):
+            tiny.activity_rhythm_profile["pop_8"] = "replacement"
+        profile = next(iter(tiny.activity_profiles.values()))
+        with self.assertRaises(TypeError):
+            profile["low_primary"] = self.catalog.resolve(
+                "tiny", "pop_8", "low_primary"
+            )
+
     def test_activity_levels_are_selected_complete_not_concatenated(self) -> None:
         pop = self.catalog.rhythm("pop_8")
         level_one = {(event.tick, event.role) for event in pop.levels[0]}

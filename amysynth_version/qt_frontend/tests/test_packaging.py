@@ -10,6 +10,30 @@ REPOSITORY = FRONTEND.parents[1]
 
 
 class PackagingContracts(unittest.TestCase):
+    def test_catalogue_schemas_and_provenance_ship_on_every_platform(self) -> None:
+        appimage = (
+            FRONTEND / "packaging" / "build_appimage.sh"
+        ).read_text(encoding="utf-8")
+        macos = (
+            FRONTEND / "packaging" / "build_macos_dmg.sh"
+        ).read_text(encoding="utf-8")
+        windows = (
+            FRONTEND / "packaging" / "build_windows.ps1"
+        ).read_text(encoding="utf-8")
+        android = (
+            FRONTEND / "packaging" / "android" / "build_android.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('--add-data "$frontend_dir/music:music"', appimage)
+        self.assertIn('--add-data "$frontend_dir/music:music"', macos)
+        self.assertIn("'music');music", windows)
+        self.assertIn('ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")', android)
+        self.assertTrue((FRONTEND / "music" / "catalogue_provenance.json").is_file())
+        self.assertEqual(
+            len(tuple((FRONTEND / "music" / "schema").glob("*.schema.json"))),
+            5,
+        )
+
     def test_every_platform_uses_one_amy_release_branch_and_commit(self) -> None:
         workflows = [
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml",

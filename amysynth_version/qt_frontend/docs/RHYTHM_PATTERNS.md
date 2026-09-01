@@ -159,6 +159,22 @@ tree and records its reviewed SHA-256. Every desktop packager copies the full
 `music` tree, Android stages it recursively, and the package self-test
 explicitly requires the drum timing, continuation and tiny mapping files.
 
+Loading is intentionally staged: a versioned schema first rejects structural
+or version drift, the typed loader then checks each row's musical constraints,
+the assembled catalogue checks references and AMY capacity, and only then are
+read-only indexes published. Schemas live in `music/schema/` and ship as part
+of the complete music asset tree. `music/catalogue_provenance.json` records
+the schema, SHA-256, item count and known manual/generation process for every
+runtime bass/drum catalogue. It also records the unresolved third-party data
+licensing evidence explicitly rather than implying that a source citation is
+a redistribution license.
+
+The Gamma9001 direct-PCM map remains a reviewed Python data snapshot. Git
+history and the pinned AMY source identify its origin, but no deterministic
+generator was recorded; changing only its file format would therefore not
+improve reproducibility. A future migration first needs a checked generator
+whose output is byte-stable and compared with the complete existing mapping.
+
 Unit tests validate every catalogue entry, all kit mappings, exact complete
 activity-level selection, all 270 preloaded definitions, the 64-event limit,
 continuation mutes, fill-order supercycles and the 1024/64/32 integration

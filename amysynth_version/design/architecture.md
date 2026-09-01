@@ -36,6 +36,15 @@ an alternate composition root and must not select concrete client or backend
 classes. Tests may replace the narrow factories with fake ports without
 patching module symbols.
 
+Musical JSON catalogues enter the runtime through a four-phase boundary:
+versioned JSON Schema validation, local row validation, cross-catalogue
+invariants and immutable index construction. `fastjsonschema` is the single
+shape-validation implementation. Runtime consumers receive tuples, frozen
+values and read-only mappings; they do not retain a mutable parsed JSON tree.
+`music/catalogue_provenance.json` records the reviewed schema, content hash,
+count and creation process for every bass/drum catalogue without becoming a
+second runtime data authority.
+
 Backend constructors establish in-memory invariants only. The composition root
 calls the public, idempotent `initialize()` phase after the complete concrete
 facade exists; preset filesystem I/O, cross-facade binding restoration and MIDI

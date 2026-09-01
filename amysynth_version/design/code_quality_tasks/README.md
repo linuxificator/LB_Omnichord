@@ -31,3 +31,4 @@ work. These files do not replace the authoritative subsystem contracts.
 | T19 | `T19_PRESET_BINDING_SERVICES.md` | complete |
 | T20 | `T20_FOCUSED_QML_PRIMITIVES.md` | complete |
 | T21 | `T21_VIEW_FACADES_AND_INITIALIZATION.md` | complete |
+| T22 | `T22_CATALOGUE_SCHEMA_PROVENANCE.md` | complete |

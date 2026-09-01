@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
+from catalog_schema import read_versioned_catalog
 from drum_gamma9001 import GAMMA9001_DIRECT_PCM
 
 
@@ -50,16 +52,16 @@ class DrumSound:
 
 @dataclass(frozen=True)
 class _KitMap:
-    activity_profiles: dict[str, dict[str, DrumSound]]
-    activity_rhythm_profile: dict[str, str]
-    fill_profiles: dict[str, dict[str, DrumSound]]
-    fill_rhythm_profile: dict[str, str]
+    activity_profiles: Mapping[str, Mapping[str, DrumSound]]
+    activity_rhythm_profile: Mapping[str, str]
+    fill_profiles: Mapping[str, Mapping[str, DrumSound]]
+    fill_rhythm_profile: Mapping[str, str]
 
 
 @dataclass(frozen=True)
 class DrumPatternCatalog:
-    rhythms: dict[str, DrumRhythm]
-    kits: dict[str, _KitMap]
+    rhythms: Mapping[str, DrumRhythm]
+    kits: Mapping[str, _KitMap]
 
     def rhythm(self, rhythm_id: str) -> DrumRhythm:
         try:
@@ -98,11 +100,8 @@ class DrumPatternCatalog:
             ) from exc
 
 
-def _read(path: Path) -> dict[str, Any]:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError(f"{path} must contain a JSON object")
-    return raw
+def _read(path: Path, schema_name: str) -> Mapping[str, Any]:
+    return read_versioned_catalog(path, schema_name)
 
 
 def _event(raw: Any, *, period_ticks: int, source: str) -> DrumEvent:
@@ -160,8 +159,8 @@ def _sound(raw: Any, *, kit_family: str) -> DrumSound:
 def _load_kit(
     path: Path,
     kit_family: str,
-) -> tuple[dict[str, dict[str, DrumSound]], dict[str, str]]:
-    raw = _read(path)
+) -> tuple[Mapping[str, Mapping[str, DrumSound]], Mapping[str, str]]:
+    raw = _read(path, "drum_kit_v1.schema.json")
     if str(raw.get("kit_family")) != kit_family:
         raise ValueError(f"{path} does not describe kit {kit_family!r}")
     raw_profiles = raw.get("profiles")
@@ -176,17 +175,55 @@ def _load_kit(
             str(role): _sound(value, kit_family=kit_family)
             for role, value in profile.items()
         }
-    return profiles, {
-        str(key): str(value)
-        for key, value in assignments.items()
+    immutable_profiles = MappingProxyType(
+        {
+            key: MappingProxyType(value)
+            for key, value in profiles.items()
+        }
+    )
+    return immutable_profiles, MappingProxyType(
+        {str(key): str(value) for key, value in assignments.items()}
+    )
+
+
+def _validate_drum_cross_references(catalog: DrumPatternCatalog) -> None:
+    global_activity_roles = {
+        event.role
+        for rhythm in catalog.rhythms.values()
+        for level in rhythm.levels
+        for event in level
     }
+    for rhythm in catalog.rhythms.values():
+        active_roles = {event.role for level in rhythm.levels for event in level}
+        fill_roles = {event.role for fill in rhythm.fills for event in fill.events}
+        for kit_family in KIT_FAMILIES:
+            for role in active_roles:
+                catalog.resolve(kit_family, rhythm.rhythm_id, role)
+            for role in fill_roles:
+                catalog.resolve(kit_family, rhythm.rhythm_id, role, fill=True)
+        for fill in rhythm.fills:
+            # A continuation role absent at the selected level is an
+            # intentional no-op; its whitelist is activity-independent.
+            if len(fill.events) + len(global_activity_roles - fill.continue_roles) > 64:
+                raise ValueError(
+                    f"{fill.fill_id} exceeds AMY's 64 events after mutes"
+                )
 
 
 def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
     directory = Path(directory)
-    activity = _read(directory / "drum_activity_timing.json")
-    fills_raw = _read(directory / "drum_fills_timing.json")
-    continuation = _read(directory / "drum_fill_continuation_roles.json")
+    activity = _read(
+        directory / "drum_activity_timing.json",
+        "drum_activity_v1.schema.json",
+    )
+    fills_raw = _read(
+        directory / "drum_fills_timing.json",
+        "drum_fills_v2.schema.json",
+    )
+    continuation = _read(
+        directory / "drum_fill_continuation_roles.json",
+        "drum_continuation_v1.schema.json",
+    )
     if int(activity.get("design_contract", {}).get("ppq", 0)) != PPQ:
         raise ValueError("drum activity catalogue must use 96 PPQ")
 
@@ -311,37 +348,9 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
             fill_rhythm_profile=fill_assignments,
         )
 
-    catalog = DrumPatternCatalog(rhythms=rhythms, kits=kits)
-    global_activity_roles = {
-        event.role
-        for rhythm in rhythms.values()
-        for level in rhythm.levels
-        for event in level
-    }
-    for rhythm in rhythms.values():
-        active_roles = {
-            event.role for level in rhythm.levels for event in level
-        }
-        fill_roles = {
-            event.role for fill in rhythm.fills for event in fill.events
-        }
-        for kit_family in KIT_FAMILIES:
-            for role in active_roles:
-                catalog.resolve(kit_family, rhythm.rhythm_id, role)
-            for role in fill_roles:
-                catalog.resolve(
-                    kit_family, rhythm.rhythm_id, role, fill=True
-                )
-        for fill in rhythm.fills:
-            # A continuation role which is absent at the selected level is an
-            # intentional no-op.  The whitelist is defined independently of
-            # the user's current activity setting.
-            if (
-                len(fill.events)
-                + len(global_activity_roles - fill.continue_roles)
-                > 64
-            ):
-                raise ValueError(
-                    f"{fill.fill_id} exceeds AMY's 64 events after mutes"
-                )
+    catalog = DrumPatternCatalog(
+        rhythms=MappingProxyType(rhythms),
+        kits=MappingProxyType(kits),
+    )
+    _validate_drum_cross_references(catalog)
     return catalog
