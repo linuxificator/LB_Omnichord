@@ -13,10 +13,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 import json_store  # noqa: E402
+import filesystem_platform_adapters  # noqa: E402
 from json_store import JsonStore, JsonStoreError  # noqa: E402
 
 
 class JsonStoreTests(unittest.TestCase):
+    def test_write_remains_atomic_without_unix_fchmod(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = JsonStore(Path(directory) / "state.json")
+            with patch.object(filesystem_platform_adapters.os, "fchmod", None):
+                store.write({"platform": "windows"})
+            self.assertEqual(store.read(), {"platform": "windows"})
+
     def test_replace_is_private_and_preserves_one_previous_document(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = JsonStore(Path(directory) / "nested" / "state.json")

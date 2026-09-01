@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from filesystem_platform_adapters import set_descriptor_mode, sync_directory
+
 
 class JsonStoreError(OSError):
     """A JSON store operation failed without discarding the prior value."""
@@ -59,7 +61,7 @@ class JsonStore:
                 dir=self.path.parent,
             )
             temporary_path = Path(raw_path)
-            os.fchmod(descriptor, self.mode)
+            set_descriptor_mode(descriptor, self.mode)
             with os.fdopen(descriptor, "wb") as handle:
                 descriptor = -1
                 handle.write(encoded)
@@ -97,19 +99,4 @@ class JsonStore:
                     pass
 
     def _sync_directory(self) -> None:
-        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
-        try:
-            descriptor = os.open(self.path.parent, flags)
-        except OSError:
-            # Some supported filesystems and Windows do not allow directory
-            # handles. The file itself is still flushed before replacement.
-            return
-        try:
-            try:
-                os.fsync(descriptor)
-            except OSError:
-                # Directory fsync is a durability enhancement where the host
-                # provides it, not a condition for atomic replacement.
-                pass
-        finally:
-            os.close(descriptor)
+        sync_directory(self.path.parent)
