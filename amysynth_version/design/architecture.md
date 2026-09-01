@@ -113,6 +113,14 @@ is opened, written and closed by the same worker; a timed-out close never
 closes a resource still used by a live worker. Debug logging is a separate
 bounded, non-blocking queue with one rotated predecessor and visible loss.
 
+Delayed work has three explicit timing owners. AMY sequencer/pattern commands
+own beat-accurate rhythm and arpeggio time. Qt `QTimer` owns presentation and
+UI feedback in the QObject thread. Remaining host note-release/tail callbacks
+use one bounded monotonic application scheduler shared by OMNI and MIDI; no
+user event creates a new timer thread. Transport `delay` records are only
+ordered device/reset allocation guards on the existing writer worker, not a
+second application timer service.
+
 That guarantee also requires identical built-in PCM preset numbering. Local
 Linux AMY is built with `AMY_PCM_BANK=tiny`, matching ESP32-P4. Gamma9001 uses a
 different meaning for PCM presets 0–18 and must not be selected for this

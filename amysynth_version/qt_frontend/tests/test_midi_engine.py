@@ -5,7 +5,6 @@ import sys
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +29,21 @@ class _RecordingWriter:
         self.events.append(("delay", seconds))
 
 
+class _ManualScheduler:
+    def __init__(self) -> None:
+        self.calls: list[tuple[float, object, str | None]] = []
+
+    def schedule(
+        self,
+        delay_seconds: float,
+        callback: object,
+        *,
+        replace_key: str | None = None,
+    ) -> int:
+        self.calls.append((delay_seconds, callback, replace_key))
+        return len(self.calls)
+
+
 class _Client:
     def __init__(
         self,
@@ -38,9 +52,8 @@ class _Client:
     ) -> None:
         self.events: list[tuple[str, object]] = []
         self.writer = _RecordingWriter(self.events)
-        config = json.loads(
-            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
-        )
+        self.application_scheduler = _ManualScheduler()
+        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
         config["performance"]["synth_alloc_guard_ms"] = 12.0
         if instrument_levels is not None:
             config["instrument_levels"] = instrument_levels
@@ -68,9 +81,7 @@ class _Client:
 
 class MidiAmyEngineTests(unittest.TestCase):
     def test_shipped_midi_profile_is_auto_and_resolves_per_package(self) -> None:
-        config = json.loads(
-            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
-        )
+        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
         configured = config["midi_input"]["tech_profile"]
         self.assertEqual(configured, "auto")
 
@@ -140,9 +151,7 @@ class MidiAmyEngineTests(unittest.TestCase):
 
         self.assertIsNotNone(middle)
         assert middle is not None
-        expected = round(
-            20.0 * (20000.0 / 20.0) ** (64.0 / 127.0)
-        )
+        expected = round(20.0 * (20000.0 / 20.0) ** (64.0 / 127.0))
         self.assertEqual(middle, expected)
         self.assertNotAlmostEqual(middle, (20.0 + 20000.0) / 2.0)
 
@@ -312,9 +321,7 @@ class MidiAmyEngineTests(unittest.TestCase):
         )
         self.assertIsNone(backend._button_takeover_group(panic))
 
-        backend._held_midi_button_targets.add(
-            backend._button_takeover_group(preset_one)
-        )
+        backend._held_midi_button_targets.add(backend._button_takeover_group(preset_one))
         self.assertTrue(
             backend.midiButtonTargetBlocked(
                 {
@@ -473,17 +480,8 @@ class MidiAmyEngineTests(unittest.TestCase):
         engine = MidiAmyEngine(client)
         client.events.clear()
 
-        class Timer:
-            def __init__(self, _delay: float, callback: object) -> None:
-                self.callback = callback
-                self.daemon = False
-
-            def start(self) -> None:
-                return
-
-        with patch("midi_player.threading.Timer", Timer):
-            for note in (60.0, 64.0, 67.0, 71.0, 72.0):
-                engine.preview_note(0, note)
+        for note in (60.0, 64.0, 67.0, 71.0, 72.0):
+            engine.preview_note(0, note)
 
         commands = [value for kind, value in client.events if kind == "wire"]
         fifth_on = commands.index("n72l0.826771654i5Z")
@@ -491,6 +489,10 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(
             engine._preview_active_notes[0],
             [64.0, 67.0, 71.0, 72.0],
+        )
+        self.assertEqual(
+            [call[2] for call in client.application_scheduler.calls],
+            ["midi-preview-tail-0"] * 5,
         )
 
     def test_every_midi_instrument_has_an_isolated_effect_bus(self) -> None:
@@ -508,9 +510,7 @@ class MidiAmyEngineTests(unittest.TestCase):
         client.events.clear()
         engine.set_reverb(0.4, 0.6, 0.7, False)
         reverb_commands = [
-            value
-            for kind, value in client.events
-            if kind == "wire" and str(value).startswith("y")
+            value for kind, value in client.events if kind == "wire" and str(value).startswith("y")
         ]
         self.assertEqual(
             reverb_commands,

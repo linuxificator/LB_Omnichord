@@ -115,11 +115,12 @@ Define shutdown semantics:
 
 Tests should simulate blocked write/read and assert bounded outcome.
 
-## Finding R5 — delayed actions create many independent timers
+## Finding R5 — delayed actions created independent timers (resolved by T17)
 
-The code creates `threading.Timer` objects for several delayed note/strum/
-preview releases. Generation tokens reduce stale effects, but bursty input can
-create many threads and separate timing domains.
+The code formerly created `threading.Timer` objects for delayed note, strum and
+preview releases. T17 replaced these with one bounded monotonic scheduler while
+retaining generation and replacement ownership. See
+`code_quality_tasks/T17_BOUNDED_APPLICATION_SCHEDULER.md`.
 
 Recommendation:
 

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from control_limits import clamp_control_value
+from application_scheduler import MonotonicScheduler
 from amy_parameter_plan import compile_parameter_commands
 from config_loader import DebugConfig, ResolvedAmyConfig, resolve_amy_config_data
 from drum_patterns import (
@@ -332,6 +333,7 @@ class AmySerialClient:
         else:
             self.writer = writer_factory(self.debug_log)
         self._transport_failure_reported = False
+        self.application_scheduler = MonotonicScheduler()
 
         self.synth_id = dict(resolved_config.layout.role_synth_ids)
         voices = resolved_config.capacities.voices
@@ -570,12 +572,10 @@ class AmySerialClient:
             else:
                 self._wire(f"n{self._f(note)}l0i{synth}Z")
 
-        timer = threading.Timer(
+        self.application_scheduler.schedule(
             max(0.001, float(delay_ms) / 1000.0),
             note_off,
         )
-        timer.daemon = True
-        timer.start()
 
     def _patch(self, role: str) -> int:
         name = self.selected_synth[role]
@@ -1488,9 +1488,11 @@ class AmySerialClient:
                 self._strum_active_notes.clear()
             self._wire(f"l0i{synth}Z")
 
-        timer = threading.Timer(max(0.01, tail_ms / 1000.0), tail_release)
-        timer.daemon = True
-        timer.start()
+        self.application_scheduler.schedule(
+            max(0.01, tail_ms / 1000.0),
+            tail_release,
+            replace_key="omni-strum-tail",
+        )
 
     def _panic(self) -> None:
         """Return AMY and the five Omnichord synths to a known-good state.
@@ -1605,6 +1607,7 @@ class AmySerialClient:
             for synth in self.synth_id.values():
                 self._wire(f"l0i{synth}Z")
         finally:
+            self.application_scheduler.close()
             self.writer.close()
             self.debug_log.close()
 
