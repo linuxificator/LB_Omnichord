@@ -1,6 +1,6 @@
 # Codex handover: package size and build slimming
 
-Status: implemented and hosted all-platform validation passed
+Status: implemented, hosted all-platform validation passed and released
 Owner: frontend release packaging
 Recorded: 2026-09-01
 Branch: `rework/code_quality`
@@ -87,6 +87,10 @@ tracked; release retention remains GitHub's responsibility rather than Git's.
 - final non-publishing all-platform run `33554564363` passed Linux x86_64,
   Raspberry Pi aarch64, macOS arm64, Windows x86_64, both Android package
   builds and the Android QML/socket/AMY/Oboe exact-sample emulator gate.
+- final `main` run `33560667071` repeated every gate, published exact release
+  `R20260901T212205`, signed and independently verified build-provenance and
+  SPDX attestations for all five packages, then validated and committed the
+  release-tagged README screenshots without starting another build.
 
 ## Measured release baseline
 
@@ -115,9 +119,27 @@ run targeted `rework/code_quality`, not `main`.
 | Windows x86_64 zip | 176,145,364 | 57,754,711 | 67.21% |
 
 The x86_64 emulator APK is 66,944,450 bytes. Every package includes separate
-QML/policy audit evidence in its workflow artifact. The arm64/x86 Android
-packages additionally include their source/output wheel hashes and retained
-native-library inventory.
+QML/policy audit evidence in a dedicated `evidence-*` workflow artifact rather
+than its publishable `package-*` artifact. The arm64/x86 Android evidence
+additionally includes source/output wheel hashes and retained native-library
+inventory. This separation preserves the exact five-package publication
+contract.
+
+## Final published release sizes
+
+Release `R20260901T212205`, built from `3740191`, published these package
+sizes after the complete `main`-only manifest, SBOM and attestation gates:
+
+| Platform | Published bytes |
+| --- | ---: |
+| Android arm64 APK | 65,622,671 |
+| Linux x86_64 AppImage | 98,896,376 |
+| Raspberry Pi aarch64 AppImage | 92,441,096 |
+| macOS arm64 DMG | 54,529,408 |
+| Windows x86_64 zip | 57,751,423 |
+
+The release integration incidents and resulting rules are recorded in
+`code_quality_tasks/POST_T25_MAIN_RELEASE_20260901.md`.
 
 The locally retained Linux AppImage with the same package shape is 196 MiB
 compressed and 573 MiB extracted. Its extracted PySide6 tree is 429 MiB. The

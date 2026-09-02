@@ -1,6 +1,6 @@
 # Codex session handoff — AMY/LB Omnichord state and code-quality audit
 
-Updated: 2026-08-31.
+Updated: 2026-09-02.
 
 This file is intentionally written for future Codex sessions. It records the
 working state, decisions, lessons learned and branch/release discipline from
@@ -10,10 +10,13 @@ contracts under `amysynth_version/design/`; it does not override either of
 them or the current user's request.
 
 The branch intended for analysis/continuation is `rework/code_quality` in
-`linuxificator/LB_Omnichord`. It was created from current `origin/main`
-commit `c46b93b607722dd429ac54cab163deb61801632a`, the screenshot-only follow-up
-to successful full release `R20260831T210652`. The audit changes documentation
-only and does not authorize product refactoring.
+`linuxificator/LB_Omnichord`. T01-T25 and package slimming were merged to
+`main`, released as `R20260901T212205`, and fast-forwarded back into the
+retained rework branch with both release fixes and the validated screenshot
+follow-up. Read
+`amysynth_version/design/code_quality_tasks/POST_T25_MAIN_RELEASE_20260901.md`
+for the exact release timeline and lessons. Analysis documents still do not
+authorize new product refactoring without a current user request.
 
 ## Mandatory startup route
 
@@ -58,13 +61,15 @@ the AMY fork, follow the additional rows in `design/README.md` before editing.
 ### LB Omnichord
 
 - Own origin: `git@github.com:linuxificator/LB_Omnichord.git`.
-- Current `main`: `c46b93b607722dd429ac54cab163deb61801632a`
-  (`Refresh README screenshots`).
-- Latest successful full release: `R20260831T210652`, produced from merge
-  commit `50118fb18c952a27c64a77a6486527a64559ebb5` by GitHub Actions run
-  `33439634074`. All six regression groups and all five platform builds,
-  publication and screenshot refresh passed. The release contains exactly five
-  packages and five SHA-256 companion files.
+- Current `main` before this documentation-only rework continuation:
+  `6ccebe9a66bdd8d6fe72a095082d9162ee194836` (`Refresh README screenshots`).
+- Latest successful full release: `R20260901T212205`, produced from commit
+  `3740191e9ae44c17e83188c78cf67c0668f20d58` by GitHub Actions run
+  `33560667071`. All seven regression groups, five platform packages, Android
+  emulator, exact manifest, SPDX SBOM, signed attestations, publication and
+  screenshot refresh passed. The release uses Gamma9001 AMY commit
+  `7c34aa514f10c33f02692f735166d65f4e20374a` and contains exactly five
+  packages, five SHA-256 companions and four release-evidence files.
 - Branch `rework/external_controls` was merged into `main` by
   `50118fb18c952a27c64a77a6486527a64559ebb5`. It is retained as branch history;
   continuation analysis now belongs on `rework/code_quality`.

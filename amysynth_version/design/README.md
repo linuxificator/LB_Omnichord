@@ -83,6 +83,9 @@ small, behavior-preserving phase:
   size/audit gates and the deliberately deferred production-signing boundary.
 - `code_quality_tasks/README.md` — actual T01-T25 result handovers, verification
   evidence and newly discovered follow-up work.
+- `code_quality_tasks/POST_T25_MAIN_RELEASE_20260901.md` — merge-to-main
+  incident record, deterministic allocation-guard proof, release/evidence
+  staging boundary and final `R20260901T212205` release evidence.
 
 ## Required reading route for Codex
 
