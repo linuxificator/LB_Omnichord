@@ -25,12 +25,18 @@ one level of nesting and finite payload-agnostic event gating. Existing root
 sequencer behavior remains unchanged and is covered by compatibility tests.
 
 The Omnichord integration release is
-`releases/amy_omnichord_R20260903T201525` at
-`3462b266e4990ab6fa617bb8fa5c5ad8b43959d5`. It layers the already-maintained
+`releases/amy_omnichord_R20260903T202802` at
+`890ec66de2677db5bdf9a5dda9f53f01628d2b58`. It layers the already-maintained
 socket, Android/Oboe, Gamma9001 and offline-render support plus the explicit
 11-bus/336-oscillator and 1024-group/64-local-tag/40-execution profile. The
 abandoned bus-mixer experiment is not included. ESP32-P4 validation is
 deliberately deferred for this rework.
+
+This release also applies lossless backpressure to the bounded Unix-socket
+receiver queue. When the realtime handoff queue is full, AMY temporarily stops
+reading and lets the kernel socket buffer throttle the sender. This preserves
+large startup transactions such as the preloaded rhythm-group library instead
+of acknowledging and discarding excess wire packets.
 
 LB branch `rework/sequencer` uses only AMY wire commands. It preloads fills as
 groups, runs each base drum role as a stable loop execution, and publishes each
