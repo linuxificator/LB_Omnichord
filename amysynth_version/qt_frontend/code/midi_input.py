@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
+from input_technology import InputTechnologyStatus
 from midi_control import PITCH_BEND_CONTROLLER
 
 
@@ -39,25 +40,7 @@ class MidiInputTechnology:
     label: str
 
 
-@dataclass(frozen=True, slots=True)
-class MidiInputTechnologyStatus:
-    key: str
-    label: str
-    state: Literal["unavailable", "listening", "activity"]
-    reason: str
-
-    @property
-    def available(self) -> bool:
-        return self.state in ("listening", "activity")
-
-    def presentation(self) -> dict[str, object]:
-        return {
-            "key": self.key,
-            "label": self.label,
-            "state": self.state,
-            "available": self.available,
-            "reason": self.reason,
-        }
+MidiInputTechnologyStatus = InputTechnologyStatus
 
 
 MidiInputEventSink = Callable[[MidiInputEvent], None]

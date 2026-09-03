@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 5
+CURRENT_CONFIG_REVISION = 6
 JsonObject = dict[str, Any]
 
 
@@ -58,6 +58,11 @@ REVISION_FIVE_GAMMA9001_MAP = {
     "elec_tick": {"preset": 15, "note": 90},
     "perc_bell": {"preset": 18, "note": 66},
     "perc_snap": {"preset": 3, "note": 60},
+}
+REVISION_SIX_OSC_INPUT = {
+    "enabled": True,
+    "listen_address": "0.0.0.0",
+    "listen_port": 8000,
 }
 
 
@@ -238,6 +243,16 @@ def _revision_four_to_five(data: JsonObject) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def _revision_five_to_six(data: JsonObject) -> tuple[str, ...]:
+    changed: list[str] = []
+    if "osc_input" not in data:
+        data["osc_input"] = copy.deepcopy(REVISION_SIX_OSC_INPUT)
+        changed.append("$.osc_input")
+    data["config_revision"] = 6
+    changed.append("$.config_revision")
+    return tuple(changed)
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
@@ -247,6 +262,7 @@ MIGRATIONS: dict[int, Migration] = {
     2: _revision_two_to_three,
     3: _revision_three_to_four,
     4: _revision_four_to_five,
+    5: _revision_five_to_six,
 }
 
 

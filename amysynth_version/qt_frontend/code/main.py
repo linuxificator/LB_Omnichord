@@ -17,6 +17,7 @@ from catalog_extensions import load_synth_catalog as load_extended_synth_catalog
 from config_loader import load_amy_config, load_resolved_amy_config
 from midi_integration import InstrumentBackend
 from midi_platform_adapters import production_midi_input_port
+from osc_input import production_osc_input_port
 from package_test_hooks import PackageTestHooks
 from program_amy import (
     ProgramAmyLocalClient,
@@ -79,6 +80,7 @@ def production_dependencies(
         socket_client=cast(ClientFactory, ProgramAmySocketClient),
         local_client=cast(ClientFactory, ProgramAmyLocalClient),
         midi_input_port=production_midi_input_port,
+        osc_input_port=production_osc_input_port,
         private_files_dir=qt_private_files_dir,
         resolve_package_runtime=resolve_package_runtime,
         package_test_hooks=PackageTestHooks.from_environment,

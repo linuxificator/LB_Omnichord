@@ -383,6 +383,62 @@ JSON and AMY output. The offscreen Qt test feeds real raw-MIDI bytes, records
 JSONL indicator/layout state and verifies the replacement transition fits the
 actual bar.
 
+### OSC-CTRL — portable OSC controller input
+
+**OSC-CTRL-01 — configured UDP input and source identity**
+
+- The shipped configuration enables OSC on `0.0.0.0:8000`; both address and
+  port are editable and no consumer fallback duplicates them.
+- Removing the complete endpoint (or disabling OSC) opens no socket and omits
+  OSC from the input-technology row.
+- A valid OSC 1.0 UDP message or bundle is decoded off the Qt thread. Each
+  numeric argument is identified by exact address and zero-based argument
+  index, reaches the Qt thread once and preserves packet order.
+- Malformed packets and unsupported argument types create no indicators and do
+  not stop the listener. Bind failure is reported as failed rather than ready.
+
+**OSC-CTRL-02 — common learn and ownership state**
+
+- A changing normalized OSC value appears in the same grey capacity/LRU bar as
+  MIDI, labelled with its address and argument index.
+- OSC uses flat F01 rotary/pushbutton visuals; MIDI remains F06. F01 contains no
+  virtual light, highlight or shadow effect.
+- Grey/blue/red/green click behavior, target learning, manual takeover, blue
+  expiry, hidden binding behavior and button takeover exactly match MIDI.
+- MIDI and OSC share global one-to-one ownership. Binding an OSC source to a
+  MIDI-owned target displaces the MIDI source to blue, and vice versa.
+- The MIDI input-technology row contains one `OSC` item for a configured
+  endpoint. Its LED is green while listening, flashes green on accepted data
+  and turns red on bind failure or loss of the configured network.
+- The OMNI rainbow button says `OSC` above `MIDI`; its existing red learn and
+  green binding-location LEDs represent both protocols without duplication.
+
+**OSC-CTRL-03 — mapping and preset compatibility**
+
+- Numeric `0.0..1.0` maps over the target's complete declared range and calls
+  the existing target setter/AMY convergence path. OSC never calls AMY itself.
+- Boolean or endpoint-only control messages can drive application buttons;
+  zero is released and any positive normalized value is pressed.
+- OSC bindings persist by address/index/type inside the existing screen-owned
+  binding list. Existing MIDI binding JSON round-trips byte-for-shape without
+  acquiring OSC fields.
+- All five release packages install and exercise `python-osc`; startup and
+  package tests retain the separate wire-only frontend/AMY process boundary.
+
+**OSC-CTRL-04 — final-package input acceptance and evidence limit**
+
+- Every Linux x64, Raspberry Pi aarch64, macOS arm64, Windows x64 and Android
+  arm64 artifact sends real OSC rotary and pushbutton datagrams through its
+  configured UDP listener and observes both controls plus the green activity
+  state in the shared Qt model before publication.
+- The same package smoke verifies the runtime-selected MIDI technology keys
+  and the packaged common CC/controller-button model. Linux separately feeds
+  real bytes through a PTY-backed raw-MIDI reader.
+- Hosted loopback does not prove an external OSC sender, firewall approval or
+  physical network. MIDI simulation is not hardware evidence; CoreMIDI,
+  WinMM and Android MIDI remain deliberately red/unavailable because their
+  native bridges are not currently bundled.
+
 ### INSTRUMENT — selected patch identity
 
 **INST-01 — selecting an instrument changes the manual chord synth**
@@ -773,8 +829,9 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 - `capture_screenshots.py` runs the production QML scene offscreen with an
   isolated temporary home and writes `screenshots/omni.png` and
   `screenshots/midi.png`.
-- The OMNI frame shows an active C-minor strum-note guide; the MIDI frame shows
-  three representative CC knobs in the grey lower bar.
+- The OMNI frame shows an active C-minor strum-note guide. The MIDI frame is
+  staged through the public simulation inputs and shows MIDI and OSC rotaries
+  plus a released pushbutton for each protocol in the grey lower bar.
 - Release refreshes store timestamped screenshot files such as
   `screenshots/omni-RYYYYMMDDTHHMMSS.png` and update the repository README to
   embed those files. Screenshot refreshes may not use a hand-drawn or generated

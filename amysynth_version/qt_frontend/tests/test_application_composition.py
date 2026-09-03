@@ -119,6 +119,7 @@ class ApplicationCompositionTests(unittest.TestCase):
             socket_client=client_factory("socket"),
             local_client=client_factory("local"),
             midi_input_port=lambda _sink, _config: None,
+            osc_input_port=lambda _sink, _config: None,
             private_files_dir=lambda: root / "private",
             resolve_package_runtime=lambda **kwargs: RuntimeOverrides(
                 kwargs["amy_socket"],
@@ -188,6 +189,10 @@ class ApplicationCompositionTests(unittest.TestCase):
         self.assertIs(
             backend_calls[0]["midi_input_port_factory"],
             dependencies.midi_input_port,
+        )
+        self.assertIs(
+            backend_calls[0]["osc_input_port_factory"],
+            dependencies.osc_input_port,
         )
         self.assertEqual(graph.resolved_config.transport.serial_port, "COM7")
         self.assertEqual(graph.resolved_config.transport.serial_baud, 230_400)

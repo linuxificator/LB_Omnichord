@@ -27,6 +27,7 @@ Button {
 
         Text {
             id: modeLabel
+            objectName: "rainbowModeLabel"
             width: root.width
             height: root.height
             anchors.centerIn: parent

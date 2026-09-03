@@ -40,6 +40,10 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertEqual(resolved.transport.serial_baud, 1_000_000)
         self.assertEqual(resolved.midi_input.configured_profile, "auto")
         self.assertEqual(resolved.midi_input.profile_source, "runtime-adapter")
+        self.assertTrue(resolved.osc_input.enabled)
+        self.assertEqual(resolved.osc_input.listen_address, "0.0.0.0")
+        self.assertEqual(resolved.osc_input.listen_port, 8000)
+        self.assertTrue(resolved.osc_input.configured)
         self.assertEqual(resolved.capacities.voices.manual_chord, 7)
         self.assertEqual(resolved.capacities.max_patterns, 1024)
         self.assertEqual(resolved.layout.midi_row_buses, (4, 5, 6, 7, 8, 9))
@@ -118,6 +122,7 @@ class ResolvedConfigTests(unittest.TestCase):
 
     def test_domain_invariants_aggregate_independent_path_errors(self) -> None:
         invalid = copy.deepcopy(self.shipped)
+        invalid["osc_input"]["listen_address"] = "all interfaces"
         invalid["synth_ids"]["bass"] = invalid["synth_ids"]["drums"]
         invalid["voices"]["manual_chord"] = 4
         invalid["voices"]["rhythm_chord"] = 4
@@ -141,6 +146,7 @@ class ResolvedConfigTests(unittest.TestCase):
         paths = {issue.path for issue in caught.exception.issues}
         self.assertTrue(
             {
+                "$.osc_input.listen_address",
                 "$.synth_ids",
                 "$.voices.manual_chord",
                 "$.voices.rhythm_chord",
@@ -171,6 +177,20 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertIn("$.rhythm.pattern_ranges.chords.start", paths)
         self.assertIn("$.rhythm.pattern_ranges.drum_bases.start", paths)
         self.assertIn("$.amy_max_patterns", paths)
+
+    def test_absent_osc_endpoint_is_an_explicit_unconfigured_capability(self) -> None:
+        unconfigured = copy.deepcopy(self.shipped)
+        unconfigured["osc_input"] = {"enabled": True}
+
+        with tempfile.TemporaryDirectory() as directory:
+            resolved = load_resolved_amy_config(
+                self.write_config(Path(directory), unconfigured)
+            )
+
+        self.assertTrue(resolved.osc_input.enabled)
+        self.assertFalse(resolved.osc_input.configured)
+        self.assertIsNone(resolved.osc_input.listen_address)
+        self.assertIsNone(resolved.osc_input.listen_port)
 
     def test_bad_config_fails_before_transport_is_opened(self) -> None:
         invalid = copy.deepcopy(self.shipped)

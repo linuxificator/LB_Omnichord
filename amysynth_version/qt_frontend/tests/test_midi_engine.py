@@ -182,18 +182,66 @@ class MidiAmyEngineTests(unittest.TestCase):
                     "action": "rhythm_toggle",
                 },
             },
+            {
+                "source_type": "osc",
+                "address": "/surface/master",
+                "argument": 0,
+                "value_type": "continuous",
+                "target": {
+                    "kind": "master_volume",
+                },
+            },
         ]
 
         entries = backend._normalized_binding_entries("omni", data)
 
+        self.assertEqual([key for key, _target in entries[:3]], [
+            (1, 74),
+            (2, PITCH_BEND_CONTROLLER),
+            (3, NOTE_BUTTON_OFFSET + 42),
+        ])
         self.assertEqual(
-            [key for key, _target in entries],
-            [
-                (1, 74),
-                (2, PITCH_BEND_CONTROLLER),
-                (3, NOTE_BUTTON_OFFSET + 42),
-            ],
+            entries[3][0],
+            backend._midi_control_state.osc_key("/surface/master", 0),
         )
+
+    def test_bound_osc_value_uses_the_existing_control_target_path(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._midi_control_state = MidiControlState()
+        backend._midi_control_lock = threading.Lock()
+        backend._write_cc_test_log = lambda *_args, **_kwargs: None
+        backend._sync_blue_timer = lambda *_args, **_kwargs: None
+        backend._bump_binding_state = lambda *_args, **_kwargs: None
+        location_feedback: list[tuple[tuple[int, int], dict[str, object] | None]] = []
+        backend._emit_binding_location_feedback = (
+            lambda key, target: location_feedback.append(
+                (key, dict(target) if target is not None else None)
+            )
+        )
+        applied: list[tuple[dict[str, object], int, tuple[int, int]]] = []
+        backend._apply_control_target = (
+            lambda target, value, key: applied.append((dict(target), value, key))
+        )
+
+        state = backend._midi_control_state
+        state.observe_osc("/surface/master", 0, 0.1, "continuous", now=1.0)
+        _changed, _target, key = state.observe_osc(
+            "/surface/master", 0, 0.2, "continuous", now=1.1
+        )
+        assert key is not None
+        state.indicator_clicked(key, now=1.2)
+        state.bind_learned_target(
+            {"id": "midi:master_volume", "screen": "midi", "kind": "master_volume"},
+            now=1.3,
+        )
+
+        backend.process_osc_control("/surface/master", 0, 0.75, "continuous")
+
+        self.assertEqual(len(applied), 1)
+        self.assertEqual(applied[0][0]["id"], "midi:master_volume")
+        self.assertEqual(applied[0][1], 750_000)
+        self.assertEqual(applied[0][2], key)
+        self.assertEqual(location_feedback, [(key, applied[0][0])])
 
     def test_midi_button_takeover_blocks_other_button_targets(self) -> None:
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)

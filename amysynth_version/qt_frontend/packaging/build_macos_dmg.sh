@@ -48,6 +48,10 @@ python -m PyInstaller \
     --add-data "$frontend_dir/music:music" \
     "$frontend_dir/packaging/appimage_entry.py"
 
+plutil -insert NSLocalNetworkUsageDescription \
+    -string "LB Omnichord receives OSC control messages from devices and apps on your local network." \
+    "$app_bundle/Contents/Info.plist"
+plutil -lint "$app_bundle/Contents/Info.plist"
 codesign --force --deep --sign - "$app_bundle"
 hdiutil create \
     -volname "LB Omnichord" \

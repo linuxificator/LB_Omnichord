@@ -91,6 +91,12 @@ class PackageChordInputTests(unittest.TestCase):
             status = status_path.read_text(encoding="utf-8")
             for checkpoint in (
                 "qml-root-ready",
+                "midi-input-profile-verified",
+                "midi-control-simulation-observed",
+                "midi-button-simulation-observed",
+                "osc-udp-rotary-observed",
+                "osc-udp-button-observed",
+                "osc-tech-activity-observed",
                 "smoke-audio-levels-full",
                 "qml-chord-press-observed",
                 "active-chord-visible",

@@ -139,8 +139,14 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("skip-rebuild: README screenshots only", workflow)
         self.assertIn("skip-checks:true", workflow)
 
-        app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
-        self.assertIn("(2, 7, 104)", app_core)
+        screenshot_state = (ROOT / "code" / "screenshot_state.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("injectMidiControl", screenshot_state)
+        self.assertIn("injectMidiButton", screenshot_state)
+        self.assertIn("injectOscControl", screenshot_state)
+        self.assertIn('"continuous"', screenshot_state)
+        self.assertIn('"button"', screenshot_state)
 
     def test_midi_qml_uses_its_own_bindable_metaobject(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
@@ -167,7 +173,8 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('import "physical_controls"', screen)
         self.assertIn("PhysicalRotary", screen)
         self.assertIn("PhysicalPushButton", screen)
-        self.assertIn("encoder: f06Control.pitchBend", screen)
+        self.assertIn("encoder: hardwareControl.pitchBend", screen)
+        self.assertIn('modelData.displayProtocol === "osc" ? 1 : 6', screen)
 
         rotary = (ROOT / "gui" / "physical_controls" / "PhysicalRotary.qml").read_text(
             encoding="utf-8"
@@ -197,6 +204,8 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn("shadow", button.lower())
         self.assertNotIn("MultiEffect", button)
         self.assertNotIn("QtQuick.Effects", button)
+        self.assertIn("control.family !== 1", rotary)
+        self.assertIn("control.family !== 1", button)
 
     def test_local_launcher_validates_but_never_builds_amy(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
@@ -289,6 +298,9 @@ class StaticContractTests(unittest.TestCase):
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
         omni = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         rainbow = (ROOT / "gui" / "RainbowModeButton.qml").read_text(encoding="utf-8")
+        tech_indicator = (ROOT / "gui" / "InputTechnologyIndicator.qml").read_text(
+            encoding="utf-8"
+        )
         for state in ("learn", "bound", "blue"):
             self.assertIn(f'modelData.state === "{state}"', midi)
         self.assertIn("modelData.evicting", midi)
@@ -303,6 +315,11 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("width: 12", rainbow)
         self.assertIn('color: "#f22b2b"', rainbow)
         self.assertIn("running: root.midiLearnActive", rainbow)
+        self.assertIn('text: "OSC\\nMIDI"', omni)
+        self.assertIn("font.pixelSize: height * 0.31", omni)
+        self.assertIn("InputTechnologyIndicator", midi)
+        self.assertIn("root.technology.idleLedVisible", tech_indicator)
+        self.assertIn('root.technology.state === "activity"', tech_indicator)
 
     def test_frontend_tree_contains_no_symlinks(self) -> None:
         generated_roots = {"build", "dist", "test-artifacts"}

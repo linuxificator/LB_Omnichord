@@ -48,7 +48,10 @@ Dial {
             width: control.size * 0.92
             height: width
             radius: width / 2
-            color: Qt.darker(control.s.panel, 1.12)
+            color:
+                control.family === 1
+                ? control.s.panel
+                : Qt.darker(control.s.panel, 1.12)
             border.width: 1
             border.color: control.s.bezel
         }
@@ -106,6 +109,7 @@ Dial {
 
     handle: Item {
         id: rotatingCap
+        objectName: "physicalRotaryCap"
         width: control.capSize
         height: control.capSize
         x: control.capX
@@ -120,10 +124,26 @@ Dial {
             border.width: 2
             border.color: control.s.bezel
             gradient: Gradient {
-                GradientStop { position: 0.00; color: control.s.capTop }
-                GradientStop { position: 0.25; color: control.s.capTop }
-                GradientStop { position: 0.58; color: control.s.capMid }
-                GradientStop { position: 1.00; color: control.s.capBottom }
+                GradientStop {
+                    objectName: "physicalRotaryGradientStop0"
+                    position: 0.00
+                    color: control.s.capTop
+                }
+                GradientStop {
+                    objectName: "physicalRotaryGradientStop1"
+                    position: 0.25
+                    color: control.s.capTop
+                }
+                GradientStop {
+                    objectName: "physicalRotaryGradientStop2"
+                    position: 0.58
+                    color: control.s.capMid
+                }
+                GradientStop {
+                    objectName: "physicalRotaryGradientStop3"
+                    position: 1.00
+                    color: control.s.capBottom
+                }
             }
 
             Repeater {
@@ -146,6 +166,7 @@ Dial {
 
             // 5: muted top bevel; no white virtual-lighting patch.
             Rectangle {
+                visible: control.family !== 1
                 x: parent.width * 0.16
                 y: parent.height * 0.11
                 width: parent.width * 0.47
@@ -168,11 +189,15 @@ Dial {
 
             // Mechanical center boss / push-center.
             Rectangle {
+                objectName: "physicalRotaryCenterBoss"
                 anchors.centerIn: parent
                 width: parent.width * (control.encoder ? 0.23 : 0.17)
                 height: width
                 radius: width / 2
-                color: Qt.darker(control.s.capMid, 1.15)
+                color:
+                    control.family === 1
+                    ? control.s.capMid
+                    : Qt.darker(control.s.capMid, 1.15)
                 border.width: 1
                 border.color: control.s.bezel
             }

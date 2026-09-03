@@ -38,6 +38,7 @@ ARCHITECTURES = {
 }
 ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
 SOURCE_EXTENSIONS = "py,qml,js,json,csv,png,jpg,jpeg"
+PORTABLE_REQUIREMENTS = Path(__file__).resolve().parents[2] / "requirements-portable.txt"
 
 
 def run(command: list[str], *, cwd: Path) -> None:
@@ -120,6 +121,19 @@ def release_values(stamp: str) -> tuple[str, str]:
     return version, numeric_version
 
 
+def portable_python_requirements(
+    path: Path = PORTABLE_REQUIREMENTS,
+) -> tuple[str, ...]:
+    requirements = tuple(
+        line
+        for raw in path.read_text(encoding="utf-8").splitlines()
+        if (line := raw.strip()) and not line.startswith("#")
+    )
+    if not requirements or any(line.startswith("-") for line in requirements):
+        raise ValueError("portable Android requirements must be explicit packages")
+    return requirements
+
+
 def patch_buildozer_spec(
     spec_path: Path,
     *,
@@ -159,8 +173,8 @@ def patch_buildozer_spec(
         "source.include_exts": SOURCE_EXTENSIONS,
         "source.exclude_dirs": "deployment,__pycache__",
         "version": version,
-        "requirements": (
-            "python3,shiboken6,PySide6,pyserial,fastjsonschema==2.22.2"
+        "requirements": ",".join(
+            ("python3", "shiboken6", "PySide6", *portable_python_requirements())
         ),
         "orientation": "landscape",
         "fullscreen": "1",
@@ -171,6 +185,7 @@ def patch_buildozer_spec(
         "android.archs": android_arch,
         "android.numeric_version": numeric_version,
         "android.allow_backup": "False",
+        "android.permissions": "INTERNET",
         "android.manifest.orientation": "landscape",
         "android.add_aars": str(aar.resolve()),
         "android.add_gradle_repositories": "flatDir { dirs 'libs' }",

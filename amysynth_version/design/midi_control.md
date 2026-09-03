@@ -1,14 +1,20 @@
 # MIDI Control Learn and Binding
 
-Status: authoritative MIDI control/binding contract
+Status: authoritative MIDI source and shared external-control binding contract
 Owner: MIDI control subsystem
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-01
+Last verified: 2026-09-03
 
 This document is the behavioral contract for MIDI Control Change, Pitch Bend and
 MIDI-button indicators, MIDI-learn bindings, preset ownership and the
 corresponding OMNI status LED. It resolves the implementation notes in
 `midi_control.txt`.
+
+OSC sources reuse this same state machine, target catalogue, one-to-one
+ownership, preset and takeover behavior. `osc_control.md` owns their network,
+identity, value and F01 presentation contract. “MIDI” in historical QObject/QML
+API names remains a compatibility name; it must not imply that OSC can acquire
+a second independent owner for the same target.
 
 ## Controller identity and genuine movement
 
@@ -96,10 +102,10 @@ application button binds that MIDI source to the touched target. The binding
 gesture is consumed: it does not also edit, tap or unlink the target. The slider
 handle or button LED and MIDI indicator LED become green.
 
-Bindings are globally one-to-one:
+Bindings are globally one-to-one across MIDI and OSC:
 
-- one MIDI source controls at most one target;
-- one target is controlled by at most one MIDI source;
+- one external-control source controls at most one target;
+- one target is controlled by at most one MIDI or OSC source;
 - assigning an occupied target to another controller unbinds the old controller
   and makes that old indicator blue.
 
@@ -235,6 +241,8 @@ LRU age and current source values are runtime state.
 - MIDI-target bindings are stored in the selected MIDI preset.
 - OMNI-target bindings are stored in the selected OMNI preset.
 - the optional JSON field is `midi_control_bindings`;
+- the field name is retained for compatibility and may also contain the OSC
+  entry shape defined in `osc_control.md`;
 - legacy CC bindings keep their existing `channel`/`controller` JSON shape;
 - Pitch Bend adds `"source_type": "pitch_bend"` and uses controller `128`;
 - explicit note-button bindings, if admitted by future device configuration,
@@ -270,8 +278,8 @@ of those valid locations are reported.
 
 Screen routing is deliberately independent of preset status. As soon as either
 the active binding set or the inactive-preset index locates the controller on
-the other screen, the visible `MIDI`/`OMNI` mode button flashes. The mode button
-therefore does not distinguish between a binding in that screen's selected
+the other screen, the visible `OSC`/`MIDI` or `OMNI` mode button flashes. The
+mode button therefore does not distinguish between a binding in that screen's selected
 preset and one in any of its non-selected presets; its purpose is to say
 "look on the other screen". Only after that screen is visible does preset
 status affect the indication: a non-selected destination preset flashes its
@@ -304,12 +312,12 @@ this feedback.
 
 ## OMNI learn LED
 
-On the OMNI screen, a blinking red learn LED appears inside the large `MIDI`
-mode button, immediately to the right of the `MIDI` label so it does not sit on
-the red end of the rainbow background. It is completely invisible whenever no
-controller is in learn state. The existing green binding-location LED remains
-on the left side of the button and follows its independent location-feedback
-rules.
+On the OMNI screen, a blinking red learn LED appears inside the large rainbow
+mode button beside the two-line `OSC`/`MIDI` label, away from the red end of its
+background. It is completely invisible whenever no external controller is in
+learn state. The existing green binding-location LED remains on the left side
+of the button and follows its independent location-feedback rules. Both LEDs
+represent the one shared MIDI/OSC state; they are not duplicated per protocol.
 
 Blue/unbound state remains visible on the detailed MIDI-screen controller
 indicator; it does not create a separate OMNI status LED. Switching screens
@@ -317,22 +325,26 @@ does not change learn, binding or musical state.
 
 ## Thread and AMY boundaries
 
-Raw MIDI bytes are parsed on the existing background reader. Genuine CC, Pitch
-Bend and MIDI-button changes are queued onto the Qt object thread before they
-mutate application state. Mapped updates call the existing MIDI/OMNI setters
-under a narrow in-call MIDI authority flag; they do not introduce a second
-synth-state path, call AMY directly or change the socket/serial wire boundary.
-The same setters reject non-MIDI writes while their target is bound.
+Raw MIDI bytes and OSC UDP packets are parsed on their respective background
+readers. Genuine CC, Pitch Bend, MIDI-button and OSC control changes are queued
+onto the Qt object thread before they mutate application state. Mapped updates
+call the existing MIDI/OMNI setters under one narrow external-control authority
+flag; they do not introduce a second synth-state path, call AMY directly or
+change the socket/serial wire boundary. The same setters reject ordinary writes
+while their target is externally bound.
 
 ## Implementation map
 
 The behavior is intentionally split along existing responsibilities:
 
 - `../qt_frontend/code/midi_control.py` contains the transport-independent
-  `MidiControlState` state machine for controller identity, genuine movement,
-  LRU visibility, LED states, one-to-one bindings and serialization. Its
-  explicit indicator-click and manual-UI-edit transitions own no pointer
-  gesture timing.
+  legacy-named `MidiControlState` state machine for MIDI and OSC source
+  identity, genuine movement, LRU visibility, LED states, global one-to-one
+  bindings and serialization. Its explicit indicator-click and manual-UI-edit
+  transitions own no pointer gesture timing.
+- `../qt_frontend/code/osc_input.py` owns portable UDP lifecycle and converts
+  `python-osc` packet values into immutable application events. It contains no
+  target, preset, QML, musical or AMY policy.
 - `../qt_frontend/code/midi_player.py` owns that state, queues raw CC changes
   onto the Qt object thread, resolves target ranges, applies button targets,
   calls the existing MIDI/OMNI setters and captures/restores bound numeric

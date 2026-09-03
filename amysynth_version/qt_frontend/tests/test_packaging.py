@@ -35,6 +35,23 @@ class PackagingContracts(unittest.TestCase):
             5,
         )
 
+    def test_network_permissions_match_current_release_targets(self) -> None:
+        macos = (
+            FRONTEND / "packaging" / "build_macos_dmg.sh"
+        ).read_text(encoding="utf-8")
+        android = (
+            FRONTEND / "packaging" / "android" / "build_android.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("NSLocalNetworkUsageDescription", macos)
+        self.assertLess(
+            macos.index("NSLocalNetworkUsageDescription"),
+            macos.index("codesign --force"),
+        )
+        self.assertIn('"android.api": "36"', android)
+        self.assertIn('"android.permissions": "INTERNET"', android)
+        self.assertNotIn("ACCESS_LOCAL_NETWORK", android)
+
     def test_every_platform_uses_one_amy_release_branch_and_commit(self) -> None:
         workflows = [
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml",
@@ -236,6 +253,35 @@ class PackagingContracts(unittest.TestCase):
         ):
             self.assertIn(expected, midi_tests)
 
+    def test_every_frontend_package_runs_external_input_acceptance(self) -> None:
+        release = (
+            REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+        windows = (
+            FRONTEND / "packaging" / "windows" / "run_windows.ps1"
+        ).read_text(encoding="utf-8")
+        android = (
+            FRONTEND / "packaging" / "android" / "test_android_apk.sh"
+        ).read_text(encoding="utf-8")
+        package_test = (
+            FRONTEND / "tests" / "test_package_chord_input.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertGreaterEqual(release.count("--package-smoke-test"), 2)
+        for checkpoint in (
+            "midi-input-profile-verified",
+            "midi-control-simulation-observed",
+            "midi-button-simulation-observed",
+            "osc-udp-rotary-observed",
+            "osc-udp-button-observed",
+            "osc-tech-activity-observed",
+        ):
+            with self.subTest(checkpoint=checkpoint):
+                self.assertGreaterEqual(release.count(checkpoint), 2)
+                self.assertIn(checkpoint, windows)
+                self.assertIn(checkpoint, android)
+                self.assertIn(checkpoint, package_test)
+
     def test_screenshots_refresh_only_after_a_successful_release(self) -> None:
         release = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
@@ -427,6 +473,9 @@ class PackagingContracts(unittest.TestCase):
         entry = (FRONTEND / "packaging" / "appimage_entry.py").read_text(
             encoding="utf-8"
         )
+        build = (FRONTEND / "packaging" / "build_appimage.sh").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("subprocess.Popen", entry)
         self.assertIn('"--amy-service"', entry)
@@ -451,6 +500,8 @@ class PackagingContracts(unittest.TestCase):
             self.assertIn(asset, entry)
         self.assertNotIn("core.FRONTEND_DIR =", entry)
         self.assertNotIn("amy.live(", entry)
+        self.assertIn("--hidden-import package_smoke", build)
+        self.assertIn("--hidden-import PySide6.QtTest", build)
 
     def test_release_stamp_validation_matches_asset_format(self) -> None:
         build_script = (FRONTEND / "packaging" / "build_appimage.sh").read_text(

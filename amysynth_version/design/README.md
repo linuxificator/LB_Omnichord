@@ -32,6 +32,8 @@ Core rules:
   provenance, validation and migration boundaries.
 - `midi_control.md` is the authoritative MIDI CC learn, binding, LRU/LED and
   preset-persistence contract.
+- `osc_control.md` defines portable OSC-over-UDP input and its reuse of the
+  same global external-control learn, binding and takeover state.
 - `CODEX_HANDOVER_EXTERNAL_CONTROLS.md` records the branch-local lessons from
   the external-control rework: smooth Qt slider drag, backend echo boundaries,
   MIDI input tech indicators and scoped hardware button takeover.
@@ -110,6 +112,7 @@ Then add every row that matches the task:
 | Python dependencies, build tools or release inputs | `CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md`, `../qt_frontend/docs/DEPENDENCIES.md`, `../qt_frontend/packaging/AMY_RELEASE.md` |
 | Qt/QML layout, interaction or screen behavior | `gui.md`, `ui_behavior_reference.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |
 | MIDI input, MIDI screen or CC learn | `midi.md`, `midi_control.md`, `presets.md`, `sound_balance.md`, `../qt_frontend/tests/USE_CASES.md` |
+| OSC input or external-control learn | `osc_control.md`, `midi_control.md`, `presets.md`, `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Presets, user state or migration | `presets.md`, `sound_balance.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Startup configuration, schema or config migration | `configuration.md`, `CODEX_HANDOVER_CONFIGURATION_AND_DRY.md`, `../qt_frontend/docs/DEPENDENCIES.md` |
 | Rhythm, tempo or sequencer behavior | `rhythm_bahavior.md`, `../qt_frontend/docs/SEQUENCER_TAGS.md`, `../qt_frontend/tests/USE_CASES.md` |

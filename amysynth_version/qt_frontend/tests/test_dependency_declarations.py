@@ -67,15 +67,21 @@ class DependencyDeclarationTests(unittest.TestCase):
         }
         self.assertEqual(
             resolved["portable"],
-            {"pyserial", "fastjsonschema"},
+            {"pyserial", "fastjsonschema", "python-osc"},
         )
         self.assertEqual(
             resolved["runtime"],
-            {"pyside6", "pyserial", "fastjsonschema"},
+            {"pyside6", "pyserial", "fastjsonschema", "python-osc"},
         )
         self.assertEqual(
             resolved["build"],
-            {"pyside6", "pyserial", "fastjsonschema", "pyinstaller"},
+            {
+                "pyside6",
+                "pyserial",
+                "fastjsonschema",
+                "python-osc",
+                "pyinstaller",
+            },
         )
         self.assertEqual(
             resolved["test_quality"],
@@ -83,6 +89,7 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "pyside6",
                 "pyserial",
                 "fastjsonschema",
+                "python-osc",
                 "numpy",
                 "ruff",
                 "mypy",
@@ -92,7 +99,7 @@ class DependencyDeclarationTests(unittest.TestCase):
         )
         self.assertEqual(
             resolved["android_host"],
-            {"pyside6", "pyserial", "fastjsonschema", "cython"},
+            {"pyside6", "pyserial", "fastjsonschema", "python-osc", "cython"},
         )
 
         for import_root, record in self.manifest["direct_imports"].items():

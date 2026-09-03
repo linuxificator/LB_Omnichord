@@ -67,15 +67,30 @@ class MidiBindingService:
             if target is None:
                 continue
             try:
-                channel = int(raw.get("channel", 0))
                 source_type = str(raw.get("source_type", "cc"))
-                if source_type == "pitch_bend":
+                if source_type == "osc":
+                    address = str(raw.get("address", ""))
+                    argument = int(raw.get("argument", 0))
+                    value_type = str(raw.get("value_type", "continuous"))
+                    if (
+                        not address.startswith("/")
+                        or argument < 0
+                        or value_type not in ("continuous", "button")
+                    ):
+                        continue
+                    key = self.state.osc_key(address, argument, value_type)
+                elif source_type == "pitch_bend":
+                    channel = int(raw.get("channel", 0))
                     controller = PITCH_BEND_CONTROLLER
+                    key = self.state.key(channel, controller)
                 elif source_type == "note_button":
+                    channel = int(raw.get("channel", 0))
                     controller = NOTE_BUTTON_OFFSET + int(raw.get("note", -1))
+                    key = self.state.key(channel, controller)
                 else:
+                    channel = int(raw.get("channel", 0))
                     controller = int(raw.get("controller", -1))
-                key = self.state.key(channel, controller)
+                    key = self.state.key(channel, controller)
             except (TypeError, ValueError):
                 continue
             if source_type == "pitch_bend" and key[1] != PITCH_BEND_CONTROLLER:
@@ -84,7 +99,7 @@ class MidiBindingService:
                 NOTE_BUTTON_OFFSET <= key[1] <= NOTE_BUTTON_LAST
             ):
                 continue
-            if source_type not in ("cc", "pitch_bend", "note_button"):
+            if source_type not in ("cc", "pitch_bend", "note_button", "osc"):
                 continue
             if source_type == "cc" and not 0 <= key[1] <= 127:
                 continue

@@ -170,6 +170,26 @@ buffer. The published arm64 APK is debug-signed and explicitly experimental;
 stable distribution signing and physical-device validation remain separate
 acceptance steps.
 
+All five package jobs run the complete packaged-input smoke. It sends real OSC
+1.0 UDP datagrams through the package's configured listener and requires a
+rotary, pushbutton and green activity state to reach the shared Qt control
+model. It also verifies the package's actual MIDI profile: Linux exposes only
+ALSA raw, ALSA sequencer and OSS MIDI, while macOS, Windows and Android expose
+their platform-relevant native technology as explicitly unavailable until a
+bridge is bundled. Public MIDI simulation slots exercise the frozen package's
+shared CC and controller-button model after that adapter selection. Separately,
+the Linux Qt integration test writes real MIDI bytes through a PTY-backed raw
+device and verifies the native reader, parser, queued Qt boundary, model and
+binding path end to end.
+
+This is the maximum deterministic hosted-CI boundary currently available. OSC
+loopback proves socket creation, packet parsing and application delivery but
+not firewall permission or packets from a second physical host. The simulated
+MIDI portion is not physical MIDI evidence, and CoreMIDI, WinMM and Android
+MIDI cannot be physical-input tested while those native bridges remain
+unimplemented. Their red unavailable state is therefore an intentional,
+tested capability result rather than a false support claim.
+
 The macOS and Windows package jobs drive both a quick tap and a long press
 classified by the real packaged QML `TapHandler`, using synthesized Qt pointer
 events and Qt's platform long-press interval. The same package smoke drags a

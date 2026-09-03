@@ -145,7 +145,7 @@ class ConfigMigrationTests(unittest.TestCase):
             "amy_max_pattern_instances",
         }
         schema_root = ROOT / "config" / "schema"
-        for revision in (1, 2, 3, 4, 5):
+        for revision in (1, 2, 3, 4, 5, 6):
             schema = json.loads(
                 (schema_root / f"amy_config_v{revision}.schema.json").read_text(
                     encoding="utf-8"
@@ -166,6 +166,19 @@ class ConfigMigrationTests(unittest.TestCase):
                 else:
                     self.assertTrue(added_midi.issubset(midi_required))
                     self.assertIn("kit", drum_required)
+                if revision < 6:
+                    self.assertNotIn("osc_input", required)
+                else:
+                    self.assertNotIn("osc_input", required)
+                    osc_schema = schema["properties"]["osc_input"]
+                    self.assertEqual(osc_schema["required"], ["enabled"])
+                    self.assertEqual(
+                        osc_schema["dependencies"],
+                        {
+                            "listen_address": ["listen_port"],
+                            "listen_port": ["listen_address"],
+                        },
+                    )
 
     def test_revision_four_infers_gamma_and_general_midi_kits(self) -> None:
         gamma = copy.deepcopy(self.shipped)
@@ -209,7 +222,9 @@ class ConfigMigrationTests(unittest.TestCase):
 
         migrated = migrate_config_document(released)
 
-        self.assertEqual(migrated.data["config_revision"], 5)
+        self.assertEqual(
+            migrated.data["config_revision"], CURRENT_CONFIG_REVISION
+        )
         self.assertEqual(migrated.data["drums"]["kit"], "gamma9001")
         self.assertEqual(
             migrated.data["drums"]["sample_map"],
@@ -237,6 +252,26 @@ class ConfigMigrationTests(unittest.TestCase):
                 self.assertEqual(
                     migrated.changed_paths, ("$.config_revision",)
                 )
+
+    def test_revision_six_adds_portable_osc_defaults(self) -> None:
+        revision_five = copy.deepcopy(self.shipped)
+        revision_five["config_revision"] = 5
+        revision_five.pop("osc_input")
+
+        migrated = migrate_config_document(revision_five)
+
+        self.assertEqual(
+            migrated.data["osc_input"],
+            {
+                "enabled": True,
+                "listen_address": "0.0.0.0",
+                "listen_port": 8000,
+            },
+        )
+        self.assertEqual(
+            migrated.changed_paths,
+            ("$.osc_input", "$.config_revision"),
+        )
 
     def test_revision_five_rejects_a_custom_tiny_mapping(self) -> None:
         custom = copy.deepcopy(self.shipped)

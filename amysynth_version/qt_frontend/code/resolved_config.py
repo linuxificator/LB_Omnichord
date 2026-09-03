@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import ipaddress
 import json
 import re
 from collections.abc import Callable, Mapping
@@ -57,6 +58,14 @@ class MidiInputConfig:
     device_glob: str
     alsa_raw_globs: tuple[str, ...]
     oss_midi_globs: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class OscInputConfig:
+    enabled: bool
+    listen_address: str | None
+    listen_port: int | None
+    configured: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,6 +163,7 @@ class ResolvedAmyConfig:
     revision: int
     transport: TransportConfig
     midi_input: MidiInputConfig
+    osc_input: OscInputConfig
     capacities: RuntimeCapacities
     layout: SynthBusLayout
     debug: DebugConfig
@@ -306,6 +316,17 @@ def _role_items(section: Mapping[str, Any]) -> tuple[tuple[str, int], ...]:
 
 def _domain_issues(data: JsonObject) -> list[ConfigIssue]:
     issues: list[ConfigIssue] = []
+    osc_input = data.get("osc_input")
+    if isinstance(osc_input, dict) and "listen_address" in osc_input:
+        try:
+            ipaddress.IPv4Address(str(osc_input["listen_address"]))
+        except ipaddress.AddressValueError:
+            issues.append(
+                ConfigIssue(
+                    "$.osc_input.listen_address",
+                    "must be a numeric IPv4 address",
+                )
+            )
     synth_ids = cast(dict[str, Any], data["synth_ids"])
     role_synths = _role_items(synth_ids)
     if len({value for _role, value in role_synths}) != len(role_synths):
@@ -521,6 +542,7 @@ def _to_resolved(
 ) -> ResolvedAmyConfig:
     serial = cast(dict[str, Any], data["serial"])
     midi_input = cast(dict[str, Any], data["midi_input"])
+    osc_input = cast(dict[str, Any] | None, data.get("osc_input"))
     configured_profile = str(midi_input["tech_profile"]).strip().casefold()
     voices = cast(dict[str, Any], data["voices"])
     midi_player = cast(dict[str, Any], data["midi_player"])
@@ -556,6 +578,24 @@ def _to_resolved(
             device_glob=str(midi_input["device_glob"]),
             alsa_raw_globs=tuple(str(value) for value in midi_input["alsa_raw_globs"]),
             oss_midi_globs=tuple(str(value) for value in midi_input["oss_midi_globs"]),
+        ),
+        osc_input=OscInputConfig(
+            enabled=bool(osc_input["enabled"]) if osc_input else False,
+            listen_address=(
+                str(osc_input["listen_address"])
+                if osc_input and "listen_address" in osc_input
+                else None
+            ),
+            listen_port=(
+                int(osc_input["listen_port"])
+                if osc_input and "listen_port" in osc_input
+                else None
+            ),
+            configured=bool(
+                osc_input
+                and "listen_address" in osc_input
+                and "listen_port" in osc_input
+            ),
         ),
         capacities=RuntimeCapacities(
             max_oscs=int(data["amy_max_oscs"]),

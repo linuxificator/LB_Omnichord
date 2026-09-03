@@ -15,6 +15,7 @@ class InstrumentBackend(OmniInstrumentBackend):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._pending_omni_control_bindings: Any = []
         self._midi_input_port_factory = kwargs.pop("midi_input_port_factory")
+        self._osc_input_port_factory = kwargs.pop("osc_input_port_factory")
         super().__init__(*args, **kwargs)
         self._syncing_tuning = False
         self._midi_player: MidiPlayerBackend
@@ -28,6 +29,7 @@ class InstrumentBackend(OmniInstrumentBackend):
             synths=tuple(self._synths),
             client=self._client,
             midi_input_port_factory=self._midi_input_port_factory,
+            osc_input_port_factory=self._osc_input_port_factory,
         )
         self._midi_player.stateChanged.connect(self.midiStateChanged)
         self._midi_player.tuningChanged.connect(self.midiTuningChanged)

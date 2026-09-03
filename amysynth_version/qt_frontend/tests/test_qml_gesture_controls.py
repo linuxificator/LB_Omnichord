@@ -128,6 +128,177 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_flat_f01_osc_controls_keep_mechanical_value_feedback(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "physical_controls"
+
+Window {
+    width: 180
+    height: 90
+    visible: true
+
+    PhysicalRotary {
+        objectName: "oscRotary"
+        x: 10
+        y: 10
+        width: 64
+        height: 64
+        family: 1
+        value: 0
+    }
+    PhysicalPushButton {
+        objectName: "oscButton"
+        x: 90
+        y: 10
+        width: 70
+        height: 54
+        family: 1
+    }
+}
+""",
+        )
+        rotary = window.findChild(QObject, "oscRotary")
+        cap = window.findChild(QObject, "physicalRotaryCap")
+        button = window.findChild(QObject, "oscButton")
+        plunger = window.findChild(QObject, "physicalButtonPlunger")
+        self.assertIsNotNone(rotary)
+        self.assertIsNotNone(cap)
+        self.assertIsNotNone(button)
+        self.assertIsNotNone(plunger)
+        assert rotary is not None
+        assert cap is not None
+        assert button is not None
+        assert plunger is not None
+        self.assertEqual(int(rotary.property("family")), 1)
+        start_rotation = float(cap.property("rotation"))
+        start_y = float(plunger.property("y"))
+        rotary_stops = [
+            window.findChild(QObject, f"physicalRotaryGradientStop{index}")
+            for index in range(4)
+        ]
+        button_stops = [
+            window.findChild(QObject, f"physicalButtonGradientStop{index}")
+            for index in range(4)
+        ]
+        self.assertTrue(all(stop is not None for stop in rotary_stops))
+        self.assertTrue(all(stop is not None for stop in button_stops))
+        self.assertEqual(
+            len({str(stop.property("color")) for stop in rotary_stops if stop}),
+            1,
+        )
+        self.assertEqual(
+            len({str(stop.property("color")) for stop in button_stops if stop}),
+            1,
+        )
+
+        rotary.setProperty("value", 127)
+        button.setProperty("forcedDown", True)
+        QTest.qWait(120)
+        QCoreApplication.processEvents()
+
+        self.assertGreater(float(cap.property("rotation")), start_rotation)
+        self.assertAlmostEqual(float(plunger.property("y")), start_y + 3.0)
+        self.assertEqual(
+            len({str(stop.property("color")) for stop in button_stops if stop}),
+            1,
+        )
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
+    def test_input_tech_leds_and_multiline_mode_label_render_contract(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    width: 520
+    height: 100
+    visible: true
+
+    InputTechnologyIndicator {
+        x: 10
+        technology: ({
+            "key": "oscIdle",
+            "label": "OSC",
+            "state": "listening",
+            "idleLedVisible": true
+        })
+    }
+    InputTechnologyIndicator {
+        x: 100
+        technology: ({
+            "key": "oscActive",
+            "label": "OSC",
+            "state": "activity",
+            "idleLedVisible": false
+        })
+    }
+    InputTechnologyIndicator {
+        x: 190
+        technology: ({
+            "key": "oscFailed",
+            "label": "OSC",
+            "state": "unavailable",
+            "idleLedVisible": false
+        })
+    }
+    InputTechnologyIndicator {
+        x: 280
+        technology: ({
+            "key": "midiIdle",
+            "label": "ALSA seq",
+            "state": "listening",
+            "idleLedVisible": true
+        })
+    }
+    RainbowModeButton {
+        objectName: "oscMidiModeButton"
+        x: 390
+        width: 110
+        height: 68
+        text: "OSC\nMIDI"
+        font.pixelSize: height * 0.31
+    }
+}
+""",
+        )
+        osc_idle = window.findChild(QObject, "oscIdleInputTechnologyLed")
+        osc_active = window.findChild(QObject, "oscActiveInputTechnologyLed")
+        osc_failed = window.findChild(QObject, "oscFailedInputTechnologyLed")
+        midi_idle = window.findChild(QObject, "midiIdleInputTechnologyLed")
+        mode_label = window.findChild(QObject, "rainbowModeLabel")
+        for item in (osc_idle, osc_active, osc_failed, midi_idle, mode_label):
+            self.assertIsNotNone(item)
+        assert osc_idle is not None
+        assert osc_active is not None
+        assert osc_failed is not None
+        assert midi_idle is not None
+        assert mode_label is not None
+
+        self.assertTrue(bool(osc_idle.property("visible")))
+        self.assertEqual(osc_idle.property("color").name(), "#35b85a")
+        self.assertTrue(bool(osc_active.property("visible")))
+        self.assertEqual(osc_active.property("color").name(), "#35b85a")
+        self.assertTrue(bool(osc_failed.property("visible")))
+        self.assertEqual(osc_failed.property("color").name(), "#c73434")
+        self.assertTrue(bool(midi_idle.property("visible")))
+        self.assertEqual(str(mode_label.property("text")), "OSC\nMIDI")
+        self.assertLessEqual(
+            float(mode_label.property("contentHeight")),
+            float(mode_label.property("height")),
+        )
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
     def test_midi_bound_slider_press_without_movement_stays_bound(self) -> None:
         engine, component, window = self.create_window(
             b"""

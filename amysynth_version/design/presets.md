@@ -67,10 +67,12 @@ The tuning link/coupling state is runtime-only and is not stored.
 MIDI master volume and mute are also runtime-only and survive MIDI preset
 switches.
 
-MIDI CC bindings follow target ownership: MIDI targets are stored in MIDI
-presets and OMNI targets in OMNI presets under the optional
-`midi_control_bindings` field. Learn selection, blue unlink timers and visible
-indicator LRU state are never preset state. See `midi_control.md`.
+External-control bindings follow target ownership: MIDI-screen targets are
+stored in MIDI presets and OMNI targets in OMNI presets under the optional,
+historically named `midi_control_bindings` field. It can contain legacy-shaped
+MIDI entries and address-shaped OSC entries. Learn selection, blue unlink
+timers, current input values and visible indicator LRU state are never preset
+state. See `midi_control.md` and `osc_control.md`.
 
 During a runtime preset switch, a numeric target controlled by MIDI keeps its
 current live value instead of accepting the destination preset value. The

@@ -3,13 +3,13 @@
 Status: authoritative dependency-source contract
 Owner: frontend runtime and release packaging
 Applies to: Python source, tests, tools and all five release targets
-Last verified: 2026-09-01
+Last verified: 2026-09-03
 
 ## Python requirement groups
 
 | Group | Source | Current direct intent | Consumers |
 | --- | --- | --- | --- |
-| Portable pure Python | `requirements-portable.txt` | `pyserial==3.5`, `fastjsonschema==2.22.2` | every frontend target |
+| Portable pure Python | `requirements-portable.txt` | `pyserial==3.5`, `fastjsonschema==2.22.2`, `python-osc==1.10.2` | every frontend target |
 | Desktop runtime intent | `requirements.txt` | portable group plus `PySide6>=6.6,<6.11` | Linux x86_64, Raspberry Pi aarch64, macOS arm64 and Windows x86_64 |
 | Desktop build | `requirements-build.txt` | runtime group plus `PyInstaller==6.22.2` | Linux/Raspberry Pi AppImage, macOS DMG and Windows zip jobs |
 | Test and quality | `requirements-test.txt` | runtime group, NumPy 2.5.2, Ruff 0.16.5, mypy 2.3.1, coverage.py 7.15.4 and pyserial stubs | local and reusable regression/quality jobs |
@@ -43,6 +43,7 @@ The machine-readable inventory is
 | `PySide6` | `PySide6` | runtime | Qt Core/GUI/QML/Quick/Test/Network APIs used by the app, tests, diagnostics and screenshot tooling |
 | `serial` | `pyserial` | runtime | UART transport is an enabled portable application capability |
 | `fastjsonschema` | `fastjsonschema` | runtime | versioned JSON Schema validation before opening runtime resources; pure-Python universal package |
+| `pythonosc` | `python-osc` | runtime | OSC 1.0 packet and bundle parsing inside the portable UDP input adapter; pure-Python universal package |
 | `numpy` | `numpy` | test and quality | `instrument_balance.py` directly renders and measures native AMY output; declaring it removes reliance on AMY's transitive unpinned requirement |
 | `amy`, `c_amy` | pinned LB AMY component exception | AMY release contract | native service and native integration tests require the fork build, not an unqualified PyPI dependency |
 

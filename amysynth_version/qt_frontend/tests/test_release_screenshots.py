@@ -23,7 +23,12 @@ spec.loader.exec_module(helper)
 
 class ReleaseScreenshotTests(unittest.TestCase):
     def test_current_readme_screenshots_pass_the_release_sanity_check(self) -> None:
-        for name in ("omni.png", "midi.png"):
+        for name in (
+            "omni.png",
+            "midi.png",
+            "osc-omni.png",
+            "osc-midi.png",
+        ):
             helper.validate_screenshot(FRONTEND / "screenshots" / name)
 
     def test_blank_error_like_screenshot_is_rejected(self) -> None:

@@ -14,7 +14,7 @@ AMY work.
 
 ## Layout
 
-- `code/` — Python application/backend, including synth, transport and MIDI-control state
+- `code/` — Python application/backend, including synth, transport and shared MIDI/OSC-control state
 - `gui/` — QML interface components and GUI assets
 - `config/` — serial/application defaults
 - `instruments/` — curated AMY Juno/DX7 catalogue and 18 factory presets
@@ -61,8 +61,9 @@ python capture_screenshots.py
 
 The helper runs the real frontend and QML scene through Qt's offscreen software
 renderer, uses an isolated temporary home and a drained pseudo-serial endpoint,
-selects C minor for the OMNI strum-note guide, and injects three representative
-MIDI CC movements for the grey MIDI controller bar. It overwrites only
+selects C minor for the OMNI strum-note guide, and uses the public simulation
+inputs to stage MIDI and OSC rotary and pushbutton events in the grey controller
+bar. It overwrites only
 `screenshots/omni.png` and `screenshots/midi.png`; it does not read or alter the
 user's presets or connect to AMY hardware.
 
@@ -107,6 +108,19 @@ Linux MIDI input opens ALSA raw-MIDI devices and an ALSA sequencer input port
 named `LB Omnichord / MIDI In`. Graph tools such as `qpwgraph` can connect VMPK,
 BLE MIDI bridges and MIDI Through directly to that port. See
 `../design/midi.md`.
+
+OSC control input is portable across release platforms. By default it listens
+for OSC 1.0 UDP messages on every IPv4 interface at port 8000. Edit the
+`osc_input.listen_address` and `osc_input.listen_port` values in the user copy
+of `config/amy_config.json` to restrict or move it; use `127.0.0.1` for local-
+only control. Changing numeric or switch addresses appears in the same grey
+learn bar as MIDI, with flat F01 controls. OSC and MIDI share one-to-one target
+ownership and the same click/manual-takeover behavior. See
+`../design/osc_control.md` for message, security and persistence rules.
+When configured, `OSC` also appears beside the MIDI input technologies: its LED
+is green while listening, flashes green on input and is red when its
+listener/network is unavailable. Removing the OSC endpoint from the user config
+removes that technology item entirely.
 
 The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
 
