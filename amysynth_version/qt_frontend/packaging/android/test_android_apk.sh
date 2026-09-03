@@ -110,11 +110,20 @@ for _ in {1..120}; do
   sleep 0.5
 done
 
-# Drive the packaged UI from the adb process. The landscape Pixel 2 viewport
-# maps the first C chord key near (250, 800); a swipe with equal endpoints is
-# an external long press and exercises both press and release delivery.
+# Drive the packaged UI from the adb process. Scale the first-row chord-key
+# coordinate from the landscape Pixel 2 reference viewport. A swipe with equal
+# endpoints is an external long press and exercises press and release delivery.
+display_size=$(adb shell wm size | tr -d '\r' | tail -1 | sed 's/.*: //')
+display_width=${display_size%x*}
+display_height=${display_size#*x}
+if (( display_width <= display_height )); then
+  echo "Android application did not enter landscape: $display_size" >&2
+  exit 1
+fi
+chord_x=$((display_width * 250 / 1920))
+chord_y=$((display_height * 735 / 1080))
 adb exec-out screencap -p > "$evidence_dir/omni-before.png"
-adb shell input swipe 250 800 250 800 700
+adb shell input swipe "$chord_x" "$chord_y" "$chord_x" "$chord_y" 700
 sleep 1
 adb exec-out screencap -p > "$evidence_dir/omni-after.png"
 capture_diagnostics

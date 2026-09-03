@@ -45,6 +45,52 @@ class ProgramArchitectureTests(unittest.TestCase):
         self.assertTrue(adapter.is_file())
         self.assertIn("injectMidiControl", adapter.read_text(encoding="utf-8"))
 
+    def test_shipped_launchers_contain_no_test_mode_or_assertions(self) -> None:
+        shipped = (
+            ROOT / "packaging" / "appimage_entry.py",
+            ROOT / "packaging" / "windows" / "run_windows.ps1",
+            ROOT / "packaging" / "windows" / "amy_service.c",
+        )
+        forbidden = (
+            "package-smoke-test",
+            "OMNICHORD_PACKAGE_SMOKE",
+            "lb-android-package-smoke",
+            "run_self_test",
+            '"--self-test"',
+            "requiredCheckpoints",
+        )
+        for path in shipped:
+            source = path.read_text(encoding="utf-8")
+            for marker in forbidden:
+                with self.subTest(path=path.name, marker=marker):
+                    self.assertNotIn(marker, source)
+
+    def test_package_scenarios_have_one_test_side_owner(self) -> None:
+        workflow = (
+            ROOT.parents[1] / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+        android = (
+            ROOT / "packaging" / "android" / "test_android_apk.sh"
+        ).read_text(encoding="utf-8")
+        evidence = (
+            ROOT / "tests" / "support" / "package_evidence.py"
+        ).read_text(encoding="utf-8")
+        self.assertGreaterEqual(workflow.count("package_evidence.py"), 3)
+        self.assertIn("package_evidence.py", android)
+        self.assertNotIn("for checkpoint", workflow)
+        self.assertNotIn("requiredCheckpoints", workflow)
+        for scenario in (
+            "artifact-present",
+            "package-content-policy",
+            "qml-import-policy",
+            "external-input-process-contract",
+            "packaged-runtime",
+            "rendered-ui",
+            "regression-prerequisite",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assertEqual(evidence.count(f'"{scenario}"'), 1)
+
     def test_portable_input_contract_has_no_platform_branches(self) -> None:
         contract = (
             ROOT / "tests" / "contracts" / "test_external_input_processes.py"

@@ -4,14 +4,14 @@
     "InstrumentBackend": {
       "property_count": 57,
       "property_sha256": "9136f289fdbb3f81d12c2b940a5b7fa3feffa94cdbe556fe9fcf2ae0583d5398",
-      "method_count": 138,
-      "method_sha256": "55ad2ba9df2ac41d83ce6bb4366a72684ba7782191a729e04809b9742310b5cc"
+      "method_count": 134,
+      "method_sha256": "c2223a07d27d17a2d3734a8c1fd98985cac6051035eaed3ca80850e098a9eea1"
     },
     "MidiPlayerBackend": {
-      "property_count": 19,
-      "property_sha256": "af1c05ec6ae306e941236446c98ea6d410b8026c680adccf8541b5bcca15c794",
-      "method_count": 56,
-      "method_sha256": "ecb8fb6cd8b1c79bb5d7c077d96c05033a592547eed3e1be27d4691e6bcdd94c"
+      "property_count": 18,
+      "property_sha256": "5de684b1c5bef029d60655ab5ddc806e45e91cc0673b5850db464c2635ca9aea",
+      "method_count": 49,
+      "method_sha256": "7aca75bcb11a2ca5e024f958a383836d3994fb73c23366ee0e39cd04de4b8d82"
     }
   },
   "supported_config_entrypoints": [
