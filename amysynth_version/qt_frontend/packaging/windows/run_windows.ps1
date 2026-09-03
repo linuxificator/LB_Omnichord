@@ -39,12 +39,23 @@ try {
     $arguments = @("--amy-local-name", $pipeName)
     if ($Windowed) { $arguments += "--windowed" }
     if ($CaptureScreenshotsDir) {
-        $arguments += @("--capture-screenshots-dir", $CaptureScreenshotsDir)
+        $quotedCaptureDir = '"' + $CaptureScreenshotsDir + '"'
+        $arguments += @("--capture-screenshots-dir", $quotedCaptureDir)
     }
-    & (Join-Path $root "LB_Omnichord.exe") @arguments
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    # Windows PowerShell does not necessarily wait when invoking a GUI-
+    # subsystem executable with `&`. Keep the launcher, its AMY service and
+    # the frontend in one explicit lifetime by owning the frontend process.
+    $frontend = Start-Process -FilePath (Join-Path $root "LB_Omnichord.exe") `
+        -ArgumentList $arguments -PassThru
+    $frontend.WaitForExit()
+    if ($frontend.ExitCode -ne 0) { exit $frontend.ExitCode }
 }
 finally {
+    if ($CaptureScreenshotsDir -and -not $service.HasExited) {
+        # The one-shot service exits itself after frontend disconnect. Let it
+        # flush its final audio/session record before using forced cleanup.
+        $service.WaitForExit(5000) | Out-Null
+    }
     if (-not $service.HasExited) {
         Stop-Process -Id $service.Id -Force
         $service.WaitForExit()
