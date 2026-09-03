@@ -91,7 +91,7 @@ class OscUdpInputPortTests(unittest.TestCase):
         self.assertIsNotNone(listening)
         assert listening is not None
         self.assertEqual(listening.state, "listening")
-        self.assertFalse(listening.idle_led_visible)
+        self.assertTrue(listening.idle_led_visible)
         active = port.status_snapshot(float("inf"), True)
         self.assertIsNotNone(active)
         assert active is not None

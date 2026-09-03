@@ -226,7 +226,7 @@ class PythonOscUdpInputPort:
             state=state,
             reason=reason,
             protocol="osc",
-            idle_led_visible=False,
+            idle_led_visible=True,
         )
 
     def _read_loop(self) -> None:

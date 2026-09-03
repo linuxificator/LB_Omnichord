@@ -117,9 +117,9 @@ learn bar as MIDI, with flat F01 controls. OSC and MIDI share one-to-one target
 ownership and the same click/manual-takeover behavior. See
 `../design/osc_control.md` for message, security and persistence rules.
 When configured, `OSC` also appears beside the MIDI input technologies: its LED
-is off while idle, flashes green on input and is red when its listener/network
-is unavailable. Removing the OSC endpoint from the user config removes that
-technology item entirely.
+is green while listening, flashes green on input and is red when its
+listener/network is unavailable. Removing the OSC endpoint from the user config
+removes that technology item entirely.
 
 The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
 

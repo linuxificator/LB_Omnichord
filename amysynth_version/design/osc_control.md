@@ -109,9 +109,9 @@ shortened.
 ## Input-technology and mode-button feedback
 
 One `OSC` item shares the MIDI input-technology row when a complete, enabled
-listen endpoint is configured. Its LED is invisible while the socket is merely
-listening, flashes green for 450 ms after accepted OSC control data, and is red
-when the socket cannot bind or the configured network is unavailable. The
+listen endpoint is configured. Its LED is green while the socket is listening,
+flashes green for 450 ms after accepted OSC control data, and is red when the
+socket cannot bind or the configured network is unavailable. The
 network state is polled through Qt's portable network-interface API; a
 loopback-only endpoint remains available without an external interface, while
 the wildcard endpoint requires one running non-loopback IPv4 interface.
@@ -158,7 +158,7 @@ binding and musical/application state.
 Tests must prove:
 
 - exact config migration/default/validation and no consumer fallback;
-- omission/disablement, idle-hidden/activity-green/network-red technology
+- omission/disablement, listening-green/activity-green/network-red technology
   presentation and live network recovery;
 - real loopback UDP reception, message/bundle decoding, ordering, malformed
   packet survival, configured bind address/port and idempotent shutdown;

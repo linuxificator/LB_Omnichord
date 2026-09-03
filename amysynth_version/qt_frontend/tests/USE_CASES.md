@@ -408,8 +408,8 @@ actual bar.
 - MIDI and OSC share global one-to-one ownership. Binding an OSC source to a
   MIDI-owned target displaces the MIDI source to blue, and vice versa.
 - The MIDI input-technology row contains one `OSC` item for a configured
-  endpoint. Its LED is off while idle, flashes green on accepted data and turns
-  red on bind failure or loss of the configured network.
+  endpoint. Its LED is green while listening, flashes green on accepted data
+  and turns red on bind failure or loss of the configured network.
 - The OMNI rainbow button says `OSC` above `MIDI`; its existing red learn and
   green binding-location LEDs represent both protocols without duplication.
 

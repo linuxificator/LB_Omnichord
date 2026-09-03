@@ -229,7 +229,7 @@ Window {
             "key": "oscIdle",
             "label": "OSC",
             "state": "listening",
-            "idleLedVisible": false
+            "idleLedVisible": true
         })
     }
     InputTechnologyIndicator {
@@ -283,7 +283,8 @@ Window {
         assert midi_idle is not None
         assert mode_label is not None
 
-        self.assertFalse(bool(osc_idle.property("visible")))
+        self.assertTrue(bool(osc_idle.property("visible")))
+        self.assertEqual(osc_idle.property("color").name(), "#35b85a")
         self.assertTrue(bool(osc_active.property("visible")))
         self.assertEqual(osc_active.property("color").name(), "#35b85a")
         self.assertTrue(bool(osc_failed.property("visible")))
