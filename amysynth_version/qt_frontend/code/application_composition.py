@@ -12,11 +12,9 @@ from config_loader import (
 )
 from midi_input import MidiInputPortFactory
 from osc_input import OscInputPortFactory
-from package_test_hooks import PackageTestHooks
 from runtime_platform_adapters import RuntimeOverrides
 
 
-Checkpoint = Callable[[str], None]
 TransportNotice = Callable[["ClientSelection", ResolvedAmyConfig], None]
 SynthFallbackNotice = Callable[[str, str, str], None]
 
@@ -43,7 +41,6 @@ class RuntimeResolver(Protocol):
         private_files_dir: Path,
         amy_socket: str | None,
         amy_local_name: str | None,
-        package_smoke_test: bool,
     ) -> RuntimeOverrides: ...
 
 
@@ -85,7 +82,6 @@ class ApplicationDependencies:
     osc_input_port: OscInputPortFactory
     private_files_dir: Callable[[], Path]
     resolve_package_runtime: RuntimeResolver
-    package_test_hooks: Callable[[bool], PackageTestHooks]
     display_diagnostics: Callable[[str], tuple[str, ...]]
     backend: BackendFactory
 
@@ -121,11 +117,6 @@ class ApplicationGraph:
     resources: ApplicationResources
 
 
-def _checkpoint(callback: Checkpoint | None, label: str) -> None:
-    if callback is not None:
-        callback(label)
-
-
 def select_config_path(
     requested: Path,
     *,
@@ -142,41 +133,31 @@ def load_application_resources(
     dependencies: ApplicationDependencies,
     *,
     user_config_dir: Path,
-    checkpoint: Checkpoint | None = None,
     synth_fallback_notice: SynthFallbackNotice | None = None,
 ) -> ApplicationResources:
     paths = dependencies.paths
     defaults = dependencies.load_defaults(user_config_dir / "defaults.json")
-    _checkpoint(checkpoint, "defaults-loaded")
     chords = dependencies.load_chords(paths.music / "chords.csv")
-    _checkpoint(checkpoint, "chords-loaded")
     synth_list, chord_fallback, strum_fallback, bass_fallback = (
         dependencies.load_synth_catalog(paths.instruments / "synths.json")
     )
     synths = tuple(synth_list)
-    _checkpoint(checkpoint, "synth-catalog-loaded")
     rhythms = dependencies.load_rhythm_catalog(paths.music / "rhythms.json")
-    _checkpoint(checkpoint, "rhythm-catalog-loaded")
     bass_riffs = dependencies.load_bass_riffs(
         paths.music / "omnichord_bass_riffs.json",
         rhythm_ids=(rhythm.key for rhythm in rhythms),
         chord_suffixes=(chord.suffix for chord in chords),
     )
-    _checkpoint(checkpoint, "bass-riff-catalog-loaded")
     title = dependencies.load_title_config(user_config_dir / "title.json")
-    _checkpoint(checkpoint, "title-config-loaded")
     intonation_eq = dependencies.load_intonation_table(
         paths.music / "intonation_eq.json"
     )
-    _checkpoint(checkpoint, "equal-intonation-loaded")
     intonation_harm = dependencies.load_intonation_table(
         paths.music / "intonation_harm.json"
     )
-    _checkpoint(checkpoint, "harmonic-intonation-loaded")
     intonation_jv = dependencies.load_intonation_table(
         paths.music / "intonation_jv.json"
     )
-    _checkpoint(checkpoint, "just-intonation-loaded")
 
     by_key = {str(synth.key): index for index, synth in enumerate(synths)}
 
@@ -203,7 +184,6 @@ def load_application_resources(
         default_strum_synth_index=selected("strum", strum_fallback),
         default_bass_synth_index=selected("bass", bass_fallback),
     )
-    _checkpoint(checkpoint, "startup-synths-selected")
     return resources
 
 
@@ -279,42 +259,29 @@ def compose_application_graph(
     resources: ApplicationResources,
     *,
     user_config_dir: Path,
-    checkpoint: Checkpoint | None = None,
     transport_notice: TransportNotice | None = None,
 ) -> ApplicationGraph:
     requested = Path(args.amy_config)
-    _checkpoint(checkpoint, "amy-config-path-resolved")
     config_path = select_config_path(
         requested,
         shipped_config=dependencies.paths.config / "amy_config.json",
         user_config=user_config_dir / "amy_config.json",
     )
-    _checkpoint(checkpoint, "amy-config-path-selected")
     resolved = dependencies.load_resolved_config(config_path)
     resolved = apply_transport_overrides(
         resolved,
         serial_port=args.serial_port,
         serial_baud=args.serial_baud,
     )
-    _checkpoint(checkpoint, "amy-config-loaded")
     selection = select_client(args)
     if transport_notice is not None:
         transport_notice(selection, resolved)
-    if selection.kind == "local":
-        _checkpoint(checkpoint, "amy-local-connect-started")
-    elif selection.kind == "socket":
-        _checkpoint(checkpoint, "amy-socket-connect-started")
     client = _create_client(
         selection,
         dependencies,
         resolved=resolved,
         addresses=address_map(args),
     )
-    if selection.kind == "local":
-        _checkpoint(checkpoint, "amy-local-connected")
-    elif selection.kind == "socket":
-        _checkpoint(checkpoint, "amy-socket-connected")
-
     backend = dependencies.backend(
         chords=resources.chords,
         synths=resources.synths,

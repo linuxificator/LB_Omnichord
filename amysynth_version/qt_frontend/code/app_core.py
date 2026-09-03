@@ -3501,14 +3501,6 @@ def parse_arguments(
         ),
     )
     parser.add_argument(
-        "--package-smoke-test",
-        action="store_true",
-        help=(
-            "Load the complete packaged UI, exercise one chord over the "
-            "configured AMY transport, and exit automatically."
-        ),
-    )
-    parser.add_argument(
         "--capture-screenshots-dir",
         type=Path,
         default=None,
@@ -3666,20 +3658,8 @@ def run_application(
     args: argparse.Namespace,
     dependencies: ApplicationDependencies,
 ) -> int:
-    if args.package_smoke_test and args.capture_screenshots_dir is not None:
-        raise ValueError("--package-smoke-test and --capture-screenshots-dir are exclusive")
-
-    package_hooks = dependencies.package_test_hooks(bool(args.package_smoke_test))
-
-    def smoke_checkpoint(label: str) -> None:
-        package_hooks.checkpoint(label)
-
-    smoke_checkpoint("frontend-entered")
-
     migrate_user_layout()
-    smoke_checkpoint("user-layout-migrated")
     user_config_dir = ensure_user_configs(dependencies.paths.config)
-    smoke_checkpoint("user-config-ready")
 
     # These Qt choices must be made before the first application/window is
     # constructed.
@@ -3698,7 +3678,6 @@ def run_application(
     # QSG_INFO prints the actual scene-graph backend chosen by Qt. It is kept
     # on for this diagnostic build; the output is only a few startup lines.
     os.environ.setdefault("QSG_INFO", "1")
-    smoke_checkpoint("renderer-environment-ready")
 
     def synth_fallback_notice(role: str, requested: str, fallback: str) -> None:
         print(
@@ -3710,7 +3689,6 @@ def run_application(
     resources = load_application_resources(
         dependencies,
         user_config_dir=user_config_dir,
-        checkpoint=smoke_checkpoint,
         synth_fallback_notice=synth_fallback_notice,
     )
     defaults = resources.defaults
@@ -3720,31 +3698,21 @@ def run_application(
     title_config = resources.title
 
     QQuickStyle.setStyle("Basic")
-    smoke_checkpoint("quick-style-selected")
 
     app = QGuiApplication(sys.argv)
     app.setApplicationName("Qt Omnichord")
-    smoke_checkpoint("qgui-created")
 
     runtime = dependencies.resolve_package_runtime(
         platform_name=QGuiApplication.platformName(),
         private_files_dir=dependencies.private_files_dir(),
         amy_socket=args.amy_socket,
         amy_local_name=args.amy_local_name,
-        package_smoke_test=bool(args.package_smoke_test),
     )
     args.amy_socket = runtime.amy_socket
     args.amy_local_name = runtime.amy_local_name
-    args.package_smoke_test = runtime.package_smoke_test
-    package_hooks = package_hooks.redirected(
-        enabled=runtime.package_smoke_test,
-        status=runtime.smoke_status,
-    )
-    smoke_checkpoint("android-runtime-configured")
 
     for diagnostic in dependencies.display_diagnostics(QGuiApplication.platformName()):
         print(diagnostic, file=sys.stderr, flush=True)
-    smoke_checkpoint("display-diagnostics-written")
 
     def transport_notice(
         selection: ClientSelection,
@@ -3767,7 +3735,6 @@ def run_application(
         dependencies,
         resources,
         user_config_dir=user_config_dir,
-        checkpoint=smoke_checkpoint,
         transport_notice=transport_notice,
     )
     amy_client = graph.client
@@ -3837,15 +3804,12 @@ def run_application(
     )
 
     engine.load(QUrl.fromLocalFile(str(dependencies.paths.gui / "Main.qml")))
-    smoke_checkpoint("qml-load-returned")
 
     if not engine.rootObjects():
         amy_client.close()
         return 1
-    smoke_checkpoint("qml-root-ready")
 
     backend.send_initial_state()
-    smoke_checkpoint("initial-state-sent")
 
     if args.capture_screenshots_dir is not None:
         capture_dir = args.capture_screenshots_dir.expanduser().resolve()
@@ -3894,68 +3858,10 @@ def run_application(
         # grab. This works with QT_QPA_PLATFORM=offscreen as used by the helper.
         QTimer.singleShot(1500, capture_omni)
 
-    if args.package_smoke_test:
-        if not args.amy_socket and not args.amy_local_name:
-            print(
-                "--package-smoke-test requires an external AMY transport",
-                file=sys.stderr,
-                flush=True,
-            )
-            amy_client.close()
-            return 2
-
-        # Exercise QML startup, backend state publication, real Qt pointer
-        # delivery, tap/hold behavior, the packaged transport and actual note
-        # generation. The Windows service renders these commands offline, so
-        # this remains deterministic without an audio device.
-        window = engine.rootObjects()[0]
-
-        def smoke_input() -> None:
-            try:
-                from package_smoke import (
-                    exercise_chord_input,
-                    exercise_external_control_input,
-                    exercise_slider_input,
-                )
-
-                exercise_external_control_input(
-                    app,
-                    backend.midiPlayer,
-                    graph.resolved_config.midi_input,
-                    graph.resolved_config.osc_input,
-                    smoke_checkpoint,
-                )
-
-                exercise_chord_input(
-                    app,
-                    window,
-                    backend,
-                    smoke_checkpoint,
-                )
-                exercise_slider_input(
-                    app,
-                    window,
-                    smoke_checkpoint,
-                )
-            except Exception as exc:
-                message = f"Package input smoke failed: {type(exc).__name__}: {exc}"
-                print(message, file=sys.stderr, flush=True)
-                smoke_checkpoint(f"input-failed {type(exc).__name__}: {exc}")
-                app.exit(3)
-                return
-
-            smoke_checkpoint("quit-requested")
-            app.quit()
-
-        # Let the first complete scene-graph frame settle before synthesizing
-        # input through the QQuickWindow.
-        QTimer.singleShot(150, smoke_input)
-
     # Make teardown order explicit. QML must be destroyed while the Python
     # backend QObject is still alive; otherwise its context property becomes
     # null and dozens of bindings log TypeErrors during application shutdown.
     exit_code = app.exec()
-    smoke_checkpoint("event-loop-exited")
 
     # Destroy the QML engine/root objects first.
     del engine
