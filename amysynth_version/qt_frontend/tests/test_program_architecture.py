@@ -25,6 +25,26 @@ class ProgramArchitectureTests(unittest.TestCase):
             (ROOT / "tests" / "support" / "external_input_peer.py").is_file()
         )
 
+    def test_synthetic_input_hooks_exist_only_in_test_support(self) -> None:
+        forbidden = (
+            "injectMidiControl",
+            "injectMidiPitchBend",
+            "injectMidiButton",
+            "injectMidiNote",
+            "injectOscControl",
+            "OMNICHORD_TEST_MIDI_CC_LOG",
+            "testCcLogging",
+            "testLogControl",
+        )
+        for path in CODE.glob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            for marker in forbidden:
+                with self.subTest(path=path.name, marker=marker):
+                    self.assertNotIn(marker, source)
+        adapter = ROOT / "tests" / "support" / "backend_control_surface.py"
+        self.assertTrue(adapter.is_file())
+        self.assertIn("injectMidiControl", adapter.read_text(encoding="utf-8"))
+
     def test_portable_input_contract_has_no_platform_branches(self) -> None:
         contract = (
             ROOT / "tests" / "contracts" / "test_external_input_processes.py"

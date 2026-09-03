@@ -180,32 +180,6 @@ class InstrumentBackend(OmniInstrumentBackend):
     def midiControlIndicators(self) -> list[dict[str, Any]]:
         return self._midi_player.commonControls(-1)
 
-    @Slot(int, int, int)
-    def injectMidiControl(
-        self,
-        channel: int,
-        controller: int,
-        value: int,
-    ) -> None:
-        self._midi_player.injectControl(channel, controller, value)
-
-    @Slot(int, int)
-    def injectMidiPitchBend(
-        self,
-        channel: int,
-        value: int,
-    ) -> None:
-        self._midi_player.injectPitchBend(channel, value)
-
-    @Slot(int, int, int)
-    def injectMidiButton(
-        self,
-        channel: int,
-        note: int,
-        velocity: int,
-    ) -> None:
-        self._midi_player.injectButton(channel, note, velocity)
-
     @Slot(int, int)
     def clickMidiControlIndicator(self, channel: int, controller: int) -> None:
         self._midi_player.clickControlIndicator(channel, controller)
@@ -369,16 +343,6 @@ class InstrumentBackend(OmniInstrumentBackend):
     @Slot()
     def finishMidiPreview(self) -> None:
         self._midi_player.previewEnd()
-
-    @Slot(int, int, int, bool)
-    def injectMidiNote(
-        self,
-        channel: int,
-        note: int,
-        velocity: int,
-        is_on: bool,
-    ) -> None:
-        self._midi_player.injectNote(channel, note, velocity, is_on)
 
     @Slot()
     def panic(self) -> None:

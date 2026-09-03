@@ -209,7 +209,6 @@ class MidiAmyEngineTests(unittest.TestCase):
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
         backend._midi_control_state = MidiControlState()
         backend._midi_control_lock = threading.Lock()
-        backend._write_cc_test_log = lambda *_args, **_kwargs: None
         backend._sync_blue_timer = lambda *_args, **_kwargs: None
         backend._bump_binding_state = lambda *_args, **_kwargs: None
         location_feedback: list[tuple[tuple[int, int], dict[str, object] | None]] = []
@@ -394,7 +393,6 @@ class MidiAmyEngineTests(unittest.TestCase):
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
         backend._midi_control_state = MidiControlState()
         backend._midi_control_lock = threading.Lock()
-        backend._write_cc_test_log = lambda *_args, **_kwargs: None
         backend._sync_blue_timer = lambda *_args, **_kwargs: None
         backend._bump_binding_state = lambda *_args, **_kwargs: None
         applied: list[tuple[dict[str, object], int, tuple[int, int]]] = []
@@ -429,8 +427,6 @@ class MidiAmyEngineTests(unittest.TestCase):
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
         backend._midi_control_state = MidiControlState()
         backend._midi_control_lock = threading.Lock()
-        records: list[dict[str, object]] = []
-        backend._write_cc_test_log = lambda record: records.append(dict(record))
         backend._sync_blue_timer = lambda *_args, **_kwargs: None
         backend._bump_binding_state = lambda *_args, **_kwargs: None
 
@@ -446,12 +442,10 @@ class MidiAmyEngineTests(unittest.TestCase):
         backend.clickControlIndicator(1, 74)
         self.assertEqual(state.status((1, 74)), "blue")
         self.assertIsNone(state.learn_key)
-        self.assertEqual(records[-1]["reason"], "indicator-click")
 
         backend.clickControlIndicator(1, 74)
         self.assertEqual(state.status((1, 74)), "learn")
         self.assertEqual(state.learn_key, (1, 74))
-        self.assertEqual(len(records), 1)
 
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
         client = _Client(instrument_levels={"dx7_215": 0.4})

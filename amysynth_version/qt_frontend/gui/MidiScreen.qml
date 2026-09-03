@@ -31,7 +31,7 @@ Item {
 
     Timer {
         interval: 100
-        running: root.visible || backend.midiPlayer.testCcLogging
+        running: root.visible
         repeat: true
         triggeredOnStart: true
         onTriggered: {
@@ -41,19 +41,6 @@ Item {
             root.midiControlModel = backend.midiPlayer
                 .commonControls(-1)
                 .slice(0, midiControlBar.indicatorCapacity)
-            backend.midiPlayer.testLogControlIndicatorLayout(
-                midiControlBar.x,
-                midiControlBar.width,
-                midiControlBar.indicatorCapacity,
-                midiControlRow.implicitWidth,
-                midiControlRepeater.count,
-                midiControlBar.x
-                + midiControlBar.horizontalPadding
-                + midiControlRow.implicitWidth
-            )
-            backend.midiPlayer.testLogControlIndicatorState(
-                root.midiControlModel
-            )
         }
     }
 
@@ -118,7 +105,7 @@ Item {
         }
 
         onIndicatorCapacityChanged: {
-            if (root.visible || backend.midiPlayer.testCcLogging) {
+            if (root.visible) {
                 publishCapacity()
             }
         }

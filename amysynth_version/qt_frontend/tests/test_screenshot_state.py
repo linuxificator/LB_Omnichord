@@ -15,13 +15,13 @@ class RecordingInjector:
     def __init__(self) -> None:
         self.events: list[tuple[object, ...]] = []
 
-    def injectMidiControl(self, channel: int, controller: int, value: int) -> None:
+    def process_midi_control(self, channel: int, controller: int, value: int) -> None:
         self.events.append(("midi-control", channel, controller, value))
 
-    def injectMidiButton(self, channel: int, note: int, velocity: int) -> None:
+    def process_midi_button(self, channel: int, note: int, velocity: int) -> None:
         self.events.append(("midi-button", channel, note, velocity))
 
-    def injectOscControl(
+    def process_osc_control(
         self,
         address: str,
         argument: int,

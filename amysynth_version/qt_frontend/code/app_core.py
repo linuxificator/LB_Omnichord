@@ -3816,9 +3816,9 @@ def run_application(
         capture_dir.mkdir(parents=True, exist_ok=True)
         window = engine.rootObjects()[0]
 
-        # Exercise the same public input paths used by controller simulations.
-        # The resulting bar contains MIDI and OSC rotaries and pushbuttons.
-        populate_screenshot_input_controls(backend, backend.midiPlayer)
+        # Stage representative controls through the normal input-processing
+        # paths. The resulting bar contains MIDI and OSC rotaries and buttons.
+        populate_screenshot_input_controls(backend.midiPlayer, backend.midiPlayer)
         # Select C minor from factory preset 1 so the OMNI capture also
         # demonstrates the active chord and its correctly spelled C/E-flat/G
         # strum-note guide.
