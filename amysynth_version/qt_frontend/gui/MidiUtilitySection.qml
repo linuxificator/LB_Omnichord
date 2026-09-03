@@ -48,6 +48,13 @@ Item {
         }
     }
 
+    function midiButtonHandled(target) {
+        const learned = root.controller.activateControlTarget(target)
+        if (learned)
+            return true
+        return root.controller.midiButtonTargetBlocked(target)
+    }
+
     onTuningCoupledChanged:
         root.synchronizeTuningWheel()
 
@@ -59,15 +66,11 @@ Item {
         }
     }
 
-    Rectangle {
-        x: -root.leftExtension
+    SectionBackground {
         y: 0
-        width: root.leftExtension + root.tuningX + root.tuningWidth
-        height: root.tuningRowHeight
-        radius: 12
-        color: "#f4c77f"
-        border.color: "#bd7517"
-        border.width: 1
+        leftExtension: root.leftExtension
+        contentWidth: root.tuningX + root.tuningWidth
+        frameHeight: root.tuningRowHeight
     }
 
     TuningLinkButton {
@@ -219,6 +222,11 @@ Item {
             "screen": "midi",
             "kind": "master_volume"
         })
+        centerMidiTarget: ({
+            "screen": "midi",
+            "kind": "button",
+            "action": "master_mute"
+        })
 
         onEdited: (value) => root.controller.setMasterVolume(value / 100)
         onCenterClicked: root.controller.toggleMasterMuted()
@@ -233,6 +241,11 @@ Item {
         text: "PNC!"
         font.pixelSize: 18
         font.bold: true
+        property var midiTarget: ({
+            "screen": "omni",
+            "kind": "button",
+            "action": "panic"
+        })
 
         contentItem: Text {
             text: panicButton.text
@@ -249,7 +262,19 @@ Item {
             border.width: 2
         }
 
-        onClicked: root.omniController.panic()
+        MidiButtonLed {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 4
+            z: 2
+            midiControlRouter: root.controller
+            midiTarget: panicButton.midiTarget
+        }
+
+        onClicked: {
+            if (!root.midiButtonHandled(panicButton.midiTarget)) {
+                root.omniController.panic()
+            }
+        }
     }
 
     Button {
@@ -300,6 +325,11 @@ Item {
             text: "STR"
             font.pixelSize: 18
             font.bold: true
+            property var midiTarget: ({
+                "screen": "midi",
+                "kind": "button",
+                "action": "store_preset"
+            })
 
             contentItem: Text {
                 text: storeButton.text
@@ -316,8 +346,19 @@ Item {
                 border.width: 2
             }
 
-            onClicked:
-                root.controller.storeSelectedPreset()
+            MidiButtonLed {
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 4
+                z: 2
+                midiControlRouter: root.controller
+                midiTarget: storeButton.midiTarget
+            }
+
+            onClicked: {
+                if (!root.midiButtonHandled(storeButton.midiTarget)) {
+                    root.controller.storeSelectedPreset()
+                }
+            }
         }
 
         Row {
@@ -334,6 +375,12 @@ Item {
                     required property int index
 
                     property int presetNumber: index + 1
+                    property var midiTarget: ({
+                        "screen": "midi",
+                        "kind": "button",
+                        "action": "select_preset",
+                        "preset": presetNumber
+                    })
                     property bool selected:
                         root.controller.selectedPreset === presetNumber
                     property bool storeFlash: false
@@ -400,6 +447,14 @@ Item {
                         locationEnabled: !presetButton.selected
                     }
 
+                    MidiButtonLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 14
+                        z: 2
+                        midiControlRouter: root.controller
+                        midiTarget: presetButton.midiTarget
+                    }
+
                     Timer {
                         id: storeFlashTimer
                         interval: 520
@@ -417,8 +472,11 @@ Item {
                         }
                     }
 
-                    onClicked:
-                        root.controller.selectPreset(presetNumber)
+                    onClicked: {
+                        if (!root.midiButtonHandled(presetButton.midiTarget)) {
+                            root.controller.selectPreset(presetNumber)
+                        }
+                    }
                 }
             }
         }

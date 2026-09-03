@@ -1,4 +1,5 @@
 {
+  "config_revision": 7,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,
@@ -26,7 +27,15 @@
   },
   "midi_input": {
     "enabled": true,
-    "device_glob": "/dev/snd/midiC*D*"
+    "tech_profile": "auto",
+    "device_glob": "/dev/snd/midiC*D*",
+    "alsa_raw_globs": ["/dev/snd/midiC*D*"],
+    "oss_midi_globs": ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"]
+  },
+  "osc_input": {
+    "enabled": true,
+    "listen_address": "0.0.0.0",
+    "listen_port": 8000
   },
   "default_synths": {
     "chord": "juno_004",
@@ -50,22 +59,23 @@
     "juno_089": 0.4
   },
   "drums": {
+    "kit": "gamma9001",
     "velocity_gain": 5.0,
     "sample_map": {
-      "bd_haus": {"preset": 1, "note": 39},
-      "drum_bass_hard": {"preset": 1, "note": 39},
-      "drum_bass_soft": {"preset": 1, "note": 39},
-      "drum_snare_hard": {"preset": 2, "note": 45},
-      "drum_snare_soft": {"preset": 5, "note": 41},
-      "drum_cymbal_closed": {"preset": 6, "note": 53},
-      "drum_cymbal_pedal": {"preset": 7, "note": 61},
-      "drum_cymbal_open": {"preset": 7, "note": 56},
-      "drum_tom_hi_soft": {"preset": 8, "note": 73},
-      "drum_tom_mid_soft": {"preset": 8, "note": 63},
-      "drum_tom_lo_soft": {"preset": 8, "note": 61},
-      "elec_tick": {"preset": 4, "note": 51},
-      "perc_bell": {"preset": 10, "note": 69},
-      "perc_snap": {"preset": 9, "note": 94}
+      "bd_haus": {"preset": 0, "note": 60},
+      "drum_bass_hard": {"preset": 2, "note": 60},
+      "drum_bass_soft": {"preset": 0, "note": 60},
+      "drum_snare_hard": {"preset": 12, "note": 45},
+      "drum_snare_soft": {"preset": 14, "note": 41},
+      "drum_cymbal_closed": {"preset": 9, "note": 60},
+      "drum_cymbal_pedal": {"preset": 9, "note": 57},
+      "drum_cymbal_open": {"preset": 10, "note": 60},
+      "drum_tom_hi_soft": {"preset": 17, "note": 70},
+      "drum_tom_mid_soft": {"preset": 17, "note": 67},
+      "drum_tom_lo_soft": {"preset": 16, "note": 61},
+      "elec_tick": {"preset": 15, "note": 90},
+      "perc_bell": {"preset": 18, "note": 66},
+      "perc_snap": {"preset": 3, "note": 60}
     }
   },
   "rhythm": {
@@ -78,6 +88,11 @@
       "drums": {"start": 0, "count": 56},
       "bass": {"start": 56, "count": 56},
       "chords": {"start": 112, "count": 140}
+    },
+    "group_ranges": {
+      "fills": {"start": 1, "count": 936},
+      "chords": {"start": 937, "count": 64},
+      "drum_bases": {"start": 1001, "count": 24}
     }
   },
   "performance": {
@@ -87,6 +102,9 @@
     "synth_alloc_guard_ms": 10.0
   },
   "amy_max_oscs": 336,
+  "amy_max_sequence_groups": 1024,
+  "amy_max_sequence_group_tags": 64,
+  "amy_max_sequence_group_executions": 40,
   "amy_max_buses": 11,
   "debug": {
     "log_amy_commands": true,

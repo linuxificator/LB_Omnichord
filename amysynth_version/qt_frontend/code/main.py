@@ -1,65 +1,104 @@
 from __future__ import annotations
 
-import os
-import sys
+from argparse import Namespace
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any, cast
 
-# PyInstaller's Windows ``--windowed`` bootloader deliberately supplies no
-# console streams.  The application and Qt diagnostics still write to them;
-# install harmless sinks before importing the frontend so a native packaged
-# launch cannot fail on ``None.write``.
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w", encoding="utf-8")
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w", encoding="utf-8")
-
-# Keep the historical `main` import surface stable while new architecture is
-# layered around the already-large application core.
-import app_core as _core
-from app_core import *  # noqa: F401,F403
-
-from catalog_extensions import load_synth_catalog as _extended_catalog
-from config_loader import load_amy_config
+import app_core
+from application_composition import (
+    ApplicationDependencies,
+    BackendFactory,
+    ClientFactory,
+    FrontendPaths,
+)
+from bass_riffs import load_bass_riff_catalog
+from catalog_extensions import load_synth_catalog as load_extended_synth_catalog
+from config_loader import load_amy_config, load_resolved_amy_config
 from midi_integration import InstrumentBackend
+from midi_platform_adapters import production_midi_input_port
+from osc_input import production_osc_input_port
 from program_amy import (
     ProgramAmyLocalClient,
     ProgramAmySerialClient,
     ProgramAmySocketClient,
 )
+from runtime_diagnostics import display_diagnostic_lines
+from runtime_paths import qt_private_files_dir
+from runtime_platform_adapters import resolve_package_runtime
+from windows_launcher import prepare_windowed_console_streams
 
 
-# app_core.main() resolves these names from its own module globals at runtime.
-# These explicit seams let us modernize configuration/program handling without
-# copying or forking the stable Qt/bootstrap/application core.
-_original_catalog_loader = _core.load_synth_catalog
+prepare_windowed_console_streams()
 
 
-def load_synth_catalog(path):
-    """Public catalogue loader including non-ROM synth programs."""
-    return _extended_catalog(_original_catalog_loader, path)
+# Explicit compatibility exports for the supported headless integration
+# entrypoint. There is no wildcard import and no assignment into app_core.
+FRONTEND_DIR = app_core.FRONTEND_DIR
+CONFIG_DIR = FRONTEND_DIR / "config"
+GUI_DIR = FRONTEND_DIR / "gui"
+INSTRUMENT_DIR = FRONTEND_DIR / "instruments"
+MUSIC_DIR = FRONTEND_DIR / "music"
+load_defaults = app_core.load_defaults
+load_chords = app_core.load_chords
+load_rhythm_catalog = app_core.load_rhythm_catalog
+load_intonation_table = app_core.load_intonation_table
 
 
-_core.load_synth_catalog = load_synth_catalog
-_core.load_amy_config = load_amy_config
-_core.AmyLocalClient = ProgramAmyLocalClient
-_core.AmySerialClient = ProgramAmySerialClient
-_core.AmySocketClient = ProgramAmySocketClient
-_core.InstrumentBackend = InstrumentBackend
+def load_synth_catalog(path: Path) -> tuple[list[Any], int, int, int]:
+    """Load the public catalogue including non-ROM synth programs."""
+
+    return load_extended_synth_catalog(app_core.load_synth_catalog, path)
+
+
+def parse_arguments(arguments: Sequence[str] | None = None) -> Namespace:
+    return app_core.parse_arguments(
+        arguments,
+        default_config_path=CONFIG_DIR / "amy_config.json",
+    )
+
+
+def production_dependencies(
+    *,
+    asset_root: Path | None = None,
+) -> ApplicationDependencies:
+    """Construct the one production dependency graph without mutating modules."""
+
+    paths = FrontendPaths.from_root(asset_root or FRONTEND_DIR)
+    return ApplicationDependencies(
+        paths=paths,
+        load_resolved_config=load_resolved_amy_config,
+        load_defaults=app_core.load_defaults,
+        load_chords=app_core.load_chords,
+        load_synth_catalog=load_synth_catalog,
+        load_rhythm_catalog=app_core.load_rhythm_catalog,
+        load_bass_riffs=load_bass_riff_catalog,
+        load_title_config=app_core.load_title_config,
+        load_intonation_table=app_core.load_intonation_table,
+        serial_client=cast(ClientFactory, ProgramAmySerialClient),
+        socket_client=cast(ClientFactory, ProgramAmySocketClient),
+        local_client=cast(ClientFactory, ProgramAmyLocalClient),
+        midi_input_port=production_midi_input_port,
+        osc_input_port=production_osc_input_port,
+        private_files_dir=qt_private_files_dir,
+        resolve_package_runtime=resolve_package_runtime,
+        display_diagnostics=display_diagnostic_lines,
+        backend=cast(BackendFactory, InstrumentBackend),
+    )
+
+
+def main(
+    arguments: Sequence[str] | None = None,
+    *,
+    asset_root: Path | None = None,
+) -> int:
+    dependencies = production_dependencies(asset_root=asset_root)
+    args = app_core.parse_arguments(
+        arguments,
+        default_config_path=dependencies.paths.config / "amy_config.json",
+    )
+    return app_core.run_application(args, dependencies)
 
 
 if __name__ == "__main__":
-    if os.environ.get("OMNICHORD_PACKAGE_SMOKE_STATUS"):
-        try:
-            _exit_code = _core.main()
-        except Exception as _exc:
-            # A --windowed PyInstaller executable otherwise displays an error
-            # dialog that cannot be dismissed on a headless CI runner.
-            from pathlib import Path
-
-            _status = Path(os.environ["OMNICHORD_PACKAGE_SMOKE_STATUS"])
-            with _status.open("a", encoding="utf-8") as _handle:
-                _handle.write(
-                    f"fatal-error {type(_exc).__name__}: {_exc}\n"
-                )
-            _exit_code = 1
-        raise SystemExit(_exit_code)
-    raise SystemExit(_core.main())
+    raise SystemExit(main())

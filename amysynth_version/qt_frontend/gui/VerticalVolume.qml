@@ -52,6 +52,12 @@ Frame {
             return
         }
 
+        if (root.midiControlRouter !== null && root.midiBound) {
+            root.midiControlRouter.releaseControlTargetForManualEdit(
+                root.midiTarget
+            )
+        }
+
         root.edited(
             root.clamp(
                 root.currentValue
@@ -63,11 +69,10 @@ Frame {
     function beginMidiInteraction() {
         if (root.midiControlRouter === null)
             return false
-        const wasBound = root.midiBound
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget
         )
-        return learned || wasBound || root.midiPresetFeedback
+        return learned || root.midiPresetFeedback
     }
 
     background: Rectangle {
@@ -222,13 +227,6 @@ Frame {
             }
             repeatingPress = true
         }
-        onDoubleClicked: {
-            if (root.midiControlRouter !== null) {
-                root.midiControlRouter.controlTargetDoubleTapped(
-                    root.midiTarget
-                )
-            }
-        }
     }
 
     Button {
@@ -259,13 +257,6 @@ Frame {
                 )
             }
             repeatingPress = true
-        }
-        onDoubleClicked: {
-            if (root.midiControlRouter !== null) {
-                root.midiControlRouter.controlTargetDoubleTapped(
-                    root.midiTarget
-                )
-            }
         }
     }
 }

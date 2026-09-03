@@ -7,13 +7,17 @@ import argparse
 import calendar
 import configparser
 import hashlib
+import json
 import re
+import shlex
 import shutil
 import subprocess
 import sys
 import zipfile
 from datetime import datetime
 from pathlib import Path
+
+from prune_pyside_wheel import prune_wheel
 
 
 PYSIDE_VERSION = "6.11.2"
@@ -25,6 +29,23 @@ ARCHITECTURES = {
 }
 ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
 SOURCE_EXTENSIONS = "py,qml,js,json,csv,png,jpg,jpeg"
+PORTABLE_REQUIREMENTS = Path(__file__).resolve().parents[2] / "requirements-portable.txt"
+RUNTIME_MANIFEST = Path(__file__).resolve().parents[1] / "qt_runtime_manifest.json"
+
+
+def configured_android_qt_modules(
+    path: Path = RUNTIME_MANIFEST,
+) -> tuple[str, ...]:
+    """Read the sole authoritative Android Qt load order."""
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    modules = tuple(str(module) for module in data["android_load_order"])
+    if not modules or len(modules) != len(set(modules)):
+        raise ValueError("Android Qt module load order must be non-empty and unique")
+    return modules
+
+
+QT_MODULE_LOAD_ORDER = configured_android_qt_modules()
 
 
 def run(command: list[str], *, cwd: Path) -> None:
@@ -39,9 +60,19 @@ def reset_staging_directory(path: Path, frontend: Path) -> None:
         raise ValueError("Android staging directory must be outside the frontend tree")
     if resolved == resolved.parent or len(resolved.parts) < 3:
         raise ValueError(f"refusing unsafe Android staging directory {resolved}")
+    build_cache = resolved / ".buildozer"
+    preserved_cache = resolved.with_name(f"{resolved.name}-preserved-build-cache")
+    if preserved_cache.exists():
+        shutil.rmtree(preserved_cache)
+    if build_cache.exists():
+        if build_cache.is_symlink() or not build_cache.is_dir():
+            raise ValueError(f"unsafe Android build cache {build_cache}")
+        build_cache.rename(preserved_cache)
     if resolved.exists():
         shutil.rmtree(resolved)
     resolved.mkdir(parents=True)
+    if preserved_cache.exists():
+        preserved_cache.rename(build_cache)
 
 
 def stage_frontend(frontend: Path, staging: Path) -> None:
@@ -97,6 +128,19 @@ def release_values(stamp: str) -> tuple[str, str]:
     return version, numeric_version
 
 
+def portable_python_requirements(
+    path: Path = PORTABLE_REQUIREMENTS,
+) -> tuple[str, ...]:
+    requirements = tuple(
+        line
+        for raw in path.read_text(encoding="utf-8").splitlines()
+        if (line := raw.strip()) and not line.startswith("#")
+    )
+    if not requirements or any(line.startswith("-") for line in requirements):
+        raise ValueError("portable Android requirements must be explicit packages")
+    return requirements
+
+
 def patch_buildozer_spec(
     spec_path: Path,
     *,
@@ -116,6 +160,19 @@ def patch_buildozer_spec(
     if not parser.has_section("app") or not parser.has_section("buildozer"):
         raise ValueError("pyside6-android-deploy generated an invalid buildozer.spec")
 
+    p4a_extra_args = shlex.split(parser.get("app", "p4a.extra_args", fallback=""))
+    qt_libs_argument = "--qt-libs=" + ",".join(QT_MODULE_LOAD_ORDER)
+    qt_libs_indices = [
+        index
+        for index, argument in enumerate(p4a_extra_args)
+        if argument.startswith("--qt-libs=")
+    ]
+    if len(qt_libs_indices) != 1:
+        raise ValueError(
+            "pyside6-android-deploy generated no unique --qt-libs argument"
+        )
+    p4a_extra_args[qt_libs_indices[0]] = qt_libs_argument
+
     app_values = {
         "title": "LB Omnichord",
         "package.name": "lb_omnichord",
@@ -123,7 +180,9 @@ def patch_buildozer_spec(
         "source.include_exts": SOURCE_EXTENSIONS,
         "source.exclude_dirs": "deployment,__pycache__",
         "version": version,
-        "requirements": "python3,shiboken6,PySide6,pyserial",
+        "requirements": ",".join(
+            ("python3", "shiboken6", "PySide6", *portable_python_requirements())
+        ),
         "orientation": "landscape",
         "fullscreen": "1",
         "android.api": "36",
@@ -133,6 +192,7 @@ def patch_buildozer_spec(
         "android.archs": android_arch,
         "android.numeric_version": numeric_version,
         "android.allow_backup": "False",
+        "android.permissions": "INTERNET",
         "android.manifest.orientation": "landscape",
         "android.add_aars": str(aar.resolve()),
         "android.add_gradle_repositories": "flatDir { dirs 'libs' }",
@@ -141,6 +201,7 @@ def patch_buildozer_spec(
         "android.debug_artifact": "apk",
         "android.release_artifact": "apk",
         "p4a.commit": P4A_COMMIT,
+        "p4a.extra_args": " ".join(p4a_extra_args),
     }
     for key, value in app_values.items():
         parser.set("app", key, value)
@@ -148,6 +209,68 @@ def patch_buildozer_spec(
 
     with spec_path.open("w", encoding="utf-8") as handle:
         parser.write(handle)
+
+
+def pin_pyside_qt_module_order(spec_path: Path) -> None:
+    """Replace deployer's set-derived module order with dependency order."""
+
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read(spec_path, encoding="utf-8")
+    if not parser.has_section("qt") or not parser.has_option("qt", "modules"):
+        raise ValueError("pyside6-android-deploy generated no Qt module list")
+    modules = tuple(
+        module.strip()
+        for module in parser.get("qt", "modules").split(",")
+        if module.strip()
+    )
+    expected = set(QT_MODULE_LOAD_ORDER)
+    actual = set(modules)
+    if actual != expected:
+        raise ValueError(
+            "unexpected Qt module set: "
+            f"missing={sorted(expected - actual)}, "
+            f"extra={sorted(actual - expected)}"
+        )
+    parser.set("qt", "modules", ",".join(QT_MODULE_LOAD_ORDER))
+    with spec_path.open("w", encoding="utf-8") as handle:
+        parser.write(handle)
+
+
+def verify_buildozer_qt_module_order(spec_path: Path) -> None:
+    """Require python-for-android's final Qt module input to be ordered."""
+
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.read(spec_path, encoding="utf-8")
+    arguments = shlex.split(parser.get("app", "p4a.extra_args", fallback=""))
+    module_arguments = [
+        argument.removeprefix("--qt-libs=")
+        for argument in arguments
+        if argument.startswith("--qt-libs=")
+    ]
+    if len(module_arguments) != 1:
+        raise ValueError("buildozer.spec has no unique --qt-libs argument")
+    modules = tuple(module_arguments[0].split(","))
+    if modules != QT_MODULE_LOAD_ORDER:
+        raise ValueError(
+            "python-for-android Qt module load order is not dependency-safe: "
+            + ",".join(modules)
+        )
+
+
+def verify_qt_modules_present(resources: bytes, abi: str) -> None:
+    """Require every configured Qt module to be present in the APK resources."""
+
+    tokens = [
+        f"{abi};Qt6{module}_{abi}".encode("ascii")
+        for module in QT_MODULE_LOAD_ORDER
+    ]
+    missing = [
+        QT_MODULE_LOAD_ORDER[index]
+        for index, token in enumerate(tokens)
+        if token not in resources
+    ]
+    if missing:
+        raise ValueError(f"APK Qt loader resources omit modules {missing}")
 
 
 def verify_inputs(aar: Path, wheel_pyside: Path, wheel_shiboken: Path, arch: str) -> None:
@@ -179,6 +302,7 @@ def verify_apk(apk: Path, architecture: str) -> None:
     abi, _ = ARCHITECTURES[architecture]
     with zipfile.ZipFile(apk) as archive:
         names = set(archive.namelist())
+        resources = archive.read("resources.arsc")
     required = {
         "AndroidManifest.xml",
         f"lib/{abi}/libamy_android.so",
@@ -192,6 +316,7 @@ def verify_apk(apk: Path, architecture: str) -> None:
     forbidden = [name for name in names if "c_amy" in name or "libamy.so" in name]
     if forbidden:
         raise ValueError(f"frontend APK contains an in-process AMY binding: {forbidden}")
+    verify_qt_modules_present(resources, abi)
 
 
 def build(args: argparse.Namespace) -> Path:
@@ -201,29 +326,51 @@ def build(args: argparse.Namespace) -> Path:
     wheel_pyside = args.wheel_pyside.resolve()
     wheel_shiboken = args.wheel_shiboken.resolve()
     verify_inputs(aar, wheel_pyside, wheel_shiboken, args.arch)
+
+    derived_inputs = staging.parent / f"{staging.name}-derived-inputs"
+    derived_inputs.mkdir(parents=True, exist_ok=True)
+    pruned_pyside = derived_inputs / wheel_pyside.name
+    prune_report = derived_inputs / "pyside-wheel-prune.json"
+    prune_wheel(
+        source=wheel_pyside,
+        output=pruned_pyside,
+        report=prune_report,
+    )
+    wheel_pyside = pruned_pyside
     stage_frontend(frontend, staging)
 
     deploy = shutil.which("pyside6-android-deploy")
     if deploy is None:
         raise RuntimeError("pyside6-android-deploy is not installed")
+    deploy_command = [
+        deploy,
+        "--init",
+        "--keep-deployment-files",
+        "--name",
+        "LB_Omnichord",
+        "--wheel-pyside",
+        str(wheel_pyside),
+        "--wheel-shiboken",
+        str(wheel_shiboken),
+        "--ndk-path",
+        str(args.ndk.resolve()),
+        "--sdk-path",
+        str(args.sdk.resolve()),
+        "--extra-modules",
+        "QtQuick,QtQuickControls2",
+    ]
+    run(deploy_command, cwd=staging)
+    pyside_spec = staging / "pysidedeploy.spec"
+    if not pyside_spec.is_file():
+        raise FileNotFoundError(
+            "pyside6-android-deploy did not create pysidedeploy.spec"
+        )
+    pin_pyside_qt_module_order(pyside_spec)
+    # Recreate recipes from the ordered list. PySide 6.11.2 otherwise derives
+    # this through sets, so QuickControls2 can be loaded before Quick and crash
+    # inside Qt's JNI_OnLoad.
     run(
-        [
-            deploy,
-            "--init",
-            "--keep-deployment-files",
-            "--name",
-            "LB_Omnichord",
-            "--wheel-pyside",
-            str(wheel_pyside),
-            "--wheel-shiboken",
-            str(wheel_shiboken),
-            "--ndk-path",
-            str(args.ndk.resolve()),
-            "--sdk-path",
-            str(args.sdk.resolve()),
-            "--extra-modules",
-            "QtQuick,QtQuickControls2,QtTest",
-        ],
+        [*deploy_command, "--config-file", str(pyside_spec)],
         cwd=staging,
     )
     sdk_compat = create_buildozer_sdk_compat(
@@ -240,6 +387,7 @@ def build(args: argparse.Namespace) -> Path:
         stamp=args.release_stamp,
         sdk_path=sdk_compat,
     )
+    verify_buildozer_qt_module_order(spec)
     run([sys.executable, "-m", "buildozer", "android", args.mode], cwd=staging)
 
     candidates = sorted((staging / "bin").glob("*.apk"))
@@ -258,6 +406,22 @@ def build(args: argparse.Namespace) -> Path:
     output.with_suffix(output.suffix + ".sha256").write_text(
         f"{digest}  {output.name}\n",
         encoding="ascii",
+    )
+    prune_evidence = output.with_suffix(output.suffix + ".pyside-prune.json")
+    shutil.copy2(prune_report, prune_evidence)
+    package_audit = output.with_suffix(output.suffix + ".package-audit.json")
+    run(
+        [
+            sys.executable,
+            str(frontend / "packaging" / "package_audit.py"),
+            "--platform",
+            f"Android-{platform_arch}",
+            "--package",
+            str(output),
+            "--output",
+            str(package_audit),
+        ],
+        cwd=frontend,
     )
     print(f"Android package: {output}", flush=True)
     return output

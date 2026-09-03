@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "active_documents": [
+    "amysynth_version/design/principles.md",
+    "amysynth_version/design/architecture.md",
+    "amysynth_version/design/behavior.md",
+    "amysynth_version/design/configuration.md",
+    "amysynth_version/design/testing.md",
+    "amysynth_version/design/gui.md",
+    "amysynth_version/design/ui_behavior_reference.md",
+    "amysynth_version/design/midi.md",
+    "amysynth_version/design/midi_control.md",
+    "amysynth_version/design/presets.md",
+    "amysynth_version/design/sound_balance.md",
+    "amysynth_version/design/rhythm_bahavior.md",
+    "amysynth_version/design/tuning.md",
+    "amysynth_version/design/use_cases.md",
+    "amysynth_version/qt_frontend/docs/CONTROL_SAFETY.md",
+    "amysynth_version/qt_frontend/docs/DEPENDENCIES.md",
+    "amysynth_version/qt_frontend/packaging/AMY_RELEASE.md"
+  ],
+  "amy_import_allowlist": [
+    "local_amy_service.py"
+  ],
+  "platform_import_allowlist": {
+    "ctypes": [
+      "midi_linux.py"
+    ]
+  },
+  "direct_platform_access_allowlist": [
+    "midi_platform_profile.py"
+  ]
+}

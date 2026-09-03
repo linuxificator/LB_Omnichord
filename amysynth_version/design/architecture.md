@@ -1,5 +1,10 @@
 # Architecture
 
+Status: authoritative architecture contract
+Owner: application/process/transport architecture
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Main data flow
 
 The frontend architecture is:
@@ -15,6 +20,62 @@ transport
   |
 separate AMY service / ESP32-P4
 ```
+
+`code/main.py` is the sole production composition root. It resolves immutable
+frontend asset paths and supplies one `ApplicationDependencies` bundle to the
+portable startup runner. The bundle explicitly names typed config resolution,
+catalogue loaders, serial/socket/local command-client factories and the QObject
+facade factory. Source, AppImage and Android use this same constructor graph;
+the AppImage passes its asset root as data and never assigns into imported
+module globals. Headless integration uses the same resource/config/client/
+backend constructors with its test control port added outside the product graph.
+
+`app_core.run_application` retains Qt startup ordering and QML context
+publication while accepting the already selected dependency bundle. It is not
+an alternate composition root and must not select concrete client or backend
+classes. Tests may replace the narrow factories with fake ports without
+patching module symbols.
+
+Musical JSON catalogues enter the runtime through a four-phase boundary:
+versioned JSON Schema validation, local row validation, cross-catalogue
+invariants and immutable index construction. `fastjsonschema` is the single
+shape-validation implementation. Runtime consumers receive tuples, frozen
+values and read-only mappings; they do not retain a mutable parsed JSON tree.
+`music/catalogue_provenance.json` records the reviewed schema, content hash,
+count and creation process for every bass/drum catalogue without becoming a
+second runtime data authority.
+
+Release construction has one machine-readable input authority:
+`qt_frontend/packaging/release_inputs.json`. It identifies the immutable AMY
+commit, PCM bank, reviewed Python constraint files and the exact five package
+shapes. A shared checkout helper proves that the detached AMY commit belongs
+to its declared release branch. Publication accepts exactly those five
+packages and their five canonical SHA-256 files, embeds dependency and source
+evidence in `release-manifest.json`, generates an SPDX 2.3 release graph and
+signs build-provenance/SBOM attestations for the five package digests. CI
+independently verifies both predicates before publication and compares the
+final GitHub asset names with the manifest plus evidence set. This provides
+input/output traceability; runner images and native toolchains mean
+byte-identical reproducibility is not claimed. Platform publisher signing is a
+separate deferred threat/distribution decision, not implied by provenance.
+
+Backend constructors establish in-memory invariants only. The composition root
+calls the public, idempotent `initialize()` phase after the complete concrete
+facade exists; preset filesystem I/O, cross-facade binding restoration and MIDI
+reader startup begin there. Extensible base constructors do not dispatch
+through `self` to overridable methods. The production MIDI integration facade
+and independent MIDI player are explicitly final; the two internal OMNI
+inheritance layers remain because each still has characterized behavioral
+overrides.
+
+AMY command construction has a pure planning boundary. `amy_parameter_plan`
+is the single implementation of shared Juno/DX7 parameter semantics for OMNI
+and MIDI. `rhythm_command_plan` compiles typed bass, chord/arpeggio, drum,
+fill and tagged-lane inputs into immutable wire-command plans. Those modules
+perform no I/O and import no Qt, serial or socket code. `AmySerialClient` owns
+current application state and submits the resulting plans; writers alone own
+framing, ordering, cancellation and delivery. OMNI- or MIDI-specific policy
+is passed explicitly instead of being inferred by the pure compilers.
 
 The Qt application must not import AMY, call AMY synthesis APIs, or manage the
 AMY service lifetime. It only produces AMY wire messages. Unix local IPC
@@ -39,18 +100,20 @@ fork's Android service and decoupled hello-world reference.
 
 The Android APK packages that service as an AAR. Its unexported lifecycle
 provider starts a separate `:amy` process under the application's UID; Oboe owns
-audio there. Qt resolves Android's actual app-private files directory with
-`QStandardPaths` and connects to `amy.sock` without importing AMY, loading JNI
-or taking over service lifecycle. The pinned Android AMY host profile provides
-the complete 336-oscillator/11-bus application capacity.
+audio there. A runtime-path adapter resolves Android's actual app-private files
+directory with `QStandardPaths`; a separate package-runtime adapter selects
+`amy.sock` and consumes the CI smoke marker. The portable startup runner only
+applies the resulting immutable values and never imports AMY, loads JNI or
+takes over service lifecycle. The pinned Android AMY host profile provides the
+complete 336-oscillator/11-bus application capacity.
 
-Platform-specific code is not permitted in the Qt application beyond a single
-startup preamble when platform facilities make it unavoidable. Android uses
-that exception only to select the app-private socket path and consume the CI
-smoke marker; Windows transport selection is capability-driven. Packaging,
-service lifecycle, Oboe/AAudio, named-pipe and operating-system build logic all
-remain outside the portable Qt behavior. Asset-root discovery is based on the
-packaged directory layout rather than an operating-system name.
+Platform-specific decisions are confined to named adapters supplied by the
+single composition root. Android private paths/markers, Linux/XDG display
+diagnostics and Windows windowed-console/fatal-smoke handling are not present in
+`app_core.py`. Packaging, service lifecycle, Oboe/AAudio, named-pipe and
+operating-system build logic remain outside portable Qt behavior. Asset-root
+discovery is based on packaged directory layout rather than an operating-system
+name. AST/source guards reject platform details returning to the portable core.
 
 The native Windows service/package is now built by the Windows packaging
 script as an experimental zip: `amy_service.exe` is compiled against the
@@ -71,19 +134,62 @@ Supported transports:
 
 The same user action must result in the same AMY wire command stream regardless of transport.
 
-That guarantee also requires identical built-in PCM preset numbering. Local
-Linux AMY is built with `AMY_PCM_BANK=tiny`, matching ESP32-P4. Gamma9001 uses a
-different meaning for PCM presets 0–18 and must not be selected for this
-application unless the wire-level sample map changes for every target.
+All three concrete transports are byte sinks composed with one bounded command
+scheduler; Unix and Qt local transports do not inherit serial behavior. The
+scheduler gives critical commands strict priority and rejects critical
+overload explicitly. Rhythm-plan work is replaceable by lane generation and
+may be coalesced or drop its oldest queued record at its documented hard
+capacity. Immutable health reports expose lifecycle, terminal failure, queue
+depth/high-water, coalescing, replaceable drops and shutdown timeout. The sink
+is opened, written and closed by the same worker; a timed-out close never
+closes a resource still used by a live worker. Debug logging is a separate
+bounded, non-blocking queue with one rotated predecessor and visible loss.
+
+Delayed work has three explicit timing owners. AMY sequencer-group commands
+own beat-accurate rhythm and arpeggio time. Qt `QTimer` owns presentation and
+UI feedback in the QObject thread. Remaining host note-release/tail callbacks
+use one bounded monotonic application scheduler shared by OMNI and MIDI; no
+user event creates a new timer thread. Transport `delay` records are only
+ordered device/reset allocation guards on the existing writer worker, not a
+second application timer service.
+
+Persistent phrase execution follows the stricter ownership contract in
+`sequencer_groups.md`: the frontend neither mirrors AMY's sequencer clock nor
+owns group execution revisions, repeat completion, phrase releases or finite
+gate expiry.
+
+Tuning, active-chord identity and live-performance context cross the OMNI/MIDI
+boundary only as frozen values from `musical_state.py`. That pure module owns
+reference/bend clamping, key-dependent intonation and chord pitch-class
+derivation. MIDI may read `performance_snapshot()` but must not reach into
+OMNI's chord catalogue, row selection or intonation-table fields. The snapshot
+does not transfer synth ownership: OMNI remains responsible for synths 0–4 and
+MIDI for synths 5–11, with note lifetime managed by their existing owners.
+
+OMNI preset dictionaries cross into application state through the pure
+`preset_plan.py` boundary. It normalizes chord rows, levels, effects, rhythm
+settings and tuning into frozen values without importing Qt or performing I/O;
+the OMNI facade remains the owner that applies those values in the existing
+side-effect order and separately loads synth-role state. OMNI and MIDI preset
+files remain independent and both use `JsonStore` for recoverable atomic
+writes. MIDI learn, bind, unlink, takeover, hidden-control retention and
+per-screen persistence remain one `MidiControlState` machine. The
+`MidiBindingService` supplies its synchronization, normalized persistence
+entries and detached immutable presentation snapshots; QML consumes semantic
+state and does not decide transitions from indicator colors.
+
+That guarantee also requires the PCM bank and configured sample map to agree.
+Linux, Raspberry Pi, macOS, Windows and Android use Gamma9001 and the reviewed
+Gamma direct-PCM map. CI proves the bank through its registration and data
+symbols; a mismatched binary can otherwise accept valid wire commands while
+playing unrelated timbres.
 
 The native Windows CMake build reaches the same result through AMY's C
-preprocessor contract rather than its Python `setup.py` option. It deliberately
-does not define `GAMMA9001` and does not link the optional generated
-`drums_bin.c`; at the pinned AMY revision, `amy.c` therefore includes
-`pcm_tiny.h`, and patch 258 also selects its `pcm_tiny` mapping. The OMNI rhythm
-engine sends the direct tiny-bank preset/native-note pairs from
-`config/amy_config.json`, so enabling Gamma9001 on only one platform would be a
-wire-level compatibility bug, not merely a packaging choice.
+preprocessor contract rather than its Python `setup.py` option. It defines
+`GAMMA9001`, generates and links `drums_bin.c`, and registers the data before
+every `amy_start()`. Android's pinned AAR follows the same sequence. ESP32-P4
+is explicitly outside this hosted profile and remains Tiny until a separately
+tested flash/storage layout exists.
 
 ## Audio ownership
 

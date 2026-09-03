@@ -14,14 +14,20 @@ private :amy service process -> AMY C engine -> Oboe -> AAudio
 ```
 
 The application embeds the `amy-service` AAR from fork release branch
-`releases/amy_omnichord_R20260830T123342`, pinned to commit
-`1e81ea571294c6aed8e2c0d57a9e09786561e9cf`. The AAR's unexported lifecycle
+`releases/amy_omnichord_R20260903T202802`, pinned to commit
+`890ec66de2677db5bdf9a5dda9f53f01628d2b58`. Its native build generates,
+links and registers Gamma9001 PCM data before AMY starts. The AAR's unexported lifecycle
 provider starts AMY in a separate `:amy` process under the same package UID.
 Qt discovers the application's real private files directory with
 `QStandardPaths`; neither the data path nor an Android user number is
 hard-coded. The Python frontend opens the socket and sends wire messages only.
 It does not import or link AMY and it does not call the AAR's JNI
 implementation.
+
+The socket receiver keeps its realtime handoff queue bounded and stops reading
+when that queue is full. Normal kernel socket backpressure therefore preserves
+large startup transactions such as the preloaded rhythm-group library instead
+of acknowledging and discarding excess wire packets.
 
 This is the Android equivalent of the desktop wrappers. Linux and macOS use a
 supervisor around a separate service and Unix socket; Windows uses
@@ -55,6 +61,32 @@ script rejects an AAR without both CI and production ABIs and rejects an APK
 that lacks the AMY/Oboe libraries or the matching CPython 3.11/shiboken native
 libraries. It also rejects an APK containing an in-process `c_amy` binding.
 
+The official, SHA-256-pinned PySide6 Android wheel is a complete Qt for Python
+SDK and is much larger than this application needs. After verification,
+`prune_pyside_wheel.py` derives a valid wheel containing only the reviewed
+Python bindings, the Basic-style QML module graph, the Android platform and
+network-information plugins, required jars, and the complete recursive native
+`DT_NEEDED` closure. It rewrites wheel `RECORD`, records both wheel hashes and
+the retained native inventory, and never modifies the downloaded source
+wheel. The final APK is audited again and the workflow retains both JSON
+reports with the package. A manually dispatched release workflow performs the
+same regression, x86_64 emulator and arm64 packaging gates on the selected
+branch without publishing a release; this is the validation route for changes
+to the package policy.
+
+PySide6 6.11.2 internally collects detected Android modules through Python
+sets, but python-for-Android writes the resulting list directly into Qt's JNI
+startup array. The build therefore makes a second deploy initialization pass
+with the explicit dependency order `Core`, `Gui`, `Network`, `OpenGL`, `Qml`,
+`Quick`, `QuickControls2`. It then checks that same order in the
+compiled APK resource table. In particular, `Quick` must load before
+`QuickControls2`; otherwise the latter can pull in the former as an ordinary
+native dependency before its Android JNI initialization is ready.
+
+QtTest and QtWidgets are test dependencies only. Package acceptance drives the
+final artifact from a separate process, so neither binding nor its native Qt
+runtime is shipped in the product APK.
+
 ## Volume notation
 
 LB Omnichord's UI volume values are logical amplitudes in the safe 0..1 range.
@@ -76,11 +108,12 @@ QML tap/hold smoke path, checks the private socket and separate AMY service,
 and compares the exact AMY render samples with the samples handed to Oboe.
 The emulator performs an unmeasured warm-up for python-for-Android's first-run
 asset extraction, force-stops the complete package, and only then arms AMY's
-eight-second Oboe capture for the measured launch. If Qt exits during the
-first-extraction startup race, the warm-up alone is retried up to three times;
-the measured QML/audio launch remains single-shot. After the warm-up, that
-window leaves enough margin for normal packaged frontend startup variation and
-the complete UI-driven synth attack.
+eight-second Oboe capture for the measured launch. If Qt exits during an
+unrelated first-extraction startup fault, the warm-up alone is retried up to
+three times; the deterministic library order prevents the former Qt Quick JNI
+load race. The measured QML/audio launch remains single-shot. After the
+warm-up, that window leaves enough margin for normal packaged frontend startup
+variation and the complete UI-driven synth attack.
 The readiness poll filters out verbose extraction traffic and retries a
 transient `adb logcat` read instead of confusing a host transport reset with an
 application failure; the filtered Python log must still contain no traceback.

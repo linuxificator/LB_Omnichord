@@ -19,6 +19,13 @@ Item {
         }
     }
 
+    function midiButtonHandled(target) {
+        const learned = root.controller.midiPlayer.activateControlTarget(target)
+        if (learned)
+            return true
+        return root.controller.midiPlayer.midiButtonTargetBlocked(target)
+    }
+
     Frame {
         id: wheelFrame
         x: 0; y: 0; width: 150; height: parent.height; padding: 0
@@ -74,6 +81,11 @@ Item {
     Button {
         id: runButton
         x: wheelFrame.width + 7; y: (parent.height - height) / 2; width: 62; height: 62
+        property var midiTarget: ({
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle"
+        })
         contentItem: Canvas {
             id: rhythmTransportSymbol
             anchors.fill: parent
@@ -114,15 +126,26 @@ Item {
             color: root.controller.rhythmRunning ? "#a56b19" : "#f0d66b"
             border.color: "#8e7012"; border.width: 2
         }
-        onClicked: root.controller.toggleRhythm()
+        MidiButtonLed {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 8
+            z: 2
+            midiControlRouter: root.controller.midiPlayer
+            midiTarget: runButton.midiTarget
+        }
+        onClicked: {
+            if (!root.midiButtonHandled(runButton.midiTarget)) {
+                root.controller.toggleRhythm()
+            }
+        }
     }
 
     Item {
         id: controlsArea
         x: runButton.x + runButton.width + 12; y: 0; width: parent.width - x; height: parent.height
 
-        // Preserve the original button width. Chord and bass each add a fifth
-        // column; only tempo yields the extra horizontal space.
+        // Percussion, chord and bass each use five columns. Tempo and fill
+        // density share the remaining strip.
         readonly property real formerActivityWidth:
             width * 0.57 - 14
         readonly property real standardActivityWidth:
@@ -133,9 +156,10 @@ Item {
             (standardActivityWidth - 10 - 3 * 4) / 4
         readonly property real bassActivityWidth:
             10 + 5 * activityButtonWidth + 4 * 4
+        readonly property real bassColumnX:
+            2 * bassActivityWidth + 2 * activityGap
         readonly property real expandedActivityWidth:
-            standardActivityWidth
-            + 2 * bassActivityWidth
+            3 * bassActivityWidth
             + 2 * activityGap
 
         LabeledSlider {
@@ -147,7 +171,7 @@ Item {
                 parent.width
                 - 14
                 - controlsArea.expandedActivityWidth
-            height: parent.height
+            height: 52
 
             label: "tempo"
             currentValue:
@@ -166,6 +190,28 @@ Item {
                 root.controller.setRhythmTempo(value)
         }
 
+        LabeledSlider {
+            id: fillDensitySlider
+            x: 0
+            y: 56
+            width: tempoSlider.width
+            height: parent.height - y
+            label: "fill density"
+            currentValue: root.controller.rhythmFillDensityIndex
+            fromValue: 0
+            toValue: 7
+            stepValue: 1
+            decimals: 0
+            valueLabels: ["/32", "/16", "/8", "/6", "/4", "/3", "/2", "/1"]
+            midiControlRouter: root.controller.midiPlayer
+            midiTarget: ({
+                "screen": "omni",
+                "kind": "rhythm_fill_density"
+            })
+            onEdited: (value) =>
+                root.controller.setRhythmFillDensity(value)
+        }
+
         Item {
             id: activityArea
 
@@ -174,29 +220,64 @@ Item {
             width: parent.width - x
             height: parent.height
 
-            ActivitySelector {
+            PercussionActivitySelector {
                 x: 0
                 y: 0
-                width: controlsArea.standardActivityWidth
-                height: 58
-
-                label: "percussion activity"
+                width: controlsArea.bassActivityWidth
+                height: parent.height
                 currentLevel:
                     root.controller.rhythmBusyness
+                fillEnabled:
+                    root.controller.rhythmFillEnabled
 
                 groupColor: "#f5df78"
                 idleColor: "#f7e9a8"
                 selectedColor: "#bc8410"
+                midiControlRouter: root.controller.midiPlayer
+                activityMidiTargetForLevel: function(level) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_busyness",
+                        "level": level
+                    }
+                }
+                fillMidiTargetForIndex: function(fillIndex) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_fill",
+                        "fill": fillIndex
+                    }
+                }
 
-                onSelected: (level) =>
-                    root.controller.setRhythmBusyness(
-                        level
-                    )
+                onActivitySelected: (level) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_busyness",
+                        "level": level
+                    })) {
+                        root.controller.setRhythmBusyness(
+                            level
+                        )
+                    }
+                }
+                onFillToggled: (fillIndex) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_fill",
+                        "fill": fillIndex
+                    })) {
+                        root.controller.toggleRhythmFill(fillIndex)
+                    }
+                }
             }
 
             ChordActivitySelector {
                 x:
-                    controlsArea.standardActivityWidth
+                    controlsArea.bassActivityWidth
                     + controlsArea.activityGap
                 y: 0
                 width: controlsArea.bassActivityWidth
@@ -220,29 +301,82 @@ Item {
                 groupColor: "#f8e9a1"
                 idleColor: "#faefbd"
                 selectedColor: "#cb981d"
+                midiControlRouter: root.controller.midiPlayer
+                activityMidiTargetForLevel: function(level) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_chord_activity",
+                        "level": level
+                    }
+                }
+                arpeggioMidiTarget: ({
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "chord_arpeggio"
+                })
+                rateMidiTargetForRate: function(rate) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_arpeggio_rate",
+                        "rate": rate
+                    }
+                }
+                directionMidiTarget: ({
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "chord_arpeggio_direction"
+                })
 
-                onActivitySelected: (level) =>
-                    root.controller
-                        .setRhythmChordActivity(
-                            level
-                        )
-                onArpeggioToggled:
-                    root.controller
-                        .toggleChordArpeggio()
-                onRateSelected: (rate) =>
-                    root.controller
-                        .setChordArpeggioRate(rate)
-                onDirectionToggled:
-                    root.controller
-                        .toggleChordArpeggioDirection()
+                onActivitySelected: (level) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_chord_activity",
+                        "level": level
+                    })) {
+                        root.controller
+                            .setRhythmChordActivity(
+                                level
+                            )
+                    }
+                }
+                onArpeggioToggled: {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_arpeggio"
+                    })) {
+                        root.controller
+                            .toggleChordArpeggio()
+                    }
+                }
+                onRateSelected: (rate) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_arpeggio_rate",
+                        "rate": rate
+                    })) {
+                        root.controller
+                            .setChordArpeggioRate(rate)
+                    }
+                }
+                onDirectionToggled: {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_arpeggio_direction"
+                    })) {
+                        root.controller
+                            .toggleChordArpeggioDirection()
+                    }
+                }
             }
 
             ActivitySelector {
-                x:
-                    controlsArea.standardActivityWidth
-                    + controlsArea.activityGap
-                    + controlsArea.bassActivityWidth
-                    + controlsArea.activityGap
+                x: controlsArea.bassColumnX
                 y: 0
                 width: controlsArea.bassActivityWidth
                 height: 52
@@ -257,22 +391,35 @@ Item {
                 groupColor: "#faefbd"
                 idleColor: "#fff5d1"
                 selectedColor: "#d4aa3a"
+                midiControlRouter: root.controller.midiPlayer
+                midiTargetForLevel: function(level) {
+                    return {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_bass_activity",
+                        "level": level
+                    }
+                }
 
-                onSelected: (level) =>
-                    root.controller
-                        .setRhythmBassActivity(
-                            level
-                        )
+                onSelected: (level) => {
+                    if (!root.midiButtonHandled({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_bass_activity",
+                        "level": level
+                    })) {
+                        root.controller
+                            .setRhythmBassActivity(
+                                level
+                            )
+                    }
+                }
             }
 
             LabeledSlider {
                 id: bassFunctionSlider
 
-                x:
-                    controlsArea.standardActivityWidth
-                    + controlsArea.activityGap
-                    + controlsArea.bassActivityWidth
-                    + controlsArea.activityGap
+                x: controlsArea.bassColumnX
                 y: 56
                 width: controlsArea.bassActivityWidth
                 height: 48

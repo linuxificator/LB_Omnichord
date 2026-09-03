@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, final
 
 from PySide6.QtCore import QObject, Property, Slot
 
@@ -8,17 +8,28 @@ from midi_player import MIDI_PRESET_COUNT, MidiPlayerBackend
 from performance_backend import InstrumentBackend as OmniInstrumentBackend
 
 
+@final
 class InstrumentBackend(OmniInstrumentBackend):
     """Narrow integration seam between Omnichord and independent MIDI player."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._pending_omni_control_bindings: Any = []
+        self._midi_input_port_factory = kwargs.pop("midi_input_port_factory")
+        self._osc_input_port_factory = kwargs.pop("osc_input_port_factory")
         super().__init__(*args, **kwargs)
         self._syncing_tuning = False
+        self._midi_player: MidiPlayerBackend
+
+    def initialize(self) -> None:
+        if getattr(self, "_midi_player", None) is not None:
+            return
+        super().initialize()
         self._midi_player = MidiPlayerBackend(
             owner=self,
             synths=tuple(self._synths),
             client=self._client,
+            midi_input_port_factory=self._midi_input_port_factory,
+            osc_input_port_factory=self._osc_input_port_factory,
         )
         self._midi_player.stateChanged.connect(self.midiStateChanged)
         self._midi_player.tuningChanged.connect(self.midiTuningChanged)
@@ -169,30 +180,17 @@ class InstrumentBackend(OmniInstrumentBackend):
     def midiControlIndicators(self) -> list[dict[str, Any]]:
         return self._midi_player.commonControls(-1)
 
-    @Slot(int, int, int)
-    def injectMidiControl(
-        self,
-        channel: int,
-        controller: int,
-        value: int,
-    ) -> None:
-        self._midi_player.injectControl(channel, controller, value)
-
     @Slot(int, int)
-    def selectMidiControlIndicator(self, channel: int, controller: int) -> None:
-        self._midi_player.selectControlIndicator(channel, controller)
+    def clickMidiControlIndicator(self, channel: int, controller: int) -> None:
+        self._midi_player.clickControlIndicator(channel, controller)
 
     @Slot("QVariantMap", result=bool)
     def activateMidiControlTarget(self, target: dict[str, Any]) -> bool:
         return self._midi_player.activateControlTarget(target)
 
     @Slot("QVariantMap")
-    def doubleTapMidiControlTarget(self, target: dict[str, Any]) -> None:
-        self._midi_player.controlTargetDoubleTapped(target)
-
-    @Slot("QVariantMap")
-    def moveMidiControlTarget(self, target: dict[str, Any]) -> None:
-        self._midi_player.controlTargetMoved(target)
+    def manuallyEditMidiControlTarget(self, target: dict[str, Any]) -> None:
+        self._midi_player.releaseControlTargetForManualEdit(target)
 
     @Slot(int, int)
     def setMidiSynthIndex(self, row: int, index: int) -> None:
@@ -345,16 +343,6 @@ class InstrumentBackend(OmniInstrumentBackend):
     @Slot()
     def finishMidiPreview(self) -> None:
         self._midi_player.previewEnd()
-
-    @Slot(int, int, int, bool)
-    def injectMidiNote(
-        self,
-        channel: int,
-        note: int,
-        velocity: int,
-        is_on: bool,
-    ) -> None:
-        self._midi_player.injectNote(channel, note, velocity, is_on)
 
     @Slot()
     def panic(self) -> None:

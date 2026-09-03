@@ -1,34 +1,53 @@
 # AMY sequencer tag allocation
 
-The Omnichord rhythm engine uses current AMY's user-addressable sequencer tags to keep percussion, bass and automatic chords independent.
+The Omnichord rhythm engine uses AMY root sequencer tags for sparse fill
+launches, bass and automatic chords. Base percussion, fills and automatic
+chord phrases use persistent AMY sequencer groups.
 
 AMY stores one sequencer entry per tag. Sending another `H<tick>,<period>,<tag>...` message replaces that tag's previous entry. `H0,0,<tag>Z` clears exactly that tag. A tag is therefore an event identity, not a track identifier: simultaneous note-ons/note-offs require different tags.
 
 ## Reserved ranges
 
-Current AMY defaults to 256 user-addressable tags. The complete `music/rhythms.json` catalogue has been audited at every maximum activity level and requires at most:
+The root sequencer retains 256 user-addressable tags. Group event tags are
+local to each definition and the integration profile allows 64 per group. The
+root allocation is:
 
 | Lane | Tag range | Capacity | Current worst case |
 | --- | ---: | ---: | ---: |
-| Percussion | 0..55 | 56 | 56 events (`trance`) |
+| Fill launches | 0..55 | 56 | 10 root triggers in the largest current fill supercycle |
 | Bass | 56..111 | 56 | 28 hits × note-on/off (`seven_four_funk`) |
-| Automatic chords/arpeggios | 112..251 | 140 | whole chords: 140 (`seven_four_funk`); compacted 2–7-note arpeggios: 84 |
+| Automatic chord phrase triggers | 112..251 | 140 | compacted chord onsets: 28 (`seven_four_funk`) |
 | Spare | 252..255 | 4 | unused |
 
-`tests/test_sequencer_tags.py` recalculates these maxima from the catalogue. Adding or editing a rhythm which no longer fits must fail CI rather than silently dropping events.
+Fill group tags are 1..936; the current library occupies 1..270. Automatic
+chord phrases reserve 937..1000. Base-role group and execution tags are 1001
+upward; the current 18 roles occupy 1001..1018, leaving 1019..1024 spare.
+Group-local tags and root tags are separate namespaces.
+`tests/test_sequencer_tags.py` and `tests/test_drum_patterns.py` recalculate
+the maxima. Adding data which no longer fits must fail CI rather than silently
+drop events.
 
 ## Lane updates
 
-Each lane assigns deterministic consecutive tags to its current events. When a new pattern uses fewer tags than an older one, the no-longer-used tags are explicitly cleared. The lane remembers its maximum occupied count so an interrupted earlier update cannot leave an unreachable stale event behind.
+Bass and chords assign deterministic consecutive tags to their current root
+events. The percussion root range contains only fill-group launches. When a
+new schedule uses fewer tags than an older one, the no-longer-used root tags
+are explicitly cleared. Each base drum role has a stable tagged loop instance;
+live replacement is quantized to a whole-bar boundary.
 
 Lane-local operations do not reset the sequencer:
 
-- a quick chord tap starts/stops manual synth 3 and selects the active chord for
-  strum, bass and automatic chords. The corresponding bass/chord pitch schedules
-  are replaced while transport and the automatic-chord lane remain enabled; it
-  does not perform the hold-specific drain of synth-4 note-on tags;
-- promotion to a manual chord hold and restoration after release change only the automatic-chord tag range (and may update bass pitches because the active chord changed). Pointer-up separately stops manual synth 3 immediately; that direct note lifetime has no sequencer delay. On hold promotion, positive-velocity synth-4 note-on tags are cleared while the already-installed synth-4 all-off tags remain. The currently sounding rhythm chord therefore reaches its sequencer-defined gate instead of being released immediately; manual synth-3 note-ons may overlap it;
-- `CHORD OFF` performs the same synth-4 drain and `CHORD ON` reinstalls that
+- a quick chord tap starts/stops manual synth 3 and immediately selects the
+  active chord for strum, bass and future automatic-phrase definitions. Active
+  executions retain their immutable old pitch and releases;
+- promotion to a manual chord hold and restoration after release change only
+  the automatic-chord tag range (and may update bass pitches because the active
+  chord changed). Pointer-up separately stops manual synth 3 immediately; that
+  direct note lifetime has no sequencer delay. On hold promotion every future
+  synth-4 phrase trigger is cleared. An already-running execution still owns
+  its original note-offs and reaches its configured gate; manual synth-3
+  note-ons may overlap it;
+- `CHORD OFF` clears the same future triggers and `CHORD ON` reinstalls that
   lane. These controls never trigger or release manual synth-3 voices;
 - chord-arpeggio `A`, `/1..4` and `U/D` changes replace only the automatic
   chord range. With `A` off, rate and direction remain editable preset state
@@ -39,9 +58,10 @@ Lane-local operations do not reset the sequencer:
   that range; it never edits drum/chord tags or resets transport;
 - tuning/chord-pitch changes replace bass and automatic-chord ranges but do not touch percussion;
 - chord timbre changes repatch synths 3/4 without replacing their sequencer events;
-- normal activity/config changes replace the affected tagged patterns while transport continues;
-- a live preset switch carries the current percussion/chord/bass activity into
-  the destination pattern instead of substituting the preset's stored activity.
+- normal activity/config changes replace the affected root events or group definitions while transport continues;
+- a live preset switch carries the current percussion/chord/bass activity,
+  fill order and fill density into the destination pattern instead of
+  substituting the preset's stored live controls.
 
 A live rhythm-style or preset change replaces tagged events without stopping
 transport or resetting the timebase. The new meter enters at the current
@@ -54,49 +74,44 @@ catalogue currently needs at most 34 bass tags (17 notes), below the existing
 pattern; its 96-PPQ ticks are converted to AMY's 48-PPQ sequencer units without
 deriving or quantizing them from `rhythms.json` `bass_levels`.
 
-Arpeggios expand every selected `chord_events` onset into every note of the
-active 2–7-note chord. `/1..4` maps to a 48, 24, 16 or 12-tick interval. Note
-gates use the normal `chord_gate_beats` value as the sounding fraction of that
-subdivision, and direction only reverses the current low-to-high chord voicing.
-Generated ticks are circular and each complete arpeggio continues across the
-end of the rhythm period.
+Each selected `chord_events` onset becomes one root trigger for an untagged
+one-shot phrase execution. The phrase contains all 2–7 chord notes and their
+matching releases. `/1..4` maps to a 48, 24, 16 or 12-tick interval. Note gates
+use the normal `chord_gate_beats` value as the sounding fraction of that
+subdivision, and direction reverses the order of grouped note events.
 
 One AMY tag can safely encode several of these occurrences when an identical
 wire body has an exact shorter period which divides the full rhythm period.
 The frontend folds only complete residue classes: expanding every compacted tag
 over the full period yields exactly the original tick/body set. Coincident
-identical events are one audible retrigger and are stored once. The catalogue
+identical triggers are one audible retrigger and are stored once. The catalogue
 audit covers every rhythm, visible chord activity, rate and 2–7-note chord;
-the current worst case is 84 tags, below the existing 140-tag range. The
+the current root worst case is 28 tags, below the existing 140-tag range. At
+most two of the reserved 64 chord groups are needed concurrently for catalogue
+velocities. The joint execution audit counts overlapping chord phrases, the
+maximum active drum roles and one fill on every tick; its worst case is 34 of
+the configured 40 executions. The
 rhythm-chord synth has seven voices so a circular overlap can sound every chord
 tone instead of truncating the set to the old four-voice whole-chord limit.
 
 ## Start and stop
 
-Starting transport installs the complete current drum, bass and automatic-chord tag ranges first and queues `zY1` last.
+Starting transport first sends
+`S(RESET_TIMEBASE|RESET_SEQUENCER)`. Stored group definitions survive this
+reset, while executions and old root triggers do not. It then installs
+the current drum loops, fill-launch schedule, bass and automatic-chord ranges,
+and queues `zY1` last.
 
 Stopping transport is different from clearing a lane. `zY0` prevents future sequencer events from firing, so a note that is currently sounding cannot rely on its later tagged note-off. Stop therefore performs an explicit all-off immediately after `zY0` for the rhythm-owned synths: percussion synth 0, bass synth 1 and automatic-chord synth 4. Manual chord synth 3 and strum synth 2 are deliberately left alone because they are controlled directly by the player rather than by rhythm transport.
 
-The same lost-future-note-off rule applies when a promoted manual chord hold
-temporarily closes the automatic-chord lane while transport keeps running. A
-quick tap may replace that lane's pitches but never closes or drains it. Current AMY has
-no deferred tag-clear operation and the wire protocol has no callback when a
-repeating event fires. Because every onset and whole-chord or note-specific
-arpeggio off has its own tag, the
-receiver instead clears only positive-velocity chord onsets and keeps the
-existing bodies ending in `l0i4`. It explicitly reinstalls those note-offs before clearing
-the onsets, so a superseded, partially transmitted lane update cannot lose the
-required release. The retained tags may repeat harmlessly against the
-isolated synth 4 while the lane is disabled. Note-specific arpeggio offs are
-then intentionally unmatched after their first effective release. Automatic
-synth 4 therefore owns AMY `SYNTH_FLAGS_NO_NOTE_WARNINGS` (`if8`), the engine
-policy intended for a sequencer joining or draining mid-bar. The flag suppresses
-only those expected synth-4 diagnostics; manual chord synth 3 and all other
-synths retain normal note-lifecycle warnings. It is included atomically in
-every ROM or physical-model chord allocation. Re-enabling or fully
-reinstalling the lane replaces the retained tags with the authoritative
-schedule. Drums, bass,
-transport/timebase and effects remain untouched.
+Manual-hold promotion and `CHORD OFF` do not share Stop's lost-off problem.
+Their root range contains only future group starts, never the releases of
+already-sounding notes. Clearing that range cannot alter an active execution's
+immutable definition, so it executes its original note-offs at their original
+gates. A live `/1`, `/2`, `/3` or `/4` change atomically publishes a new
+revision under the same stable group tag and replaces future root starts. A
+running old revision remains unchanged. Drums, bass, transport/timebase and
+effects remain untouched.
 
 The real-serial regression tests this ordering and also requires the frontend `rhythmRunning` state to become false after Stop. This guards both against hanging accompaniment notes and against a transport button that remains visually stuck on STOP even though the AMY sequencer has stopped.
 
@@ -106,7 +121,9 @@ Low-priority sequencer traffic has an independent generation per lane, so a new 
 
 A targeted lane update is allowed to queue behind an in-progress full transaction, but it must **not cancel that full transaction halfway through**. Otherwise another lane could be left only partially installed. A newer complete transaction may supersede an older complete transaction; it first invalidates queued per-lane updates and then installs the authoritative three-lane state.
 
-On Start, `zY1` is queued as the final item in the complete transaction, after all tagged definitions. Transport therefore cannot resume before the initial pattern has been sent.
+On Start, `zY1` is queued as the final item in the complete transaction, after
+all tagged definitions. Transport therefore cannot resume before the initial
+phrases have been sent.
 
 ## Period wrapping
 

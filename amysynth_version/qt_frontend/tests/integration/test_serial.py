@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import re
+import tempfile
 import time
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import serial
 
 from catalog import control_default, patch_for_index, synth_index
-from harness import HeadlessApp
+from harness import HeadlessApp, SerialAmyBridge
 
 
 _NOTE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
+CHORD_GROUP_START = 937
+DRUM_BASE_GROUP_START = 1001
 
 
 def wire_float(value: float) -> str:
@@ -16,15 +23,48 @@ def wire_float(value: float) -> str:
 
 
 def scheduled_note_ons(lines: list[str], synth: int) -> list[float]:
-    pattern = re.compile(
+    direct_pattern = re.compile(
         rf"^H\d+,\d+,\d+n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
     )
+    definition_pattern = re.compile(
+        rf"^H\d+,\d+,\d+,(?P<group>\d+)"
+        rf"n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
+    )
+    trigger_pattern = re.compile(
+        r"^H\d+,\d+,\d+zQ(?P<group>\d+),1,1,0Z$"
+    )
+    definitions: dict[int, list[float]] = {}
     notes: list[float] = []
     for line in lines:
-        match = pattern.match(line)
+        match = direct_pattern.match(line)
         if match and float(match.group("vel")) > 0.0:
             notes.append(float(match.group("note")))
+            continue
+        match = definition_pattern.match(line)
+        if match and float(match.group("vel")) > 0.0:
+            definitions.setdefault(int(match.group("group")), []).append(
+                float(match.group("note"))
+            )
+        match = trigger_pattern.match(line)
+        if match:
+            notes.extend(definitions.get(int(match.group("group")), []))
     return notes
+
+
+def chord_trigger(line: str) -> tuple[int, int] | None:
+    match = re.match(
+        r"^H\d+,\d+,(?P<tag>\d+)zQ(?P<group>\d+),1,1,0Z$",
+        line,
+    )
+    if match is None:
+        return None
+    tag = int(match.group("tag"))
+    group = int(match.group("group"))
+    if not 112 <= tag < 252:
+        return None
+    if not CHORD_GROUP_START <= group < DRUM_BASE_GROUP_START:
+        return None
+    return tag, group
 
 
 def immediate_note_ons(lines: list[str], synth: int) -> list[float]:
@@ -64,7 +104,107 @@ def contains_fractional_pitch(notes: list[float]) -> bool:
     return any(abs(note - round(note)) > 1e-5 for note in notes)
 
 
+class SerialHarnessTests(unittest.TestCase):
+    def test_diagnostic_logging_does_not_backpressure_a_serial_burst(self) -> None:
+        line_count = 4_096
+        lines = [f"H{index},0,0n60l1i0Z" for index in range(line_count)]
+        payload = ("\n".join(lines) + "\n").encode("ascii")
+
+        with tempfile.TemporaryDirectory() as directory:
+            bridge = SerialAmyBridge(Path(directory), native_amy=False)
+            log_path = bridge._serial_log_path
+            original_open = Path.open
+
+            def delayed_artifact_open(
+                path: Path, *args: object, **kwargs: object
+            ) -> object:
+                if path == log_path:
+                    time.sleep(0.002)
+                return original_open(path, *args, **kwargs)
+
+            try:
+                with serial.Serial(
+                    bridge.serial_port,
+                    baudrate=1_000_000,
+                    write_timeout=0.5,
+                ) as sender:
+                    with patch.object(Path, "open", delayed_artifact_open):
+                        self.assertEqual(sender.write(payload), len(payload))
+                        bridge.wait_for_lines([lines[-1]], timeout=5.0)
+                self.assertEqual(bridge.count(), line_count)
+            finally:
+                bridge.close()
+            self.assertEqual(
+                log_path.read_text(encoding="utf-8").splitlines(),
+                lines,
+            )
+
+
 class SerialIntegrationTests(unittest.TestCase):
+    def test_drum_library_is_preloaded_once_and_controls_send_only_deltas(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=12.0)
+            startup = app.bridge.lines_since(0)
+            self.assertIn("zQ1,3,48,0Z", startup)
+            self.assertTrue(
+                any(line.startswith("zQ270,3,") for line in startup),
+                "last fill definition was not preloaded",
+            )
+            self.assertEqual(
+                sum(
+                    (match := re.match(r"^zQ(\d+),3,", line)) is not None
+                    and int(match.group(1)) < 1001
+                    for line in startup
+                ),
+                270,
+            )
+
+            fill_start = app.bridge.count()
+            app.action("toggleRhythmFill", 0)
+            app.bridge.wait_for_line_match(
+                lambda line: line.startswith("H") and "zQ" in line,
+                "updated fill root schedule",
+                start=fill_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            fill_lines = app.bridge.lines_since(fill_start)
+            self.assertTrue(
+                any(line.startswith("H") and "zQ" in line for line in fill_lines)
+            )
+            self.assertFalse(
+                any(
+                    re.match(r"^H\d+,\d+,\d+,[1-9]\d*", line)
+                    for line in fill_lines
+                ),
+                "fill selection resent its stored event block",
+            )
+
+            activity_start = app.bridge.count()
+            app.action("setRhythmBusyness", 5.0)
+            app.bridge.wait_for_line_match(
+                lambda line: line.startswith("zQ100") and ",3," in line,
+                "replacement base-drum group definition",
+                start=activity_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            activity_lines = app.bridge.lines_since(activity_start)
+            self.assertTrue(
+                any(line.startswith("zQ100") and ",3," in line for line in activity_lines)
+            )
+            self.assertTrue(
+                any(re.match(r"^H\d+,\d+,\d+,100\d", line) for line in activity_lines)
+            )
+            self.assertFalse(
+                any(
+                    (match := re.match(r"^zQ(\d+),3,", line)) is not None
+                    and int(match.group(1)) < 937
+                    for line in activity_lines
+                ),
+                "activity change rebuilt a preloaded fill",
+            )
+
     def test_preset7_rhythm_start_preserves_native_filter_until_user_override(self) -> None:
         """Fresh P7 must leave Chorus Vibes' complete native VCF model intact."""
         chorus_index = synth_index("Chorus Vibes")
@@ -99,7 +239,7 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertNotIn(native_cutoff4, lines)
             self.assertNotIn(f"K{chorus_patch}i4if8Z", lines)
             self.assertTrue(
-                any(line.startswith("H") and "i4Z" in line for line in lines),
+                any(chord_trigger(line) is not None for line in lines),
                 "no rhythm-chord events were scheduled",
             )
 
@@ -388,7 +528,7 @@ class SerialIntegrationTests(unittest.TestCase):
             arpeggio_start = app.bridge.count()
             app.action("toggleChordArpeggio")
             app.bridge.wait_for_line_match(
-                lambda line: line.startswith("H") and "i4Z" in line,
+                lambda line: chord_trigger(line) is not None,
                 "ascending arpeggio chord tags",
                 start=arpeggio_start,
                 timeout=8.0,
@@ -400,12 +540,10 @@ class SerialIntegrationTests(unittest.TestCase):
                 [48.0, 52.0, 55.0, 58.0, 62.0, 65.0, 69.0],
             )
             for line in arpeggio_lines:
-                if not line.startswith("H"):
+                trigger = chord_trigger(line)
+                if trigger is None:
                     continue
-                match = re.match(r"^H\d+,\d+,(\d+)", line)
-                self.assertIsNotNone(match)
-                assert match is not None
-                tag = int(match.group(1))
+                tag, _ = trigger
                 self.assertGreaterEqual(tag, 112)
                 self.assertLess(tag, 252)
             self.assertFalse(
@@ -418,15 +556,12 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertNotIn("zY0Z", arpeggio_lines)
             self.assertNotIn("zY1Z", arpeggio_lines)
             self.assertNotIn("S16384Z", arpeggio_lines)
+            self.assertNotIn("S20480Z", arpeggio_lines)
 
             direction_start = app.bridge.count()
             app.action("toggleChordArpeggioDirection")
             app.bridge.wait_for_line_match(
-                lambda line: (
-                    line.startswith("H")
-                    and "n69" in line
-                    and "i4Z" in line
-                ),
+                lambda line: chord_trigger(line) is not None,
                 "descending arpeggio chord tags",
                 start=direction_start,
                 timeout=8.0,
@@ -440,7 +575,7 @@ class SerialIntegrationTests(unittest.TestCase):
             whole_chord_start = app.bridge.count()
             app.action("toggleChordArpeggio")
             app.bridge.wait_for_line_match(
-                lambda line: line.startswith("H") and "i4Z" in line,
+                lambda line: chord_trigger(line) is not None,
                 "whole-chord tags after arpeggio off",
                 start=whole_chord_start,
                 timeout=8.0,
@@ -552,8 +687,7 @@ class SerialIntegrationTests(unittest.TestCase):
     def test_cold_start_guards_synth4_and_reverb_zero_is_exact(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=10.0)
-            records = app.bridge.timed_lines()
-            lines = [line for line, _ in records]
+            lines = app.bridge.lines_since(0)
 
             # Four isolated buses: drums 0 are dry by default; bass/strum/chord
             # buses also start at user reverb level zero. Liveness/damping are
@@ -562,22 +696,35 @@ class SerialIntegrationTests(unittest.TestCase):
                 self.assertIn(f"y{bus}h0,0.5,0.5Z", lines)
             self.assertFalse(any("h0.001" in line for line in lines))
 
-            k4_index = next(
-                i for i, line in enumerate(lines)
+            # The PTY may coalesce writes that were physically separated by a
+            # scheduler delay when its reader thread is descheduled. Verify
+            # the application's ordered transport decisions here; the
+            # scheduler unit test measures the actual sink-write separation.
+            allocation = next(
+                line
+                for line in lines
                 if line.startswith("K")
                 and "i4iv" in line
                 and "iy3if8Z" in line
             )
-            next_synth4_index = next(
-                i for i in range(k4_index + 1, len(lines))
-                if "i4" in lines[i]
+            routed = "i4iy3Z"
+            transport_log = app.wait_for_frontend_log(
+                f"TX-HIGH      {routed}",
+                timeout=5.0,
             )
-            elapsed = records[next_synth4_index][1] - records[k4_index][1]
-            self.assertGreaterEqual(
-                elapsed,
-                0.008,
-                f"synth 4 post-allocation command arrived after only {elapsed:.4f}s",
+            allocation_offset = transport_log.index(
+                f"TX-HIGH      {allocation}"
             )
+            guard_offset = transport_log.index(
+                "GUARD        sleep 10.0 ms",
+                allocation_offset,
+            )
+            routed_offset = transport_log.index(
+                f"TX-HIGH      {routed}",
+                allocation_offset,
+            )
+            self.assertLess(allocation_offset, guard_offset)
+            self.assertLess(guard_offset, routed_offset)
 
             # User reverb applies to bass/strum/chords, never drums unless DRM
             # is explicitly enabled.
@@ -626,17 +773,20 @@ class SerialIntegrationTests(unittest.TestCase):
                 app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
                 app.bridge.wait_idle(timeout=8.0)
 
-            # First establish real bass/chord tagged patterns. The cancellation
+            # First establish real bass/chord root events. The cancellation
             # assertion below is meaningful only for tags that were installed.
             seed = app.bridge.count()
             app.action("selectChord", 0, 0)
             app.action("toggleChordGate")
+            if not bool(app.query("chordArpeggioEnabled")):
+                app.action("toggleChordArpeggio")
+            app.action("setChordArpeggioRate", 2.0)
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 seeded = app.bridge.lines_since(seed)
                 if (
                     any(line.startswith("H") and "i1Z" in line for line in seeded)
-                    and any(line.startswith("H") and "i4Z" in line for line in seeded)
+                    and any(chord_trigger(line) is not None for line in seeded)
                 ):
                     break
                 time.sleep(0.01)
@@ -645,25 +795,12 @@ class SerialIntegrationTests(unittest.TestCase):
             time.sleep(0.75)  # allow one-shot chord release timer to drain
             app.bridge.wait_idle(timeout=8.0)
             seeded = app.bridge.lines_since(seed)
-            scheduled_tag = re.compile(
-                r"^H\d+,\d+,(?P<tag>\d+)(?P<body>.*)$"
-            )
-            chord_on_tags: set[int] = set()
-            chord_off_tags: set[int] = set()
-            for line in seeded:
-                match = scheduled_tag.match(line)
-                if match is None:
-                    continue
-                tag = int(match.group("tag"))
-                if not 112 <= tag < 252:
-                    continue
-                body = match.group("body")
-                if body == "l0i4Z":
-                    chord_off_tags.add(tag)
-                elif "i4Z" in body and body.startswith("n"):
-                    chord_on_tags.add(tag)
-            self.assertTrue(chord_on_tags, seeded)
-            self.assertTrue(chord_off_tags, seeded)
+            chord_trigger_tags = {
+                trigger[0]
+                for line in seeded
+                if (trigger := chord_trigger(line)) is not None
+            }
+            self.assertTrue(chord_trigger_tags, seeded)
 
             start = app.bridge.count()
             app.action("pressChord", 0, 0)
@@ -690,10 +827,10 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=8.0)
             delta = app.bridge.lines_since(start)
 
-            # Finger-down starts synth 3 immediately, but does not truncate a
-            # sounding rhythm chord. Only future synth-4 onsets are removed;
-            # its sequenced all-off tags remain to end the existing chord at
-            # the original rhythmic gate.
+            # Finger-down starts synth 3 immediately. Promotion removes only
+            # future child triggers. A child which already fired owns its
+            # immutable note-off, so no root release tag needs retaining and
+            # no immediate synth-4 all-off is allowed.
             self.assertNotIn("l0i4Z", delta)
             manual_note_pattern = re.compile(
                 rf"^n{_NOTE}l(?P<vel>{_NOTE})i3Z$"
@@ -713,17 +850,9 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertTrue(cancellations, delta)
             cancel_tags = {int(line.split(",", 2)[2][:-1]) for line in cancellations}
             self.assertTrue(all(112 <= tag < 252 for tag in cancel_tags), cancel_tags)
-            self.assertTrue(chord_on_tags <= cancel_tags, (chord_on_tags, cancel_tags))
-            self.assertFalse(chord_off_tags & cancel_tags, (chord_off_tags, cancel_tags))
-            rewritten_off_tags = {
-                int(match.group("tag"))
-                for line in delta
-                if (match := scheduled_tag.match(line)) is not None
-                and match.group("body") == "l0i4Z"
-            }
             self.assertTrue(
-                chord_off_tags <= rewritten_off_tags,
-                (chord_off_tags, rewritten_off_tags),
+                chord_trigger_tags <= cancel_tags,
+                (chord_trigger_tags, cancel_tags),
             )
             self.assertFalse(
                 any(
@@ -743,7 +872,10 @@ class SerialIntegrationTests(unittest.TestCase):
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 release_delta = app.bridge.lines_since(release_start)
-                if any(line.startswith("H") and "i4Z" in line for line in release_delta):
+                if any(
+                    chord_trigger(line) is not None
+                    for line in release_delta
+                ):
                     break
                 time.sleep(0.01)
             else:
@@ -755,6 +887,110 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertFalse(any("i0Z" in line for line in release_delta if line.startswith("H")))
             self.assertFalse(any("i1Z" in line for line in release_delta if line.startswith("H")))
             self.assertTrue(bool(app.query("rhythmRunning")))
+
+    def test_arpeggio_rate_switch_keeps_running_note_gate_owned_by_old_rate(
+        self,
+    ) -> None:
+        """Rate changes atomically publish a new revision of the same group."""
+        publish_group = re.compile(
+            r"^zQ(?P<group>\d+),3,(?P<length>\d+),0Z$"
+        )
+        off_pattern = re.compile(
+            rf"^H(?P<tick>\d+),0,\d+,(?P<group>\d+)"
+            rf"n(?P<note>{_NOTE})l0i4Z$"
+        )
+
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("setRhythmIndex", 0)
+            app.action("setTuningModeIndex", 1)
+            app.action("setRowChordType", 0, 27)
+            app.action("selectChord", 0, 0)
+            app.action("setRhythmChordActivity", 4.0)
+            if int(app.query("chordGateState")) != 1:
+                app.action("toggleChordGate")
+            if not bool(app.query("chordArpeggioEnabled")):
+                app.action("toggleChordArpeggio")
+            if not bool(app.query("rhythmRunning")):
+                app.action("toggleRhythm")
+            app.action("setChordArpeggioRate", 1.0)
+            app.bridge.wait_idle(timeout=10.0)
+
+            rate2_start = app.bridge.count()
+            app.action("setChordArpeggioRate", 2.0)
+            app.bridge.wait_for_line_match(
+                lambda line: chord_trigger(line) is not None,
+                "/2 child triggers",
+                start=rate2_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=10.0)
+            rate2_lines = app.bridge.lines_since(rate2_start)
+            rate2_groups = {
+                int(match.group("group"))
+                for line in rate2_lines
+                if (match := publish_group.match(line)) is not None
+                and int(match.group("length")) == 162
+            }
+            rate2_offs = {
+                (int(match.group("group")), int(match.group("tick"))): float(
+                    match.group("note")
+                )
+                for line in rate2_lines
+                if (match := off_pattern.match(line)) is not None
+            }
+            rate2_triggers = {
+                trigger[1]
+                for line in rate2_lines
+                if (trigger := chord_trigger(line)) is not None
+            }
+            self.assertEqual(rate2_groups, rate2_triggers)
+            self.assertTrue(
+                all(group in rate2_groups for group, _tick in rate2_offs)
+            )
+            self.assertIn((937, 161), rate2_offs)
+            self.assertGreaterEqual(len(set(rate2_offs.values())), 7)
+
+            rate4_start = app.bridge.count()
+            app.action("setChordArpeggioRate", 4.0)
+            app.bridge.wait_for_line_match(
+                lambda line: chord_trigger(line) is not None,
+                "/4 child triggers",
+                start=rate4_start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=10.0)
+            rate4_lines = app.bridge.lines_since(rate4_start)
+            rate4_groups = {
+                int(match.group("group"))
+                for line in rate4_lines
+                if (match := publish_group.match(line)) is not None
+                and int(match.group("length")) == 82
+            }
+            rate4_offs = {
+                (int(match.group("group")), int(match.group("tick"))): float(
+                    match.group("note")
+                )
+                for line in rate4_lines
+                if (match := off_pattern.match(line)) is not None
+            }
+            rate4_triggers = {
+                trigger[1]
+                for line in rate4_lines
+                if (trigger := chord_trigger(line)) is not None
+            }
+            self.assertEqual(rate4_groups, rate4_triggers)
+            self.assertTrue(
+                all(group in rate4_groups for group, _tick in rate4_offs)
+            )
+            self.assertIn((937, 81), rate4_offs)
+            # Group identity is stable. AMY's immutable revisions, covered by
+            # its native tests, let already-running /2 notes retain releases.
+            self.assertEqual(rate2_groups, rate4_groups)
+            self.assertNotIn("l0i4Z", rate4_lines)
+            self.assertNotIn("zY0Z", rate4_lines)
+            self.assertNotIn("zY1Z", rate4_lines)
+            self.assertFalse(any(line.startswith("S") for line in rate4_lines))
 
     def test_quick_chord_tap_never_drains_automatic_chord_lane(self) -> None:
         with HeadlessApp(native_amy=False) as app:
@@ -852,7 +1088,7 @@ class SerialIntegrationTests(unittest.TestCase):
                 seeded = app.bridge.lines_since(seed)
                 if (
                     any(line.startswith("H") and "i1Z" in line for line in seeded)
-                    and any(line.startswith("H") and "i4Z" in line for line in seeded)
+                    and any(chord_trigger(line) is not None for line in seeded)
                 ):
                     break
                 time.sleep(0.01)
@@ -898,22 +1134,17 @@ class SerialIntegrationTests(unittest.TestCase):
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 lines = app.bridge.lines_since(start)
-                if any(line.startswith("H") and "i4Z" in line for line in lines):
+                if any(chord_trigger(line) is not None for line in lines):
                     break
                 time.sleep(0.01)
             else:
                 self.fail("chord lane was not reinstalled")
             self.assertEqual(int(app.query("chordGateState")), 1)
-            chord_tags = []
+            chord_tags: list[int] = []
             for line in lines:
-                if not line.startswith("H") or "i4Z" not in line:
-                    continue
-                header = line[1:].split("i", 1)[0]
-                parts = header.split(",", 3)
-                if len(parts) >= 3:
-                    tag_text = re.match(r"(\d+)", parts[2])
-                    if tag_text:
-                        chord_tags.append(int(tag_text.group(1)))
+                trigger = chord_trigger(line)
+                if trigger is not None:
+                    chord_tags.append(trigger[0])
             self.assertTrue(chord_tags, lines)
             self.assertTrue(all(112 <= tag < 252 for tag in chord_tags), chord_tags)
 

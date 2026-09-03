@@ -1,5 +1,10 @@
 # Design Principles
 
+Status: authoritative baseline contract
+Owner: application architecture
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-03
+
 ## Wire protocol boundary
 
 The Qt application only produces AMY wire commands. It must never depend on whether AMY runs locally or on ESP32.
@@ -31,3 +36,21 @@ dependency.
 ## Simplicity
 
 New abstractions are added only when they reduce coupling or prevent regressions.
+
+## Code-quality non-regression
+
+Bug fixes must preserve the architectural and code-quality improvements already
+recorded in this design tree. In particular, a platform-specific symptom does
+not justify platform-specific application behavior when the affected framework
+primitive is shared. Reproduce the behavior at the narrowest shared boundary,
+add a behavioral regression test, and fix that shared boundary without adding
+duplicate input policy, cross-layer state ownership or source-text assertions.
+
+Production application modules must not contain integration/package test
+drivers, synthetic input generators, expected test outcomes or test-only
+status protocols. Unit tests may directly exercise narrow objects, but an
+integration or package sender/controller runs in a separate process and uses a
+normal production boundary. Cross-platform tests apply one portable semantic
+contract everywhere and isolate unavoidable native setup and capability
+expectations in named platform test adapters. The complete rules are owned by
+`test_process_architecture.md`.

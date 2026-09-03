@@ -1,11 +1,26 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import unittest
 
 from catalog import control_default, entry_for_index, synth_index
 from harness import HeadlessApp
+
+
+def chord_child_note(line: str, expected_note: float) -> bool:
+    match = re.match(
+        r"^H\d+,\d+,\d+,(?P<group>\d+)"
+        r"n(?P<note>[-+]?\d+(?:\.\d+)?)l(?P<velocity>[-+]?\d+(?:\.\d+)?)i4Z$",
+        line,
+    )
+    return bool(
+        match
+        and 937 <= int(match.group("group")) < 1001
+        and float(match.group("velocity")) > 0.0
+        and abs(float(match.group("note")) - expected_note) < 1e-6
+    )
 
 
 def bind_control(
@@ -16,7 +31,19 @@ def bind_control(
 ) -> None:
     app.action("injectMidiControl", channel, controller, 0)
     app.action("injectMidiControl", channel, controller, 1)
-    app.action("selectMidiControlIndicator", channel, controller)
+    states = {
+        (item["channel"], item["controller"]): item["state"]
+        for item in app.action("midiControlIndicators")
+    }
+    if states.get((channel, controller)) == "bound":
+        app.action("clickMidiControlIndicator", channel, controller)
+        unlinked = {
+            (item["channel"], item["controller"]): item["state"]
+            for item in app.action("midiControlIndicators")
+        }
+        if unlinked.get((channel, controller)) != "blue":
+            raise AssertionError("green indicator click did not unlink to blue")
+    app.action("clickMidiControlIndicator", channel, controller)
     if not app.action("activateMidiControlTarget", target):
         raise AssertionError(f"could not bind MIDI target {target}")
 
@@ -115,7 +142,7 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("tuningReference")), 466)
             self.assertEqual(int(app.action("midiTuningReference")), 466)
 
-            app.action("moveMidiControlTarget", midi_target)
+            app.action("manuallyEditMidiControlTarget", midi_target)
             omni_target = {"screen": "omni", "kind": "tuning_reference"}
             bind_control(app, 11, 91, omni_target)
             app.action("injectMidiControl", 11, 91, 127)
@@ -152,7 +179,7 @@ class PresetIntegrationTests(unittest.TestCase):
                 app.action("injectMidiControl", channel, controller, 0)
                 app.action("injectMidiControl", channel, controller, 1)
                 app.action(
-                    "selectMidiControlIndicator",
+                    "clickMidiControlIndicator",
                     channel,
                     controller,
                 )
@@ -579,6 +606,7 @@ class PresetIntegrationTests(unittest.TestCase):
                 )
             self.assertNotIn("zY0Z", switched)
             self.assertNotIn("S16384Z", switched)
+            self.assertNotIn("S20480Z", switched)
 
             # The original physical button-up must still own the live voice.
             checkpoint = app.bridge.count()
@@ -612,6 +640,8 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("selectChord", 0, 0)
             app.action("setRowOctave", 0, 2)
             app.action("setBassVoicingShift", -2.0)
+            app.action("toggleRhythmFill", 2)
+            app.action("setRhythmFillDensity", 5.0)
 
             app.action("toggleRhythm")
             self.assertTrue(bool(app.query("rhythmRunning")))
@@ -627,6 +657,11 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
             self.assertEqual(int(app.query("rhythmBassActivity")), 4)
             self.assertEqual(int(app.query("bassVoicingShift")), -2)
+            self.assertEqual(
+                list(app.query("rhythmFillEnabled")),
+                [False, False, True, False, False],
+            )
+            self.assertEqual(int(app.query("rhythmFillDensityIndex")), 5)
             self.assertEqual(int(app.action("octaveIndexForRow", 0)), 2)
 
             switched = app.bridge.lines_since(checkpoint)
@@ -645,6 +680,11 @@ class PresetIntegrationTests(unittest.TestCase):
                 switched,
                 "live style switch reset the sequencer timebase",
             )
+            self.assertNotIn(
+                "S20480Z",
+                switched,
+                "live style switch reset nested sequencer instances",
+            )
             for synth in (0, 1, 4):
                 self.assertNotIn(
                     f"l0i{synth}Z",
@@ -653,8 +693,17 @@ class PresetIntegrationTests(unittest.TestCase):
                 )
 
             self.assertTrue(
-                any(line.startswith("H") and "i0Z" in line for line in switched),
-                "live style switch did not replace tagged drum events",
+                any(
+                    line.startswith("H")
+                    and re.match(r"^H\d+,\d+,\d+,1\d{3}", line)
+                    and "i0Z" in line
+                    for line in switched
+                ),
+                "live style switch did not author nested drum events",
+            )
+            self.assertTrue(
+                any(re.match(r"^zQ1\d{3},1,0,", line) for line in switched),
+                "live style switch did not quantize new drum role loops",
             )
 
             # Stopped switching still recalls the destination style's own
@@ -708,6 +757,8 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setRhythmChordActivity", 3.0)
             app.action("setRhythmBassActivity", 4.0)
             app.action("setBassVoicingShift", -2.0)
+            app.action("toggleRhythmFill", 4)
+            app.action("setRhythmFillDensity", 6.0)
             app.action("setChordArpeggioRate", 3.0)
             app.action("toggleChordArpeggioDirection")
             app.action("toggleChordArpeggio")
@@ -722,11 +773,7 @@ class PresetIntegrationTests(unittest.TestCase):
             # observe the old idle period and return before the first new
             # serial line.  Wait for the musical continuation contract first.
             app.bridge.wait_for_line_match(
-                lambda line: (
-                    line.startswith("H")
-                    and "n52" in line
-                    and "i4Z" in line
-                ),
+                lambda line: chord_child_note(line, 52.0),
                 "continuing C-major rhythm chord",
                 start=checkpoint,
                 timeout=3.0,
@@ -739,6 +786,11 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
             self.assertEqual(int(app.query("rhythmBassActivity")), 4)
             self.assertEqual(int(app.query("bassVoicingShift")), -2)
+            self.assertEqual(
+                list(app.query("rhythmFillEnabled")),
+                [False, False, False, False, True],
+            )
+            self.assertEqual(int(app.query("rhythmFillDensityIndex")), 6)
             self.assertTrue(bool(app.query("chordArpeggioEnabled")))
             self.assertEqual(int(app.query("chordArpeggioRate")), 3)
             self.assertTrue(bool(app.query("chordArpeggioDescending")))
@@ -753,12 +805,17 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertNotIn("zY0Z", switched)
             self.assertNotIn("zY1Z", switched)
             self.assertNotIn("S16384Z", switched)
+            self.assertNotIn("S20480Z", switched)
+            self.assertTrue(
+                any(chord_child_note(line, 52.0) for line in switched),
+                "running preset switch did not continue the new C-major chord",
+            )
             self.assertTrue(
                 any(
-                    line.startswith("H") and "n52" in line and "i4Z" in line
+                    line.startswith("H") and re.search(r"zQ\d+,1,1,0Z$", line)
                     for line in switched
                 ),
-                "running preset switch did not continue the new C-major chord",
+                "running preset switch installed no chord child triggers",
             )
 
             # STR stores the effective live tempo, not the dormant preset
@@ -774,6 +831,8 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(stored_settings["percussion_activity"]), 4)
             self.assertEqual(int(stored_settings["chord_activity"]), 3)
             self.assertEqual(int(stored_settings["bass_activity"]), 4)
+            self.assertEqual(stored_settings["fill_order"], [4])
+            self.assertEqual(int(stored_settings["fill_density_bars"]), 2)
             self.assertEqual(int(stored["rhythm"]["bass_voicing_shift"]), -2)
             self.assertTrue(bool(stored["rhythm"]["chord_arpeggio_enabled"]))
             self.assertEqual(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 import unittest
 from pathlib import Path
 
@@ -8,7 +9,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
-from midi_control import MidiControlState  # noqa: E402
+from midi_control import (  # noqa: E402
+    NOTE_BUTTON_OFFSET,
+    PITCH_BEND_CONTROLLER,
+    MidiControlState,
+)
+from midi_binding_service import MidiBindingService  # noqa: E402
 
 
 def target(name: str, screen: str = "midi") -> dict[str, object]:
@@ -33,6 +39,48 @@ def change(
 
 
 class MidiControlStateTests(unittest.TestCase):
+    def test_deterministic_transition_sequences_preserve_state_invariants(self) -> None:
+        for capacity in range(1, 6):
+            state = MidiControlState(capacity=capacity)
+            for step in range(1, 41):
+                channel = 1 + step % 16
+                controller = (step * 17) % 128
+                value = (step * 29) % 128
+                state.observe(channel, controller, value, now=float(step))
+                key = state.key(channel, controller)
+                if step % 7 == 0:
+                    state.indicator_clicked(key, now=step + 0.1)
+                if step % 11 == 0 and state.learn_key is not None:
+                    state.bind_learned_target(
+                        target(f"property-{step % 4}"),
+                        now=step + 0.2,
+                    )
+
+                visible_keys = [
+                    (int(item["channel"]), int(item["controller"]))
+                    for item in state.controls
+                ]
+                self.assertLessEqual(len(visible_keys), capacity)
+                self.assertEqual(len(visible_keys), len(set(visible_keys)))
+                self.assertLessEqual(int(state.learn_key is not None), 1)
+                self.assertEqual(
+                    set(state._target_to_control.values()),
+                    set(state.bindings),
+                )
+                self.assertEqual(
+                    set(state._target_to_control),
+                    {
+                        state.target_id(binding)
+                        for binding in state.bindings.values()
+                    },
+                )
+                for control_key, observed in state.values.items():
+                    self.assertGreaterEqual(observed, 0)
+                    self.assertLessEqual(
+                        observed,
+                        state.value_max_for_key(control_key),
+                    )
+
     def test_true_lru_and_outgoing_red_replacement_model(self) -> None:
         state = MidiControlState(capacity=3)
         change(state, 10, now=1.0)
@@ -63,16 +111,16 @@ class MidiControlStateTests(unittest.TestCase):
         state = MidiControlState(capacity=2)
         change(state, 1, now=1.0)
         change(state, 2, now=2.0)
-        state.select_control((1, 1), now=3.0)
+        state.indicator_clicked((1, 1), now=3.0)
         self.assertEqual(state.status((1, 1)), "learn")
 
         change(state, 3, now=4.0)
         self.assertIsNotNone(state._visible((1, 1)))
         self.assertIsNone(state._visible((1, 2)))
 
-        state.select_control((1, 1), now=5.0)
+        state.indicator_clicked((1, 1), now=5.0)
         self.assertEqual(state.status((1, 1)), "idle")
-        state.select_control((1, 3), now=6.0)
+        state.indicator_clicked((1, 3), now=6.0)
         self.assertEqual(state.status((1, 3)), "learn")
         self.assertEqual(state.status((1, 1)), "idle")
 
@@ -80,7 +128,7 @@ class MidiControlStateTests(unittest.TestCase):
         state = MidiControlState(capacity=2)
         change(state, 1, now=1.0)
         change(state, 2, now=2.0)
-        state.select_control((1, 1), now=2.1)
+        state.indicator_clicked((1, 1), now=2.1)
         state.bind_learned_target(target("volume"), now=2.2)
 
         change(state, 3, now=3.0)
@@ -93,21 +141,23 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertEqual(mapped, target("volume"))
         self.assertIsNotNone(state._visible((1, 1)))
 
-    def test_one_to_one_replacement_and_double_tap_unbind(self) -> None:
+    def test_one_to_one_replacement_and_manual_edit_unbind(self) -> None:
         state = MidiControlState(capacity=3)
         change(state, 1, now=1.0)
         change(state, 2, now=2.0)
         shared = target("shared")
 
-        state.select_control((1, 1), now=3.0)
+        state.indicator_clicked((1, 1), now=3.0)
         state.bind_learned_target(shared, now=3.1)
-        state.select_control((1, 2), now=3.2)
+        state.indicator_clicked((1, 2), now=3.2)
         state.bind_learned_target(shared, now=3.3)
 
         self.assertNotIn((1, 1), state.bindings)
         self.assertEqual(state.status((1, 1)), "blue")
         self.assertEqual(state.status((1, 2)), "bound")
-        self.assertTrue(state.target_double_tapped(shared, now=4.0))
+        self.assertTrue(
+            state.release_target_for_manual_edit(shared, now=4.0)
+        )
         self.assertEqual(state.status((1, 2)), "blue")
         self.assertEqual(state.omni_led_state(), "blue")
 
@@ -116,18 +166,32 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertIsNone(state._visible((1, 1)))
         self.assertIsNone(state._visible((1, 2)))
 
-    def test_clicking_green_starts_relearn_and_second_click_cancels_to_off(self) -> None:
+    def test_indicator_single_click_unlinks_or_toggles_learn_by_state(self) -> None:
         state = MidiControlState(capacity=2)
         change(state, 1, now=1.0)
+        change(state, 2, now=1.1)
         binding = target("volume")
-        state.select_control((1, 1), now=2.0)
+        state.indicator_clicked((1, 1), now=2.0)
         state.bind_learned_target(binding, now=2.1)
         self.assertEqual(state.status((1, 1)), "bound")
 
-        state.select_control((1, 1), now=3.0)
-        self.assertEqual(state.status((1, 1)), "learn")
+        state.indicator_clicked((1, 2), now=2.2)
+        self.assertEqual(state.status((1, 2)), "learn")
+
+        # Clicking green means unlink only; it must not silently start relearn
+        # or steal an existing red learn selection.
+        state.indicator_clicked((1, 1), now=3.0)
+        self.assertEqual(state.status((1, 1)), "blue")
+        self.assertEqual(state.status((1, 2)), "learn")
         self.assertNotIn((1, 1), state.bindings)
-        state.select_control((1, 1), now=3.1)
+
+        # Clicking blue starts learn and transfers the unique red selection.
+        state.indicator_clicked((1, 1), now=3.1)
+        self.assertEqual(state.status((1, 1)), "learn")
+        self.assertEqual(state.status((1, 2)), "idle")
+
+        # Clicking the already-red indicator cancels learn.
+        state.indicator_clicked((1, 1), now=3.2)
         self.assertEqual(state.status((1, 1)), "idle")
 
     def test_real_move_unbinds_and_oldest_blue_can_leave_early(self) -> None:
@@ -139,9 +203,14 @@ class MidiControlStateTests(unittest.TestCase):
             (2, second, 2.0),
         ):
             change(state, controller, now=start)
-            state.select_control((1, controller), now=start + 0.1)
+            state.indicator_clicked((1, controller), now=start + 0.1)
             state.bind_learned_target(binding, now=start + 0.2)
-            self.assertTrue(state.target_moved(binding, now=start + 0.3))
+            self.assertTrue(
+                state.release_target_for_manual_edit(
+                    binding,
+                    now=start + 0.3,
+                )
+            )
 
         change(state, 3, now=4.0)
         self.assertIsNone(state._visible((1, 1)))
@@ -152,9 +221,11 @@ class MidiControlStateTests(unittest.TestCase):
         state = MidiControlState(capacity=2)
         binding = target("volume")
         change(state, 1, now=1.0)
-        state.select_control((1, 1), now=2.0)
+        state.indicator_clicked((1, 1), now=2.0)
         state.bind_learned_target(binding, now=2.1)
-        self.assertTrue(state.target_moved(binding, now=3.0))
+        self.assertTrue(
+            state.release_target_for_manual_edit(binding, now=3.0)
+        )
         self.assertEqual(state.status((1, 1)), "blue")
 
         changed, mapped, key = state.observe(1, 1, 1, now=3.5)
@@ -199,6 +270,118 @@ class MidiControlStateTests(unittest.TestCase):
             [{"channel": 2, "controller": 8, "target": omni_target}],
         )
 
+    def test_pitch_bend_is_high_resolution_centered_control(self) -> None:
+        state = MidiControlState(capacity=4)
+
+        unchanged, mapped, key = state.observe(
+            1,
+            PITCH_BEND_CONTROLLER,
+            8192,
+            now=1.0,
+        )
+
+        self.assertFalse(unchanged)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+
+        changed, mapped, key = state.observe(
+            1,
+            PITCH_BEND_CONTROLLER,
+            12288,
+            now=2.0,
+        )
+
+        self.assertTrue(changed)
+        self.assertIsNone(mapped)
+        self.assertEqual(key, (1, PITCH_BEND_CONTROLLER))
+        model = state.visible_model(now=2.0)[0]
+        self.assertEqual(model["displayType"], "pitch_bend")
+        self.assertEqual(model["displayLabel"], "CH1 PB")
+        self.assertEqual(model["rawValue"], 12288)
+        self.assertGreater(model["displayValue"], 64)
+
+    def test_note_on_off_is_button_source(self) -> None:
+        state = MidiControlState(capacity=4)
+        controller = NOTE_BUTTON_OFFSET + 36
+
+        unchanged, mapped, key = state.observe(2, controller, 0, now=1.0)
+        self.assertFalse(unchanged)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+
+        changed, mapped, key = state.observe(2, controller, 100, now=2.0)
+        self.assertTrue(changed)
+        self.assertIsNone(mapped)
+        self.assertEqual(key, (2, controller))
+        model = state.visible_model(now=2.0)[0]
+        self.assertEqual(model["displayType"], "note_button")
+        self.assertEqual(model["displayLabel"], "CH2 N36")
+        self.assertTrue(model["buttonDown"])
+
+        changed, mapped, key = state.observe(2, controller, 0, now=3.0)
+        self.assertTrue(changed)
+        self.assertIsNone(mapped)
+        self.assertEqual(key, (2, controller))
+        self.assertFalse(state.visible_model(now=3.0)[0]["buttonDown"])
+
+    def test_cc_bound_to_button_target_renders_as_button(self) -> None:
+        state = MidiControlState(capacity=4)
+        button_target = {
+            "id": "omni:button:rhythm_toggle",
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle",
+        }
+
+        change(state, 21, value=127, now=1.0)
+        state.indicator_clicked((1, 21), now=2.0)
+        state.bind_learned_target(button_target, now=2.1)
+        changed, mapped, key = state.observe(1, 21, 0, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(mapped, button_target)
+        self.assertEqual(key, (1, 21))
+        model = state.visible_model(now=3.0)[0]
+        self.assertEqual(model["displayType"], "button")
+        self.assertEqual(model["displayLabel"], "CH1 CC21")
+        self.assertFalse(model["buttonDown"])
+
+    def test_non_cc_bindings_serialize_source_type(self) -> None:
+        state = MidiControlState(capacity=4)
+        button_target = {
+            "id": "omni:button:rhythm_toggle",
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle",
+        }
+        state.replace_screen_bindings(
+            "omni",
+            [
+                ((1, PITCH_BEND_CONTROLLER), target("volume", screen="omni")),
+                ((2, NOTE_BUTTON_OFFSET + 40), button_target),
+            ],
+            now=1.0,
+        )
+
+        self.assertEqual(
+            state.serialize_bindings("omni"),
+            [
+                {
+                    "channel": 1,
+                    "controller": PITCH_BEND_CONTROLLER,
+                    "target": target("volume", screen="omni"),
+                    "source_type": "pitch_bend",
+                },
+                {
+                    "channel": 2,
+                    "controller": NOTE_BUTTON_OFFSET + 40,
+                    "target": button_target,
+                    "source_type": "note_button",
+                    "note": 40,
+                },
+            ],
+        )
+
     def test_preset_binding_conflict_prefers_incoming_and_expires_feedback(self) -> None:
         state = MidiControlState(capacity=4, preset_feedback_duration=2.0)
         displaced = target("old", screen="omni")
@@ -230,6 +413,85 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertTrue(state.expire_preset_feedback(now=12.0))
         self.assertEqual(state.target_visual_state(displaced, now=12.0), "idle")
         self.assertEqual(state.target_visual_state(incoming, now=12.0), "bound")
+
+    def test_osc_continuous_and_button_sources_share_indicator_contract(self) -> None:
+        state = MidiControlState(capacity=4)
+        changed, _target, key = state.observe_osc(
+            "/surface/filter", 0, 0.25, "continuous", now=1.0
+        )
+        self.assertFalse(changed)
+        self.assertIsNone(key)
+
+        changed, _target, key = state.observe_osc(
+            "/surface/filter", 0, 0.5, "continuous", now=2.0
+        )
+        self.assertTrue(changed)
+        self.assertIsNotNone(key)
+        button_changed, _target, button_key = state.observe_osc(
+            "/surface/mute", 0, 1.0, "button", now=3.0
+        )
+        self.assertTrue(button_changed)
+        self.assertIsNotNone(button_key)
+
+        models = {item["displayLabel"]: item for item in state.visible_model(now=3.0)}
+        self.assertEqual(models["/surface/filter"]["displayProtocol"], "osc")
+        self.assertEqual(models["/surface/filter"]["displayType"], "osc")
+        self.assertEqual(models["/surface/mute"]["displayType"], "button")
+        self.assertTrue(models["/surface/mute"]["buttonDown"])
+
+    def test_midi_and_osc_enforce_one_global_target_owner(self) -> None:
+        state = MidiControlState(capacity=4)
+        shared = target("shared")
+        change(state, 7, now=1.0)
+        state.indicator_clicked((1, 7), now=1.1)
+        state.bind_learned_target(shared, now=1.2)
+
+        state.observe_osc("/surface/volume", 0, 0.1, "continuous", now=2.0)
+        _changed, _target, osc_key = state.observe_osc(
+            "/surface/volume", 0, 0.2, "continuous", now=2.1
+        )
+        self.assertIsNotNone(osc_key)
+        assert osc_key is not None
+        state.indicator_clicked(osc_key, now=2.2)
+        self.assertEqual(state.omni_led_state(), "learn")
+        state.bind_learned_target(shared, now=2.3)
+
+        self.assertEqual(state.status((1, 7)), "blue")
+        self.assertEqual(state.status(osc_key), "bound")
+        self.assertEqual(state.bindings[osc_key], shared)
+
+    def test_osc_binding_serializes_stable_address_not_runtime_surrogate(self) -> None:
+        state = MidiControlState(capacity=4)
+        osc_key = state.osc_key("/bank/cutoff", 1, "continuous")
+        state.replace_screen_bindings(
+            "omni",
+            [(osc_key, target("cutoff", screen="omni"))],
+            now=1.0,
+        )
+
+        self.assertEqual(
+            state.serialize_bindings("omni"),
+            [
+                {
+                    "source_type": "osc",
+                    "address": "/bank/cutoff",
+                    "argument": 1,
+                    "value_type": "continuous",
+                    "target": target("cutoff", screen="omni"),
+                }
+            ],
+        )
+
+        restored = MidiControlState(capacity=4)
+        service = MidiBindingService(restored, threading.Lock())
+        serialized = state.serialize_bindings("omni")
+        normalized = service.normalize_entries(
+            "omni",
+            serialized,
+            lambda raw: dict(raw),
+        )
+        self.assertTrue(service.replace_screen("omni", normalized))
+        self.assertEqual(restored.serialize_bindings("omni"), serialized)
 
 
 if __name__ == "__main__":

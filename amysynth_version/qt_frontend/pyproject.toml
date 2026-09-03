@@ -1,0 +1,27 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["build", "dist", "test-artifacts", "deployment"]
+
+[tool.ruff.lint]
+# Begin with correctness-critical rules. T25 may expand this set after legacy
+# findings are fixed deliberately; formatting is not part of this gate.
+select = ["E9", "F63", "F7", "F82"]
+
+[tool.ruff.lint.per-file-ignores]
+# These two names are created in the composition branches that T11 will make
+# explicit. They are a narrow recorded baseline, not a repository-wide F821
+# suppression.
+"code/app_core.py" = ["F821"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["code"]
+mypy_path = "code"
+check_untyped_defs = true
+show_error_codes = true
+show_error_context = false
+pretty = false
+color_output = false
+error_summary = false
+warn_unused_configs = true

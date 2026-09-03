@@ -11,12 +11,12 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any, Literal
 
 from PySide6.QtCore import (
     QObject,
     Property,
-    QStandardPaths,
     QTimer,
     QUrl,
     Signal,
@@ -25,42 +25,45 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
-from amy_serial import (
-    AmyLocalClient,
-    AmySerialClient,
-    AmySocketClient,
-    load_amy_config,
+from application_composition import (
+    ApplicationDependencies,
+    ClientSelection,
+    CommandClient,
+    compose_application_graph,
+    load_application_resources,
 )
 from bass_riffs import BassRiffCatalog, load_bass_riff_catalog
 from control_limits import bounded_control_range, clamp_control_value
+from config_loader import ResolvedAmyConfig
+from drum_patterns import (
+    DrumRhythm,
+    load_drum_pattern_catalog,
+)
+from musical_state import (
+    ChordSnapshot,
+    OmniPerformanceSnapshot,
+    TuningSnapshot,
+    chord_snapshot,
+    freeze_intonation_tables,
+    intonation_factor,
+    tune_note,
+    tuning_note_offset,
+)
+from json_store import JsonStore
+from preset_plan import (
+    ChordRowPreset,
+    EffectsPreset,
+    RhythmSettingPreset,
+    compile_omni_preset_plan,
+)
+from runtime_paths import production_frontend_asset_root
+from screenshot_state import populate_screenshot_input_controls
 from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
 
-ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
-
-
-def resolve_frontend_asset_root(
-    code_dir: Path,
-    packaged_root: Path | None = None,
-) -> Path:
-    """Find assets in source, frozen, or Android's flat staged layout."""
-
-    code_dir = Path(code_dir)
-    if all((code_dir / name).is_dir() for name in ASSET_DIRECTORIES):
-        return code_dir
-    if packaged_root is not None:
-        return Path(packaged_root)
-    return code_dir.parent
-
-
 CODE_DIR = Path(__file__).resolve().parent
-# PyInstaller exposes its data root as ``sys._MEIPASS``. Android's p4a stage
-# instead puts modules and data directories beside each other under ``app``.
-FRONTEND_DIR = resolve_frontend_asset_root(
-    CODE_DIR,
-    Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else None,
-)
+FRONTEND_DIR = production_frontend_asset_root(CODE_DIR)
 GUI_DIR = FRONTEND_DIR / "gui"
 CONFIG_DIR = FRONTEND_DIR / "config"
 INSTRUMENT_DIR = FRONTEND_DIR / "instruments"
@@ -81,10 +84,7 @@ NOTE_DEFINITIONS = (
     {"label": "F♯", "semitone": 6, "accidental": True},
 )
 
-NOTE_NAMES_BY_SEMITONE = {
-    item["semitone"]: item["label"]
-    for item in NOTE_DEFINITIONS
-}
+NOTE_NAMES_BY_SEMITONE = {item["semitone"]: item["label"] for item in NOTE_DEFINITIONS}
 
 SHARP_NOTE_NAMES = (
     "C",
@@ -191,7 +191,6 @@ STRUM_HIGH_MIDI = 107
 SynthRole = Literal["chord", "strum", "bass"]
 
 
-
 def source_activity_to_ui(source_level: int) -> int:
     """Convert a catalogue level 0..4 to one visible level 1..4."""
     if source_level <= 0:
@@ -239,7 +238,6 @@ class SynthDefinition:
     controls: tuple[SynthControl, ...]
 
 
-
 @dataclass(frozen=True)
 class RhythmDefinition:
     key: str
@@ -252,6 +250,9 @@ class RhythmDefinition:
     default_busyness: int
     default_chord_activity: int
     default_bass_activity: int
+    drum_pattern: DrumRhythm
+    # Retained only for backwards-compatible catalogue diagnostics. Runtime
+    # percussion uses drum_pattern's five complete logical-role patterns.
     percussion_layers: tuple[dict[str, Any], ...]
     chord_levels: tuple[tuple[dict[str, Any], ...], ...]
     bass_levels: tuple[tuple[dict[str, Any], ...], ...]
@@ -264,6 +265,11 @@ class RhythmRuntime:
     busyness_by_rhythm: list[int]
     chord_activity_by_rhythm: list[int]
     bass_activity_by_rhythm: list[int]
+    fill_order_by_rhythm: list[list[int]]
+    fill_density_index_by_rhythm: list[int]
+
+
+FILL_DENSITY_BARS = (32, 16, 8, 6, 4, 3, 2, 1)
 
 
 def display_label(suffix: str) -> str:
@@ -276,10 +282,7 @@ def display_label(suffix: str) -> str:
         "diminished": "dim",
         "dominant": "dom",
     }
-    return " ".join(
-        abbreviations.get(word, word)
-        for word in text.split()
-    )
+    return " ".join(abbreviations.get(word, word) for word in text.split())
 
 
 LadderPattern = tuple[tuple[int, ...], tuple[int, ...]]
@@ -425,9 +428,7 @@ def ladder_pattern(chord_suffix: str) -> LadderPattern:
     try:
         return CHORD_LADDER_PATTERNS[chord_suffix]
     except KeyError as exc:
-        raise ValueError(
-            f"No audited LDR pattern for chord {chord_suffix!r}"
-        ) from exc
+        raise ValueError(f"No audited LDR pattern for chord {chord_suffix!r}") from exc
 
 
 def _fallback_prefers_flats(root_label: str, chord_suffix: str) -> bool:
@@ -441,9 +442,7 @@ def _fallback_prefers_flats(root_label: str, chord_suffix: str) -> bool:
     if "sharp" in chord_suffix or "augmented" in chord_suffix:
         return False
 
-    root_semitone = NATURAL_NOTE_SEMITONES[
-        NATURAL_NOTE_LETTERS.index(root_label)
-    ]
+    root_semitone = NATURAL_NOTE_SEMITONES[NATURAL_NOTE_LETTERS.index(root_label)]
     if chord_suffix.startswith("minor"):
         return root_semitone in {0, 2, 5, 7}
     if "dominant" in chord_suffix or chord_suffix == "7_sus4":
@@ -461,9 +460,7 @@ def spell_strum_note_names(
     root_label = NOTE_NAMES_BY_SEMITONE[int(root_semitone) % 12]
     root_letter_index = NATURAL_NOTE_LETTERS.index(root_label[0])
     fallback_names = (
-        FLAT_NOTE_NAMES
-        if _fallback_prefers_flats(root_label, chord_suffix)
-        else SHARP_NOTE_NAMES
+        FLAT_NOTE_NAMES if _fallback_prefers_flats(root_label, chord_suffix) else SHARP_NOTE_NAMES
     )
 
     names: list[str] = []
@@ -476,9 +473,7 @@ def spell_strum_note_names(
 
         letter_index = (root_letter_index + degree_offset) % 7
         letter = NATURAL_NOTE_LETTERS[letter_index]
-        accidental = (
-            pitch_class - NATURAL_NOTE_SEMITONES[letter_index]
-        ) % 12
+        accidental = (pitch_class - NATURAL_NOTE_SEMITONES[letter_index]) % 12
         if accidental > 6:
             accidental -= 12
 
@@ -511,13 +506,12 @@ def inverted_intervals(
     if inversion_index == 0:
         return intervals
 
-    rotated = (
-        list(enumerate(
+    rotated = list(
+        enumerate(
             intervals[inversion_index:],
             start=inversion_index,
-        ))
-        + list(enumerate(intervals[:inversion_index]))
-    )
+        )
+    ) + list(enumerate(intervals[:inversion_index]))
 
     ascending: list[tuple[int, int]] = []
     previous_pitch: int | None = None
@@ -530,25 +524,15 @@ def inverted_intervals(
         ascending.append((original_index, pitch))
         previous_pitch = pitch
 
-    root_pitch = next(
-        pitch
-        for original_index, pitch in ascending
-        if original_index == 0
-    )
+    root_pitch = next(pitch for original_index, pitch in ascending if original_index == 0)
 
-    return tuple(
-        pitch - root_pitch
-        for _, pitch in ascending
-    )
+    return tuple(pitch - root_pitch for _, pitch in ascending)
 
 
 def make_inversions(
     intervals: tuple[int, ...],
 ) -> tuple[tuple[int, ...], ...]:
-    return tuple(
-        inverted_intervals(intervals, index)
-        for index in range(len(intervals))
-    )
+    return tuple(inverted_intervals(intervals, index) for index in range(len(intervals)))
 
 
 def load_chords(path: Path) -> tuple[ChordType, ...]:
@@ -559,9 +543,7 @@ def load_chords(path: Path) -> tuple[ChordType, ...]:
         header = next(reader, None)
 
         if not header or header[:2] != ["chord_suffix", "intervals"]:
-            raise ValueError(
-                f"{path} must begin with: chord_suffix,intervals"
-            )
+            raise ValueError(f"{path} must begin with: chord_suffix,intervals")
 
         for line_number, row in enumerate(reader, start=2):
             if not row or not row[0].strip():
@@ -570,25 +552,15 @@ def load_chords(path: Path) -> tuple[ChordType, ...]:
             suffix = row[0].strip()
 
             try:
-                intervals = tuple(
-                    int(value.strip())
-                    for value in row[1:]
-                    if value.strip()
-                )
+                intervals = tuple(int(value.strip()) for value in row[1:] if value.strip())
             except ValueError as exc:
-                raise ValueError(
-                    f"Invalid interval on line {line_number} of {path}"
-                ) from exc
+                raise ValueError(f"Invalid interval on line {line_number} of {path}") from exc
 
             if not intervals or intervals[0] != 0:
-                raise ValueError(
-                    f"Chord {suffix!r} must start with interval 0"
-                )
+                raise ValueError(f"Chord {suffix!r} must start with interval 0")
 
             if tuple(sorted(intervals)) != intervals:
-                raise ValueError(
-                    f"Intervals for {suffix!r} must be ascending"
-                )
+                raise ValueError(f"Intervals for {suffix!r} must be ascending")
 
             chords.append(
                 ChordType(
@@ -605,15 +577,12 @@ def load_chords(path: Path) -> tuple[ChordType, ...]:
     return tuple(chords)
 
 
-
 def load_defaults(path: Path) -> dict[str, Any]:
     raw = json.loads(path.read_text(encoding="utf-8"))
 
     rows = raw.get("chord_rows")
     if not isinstance(rows, list) or len(rows) != ROW_COUNT:
-        raise ValueError(
-            f"{path} must define exactly {ROW_COUNT} chord_rows"
-        )
+        raise ValueError(f"{path} must define exactly {ROW_COUNT} chord_rows")
 
     required_sections = (
         "synths",
@@ -623,9 +592,7 @@ def load_defaults(path: Path) -> dict[str, Any]:
     )
     for section in required_sections:
         if section not in raw:
-            raise ValueError(
-                f"{path} is missing section {section!r}"
-            )
+            raise ValueError(f"{path} is missing section {section!r}")
 
     return raw
 
@@ -633,9 +600,7 @@ def load_defaults(path: Path) -> dict[str, Any]:
 def load_intonation_table(
     path: Path,
 ) -> tuple[tuple[float, ...], ...]:
-    raw = json.loads(
-        path.read_text(encoding="utf-8")
-    )
+    raw = json.loads(path.read_text(encoding="utf-8"))
 
     rows: list[tuple[float, ...]] = []
 
@@ -644,9 +609,7 @@ def load_intonation_table(
         row_raw = raw.get(key_name)
 
         if not isinstance(row_raw, dict):
-            raise ValueError(
-                f"{path} is missing {key_name!r}"
-            )
+            raise ValueError(f"{path} is missing {key_name!r}")
 
         row: list[float] = []
 
@@ -654,23 +617,12 @@ def load_intonation_table(
             value_name = f"note_{note_name}"
 
             if value_name not in row_raw:
-                raise ValueError(
-                    f"{path}: {key_name!r} is missing "
-                    f"{value_name!r}"
-                )
+                raise ValueError(f"{path}: {key_name!r} is missing {value_name!r}")
 
-            factor = float(
-                row_raw[value_name]
-            )
+            factor = float(row_raw[value_name])
 
-            if (
-                not math.isfinite(factor)
-                or factor <= 0.0
-            ):
-                raise ValueError(
-                    f"{path}: invalid factor "
-                    f"{key_name}.{value_name}={factor!r}"
-                )
+            if not math.isfinite(factor) or factor <= 0.0:
+                raise ValueError(f"{path}: invalid factor {key_name}.{value_name}={factor!r}")
 
             row.append(factor)
 
@@ -689,26 +641,18 @@ def load_title_config(
     }
 
     try:
-        raw = json.loads(
-            path.read_text(encoding="utf-8")
-        )
+        raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return default
 
     if not isinstance(raw, dict):
         return default
 
-    text = str(
-        raw.get("text", default["text"])
-    )
-    font = str(
-        raw.get("font", default["font"])
-    ).strip()
+    text = str(raw.get("text", default["text"]))
+    font = str(raw.get("font", default["font"])).strip()
 
     try:
-        height = int(
-            raw.get("height", default["height"])
-        )
+        height = int(raw.get("height", default["height"]))
     except (TypeError, ValueError):
         height = int(default["height"])
 
@@ -777,11 +721,7 @@ def load_synth_catalog(
         )
 
     def index_for(key: str) -> int:
-        return next(
-            index
-            for index, synth in enumerate(synths)
-            if synth.key == key
-        )
+        return next(index for index, synth in enumerate(synths) if synth.key == key)
 
     return (
         tuple(synths),
@@ -795,6 +735,7 @@ def load_rhythm_catalog(
     path: Path,
 ) -> tuple[RhythmDefinition, ...]:
     raw = json.loads(path.read_text(encoding="utf-8"))
+    drum_catalog = load_drum_pattern_catalog(path.parent / "drums")
     rhythms: list[RhythmDefinition] = []
 
     for item in raw["rhythms"]:
@@ -810,23 +751,15 @@ def load_rhythm_catalog(
                 tempo_max=float(tempo["max"]),
                 tempo_default=float(tempo["default"]),
                 default_busyness=int(item["default_busyness"]),
-                default_chord_activity=int(
-                    item["default_chord_activity"]
-                ),
-                default_bass_activity=int(
-                    item["default_bass_activity"]
-                ),
-                percussion_layers=tuple(
-                    dict(layer)
-                    for layer in item["percussion_layers"]
-                ),
+                default_chord_activity=int(item["default_chord_activity"]),
+                default_bass_activity=int(item["default_bass_activity"]),
+                drum_pattern=drum_catalog.rhythm(str(item["id"])),
+                percussion_layers=tuple(dict(layer) for layer in item["percussion_layers"]),
                 chord_levels=tuple(
-                    tuple(dict(event) for event in level)
-                    for level in item["chord_levels"]
+                    tuple(dict(event) for event in level) for level in item["chord_levels"]
                 ),
                 bass_levels=tuple(
-                    tuple(dict(event) for event in level)
-                    for level in item["bass_levels"]
+                    tuple(dict(event) for event in level) for level in item["bass_levels"]
                 ),
             )
         )
@@ -836,20 +769,15 @@ def load_rhythm_catalog(
 
     for rhythm in rhythms:
         if len(rhythm.percussion_layers) != 5:
-            raise ValueError(
-                f"Rhythm {rhythm.key!r} must have five percussion layers"
-            )
+            raise ValueError(f"Rhythm {rhythm.key!r} must have five percussion layers")
+        if rhythm.drum_pattern.meter != rhythm.meter:
+            raise ValueError(f"Rhythm {rhythm.key!r} meter differs from drum catalogue")
         if len(rhythm.chord_levels) != 5:
-            raise ValueError(
-                f"Rhythm {rhythm.key!r} must have five chord levels"
-            )
+            raise ValueError(f"Rhythm {rhythm.key!r} must have five chord levels")
         if len(rhythm.bass_levels) != 5:
-            raise ValueError(
-                f"Rhythm {rhythm.key!r} must have five bass levels"
-            )
+            raise ValueError(f"Rhythm {rhythm.key!r} must have five bass levels")
 
     return tuple(rhythms)
-
 
 
 class InstrumentBackend(QObject):
@@ -904,7 +832,7 @@ class InstrumentBackend(QObject):
         default_strum_synth_index: int,
         default_bass_synth_index: int,
         defaults: dict[str, Any],
-        client: AmySerialClient,
+        client: CommandClient,
         chord_state_address: str,
         chord_manual_address: str,
         chord_amp_address: str,
@@ -939,6 +867,7 @@ class InstrumentBackend(QObject):
             "HARM": intonation_harm,
             "JV": intonation_jv,
         }
+        self._frozen_intonation_tables = freeze_intonation_tables(self._intonation_tables)
         self._client = client
 
         self._chord_state_address = chord_state_address
@@ -959,9 +888,7 @@ class InstrumentBackend(QObject):
         self._strum_note_address = strum_note_address
         self._rhythm_config_address = rhythm_config_address
         self._rhythm_running_address = rhythm_running_address
-        self._rhythm_chord_enabled_address = (
-            rhythm_chord_enabled_address
-        )
+        self._rhythm_chord_enabled_address = rhythm_chord_enabled_address
         self._panic_address = panic_address
 
         self._preset_dir = PRESET_DIRECTORY
@@ -978,22 +905,11 @@ class InstrumentBackend(QObject):
             )
 
             if debug_file is None:
-                debug_file = (
-                    self._preset_dir
-                    / (
-                        "debug-"
-                        + time.strftime(
-                            "%Y%m%d-%H%M%S"
-                        )
-                        + ".jsonl"
-                    )
+                debug_file = self._preset_dir / (
+                    "debug-" + time.strftime("%Y%m%d-%H%M%S") + ".jsonl"
                 )
             else:
-                debug_file = (
-                    Path(debug_file)
-                    .expanduser()
-                    .resolve()
-                )
+                debug_file = Path(debug_file).expanduser().resolve()
                 debug_file.parent.mkdir(
                     parents=True,
                     exist_ok=True,
@@ -1006,8 +922,7 @@ class InstrumentBackend(QObject):
             )
 
             print(
-                "Omnichord debug log: "
-                f"{self._debug_file}",
+                f"Omnichord debug log: {self._debug_file}",
                 file=sys.stderr,
                 flush=True,
             )
@@ -1015,51 +930,24 @@ class InstrumentBackend(QObject):
         self._defaults = copy.deepcopy(defaults)
         self._preset_reference_data: dict[str, Any] = {}
         self._selected_preset = 1
-        self._tuning_mode_index = (
-            DEFAULT_TUNING_MODE_INDEX
-        )
-        self._tuning_reference = (
-            DEFAULT_TUNING_REFERENCE
-        )
+        self._tuning_mode_index = DEFAULT_TUNING_MODE_INDEX
+        self._tuning_reference = DEFAULT_TUNING_REFERENCE
 
-        suffix_to_index = {
-            chord.suffix: index
-            for index, chord in enumerate(chords)
-        }
-        octave_to_index = {
-            name: index
-            for index, name in enumerate(OCTAVE_NAMES)
-        }
+        suffix_to_index = {chord.suffix: index for index, chord in enumerate(chords)}
+        octave_to_index = {name: index for index, name in enumerate(OCTAVE_NAMES)}
 
         row_defaults = defaults["chord_rows"]
 
         try:
-            self._row_chord_indexes = [
-                suffix_to_index[str(row["chord"])]
-                for row in row_defaults
-            ]
-            self._row_octave_indexes = [
-                octave_to_index[str(row["octave"])]
-                for row in row_defaults
-            ]
-            self._row_inversion_indexes = [
-                int(row.get("inversion", 0))
-                for row in row_defaults
-            ]
+            self._row_chord_indexes = [suffix_to_index[str(row["chord"])] for row in row_defaults]
+            self._row_octave_indexes = [octave_to_index[str(row["octave"])] for row in row_defaults]
+            self._row_inversion_indexes = [int(row.get("inversion", 0)) for row in row_defaults]
         except KeyError as exc:
-            raise ValueError(
-                f"Unknown chord or octave in defaults.json: {exc}"
-            ) from exc
+            raise ValueError(f"Unknown chord or octave in defaults.json: {exc}") from exc
 
-        for row_index, chord_index in enumerate(
-            self._row_chord_indexes
-        ):
-            inversion_count = len(
-                self._chords[chord_index].inversions
-            )
-            self._row_inversion_indexes[row_index] %= (
-                inversion_count
-            )
+        for row_index, chord_index in enumerate(self._row_chord_indexes):
+            inversion_count = len(self._chords[chord_index].inversions)
+            self._row_inversion_indexes[row_index] %= inversion_count
 
         self._active_row = -1
         self._active_root_semitone = -1
@@ -1071,71 +959,48 @@ class InstrumentBackend(QObject):
         self._chord_volume = float(volumes["chord"])
         self._strum_volume = float(volumes["strum"])
         self._bass_volume = float(volumes["bass"])
-        self._percussion_volume = float(
-            volumes["percussion"]
-        )
+        self._percussion_volume = float(volumes["percussion"])
         effects = defaults.get("effects", {})
         self._reverb_level = max(
             0.0,
             min(REVERB_LEVEL_MAX, float(effects.get("reverb_level", 0.0))),
         )
-        self._reverb_liveness = max(
-            0.0, min(1.0, float(effects.get("reverb_liveness", 0.5)))
-        )
-        self._reverb_damping = max(
-            0.0, min(1.0, float(effects.get("reverb_damping", 0.5)))
-        )
+        self._reverb_liveness = max(0.0, min(1.0, float(effects.get("reverb_liveness", 0.5))))
+        self._reverb_damping = max(0.0, min(1.0, float(effects.get("reverb_damping", 0.5))))
         self._reverb_drums = bool(effects.get("reverb_drums", False))
         # Screen masters are live output state, independent of presets.
         self._master_volume = 1.0
         self._master_muted = False
-        self._bass_running = bool(
-            transport["bass_running"]
+        self._bass_running = bool(transport["bass_running"])
+
+        self._chord_synth = InstrumentBackend._make_synth_runtime(
+            self, default_chord_synth_index
+        )
+        self._strum_synth = InstrumentBackend._make_synth_runtime(
+            self, default_strum_synth_index
+        )
+        self._bass_synth = InstrumentBackend._make_synth_runtime(
+            self, default_bass_synth_index
         )
 
-        self._chord_synth = self._make_synth_runtime(
-            default_chord_synth_index
-        )
-        self._strum_synth = self._make_synth_runtime(
-            default_strum_synth_index
-        )
-        self._bass_synth = self._make_synth_runtime(
-            default_bass_synth_index
-        )
-
-        rhythm_key_to_index = {
-            rhythm.key: index
-            for index, rhythm in enumerate(rhythms)
-        }
-        selected_rhythm_key = str(
-            defaults["rhythm"]["selected"]
-        )
+        rhythm_key_to_index = {rhythm.key: index for index, rhythm in enumerate(rhythms)}
+        selected_rhythm_key = str(defaults["rhythm"]["selected"])
 
         if selected_rhythm_key not in rhythm_key_to_index:
-            raise ValueError(
-                "Unknown rhythm in defaults.json: "
-                f"{selected_rhythm_key!r}"
-            )
+            raise ValueError(f"Unknown rhythm in defaults.json: {selected_rhythm_key!r}")
 
         self._rhythm = RhythmRuntime(
-            selected_index=rhythm_key_to_index[
-                selected_rhythm_key
-            ],
-            tempo_by_rhythm=[
-                rhythm.tempo_default for rhythm in rhythms
-            ],
-            busyness_by_rhythm=[
-                source_activity_to_ui(rhythm.default_busyness)
-                for rhythm in rhythms
-            ],
+            selected_index=rhythm_key_to_index[selected_rhythm_key],
+            tempo_by_rhythm=[rhythm.tempo_default for rhythm in rhythms],
+            busyness_by_rhythm=[max(1, min(5, rhythm.default_busyness + 1)) for rhythm in rhythms],
             chord_activity_by_rhythm=[
-                source_activity_to_ui(rhythm.default_chord_activity)
-                for rhythm in rhythms
+                source_activity_to_ui(rhythm.default_chord_activity) for rhythm in rhythms
             ],
             bass_activity_by_rhythm=[
-                source_activity_to_ui(rhythm.default_bass_activity)
-                for rhythm in rhythms
+                source_activity_to_ui(rhythm.default_bass_activity) for rhythm in rhythms
             ],
+            fill_order_by_rhythm=[[] for _ in rhythms],
+            fill_density_index_by_rhythm=[0 for _ in rhythms],
         )
         # Rhythm transport is live session state, never startup/preset state.
         self._rhythm_running = False
@@ -1169,18 +1034,22 @@ class InstrumentBackend(QObject):
         self._promoted_chords: set[tuple[int, int]] = set()
         self._chord_activity_hold_override = False
 
+        self._initialized = False
+
+    def initialize(self) -> None:
+        """Perform preset I/O after the complete concrete facade is built."""
+        if self._initialized:
+            return
         self._ensure_preset_storage()
         self._load_startup_preset()
+        self._initialized = True
 
     def _debug(
         self,
         event: str,
         **fields: Any,
     ) -> None:
-        if (
-            not self._debug_enabled
-            or self._debug_file is None
-        ):
+        if not self._debug_enabled or self._debug_file is None:
             return
 
         self._debug_sequence += 1
@@ -1188,11 +1057,7 @@ class InstrumentBackend(QObject):
         record = {
             "seq": self._debug_sequence,
             "t_ms": round(
-                (
-                    time.monotonic()
-                    - self._debug_started
-                )
-                * 1000.0,
+                (time.monotonic() - self._debug_started) * 1000.0,
                 3,
             ),
             "event": event,
@@ -1216,33 +1081,12 @@ class InstrumentBackend(QObject):
         self,
     ) -> dict[str, Any]:
         return {
-            "pressed": [
-                list(key)
-                for key in sorted(
-                    self._pressed_chords
-                )
-            ],
-            "promoted": [
-                list(key)
-                for key in sorted(
-                    self._promoted_chords
-                )
-            ],
-            "override": (
-                self._chord_activity_hold_override
-            ),
-            "effective_activity": (
-                self._effective_chord_activity()
-            ),
-            "stored_activity": (
-                self._rhythm
-                .chord_activity_by_rhythm[
-                    self._rhythm.selected_index
-                ]
-            ),
-            "rhythm_running": (
-                self._rhythm_running
-            ),
+            "pressed": [list(key) for key in sorted(self._pressed_chords)],
+            "promoted": [list(key) for key in sorted(self._promoted_chords)],
+            "override": (self._chord_activity_hold_override),
+            "effective_activity": (self._effective_chord_activity()),
+            "stored_activity": (self._rhythm.chord_activity_by_rhythm[self._rhythm.selected_index]),
+            "rhythm_running": (self._rhythm_running),
         }
 
     @Slot(str, int, int, float, float)
@@ -1398,9 +1242,7 @@ class InstrumentBackend(QObject):
     def rhythmTempo(self) -> float:
         if self._rhythm_running and self._running_tempo is not None:
             return self._running_tempo
-        return self._rhythm.tempo_by_rhythm[
-            self._rhythm.selected_index
-        ]
+        return self._rhythm.tempo_by_rhythm[self._rhythm.selected_index]
 
     @Property(float, notify=rhythmStateChanged)
     def rhythmTempoMin(self) -> float:
@@ -1412,17 +1254,26 @@ class InstrumentBackend(QObject):
 
     @Property(int, notify=rhythmControlsChanged)
     def rhythmBusyness(self) -> int:
-        return self._rhythm.busyness_by_rhythm[
-            self._rhythm.selected_index
-        ]
+        return self._rhythm.busyness_by_rhythm[self._rhythm.selected_index]
+
+    @Property("QVariantList", notify=rhythmControlsChanged)
+    def rhythmFillEnabled(self) -> list[bool]:
+        enabled = set(self._rhythm.fill_order_by_rhythm[self._rhythm.selected_index])
+        return [index in enabled for index in range(5)]
+
+    @Property(int, notify=rhythmControlsChanged)
+    def rhythmFillDensityIndex(self) -> int:
+        return self._rhythm.fill_density_index_by_rhythm[self._rhythm.selected_index]
+
+    @Property(int, notify=rhythmControlsChanged)
+    def rhythmFillDensityBars(self) -> int:
+        return FILL_DENSITY_BARS[self.rhythmFillDensityIndex]
 
     def _effective_chord_activity(self) -> int:
         if self._chord_activity_hold_override:
             return 0
 
-        return self._rhythm.chord_activity_by_rhythm[
-            self._rhythm.selected_index
-        ]
+        return self._rhythm.chord_activity_by_rhythm[self._rhythm.selected_index]
 
     @Property(int, notify=rhythmControlsChanged)
     def rhythmChordActivity(self) -> int:
@@ -1430,9 +1281,7 @@ class InstrumentBackend(QObject):
 
     @Property(int, notify=rhythmControlsChanged)
     def rhythmBassActivity(self) -> int:
-        return self._rhythm.bass_activity_by_rhythm[
-            self._rhythm.selected_index
-        ]
+        return self._rhythm.bass_activity_by_rhythm[self._rhythm.selected_index]
 
     @Property(int, notify=tuningChanged)
     def selectedTuningModeIndex(self) -> int:
@@ -1476,9 +1325,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setChordVolume(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "volume", "role": "chord"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "volume", "role": "chord"}):
             return
         clamped = max(0.0, min(1.0, float(value)))
 
@@ -1494,9 +1341,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setStrumVolume(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "volume", "role": "strum"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "volume", "role": "strum"}):
             return
         clamped = max(0.0, min(1.0, float(value)))
 
@@ -1512,9 +1357,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setBassVolume(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "volume", "role": "bass"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "volume", "role": "bass"}):
             return
         clamped = max(0.0, min(1.0, float(value)))
 
@@ -1539,9 +1382,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setPercussionVolume(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "volume", "role": "percussion"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "volume", "role": "percussion"}):
             return
         clamped = max(0.0, min(1.0, float(value)))
 
@@ -1572,9 +1413,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setMasterVolume(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "master_volume"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "master_volume"}):
             return
         clamped = max(0.0, min(1.0, float(value)))
         if math.isclose(clamped, self._master_volume, abs_tol=1e-4):
@@ -1591,9 +1430,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "reverb_level"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "reverb_level"}):
             return
         clamped = max(0.0, min(REVERB_LEVEL_MAX, float(value)))
         if abs(clamped - self._reverb_level) < 0.0001:
@@ -1604,9 +1441,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setReverbLiveness(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "reverb_liveness"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "reverb_liveness"}):
             return
         clamped = max(0.0, min(1.0, float(value)))
         if abs(clamped - self._reverb_liveness) < 0.0001:
@@ -1617,9 +1452,7 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setReverbDamping(self, value: float) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "reverb_damping"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "reverb_damping"}):
             return
         clamped = max(0.0, min(1.0, float(value)))
         if abs(clamped - self._reverb_damping) < 0.0001:
@@ -1698,12 +1531,28 @@ class InstrumentBackend(QObject):
         self._set_synth_control("chord", key, value)
 
     @Slot(str, float)
+    def editChordSynthControl(
+        self,
+        key: str,
+        value: float,
+    ) -> None:
+        self._set_synth_control("chord", key, value, emit_controls=False)
+
+    @Slot(str, float)
     def setStrumSynthControl(
         self,
         key: str,
         value: float,
     ) -> None:
         self._set_synth_control("strum", key, value)
+
+    @Slot(str, float)
+    def editStrumSynthControl(
+        self,
+        key: str,
+        value: float,
+    ) -> None:
+        self._set_synth_control("strum", key, value, emit_controls=False)
 
     @Slot(str, float)
     def setBassSynthControl(
@@ -1713,11 +1562,21 @@ class InstrumentBackend(QObject):
     ) -> None:
         self._set_synth_control("bass", key, value)
 
+    @Slot(str, float)
+    def editBassSynthControl(
+        self,
+        key: str,
+        value: float,
+    ) -> None:
+        self._set_synth_control("bass", key, value, emit_controls=False)
+
     def _set_synth_control(
         self,
         role: SynthRole,
         key: str,
         value: float,
+        *,
+        emit_controls: bool = True,
     ) -> None:
         runtime = self._runtime(role)
         if self._midi_control_blocks(
@@ -1733,47 +1592,52 @@ class InstrumentBackend(QObject):
         if not runtime.set_control(key, value):
             return
 
-        # UI edits publish the same complete logical state as preset loads and
-        # instrument switches. AmySerialClient diffs this state and sends only
-        # the engine parameters which actually changed.
-        self._emit_synth_change(role, selection_changed=False)
+        # UI live edits send the same complete logical state to AMY, but they
+        # must not republish the QML control-list model on every mouse move:
+        # resetting a Repeater delegate during an active drag drops Qt's mouse
+        # grab after the first movement. Instrument switches, preset loads and
+        # external API/MIDI writes keep the default controlsChanged emission.
+        if emit_controls:
+            self._emit_synth_change(role, selection_changed=False)
         self._send_synth_state(role)
 
-    def _effective_tuning_reference(self) -> float:
-        return max(
-            415.0,
-            min(466.0, float(self._tuning_reference) + self._pitch_bend_offset_hz),
+    def _tuning_snapshot(self) -> TuningSnapshot:
+        return TuningSnapshot(
+            mode=TUNING_MODE_NAMES[self._tuning_mode_index],
+            reference_hz=float(self._tuning_reference),
+            bend_offset_hz=float(self._pitch_bend_offset_hz),
+            intonation_tables=self._frozen_intonation_tables,
         )
 
-    def _tuning_note_offset(self) -> float:
-        return 12.0 * math.log2(
-            self._effective_tuning_reference() / 440.0
+    def _chord_snapshot(self) -> ChordSnapshot:
+        return chord_snapshot(
+            active_row=self._active_row,
+            active_root_semitone=self._active_root_semitone,
+            row_chord_indexes=self._row_chord_indexes,
+            suffixes=tuple(chord.suffix for chord in self._chords),
+            intervals=tuple(chord.intervals for chord in self._chords),
         )
+
+    def performance_snapshot(self) -> OmniPerformanceSnapshot:
+        """Return immutable OMNI context intentionally shared with MIDI."""
+
+        return OmniPerformanceSnapshot(
+            tuning=self._tuning_snapshot(),
+            chord=self._chord_snapshot(),
+        )
+
+    def _effective_tuning_reference(self) -> float:
+        return self._tuning_snapshot().effective_reference_hz
+
+    def _tuning_note_offset(self) -> float:
+        return tuning_note_offset(self._tuning_snapshot())
 
     def _intonation_factor(
         self,
         root_semitone: int | None,
         note: int | float,
     ) -> float:
-        # EQ is explicitly unity; HARM and JV are key-dependent tables.
-        mode = TUNING_MODE_NAMES[
-            self._tuning_mode_index
-        ]
-
-        if mode not in self._intonation_tables:
-            return 1.0
-
-        if root_semitone is None:
-            return 1.0
-
-        root_pc = int(root_semitone) % 12
-        note_pc = int(
-            math.floor(float(note) + 0.5)
-        ) % 12
-
-        return self._intonation_tables[
-            mode
-        ][root_pc][note_pc]
+        return intonation_factor(self._tuning_snapshot(), root_semitone, note)
 
     def _intonation_note_offset(
         self,
@@ -1795,14 +1659,7 @@ class InstrumentBackend(QObject):
         note: int | float,
         root_semitone: int | None = None,
     ) -> float:
-        return (
-            float(note)
-            + self._tuning_note_offset()
-            + self._intonation_note_offset(
-                root_semitone,
-                note,
-            )
-        )
+        return tune_note(self._tuning_snapshot(), note, root_semitone)
 
     def _tuned_notes(
         self,
@@ -1823,9 +1680,7 @@ class InstrumentBackend(QObject):
         root_semitone: int | None = None,
     ) -> str:
         # Keep the high-precision text OSC path used by strum notes.
-        return (
-            f"{self._tuned_note(note, root_semitone):.12f}"
-        )
+        return f"{self._tuned_note(note, root_semitone):.12f}"
 
     def _refresh_tuning_on_active_notes(self) -> None:
         # Retune every manually held chord in place.
@@ -1843,13 +1698,8 @@ class InstrumentBackend(QObject):
 
         # This updates bass-note state as well and retunes a currently sounding
         # automatic rhythm chord without creating a new attack.
-        if (
-            self._active_row >= 0
-            and self._active_root_semitone >= 0
-        ):
-            self._send_chord_state(
-                play_now=False
-            )
+        if self._active_row >= 0 and self._active_root_semitone >= 0:
+            self._send_chord_state(play_now=False)
 
     @Slot(int)
     def setTuningModeIndex(self, index: int) -> None:
@@ -1896,9 +1746,7 @@ class InstrumentBackend(QObject):
 
     @Slot(int)
     def beginPitchBend(self, direction: int) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "tuning_reference"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "tuning_reference"}):
             self._stop_pitch_bend()
             self._pitch_bend_offset_hz = 0.0
             return
@@ -1910,9 +1758,7 @@ class InstrumentBackend(QObject):
 
     @Slot()
     def endPitchBend(self) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "tuning_reference"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "tuning_reference"}):
             self._stop_pitch_bend()
             self._pitch_bend_offset_hz = 0.0
             return
@@ -1926,9 +1772,7 @@ class InstrumentBackend(QObject):
 
     @Slot(int)
     def setTuningReference(self, value: int) -> None:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "tuning_reference"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "tuning_reference"}):
             return
         clamped = max(415, min(466, int(value)))
         self._stop_pitch_bend()
@@ -1943,29 +1787,14 @@ class InstrumentBackend(QObject):
         self._refresh_tuning_on_active_notes()
 
     def _preset_path(self, preset_number: int) -> Path:
-        return (
-            self._preset_dir
-            / f"p{preset_number}.json"
-        )
+        return self._preset_dir / f"p{preset_number}.json"
 
     @staticmethod
     def _write_json_atomic(
         path: Path,
         data: dict[str, Any],
     ) -> None:
-        temporary = path.with_suffix(
-            path.suffix + ".tmp"
-        )
-        temporary.write_text(
-            json.dumps(
-                data,
-                indent=2,
-                ensure_ascii=False,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
-        temporary.replace(path)
+        JsonStore(path).write(data)
 
     def _preset_snapshot(self) -> dict[str, Any]:
         synth_roles: dict[str, Any] = {}
@@ -1974,35 +1803,26 @@ class InstrumentBackend(QObject):
             runtime = self._runtime(role)
 
             synth_roles[role] = {
-                "selected": self._synths[
-                    runtime.selected_index
-                ].key,
+                "selected": self._synths[runtime.selected_index].key,
                 "parameters": runtime.sparse_overrides(),
             }
 
         rhythm_settings = {}
 
-        for index, rhythm in enumerate(
-            self._rhythms
-        ):
+        for index, rhythm in enumerate(self._rhythms):
             rhythm_settings[rhythm.key] = {
                 "tempo": (
                     self.rhythmTempo
                     if index == self._rhythm.selected_index
                     else self._rhythm.tempo_by_rhythm[index]
                 ),
-                "percussion_activity": (
-                    self._rhythm
-                    .busyness_by_rhythm[index]
-                ),
-                "chord_activity": (
-                    self._rhythm
-                    .chord_activity_by_rhythm[index]
-                ),
-                "bass_activity": (
-                    self._rhythm
-                    .bass_activity_by_rhythm[index]
-                ),
+                "percussion_activity": (self._rhythm.busyness_by_rhythm[index]),
+                "chord_activity": (self._rhythm.chord_activity_by_rhythm[index]),
+                "bass_activity": (self._rhythm.bass_activity_by_rhythm[index]),
+                "fill_order": list(self._rhythm.fill_order_by_rhythm[index]),
+                "fill_density_bars": FILL_DENSITY_BARS[
+                    self._rhythm.fill_density_index_by_rhythm[index]
+                ],
             }
 
         snapshot: dict[str, Any] = {
@@ -2010,21 +1830,9 @@ class InstrumentBackend(QObject):
             "strum_mode": "LDR" if self._strum_ladder_mode else "APG",
             "chord_rows": [
                 {
-                    "chord": self._chords[
-                        self._row_chord_indexes[
-                            row_index
-                        ]
-                    ].suffix,
-                    "octave": OCTAVE_NAMES[
-                        self._row_octave_indexes[
-                            row_index
-                        ]
-                    ],
-                    "inversion": (
-                        self._row_inversion_indexes[
-                            row_index
-                        ]
-                    ),
+                    "chord": self._chords[self._row_chord_indexes[row_index]].suffix,
+                    "octave": OCTAVE_NAMES[self._row_octave_indexes[row_index]],
+                    "inversion": (self._row_inversion_indexes[row_index]),
                 }
                 for row_index in range(ROW_COUNT)
             ],
@@ -2033,28 +1841,18 @@ class InstrumentBackend(QObject):
                 "chord": self._chord_volume,
                 "strum": self._strum_volume,
                 "bass": self._bass_volume,
-                "percussion": (
-                    self._percussion_volume
-                ),
+                "percussion": (self._percussion_volume),
             },
             "transport": {
-                "bass_running": (
-                    self._bass_running
-                ),
+                "bass_running": (self._bass_running),
             },
             "rhythm": {
-                "selected": (
-                    self._selected_rhythm().key
-                ),
+                "selected": (self._selected_rhythm().key),
                 "settings": rhythm_settings,
             },
             "tuning": {
-                "mode": TUNING_MODE_NAMES[
-                    self._tuning_mode_index
-                ],
-                "reference_hz": (
-                    self._tuning_reference
-                ),
+                "mode": TUNING_MODE_NAMES[self._tuning_mode_index],
+                "reference_hz": (self._tuning_reference),
             },
         }
         snapshot["effects"] = {
@@ -2073,44 +1871,31 @@ class InstrumentBackend(QObject):
 
         self._archive_legacy_bootstrap_presets()
 
-        factory_dir = (
-            INSTRUMENT_DIR / "default_presets"
-        )
+        factory_dir = INSTRUMENT_DIR / "default_presets"
         fallback = self._preset_snapshot()
 
         for preset_number in range(
             1,
             PRESET_COUNT + 1,
         ):
-            path = self._preset_path(
-                preset_number
-            )
+            path = self._preset_path(preset_number)
 
             # Never overwrite an existing user preset. A missing pN.json is
             # seeded from the corresponding factory pN.json.
             if path.exists():
                 continue
 
-            factory_path = (
-                factory_dir
-                / f"p{preset_number}.json"
-            )
+            factory_path = factory_dir / f"p{preset_number}.json"
 
             if factory_path.exists():
                 try:
-                    factory_data = json.loads(
-                        factory_path.read_text(
-                            encoding="utf-8"
-                        )
-                    )
+                    factory_data = json.loads(factory_path.read_text(encoding="utf-8"))
 
                     if not isinstance(
                         factory_data,
                         dict,
                     ):
-                        raise ValueError(
-                            "factory preset is not an object"
-                        )
+                        raise ValueError("factory preset is not an object")
 
                     self._write_json_atomic(
                         path,
@@ -2123,9 +1908,7 @@ class InstrumentBackend(QObject):
                     json.JSONDecodeError,
                 ) as exc:
                     print(
-                        "Could not seed "
-                        f"P{preset_number} from "
-                        f"{factory_path}: {exc}",
+                        f"Could not seed P{preset_number} from {factory_path}: {exc}",
                         file=sys.stderr,
                     )
 
@@ -2136,10 +1919,7 @@ class InstrumentBackend(QObject):
                 fallback,
             )
 
-        last_path = (
-            self._preset_dir
-            / LAST_PRESET_FILE
-        )
+        last_path = self._preset_dir / LAST_PRESET_FILE
 
         if not last_path.exists():
             self._write_json_atomic(
@@ -2155,26 +1935,18 @@ class InstrumentBackend(QObject):
         retaining that bank makes every preset button appear ineffective.  The
         deliberately narrow signature below avoids replacing user-edited banks.
         """
-        paths = [
-            self._preset_path(preset_number)
-            for preset_number in range(1, PRESET_COUNT + 1)
-        ]
+        paths = [self._preset_path(preset_number) for preset_number in range(1, PRESET_COUNT + 1)]
 
         if not all(path.is_file() for path in paths):
             return None
 
         try:
-            presets = [
-                json.loads(path.read_text(encoding="utf-8"))
-                for path in paths
-            ]
+            presets = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
         except (OSError, ValueError, json.JSONDecodeError):
             return None
 
         first = presets[0]
-        if not isinstance(first, dict) or any(
-            preset != first for preset in presets[1:]
-        ):
+        if not isinstance(first, dict) or any(preset != first for preset in presets[1:]):
             return None
 
         synths = first.get("synths")
@@ -2195,15 +1967,11 @@ class InstrumentBackend(QObject):
         if signature != ("prophet", "pluck", "fm", "waltz"):
             return None
 
-        archive_dir = self._preset_dir / (
-            "legacy-presets-" + time.strftime("%Y%m%d-%H%M%S")
-        )
+        archive_dir = self._preset_dir / ("legacy-presets-" + time.strftime("%Y%m%d-%H%M%S"))
         suffix = 1
         while archive_dir.exists():
             archive_dir = self._preset_dir / (
-                "legacy-presets-"
-                + time.strftime("%Y%m%d-%H%M%S")
-                + f"-{suffix}"
+                "legacy-presets-" + time.strftime("%Y%m%d-%H%M%S") + f"-{suffix}"
             )
             suffix += 1
 
@@ -2212,8 +1980,7 @@ class InstrumentBackend(QObject):
             path.replace(archive_dir / path.name)
 
         print(
-            "Archived obsolete preset bank to "
-            f"{archive_dir}; installing current factory presets."
+            f"Archived obsolete preset bank to {archive_dir}; installing current factory presets."
         )
         return archive_dir
 
@@ -2221,40 +1988,23 @@ class InstrumentBackend(QObject):
         self,
         preset_number: int,
     ) -> dict[str, Any]:
-        path = self._preset_path(
-            preset_number
-        )
+        path = self._preset_path(preset_number)
 
-        data = json.loads(
-            path.read_text(
-                encoding="utf-8"
-            )
-        )
+        data = json.loads(path.read_text(encoding="utf-8"))
 
         if not isinstance(data, dict):
-            raise ValueError(
-                f"{path} does not contain a JSON object"
-            )
+            raise ValueError(f"{path} does not contain a JSON object")
 
         return data
 
     def _load_startup_preset(self) -> None:
-        last_path = (
-            self._preset_dir
-            / LAST_PRESET_FILE
-        )
+        last_path = self._preset_dir / LAST_PRESET_FILE
 
         preset_number = 1
 
         try:
-            last_data = json.loads(
-                last_path.read_text(
-                    encoding="utf-8"
-                )
-            )
-            preset_number = int(
-                last_data.get("preset", 1)
-            )
+            last_data = json.loads(last_path.read_text(encoding="utf-8"))
+            preset_number = int(last_data.get("preset", 1))
         except (
             OSError,
             ValueError,
@@ -2267,14 +2017,10 @@ class InstrumentBackend(QObject):
             preset_number = 1
 
         try:
-            data = self._read_preset(
-                preset_number
-            )
+            data = self._read_preset(preset_number)
             self._apply_preset_data(data)
             self._preset_reference_data = copy.deepcopy(data)
-            self._selected_preset = (
-                preset_number
-            )
+            self._selected_preset = preset_number
         except (
             OSError,
             ValueError,
@@ -2283,38 +2029,23 @@ class InstrumentBackend(QObject):
             json.JSONDecodeError,
         ) as exc:
             print(
-                "Could not load startup preset "
-                f"P{preset_number}: {exc}",
+                f"Could not load startup preset P{preset_number}: {exc}",
                 file=sys.stderr,
             )
             self._selected_preset = 1
 
     def _reset_presettable_state_to_defaults(self) -> None:
         """Restore every presettable field to application/catalogue defaults."""
-        suffix_to_index = {
-            chord.suffix: index
-            for index, chord in enumerate(self._chords)
-        }
-        octave_to_index = {
-            name: index
-            for index, name in enumerate(OCTAVE_NAMES)
-        }
+        suffix_to_index = {chord.suffix: index for index, chord in enumerate(self._chords)}
+        octave_to_index = {name: index for index, name in enumerate(OCTAVE_NAMES)}
         row_defaults = self._defaults["chord_rows"]
-        self._row_chord_indexes = [
-            suffix_to_index[str(row["chord"])]
-            for row in row_defaults
-        ]
-        self._row_octave_indexes = [
-            octave_to_index[str(row["octave"])]
-            for row in row_defaults
-        ]
+        self._row_chord_indexes = [suffix_to_index[str(row["chord"])] for row in row_defaults]
+        self._row_octave_indexes = [octave_to_index[str(row["octave"])] for row in row_defaults]
         self._row_inversion_indexes = []
         for row_index, row in enumerate(row_defaults):
             chord_index = self._row_chord_indexes[row_index]
             inversion_count = len(self._chords[chord_index].inversions)
-            self._row_inversion_indexes.append(
-                int(row.get("inversion", 0)) % inversion_count
-            )
+            self._row_inversion_indexes.append(int(row.get("inversion", 0)) % inversion_count)
 
         for role in ("chord", "strum", "bass"):
             self._runtime(role).reset_to_defaults()
@@ -2323,9 +2054,7 @@ class InstrumentBackend(QObject):
         self._chord_volume = max(0.0, min(1.0, float(volumes["chord"])))
         self._strum_volume = max(0.0, min(1.0, float(volumes["strum"])))
         self._bass_volume = max(0.0, min(1.0, float(volumes["bass"])))
-        self._percussion_volume = max(
-            0.0, min(1.0, float(volumes["percussion"]))
-        )
+        self._percussion_volume = max(0.0, min(1.0, float(volumes["percussion"])))
 
         effects = self._defaults.get("effects", {})
         self._reverb_level = max(
@@ -2341,27 +2070,21 @@ class InstrumentBackend(QObject):
         self._running_tempo = None
         self._bass_running = bool(transport["bass_running"])
 
-        rhythm_key_to_index = {
-            rhythm.key: index
-            for index, rhythm in enumerate(self._rhythms)
-        }
+        rhythm_key_to_index = {rhythm.key: index for index, rhythm in enumerate(self._rhythms)}
         default_rhythm_key = str(self._defaults["rhythm"]["selected"])
         self._rhythm.selected_index = rhythm_key_to_index[default_rhythm_key]
-        self._rhythm.tempo_by_rhythm = [
-            rhythm.tempo_default for rhythm in self._rhythms
-        ]
+        self._rhythm.tempo_by_rhythm = [rhythm.tempo_default for rhythm in self._rhythms]
         self._rhythm.busyness_by_rhythm = [
-            source_activity_to_ui(rhythm.default_busyness)
-            for rhythm in self._rhythms
+            max(1, min(5, rhythm.default_busyness + 1)) for rhythm in self._rhythms
         ]
         self._rhythm.chord_activity_by_rhythm = [
-            source_activity_to_ui(rhythm.default_chord_activity)
-            for rhythm in self._rhythms
+            source_activity_to_ui(rhythm.default_chord_activity) for rhythm in self._rhythms
         ]
         self._rhythm.bass_activity_by_rhythm = [
-            source_activity_to_ui(rhythm.default_bass_activity)
-            for rhythm in self._rhythms
+            source_activity_to_ui(rhythm.default_bass_activity) for rhythm in self._rhythms
         ]
+        self._rhythm.fill_order_by_rhythm = [[] for _ in self._rhythms]
+        self._rhythm.fill_density_index_by_rhythm = [0 for _ in self._rhythms]
 
         tuning = self._defaults.get("tuning", {})
         mode = str(tuning.get("mode", "EQ"))
@@ -2385,7 +2108,7 @@ class InstrumentBackend(QObject):
     ) -> None:
         rhythm_was_running = self._rhythm_running
         live_tempo = self.rhythmTempo if rhythm_was_running else None
-        live_rhythm_controls: tuple[int, int, int] | None = None
+        live_rhythm_controls: tuple[int, int, int, list[int], int] | None = None
         live_active_row_octave: tuple[int, int] | None = None
         if rhythm_was_running:
             rhythm_index = self._rhythm.selected_index
@@ -2393,6 +2116,8 @@ class InstrumentBackend(QObject):
                 self._rhythm.busyness_by_rhythm[rhythm_index],
                 self._rhythm.chord_activity_by_rhythm[rhythm_index],
                 self._rhythm.bass_activity_by_rhythm[rhythm_index],
+                list(self._rhythm.fill_order_by_rhythm[rhythm_index]),
+                self._rhythm.fill_density_index_by_rhythm[rhythm_index],
             )
             if 0 <= self._active_row < ROW_COUNT:
                 live_active_row_octave = (
@@ -2400,316 +2125,85 @@ class InstrumentBackend(QObject):
                     self._row_octave_indexes[self._active_row],
                 )
         self._reset_presettable_state_to_defaults()
-        self._strum_ladder_mode = (
-            str(data.get("strum_mode", "APG")).upper() == "LDR"
+        plan = compile_omni_preset_plan(
+            data,
+            chord_suffixes=tuple(chord.suffix for chord in self._chords),
+            chord_inversion_counts=tuple(len(chord.inversions) for chord in self._chords),
+            octave_names=OCTAVE_NAMES,
+            default_rows=tuple(
+                ChordRowPreset(
+                    self._row_chord_indexes[index],
+                    self._row_octave_indexes[index],
+                    self._row_inversion_indexes[index],
+                )
+                for index in range(ROW_COUNT)
+            ),
+            default_volumes=(
+                self._chord_volume,
+                self._strum_volume,
+                self._bass_volume,
+                self._percussion_volume,
+            ),
+            default_effects=EffectsPreset(
+                self._reverb_level,
+                self._reverb_liveness,
+                self._reverb_damping,
+                self._reverb_drums,
+            ),
+            default_bass_running=self._bass_running,
+            rhythm_keys=tuple(rhythm.key for rhythm in self._rhythms),
+            default_selected_rhythm_index=self._rhythm.selected_index,
+            default_rhythm_settings=tuple(
+                RhythmSettingPreset(
+                    self._rhythm.tempo_by_rhythm[index],
+                    self._rhythm.busyness_by_rhythm[index],
+                    self._rhythm.chord_activity_by_rhythm[index],
+                    self._rhythm.bass_activity_by_rhythm[index],
+                    tuple(self._rhythm.fill_order_by_rhythm[index]),
+                    self._rhythm.fill_density_index_by_rhythm[index],
+                )
+                for index in range(len(self._rhythms))
+            ),
+            fill_density_bars=FILL_DENSITY_BARS,
+            tuning_modes=TUNING_MODE_NAMES,
+            default_tuning_mode_index=self._tuning_mode_index,
+            default_tuning_reference_hz=self._tuning_reference,
+            reverb_level_max=REVERB_LEVEL_MAX,
         )
-
-        suffix_to_index = {
-            chord.suffix: index
-            for index, chord
-            in enumerate(self._chords)
-        }
-        octave_to_index = {
-            name: index
-            for index, name
-            in enumerate(OCTAVE_NAMES)
-        }
-
-        rows = data.get("chord_rows", [])
-
-        if (
-            isinstance(rows, list)
-            and len(rows) == ROW_COUNT
-        ):
-            for row_index, row in enumerate(
-                rows
-            ):
-                if not isinstance(row, dict):
-                    continue
-
-                chord_key = str(
-                    row.get(
-                        "chord",
-                        self._chords[
-                            self._row_chord_indexes[
-                                row_index
-                            ]
-                        ].suffix,
-                    )
-                )
-                octave_key = str(
-                    row.get(
-                        "octave",
-                        OCTAVE_NAMES[
-                            self._row_octave_indexes[
-                                row_index
-                            ]
-                        ],
-                    )
-                )
-
-                if chord_key in suffix_to_index:
-                    self._row_chord_indexes[
-                        row_index
-                    ] = suffix_to_index[
-                        chord_key
-                    ]
-
-                if octave_key in octave_to_index:
-                    self._row_octave_indexes[
-                        row_index
-                    ] = octave_to_index[
-                        octave_key
-                    ]
-
-                chord = self._chords[
-                    self._row_chord_indexes[
-                        row_index
-                    ]
-                ]
-                inversion_count = len(
-                    chord.inversions
-                )
-                self._row_inversion_indexes[
-                    row_index
-                ] = int(
-                    row.get("inversion", 0)
-                ) % inversion_count
+        self._strum_ladder_mode = plan.strum_ladder_mode
+        for index, row in enumerate(plan.chord_rows):
+            self._row_chord_indexes[index] = row.chord_index
+            self._row_octave_indexes[index] = row.octave_index
+            self._row_inversion_indexes[index] = row.inversion_index
 
         synth_data = data.get("synths", {})
-
         if isinstance(synth_data, dict):
             for role in ("chord", "strum", "bass"):
                 role_data = synth_data.get(role, {})
                 if isinstance(role_data, dict):
                     self._runtime(role).load_preset(role_data)
 
-        volumes = data.get("volumes", {})
-
-        if isinstance(volumes, dict):
-            self._chord_volume = max(
-                0.0,
-                min(
-                    1.0,
-                    float(
-                        volumes.get(
-                            "chord",
-                            self._chord_volume,
-                        )
-                    ),
-                ),
-            )
-            self._strum_volume = max(
-                0.0,
-                min(
-                    1.0,
-                    float(
-                        volumes.get(
-                            "strum",
-                            self._strum_volume,
-                        )
-                    ),
-                ),
-            )
-            self._bass_volume = max(
-                0.0,
-                min(
-                    1.0,
-                    float(
-                        volumes.get(
-                            "bass",
-                            self._bass_volume,
-                        )
-                    ),
-                ),
-            )
-            self._percussion_volume = max(
-                0.0,
-                min(
-                    1.0,
-                    float(
-                        volumes.get(
-                            "percussion",
-                            self._percussion_volume,
-                        )
-                    ),
-                ),
-            )
-
-        effects = data.get("effects", {})
-        if not isinstance(effects, dict):
-            effects = {}
-        default_effects = self._defaults.get("effects", {})
-        legacy_main = effects.get("main_reverb", default_effects.get("reverb_level", 0.0))
-        legacy_drum = effects.get("percussion_reverb", 0.0)
-        self._reverb_level = max(
-            0.0,
-            min(
-                REVERB_LEVEL_MAX,
-                float(effects.get("reverb_level", legacy_main)),
-            ),
-        )
-        self._reverb_liveness = max(0.0, min(1.0, float(effects.get("reverb_liveness", default_effects.get("reverb_liveness", 0.5)))))
-        self._reverb_damping = max(0.0, min(1.0, float(effects.get("reverb_damping", default_effects.get("reverb_damping", 0.5)))))
-        self._reverb_drums = bool(effects.get("reverb_drums", float(legacy_drum) > 0.0))
-
-        transport = data.get(
-            "transport",
-            {},
-        )
-
-        if isinstance(transport, dict):
-            self._bass_running = bool(
-                transport.get(
-                    "bass_running",
-                    self._bass_running,
-                )
-            )
-
-        rhythm_data = data.get(
-            "rhythm",
-            {},
-        )
-
-        if isinstance(rhythm_data, dict):
-            rhythm_key_to_index = {
-                rhythm.key: index
-                for index, rhythm
-                in enumerate(self._rhythms)
-            }
-
-            selected_key = str(
-                rhythm_data.get(
-                    "selected",
-                    self._selected_rhythm().key,
-                )
-            )
-
-            if selected_key in rhythm_key_to_index:
-                self._rhythm.selected_index = (
-                    rhythm_key_to_index[
-                        selected_key
-                    ]
-                )
-
-            settings = rhythm_data.get(
-                "settings",
-                {},
-            )
-
-            if isinstance(settings, dict):
-                for index, rhythm in enumerate(
-                    self._rhythms
-                ):
-                    stored = settings.get(
-                        rhythm.key,
-                        {},
-                    )
-
-                    if not isinstance(
-                        stored,
-                        dict,
-                    ):
-                        continue
-
-                    self._rhythm.tempo_by_rhythm[
-                        index
-                    ] = max(
-                        40.0,
-                        min(
-                            200.0,
-                            float(
-                                stored.get(
-                                    "tempo",
-                                    self._rhythm
-                                    .tempo_by_rhythm[
-                                        index
-                                    ],
-                                )
-                            ),
-                        ),
-                    )
-                    self._rhythm.busyness_by_rhythm[
-                        index
-                    ] = max(
-                        1,
-                        min(
-                            4,
-                            int(
-                                stored.get(
-                                    "percussion_activity",
-                                    self._rhythm
-                                    .busyness_by_rhythm[
-                                        index
-                                    ],
-                                )
-                            ),
-                        ),
-                    )
-                    self._rhythm.chord_activity_by_rhythm[
-                        index
-                    ] = max(
-                        1,
-                        min(
-                            4,
-                            int(
-                                stored.get(
-                                    "chord_activity",
-                                    self._rhythm
-                                    .chord_activity_by_rhythm[
-                                        index
-                                    ],
-                                )
-                            ),
-                        ),
-                    )
-                    self._rhythm.bass_activity_by_rhythm[
-                        index
-                    ] = max(
-                        1,
-                        min(
-                            5,
-                            int(
-                                stored.get(
-                                    "bass_activity",
-                                    self._rhythm
-                                    .bass_activity_by_rhythm[
-                                        index
-                                    ],
-                                )
-                            ),
-                        ),
-                    )
-
-        tuning = data.get("tuning", {})
-
-        if isinstance(tuning, dict):
-            mode = str(
-                tuning.get(
-                    "mode",
-                    TUNING_MODE_NAMES[
-                        self._tuning_mode_index
-                    ],
-                )
-            )
-
-            if mode in TUNING_MODE_NAMES:
-                self._tuning_mode_index = (
-                    TUNING_MODE_NAMES.index(mode)
-                )
-
-            self._tuning_reference = max(
-                415,
-                min(
-                    466,
-                    int(
-                        tuning.get(
-                            "reference_hz",
-                            self._tuning_reference,
-                        )
-                    ),
-                ),
-            )
+        (
+            self._chord_volume,
+            self._strum_volume,
+            self._bass_volume,
+            self._percussion_volume,
+        ) = plan.volumes
+        self._reverb_level = plan.effects.level
+        self._reverb_liveness = plan.effects.liveness
+        self._reverb_damping = plan.effects.damping
+        self._reverb_drums = plan.effects.drums
+        self._bass_running = plan.bass_running
+        self._rhythm.selected_index = plan.selected_rhythm_index
+        for index, setting in enumerate(plan.rhythm_settings):
+            self._rhythm.tempo_by_rhythm[index] = setting.tempo
+            self._rhythm.busyness_by_rhythm[index] = setting.percussion_activity
+            self._rhythm.chord_activity_by_rhythm[index] = setting.chord_activity
+            self._rhythm.bass_activity_by_rhythm[index] = setting.bass_activity
+            self._rhythm.fill_order_by_rhythm[index] = list(setting.fill_order)
+            self._rhythm.fill_density_index_by_rhythm[index] = setting.fill_density_index
+        self._tuning_mode_index = plan.tuning_mode_index
+        self._tuning_reference = int(plan.tuning_reference_hz)
         self._stop_pitch_bend()
         self._pitch_bend_offset_hz = 0.0
         self._stop_tempo_nudge()
@@ -2724,6 +2218,8 @@ class InstrumentBackend(QObject):
                 self._rhythm.busyness_by_rhythm[rhythm_index],
                 self._rhythm.chord_activity_by_rhythm[rhythm_index],
                 self._rhythm.bass_activity_by_rhythm[rhythm_index],
+                self._rhythm.fill_order_by_rhythm[rhythm_index],
+                self._rhythm.fill_density_index_by_rhythm[rhythm_index],
             ) = live_rhythm_controls
         if live_active_row_octave is not None:
             row_index, octave_index = live_active_row_octave
@@ -2764,8 +2260,7 @@ class InstrumentBackend(QObject):
 
     def _write_last_preset(self) -> None:
         self._write_json_atomic(
-            self._preset_dir
-            / LAST_PRESET_FILE,
+            self._preset_dir / LAST_PRESET_FILE,
             {
                 "preset": self._selected_preset,
             },
@@ -2780,9 +2275,7 @@ class InstrumentBackend(QObject):
             return
 
         try:
-            data = self._read_preset(
-                preset_number
-            )
+            data = self._read_preset(preset_number)
             self._apply_preset_data(data)
         except (
             OSError,
@@ -2792,8 +2285,7 @@ class InstrumentBackend(QObject):
             json.JSONDecodeError,
         ) as exc:
             print(
-                f"Could not load P{preset_number}: "
-                f"{exc}",
+                f"Could not load P{preset_number}: {exc}",
                 file=sys.stderr,
             )
             return
@@ -2814,17 +2306,13 @@ class InstrumentBackend(QObject):
     def storeSelectedPreset(self) -> None:
         snapshot = self._preset_snapshot()
         self._write_json_atomic(
-            self._preset_path(
-                self._selected_preset
-            ),
+            self._preset_path(self._selected_preset),
             snapshot,
         )
         self._preset_reference_data = copy.deepcopy(snapshot)
         self._write_last_preset()
         self.presetChanged.emit()
-        self.presetStored.emit(
-            self._selected_preset
-        )
+        self.presetStored.emit(self._selected_preset)
 
     def _preset_role_data(self, role: SynthRole) -> dict[str, Any]:
         synths = self._preset_reference_data.get("synths", {})
@@ -2898,18 +2386,13 @@ class InstrumentBackend(QObject):
             fallback = defaults[row_index]
             chord_key = str(stored.get("chord", fallback["chord"]))
             octave_key = str(stored.get("octave", fallback["octave"]))
-            chord_index = suffix_to_index.get(
-                chord_key, suffix_to_index[str(fallback["chord"])]
-            )
-            octave_index = octave_to_index.get(
-                octave_key, octave_to_index[str(fallback["octave"])]
-            )
+            chord_index = suffix_to_index.get(chord_key, suffix_to_index[str(fallback["chord"])])
+            octave_index = octave_to_index.get(octave_key, octave_to_index[str(fallback["octave"])])
             self._row_chord_indexes[row_index] = chord_index
             self._row_octave_indexes[row_index] = octave_index
             inversion_count = len(self._chords[chord_index].inversions)
             self._row_inversion_indexes[row_index] = (
-                int(stored.get("inversion", fallback.get("inversion", 0)))
-                % inversion_count
+                int(stored.get("inversion", fallback.get("inversion", 0))) % inversion_count
             )
         self._strum_last_index = None
         self._emit_state_changed()
@@ -2954,9 +2437,7 @@ class InstrumentBackend(QObject):
             0,
         )
         self._send_manual_chord("stop_all")
-        self._send_chord_state(
-            play_now=False
-        )
+        self._send_chord_state(play_now=False)
 
         self._emit_state_changed()
         self.rhythmStateChanged.emit()
@@ -2977,9 +2458,7 @@ class InstrumentBackend(QObject):
         self._send_rhythm_config()
 
     def _set_rhythm_tempo_value(self, value: float) -> bool:
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "rhythm_tempo"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "rhythm_tempo"}):
             return False
         clamped = max(40.0, min(200.0, float(value)))
         index = self._rhythm.selected_index
@@ -2999,9 +2478,7 @@ class InstrumentBackend(QObject):
 
     def _tempo_nudge_tick(self) -> None:
         current = self.rhythmTempo
-        changed = self._set_rhythm_tempo_value(
-            current + float(self._tempo_nudge_direction)
-        )
+        changed = self._set_rhythm_tempo_value(current + float(self._tempo_nudge_direction))
         moved = abs(self.rhythmTempo - self._tempo_nudge_origin)
         if (not changed) or (not self._tempo_nudge_pressed and moved >= 20.0 - 1e-9):
             self._stop_tempo_nudge()
@@ -3009,9 +2486,7 @@ class InstrumentBackend(QObject):
     @Slot(int)
     def beginTempoNudge(self, direction: int) -> None:
         self._stop_tempo_nudge()
-        if self._midi_control_blocks(
-            {"screen": "omni", "kind": "rhythm_tempo"}
-        ):
+        if self._midi_control_blocks({"screen": "omni", "kind": "rhythm_tempo"}):
             return
         self._tempo_nudge_direction = 1 if int(direction) > 0 else -1
         self._tempo_nudge_origin = self.rhythmTempo
@@ -3033,13 +2508,48 @@ class InstrumentBackend(QObject):
 
     @Slot(float)
     def setRhythmBusyness(self, value: float) -> None:
-        level = max(1, min(4, int(round(float(value)))))
+        level = max(1, min(5, int(round(float(value)))))
         index = self._rhythm.selected_index
 
         if level == self._rhythm.busyness_by_rhythm[index]:
             return
 
         self._rhythm.busyness_by_rhythm[index] = level
+        self.rhythmControlsChanged.emit()
+        self._send_rhythm_config()
+
+    @Slot(int)
+    def toggleRhythmFill(self, fill_index: int) -> None:
+        fill_index = int(fill_index)
+        if not 0 <= fill_index < 5:
+            return
+        rhythm_index = self._rhythm.selected_index
+        order = list(self._rhythm.fill_order_by_rhythm[rhythm_index])
+        if fill_index in order:
+            order.remove(fill_index)
+        else:
+            # The most recently enabled fill is musically next. Existing
+            # enabled fills retain their relative cycling order.
+            order.insert(0, fill_index)
+        self._rhythm.fill_order_by_rhythm[rhythm_index] = order
+        self.rhythmControlsChanged.emit()
+        self._send_rhythm_config()
+
+    @Slot(float)
+    def setRhythmFillDensity(self, value: float) -> None:
+        if self._midi_control_blocks({"screen": "omni", "kind": "rhythm_fill_density"}):
+            return
+        density_index = max(
+            0,
+            min(
+                len(FILL_DENSITY_BARS) - 1,
+                int(round(float(value))),
+            ),
+        )
+        rhythm_index = self._rhythm.selected_index
+        if self._rhythm.fill_density_index_by_rhythm[rhythm_index] == density_index:
+            return
+        self._rhythm.fill_density_index_by_rhythm[rhythm_index] = density_index
         self.rhythmControlsChanged.emit()
         self._send_rhythm_config()
 
@@ -3088,9 +2598,7 @@ class InstrumentBackend(QObject):
     @Slot()
     def toggleRhythm(self) -> None:
         if not self._rhythm_running:
-            self._running_tempo = self._rhythm.tempo_by_rhythm[
-                self._rhythm.selected_index
-            ]
+            self._running_tempo = self._rhythm.tempo_by_rhythm[self._rhythm.selected_index]
             self._rhythm_running = True
             self._send_rhythm_config()
 
@@ -3105,9 +2613,7 @@ class InstrumentBackend(QObject):
         else:
             # Stopping retains the effective live configuration in the UI.
             if self._running_tempo is not None:
-                self._rhythm.tempo_by_rhythm[
-                    self._rhythm.selected_index
-                ] = self._running_tempo
+                self._rhythm.tempo_by_rhythm[self._rhythm.selected_index] = self._running_tempo
             self._rhythm_running = False
             self._running_tempo = None
             # Close the automatic-chord path before stopping transport.
@@ -3136,9 +2642,7 @@ class InstrumentBackend(QObject):
         if not 0 <= row_index < ROW_COUNT:
             return 1
 
-        chord = self._chords[
-            self._row_chord_indexes[row_index]
-        ]
+        chord = self._chords[self._row_chord_indexes[row_index]]
         return len(chord.inversions)
 
     @Slot(int, result=str)
@@ -3235,10 +2739,7 @@ class InstrumentBackend(QObject):
         row_index: int,
         root_semitone: int,
     ) -> bool:
-        return (
-            0 <= row_index < ROW_COUNT
-            and root_semitone in NOTE_NAMES_BY_SEMITONE
-        )
+        return 0 <= row_index < ROW_COUNT and root_semitone in NOTE_NAMES_BY_SEMITONE
 
     def _set_active_chord(
         self,
@@ -3285,31 +2786,21 @@ class InstrumentBackend(QObject):
             payload["id"] = self._manual_voice_id(key)
 
         if notes is not None:
-            root_semitone = (
-                key[1]
-                if key is not None
-                else self._active_root_semitone
-            )
+            root_semitone = key[1] if key is not None else self._active_root_semitone
             payload["notes"] = self._tuned_notes(
                 notes,
                 root_semitone,
             )
 
         if action == "start":
-            payload["rhythm_running"] = bool(
-                self._rhythm_running
-            )
+            payload["rhythm_running"] = bool(self._rhythm_running)
 
         self._debug(
             "osc_manual_chord",
             action=action,
             voice_id=payload.get("id"),
             notes=payload.get("notes"),
-            packet_rhythm_running=(
-                payload.get(
-                    "rhythm_running"
-                )
-            ),
+            packet_rhythm_running=(payload.get("rhythm_running")),
             **self._debug_chord_state(),
         )
 
@@ -3322,9 +2813,7 @@ class InstrumentBackend(QObject):
         )
 
     def _update_hold_override(self, *, publish: bool = True) -> None:
-        should_override = bool(
-            self._promoted_chords
-        )
+        should_override = bool(self._promoted_chords)
 
         self._debug(
             "hold_override_check",
@@ -3332,18 +2821,11 @@ class InstrumentBackend(QObject):
             **self._debug_chord_state(),
         )
 
-        if (
-            should_override
-            == self._chord_activity_hold_override
-        ):
+        if should_override == self._chord_activity_hold_override:
             return
 
-        old_value = (
-            self._chord_activity_hold_override
-        )
-        self._chord_activity_hold_override = (
-            should_override
-        )
+        old_value = self._chord_activity_hold_override
+        self._chord_activity_hold_override = should_override
 
         self._debug(
             "hold_override_changed",
@@ -3387,20 +2869,15 @@ class InstrumentBackend(QObject):
 
         if (
             self._active_row == row_index
-            and self._active_root_semitone
-            == root_semitone
+            and self._active_root_semitone == root_semitone
             and self._pressed_chord_order
         ):
-            next_row, next_root = (
-                self._pressed_chord_order[-1]
-            )
+            next_row, next_root = self._pressed_chord_order[-1]
             self._set_active_chord(
                 next_row,
                 next_root,
             )
-            self._send_chord_state(
-                play_now=False
-            )
+            self._send_chord_state(play_now=False)
             # The AMY backend intentionally uses one fixed manual-chord
             # synth.  If an older still-held chord becomes active again after
             # the newer chord is released, retrigger it on that synth.
@@ -3490,10 +2967,7 @@ class InstrumentBackend(QObject):
         root_semitone: int,
     ) -> None:
         key = (row_index, root_semitone)
-        if (
-            key not in self._pressed_chords
-            or key in self._promoted_chords
-        ):
+        if key not in self._pressed_chords or key in self._promoted_chords:
             return
 
         # Qt/QML owns long-press recognition. Promotion performs only the
@@ -3576,27 +3050,15 @@ class InstrumentBackend(QObject):
         ):
             return []
 
-        chord = self._chords[
-            self._row_chord_indexes[row_index]
-        ]
-        inversion_index = (
-            self._row_inversion_indexes[row_index]
-        )
-        octave_base = OCTAVE_BASES[
-            self._row_octave_indexes[row_index]
-        ]
+        chord = self._chords[self._row_chord_indexes[row_index]]
+        inversion_index = self._row_inversion_indexes[row_index]
+        octave_base = OCTAVE_BASES[self._row_octave_indexes[row_index]]
         root_midi = octave_base + root_semitone
 
-        return [
-            root_midi + interval
-            for interval in chord.inversions[inversion_index]
-        ]
+        return [root_midi + interval for interval in chord.inversions[inversion_index]]
 
     def _current_notes(self) -> list[int]:
-        if (
-            self._active_row < 0
-            or self._active_root_semitone < 0
-        ):
+        if self._active_row < 0 or self._active_root_semitone < 0:
             return []
 
         return self._notes_for_chord(
@@ -3605,30 +3067,17 @@ class InstrumentBackend(QObject):
         )
 
     def _current_bass_notes(self) -> list[int]:
-        if (
-            self._active_row < 0
-            or self._active_root_semitone < 0
-        ):
+        if self._active_row < 0 or self._active_root_semitone < 0:
             return []
 
-        chord = self._chords[
-            self._row_chord_indexes[self._active_row]
-        ]
+        chord = self._chords[self._row_chord_indexes[self._active_row]]
 
         # One low-register octave of unique chord tones. The bass remains
         # rooted around octave 2 regardless of the selected chord octave.
-        pitch_classes = sorted(
-            {
-                interval % 12
-                for interval in chord.intervals
-            }
-        )
+        pitch_classes = sorted({interval % 12 for interval in chord.intervals})
         bass_root = 36 + self._active_root_semitone
 
-        return [
-            bass_root + pitch_class
-            for pitch_class in pitch_classes
-        ]
+        return [bass_root + pitch_class for pitch_class in pitch_classes]
 
     def _send_chord_state(self, play_now: bool) -> None:
         payload = {
@@ -3641,26 +3090,16 @@ class InstrumentBackend(QObject):
                 self._active_root_semitone,
             ),
             "play_now": bool(play_now),
-            "rhythm_running": bool(
-                self._rhythm_running
-            ),
-            "rhythm_chord_enabled": bool(
-                self._effective_chord_activity() > 0
-            ),
+            "rhythm_running": bool(self._rhythm_running),
+            "rhythm_chord_enabled": bool(self._effective_chord_activity() > 0),
         }
 
         self._debug(
             "osc_chord_state",
             play_now=bool(play_now),
             notes=payload.get("notes"),
-            bass_notes=payload.get(
-                "bass_notes"
-            ),
-            packet_rhythm_running=(
-                payload.get(
-                    "rhythm_running"
-                )
-            ),
+            bass_notes=payload.get("bass_notes"),
+            packet_rhythm_running=(payload.get("rhythm_running")),
             **self._debug_chord_state(),
         )
 
@@ -3670,24 +3109,15 @@ class InstrumentBackend(QObject):
         )
 
     def _arpeggio_notes(self) -> list[int]:
-        if (
-            self._active_row < 0
-            or self._active_root_semitone < 0
-        ):
+        if self._active_row < 0 or self._active_root_semitone < 0:
             return []
 
-        chord = self._chords[
-            self._row_chord_indexes[self._active_row]
-        ]
+        chord = self._chords[self._row_chord_indexes[self._active_row]]
 
         # Convert the chord definition to pitch classes only. This deliberately
         # ignores both the row octave and the selected inversion.
         pitch_classes = {
-            (
-                self._active_root_semitone
-                + interval
-            ) % 12
-            for interval in chord.intervals
+            (self._active_root_semitone + interval) % 12 for interval in chord.intervals
         }
 
         return [
@@ -3705,9 +3135,7 @@ class InstrumentBackend(QObject):
         if self._active_row < 0 or self._active_root_semitone < 0:
             return None
 
-        chord = self._chords[
-            self._row_chord_indexes[self._active_row]
-        ]
+        chord = self._chords[self._row_chord_indexes[self._active_row]]
         if self._strum_ladder_mode:
             intervals, degree_offsets = ladder_pattern(chord.suffix)
         else:
@@ -3736,16 +3164,12 @@ class InstrumentBackend(QObject):
     def _ladder_notes(self) -> list[int]:
         if self._active_row < 0 or self._active_root_semitone < 0:
             return []
-        chord = self._chords[
-            self._row_chord_indexes[self._active_row]
-        ]
+        chord = self._chords[self._row_chord_indexes[self._active_row]]
         intervals, _ = ladder_pattern(chord.suffix)
-        pitch_classes = {
-            (self._active_root_semitone + interval) % 12
-            for interval in intervals
-        }
+        pitch_classes = {(self._active_root_semitone + interval) % 12 for interval in intervals}
         return [
-            note for note in range(STRUM_LOW_MIDI, STRUM_HIGH_MIDI + 1)
+            note
+            for note in range(STRUM_LOW_MIDI, STRUM_HIGH_MIDI + 1)
             if note % 12 in pitch_classes
         ]
 
@@ -3804,9 +3228,7 @@ class InstrumentBackend(QObject):
     @Slot(float)
     def strumStart(self, normalized_y: float) -> None:
         normalized_y = self._decode_strum_position(normalized_y)
-        self._strum_last_index = self._strum_index(
-            normalized_y
-        )
+        self._strum_last_index = self._strum_index(normalized_y)
         # Sound the note immediately on press.  The old touch path only
         # emitted a note after a move or release, which meant a perfectly
         # valid press could remain silent depending on QML touch delivery.
@@ -3870,34 +3292,10 @@ class InstrumentBackend(QObject):
         index = self._rhythm.selected_index
         busyness = self._rhythm.busyness_by_rhythm[index]
         chord_activity = self._effective_chord_activity()
-        bass_activity = (
-            self._rhythm.bass_activity_by_rhythm[index]
-        )
+        bass_activity = self._rhythm.bass_activity_by_rhythm[index]
 
-        busyness_source = ui_activity_to_source(busyness)
-        chord_source = (
-            ui_activity_to_source(chord_activity)
-            if chord_activity > 0
-            else None
-        )
-        bass_source = (
-            ui_activity_to_source(bass_activity)
-            if bass_activity <= 4
-            else None
-        )
-
-        percussion_events: list[dict[str, Any]] = []
-
-        for layer_index in range(busyness_source + 1):
-            percussion_events.extend(
-                copy.deepcopy(
-                    rhythm.percussion_layers[layer_index]["events"]
-                )
-            )
-
-        percussion_events.sort(
-            key=lambda event: float(event["time"])
-        )
+        chord_source = ui_activity_to_source(chord_activity) if chord_activity > 0 else None
+        bass_source = ui_activity_to_source(bass_activity) if bass_activity <= 4 else None
 
         return {
             "id": rhythm.key,
@@ -3908,20 +3306,18 @@ class InstrumentBackend(QObject):
             "busyness": busyness,
             "chord_activity": chord_activity,
             "bass_activity": bass_activity,
-            "percussion_events": percussion_events,
+            "percussion_activity": busyness,
+            "fill_order": list(self._rhythm.fill_order_by_rhythm[index]),
+            "fill_density_bars": FILL_DENSITY_BARS[
+                self._rhythm.fill_density_index_by_rhythm[index]
+            ],
             "chord_events": (
-                [
-                    copy.deepcopy(event)
-                    for event in rhythm.chord_levels[chord_source]
-                ]
+                [copy.deepcopy(event) for event in rhythm.chord_levels[chord_source]]
                 if chord_source is not None
                 else []
             ),
             "bass_events": (
-                [
-                    copy.deepcopy(event)
-                    for event in rhythm.bass_levels[bass_source]
-                ]
+                [copy.deepcopy(event) for event in rhythm.bass_levels[bass_source]]
                 if bass_source is not None
                 else []
             ),
@@ -4008,9 +3404,7 @@ class InstrumentBackend(QObject):
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
         self._chord_activity_hold_override = False
-        self._send_chord_state(
-            play_now=False
-        )
+        self._send_chord_state(play_now=False)
 
         self._client.send_message(
             self._chord_amp_address,
@@ -4058,16 +3452,18 @@ class InstrumentBackend(QObject):
             )
 
 
-def parse_arguments() -> argparse.Namespace:
+def parse_arguments(
+    arguments: Sequence[str] | None = None,
+    *,
+    default_config_path: Path | None = None,
+) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Qt Quick Omnichord using native AMY commands over serial"
-        )
+        description=("Qt Quick Omnichord using native AMY commands over serial")
     )
     parser.add_argument(
         "--amy-config",
         type=Path,
-        default=CONFIG_DIR / "amy_config.json",
+        default=default_config_path or CONFIG_DIR / "amy_config.json",
         help="AMY serial/backend JSON configuration file.",
     )
     parser.add_argument(
@@ -4086,9 +3482,7 @@ def parse_arguments() -> argparse.Namespace:
         action="store_const",
         const=str(Path.home() / ".omnichord" / "amy.sock"),
         dest="amy_socket",
-        help=(
-            "Connect to the external AMY service at ~/.omnichord/amy.sock."
-        ),
+        help=("Connect to the external AMY service at ~/.omnichord/amy.sock."),
     )
     parser.add_argument(
         "--amy-socket",
@@ -4104,14 +3498,6 @@ def parse_arguments() -> argparse.Namespace:
         help=(
             "Connect to an external AMY service through Qt local IPC "
             "(a named pipe in the native Windows package)."
-        ),
-    )
-    parser.add_argument(
-        "--package-smoke-test",
-        action="store_true",
-        help=(
-            "Load the complete packaged UI, exercise one chord over the "
-            "configured AMY transport, and exit automatically."
         ),
     )
     parser.add_argument(
@@ -4153,27 +3539,19 @@ def parse_arguments() -> argparse.Namespace:
     renderer_group.add_argument(
         "--opengl-renderer",
         action="store_true",
-        help=(
-            "Request the OpenGL Qt Quick RHI backend explicitly."
-        ),
+        help=("Request the OpenGL Qt Quick RHI backend explicitly."),
     )
 
     platform_group = parser.add_mutually_exclusive_group()
     platform_group.add_argument(
         "--x11",
         action="store_true",
-        help=(
-            "Run through XWayland/XCB instead of native Wayland "
-            "(diagnostic option)."
-        ),
+        help=("Run through XWayland/XCB instead of native Wayland (diagnostic option)."),
     )
     platform_group.add_argument(
         "--wayland",
         action="store_true",
-        help=(
-            "Force the native Wayland Qt platform plugin "
-            "(diagnostic option)."
-        ),
+        help=("Force the native Wayland Qt platform plugin (diagnostic option)."),
     )
     parser.add_argument(
         "--chord-state-address",
@@ -4259,81 +3637,29 @@ def parse_arguments() -> argparse.Namespace:
         "--debug",
         action="store_true",
         help=(
-            "Log detailed chord-touch and backend state transitions "
-            "to ~/.omnichord/debug-*.jsonl"
+            "Log detailed chord-touch and backend state transitions to ~/.omnichord/debug-*.jsonl"
         ),
     )
     parser.add_argument(
         "--debug-file",
         type=Path,
         default=None,
-        help=(
-            "Write debug JSONL to this path; implies --debug."
-        ),
+        help=("Write debug JSONL to this path; implies --debug."),
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--slider-trace",
+        action="store_true",
+        help=("Print QML slider press/move/current-value diagnostics to stderr."),
+    )
+    return parser.parse_args(arguments)
 
 
-ANDROID_SMOKE_ENABLE = "lb-android-package-smoke.enable"
-ANDROID_SMOKE_STATUS = "lb-android-package-smoke.status"
-
-
-def configure_android_runtime(
+def run_application(
     args: argparse.Namespace,
-    *,
-    platform_name: str,
-    files_dir: Path,
-) -> Path | None:
-    """Select Android's private AMY socket and consume the CI smoke marker.
-
-    The AMY AAR and the Qt activity share one application UID.  Qt's Android
-    HomeLocation is Android's app-private files directory, which is also where
-    the AAR publishes ``amy.sock``.  Explicit command-line transports remain
-    authoritative for diagnostics and source-tree tests.
-    """
-
-    if str(platform_name).casefold() != "android":
-        return None
-
-    files_dir = Path(files_dir)
-    if not args.amy_socket and not args.amy_local_name:
-        args.amy_socket = str(files_dir / "amy.sock")
-
-    marker = files_dir / ANDROID_SMOKE_ENABLE
-    if not marker.is_file():
-        return None
-
-    marker.unlink()
-    status = files_dir / ANDROID_SMOKE_STATUS
-    status.unlink(missing_ok=True)
-    args.package_smoke_test = True
-    return status
-
-
-def main() -> int:
-    args = parse_arguments()
-    if args.package_smoke_test and args.capture_screenshots_dir is not None:
-        raise ValueError(
-            "--package-smoke-test and --capture-screenshots-dir are exclusive"
-        )
-
-    smoke_status_value = os.environ.get("OMNICHORD_PACKAGE_SMOKE_STATUS")
-    smoke_status = Path(smoke_status_value) if smoke_status_value else None
-
-    def smoke_checkpoint(label: str) -> None:
-        if not args.package_smoke_test or smoke_status is None:
-            return
-        smoke_status.parent.mkdir(parents=True, exist_ok=True)
-        with smoke_status.open("a", encoding="utf-8") as handle:
-            handle.write(f"{label}\n")
-            handle.flush()
-
-    smoke_checkpoint("frontend-entered")
-
+    dependencies: ApplicationDependencies,
+) -> int:
     migrate_user_layout()
-    smoke_checkpoint("user-layout-migrated")
-    user_config_dir = ensure_user_configs(CONFIG_DIR)
-    smoke_checkpoint("user-config-ready")
+    user_config_dir = ensure_user_configs(dependencies.paths.config)
 
     # These Qt choices must be made before the first application/window is
     # constructed.
@@ -4352,271 +3678,76 @@ def main() -> int:
     # QSG_INFO prints the actual scene-graph backend chosen by Qt. It is kept
     # on for this diagnostic build; the output is only a few startup lines.
     os.environ.setdefault("QSG_INFO", "1")
-    smoke_checkpoint("renderer-environment-ready")
 
-    defaults = load_defaults(user_config_dir / "defaults.json")
-    smoke_checkpoint("defaults-loaded")
-    chords = load_chords(MUSIC_DIR / "chords.csv")
-    smoke_checkpoint("chords-loaded")
-    (
-        synths,
-        legacy_chord_synth_index,
-        legacy_strum_synth_index,
-        legacy_bass_synth_index,
-    ) = load_synth_catalog(INSTRUMENT_DIR / "synths.json")
-    smoke_checkpoint("synth-catalog-loaded")
-    rhythms = load_rhythm_catalog(MUSIC_DIR / "rhythms.json")
-    smoke_checkpoint("rhythm-catalog-loaded")
-    bass_riffs = load_bass_riff_catalog(
-        MUSIC_DIR / "omnichord_bass_riffs.json",
-        rhythm_ids=(rhythm.key for rhythm in rhythms),
-        chord_suffixes=(chord.suffix for chord in chords),
-    )
-    smoke_checkpoint("bass-riff-catalog-loaded")
-    title_config = load_title_config(
-        user_config_dir / "title.json"
-    )
-    smoke_checkpoint("title-config-loaded")
-    intonation_eq = load_intonation_table(
-        MUSIC_DIR / "intonation_eq.json"
-    )
-    smoke_checkpoint("equal-intonation-loaded")
-    intonation_harm = load_intonation_table(
-        MUSIC_DIR / "intonation_harm.json"
-    )
-    smoke_checkpoint("harmonic-intonation-loaded")
-    intonation_jv = load_intonation_table(
-        MUSIC_DIR / "intonation_jv.json"
-    )
-    smoke_checkpoint("just-intonation-loaded")
-
-    # Startup synth selections are controlled by defaults.json.
-    # Unknown keys fall back to the catalogue defaults.
-    synth_index_by_key = {
-        synth.key: index
-        for index, synth in enumerate(synths)
-    }
-
-    def startup_synth_index(
-        role: str,
-        fallback_index: int,
-    ) -> int:
-        raw_key = str(
-            defaults.get("synths", {}).get(role, "")
-        )
-        index = synth_index_by_key.get(raw_key)
-        if index is not None:
-            return index
-
-        fallback_key = synths[fallback_index].key
+    def synth_fallback_notice(role: str, requested: str, fallback: str) -> None:
         print(
-            f"Warning: unknown {role} synth {raw_key!r} "
-            f"in defaults.json; using {fallback_key!r}",
+            f"Warning: unknown {role} synth {requested!r} in defaults.json; using {fallback!r}",
             file=sys.stderr,
             flush=True,
         )
-        return fallback_index
 
-    default_chord_synth_index = startup_synth_index(
-        "chord", legacy_chord_synth_index
+    resources = load_application_resources(
+        dependencies,
+        user_config_dir=user_config_dir,
+        synth_fallback_notice=synth_fallback_notice,
     )
-    default_strum_synth_index = startup_synth_index(
-        "strum", legacy_strum_synth_index
-    )
-    default_bass_synth_index = startup_synth_index(
-        "bass", legacy_bass_synth_index
-    )
-    smoke_checkpoint("startup-synths-selected")
+    defaults = resources.defaults
+    chords = resources.chords
+    synths = resources.synths
+    rhythms = resources.rhythms
+    title_config = resources.title
 
     QQuickStyle.setStyle("Basic")
-    smoke_checkpoint("quick-style-selected")
 
     app = QGuiApplication(sys.argv)
     app.setApplicationName("Qt Omnichord")
-    smoke_checkpoint("qgui-created")
 
-    android_smoke_status = configure_android_runtime(
-        args,
+    runtime = dependencies.resolve_package_runtime(
         platform_name=QGuiApplication.platformName(),
-        files_dir=Path(
-            QStandardPaths.writableLocation(QStandardPaths.HomeLocation)
-        ),
+        private_files_dir=dependencies.private_files_dir(),
+        amy_socket=args.amy_socket,
+        amy_local_name=args.amy_local_name,
     )
-    if android_smoke_status is not None:
-        smoke_status = android_smoke_status
-    smoke_checkpoint("android-runtime-configured")
+    args.amy_socket = runtime.amy_socket
+    args.amy_local_name = runtime.amy_local_name
 
-    print(
-        "Qt Omnichord display diagnostics:",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  QPA platform: {QGuiApplication.platformName()}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  XDG_SESSION_TYPE: {os.environ.get('XDG_SESSION_TYPE', '<unset>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  WAYLAND_DISPLAY: {os.environ.get('WAYLAND_DISPLAY', '<unset>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  DISPLAY: {os.environ.get('DISPLAY', '<unset>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  QT_QPA_PLATFORM: {os.environ.get('QT_QPA_PLATFORM', '<auto>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  QT_QUICK_BACKEND: {os.environ.get('QT_QUICK_BACKEND', '<default>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    print(
-        f"  QSG_RHI_BACKEND: {os.environ.get('QSG_RHI_BACKEND', '<default>')}",
-        file=sys.stderr,
-        flush=True,
-    )
-    smoke_checkpoint("display-diagnostics-written")
+    for diagnostic in dependencies.display_diagnostics(QGuiApplication.platformName()):
+        print(diagnostic, file=sys.stderr, flush=True)
 
-    amy_config_path = args.amy_config.expanduser().resolve()
-    smoke_checkpoint("amy-config-path-resolved")
-    if amy_config_path == (CONFIG_DIR / "amy_config.json").resolve():
-        amy_config_path = user_config_dir / "amy_config.json"
-    smoke_checkpoint("amy-config-path-selected")
-    amy_config = load_amy_config(amy_config_path)
-    smoke_checkpoint("amy-config-loaded")
-    if args.serial_port is not None:
-        amy_config["serial"]["port"] = args.serial_port
-    if args.serial_baud is not None:
-        amy_config["serial"]["baud"] = args.serial_baud
+    def transport_notice(
+        selection: ClientSelection,
+        resolved: ResolvedAmyConfig,
+    ) -> None:
+        if selection.kind == "local":
+            message = f"AMY backend: Qt local IPC {selection.endpoint}"
+        elif selection.kind == "socket":
+            message = f"AMY backend: external socket {selection.endpoint}"
+        else:
+            message = (
+                "AMY serial backend: "
+                f"{resolved.transport.serial_port} @ "
+                f"{resolved.transport.serial_baud} baud"
+            )
+        print(message, file=sys.stderr, flush=True)
 
-    address_map = {
-        "chord_state": args.chord_state_address,
-        "manual_chord": args.chord_manual_address,
-        "chord_amp": args.chord_amp_address,
-        "strum_amp": args.strum_amp_address,
-        "bass_amp": args.bass_amp_address,
-        "percussion_amp": args.percussion_amp_address,
-        "reverb": args.reverb_address,
-        "master_volume": args.master_volume_address,
-        "chord_synth": args.chord_synth_address,
-        "chord_params": args.chord_params_address,
-        "strum_synth": args.strum_synth_address,
-        "strum_params": args.strum_params_address,
-        "bass_synth": args.bass_synth_address,
-        "bass_params": args.bass_params_address,
-        "bass_running": args.bass_running_address,
-        "strum_note": args.strum_note_address,
-        "rhythm_config": args.rhythm_config_address,
-        "rhythm_running": args.rhythm_running_address,
-        "rhythm_chord_enabled": args.rhythm_chord_enabled_address,
-        "panic": args.panic_address,
-    }
-
-    if args.amy_socket and args.amy_local_name:
-        raise ValueError("select either --amy-socket or --amy-local-name")
-
-    if args.amy_local_name:
-        print(
-            f"AMY backend: Qt local IPC {args.amy_local_name}",
-            file=sys.stderr,
-            flush=True,
-        )
-        smoke_checkpoint("amy-local-connect-started")
-        amy_client = AmyLocalClient(
-            config=amy_config,
-            addresses=address_map,
-            server_name=args.amy_local_name,
-        )
-        smoke_checkpoint("amy-local-connected")
-    elif args.amy_socket:
-        print(
-            f"AMY backend: external socket {args.amy_socket}",
-            file=sys.stderr,
-            flush=True,
-        )
-        smoke_checkpoint("amy-socket-connect-started")
-        amy_client = AmySocketClient(
-            config=amy_config,
-            addresses=address_map,
-            socket_path=str(Path(args.amy_socket).expanduser()),
-        )
-        smoke_checkpoint("amy-socket-connected")
-    else:
-        print(
-            "AMY serial backend: "
-            f"{amy_config['serial']['port']} @ "
-            f"{amy_config['serial']['baud']} baud",
-            file=sys.stderr,
-            flush=True,
-        )
-        amy_client = AmySerialClient(
-            config=amy_config,
-            addresses=address_map,
-        )
-
-    backend = InstrumentBackend(
-        chords=chords,
-        synths=synths,
-        rhythms=rhythms,
-        bass_riffs=bass_riffs,
-        intonation_eq=intonation_eq,
-        intonation_harm=intonation_harm,
-        intonation_jv=intonation_jv,
-        default_chord_synth_index=(
-            default_chord_synth_index
-        ),
-        default_strum_synth_index=(
-            default_strum_synth_index
-        ),
-        default_bass_synth_index=(
-            default_bass_synth_index
-        ),
-        defaults=defaults,
-        client=amy_client,
-        chord_state_address=args.chord_state_address,
-        chord_manual_address=args.chord_manual_address,
-        chord_amp_address=args.chord_amp_address,
-        strum_amp_address=args.strum_amp_address,
-        bass_amp_address=args.bass_amp_address,
-        percussion_amp_address=args.percussion_amp_address,
-        reverb_address=args.reverb_address,
-        master_volume_address=args.master_volume_address,
-        chord_synth_address=args.chord_synth_address,
-        chord_params_address=args.chord_params_address,
-        strum_synth_address=args.strum_synth_address,
-        strum_params_address=args.strum_params_address,
-        bass_synth_address=args.bass_synth_address,
-        bass_params_address=args.bass_params_address,
-        bass_running_address=args.bass_running_address,
-        strum_note_address=args.strum_note_address,
-        rhythm_config_address=args.rhythm_config_address,
-        rhythm_running_address=args.rhythm_running_address,
-        rhythm_chord_enabled_address=(
-            args.rhythm_chord_enabled_address
-        ),
-        panic_address=args.panic_address,
-        debug_enabled=(
-            args.debug
-            or args.debug_file is not None
-        ),
-        debug_file=args.debug_file,
+    graph = compose_application_graph(
+        args,
+        dependencies,
+        resources,
+        user_config_dir=user_config_dir,
+        transport_notice=transport_notice,
     )
+    amy_client = graph.client
+    backend = graph.backend
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
 
     context.setContextProperty("backend", backend)
+    context.setContextProperty(
+        "sliderTrace",
+        bool(args.slider_trace) or os.environ.get("OMNICHORD_SLIDER_TRACE") == "1",
+    )
     context.setContextProperty(
         "chordNames",
         [chord.label for chord in chords],
@@ -4655,17 +3786,13 @@ def main() -> int:
     )
 
     window_defaults = defaults.get("window", {})
-    start_fullscreen = bool(
-        window_defaults.get("start_fullscreen", False)
-    )
+    start_fullscreen = bool(window_defaults.get("start_fullscreen", False))
     if args.fullscreen:
         start_fullscreen = True
     elif args.windowed:
         start_fullscreen = False
 
-    scale_to_fit = bool(
-        window_defaults.get("scale_to_fit", True)
-    ) and not args.no_scale_to_fit
+    scale_to_fit = bool(window_defaults.get("scale_to_fit", True)) and not args.no_scale_to_fit
 
     context.setContextProperty(
         "startFullscreen",
@@ -4676,34 +3803,22 @@ def main() -> int:
         scale_to_fit,
     )
 
-    engine.load(
-        QUrl.fromLocalFile(str(GUI_DIR / "Main.qml"))
-    )
-    smoke_checkpoint("qml-load-returned")
+    engine.load(QUrl.fromLocalFile(str(dependencies.paths.gui / "Main.qml")))
 
     if not engine.rootObjects():
         amy_client.close()
         return 1
-    smoke_checkpoint("qml-root-ready")
 
     backend.send_initial_state()
-    smoke_checkpoint("initial-state-sent")
 
     if args.capture_screenshots_dir is not None:
         capture_dir = args.capture_screenshots_dir.expanduser().resolve()
         capture_dir.mkdir(parents=True, exist_ok=True)
         window = engine.rootObjects()[0]
 
-        # Populate the MIDI screen's grey controller bar with representative
-        # genuine CC movements. The first packet establishes the previous
-        # value; the second is the movement that makes the knob visible.
-        for channel, controller, value in (
-            (2, 7, 104),
-            (2, 11, 72),
-            (2, 92, 38),
-        ):
-            backend.injectMidiControl(channel, controller, 0)
-            backend.injectMidiControl(channel, controller, value)
+        # Stage representative controls through the normal input-processing
+        # paths. The resulting bar contains MIDI and OSC rotaries and buttons.
+        populate_screenshot_input_controls(backend.midiPlayer, backend.midiPlayer)
         # Select C minor from factory preset 1 so the OMNI capture also
         # demonstrates the active chord and its correctly spelled C/E-flat/G
         # strum-note guide.
@@ -4743,56 +3858,10 @@ def main() -> int:
         # grab. This works with QT_QPA_PLATFORM=offscreen as used by the helper.
         QTimer.singleShot(1500, capture_omni)
 
-    if args.package_smoke_test:
-        if not args.amy_socket and not args.amy_local_name:
-            print(
-                "--package-smoke-test requires an external AMY transport",
-                file=sys.stderr,
-                flush=True,
-            )
-            amy_client.close()
-            return 2
-
-        # Exercise QML startup, backend state publication, real Qt pointer
-        # delivery, tap/hold behavior, the packaged transport and actual note
-        # generation. The Windows service renders these commands offline, so
-        # this remains deterministic without an audio device.
-        window = engine.rootObjects()[0]
-
-        def smoke_input() -> None:
-            try:
-                from package_smoke import exercise_chord_input
-
-                exercise_chord_input(
-                    app,
-                    window,
-                    backend,
-                    smoke_checkpoint,
-                )
-            except Exception as exc:
-                message = (
-                    "Package chord-input smoke failed: "
-                    f"{type(exc).__name__}: {exc}"
-                )
-                print(message, file=sys.stderr, flush=True)
-                smoke_checkpoint(
-                    f"chord-input-failed {type(exc).__name__}: {exc}"
-                )
-                app.exit(3)
-                return
-
-            smoke_checkpoint("quit-requested")
-            app.quit()
-
-        # Let the first complete scene-graph frame settle before synthesizing
-        # input through the QQuickWindow.
-        QTimer.singleShot(150, smoke_input)
-
     # Make teardown order explicit. QML must be destroyed while the Python
     # backend QObject is still alive; otherwise its context property becomes
     # null and dozens of bindings log TypeErrors during application shutdown.
     exit_code = app.exec()
-    smoke_checkpoint("event-loop-exited")
 
     # Destroy the QML engine/root objects first.
     del engine
@@ -4805,7 +3874,3 @@ def main() -> int:
     del backend
 
     return exit_code
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

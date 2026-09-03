@@ -4,7 +4,10 @@ This directory is a standalone ESP-IDF project for the AMY-based LB Omnichord ta
 
 The project builds AMY for the ESP32-P4, outputs stereo I2S to an external PCM5102A DAC, and receives native AMY wire-protocol messages on the ESP32-P4 low-power UART. The LP core receives the UART bytes and forwards complete AMY messages to the high-performance cores through the LP mailbox.
 
-The repository intentionally does **not** vendor ESP-IDF, AMY, or build output. `prepare_amy.sh` fetches current upstream AMY and applies the small target-specific changes required by this firmware. The same script is used locally and by GitHub Actions.
+The repository intentionally does **not** vendor ESP-IDF, AMY, or build output.
+`prepare_amy.sh` fetches the exact pinned AMY fork release and applies the small
+target-specific changes required by this firmware. The same script is used
+locally and by GitHub Actions.
 
 ## Hardware
 
@@ -75,7 +78,12 @@ esp32p4/
 
 The checked-in project configuration was generated with ESP-IDF **6.0.2**. The CI build is pinned to the official Espressif `v6.0.2` environment.
 
-AMY follows current upstream `shorepine/amy` `main` by default. To build against a specific AMY commit, set `AMY_REF` before running `prepare_amy.sh`.
+AMY is pinned to our immutable Omnichord fork release
+`releases/amy_omnichord_R20260831T042456` at commit
+`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`. That release contains the nested
+sequencer API used by this firmware. `prepare_amy.sh` verifies that the branch
+tip and requested commit match, so it cannot silently compile against
+incompatible Shorepine `main`.
 
 The short-DMA scheduling fix from upstream AMY PR #1119 is required by this target. `prepare_amy.sh` checks that the selected AMY revision contains that merged fix; it does **not** carry the older local workaround that removed `vTaskDelay()`.
 
@@ -151,7 +159,7 @@ bash prepare_amy.sh
 The script:
 
 1. removes any previously generated `components/amy/` tree;
-2. clones current upstream AMY;
+2. clones and verifies the pinned Omnichord AMY fork release;
 3. changes AMY to a 128-sample block at 48 kHz;
 4. selects Philips I2S framing for the PCM5102A;
 5. uses two DMA descriptors with 64 frames each;
@@ -161,10 +169,14 @@ The script:
 9. writes the ESP-IDF component `CMakeLists.txt` used by this project;
 10. prints the exact AMY commit that was prepared.
 
-To build a specific AMY commit instead of current `main`:
+To deliberately test another release, override the repository, release branch
+and exact commit together:
 
 ```bash
-AMY_REF=<40-character-commit-sha> bash prepare_amy.sh
+AMY_REPO=<amy-fork-url> \
+AMY_RELEASE_BRANCH=<release-branch> \
+AMY_REF=<40-character-commit-sha> \
+bash prepare_amy.sh
 ```
 
 A deliberately old commit from before AMY PR #1119 will be rejected because its render-task scheduling is not compatible with the short 2×64 DMA ring used here.
@@ -262,7 +274,9 @@ The workflow has concurrency cancellation enabled, so a newer commit to the same
 
 ## Current AMY target modifications
 
-The firmware deliberately differs from stock upstream AMY only in target-specific areas. `prepare_amy.sh` applies these changes after cloning current upstream `main`.
+The firmware deliberately differs from the pinned Omnichord AMY release only
+in target-specific areas. `prepare_amy.sh` applies these changes after checking
+out that exact release commit.
 
 ### 48 kHz, 128-sample blocks
 
@@ -387,11 +401,15 @@ The project-local `.gitignore` enforces these rules.
 
 ## Updating AMY
 
-Because the project follows current upstream AMY, refreshing it is simply:
+To regenerate the component from the pinned release:
 
 ```bash
 bash prepare_amy.sh
 idf.py build
 ```
 
-If upstream changes one of the source locations that this project patches, `prepare_amy.sh` deliberately fails instead of silently producing a differently configured firmware. Update the preparation script and CI together when that happens.
+When adopting a newer fork release, update the repository, branch and commit
+pin together. If that AMY revision changes one of the source locations patched
+for the P4 target, `prepare_amy.sh` deliberately fails instead of silently
+producing a differently configured firmware. Update the preparation script and
+CI together when that happens.

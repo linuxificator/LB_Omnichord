@@ -1,5 +1,10 @@
 # GUI Design
 
+Status: authoritative GUI structure contract
+Owner: Qt/QML user interface
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-03
+
 ## Screens
 
 The application has two main views:
@@ -74,6 +79,12 @@ and LED states defined in `midi_control.md`; an unbound knob remains display-onl
 When the bar is full, eligible indicators follow genuine-change LRU replacement
 and the outgoing knob flashes red twice.
 
+The narrow unused gap between MIDI synth row 6 and the lower grey MIDI CC bar is
+reserved for MIDI input tech LEDs. Each visible LED has a short label such as
+`ALSA raw`, `ALSA seq` or `OSS MIDI`. Only techs relevant to the active platform
+are shown. Red means unavailable to this runtime; green means available and
+listened to; blinking green means recent incoming MIDI bytes on that tech.
+
 On the OMNI screen, MIDI learn is shown by a blinking red LED inside the large
 `MIDI` mode button, immediately to the right of its label. It is absent rather
 than grey when learn is inactive. The green binding-location LED remains on
@@ -137,9 +148,40 @@ border after a quick tap.
 
 Ordinary buttons use Qt Quick Controls button signals. Held increment/decrement
 controls use `AbstractButton.autoRepeat`; sliders use `Slider.onMoved`; MIDI
-unlink uses Qt's double-click/double-tap signals. Application code assigns the
-musical meaning after Qt has classified the input and must not infer these
-gestures with elapsed-time or movement-count thresholds.
+manual takeover uses the first real `Slider.onMoved` value change or the first
+increment/decrement step. Pressing a slider without changing its value does not
+unlink it. Application code assigns the musical meaning after Qt has classified
+the input and must not infer these gestures with elapsed-time or movement-count
+thresholds.
+
+Custom Qt Slider handles must expose `implicitWidth` and `implicitHeight`.
+Setting only visual `width` and `height` can leave `implicitHandleWidth` at
+zero, which makes the visible knob differ from Qt's actual drag handle.
+While `Slider.pressed` is true, Qt owns the interactive slider value. Backend
+property echoes or repeater model replacements must not force the handle back
+to an older value during that press. After a real move, the native value and
+its visible handle/fill remain at the accepted user value across release even
+when the backend deliberately suppresses a live model refresh. A later external
+backend change resumes synchronization. A press without movement and a gesture
+consumed by MIDI learn synchronize immediately. This contract is identical for
+mouse and touchscreen input on Linux, macOS, Windows and Android; application
+code must not classify either gesture itself.
+
+`BindableSlider.qml` is the single implementation of that native horizontal
+slider interaction, visual-position mapping and semantic MIDI binding
+presentation. `LabeledSlider.qml` and `ParameterSlider.qml` remain separate
+domain/display wrappers and supply their own value formatting and conversion.
+Both fill and handle derive from the same native `Slider.visualPosition`; the
+primitive must not contain OMNI/MIDI musical policy. The two strum surfaces
+share only clamped vertical pointer normalization, and utility screens share
+only their passive section background.
+
+`Main.qml` remains the top-level window/layout facade, while complete title and
+strum-note-guide sections live in `OmniTitleSection.qml` and
+`StrumNoteGuide.qml`. Child components emit semantic requests such as
+`strumModeToggleRequested`; the root resolves global navigation/MIDI-learn
+policy and calls the backend. Extracted sections do not reach through the root
+to invoke unrelated backend functions.
 
 The RST/UP/DWN block left of the first two chord rows ends at the bottom of the
 second row. Its three controls are distributed evenly over that complete

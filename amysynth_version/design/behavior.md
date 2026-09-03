@@ -1,5 +1,10 @@
 # Runtime Behavior
 
+Status: authoritative runtime behavior contract
+Owner: shared application behavior
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Screen switching
 
 Switching OMNI/MIDI is display-only. Existing notes, rhythms, drums, and sequences continue unchanged.

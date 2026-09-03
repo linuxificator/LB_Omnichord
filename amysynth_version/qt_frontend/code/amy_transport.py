@@ -3,16 +3,40 @@ from __future__ import annotations
 import json
 import math
 import queue
+import sys
 import threading
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-import serial
-
 from control_limits import clamp_control_value
-from unix_wire_socket import connect_unix_wire_socket
+from application_scheduler import MonotonicScheduler
+from amy_parameter_plan import compile_parameter_commands
+from config_loader import DebugConfig, ResolvedAmyConfig, resolve_amy_config_data
+from drum_patterns import (
+    DrumFill,
+    DrumPatternCatalog,
+    load_drum_pattern_catalog,
+)
+from rhythm_command_plan import (
+    compact_repeating_events,
+    compile_bass_events,
+    compile_chord_group_plan,
+    compile_drum_activity_groups,
+    compile_fill_group,
+    compile_fill_schedule,
+    compile_tagged_lane,
+    drum_quantum,
+    fill_occurrences,
+)
+from transport_scheduler import (
+    CommandScheduler,
+    TransportFailed,
+    TransportHealth,
+    encode_command,
+)
+from transport_sinks import QtLocalByteSink, SerialByteSink, UnixByteSink
 
 
 AMY_PPQ = 48
@@ -21,273 +45,33 @@ RESET_ALL_OSCS = 8192
 RESET_TIMEBASE = 16384
 RESET_ALL_NOTES = 131072
 SYNTH_FLAGS_NO_NOTE_WARNINGS = 8
+DEBUG_LOG_QUEUE_CAPACITY = 2048
+DEBUG_LOG_MAX_BYTES = 4 * 1024 * 1024
 
 
-def _period_divisors(period: int) -> tuple[int, ...]:
-    """Return every positive divisor in deterministic ascending order."""
-    period = max(1, int(period))
-    lower: list[int] = []
-    upper: list[int] = []
-    for candidate in range(1, math.isqrt(period) + 1):
-        if period % candidate:
-            continue
-        lower.append(candidate)
-        paired = period // candidate
-        if paired != candidate:
-            upper.append(paired)
-    return tuple(lower + list(reversed(upper)))
+def _resolve_drum_catalog_directory(
+    module_file: Path = Path(__file__),
+    packaged_root: Path | None = None,
+) -> Path:
+    """Resolve drum assets in source, frozen, and flat Android layouts."""
+
+    if packaged_root is not None:
+        return Path(packaged_root) / "music" / "drums"
+
+    module_directory = Path(module_file).resolve().parent
+    source_directory = module_directory.parent / "music" / "drums"
+    if source_directory.is_dir():
+        return source_directory
+    return module_directory / "music" / "drums"
 
 
 def _compact_repeating_events(
     occurrences: list[tuple[int, str]],
     bar_period: int,
 ) -> list[tuple[int, int, str]]:
-    """Encode an exact circular event set using the fewest obvious periods.
+    """Compatibility alias for tests and callers using the former location."""
 
-    A single AMY sequencer tag can repeat on a shorter period when every
-    occurrence of that residue is present in the full rhythm cycle.  Folding
-    those exact repetitions keeps dense arpeggios inside the existing chord
-    lane without changing their audible tick set or allocating more tags.
-    """
-    bar_period = max(1, int(bar_period))
-    ticks_by_body: dict[str, set[int]] = {}
-    for tick, body in occurrences:
-        ticks_by_body.setdefault(str(body), set()).add(
-            int(tick) % bar_period
-        )
-
-    divisors = _period_divisors(bar_period)
-    compacted: list[tuple[int, int, str]] = []
-    for body, source_ticks in ticks_by_body.items():
-        remaining = set(source_ticks)
-        while remaining:
-            best_period = bar_period
-            best_residue = min(remaining)
-            best_cycle = {best_residue}
-            for candidate_period in divisors:
-                for residue in sorted(
-                    {tick % candidate_period for tick in remaining}
-                ):
-                    cycle = set(
-                        range(residue, bar_period, candidate_period)
-                    )
-                    if cycle.issubset(remaining) and len(cycle) > len(
-                        best_cycle
-                    ):
-                        best_period = candidate_period
-                        best_residue = residue
-                        best_cycle = cycle
-            compacted.append((best_residue, best_period, body))
-            remaining.difference_update(best_cycle)
-    return compacted
-
-
-DEFAULT_CONFIG: dict[str, Any] = {'serial': {'port': '/dev/serial0', 'baud': 1000000, 'write_timeout': 0.5},
- 'synth_ids': {'drums': 0, 'bass': 1, 'strum': 2, 'manual_chord': 3, 'rhythm_chord': 4},
- 'voices': {'drums': 4, 'bass': 1, 'strum': 2, 'manual_chord': 7, 'rhythm_chord': 7},
- 'default_synths': {'chord': 'juno_004', 'strum': 'juno_028', 'bass': 'dx7_143'},
- 'buses': {'main': 0, 'percussion': 1},
- 'drums': {'velocity_gain': 5.0,
-           'sample_map': {'bd_haus': {'preset': 1, 'note': 39},
-                          'drum_bass_hard': {'preset': 1, 'note': 39},
-                          'drum_bass_soft': {'preset': 1, 'note': 39},
-                          'drum_snare_hard': {'preset': 2, 'note': 45},
-                          'drum_snare_soft': {'preset': 5, 'note': 41},
-                          'drum_cymbal_closed': {'preset': 6, 'note': 53},
-                          'drum_cymbal_pedal': {'preset': 7, 'note': 61},
-                          'drum_cymbal_open': {'preset': 7, 'note': 56},
-                          'drum_tom_hi_soft': {'preset': 8, 'note': 73},
-                          'drum_tom_mid_soft': {'preset': 8, 'note': 63},
-                          'drum_tom_lo_soft': {'preset': 8, 'note': 61},
-                          'elec_tick': {'preset': 4, 'note': 51},
-                          'perc_bell': {'preset': 10, 'note': 69},
-                          'perc_snap': {'preset': 9, 'note': 94}}},
- 'rhythm': {'chord_gate_beats': 0.72,
-            'bass_gate_beats': 0.3,
-            'max_rhythm_chord_notes': 4,
-            'max_sequencer_items': 256,
-            'sequencer_reset_guard_ms': 10.0},
- 'performance': {'strum_gate_ms': 800, 'one_shot_chord_gate_ms': 650, 'strum_tail_ms': 450},
- 'synth_patches': {'juno_000': 0,
-                   'juno_001': 1,
-                   'juno_002': 2,
-                   'juno_003': 3,
-                   'juno_004': 4,
-                   'juno_005': 5,
-                   'juno_006': 6,
-                   'juno_007': 7,
-                   'juno_008': 8,
-                   'juno_009': 9,
-                   'juno_010': 10,
-                   'juno_011': 11,
-                   'juno_012': 12,
-                   'juno_013': 13,
-                   'juno_014': 14,
-                   'juno_015': 15,
-                   'juno_016': 16,
-                   'juno_017': 17,
-                   'juno_018': 18,
-                   'juno_019': 19,
-                   'juno_020': 20,
-                   'juno_021': 21,
-                   'juno_022': 22,
-                   'juno_023': 23,
-                   'juno_024': 24,
-                   'juno_025': 25,
-                   'juno_026': 26,
-                   'juno_027': 27,
-                   'juno_028': 28,
-                   'juno_029': 29,
-                   'juno_030': 30,
-                   'juno_031': 31,
-                   'juno_032': 32,
-                   'juno_033': 33,
-                   'juno_034': 34,
-                   'juno_035': 35,
-                   'juno_036': 36,
-                   'juno_037': 37,
-                   'juno_038': 38,
-                   'juno_040': 40,
-                   'juno_041': 41,
-                   'juno_042': 42,
-                   'juno_047': 47,
-                   'juno_048': 48,
-                   'juno_049': 49,
-                   'juno_050': 50,
-                   'juno_051': 51,
-                   'juno_052': 52,
-                   'juno_053': 53,
-                   'juno_054': 54,
-                   'juno_055': 55,
-                   'juno_056': 56,
-                   'juno_064': 64,
-                   'juno_065': 65,
-                   'juno_066': 66,
-                   'juno_067': 67,
-                   'juno_068': 68,
-                   'juno_069': 69,
-                   'juno_070': 70,
-                   'juno_072': 72,
-                   'juno_073': 73,
-                   'juno_074': 74,
-                   'juno_075': 75,
-                   'juno_076': 76,
-                   'juno_077': 77,
-                   'juno_080': 80,
-                   'juno_082': 82,
-                   'juno_083': 83,
-                   'juno_086': 86,
-                   'juno_087': 87,
-                   'juno_088': 88,
-                   'juno_089': 89,
-                   'juno_090': 90,
-                   'juno_091': 91,
-                   'juno_093': 93,
-                   'juno_094': 94,
-                   'juno_095': 95,
-                   'juno_096': 96,
-                   'juno_097': 97,
-                   'juno_098': 98,
-                   'juno_100': 100,
-                   'juno_101': 101,
-                   'juno_102': 102,
-                   'juno_104': 104,
-                   'juno_105': 105,
-                   'juno_107': 107,
-                   'juno_108': 108,
-                   'juno_109': 109,
-                   'juno_111': 111,
-                   'juno_112': 112,
-                   'juno_113': 113,
-                   'juno_114': 114,
-                   'juno_115': 115,
-                   'juno_116': 116,
-                   'juno_118': 118,
-                   'juno_119': 119,
-                   'juno_120': 120,
-                   'juno_121': 121,
-                   'juno_122': 122,
-                   'juno_123': 123,
-                   'juno_125': 125,
-                   'juno_127': 127,
-                   'dx7_128': 128,
-                   'dx7_133': 133,
-                   'dx7_138': 138,
-                   'dx7_143': 143,
-                   'dx7_148': 148,
-                   'dx7_154': 154,
-                   'dx7_160': 160,
-                   'dx7_166': 166,
-                   'dx7_172': 172,
-                   'dx7_178': 178,
-                   'dx7_184': 184,
-                   'dx7_190': 190,
-                   'dx7_196': 196,
-                   'dx7_202': 202,
-                   'dx7_213': 213,
-                   'dx7_214': 214,
-                   'dx7_215': 215,
-                   'dx7_216': 216,
-                   'dx7_244': 244,
-                   'dx7_246': 246,
-                   'juno_057': 57},
- 'amy_max_oscs': 120,
- 'debug': {'log_amy_commands': True,
-           'amy_command_log': '~/.omnichord/amy_debug.log',
-           'log_logical_events': True},
- 'patch_compatibility': {'57': {'label': 'Juno A82 Resonance Funk',
-                                'reason': 'All Juno sound-source amplitudes are zero; add a small '
-                                          'noise excitation so the resonant VCF has input.',
-                                'juno_noise_amp': 0.05},
-                         '68': {'label': 'Juno B15 Harpsichord 1',
-                                'reason': 'Factory patch requests 71265 Hz cutoff and Q 11.2; '
-                                          'constrain the P4 fixed-point filter to a stable bright '
-                                          'range.',
-                                'juno_filter_hz': 6000.0,
-                                'juno_resonance': 4.0},
-                         '89': {'label': 'Juno B26 Harpsichord 2',
-                                'reason': 'Factory filter base is at the unsafe top edge; keep the P4 filter stable.',
-                                'juno_filter_hz': 6000.0},
-                         '48': {'label': 'Juno A71 Sweep I',
-                                'reason': 'Factory filter base is at the previous 18 kHz UI limit; keep below safety ceiling.',
-                                'juno_filter_hz': 9000.0},
-                         '74': {'label': 'Juno B23 Orchestral Pad',
-                                'reason': 'Factory patch sets gather/output osc amp const to zero; '
-                                          'AMY skips rendering when amp const is zero.',
-                                'juno_output_amp': 1.0}}}
-
-
-def _deep_merge(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in base.items():
-        if isinstance(value, dict):
-            result[key] = _deep_merge(value, {})
-        elif isinstance(value, list):
-            result[key] = list(value)
-        else:
-            result[key] = value
-
-    for key, value in extra.items():
-        if (
-            key in result
-            and isinstance(result[key], dict)
-            and isinstance(value, dict)
-        ):
-            result[key] = _deep_merge(result[key], value)
-        else:
-            result[key] = value
-    return result
-
-
-def load_amy_config(path: Path) -> dict[str, Any]:
-    if path.exists():
-        with path.open("r", encoding="utf-8") as handle:
-            user = json.load(handle)
-        if not isinstance(user, dict):
-            raise ValueError(f"{path} must contain a JSON object")
-    else:
-        user = {}
-    return _deep_merge(DEFAULT_CONFIG, user)
+    return compact_repeating_events(occurrences, bar_period)
 
 
 class _DebugLog:
@@ -298,22 +82,19 @@ class _DebugLog:
     low-impact thread owns the file and writes the records.
     """
 
-    def __init__(self, config: dict[str, Any]) -> None:
-        debug = config.get("debug", {})
-        self.enabled = bool(debug.get("log_amy_commands", False))
-        self.log_logical = bool(debug.get("log_logical_events", False))
+    def __init__(self, config: DebugConfig) -> None:
+        self.enabled = config.log_amy_commands
+        self.log_logical = config.log_logical_events
         self.path: Path | None = None
-        self._queue: queue.SimpleQueue[str | None] | None = None
+        self._queue: queue.Queue[str | None] | None = None
         self._thread: threading.Thread | None = None
+        self.dropped_records = 0
 
         if self.enabled:
-            path = Path(str(debug.get(
-                "amy_command_log",
-                "~/.omnichord/amy_debug.log",
-            ))).expanduser()
+            path = Path(config.amy_command_log).expanduser()
             path.parent.mkdir(parents=True, exist_ok=True)
             self.path = path
-            self._queue = queue.SimpleQueue()
+            self._queue = queue.Queue(maxsize=DEBUG_LOG_QUEUE_CAPACITY)
             self._thread = threading.Thread(
                 target=self._run,
                 name="amy-debug-log",
@@ -325,6 +106,10 @@ class _DebugLog:
     def _run(self) -> None:
         if self.path is None or self._queue is None:
             return
+        if self.path.exists() and self.path.stat().st_size >= DEBUG_LOG_MAX_BYTES:
+            rotated = self.path.with_suffix(self.path.suffix + ".1")
+            rotated.unlink(missing_ok=True)
+            self.path.replace(rotated)
         with self.path.open("a", encoding="utf-8", buffering=1) as handle:
             while True:
                 line = self._queue.get()
@@ -337,296 +122,112 @@ class _DebugLog:
         if not self.enabled or self._queue is None:
             return
         stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
-        self._queue.put(f"{stamp} {kind:<12} {text}\n")
+        try:
+            self._queue.put_nowait(f"{stamp} {kind:<12} {text}\n")
+        except queue.Full:
+            self.dropped_records += 1
 
     def close(self) -> None:
         if self._queue is None or self._thread is None:
             return
-        self._queue.put(None)
+        try:
+            self._queue.put_nowait(None)
+        except queue.Full:
+            self._queue.get_nowait()
+            self.dropped_records += 1
+            self._queue.put_nowait(None)
         self._thread.join(timeout=1.0)
         self._queue = None
         self._thread = None
 
 
-class _SerialWriter:
-    """Priority UART writer with independently cancelable low-priority lanes."""
+class _ScheduledWriter:
+    """Compatibility facade over the shared scheduler and one byte sink."""
 
-    def __init__(self, port: str, baud: int, write_timeout: float, debug_log: _DebugLog | None = None) -> None:
-        from collections import deque
-
-        self.debug_log = debug_log
-        self.serial = serial.Serial(
-            port=port,
-            baudrate=int(baud),
-            bytesize=serial.EIGHTBITS,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=0,
-            write_timeout=float(write_timeout),
+    def __init__(
+        self,
+        sink: Any,
+        *,
+        thread_name: str,
+        debug_log: _DebugLog | None,
+    ) -> None:
+        self._scheduler = CommandScheduler(
+            sink,
+            name=thread_name,
+            recorder=debug_log,
         )
-        self._high = deque()
-        self._low = deque()
-        self._lane_generation: dict[str, int] = {}
-        self._closed = False
-        self._condition = threading.Condition()
-        self._thread = threading.Thread(
-            target=self._run,
-            name="amy-uart-writer",
-            daemon=True,
-        )
-        self._thread.start()
 
     @staticmethod
     def _line(command: str) -> bytes:
-        command = command.strip()
-        if not command.endswith("Z"):
-            command += "Z"
-        return (command + "\n").encode("ascii")
+        return encode_command(command, b"\n")
 
     def new_low_generation(self, lane: str) -> int:
-        lane = str(lane)
-        with self._condition:
-            generation = self._lane_generation.get(lane, 0) + 1
-            self._lane_generation[lane] = generation
-            self._condition.notify_all()
-            return generation
+        return self._scheduler.new_low_generation(lane)
 
     def invalidate_all_low(self) -> None:
-        with self._condition:
-            for lane in list(self._lane_generation):
-                self._lane_generation[lane] += 1
-            self._low.clear()
-            self._condition.notify_all()
+        self._scheduler.invalidate_all_low()
 
     def high(self, command: str) -> None:
-        with self._condition:
-            if self._closed:
-                return
-            self._high.append(("command", command, 0.0))
-            self._condition.notify()
+        self._scheduler.high(command)
+
+    def high_many(self, commands: list[str] | tuple[str, ...]) -> None:
+        self._scheduler.high_many(commands)
 
     def delay(self, delay_seconds: float) -> None:
-        """Insert a host-side guard before later high-priority commands."""
-        with self._condition:
-            if self._closed:
-                return
-            self._high.append((
-                "delay",
-                None,
-                max(0.0, float(delay_seconds)),
-            ))
-            self._condition.notify()
+        self._scheduler.delay(delay_seconds)
 
     def low(self, lane: str, generation: int, command: str) -> None:
-        with self._condition:
-            if self._closed:
-                return
-            self._low.append((str(lane), int(generation), command))
-            self._condition.notify()
+        self._scheduler.low(lane, generation, command)
 
-    def _write(self, command: str, lane: str) -> None:
-        if self.debug_log is not None:
-            self.debug_log.write(f"TX-{lane}", command.strip())
-        self.serial.write(self._line(command))
-
-    def _run(self) -> None:
-        while True:
-            item_kind: str | None = None
-            command: str | None = None
-            delay_seconds = 0.0
-            output_lane = "HIGH"
-
-            with self._condition:
-                while True:
-                    if self._closed and not self._high and not self._low:
-                        return
-
-                    if self._high:
-                        item_kind, command, delay_seconds = self._high.popleft()
-                        break
-
-                    # Drop stale lane generations without touching UART. This
-                    # scan is intentionally cheap: there are only three rhythm
-                    # lanes plus the occasional full-rhythm transaction lane.
-                    while self._low:
-                        low_lane, generation, low_command = self._low.popleft()
-                        if generation != self._lane_generation.get(low_lane, 0):
-                            continue
-                        item_kind = "command"
-                        command = low_command
-                        output_lane = "LOW"
-                        break
-
-                    if item_kind is not None:
-                        break
-
-                    self._condition.wait()
-
-            if item_kind == "delay":
-                if self.debug_log is not None:
-                    self.debug_log.write(
-                        "GUARD", f"sleep {delay_seconds * 1000.0:.1f} ms"
-                    )
-                time.sleep(delay_seconds)
-                continue
-
-            if item_kind == "command" and command is not None:
-                self._write(command, output_lane)
+    @property
+    def health(self) -> TransportHealth:
+        return self._scheduler.health
 
     def close(self) -> None:
-        with self._condition:
-            if self._closed:
-                return
-            # Do not call invalidate_all_low() while already holding this
-            # non-reentrant Condition lock.
-            for lane in list(self._lane_generation):
-                self._lane_generation[lane] += 1
-            self._low.clear()
-            self._closed = True
-            self._condition.notify_all()
-
-        self._thread.join(timeout=1.0)
-        self.serial.close()
+        self._scheduler.close()
 
 
-class _UnixSocketWriter(_SerialWriter):
-    """Priority writer for a separately managed local AMY service."""
+class _SerialWriter(_ScheduledWriter):
+    def __init__(
+        self,
+        port: str,
+        baud: int,
+        write_timeout: float,
+        debug_log: _DebugLog | None = None,
+    ) -> None:
+        super().__init__(
+            SerialByteSink(port, baud, write_timeout),
+            thread_name="amy-uart-writer",
+            debug_log=debug_log,
+        )
 
+
+class _UnixSocketWriter(_ScheduledWriter):
     def __init__(
         self,
         socket_path: str,
         debug_log: _DebugLog | None = None,
     ) -> None:
-        from collections import deque
-
-        self.debug_log = debug_log
-        # Prefer packet-preserving local IPC and fall back to an LF-framed
-        # stream when that socket mode is unavailable. The choice follows the
-        # actual endpoint capability rather than an operating-system name.
-        self.socket, self._stream_transport = connect_unix_wire_socket(
-            str(socket_path),
-            timeout=5.0,
+        super().__init__(
+            UnixByteSink(socket_path),
+            thread_name="amy-socket-writer",
+            debug_log=debug_log,
         )
-        self.serial = self.socket
-        self._high = deque()
-        self._low = deque()
-        self._lane_generation: dict[str, int] = {}
-        self._closed = False
-        self._condition = threading.Condition()
-        self._thread = threading.Thread(
-            target=self._run,
-            name="amy-socket-writer",
-            daemon=True,
-        )
-        self._thread.start()
-
-    def _write(self, command: str, lane: str) -> None:
-        command = command.strip()
-        if not command.endswith("Z"):
-            command += "Z"
-        if self.debug_log is not None:
-            self.debug_log.write(f"TX-{lane}", command)
-        framing = "\n" if self._stream_transport else ""
-        self.socket.sendall((command + framing).encode("ascii"))
-
-    def close(self) -> None:
-        super().close()
 
 
-class _QtLocalSocketWriter(_SerialWriter):
-    """LF-framed Qt local IPC writer used by the native Windows package.
-
-    QLocalSocket maps this name to a Windows named pipe.  The object is
-    created, connected, written and closed on the existing dedicated writer
-    thread so its QObject thread affinity is never crossed.
-    """
+class _QtLocalSocketWriter(_ScheduledWriter):
+    """QLocalSocket sink created, used and closed on its scheduler thread."""
 
     def __init__(
         self,
         server_name: str,
         debug_log: _DebugLog | None = None,
     ) -> None:
-        from collections import deque
-
-        self.debug_log = debug_log
-        self.server_name = str(server_name)
-        self._high = deque()
-        self._low = deque()
-        self._lane_generation: dict[str, int] = {}
-        self._closed = False
-        self._condition = threading.Condition()
-        self._connect_complete = threading.Event()
-        self._connect_error: BaseException | None = None
-        self._local_socket: Any | None = None
-        self._thread = threading.Thread(
-            target=self._run,
-            name="amy-local-writer",
-            daemon=True,
+        super().__init__(
+            QtLocalByteSink(server_name),
+            thread_name="amy-local-writer",
+            debug_log=debug_log,
         )
-        self._thread.start()
-
-        if not self._connect_complete.wait(5.5):
-            with self._condition:
-                self._closed = True
-                self._condition.notify_all()
-            self._thread.join(timeout=1.0)
-            raise TimeoutError(
-                f"timed out connecting to local AMY service {self.server_name!r}"
-            )
-        if self._connect_error is not None:
-            raise ConnectionError(str(self._connect_error)) from self._connect_error
-
-    def _run(self) -> None:
-        from PySide6.QtNetwork import QLocalSocket
-
-        local_socket = QLocalSocket()
-        self._local_socket = local_socket
-        try:
-            local_socket.connectToServer(self.server_name)
-            if not local_socket.waitForConnected(5000):
-                raise ConnectionError(local_socket.errorString())
-            self._connect_complete.set()
-            super()._run()
-        except BaseException as exc:
-            self._connect_error = exc
-            with self._condition:
-                self._closed = True
-                self._high.clear()
-                self._low.clear()
-                self._condition.notify_all()
-        finally:
-            local_socket.close()
-            self._connect_complete.set()
-
-    def _write(self, command: str, lane: str) -> None:
-        command = command.strip()
-        if not command.endswith("Z"):
-            command += "Z"
-        if self.debug_log is not None:
-            self.debug_log.write(f"TX-{lane}", command)
-        payload = (command + "\n").encode("ascii")
-        local_socket = self._local_socket
-        if local_socket is None:
-            raise ConnectionError("local AMY socket is not connected")
-        if local_socket.write(payload) != len(payload):
-            raise OSError(local_socket.errorString())
-        deadline = time.monotonic() + 5.0
-        while local_socket.bytesToWrite() > 0:
-            remaining_ms = max(1, int((deadline - time.monotonic()) * 1000))
-            if time.monotonic() >= deadline or not local_socket.waitForBytesWritten(
-                remaining_ms
-            ):
-                raise TimeoutError(local_socket.errorString())
-
-    def close(self) -> None:
-        with self._condition:
-            if not self._closed:
-                for lane in list(self._lane_generation):
-                    self._lane_generation[lane] += 1
-                self._low.clear()
-                self._closed = True
-                self._condition.notify_all()
-        self._thread.join(timeout=1.0)
 
 
 class _TaggedSequencerLane:
@@ -645,7 +246,7 @@ class _TaggedSequencerLane:
         name: str,
         start: int,
         count: int,
-        writer: _SerialWriter,
+        writer: _ScheduledWriter,
     ) -> None:
         self.name = str(name)
         self.start = int(start)
@@ -659,88 +260,24 @@ class _TaggedSequencerLane:
     def end(self) -> int:
         return self.start + self.count
 
-    def _event_command(
-        self,
-        index: int,
-        event: tuple[int, int, str],
-    ) -> str:
-        tick, period, body = event
-        tag = self.start + int(index)
-        period_value = max(1, int(period))
-        tick_value = max(0, int(tick)) % period_value
-        body = str(body)
-        if body.endswith("Z"):
-            body = body[:-1]
-        return f"H{tick_value},{period_value},{tag}{body}Z"
-
     def commands(
         self,
         events: list[tuple[int, int, str]],
     ) -> list[str]:
-        if len(events) > self.count:
-            raise ValueError(
-                f"sequencer lane {self.name} requires {len(events)} tags; "
-                f"range capacity is {self.count}"
-            )
-
-        previous_high_water = self.high_water
-        self.high_water = max(self.high_water, len(events))
-        commands: list[str] = []
-
-        for index, event in enumerate(events):
-            commands.append(self._event_command(index, event))
-
-        # Clear tags no longer used by the new pattern. Keep using the maximum
-        # ever occupied slot so an interrupted earlier update cannot leave a
-        # stale event beyond the current event count.
-        for index in range(len(events), max(previous_high_water, self.high_water)):
-            commands.append(f"H0,0,{self.start + index}Z")
-
-        return commands
+        plan = compile_tagged_lane(
+            name=self.name,
+            start=self.start,
+            count=self.count,
+            previous_high_water=self.high_water,
+            events=events,
+        )
+        self.high_water = plan.high_water
+        return list(plan.commands)
 
     def enqueue(self, events: list[tuple[int, int, str]]) -> None:
         generation = self.writer.new_low_generation(self.name)
         for command in self.commands(events):
             self.writer.low(self.name, generation, command)
-
-    def retain_only(
-        self,
-        events: list[tuple[int, int, str]],
-        retained_indexes: set[int],
-    ) -> None:
-        """Reinstall selected events and clear every other occupied tag."""
-        retained = {int(index) for index in retained_indexes}
-        invalid = {
-            index
-            for index in retained
-            if index < 0
-            or index >= len(events)
-            or index >= self.high_water
-        }
-        if invalid:
-            raise ValueError(
-                f"sequencer lane {self.name} cannot retain indexes "
-                f"{sorted(invalid)} with high-water {self.high_water}"
-            )
-
-        generation = self.writer.new_low_generation(self.name)
-        # Starting a new lane generation invalidates commands from an update
-        # which may only have been partially transmitted. Reinstall retained
-        # events first so their delivery does not depend on that older queue.
-        for index in sorted(retained):
-            self.writer.low(
-                self.name,
-                generation,
-                self._event_command(index, events[index]),
-            )
-        for index in range(self.high_water):
-            if index in retained:
-                continue
-            self.writer.low(
-                self.name,
-                generation,
-                f"H0,0,{self.start + index}Z",
-            )
 
     def clear(self) -> None:
         self.enqueue([])
@@ -763,85 +300,69 @@ class AmySerialClient:
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: dict[str, Any] | None,
         addresses: dict[str, str],
         *,
         writer_factory: Any | None = None,
+        resolved_config: ResolvedAmyConfig | None = None,
     ) -> None:
-        self.config = config
+        if resolved_config is None:
+            if config is None:
+                raise ValueError("config or resolved_config is required")
+            resolved_config = resolve_amy_config_data(
+                config,
+                source_path=(Path(__file__).resolve().parent.parent / "config" / "amy_config.json"),
+                source_kind="external",
+            )
+        self.resolved_config = resolved_config
         self.addr = addresses
 
-        self.debug_log = _DebugLog(config)
+        self.debug_log = _DebugLog(resolved_config.debug)
         if self.debug_log.path is not None:
             print(
                 f"AMY command log: {self.debug_log.path}",
                 flush=True,
             )
         if writer_factory is None:
-            serial_cfg = config["serial"]
             self.writer = _SerialWriter(
-                str(serial_cfg["port"]),
-                int(serial_cfg["baud"]),
-                float(serial_cfg.get("write_timeout", 0.5)),
+                resolved_config.transport.serial_port,
+                resolved_config.transport.serial_baud,
+                resolved_config.transport.serial_write_timeout,
                 self.debug_log,
             )
         else:
             self.writer = writer_factory(self.debug_log)
+        self._transport_failure_reported = False
+        self.application_scheduler = MonotonicScheduler()
 
-        ids = config["synth_ids"]
-        self.synth_id = {
-            "drums": int(ids["drums"]),
-            "bass": int(ids["bass"]),
-            "strum": int(ids["strum"]),
-            "manual_chord": int(ids["manual_chord"]),
-            "rhythm_chord": int(ids["rhythm_chord"]),
-        }
-        voices = config["voices"]
+        self.synth_id = dict(resolved_config.layout.role_synth_ids)
+        voices = resolved_config.capacities.voices
         self.voice_count = {
-            "drums": int(voices["drums"]),
-            "bass": int(voices["bass"]),
-            "strum": int(voices["strum"]),
-            "manual_chord": int(voices["manual_chord"]),
-            "rhythm_chord": int(voices["rhythm_chord"]),
+            "drums": voices.drums,
+            "bass": voices.bass,
+            "strum": voices.strum,
+            "manual_chord": voices.manual_chord,
+            "rhythm_chord": voices.rhythm_chord,
         }
 
-        defaults = config.get("default_synths", {})
         self.selected_synth = {
-            "chord": str(defaults.get("chord", "juno_004")),
-            "strum": str(defaults.get("strum", "juno_028")),
-            "bass": str(defaults.get("bass", "dx7_143")),
+            "chord": resolved_config.synth_defaults.chord,
+            "strum": resolved_config.synth_defaults.strum,
+            "bass": resolved_config.synth_defaults.bass,
         }
-        self.patch_map = {
-            str(key): int(value)
-            for key, value in config["synth_patches"].items()
-        }
-        self.synth_params: dict[str, dict[str, float]] = {
-            "chord": {}, "strum": {}, "bass": {}
-        }
-        self._adsr_override_active = {
-            "chord": False, "strum": False, "bass": False
-        }
+        self.patch_map = {str(key): int(value) for key, value in resolved_config.synth_patches}
+        self.synth_params: dict[str, dict[str, float]] = {"chord": {}, "strum": {}, "bass": {}}
+        self._adsr_override_active = {"chord": False, "strum": False, "bass": False}
         self.volume = {
             "chord": 0.5,
             "strum": 0.5,
             "bass": 0.5,
             "drums": 0.5,
         }
-        buses = config.get("buses", {})
-        self.bus_id = {
-            "drums": int(buses.get("drums", 0)),
-            "bass": int(buses.get("bass", 1)),
-            "strum": int(buses.get("strum", 2)),
-            "chord": int(buses.get("chord", 3)),
-        }
+        self.bus_id = dict(resolved_config.layout.role_buses)
         bus_values = tuple(self.bus_id.values())
-        if (
-            len(set(bus_values)) != 4
-            or any(bus < 0 or bus > 3 for bus in bus_values)
-        ):
-            raise ValueError(
-                "drums, bass, strum and chord must use four distinct AMY buses 0..3"
-            )
+        if len(set(bus_values)) != 4 or any(bus < 0 or bus > 3 for bus in bus_values):
+            raise ValueError("drums, bass, strum and chord must use four distinct AMY buses 0..3")
         self.master_volume = 1.0
         self.reverb = {
             "level": 0.0,
@@ -856,20 +377,54 @@ class AmySerialClient:
         self.rhythm_config: dict[str, Any] | None = None
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
-        self._rhythm_chord_draining = False
         self.bass_running = True
         self._scheduled_rhythm_id: str | None = None
+        self.drum_catalog: DrumPatternCatalog = load_drum_pattern_catalog(
+            _resolve_drum_catalog_directory(
+                packaged_root=(Path(sys._MEIPASS) if hasattr(sys, "_MEIPASS") else None)
+            )
+        )
+        self.drum_kit = resolved_config.drums.kit
+        if self.drum_kit not in self.drum_catalog.kits:
+            raise ValueError(
+                f"unknown drums.kit {self.drum_kit!r}; expected tiny, gamma9001 or general_midi"
+            )
+        self._drum_roles = tuple(
+            sorted(
+                {
+                    event.role
+                    for rhythm in self.drum_catalog.rhythms.values()
+                    for level in rhythm.levels
+                    for event in level
+                }
+            )
+        )
+        self._group_ranges = {
+            name: (start, count)
+            for name, start, count in resolved_config.layout.sequencer_group_ranges
+        }
+        _, drum_group_count = self._group_ranges["drum_bases"]
+        if len(self._drum_roles) > drum_group_count:
+            raise ValueError("logical drum roles exceed reserved AMY group slots")
+        self._drum_role_index = {role: index for index, role in enumerate(self._drum_roles)}
+        # High-water marks only grow. If an asynchronous definition update is
+        # superseded, a later transaction may clear extra local tags but can
+        # never overlook a tag still present in AMY.
+        self._group_tag_high_waters: dict[int, int] = {}
 
-        tag_config = config.get("rhythm", {}).get("tag_ranges", {})
-        max_tags = int(config.get("rhythm", {}).get("max_sequencer_tags", 256))
+        tag_config = {
+            name: (start, count)
+            for name, start, count in resolved_config.layout.sequencer_tag_ranges
+        }
+        max_tags = resolved_config.rhythm.max_sequencer_tags
         self._sequencer_lanes: dict[str, _TaggedSequencerLane] = {}
         occupied: set[int] = set()
         for lane_name in ("drums", "bass", "chords"):
-            raw_range = tag_config.get(lane_name, {})
+            start, count = tag_config[lane_name]
             lane = _TaggedSequencerLane(
                 lane_name,
-                int(raw_range.get("start", -1)),
-                int(raw_range.get("count", 0)),
+                start,
+                count,
                 self.writer,
             )
             if lane.end > max_tags:
@@ -880,30 +435,23 @@ class AmySerialClient:
             tags = set(range(lane.start, lane.end))
             overlap = tags & occupied
             if overlap:
-                raise ValueError(
-                    f"sequencer tag ranges overlap at {min(overlap)}"
-                )
+                raise ValueError(f"sequencer tag ranges overlap at {min(overlap)}")
             occupied |= tags
             self._sequencer_lanes[lane_name] = lane
 
         self._configured_synths: set[int] = set()
-        self._synth_generation: dict[int, int] = {
-            synth: 0 for synth in self.synth_id.values()
-        }
+        self._synth_generation: dict[int, int] = {synth: 0 for synth in self.synth_id.values()}
 
         # Conservative oscillator-budget guard.  Every synth in the shipped
         # catalogue is Juno (6 oscs/voice) or DX7 (8 oscs/voice).  Drums use
         # one PCM osc per voice in v3.2.
-        worst_case_oscs = (
-            self.voice_count["drums"]
-            + 8 * (
-                self.voice_count["bass"]
-                + self.voice_count["strum"]
-                + self.voice_count["manual_chord"]
-                + self.voice_count["rhythm_chord"]
-            )
+        worst_case_oscs = self.voice_count["drums"] + 8 * (
+            self.voice_count["bass"]
+            + self.voice_count["strum"]
+            + self.voice_count["manual_chord"]
+            + self.voice_count["rhythm_chord"]
         )
-        max_oscs = int(config.get("amy_max_oscs", 120))
+        max_oscs = resolved_config.capacities.max_oscs
         if worst_case_oscs > max_oscs:
             raise ValueError(
                 f"AMY voice configuration can require {worst_case_oscs} "
@@ -934,13 +482,93 @@ class AmySerialClient:
         self.writer.delay(0.020)
         self._configured_synths.clear()
         self._configure_fixed_synths()
+        self._preload_drum_library()
 
     def _wire(self, command: str) -> None:
-        self.writer.high(command)
+        try:
+            self.writer.high(command)
+        except TransportFailed as exc:
+            # A failed device must be visible, but it must not abort the Qt
+            # event batch that delivered unrelated MIDI/UI state changes.
+            if not self._transport_failure_reported:
+                print(f"AMY transport failed: {exc}", flush=True)
+                self._transport_failure_reported = True
 
     @staticmethod
     def _f(value: float) -> str:
         return f"{float(value):.9g}"
+
+    def _drum_hit_body(
+        self,
+        rhythm_id: str,
+        role: str,
+        velocity: int,
+        *,
+        fill: bool,
+    ) -> str:
+        sound = self.drum_catalog.resolve(
+            self.drum_kit,
+            rhythm_id,
+            role,
+            fill=fill,
+        )
+        gain = max(0.0, self.resolved_config.drums.velocity_gain)
+        level = max(0.0, min(1.0, float(velocity) / 127.0)) * gain
+        preset = "" if sound.preset is None else f"p{sound.preset}"
+        return f"{preset}n{self._f(float(sound.note))}l{self._f(level)}i{self.synth_id['drums']}"
+
+    def _fill_group_tag(self, fill: DrumFill) -> int:
+        start, count = self._group_ranges["fills"]
+        group = start + int(fill.index) - 1
+        if not start <= group < start + count:
+            raise ValueError(f"fill {fill.fill_id!r} has unsupported index {fill.index}")
+        return group
+
+    def _remember_group_tag_high_waters(
+        self,
+        values: tuple[tuple[int, int], ...],
+    ) -> None:
+        for group, high_water in values:
+            self._group_tag_high_waters[group] = max(
+                self._group_tag_high_waters.get(group, 0),
+                high_water,
+            )
+
+    def _preload_drum_library(self) -> None:
+        """Author every fill once; runtime changes only schedule definitions."""
+        fills = {
+            fill.index: (rhythm.rhythm_id, fill)
+            for rhythm in self.drum_catalog.rhythms.values()
+            for fill in rhythm.fills
+        }
+        for _, (rhythm_id, fill) in sorted(fills.items()):
+            group = self._fill_group_tag(fill)
+            drum_base, _ = self._group_ranges["drum_bases"]
+            definition = compile_fill_group(
+                rhythm_id=rhythm_id,
+                fill=fill,
+                group=group,
+                roles=self._drum_roles,
+                role_indexes=self._drum_role_index,
+                drum_group_start=drum_base,
+                hit_body=self._drum_hit_body,
+            )
+            if (
+                definition.tag_count
+                > self.resolved_config.capacities.max_sequence_group_tags
+            ):
+                raise ValueError(
+                    f"fill {fill.fill_id!r} needs {definition.tag_count} "
+                    "AMY sequence-group tags"
+                )
+            self._remember_group_tag_high_waters(((group, definition.high_water),))
+            writer = getattr(self, "writer", None)
+            high_many = getattr(writer, "high_many", None)
+            if callable(high_many):
+                high_many(definition.commands)
+            else:
+                for command in definition.commands:
+                    self._wire(command)
 
     def _bump_synth_generation(self, synth: int) -> None:
         self._synth_generation[synth] = self._synth_generation.get(synth, 0) + 1
@@ -964,12 +592,10 @@ class AmySerialClient:
             else:
                 self._wire(f"n{self._f(note)}l0i{synth}Z")
 
-        timer = threading.Timer(
+        self.application_scheduler.schedule(
             max(0.001, float(delay_ms) / 1000.0),
             note_off,
         )
-        timer.daemon = True
-        timer.start()
 
     def _patch(self, role: str) -> int:
         name = self.selected_synth[role]
@@ -1008,17 +634,15 @@ class AmySerialClient:
             return f"if{SYNTH_FLAGS_NO_NOTE_WARNINGS}"
         return ""
 
-    def _patch_compatibility_commands(
-        self, patch: int, synth: int
-    ) -> list[str]:
+    def _patch_compatibility_commands(self, patch: int, synth: int) -> list[str]:
         """Small target-side corrections for known factory-patch edge cases.
 
         These do not replace the AMY patches.  They are sent immediately after
         the factory K command, so the original patch remains the source of all
         other settings.  Values live in amy_config.json for easy testing.
         """
-        raw = self.config.get("patch_compatibility", {}).get(str(patch), {})
-        if not isinstance(raw, dict):
+        raw = self.resolved_config.patch_compatibility(patch)
+        if raw is None:
             return []
         out: list[str] = []
         if "juno_noise_amp" in raw:
@@ -1132,16 +756,10 @@ class AmySerialClient:
             # Put the bus in the allocation/patch event itself. Many Juno ROM
             # patches contain bus FX; without iy here those startup FX briefly
             # (and persistently) land on default bus 0 before a later route.
-            self._wire(
-                f"K{patch}i{synth}iv{voices}iy{bus}{flag_fields}Z"
-            )
+            self._wire(f"K{patch}i{synth}iv{voices}iy{bus}{flag_fields}Z")
             self._configured_synths.add(synth)
 
-            guard_ms = float(
-                self.config.get("performance", {}).get(
-                    "synth_alloc_guard_ms", 10.0
-                )
-            )
+            guard_ms = self.resolved_config.performance.synth_alloc_guard_ms
             self.writer.delay(max(0.0, guard_ms) / 1000.0)
         self._apply_patch_compatibility(patch, synth)
         self._route_synth_bus(synth)
@@ -1160,11 +778,7 @@ class AmySerialClient:
             # next patch transaction out of the same audio-block burst.  This
             # is especially important during startup/preset restore, where the
             # chord, strum and bass patches are otherwise queued back-to-back.
-            guard_ms = float(
-                self.config.get("performance", {}).get(
-                    "synth_alloc_guard_ms", 10.0
-                )
-            )
+            guard_ms = self.resolved_config.performance.synth_alloc_guard_ms
             self.writer.delay(max(0.0, guard_ms) / 1000.0)
 
     def _configure_synth(self, role: str) -> None:
@@ -1177,16 +791,18 @@ class AmySerialClient:
                 self._wire(command)
 
     def _configure_fixed_synths(self) -> None:
-        # Drums deliberately do NOT use legacy patch 258 here.  That patch
-        # reserves 32 oscillators merely to implement the complete GM-note
-        # lookup table.  The Omnichord needs only a handful of simultaneous
-        # hits, so synth 0 is a small polyphonic PCM synth: one oscillator per
-        # voice, preconfigured as PCM.  Each hit supplies preset+native note.
+        # Tiny and Gamma9001 resolve kit roles to direct PCM presets, allowing
+        # one small polyphonic synth even when a Gamma rhythm mixes kit
+        # families. General MIDI deliberately uses AMY's engine-side patch
+        # 258 note map; it is still AMY audio and never opens a MIDI path.
         drums = self.synth_id["drums"]
         drum_voices = self.voice_count["drums"]
         self._bump_synth_generation(drums)
-        self._wire(f"i{drums}iv{drum_voices}in1Z")
-        self._wire(f"v0w7i{drums}Z")
+        if self.drum_kit == "general_midi":
+            self._wire(f"K258i{drums}iy{self._bus_for_synth(drums)}Z")
+        else:
+            self._wire(f"i{drums}iv{drum_voices}in1Z")
+            self._wire(f"v0w7i{drums}Z")
         self._route_synth_bus(drums)
         self._wire(f"i{drums}iV{self._f(self.volume['drums'])}Z")
         self._configured_synths.add(drums)
@@ -1218,164 +834,22 @@ class AmySerialClient:
     ) -> list[str]:
         """Build engine-relevant control commands for one synth.
 
-        Missing controls leave the current patch value alone.  Negative values
-        are accepted only as a legacy "unset" sentinel and are never exposed
-        by the current UI.  When parameter_keys is provided, emit commands
-        only for those controls so moving one slider cannot resend unrelated
-        filter/LFO/envelope settings.
-
-        Juno: osc0 is VCF/VCA gather, osc1 is the LFO, osc2 pulse,
-        osc3 saw, osc4 sub.  DX7: osc0 is ALGO output, osc1 is its LFO.
+        The pure compiler owns patch semantics and selective-update behavior;
+        this adapter only supplies current application state.
         """
-        patch = self._patch(role)
-        params = self.synth_params[role]
-        commands: list[str] = []
-
-        def nonneg(name: str) -> float | None:
-            if parameter_keys is not None and name not in parameter_keys:
-                return None
-            value = params.get(name)
-            if value is None or value < 0:
-                return None
-            return clamp_control_value(name, float(value))
-
-        lfo_hz = nonneg("lfo_hz")
-        portamento = nonneg("portamento_ms")
-
-        if 0 <= patch <= 127:  # Juno
-            cutoff = nonneg("filter_hz")
-            if cutoff is not None:
-                cutoff = clamp_control_value("filter_hz", cutoff)
-                commands.append(f"v0F{self._f(cutoff)}i{synth}Z")
-
-            resonance = nonneg("resonance")
-            if resonance is not None:
-                resonance = clamp_control_value("resonance", resonance)
-                commands.append(f"v0R{self._f(resonance)}i{synth}Z")
-
-            if lfo_hz is not None:
-                commands.append(
-                    f"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z"
-                )
-
-            # Merely changing LFO frequency is inaudible when the patch has
-            # zero modulation depth.  These controls explicitly route osc1
-            # into the parameters the Juno architecture actually uses.
-            vibrato = nonneg("vibrato_depth")
-            if vibrato is not None:
-                depth = max(0.0, min(0.05, vibrato))
-                for osc in (2, 3, 4):
-                    commands.append(f"v{osc}f,,,,,{self._f(depth)}i{synth}Z")
-
-            vcf_lfo = nonneg("filter_lfo_depth")
-            if vcf_lfo is not None:
-                depth = clamp_control_value("filter_lfo_depth", vcf_lfo)
-                commands.append(f"v0F,,,,,{self._f(depth)}i{synth}Z")
-
-            pulse_width = nonneg("pulse_width")
-            if pulse_width is not None:
-                duty = max(0.05, min(0.95, pulse_width))
-                commands.append(f"v2d{self._f(duty)}i{synth}Z")
-
-            pwm_depth = nonneg("pwm_depth")
-            if pwm_depth is not None:
-                depth = max(0.0, min(0.45, pwm_depth))
-                commands.append(f"v2d,,,,,{self._f(depth)}i{synth}Z")
-
-            if portamento is not None:
-                ms = max(0, int(round(portamento)))
-                for osc in (2, 3, 4):
-                    commands.append(f"v{osc}m{ms}i{synth}Z")
-
-            attack = nonneg("attack_ms")
-            decay = nonneg("decay_ms")
-            sustain = nonneg("sustain")
-            release = nonneg("release_ms")
-            if any(v is not None for v in (attack, decay, sustain, release)):
-                fields = [
-                    self._f(attack) if attack is not None else "",
-                    "",
-                    self._f(decay) if decay is not None else "",
-                    self._f(max(0.0, min(1.0, sustain)))
-                    if sustain is not None else "",
-                    self._f(release) if release is not None else "",
-                    "",
-                ]
-                commands.append(f"v0A{','.join(fields)}i{synth}Z")
-
-        elif 128 <= patch <= 255:  # DX7 / ALGO
-            algorithm = nonneg("algorithm")
-            if algorithm is not None:
-                algorithm_i = max(1, min(32, int(round(algorithm))))
-                commands.append(f"v0o{algorithm_i}i{synth}Z")
-
-            feedback = nonneg("feedback")
-            if feedback is not None:
-                commands.append(
-                    f"v0b{self._f(max(0.0, min(1.0, feedback)))}i{synth}Z"
-                )
-
-            if lfo_hz is not None:
-                commands.append(
-                    f"v1f{self._f(clamp_control_value('lfo_hz', lfo_hz))}i{synth}Z"
-                )
-
-            vibrato = nonneg("vibrato_depth")
-            if vibrato is not None:
-                depth = max(0.0, min(0.05, vibrato))
-                commands.append(f"v0f,,,,,{self._f(depth)}i{synth}Z")
-
-            if portamento is not None:
-                commands.append(
-                    f"v0m{max(0, int(round(portamento)))}i{synth}Z"
-                )
-
-            # This is a global ALGO-output ADSR layered on top of the DX7
-            # operators' native envelopes.  The native operator envelopes are
-            # intentionally left intact.  If any ADSR member changed, resend
-            # the complete global envelope because it belongs to us rather than
-            # to the factory DX7 operator patch.
-            adsr_keys = {
-                "attack_ms", "decay_ms", "sustain", "release_ms"
-            }
-            if (
-                parameter_keys is None
-                or bool(parameter_keys & adsr_keys)
-            ):
-                def current_nonneg(name: str) -> float | None:
-                    value = params.get(name)
-                    if value is None or value < 0:
-                        return None
-                    return clamp_control_value(name, float(value))
-
-                attack = current_nonneg("attack_ms")
-                decay = current_nonneg("decay_ms")
-                sustain = current_nonneg("sustain")
-                release = current_nonneg("release_ms")
-                if any(
-                    v is not None
-                    for v in (attack, decay, sustain, release)
-                ):
-                    a = 0.0 if attack is None else max(0.0, attack)
-                    d = 0.0 if decay is None else max(0.0, decay)
-                    sus = (
-                        1.0
-                        if sustain is None
-                        else max(0.0, min(1.0, sustain))
-                    )
-                    r = 60000.0 if release is None else max(0.0, release)
-                    commands.append(
-                        f"v0a,,,1A{self._f(a)},1,{self._f(d)},{self._f(sus)},"
-                        f"{self._f(r)},0i{synth}Z"
-                    )
-
-        return commands
+        return list(
+            compile_parameter_commands(
+                patch=self._patch(role),
+                synth=synth,
+                parameters=self.synth_params[role],
+                selected_keys=parameter_keys,
+            )
+        )
 
     def _adsr_is_active(self, role: str) -> bool:
         params = self.synth_params[role]
         return any(
-            params.get(key, -1.0) >= 0
-            for key in ("attack_ms", "decay_ms", "sustain", "release_ms")
+            params.get(key, -1.0) >= 0 for key in ("attack_ms", "decay_ms", "sustain", "release_ms")
         )
 
     def _sync_synth_params(
@@ -1386,9 +860,7 @@ class AmySerialClient:
     ) -> None:
         targets = self._role_synth_ids(role) if synth_ids is None else synth_ids
         for synth in targets:
-            for command in self._param_commands_for_synth(
-                role, synth, parameter_keys
-            ):
+            for command in self._param_commands_for_synth(role, synth, parameter_keys):
                 self._wire(command)
 
     def _apply_supported_params(
@@ -1518,11 +990,8 @@ class AmySerialClient:
             self._wire(f"i{synth}iV{self._f(output_level)}Z")
 
     def _instrument_level(self, role: str) -> float:
-        levels = self.config.get("instrument_levels", {})
-        if not isinstance(levels, dict):
-            return 1.0
         key = self.selected_synth.get(role, "")
-        return max(0.0, float(levels.get(key, 1.0)))
+        return max(0.0, self.resolved_config.instrument_level(key))
 
     # ------------------------------------------------------------------
     # Manual chord voice (synth 3)
@@ -1566,52 +1035,17 @@ class AmySerialClient:
         elif action == "stop_all":
             self._stop_all_manual()
 
-    def _begin_rhythm_chord_drain(
-        self,
-        existing_events: list[tuple[int, int, str]],
-    ) -> None:
-        """Suppress future onsets while preserving sequenced synth-4 offs."""
-        note_off = f"l0i{self.synth_id['rhythm_chord']}"
-        retained_indexes = {
-            index
-            for index, (_, _, body) in enumerate(existing_events)
-            if str(body).removesuffix("Z").endswith(note_off)
-        }
-        lane = self._sequencer_lanes["chords"]
-        retained_indexes = {
-            index
-            for index in retained_indexes
-            if index < lane.high_water
-        }
-        if not retained_indexes:
-            return
-
-        lane.retain_only(existing_events, retained_indexes)
-        self._rhythm_chord_draining = True
-
     def _set_rhythm_chord_enabled(
         self,
         enabled: bool,
-        *,
-        existing_chord_events: list[tuple[int, int, str]] | None = None,
     ) -> bool:
-        """Apply an automatic-chord gate transition without truncating it."""
+        """Apply an automatic-chord gate without truncating active children."""
         enabled = bool(enabled)
         if self.rhythm_chord_enabled == enabled:
             return False
 
-        if existing_chord_events is None:
-            existing_chord_events = self._lane_events("chords")
-
         self.rhythm_chord_enabled = enabled
-        self._rhythm_chord_draining = False
-        if not enabled:
-            # AMY has no deferred tag deletion. Clear only the scheduled
-            # positive-velocity onsets and leave the already-installed l0
-            # events to close a sounding chord at its original rhythmic gate.
-            if self.rhythm_running:
-                self._begin_rhythm_chord_drain(existing_chord_events)
-        else:
+        if enabled:
             self._sync_synth_params(
                 "chord",
                 (self.synth_id["rhythm_chord"],),
@@ -1623,7 +1057,6 @@ class AmySerialClient:
             payload = json.loads(payload_text)
         except json.JSONDecodeError:
             return
-        existing_chord_events = self._lane_events("chords")
         self.chord_notes = [float(x) for x in payload.get("notes", [])]
         self.bass_notes = [float(x) for x in payload.get("bass_notes", [])]
         if "bass_riff" in payload:
@@ -1632,7 +1065,6 @@ class AmySerialClient:
         if "rhythm_chord_enabled" in payload:
             self._set_rhythm_chord_enabled(
                 payload.get("rhythm_chord_enabled"),
-                existing_chord_events=existing_chord_events,
             )
 
         if payload.get("play_now") and self.chord_notes:
@@ -1643,7 +1075,7 @@ class AmySerialClient:
             self._note_off_later(
                 synth,
                 None,
-                float(self.config["performance"]["one_shot_chord_gate_ms"]),
+                self.resolved_config.performance.one_shot_chord_gate_ms,
             )
 
         # Chord and bass are independent tagged sequencer lanes. Updating
@@ -1663,172 +1095,138 @@ class AmySerialClient:
             return AMY_PPQ
         return max(1, round(float(config["length_beats"]) * AMY_PPQ))
 
+    def _chord_group_plan(
+    self,
+    ) -> tuple[list[str], list[tuple[int, int, str]]]:
+        """Build note-owner groups and repeating root triggers.
+
+        The pure planner keeps each note's matching release in its immutable
+        one-shot revision. Replacing a root schedule therefore cannot shorten
+        an already-sounding arpeggio note.
+        """
+        rhythm_cfg = self.resolved_config.rhythm
+        group_start, group_count = self._group_ranges["chords"]
+        plan = compile_chord_group_plan(
+            config=self.rhythm_config,
+            enabled=self.rhythm_chord_enabled,
+            chord_notes=self.chord_notes,
+            max_chord_notes=rhythm_cfg.max_rhythm_chord_notes,
+            chord_gate_beats=rhythm_cfg.chord_gate_beats,
+            group_start=group_start,
+            group_count=group_count,
+            previous_tag_high_waters=self._group_tag_high_waters,
+            synth=self.synth_id["rhythm_chord"],
+            ppq=AMY_PPQ,
+        )
+        self._remember_group_tag_high_waters(plan.tag_high_waters)
+        return list(plan.definitions), list(plan.triggers)
+
     def _lane_events(self, lane_name: str) -> list[tuple[int, int, str]]:
-        config = self.rhythm_config
-        if not config:
-            return []
-
-        period = self._rhythm_period_ticks()
-        rhythm_cfg = self.config["rhythm"]
-        events: list[tuple[int, int, str]] = []
-
         if lane_name == "drums":
-            drum_synth = self.synth_id["drums"]
-            sample_map = self.config["drums"]["sample_map"]
-            drum_gain = max(
-                0.0,
-                float(self.config["drums"].get("velocity_gain", 5.0)),
-            )
-            for event in config.get("percussion_events", []):
-                sample = str(event.get("sample", ""))
-                if sample not in sample_map:
-                    continue
-                tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
-                velocity = max(0.0, min(1.0, float(event.get("amp", 1.0))))
-                hit = sample_map[sample]
-                events.append((
-                    tick,
-                    period,
-                    f"p{int(hit['preset'])}n{self._f(float(hit['note']))}"
-                    f"l{self._f(velocity * drum_gain)}i{drum_synth}",
-                ))
-            return events
-
+            # Percussion uses sequence groups; this lane carries fill triggers.
+            return []
         if lane_name == "bass":
-            if not self.bass_running:
-                return []
-            bass_synth = self.synth_id["bass"]
-            if str(config.get("bass_mode", "activity")) == "riff":
-                riff = self.bass_riff
-                if not isinstance(riff, dict):
-                    return []
-                ppq = max(1, int(riff.get("ppq", AMY_PPQ)))
-                phrase_ticks = max(1, int(riff.get("phrase_ticks", ppq)))
-                riff_period = max(1, round(phrase_ticks * AMY_PPQ / ppq))
-                for event in riff.get("events", []):
-                    if not isinstance(event, dict):
-                        continue
-                    tick = round(float(event.get("tick", 0)) * AMY_PPQ / ppq)
-                    duration = max(
-                        1,
-                        round(
-                            float(event.get("duration_ticks", 1))
-                            * AMY_PPQ
-                            / ppq
-                        ),
-                    )
-                    note = float(event.get("note", 36.0))
-                    velocity = max(
-                        0.0,
-                        min(1.0, float(event.get("velocity", 0)) / 127.0),
-                    )
-                    events.append((
-                        tick,
-                        riff_period,
-                        f"n{self._f(note)}l{self._f(velocity)}i{bass_synth}",
-                    ))
-                    events.append((
-                        tick + duration,
-                        riff_period,
-                        f"n{self._f(note)}l0i{bass_synth}",
-                    ))
-                return events
-
-            if not self.bass_notes:
-                return []
-            gate = max(
-                1,
-                round(float(rhythm_cfg["bass_gate_beats"]) * AMY_PPQ),
+            rhythm_cfg = self.resolved_config.rhythm
+            return list(
+                compile_bass_events(
+                    config=self.rhythm_config,
+                    running=self.bass_running,
+                    bass_notes=self.bass_notes,
+                    bass_riff=self.bass_riff,
+                    synth=self.synth_id["bass"],
+                    bass_gate_beats=rhythm_cfg.bass_gate_beats,
+                    ppq=AMY_PPQ,
+                )
             )
-            for event in config.get("bass_events", []):
-                degree = int(event.get("degree", 0))
-                note = self.bass_notes[degree % len(self.bass_notes)]
-                tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
-                velocity = max(0.0, min(1.0, float(event.get("amp", 1.0))))
-                events.append((
-                    tick,
-                    period,
-                    f"n{self._f(note)}l{self._f(velocity)}i{bass_synth}",
-                ))
-                events.append((
-                    tick + gate,
-                    period,
-                    f"n{self._f(note)}l0i{bass_synth}",
-                ))
-            return events
-
         if lane_name == "chords":
-            if not self.rhythm_chord_enabled or not self.chord_notes:
-                return []
-            chord_synth = self.synth_id["rhythm_chord"]
-            arpeggio = config.get("chord_arpeggio", {})
-            if isinstance(arpeggio, dict) and bool(
-                arpeggio.get("enabled", False)
-            ):
-                rate = max(
-                    1,
-                    min(4, int(arpeggio.get("notes_per_beat", 1))),
-                )
-                step = max(1, round(AMY_PPQ / rate))
-                gate = max(
-                    1,
-                    round(float(rhythm_cfg["chord_gate_beats"]) * step),
-                )
-                rhythm_notes = list(self.chord_notes)
-                if str(arpeggio.get("direction", "up")).lower() == "down":
-                    rhythm_notes.reverse()
-
-                note_offs: list[tuple[int, str]] = []
-                note_ons: list[tuple[int, str]] = []
-                for event in config.get("chord_events", []):
-                    start_tick = round(
-                        float(event.get("time", 0.0)) * AMY_PPQ
-                    )
-                    velocity = max(
-                        0.0,
-                        min(1.0, float(event.get("amp", 1.0))),
-                    )
-                    for note_index, note in enumerate(rhythm_notes):
-                        tick = start_tick + note_index * step
-                        note_offs.append((
-                            tick + gate,
-                            f"n{self._f(note)}l0i{chord_synth}",
-                        ))
-                        note_ons.append((
-                            tick,
-                            f"n{self._f(note)}l{self._f(velocity)}"
-                            f"i{chord_synth}",
-                        ))
-
-                # Off tags receive lower indexes than on tags. If one arp's
-                # release meets another's onset on the same tick, AMY closes
-                # the old note before it retriggers the new one.
-                return _compact_repeating_events(
-                    note_offs, period
-                ) + _compact_repeating_events(note_ons, period)
-
-            max_notes = max(
-                1,
-                int(rhythm_cfg.get("max_rhythm_chord_notes", 4)),
-            )
-            rhythm_notes = self.chord_notes[:max_notes]
-            gate = max(
-                1,
-                round(float(rhythm_cfg["chord_gate_beats"]) * AMY_PPQ),
-            )
-            for event in config.get("chord_events", []):
-                tick = round(float(event.get("time", 0.0)) * AMY_PPQ)
-                velocity = max(0.0, min(1.0, float(event.get("amp", 1.0))))
-                for note in rhythm_notes:
-                    events.append((
-                        tick,
-                        period,
-                        f"n{self._f(note)}l{self._f(velocity)}i{chord_synth}",
-                    ))
-                events.append((tick + gate, period, f"l0i{chord_synth}"))
-            return events
-
+            return self._chord_group_plan()[1]
         raise KeyError(lane_name)
+
+    def _drum_quantum(self) -> int:
+        config = self.rhythm_config
+        if not isinstance(config, dict):
+            return 0
+        return drum_quantum(self.drum_catalog.rhythm(str(config.get("id", ""))))
+
+    def _drum_activity_commands(
+        self,
+        *,
+        quantize_live: bool | None = None,
+    ) -> list[str]:
+        config = self.rhythm_config
+        if not isinstance(config, dict):
+            return []
+        rhythm = self.drum_catalog.rhythm(str(config.get("id", "")))
+        use_live_quantization = (
+            self.rhythm_running if quantize_live is None else bool(quantize_live)
+        )
+        drum_base, _ = self._group_ranges["drum_bases"]
+        plan = compile_drum_activity_groups(
+            rhythm=rhythm,
+            percussion_activity=int(config.get("percussion_activity", 1)),
+            roles=self._drum_roles,
+            group_start=drum_base,
+            previous_tag_high_waters=self._group_tag_high_waters,
+            rhythm_running=self.rhythm_running,
+            quantize_live=use_live_quantization,
+            hit_body=self._drum_hit_body,
+        )
+        self._remember_group_tag_high_waters(plan.tag_high_waters)
+        return list(plan.commands)
+
+    @staticmethod
+    def _fill_occurrences(
+        order: list[int],
+        fills: tuple[DrumFill, ...],
+    ) -> list[tuple[DrumFill, int]]:
+        return [(fill, start) for fill, start in fill_occurrences(order, fills)]
+
+    def _fill_schedule_commands(self) -> list[str]:
+        config = self.rhythm_config
+        if not isinstance(config, dict):
+            return []
+        rhythm = self.drum_catalog.rhythm(str(config.get("id", "")))
+        raw_order = config.get("fill_order", [])
+        order = (
+            list(
+                dict.fromkeys(
+                    int(value) for value in raw_order if 0 <= int(value) < len(rhythm.fills)
+                )
+            )
+            if isinstance(raw_order, list)
+            else []
+        )
+        lane = self._sequencer_lanes["drums"]
+        plan = compile_fill_schedule(
+            fills=rhythm.fills,
+            order=order,
+            density_bars=int(config.get("fill_density_bars", 32)),
+            bar_ticks=self._drum_quantum(),
+            lane_start=lane.start,
+            lane_count=lane.count,
+            previous_high_water=lane.high_water,
+            group_tag=self._fill_group_tag,
+        )
+        lane.high_water = plan.high_water
+        return list(plan.commands)
+
+    def _drum_commands(
+        self,
+        *,
+        activity: bool = True,
+        fills: bool = True,
+        quantize_live: bool | None = None,
+    ) -> list[str]:
+        commands: list[str] = []
+        if activity:
+            commands.extend(
+                self._drum_activity_commands(
+                    quantize_live=quantize_live,
+                )
+            )
+        if fills:
+            commands.extend(self._fill_schedule_commands())
+        return commands
 
     @staticmethod
     def _only_bass_config_changed(
@@ -1843,16 +1241,8 @@ class AmySerialClient:
             "bass_mode",
             "bass_riff",
         }
-        old_shared = {
-            key: value
-            for key, value in old_config.items()
-            if key not in bass_fields
-        }
-        new_shared = {
-            key: value
-            for key, value in new_config.items()
-            if key not in bass_fields
-        }
+        old_shared = {key: value for key, value in old_config.items() if key not in bass_fields}
+        new_shared = {key: value for key, value in new_config.items() if key not in bass_fields}
         return old_shared == new_shared
 
     @staticmethod
@@ -1867,38 +1257,105 @@ class AmySerialClient:
             "chord_events",
             "chord_arpeggio",
         }
-        old_shared = {
-            key: value
-            for key, value in old_config.items()
-            if key not in chord_fields
-        }
-        new_shared = {
-            key: value
-            for key, value in new_config.items()
-            if key not in chord_fields
-        }
+        old_shared = {key: value for key, value in old_config.items() if key not in chord_fields}
+        new_shared = {key: value for key, value in new_config.items() if key not in chord_fields}
         return old_shared == new_shared
 
+    @staticmethod
+    def _only_drum_activity_changed(
+        old_config: dict[str, Any] | None,
+        new_config: dict[str, Any],
+    ) -> bool:
+        if not isinstance(old_config, dict) or old_config == new_config:
+            return False
+        fields = {"busyness", "percussion_activity"}
+        return {key: value for key, value in old_config.items() if key not in fields} == {
+            key: value for key, value in new_config.items() if key not in fields
+        }
+
+    @staticmethod
+    def _only_fill_config_changed(
+        old_config: dict[str, Any] | None,
+        new_config: dict[str, Any],
+    ) -> bool:
+        if not isinstance(old_config, dict) or old_config == new_config:
+            return False
+        fields = {"fill_order", "fill_density_bars"}
+        return {key: value for key, value in old_config.items() if key not in fields} == {
+            key: value for key, value in new_config.items() if key not in fields
+        }
+
+    @staticmethod
+    def _only_tempo_config_changed(
+        old_config: dict[str, Any] | None,
+        new_config: dict[str, Any],
+    ) -> bool:
+        if not isinstance(old_config, dict) or old_config == new_config:
+            return False
+        return {key: value for key, value in old_config.items() if key != "tempo"} == {
+            key: value for key, value in new_config.items() if key != "tempo"
+        }
+
     def _replace_lane(self, lane_name: str) -> None:
-        if lane_name == "chords" and self._rhythm_chord_draining:
-            return
         lane = self._sequencer_lanes[lane_name]
         try:
-            lane.enqueue(self._lane_events(lane_name))
+            if lane_name == "drums":
+                generation = self.writer.new_low_generation("drums")
+                for command in self._drum_commands():
+                    self.writer.low("drums", generation, command)
+            elif lane_name == "chords":
+                generation = self.writer.new_low_generation("chords")
+                group_commands, events = self._chord_group_plan()
+                for command in group_commands + lane.commands(events):
+                    self.writer.low("chords", generation, command)
+            else:
+                lane.enqueue(self._lane_events(lane_name))
+        except ValueError as exc:
+            print(f"AMY rhythm warning: {exc}", flush=True)
+
+    def _replace_drums(
+        self,
+        *,
+        activity: bool,
+        fills: bool,
+    ) -> None:
+        try:
+            generation = self.writer.new_low_generation("drums")
+            for command in self._drum_commands(
+                activity=activity,
+                fills=fills,
+            ):
+                self.writer.low("drums", generation, command)
         except ValueError as exc:
             print(f"AMY rhythm warning: {exc}", flush=True)
 
     def _replace_all_lanes(self, *, resume_transport: bool) -> None:
-        self._rhythm_chord_draining = False
         for lane_name in self._sequencer_lanes:
             self.writer.new_low_generation(lane_name)
         generation = self.writer.new_low_generation("rhythm-full")
 
         commands: list[str] = []
-        for lane_name in ("drums", "bass", "chords"):
+        try:
+            commands.extend(
+                self._drum_commands(
+                    # Explicit Start has just reset the timebase and must begin at
+                    # tick zero. Only replacements on a running transport wait for
+                    # the next whole-bar boundary.
+                    quantize_live=False if resume_transport else None,
+                )
+            )
+        except ValueError as exc:
+            print(f"AMY rhythm warning: {exc}", flush=True)
+            return
+        for lane_name in ("bass", "chords"):
             lane = self._sequencer_lanes[lane_name]
             try:
-                commands.extend(lane.commands(self._lane_events(lane_name)))
+                if lane_name == "chords":
+                    group_commands, events = self._chord_group_plan()
+                    commands.extend(group_commands)
+                else:
+                    events = self._lane_events(lane_name)
+                commands.extend(lane.commands(events))
             except ValueError as exc:
                 print(f"AMY rhythm warning: {exc}", flush=True)
                 return
@@ -1935,16 +1392,13 @@ class AmySerialClient:
             return
 
         old_config = self.rhythm_config
-        bass_only_changed = self._only_bass_config_changed(
-            old_config, new_config
-        )
-        chord_only_changed = self._only_chord_config_changed(
-            old_config, new_config
-        )
+        bass_only_changed = self._only_bass_config_changed(old_config, new_config)
+        chord_only_changed = self._only_chord_config_changed(old_config, new_config)
+        drum_only_changed = self._only_drum_activity_changed(old_config, new_config)
+        fill_only_changed = self._only_fill_config_changed(old_config, new_config)
+        tempo_only_changed = self._only_tempo_config_changed(old_config, new_config)
         old_id = (
-            str(self.rhythm_config.get("id", ""))
-            if isinstance(self.rhythm_config, dict)
-            else ""
+            str(self.rhythm_config.get("id", "")) if isinstance(self.rhythm_config, dict) else ""
         )
         new_id = str(new_config.get("id", ""))
         style_changed = bool(old_id) and old_id != new_id
@@ -1954,19 +1408,25 @@ class AmySerialClient:
         self._scheduled_rhythm_id = new_id
         self._wire(f"j{self._f(float(new_config.get('tempo', 108.0)))}Z")
 
+        if tempo_only_changed:
+            return
         if bass_only_changed:
             self._replace_lane("bass")
             return
         if chord_only_changed:
             self._replace_lane("chords")
             return
+        if drum_only_changed:
+            self._replace_drums(activity=True, fills=False)
+            return
+        if fill_only_changed:
+            self._replace_drums(activity=False, fills=True)
+            return
 
         if style_changed and self.rhythm_running:
-            self._cancel_queued_rhythm_updates()
-            self._wire("zY0Z")
-            self._silence_accompaniment()
-            self._wire(f"S{RESET_TIMEBASE}Z")
-            self._replace_all_lanes(resume_transport=True)
+            # The new drum loops and melodic root events take over on the
+            # live clock. Do not stop transport, silence voices or reset time.
+            self._replace_all_lanes(resume_transport=False)
         else:
             for lane_name in ("drums", "bass", "chords"):
                 self._replace_lane(lane_name)
@@ -1975,14 +1435,21 @@ class AmySerialClient:
         if self.rhythm_running:
             return
         self.rhythm_running = True
-        self._wire(f"S{RESET_TIMEBASE}Z")
+        # Stored group definitions survive RESET_SEQUENCER, while executions
+        # and old root H events do not. Starting is therefore a clean transport
+        # boundary even after an earlier stop mid-phrase.
+        self._wire(f"S{RESET_TIMEBASE | RESET_SEQUENCER}Z")
+        # Reset is an ordinary AMY event and takes effect at the next audio
+        # block boundary, whereas group control is handled immediately on
+        # ingest. Keep new executions behind several 128-sample blocks so reset can
+        # never erase triggers that arrived in the same host burst.
+        self.writer.delay(0.020)
         self._replace_all_lanes(resume_transport=True)
 
     def _stop_rhythm(self) -> None:
         if not self.rhythm_running:
             return
         self.rhythm_running = False
-        self._rhythm_chord_draining = False
         self._cancel_queued_rhythm_updates()
         self._wire("zY0Z")
         self._silence_accompaniment()
@@ -2004,8 +1471,7 @@ class AmySerialClient:
             # AMY matches stolen/forgotten notes by rounded MIDI note.  If the
             # same pitch is re-entered, explicitly release the old instance.
             duplicate_index = next(
-                (i for i, n in enumerate(self._strum_active_notes)
-                 if int(round(n)) == midi_key),
+                (i for i, n in enumerate(self._strum_active_notes) if int(round(n)) == midi_key),
                 None,
             )
             if duplicate_index is not None:
@@ -2023,9 +1489,7 @@ class AmySerialClient:
             self._wire(f"n{self._f(note)}l1i{synth}Z")
             self._strum_active_notes.append(note)
 
-        tail_ms = float(
-            self.config.get("performance", {}).get("strum_tail_ms", 450)
-        )
+        tail_ms = self.resolved_config.performance.strum_tail_ms
 
         def tail_release() -> None:
             with self._strum_lock:
@@ -2035,9 +1499,11 @@ class AmySerialClient:
                 self._strum_active_notes.clear()
             self._wire(f"l0i{synth}Z")
 
-        timer = threading.Timer(max(0.01, tail_ms / 1000.0), tail_release)
-        timer.daemon = True
-        timer.start()
+        self.application_scheduler.schedule(
+            max(0.01, tail_ms / 1000.0),
+            tail_release,
+            replace_key="omni-strum-tail",
+        )
 
     def _panic(self) -> None:
         """Return AMY and the five Omnichord synths to a known-good state.
@@ -2054,7 +1520,6 @@ class AmySerialClient:
 
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
-        self._rhythm_chord_draining = False
         self.bass_running = False
         self._manual_active_id = None
         self._manual_active_notes = []
@@ -2153,6 +1618,7 @@ class AmySerialClient:
             for synth in self.synth_id.values():
                 self._wire(f"l0i{synth}Z")
         finally:
+            self.application_scheduler.close()
             self.writer.close()
             self.debug_log.close()
 
@@ -2162,13 +1628,15 @@ class AmySocketClient(AmySerialClient):
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: dict[str, Any] | None,
         addresses: dict[str, str],
         socket_path: str,
+        resolved_config: ResolvedAmyConfig | None = None,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
+            resolved_config=resolved_config,
             writer_factory=lambda debug_log: _UnixSocketWriter(
                 socket_path,
                 debug_log,
@@ -2181,13 +1649,15 @@ class AmyLocalClient(AmySerialClient):
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: dict[str, Any] | None,
         addresses: dict[str, str],
         server_name: str,
+        resolved_config: ResolvedAmyConfig | None = None,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
+            resolved_config=resolved_config,
             writer_factory=lambda debug_log: _QtLocalSocketWriter(
                 server_name,
                 debug_log,

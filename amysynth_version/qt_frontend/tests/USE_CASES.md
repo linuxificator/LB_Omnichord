@@ -1,12 +1,17 @@
 # AMY Omnichord regression catalogue
 
+Status: authoritative executable regression-scenario contract
+Owner: frontend integration/native/package tests
+Applies to: active `amysynth_version/qt_frontend` implementation
+Last verified: 2026-09-03
+
 This file is the executable-test contract for the active `amysynth_version/qt_frontend` application. The Sonic Pi version is frozen and is intentionally outside this test plan.
 
 The application has three observable layers:
 
 1. **Frontend/backend state** — Qt `InstrumentBackend`, preset state and slider models.
 2. **Transport** — logical events translated to AMY wire commands and, in the Raspberry Pi setup, framed as 1,000,000-baud 8N1 serial lines.
-3. **AMY engine state/output** — the commands must actually configure the supported AMY runtime as intended. Native-Linux tests use the pinned `linuxificator/amy` bus-mixer revision from CI and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
+3. **AMY engine state/output** — the commands must actually configure the supported AMY runtime as intended. Native-Linux tests use the exact `linuxificator/amy` sequencer-group release pinned by CI and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
 
 Every defect below must have a permanent regression test before it is considered fixed.
 
@@ -40,10 +45,12 @@ A static regression test rejects reintroduction of the former parallel `SynthRun
 | Suite | Purpose | Hardware/AMY |
 | --- | --- | --- |
 | `unit` | all top-level `test_*.py`: catalogue/state, MIDI engine, socket framing, migration and structural invariants | none |
+| `portable-input-processes` | identical OSC UDP and MIDI parser scenarios with external sender and receiver PIDs | all package build runners; no hardware claim |
+| `platform-input-linux` | real raw-MIDI bytes and source-package OSC from external controller processes into a separately launched Omnichord | Linux PTY/socket + Qt offscreen |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
-| `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned LB AMY fork |
-| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + pinned LB AMY fork |
+| `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned Gamma9001 LB AMY fork |
+| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + pinned Gamma9001 LB AMY fork in deterministic offline-render mode |
 | `presets` | per-instrument session state and sparse preset save/load semantics | none/headless backend |
 | `all` | all suites sequentially; intended for local/manual use. CI runs the component suites in parallel for a PR to `main`. | mixed |
 
@@ -97,14 +104,14 @@ The serial regression requires the factory patch to remain authoritative for nat
 
 - A held chord must not repeatedly drop to activity 0 and re-trigger because of touch-release bounce.
 - Quick intentional taps must start and stop manual synth 3 immediately without
-  changing effective chord activity or temporarily closing/draining the
+  changing effective chord activity or temporarily closing the
   automatic-chord lane. They do select the active chord and replace the
   corresponding strum, bass and automatic-chord pitches while transport keeps
   running.
 - When Qt's `TapHandler` reports a platform-defined long press, the contact must
-  enter the existing manual-hold takeover: future automatic chord onsets drain,
-  already scheduled automatic note-offs remain, and release stops manual synth
-  3 immediately before reinstating the automatic chord lane. The backend must
+  enter the existing manual-hold takeover: future automatic group starts are
+  removed, already-running executions retain their own note-offs, and release
+  stops manual synth 3 immediately before reinstating the automatic chord lane. The backend must
   not run a second gesture-classification timer.
 
 **Failure history:** earlier builds showed erratic repeated chord starts while
@@ -224,11 +231,13 @@ installation failed to show or release chord-key interaction correctly.
 - Green bindings may become invisible without losing their mapping; activity
   makes a hidden binding visible again when an eligible slot exists.
 
-**MIDI-CC-03 — one red learn selection and LED state**
+**MIDI-CC-03 — one-click indicator state transitions**
 
-- Clicking an idle, green or blue indicator selects exactly one blinking red
-  learn controller.
-- Clicking another transfers red selection.
+- Clicking an idle grey or manually unlinked blue indicator selects exactly one
+  blinking red learn controller.
+- Clicking another idle/blue indicator transfers red selection.
+- Clicking a green indicator unlinks it and turns it blue; that click does not
+  also start learn or replace another indicator's red learn selection.
 - Clicking the red controller again cancels learn and turns it off.
 - The OMNI screen mirrors red learn state without exposing controller details.
 - Its red LED blinks to the right of the label inside the large `MIDI` button
@@ -256,11 +265,14 @@ installation failed to show or release chord-key interaction correctly.
 **MIDI-CC-06 — deliberate manual unlink and blue expiry**
 
 - The learning touch cannot unlink the new binding in the same gesture.
-- One click on a bound target does not unlink.
-- Drag/edit gestures on a bound target are consumed and do not move or unlink
-  it. Qt's standard double-click/double-tap event is the explicit unlink
-  gesture, using platform time and distance style hints; that second gesture
-  still cannot edit the numeric value.
+- Pressing and releasing a bound slider without changing its value does not
+  unlink.
+- The first value-changing mouse/touch drag event on a bound numeric target
+  performs manual takeover: MIDI ownership is released before the UI value is
+  applied and the previous controller becomes blue.
+- The first increment/decrement on a bound click-only numeric control follows
+  the same release-before-edit ordering.
+- There is no separate double-click/double-tap unlink gesture.
 - The controller becomes blue and visible when capacity permits.
 - The next genuine CC movement changes a blue controller immediately into an
   ordinary grey unbound indicator. Without movement, blue expires and removes
@@ -353,11 +365,84 @@ installation failed to show or release chord-key interaction correctly.
   never selects a preset, changes screen, applies the inactive preset's value,
   or changes musical state.
 
+**MIDI-CC-14 — hardware button takeover is scoped**
+
+- MIDI CC-style button controls and pitch/note-style hardware controls that
+  are explicitly treated as controller buttons may bind to supported app
+  buttons. Ordinary musical Note On/Off input must never create controller
+  button indicators or bindings.
+- A held on/off hardware button owns only its target's logical button group.
+  Preset choices block other preset choices, activity choices block only their
+  own activity row and arpeggio-rate choices block only other arpeggio-rate
+  choices. Independent toggles block only their exact screen button.
+- Tap-only actions, including panic, store-preset and cycle-channel, trigger on
+  press but do not create held takeover state. Unrelated screen buttons remain
+  usable while any hardware button is held.
+
 Unit tests cover the state machine and mapping math. Headless frontend tests use
 simulated user actions plus simulated MIDI CC input and inspect state, preset
 JSON and AMY output. The offscreen Qt test feeds real raw-MIDI bytes, records
 JSONL indicator/layout state and verifies the replacement transition fits the
 actual bar.
+
+### OSC-CTRL — portable OSC controller input
+
+**OSC-CTRL-01 — configured UDP input and source identity**
+
+- The shipped configuration enables OSC on `0.0.0.0:8000`; both address and
+  port are editable and no consumer fallback duplicates them.
+- Removing the complete endpoint (or disabling OSC) opens no socket and omits
+  OSC from the input-technology row.
+- A valid OSC 1.0 UDP message or bundle is decoded off the Qt thread. Each
+  numeric argument is identified by exact address and zero-based argument
+  index, reaches the Qt thread once and preserves packet order.
+- Malformed packets and unsupported argument types create no indicators and do
+  not stop the listener. Bind failure is reported as failed rather than ready.
+
+**OSC-CTRL-02 — common learn and ownership state**
+
+- A changing normalized OSC value appears in the same grey capacity/LRU bar as
+  MIDI, labelled with its address and argument index.
+- OSC uses flat F01 rotary/pushbutton visuals; MIDI remains F06. F01 contains no
+  virtual light, highlight or shadow effect.
+- Grey/blue/red/green click behavior, target learning, manual takeover, blue
+  expiry, hidden binding behavior and button takeover exactly match MIDI.
+- MIDI and OSC share global one-to-one ownership. Binding an OSC source to a
+  MIDI-owned target displaces the MIDI source to blue, and vice versa.
+- The MIDI input-technology row contains one `OSC` item for a configured
+  endpoint. Its LED is green while listening, flashes green on accepted data
+  and turns red on bind failure or loss of the configured network.
+- The OMNI rainbow button says `OSC` above `MIDI`; its existing red learn and
+  green binding-location LEDs represent both protocols without duplication.
+
+**OSC-CTRL-03 — mapping and preset compatibility**
+
+- Numeric `0.0..1.0` maps over the target's complete declared range and calls
+  the existing target setter/AMY convergence path. OSC never calls AMY itself.
+- Boolean or endpoint-only control messages can drive application buttons;
+  zero is released and any positive normalized value is pressed.
+- OSC bindings persist by address/index/type inside the existing screen-owned
+  binding list. Existing MIDI binding JSON round-trips byte-for-shape without
+  acquiring OSC fields.
+- All five release packages install and exercise `python-osc`; startup and
+  package tests retain the separate wire-only frontend/AMY process boundary.
+
+**OSC-CTRL-04 — final-package input acceptance and evidence limit**
+
+- Every Linux x64, Raspberry Pi aarch64, macOS arm64, Windows x64 and Android
+  arm64 artifact receives real OSC rotary and pushbutton datagrams from a
+  separate test process through its configured UDP listener and exposes both
+  controls plus the green activity state in the shared Qt model before
+  publication. Android uses a separate host process through emulator UDP
+  redirection into the guest app.
+- The same package smoke verifies the runtime-selected MIDI technology keys
+  and availability. An identical two-process MIDI byte/parser contract runs on
+  every package builder; Linux separately feeds real bytes through a PTY-backed
+  raw-MIDI reader into a separately launched Omnichord.
+- Hosted loopback proves a separate local OSC process, not firewall approval,
+  a second host or a physical network. The portable MIDI parser pipe is not
+  native-hardware evidence; CoreMIDI, WinMM and Android MIDI remain deliberately
+  red/unavailable because their native bridges are not currently bundled.
 
 ### INSTRUMENT — selected patch identity
 
@@ -433,8 +518,24 @@ Expected:
 
 - Sustain zero is the left edge, not the middle of the slider.
 - The label always renders a numeric value such as `Sustain 0.00`.
+- Dragging a synth-parameter slider must not republish/reset the QML
+  `Repeater` control-list model on every movement. The live edit still updates
+  backend state and AMY immediately, but the active delegate must keep Qt's
+  pointer grab until release.
+- Mouse and touchscreen drags use the same native Qt Slider path. During every
+  move and after release, `Slider.value`, the custom handle and the filled track
+  must remain aligned with the value accepted from that gesture, even when the
+  live backend intentionally leaves the QML model at its previous value.
+- A later external backend update remains authoritative and synchronizes all
+  three visual/value representations.
 
-**Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the control; negative values also caused the numeric text to disappear.
+**Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the
+control; negative values also caused the numeric text to disappear. After the
+shared slider primitive was consolidated, release always restored its backend
+binding. Synth-control live edits intentionally suppress model publication to
+preserve the pointer grab, so a macOS mouse edit could reach the backend while
+the visible handle/fill returned to an old value. Tests that asserted only the
+emitted/backend value did not detect that visual regression.
 
 **CTRL-03 — one slider changes only its intended AMY parameters**
 
@@ -521,6 +622,10 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 - Current AMY stores exactly one sequencer entry per user tag; reusing a tag replaces that entry, and `H0,0,<tag>` clears only that entry. Multiple simultaneous events therefore require distinct tags.
 - The application reserves non-overlapping ranges sized from the complete rhythm catalogue: drums 0..55, bass 56..111 and automatic chords 112..251. Tags 252..255 remain unused.
+- Sequence groups reserve 1..936 for fills, 937..1000 for automatic-chord
+  phrases and 1001 upward for base drum roles. The current chord state needs
+  at most two velocity-specific definitions and the complete overlap audit
+  reaches 34 of 40 active executions.
 - Every scheduled wire body owns deterministic lane tags. Exact circular
   repetitions may share one shorter-period tag only when expanding that tag
   reproduces the complete original tick/body set.
@@ -531,7 +636,7 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
   percussion or stop transport.
 - A live rhythm-style or preset change must preserve tempo, all three activity
   values, chord-arpeggio mode/rate/direction, bass voicing, the active-row
-  octave and sequencer timebase. It may replace tagged pattern events but may
+  octave and sequencer timebase. It may replace affected root events or group definitions but may
   not stop/restart transport or issue `RESET_SEQUENCER`.
 
 **Failure history:** whole-sequencer rebuilds were used for chord hold/release, pitch changes and other lane-local operations. On the ESP32-P4 this could make the rhythm audibly disappear while a manual chord was held and then return on release.
@@ -552,8 +657,14 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **RHYTHM-04 — starting automatic chords converges synth 4 first**
 
-- Starting rhythm from stopped state installs the authoritative tagged drum/bass/chord ranges and resumes transport only after those definitions are queued ahead of `zY1`.
-- Starting rhythm must not require `RESET_SEQUENCER`; tagged replacement itself removes stale lane entries.
+- Starting rhythm from stopped state sends
+  `RESET_TIMEBASE | RESET_SEQUENCER`, waits for the reset's audio-block
+  boundary, installs the authoritative runtime drum groups and tagged
+  bass/chord/fill-launch ranges, and resumes transport only after those
+  commands are queued ahead of `zY1`.
+- Persistent fill definitions survive that reset and are not resent. Root
+  events and old active executions do not survive it, making explicit Start a
+  clean transport-run boundary.
 
 **RHYTHM-05 — stopping transport releases sounding accompaniment**
 
@@ -567,20 +678,20 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 **RHYTHM-06 — manual chord input lets the current automatic chord finish**
 
 - Finger-down immediately starts manual synth 3 and selects the new active
-  chord for strum, bass and automatic accompaniment pitches.
+  chord for strum, bass and future automatic-phrase definitions. An already
+  running execution keeps its immutable old definition and releases.
 - Every real finger-up immediately stops the manual synth-3 voice, including a
   release shortly after hold promotion. Its release is neither delayed by a
   dropout-grace timer nor quantized to rhythm. A tap must not change effective
-  chord activity, close the automatic-chord lane or drain its tags.
+  chord activity or close the automatic-chord lane.
 - If Qt reports a long press using its platform style hint, hold promotion
   suppresses the effective automatic-chord lane without changing the `CHORD
   ON/OFF` state or sending an immediate `l0i4`.
-- Positive-velocity synth-4 note-on tags are cleared. Existing synth-4 `l0`
-  tags remain installed, so the currently sounding chord receives its original
-  sequencer note-off and completes the configured rhythmic gate.
+- Future synth-4 group-start root triggers are cleared. Root tags own no release;
+  every currently sounding whole-chord or arpeggio execution executes its own
+  original `l0` event and completes the configured gate.
 - No later automatic-chord note-on may occur while the manual chord is held.
-  Repeating retained all-offs on isolated synth 4 are harmless and are
-  replaced when the lane is enabled or fully reinstalled.
+  The lane is reinstalled on release.
 - Drums, bass, transport and sequencer timebase continue without a stop,
   restart or reset. The manual synth-3 chord may overlap the remaining gate and
   normal release of synth 4.
@@ -589,7 +700,13 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 the tagged chord lane, including the scheduled note-off for a chord which was
 already sounding. The old synth-4 chord could then remain audible indefinitely
 under the new manual chord. The first correction added an immediate `l0i4`;
-that prevented hanging but audibly shortened the accompaniment gate.
+that prevented hanging but audibly shortened the accompaniment gate. A later
+arpeggio implementation exposed a second form: finger-down rewrote the lane to
+new pitches before hold promotion, so one old pitch-specific release could be
+replaced and one arpeggio note remained indefinitely. The final design moved
+release ownership into immutable one-shot group revisions. The serial regression
+proves that hold promotion clears only root triggers and emits no immediate
+`l0i4`.
 
 **RHYTHM-07 — live preset changes preserve beat-shaping controls**
 
@@ -659,17 +776,41 @@ that prevented hanging but audibly shortened the accompaniment gate.
   `/1`, starting only at beat 1 of a four-beat measure, therefore starts notes
   at beats 1, 2, 3 and 4 and repeats from beat 1.
 - The tag audit expands every compacted period and proves exact timing for all
-  catalogue rhythms, activity levels, rates and 2–7-note chords. The worst
-  arpeggio uses 84 of the existing 140 chord tags.
+  catalogue rhythms, activity levels, rates and 2–7-note chords. Root tags
+  launch one-shot phrases; the worst rhythm uses 28 of the existing 140 chord
+  tags.
 - The real serial test proves a seven-note dominant-13 chord is sent in both
   directions using only tags 112..251. Disabling `A` restores the old four-note
   whole-chord limit. Arpeggio changes never touch drums, bass, transport or
   sequencer timebase.
-- Turning `A` or `CHORD ON/OFF` off may retain repeating, note-specific synth-4
-  releases after their matching onsets have been removed. AMY flag `if8` is
-  present only on automatic chord synth 4, including after ROM and physical
-  instrument changes, so those expected unmatched-off diagnostics cannot flood
-  stderr while lifecycle warnings on synths 0–3 remain visible.
+- Both manual and automatic chord synths require seven voices. Config revision
+  1 migrates only the former shipped `rhythm_chord: 4` default to 7 while
+  retaining other user overrides; startup validation rejects smaller custom
+  pools instead of silently allowing voice stealing to truncate an arpeggio.
+- `/1..4` atomically publish revisions under stable group tags. The `/2 -> /4`
+  serial regression proves the resulting phrases contain their 17-tick and
+  9-tick note gates; AMY's native test proves an already-running revision keeps
+  its old releases after publication. The exhaustive execution audit includes
+  every overlap, all current drum roles and one fill; its worst case is 34 of
+  the configured 40 executions.
+
+**RHYTHM-12 — cold Start plays the visible percussion level immediately**
+
+- With a fresh application and rhythm stopped, press Start without touching a
+  percussion activity button first.
+- The backend sends the reset, waits until it has crossed an AMY audio-block
+  boundary, creates the visible level's loop at tick zero and starts transport.
+- The native PTY bridge applies the queued sequencer reset and, for a timebase
+  reset, its deferred second block boundary before accepting later serial
+  commands. This models the independently running production audio callback
+  without making the regression depend on CI thread scheduling.
+- Native CI compiles the same Gamma9001 PCM bank as the hosted packages and
+  proves its registration and linked-data symbols. ESP32-P4 is a separately
+  declared Tiny-bank target.
+  AMY runs with `audio=False`, so only the bridge's explicit renderer advances
+  engine time or consumes samples; no ALSA/miniaudio callback races the test.
+- The native regression requires non-silent rendered drum audio within one
+  second. A one-bar delay or a required activity reselection is a failure.
 
 ### TUNING — all note-producing paths follow the selected tuning
 
@@ -700,16 +841,37 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 - `capture_screenshots.py` runs the production QML scene offscreen with an
   isolated temporary home and writes `screenshots/omni.png` and
   `screenshots/midi.png`.
-- The OMNI frame shows an active C-minor strum-note guide; the MIDI frame shows
-  three representative CC knobs in the grey lower bar.
-- The repository README embeds those exact two files. Screenshot refreshes may
-  not use a hand-drawn or generated substitute for the actual Qt interface.
+- The OMNI frame shows an active C-minor strum-note guide. The MIDI frame is
+  staged through the public simulation inputs and shows MIDI and OSC rotaries
+  plus a released pushbutton for each protocol in the grey lower bar.
+- Release refreshes store timestamped screenshot files such as
+  `screenshots/omni-RYYYYMMDDTHHMMSS.png` and update the repository README to
+  embed those files. Screenshot refreshes may not use a hand-drawn or generated
+  substitute for the actual Qt interface.
+- Before README assets are committed, the generated PNGs must load at the
+  expected 1920x850 size and must have enough sampled color variation to reject
+  a blank or obvious error screen.
+- The capture helper continuously drains the pseudo-serial endpoint, so the
+  complete startup wire stream cannot block its writer while large rhythm and
+  fill libraries are installed.
+- A successful `main` release captures the exact released commit. CI commits
+  only `README.md` and the new release-tagged screenshot PNGs. That
+  screenshot-only commit uses a human-readable `skip-rebuild` note plus
+  GitHub's required `skip-checks:true` trailer, so ordinary merges and pushes to
+  `main` still rebuild while screenshot refreshes do not create a release loop.
 
 **UI-03 — instrument names contain useful names only**
 
 - Curated names must not acquire redundant `PATCH` suffixes or unwanted generic engine prefixes in the visible label.
 
 **Failure history:** labels previously appeared with unwanted Juno/DX7 prefixes and later a `PATCH` suffix.
+
+**UI-04 — bass function slider aligns with bass activity**
+
+- The `bass voicing` / `riff selector` slider and the five bass-activity
+  buttons use the same horizontal column origin and width.
+- The layout contract references the shared `bassColumnX`; it may not reuse
+  the obsolete four-button activity width.
 
 ## Proof produced by CI
 

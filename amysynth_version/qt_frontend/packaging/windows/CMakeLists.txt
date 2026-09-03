@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(lb_amy_service C)
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 if(NOT DEFINED AMY_ROOT)
     message(FATAL_ERROR "AMY_ROOT must point to the checked-out AMY fork")
 endif()
@@ -8,15 +10,32 @@ endif()
 file(TO_CMAKE_PATH "${AMY_ROOT}" AMY_ROOT_CMAKE)
 set(AMY_SRC "${AMY_ROOT_CMAKE}/src")
 set(AMY_SOURCES
-    algorithms.c amy.c bus_mixer.c envelope.c examples.c parse.c filters.c
+    algorithms.c amy.c envelope.c examples.c parse.c filters.c
     oscillators.c pcm.c interp_partials.c custom.c delay.c log2_exp2.c
     patches.c transfer.c sequencer.c libminiaudio-audio.c instrument.c
     amy_midi.c api.c midi_mappings.c cv_trigger.c)
 list(TRANSFORM AMY_SOURCES PREPEND "${AMY_SRC}/")
 
-add_executable(amy_service amy_service.c ${AMY_SOURCES})
+set(GAMMA9001_PCM_C "${CMAKE_CURRENT_BINARY_DIR}/drums_bin.c")
+file(GLOB_RECURSE GAMMA9001_PCM_INPUTS CONFIGURE_DEPENDS
+    "${AMY_ROOT_CMAKE}/sounds/gamma9001/*.wav"
+)
+add_custom_command(
+    OUTPUT "${GAMMA9001_PCM_C}"
+    COMMAND "${Python3_EXECUTABLE}" -m amy.headers
+            gamma9001-blob-c "${GAMMA9001_PCM_C}"
+    WORKING_DIRECTORY "${AMY_ROOT_CMAKE}"
+    DEPENDS
+        "${AMY_ROOT_CMAKE}/amy/headers.py"
+        "${AMY_ROOT_CMAKE}/sounds/gamma9001/manifest.json"
+        ${GAMMA9001_PCM_INPUTS}
+    VERBATIM
+)
+set_source_files_properties("${GAMMA9001_PCM_C}" PROPERTIES GENERATED TRUE)
+
+add_executable(amy_service amy_service.c ${AMY_SOURCES} "${GAMMA9001_PCM_C}")
 target_include_directories(amy_service PRIVATE "${AMY_SRC}")
 target_compile_definitions(amy_service PRIVATE
-    AMY_WAVETABLE _CRT_SECURE_NO_WARNINGS _USE_MATH_DEFINES)
+    AMY_WAVETABLE GAMMA9001=1 _CRT_SECURE_NO_WARNINGS _USE_MATH_DEFINES)
 target_compile_options(amy_service PRIVATE /O2 /W3 /std:c11 /experimental:c11atomics)
 target_link_libraries(amy_service PRIVATE ws2_32 winmm ole32)

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import amy_transport as base
+from config_loader import ResolvedAmyConfig
 from synth_programs import SynthProgram, resolve_program
 
 
@@ -30,9 +30,9 @@ class ProgramAmySerialClient(base.AmySerialClient):
         # partially constructed client. The generalized layer must remain a
         # transparent extension in that case, not make the old low-level
         # contracts depend on full application configuration.
-        config = getattr(self, "config", None)
+        config = getattr(self, "resolved_config", None)
         selected = getattr(self, "selected_synth", None)
-        if not isinstance(config, dict) or not isinstance(selected, dict):
+        if not isinstance(config, ResolvedAmyConfig) or not isinstance(selected, dict):
             return None
         key = selected.get(role)
         if key is None:
@@ -41,21 +41,15 @@ class ProgramAmySerialClient(base.AmySerialClient):
 
     def preview_drum(self, preview_index: int) -> None:
         """Add one Drum Kit 0 preview hit without changing drum configuration."""
-        sample_map = self.config.get("drums", {}).get("sample_map", {})
-        if not isinstance(sample_map, dict):
-            return
         name = DRUM_PREVIEW_SAMPLES[
             max(0, min(len(DRUM_PREVIEW_SAMPLES) - 1, int(preview_index)))
         ]
-        hit = sample_map.get(name)
-        if not isinstance(hit, dict):
+        hit = self.resolved_config.drums.sample(name)
+        if hit is None:
             return
-        gain = max(
-            0.0,
-            float(self.config.get("drums", {}).get("velocity_gain", 5.0)),
-        )
+        gain = max(0.0, self.resolved_config.drums.velocity_gain)
         self._wire(
-            f"p{int(hit['preset'])}n{self._f(float(hit['note']))}"
+            f"p{hit.preset}n{self._f(float(hit.note))}"
             f"l{self._f(gain)}i{self.synth_id['drums']}Z"
         )
 
@@ -87,57 +81,8 @@ class ProgramAmySerialClient(base.AmySerialClient):
         self._apply_reverb_buses()
 
     def _set_rhythm_config(self, payload_text: str) -> None:
-        """Hot-swap a running rhythm without stopping or resetting its clock.
-
-        Tagged AMY sequencer events can be replaced while transport is live.
-        Keeping the existing sequencer timebase preserves the musical beat;
-        only the pattern definition changes. A new meter may therefore enter
-        part-way through its measure, but the 48-PPQ pulse never pauses.
-        """
-        try:
-            new_config = json.loads(str(payload_text))
-        except json.JSONDecodeError:
-            return
-        if not isinstance(new_config, dict):
-            return
-
-        old_config = self.rhythm_config
-        bass_only_changed = self._only_bass_config_changed(
-            old_config, new_config
-        )
-        chord_only_changed = self._only_chord_config_changed(
-            old_config, new_config
-        )
-        old_id = (
-            str(self.rhythm_config.get("id", ""))
-            if isinstance(self.rhythm_config, dict)
-            else ""
-        )
-        new_id = str(new_config.get("id", ""))
-        style_changed = bool(old_id) and old_id != new_id
-
-        self.rhythm_config = new_config
-        bass_riff = new_config.get("bass_riff")
-        self.bass_riff = bass_riff if isinstance(bass_riff, dict) else None
-        self._scheduled_rhythm_id = new_id
-        self._wire(f"j{self._f(float(new_config.get('tempo', 108.0)))}Z")
-
-        if bass_only_changed:
-            self._replace_lane("bass")
-            return
-        if chord_only_changed:
-            self._replace_lane("chords")
-            return
-
-        if style_changed and self.rhythm_running:
-            # Do not send zY0, accompaniment note-offs, RESET_TIMEBASE or zY1.
-            # Replacing the tagged repeating events is sufficient and leaves
-            # AMY's sequencer_tick_count advancing continuously.
-            self._replace_all_lanes(resume_transport=False)
-            return
-
-        for lane_name in ("drums", "bass", "chords"):
-            self._replace_lane(lane_name)
+        """Use the common nested-pattern transport for every synth program."""
+        super()._set_rhythm_config(payload_text)
 
     def _configure_physical_one(
         self, role: str, synth: int, program: SynthProgram
@@ -156,11 +101,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
             f"iy{bus}{flag_fields}Z"
         )
         self._configured_synths.add(synth)
-        guard_ms = float(
-            self.config.get("performance", {}).get(
-                "synth_alloc_guard_ms", 10.0
-            )
-        )
+        guard_ms = self.resolved_config.performance.synth_alloc_guard_ms
         self.writer.delay(max(0.0, guard_ms) / 1000.0)
         if program.kind == "karplus_strong":
             wave = KS_WAVE if program.wave is None else int(program.wave)
@@ -189,7 +130,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
     def _strum_note_on(self, note: float) -> None:
         program = self._program("strum")
         if program is not None and program.kind == "karplus_strong":
-            raw = self.config.get("synth_programs", {}).get(program.key, {})
+            raw = self.resolved_config.synth_program(program.key) or {}
             start = float(raw.get("high_note_start", 60.0))
             full = max(start + 1.0, float(raw.get("high_note_full", 96.0)))
             maximum = max(1.0, float(raw.get("high_note_gain", 1.0)))
@@ -235,8 +176,8 @@ class ProgramAmySerialClient(base.AmySerialClient):
         *,
         force_patch: bool = False,
     ) -> None:
-        config = getattr(self, "config", None)
-        if not isinstance(config, dict):
+        config = getattr(self, "resolved_config", None)
+        if not isinstance(config, ResolvedAmyConfig):
             super()._apply_synth_state(
                 role, name, params, force_patch=force_patch
             )
@@ -281,13 +222,15 @@ class ProgramAmySocketClient(ProgramAmySerialClient):
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: dict[str, Any] | None,
         addresses: dict[str, str],
         socket_path: str,
+        resolved_config: ResolvedAmyConfig | None = None,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
+            resolved_config=resolved_config,
             writer_factory=lambda debug_log: base._UnixSocketWriter(
                 socket_path,
                 debug_log,
@@ -300,13 +243,15 @@ class ProgramAmyLocalClient(ProgramAmySerialClient):
 
     def __init__(
         self,
-        config: dict[str, Any],
+        config: dict[str, Any] | None,
         addresses: dict[str, str],
         server_name: str,
+        resolved_config: ResolvedAmyConfig | None = None,
     ) -> None:
         super().__init__(
             config=config,
             addresses=addresses,
+            resolved_config=resolved_config,
             writer_factory=lambda debug_log: base._QtLocalSocketWriter(
                 server_name,
                 debug_log,

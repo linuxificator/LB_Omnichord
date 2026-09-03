@@ -1,5 +1,10 @@
 # Use Cases and Test Cases
 
+Status: authoritative product use-case contract
+Owner: application behavior/test design
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## UC-001 Application startup
 
 Given a clean start:

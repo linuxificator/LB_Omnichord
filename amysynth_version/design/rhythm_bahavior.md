@@ -1,5 +1,10 @@
 # Omnichord Rhythm Behavior
 
+Status: authoritative rhythm/tempo/continuity contract
+Owner: OMNI rhythm subsystem
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-03
+
 This document defines the required behavior of the Omnichord rhythm/drum subsystem. It is a behavioral contract for the GUI, backend, AMY wire-command generation, presets, and regression tests.
 
 The central rule is:
@@ -10,9 +15,15 @@ A preset or rhythm selection may change the pattern and other stored rhythm para
 
 For preset selection, playback continuity also includes the current
 percussion/chord/bass activity, chord-arpeggio mode/rate/direction, bass
-voicing, compatible playing bass riff and active chord-row octave. These
+voicing, selected drum fills, fill density, compatible playing bass riff and
+active chord-row octave. These
 controls shape the accompaniment that is already in progress and therefore
 remain live while transport runs.
+
+The five percussion levels are complete pattern alternatives, not cumulative
+layers. Drum fills are compact AMY one-shot sequence groups, preloaded once at
+startup and launched by the AMY root sequencer. The frontend never follows
+AMY's musical clock with a host timer.
 
 ## 1. State model
 
@@ -97,6 +108,16 @@ Arpeggio enabled state, rate and direction are preset configuration. A stopped
 preset switch loads them. A running preset switch preserves their current live
 values. Toggling `A` or changing an effective arpeggio control replaces only
 the automatic-chord tag range and never stops or resets transport.
+
+The root range schedules one-shot group starts. A whole-chord group revision
+owns all of its onsets and its all-off. An arpeggio group revision owns the
+complete ordered phrase, including every note-on and matching note-off. Each
+distinct source velocity uses one stable group tag; `/1` through `/4`, chord,
+pitch and direction changes atomically publish new revisions under those same
+tags and replace future root starts. An execution which has already begun
+retains its immutable old revision and completes its original gates. Thus
+`/2 -> /4` may not cut a sounding `/2` note short, nor may it defer that note's
+off until `/4` next reaches the same pitch.
 
 ## 2. Application startup
 
@@ -338,12 +359,13 @@ The intended behavior is conceptually:
 
 ```text
 old rhythm events  -------------------->
-                       replace pattern events
+                       replace affected root/group events
 new rhythm events                       -------------------->
 sequencer clock      --------------------------------------->
 ```
 
-The clock remains continuous. Only the pattern events associated with the rhythm are replaced.
+The clock remains continuous. Only the root events and group definitions
+associated with the rhythm are replaced.
 
 A live pattern change must therefore use AMY's running sequencer/event replacement mechanism rather than transport stop/reset/start behavior.
 
@@ -555,6 +577,11 @@ must remain effective through subsequent live rhythm-type changes.
 ### RHYTHM-015 — starting uses current visible configuration
 
 Starting rhythm playback must use the currently selected rhythm and current displayed tempo without first reloading preset defaults.
+The already-visible percussion activity is part of that configuration: its
+first tick must become audible immediately after Start, without reselecting an
+activity button and without an artificial one-bar wait. Because AMY applies a
+sequencer reset at an audio-block boundary, wrapper transports must not submit
+new group executions until that reset has crossed the boundary.
 
 ### RHYTHM-016 — manual chord takeover preserves the sequenced gate
 
@@ -562,8 +589,7 @@ Chord finger-down must start the manual synth-3 chord immediately. A quick tap
 ends that manual voice on finger-up and immediately selects the chord for the
 strum, bass and automatic chord accompaniment. The affected bass/chord pitch
 schedules are replaced without stopping transport. A tap must not change
-effective chord activity, close the automatic-chord lane or perform the
-hold-specific draining of its note-on tags.
+effective chord activity or close the automatic-chord lane.
 
 If Qt's `TapHandler` reports a long press using its platform long-press style
 hint, the contact is promoted to a manual hold. The backend does not classify
@@ -571,24 +597,11 @@ the contact with another timer. That promotion performs the established
 accompaniment takeover:
 while automatic rhythm chords are enabled it temporarily closes the effective
 automatic-chord lane without changing the independent `CHORD ON/OFF` state. It
-must remove the repeating positive-velocity synth-4 note-on tags, but retain the
-already scheduled synth-4 `l0` tags. Retained note-offs are explicitly
-reinstalled so their delivery does not depend on an older queued lane update. A
-rhythm chord which is sounding when the hold is promoted therefore reaches the
-note-off at its original sequencer gate instead of being cut off immediately or
-hanging because its future note-off was removed.
-
-Current AMY has no deferred tag-removal command or wire callback which says
-that a repeating event has just fired. Its per-event user tags nevertheless
-provide the required behavior: note-on tags and note-off tags are addressed
-independently. While automatic chords are gated off, retained note-off tags may
-continue firing harmless synth-4 all-offs or note-specific arpeggio offs; they
-are replaced or cleared when the lane is enabled, restarted or reset. Because
-repeating arpeggio offs are intentionally unmatched after the first effective
-release, automatic synth 4 uses AMY's `SYNTH_FLAGS_NO_NOTE_WARNINGS` (`if8`).
-That policy is included atomically in every ROM or physical-model allocation
-and is not set on manual synth 3 or any other synth, so unrelated lifecycle
-errors remain observable. Manual synth-3 note-ons begin at
+must remove the repeating future root `H...zQ<group>,1,...` triggers. Root tags
+contain no synth-4 release: every already-running immutable group execution
+owns its own whole-chord or note-specific off and reaches that original gate
+without an immediate all-off.
+Manual synth-3 note-ons begin at
 finger-down and may overlap the remainder of the automatic chord's normal gate
 and release. Drums, bass, transport, effects and sequencer timebase continue.
 
@@ -605,8 +618,8 @@ non-active chord rows load from the destination preset. When
 
 ### RHYTHM-018 — CHORD ON/OFF owns only automatic sequencer chords
 
-`CHORD OFF` drains future synth-4 note-ons while preserving their sequenced
-note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
+`CHORD OFF` removes future synth-4 group starts; already-running executions
+retain their immutable sequenced note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
 chord identity. Neither action may start, retrigger, release or otherwise
 control a manual synth-3 chord. A physically held chord remains owned by its
 chord-button press/release lifecycle.
@@ -649,17 +662,45 @@ sequence is truncated at its end. Overlapping starts remain valid.
 
 Exact repeated tick/body sets may be represented by one AMY tag with a shorter
 period, but expanding those tags over the rhythm cycle must reproduce exactly
-the generated circular event set. Arpeggio changes replace only tags 112..251.
+the generated circular trigger set. Arpeggio changes replace only tags 112..251.
 Every catalogue rhythm, every activity selection, `/1..4` and every supported
 2–7-note chord must fit that existing range. Disabling automatic chords or
-promoting a manual hold retains both whole-chord all-offs and arpeggio
-note-specific offs until their scheduled gates have closed sounding notes.
-The automatic chord synth alone suppresses AMY's expected unmatched-note-off
-diagnostic during this retained-off drain; the events and audio behavior are
-unchanged.
+promoting a manual hold clears future triggers while active executions retain
+their whole-chord or note-specific offs. The exhaustive catalogue proof also
+counts overlapping chord executions together with the maximum active drum
+roles and one fill; the current worst case is 34 of 40 configured executions.
 
-## 16. Summary rule
+## 16. Drum-fill behavior
+
+The lower percussion row contains independent `F1` through `F5` enables. No
+enabled F button means no fills. The density choices are exactly 32, 16, 8, 6,
+4, 3, 2 or 1 bars between launches. Selected fills rotate in selection order
+and rotate through the allowed whole-beat start positions stored in the data.
+
+Enabling the first fill begins a new cycle at the next whole-bar boundary.
+Enabling another fill while a cycle exists puts it first in the next schedule.
+Disabling one removes future launches, but a fill which is already playing is
+immutable and always finishes.
+
+Each base percussion role is an independent tagged AMY group execution. The LB
+data for a fill lists the musical roles which continue. During the fill, every
+other active role suppresses event dispatch for the complete, whole-beat fill
+duration;
+already-ringing sound is not cut off and the loop phase is not reset. A listed
+role which is absent from the selected activity level remains absent. This
+musical continuation decision is LB Omnichord policy; AMY implements only the
+generic execution-tag-targeted finite event gate.
+
+Fill selection and density are preset configuration. A stopped preset switch
+loads them. A running preset switch preserves the current live fill order and
+density. Any live fill edit replaces only future fill-launch root events. It
+must not send `zY0`, `zY1`, reset the sequencer or reset the timebase.
+
+The complete storage, kit and wire contract is documented in
+`../qt_frontend/docs/RHYTHM_PATTERNS.md`.
+
+## 17. Summary rule
 
 The complete behavior can be reduced to this rule:
 
-> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, chord-arpeggio controls, bass voicing, a compatible playing bass riff, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**
+> **When stopped, preset configuration wins. When running, preset changes preserve live tempo, activity, drum fills and density, chord-arpeggio controls, bass voicing, a compatible playing bass riff, the active chord-row octave and the continuous sequencer clock. Transport ON/OFF is user-controlled live state and is never preset state.**

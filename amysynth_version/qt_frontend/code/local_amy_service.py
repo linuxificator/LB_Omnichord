@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import argparse
-import json
 import signal
 import stat
 import sys
 from pathlib import Path
 
+from config_loader import load_resolved_amy_config
 from unix_wire_socket import listen_unix_wire_socket
+from wire_frames import LfWireFrameParser, validate_wire_request
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -34,18 +35,20 @@ def remove_stale_socket(path: Path) -> None:
 
 def main() -> int:
     args = parse_arguments()
-    with args.config.expanduser().open("r", encoding="utf-8") as handle:
-        config = json.load(handle)
+    config = load_resolved_amy_config(args.config.expanduser())
     max_buses = int(
-        config.get("amy_max_buses", 11)
+        config.capacities.max_buses
         if args.max_buses is None
         else args.max_buses
     )
     max_oscs = int(
-        config.get("amy_max_oscs", 336)
+        config.capacities.max_oscs
         if args.max_oscs is None
         else args.max_oscs
     )
+    max_sequence_groups = config.capacities.max_sequence_groups
+    max_sequence_group_tags = config.capacities.max_sequence_group_tags
+    max_sequence_group_executions = config.capacities.max_sequence_group_executions
     if max_buses < 11:
         raise ValueError("LB Omnichord requires at least 11 AMY buses")
     args.socket = args.socket.expanduser().resolve()
@@ -64,6 +67,9 @@ def main() -> int:
         default_synths=0,
         max_buses=max_buses,
         max_oscs=max_oscs,
+        max_sequence_groups=max_sequence_groups,
+        max_sequence_group_tags=max_sequence_group_tags,
+        max_sequence_group_executions=max_sequence_group_executions,
     )
 
     running = True
@@ -88,22 +94,22 @@ def main() -> int:
                 continue
             with client:
                 client.settimeout(0.25)
-                buffered = b""
+                frame_parser = LfWireFrameParser() if stream_transport else None
                 while running:
                     try:
                         packet = client.recv(4096)
                     except TimeoutError:
                         continue
                     if not packet:
+                        if frame_parser is not None:
+                            frame_parser.finish()
                         break
                     if not stream_transport:
-                        amy.send_wire(packet.decode("ascii"))
+                        amy.send_wire(validate_wire_request(packet))
                         continue
-                    buffered += packet
-                    while b"\n" in buffered:
-                        request, buffered = buffered.split(b"\n", 1)
-                        if request:
-                            amy.send_wire(request.decode("ascii"))
+                    assert frame_parser is not None
+                    for request in frame_parser.feed(packet):
+                        amy.send_wire(request)
     finally:
         server.close()
         remove_stale_socket(args.socket)

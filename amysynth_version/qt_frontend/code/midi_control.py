@@ -2,19 +2,34 @@ from __future__ import annotations
 
 import copy
 import time
+from dataclasses import dataclass
 from typing import Any, Iterable
 
+
+PITCH_BEND_CONTROLLER = 128
+NOTE_BUTTON_OFFSET = 256
+NOTE_BUTTON_LAST = NOTE_BUTTON_OFFSET + 127
+OSC_CONTROL_CHANNEL = 17
+OSC_VALUE_MAX = 1_000_000
 
 ControlKey = tuple[int, int]
 
 
+@dataclass(frozen=True, slots=True)
+class OscSourceDefinition:
+    address: str
+    argument: int
+    value_type: str
+
+
 class MidiControlState:
-    """Own MIDI-CC learn, binding, visibility and eviction state.
+    """Own external-control learn, binding, visibility and eviction state.
 
     The class deliberately contains no Qt or AMY code.  It keeps the
-    controller/slider relationship separate from the visible indicator bar:
-    a green binding may be evicted from the bar without losing its musical
-    target, and a later CC change can make it visible again.
+    MIDI/OSC-source relationship separate from the visible indicator bar: a
+    green binding may be evicted from the bar without losing its musical
+    target, and later source activity can make it visible again.  The class
+    name is retained as a compatibility boundary for existing callers.
     """
 
     def __init__(
@@ -38,17 +53,90 @@ class MidiControlState:
         self.learn_key: ControlKey | None = None
         self.blue_since: dict[ControlKey, float] = {}
         self._preset_target_feedback: dict[str, tuple[str, float]] = {}
+        self._osc_keys: dict[tuple[str, int], ControlKey] = {}
+        self._osc_sources: dict[ControlKey, OscSourceDefinition] = {}
+        self._next_osc_controller = 0
 
     @staticmethod
     def key(channel: int, controller: int) -> ControlKey:
         return (
             max(1, min(16, int(channel))),
-            max(0, min(127, int(controller))),
+            max(0, min(NOTE_BUTTON_LAST, int(controller))),
         )
 
     @staticmethod
     def target_id(target: dict[str, Any]) -> str:
         return str(target["id"])
+
+    def osc_key(
+        self,
+        address: str,
+        argument: int = 0,
+        value_type: str = "continuous",
+    ) -> ControlKey:
+        address = str(address)
+        argument = int(argument)
+        if not address.startswith("/") or argument < 0:
+            raise ValueError("OSC source requires an address and non-negative argument")
+        normalized_type = "button" if str(value_type) == "button" else "continuous"
+        identity = (address, argument)
+        key = self._osc_keys.get(identity)
+        if key is None:
+            key = (OSC_CONTROL_CHANNEL, self._next_osc_controller)
+            self._next_osc_controller += 1
+            self._osc_keys[identity] = key
+        previous = self._osc_sources.get(key)
+        if previous is None or (
+            previous.value_type == "button" and normalized_type == "continuous"
+        ):
+            self._osc_sources[key] = OscSourceDefinition(
+                address,
+                argument,
+                normalized_type,
+            )
+        return key
+
+    def _normalized_registered_key(self, key: ControlKey) -> ControlKey:
+        candidate = (int(key[0]), int(key[1]))
+        if candidate in self._osc_sources:
+            return candidate
+        return self.key(*candidate)
+
+    def source_type(self, key: ControlKey) -> str:
+        osc_source = self._osc_sources.get(key)
+        if osc_source is not None:
+            return "osc_button" if osc_source.value_type == "button" else "osc"
+        controller = int(key[1])
+        if controller == PITCH_BEND_CONTROLLER:
+            return "pitch_bend"
+        if NOTE_BUTTON_OFFSET <= controller <= NOTE_BUTTON_LAST:
+            return "note_button"
+        return "cc"
+
+    def source_label(self, key: ControlKey) -> str:
+        osc_source = self._osc_sources.get(key)
+        if osc_source is not None:
+            suffix = "" if osc_source.argument == 0 else f"[{osc_source.argument}]"
+            return f"{osc_source.address}{suffix}"
+        source_type = self.source_type(key)
+        if source_type == "pitch_bend":
+            return f"CH{key[0]} PB"
+        if source_type == "note_button":
+            return f"CH{key[0]} N{key[1] - NOTE_BUTTON_OFFSET}"
+        return f"CH{key[0]} CC{key[1]}"
+
+    def value_max_for_key(self, key: ControlKey) -> int:
+        source_type = self.source_type(key)
+        if source_type.startswith("osc"):
+            return OSC_VALUE_MAX
+        return 16383 if source_type == "pitch_bend" else 127
+
+    def default_value_for_key(self, key: ControlKey) -> int:
+        return 8192 if self.source_type(key) == "pitch_bend" else 0
+
+    def display_value_for_key(self, key: ControlKey, value: int) -> int:
+        maximum = self.value_max_for_key(key)
+        return int(round(max(0, min(maximum, int(value))) * 127 / maximum))
 
     def status(self, key: ControlKey) -> str:
         if self.learn_key == key:
@@ -109,10 +197,11 @@ class MidiControlState:
         )
 
     def _new_visible_item(self, key: ControlKey) -> dict[str, Any]:
+        value = int(self.values.get(key, self.default_value_for_key(key)))
         return {
             "channel": key[0],
             "controller": key[1],
-            "value": int(self.values.get(key, 0)),
+            "value": value,
             "lastSeen": int(self.clock),
             "pulse": int(self.clock),
             "replaced": 0,
@@ -166,10 +255,42 @@ class MidiControlState:
         """Record one CC packet and return a target only for a real change."""
         now = time.monotonic() if now is None else float(now)
         key = self.key(channel, controller)
-        value = max(0, min(127, int(value)))
+        return self._observe_key(key, value, now=now)
+
+    def observe_osc(
+        self,
+        address: str,
+        argument: int,
+        value: float,
+        value_type: str,
+        *,
+        now: float | None = None,
+    ) -> tuple[bool, dict[str, Any] | None, ControlKey | None]:
+        now = time.monotonic() if now is None else float(now)
+        key = self.osc_key(address, argument, value_type)
+        scaled = int(round(max(0.0, min(1.0, float(value))) * OSC_VALUE_MAX))
+        return self._observe_key(key, scaled, now=now)
+
+    def _observe_key(
+        self,
+        key: ControlKey,
+        value: int,
+        *,
+        now: float,
+    ) -> tuple[bool, dict[str, Any] | None, ControlKey | None]:
+        source_type = self.source_type(key)
+        value = max(0, min(self.value_max_for_key(key), int(value)))
         previous = self.values.get(key)
         self.values[key] = value
-        if previous is None or previous == value:
+        if previous is None:
+            if source_type == "pitch_bend":
+                previous = self.default_value_for_key(key)
+            elif source_type in ("note_button", "osc_button"):
+                if value <= 0:
+                    return False, None, None
+            else:
+                return False, None, None
+        if previous == value:
             return False, None, None
 
         # Blue marks a recently unbound control.  Its next genuine movement
@@ -198,18 +319,48 @@ class MidiControlState:
             model = dict(item)
             key = (int(item["channel"]), int(item["controller"]))
             evicting = float(item.get("replacementUntil", 0.0)) > now
-            model["state"] = self.status(key)
-            model["evicting"] = evicting
-            model["displayChannel"] = int(
-                item.get("outgoingChannel", key[0]) if evicting else key[0]
-            )
-            model["displayController"] = int(
-                item.get("outgoingController", key[1]) if evicting else key[1]
-            )
-            model["displayValue"] = int(
+            display_key = (
+                int(item.get("outgoingChannel", key[0])),
+                int(item.get("outgoingController", key[1])),
+            ) if evicting else key
+            raw_display_value = int(
                 item.get("outgoingValue", item.get("value", 0))
                 if evicting
                 else item.get("value", 0)
+            )
+            model["state"] = self.status(key)
+            model["evicting"] = evicting
+            model["inputType"] = self.source_type(key)
+            model["sourceProtocol"] = (
+                "osc" if self.source_type(key).startswith("osc") else "midi"
+            )
+            model["displayProtocol"] = (
+                "osc"
+                if self.source_type(display_key).startswith("osc")
+                else "midi"
+            )
+            display_type = self.source_type(display_key)
+            display_target = self.bindings.get(display_key)
+            if (
+                display_type in ("cc", "osc")
+                and isinstance(display_target, dict)
+                and str(display_target.get("kind", "")) == "button"
+            ):
+                display_type = "button"
+            elif display_type == "osc_button":
+                display_type = "button"
+            model["displayType"] = display_type
+            model["displayLabel"] = self.source_label(display_key)
+            model["displayChannel"] = int(display_key[0])
+            model["displayController"] = int(display_key[1])
+            model["displayValue"] = self.display_value_for_key(
+                display_key,
+                raw_display_value,
+            )
+            model["rawValue"] = int(item.get("value", 0))
+            model["buttonDown"] = (
+                display_type in ("button", "note_button")
+                and raw_display_value > 0
             )
             result.append(model)
         return result
@@ -229,16 +380,30 @@ class MidiControlState:
             changed = True
         return changed
 
-    def select_control(self, key: ControlKey, *, now: float | None = None) -> bool:
+    def indicator_clicked(
+        self,
+        key: ControlKey,
+        *,
+        now: float | None = None,
+    ) -> bool:
+        """Apply the single-click contract for a controller indicator.
+
+        A bound (green) indicator is an unlink action only.  An unbound grey
+        or blue indicator starts learn, while clicking the already-red learn
+        indicator cancels learn.  Keeping these transitions here prevents the
+        QML button from accidentally combining unlink and relearn.
+        """
         now = time.monotonic() if now is None else float(now)
-        key = self.key(*key)
+        key = self._normalized_registered_key(key)
         if self.learn_key == key:
             self.learn_key = None
             self.blue_since.pop(key, None)
             return True
-        previous_target = self.bindings.pop(key, None)
-        if previous_target is not None:
-            self._target_to_control.pop(self.target_id(previous_target), None)
+
+        bound_target = self.bindings.get(key)
+        if bound_target is not None:
+            return self._unbind_target(bound_target, now)
+
         self.learn_key = key
         self.blue_since.pop(key, None)
         self.ensure_visible(key, now=now)
@@ -313,7 +478,7 @@ class MidiControlState:
     ) -> set[str]:
         conflicts: set[str] = set()
         for raw_key, target in entries:
-            key = self.key(*raw_key)
+            key = self._normalized_registered_key(raw_key)
             old_target = self.bindings.get(key)
             if old_target is None:
                 continue
@@ -333,21 +498,13 @@ class MidiControlState:
         self.ensure_visible(key, now=now)
         return True
 
-    def target_double_tapped(
+    def release_target_for_manual_edit(
         self,
         target: dict[str, Any],
         *,
         now: float | None = None,
     ) -> bool:
-        now = time.monotonic() if now is None else float(now)
-        return self._unbind_target(target, now)
-
-    def target_moved(
-        self,
-        target: dict[str, Any],
-        *,
-        now: float | None = None,
-    ) -> bool:
+        """Release external-control ownership before a genuine UI edit."""
         now = time.monotonic() if now is None else float(now)
         return self._unbind_target(target, now)
 
@@ -375,15 +532,32 @@ class MidiControlState:
         return "idle"
 
     def serialize_bindings(self, screen: str) -> list[dict[str, Any]]:
-        return [
-            {
-                "channel": key[0],
-                "controller": key[1],
-                "target": copy.deepcopy(target),
-            }
-            for key, target in sorted(self.bindings.items())
-            if str(target.get("screen")) == str(screen)
-        ]
+        result: list[dict[str, Any]] = []
+        for key, target in sorted(self.bindings.items()):
+            if str(target.get("screen")) != str(screen):
+                continue
+            source_type = self.source_type(key)
+            osc_source = self._osc_sources.get(key)
+            if osc_source is not None:
+                entry = {
+                    "source_type": "osc",
+                    "address": osc_source.address,
+                    "argument": osc_source.argument,
+                    "value_type": osc_source.value_type,
+                    "target": copy.deepcopy(target),
+                }
+            else:
+                entry = {
+                    "channel": key[0],
+                    "controller": key[1],
+                    "target": copy.deepcopy(target),
+                }
+            if source_type not in ("cc", "osc", "osc_button"):
+                entry["source_type"] = source_type
+                if source_type == "note_button":
+                    entry["note"] = key[1] - NOTE_BUTTON_OFFSET
+            result.append(entry)
+        return result
 
     def replace_screen_bindings(
         self,
@@ -410,7 +584,7 @@ class MidiControlState:
             self._target_to_control.pop(self.target_id(target), None)
 
         for raw_key, target in entries:
-            key = self.key(*raw_key)
+            key = self._normalized_registered_key(raw_key)
             target_id = self.target_id(target)
             previous_target = previous_bindings.get(key)
             if (

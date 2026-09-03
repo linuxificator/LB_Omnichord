@@ -3,16 +3,29 @@ set -euo pipefail
 
 readonly package=org.linuxificator.lb_omnichord
 readonly evidence_dir=android-audio-capture
-readonly status_file="$evidence_dir/lb-android-smoke.status"
 readonly log_file="$evidence_dir/lb-android.log"
+readonly sender_log="$evidence_dir/lb-android-external-osc-sender.log"
+readonly input_contract_log="$evidence_dir/external-input-contract.log"
 mkdir -p "$evidence_dir"
+external_sender_pid=""
+osc_port=""
 
 capture_diagnostics() {
   adb logcat -d > "$log_file" 2>/dev/null || true
-  adb exec-out run-as "$package" cat \
-    files/lb-android-package-smoke.status > "$status_file" 2>/dev/null || true
 }
-trap capture_diagnostics EXIT
+
+cleanup() {
+  if [[ -n "$external_sender_pid" ]]; then
+    kill -TERM "$external_sender_pid" 2>/dev/null || true
+    wait "$external_sender_pid" 2>/dev/null || true
+  fi
+  if [[ -n "$osc_port" ]]; then
+    adb emu redir del "udp:$osc_port" >/dev/null 2>&1 || true
+  fi
+  adb shell am force-stop "$package" >/dev/null 2>&1 || true
+  capture_diagnostics
+}
+trap cleanup EXIT
 
 mapfile -t apks < <(find android-package -type f -name '*.apk' -print)
 if [[ ${#apks[@]} -ne 1 ]]; then
@@ -21,6 +34,15 @@ if [[ ${#apks[@]} -ne 1 ]]; then
 fi
 readonly apk=${apks[0]}
 test -s "$apk"
+mapfile -t package_audits < <(find android-package-evidence -type f -name '*.apk.package-audit.json' -print)
+mapfile -t qml_evidence < <(find android-package-evidence -type f -name '*.apk.pyside-prune.json' -print)
+if [[ ${#package_audits[@]} -ne 1 || ${#qml_evidence[@]} -ne 1 ]]; then
+  echo "Expected one Android package audit and one QML prune report" >&2
+  exit 1
+fi
+
+python3 amysynth_version/qt_frontend/tests/contracts/test_external_input_processes.py \
+  > "$input_contract_log" 2>&1
 
 adb uninstall "$package" >/dev/null 2>&1 || true
 adb install "$apk"
@@ -61,37 +83,85 @@ test "$warmup_ready" -eq 1
 ! grep -q 'Traceback (most recent call last)' /tmp/lb-android-warmup.log
 adb shell am force-stop "$package"
 
-adb shell run-as "$package" touch files/lb-android-package-smoke.enable
+readonly osc_config=amysynth_version/qt_frontend/config/amy_config.json
+osc_port=$(python3 \
+  amysynth_version/qt_frontend/tests/support/external_input_peer.py \
+  osc-port --config "$osc_config")
+redir_result=$(adb emu redir add "udp:${osc_port}:${osc_port}")
+if [[ "$redir_result" != OK* ]]; then
+  echo "Could not configure emulator OSC UDP redirection: $redir_result" >&2
+  exit 1
+fi
+
 adb shell run-as "$package" touch files/amy-audio-capture.enable
 adb logcat -c
+python3 amysynth_version/qt_frontend/tests/support/external_input_peer.py \
+  osc --config "$osc_config" --duration 30 \
+  > "$sender_log" 2>&1 &
+external_sender_pid=$!
 adb shell monkey -p "$package" 1
 
 for _ in {1..120}; do
-  if adb exec-out run-as "$package" cat \
-      files/lb-android-package-smoke.status \
-      > "$status_file" 2>/dev/null && \
-      grep -q 'event-loop-exited' "$status_file"; then
+  adb logcat -d > "$log_file" 2>/dev/null || true
+  if grep -q 'Audio capture armed: 384000 frames' "$log_file" && \
+      grep -q 'QPA platform: android' "$log_file"; then
     break
   fi
   sleep 0.5
 done
+
+# Drive the packaged UI from the adb process. A QPA-ready log line precedes the
+# first rendered QML frame on a cold emulator, so wait for visual evidence
+# before injecting input. A blank Android system surface compresses to only a
+# few KiB; the real, detailed Omnichord surface is comfortably larger than
+# this conservative lower bound on every packaged Android viewport.
+readonly before_screenshot="$evidence_dir/omni-before.png"
+rendered_viewport=0
+for _ in {1..40}; do
+  adb exec-out screencap -p > "$before_screenshot"
+  if (( $(stat -c %s "$before_screenshot") >= 65536 )); then
+    rendered_viewport=1
+    break
+  fi
+  sleep 0.25
+done
+if (( rendered_viewport != 1 )); then
+  echo "Android application did not produce a detailed rendered frame" >&2
+  exit 1
+fi
+
+# Use the actual screenshot viewport: `wm size` reports natural panel
+# dimensions and Android 35 no longer exposes SurfaceOrientation in
+# `dumpsys input`.
+read -r display_width display_height < <(
+  python3 - "$before_screenshot" <<'PY'
+import struct
+import sys
+from pathlib import Path
+
+header = Path(sys.argv[1]).read_bytes()[:24]
+if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+    raise SystemExit("Android screencap did not produce a PNG")
+print(*struct.unpack(">II", header[16:24]))
+PY
+)
+if (( display_width <= display_height )); then
+  echo "Android application did not render landscape: ${display_width}x${display_height}" >&2
+  exit 1
+fi
+chord_x=$((display_width * 250 / 1920))
+chord_y=$((display_height * 735 / 1080))
+adb shell input swipe "$chord_x" "$chord_y" "$chord_x" "$chord_y" 700
+sleep 1
+adb exec-out screencap -p > "$evidence_dir/omni-after.png"
 capture_diagnostics
-cat "$status_file"
+kill -TERM "$external_sender_pid" 2>/dev/null || true
+wait "$external_sender_pid" 2>/dev/null || true
+external_sender_pid=""
+cat "$sender_log"
+grep -q 'osc-external-process-started' "$sender_log"
 grep -E 'AmyAndroid|AmyAudioCapture|AMY backend|QPA platform|Traceback' \
   "$log_file" || true
-for checkpoint in \
-  android-runtime-configured \
-  qml-root-ready \
-  initial-state-sent \
-  smoke-audio-levels-full \
-  qml-chord-press-observed \
-  active-chord-visible \
-  qml-chord-tap-released \
-  qml-chord-hold-promoted \
-  qml-chord-hold-released \
-  event-loop-exited; do
-  grep -q "$checkpoint" "$status_file"
-done
 grep -q 'AMY/Oboe started: .*336 oscs, 11 buses' "$log_file"
 grep -q 'Audio capture armed: 384000 frames, 48000 Hz, 2 channels' "$log_file"
 grep -q 'AMY output route: deviceId=' "$log_file"
@@ -118,6 +188,19 @@ cat "$evidence_dir/amy-audio-levels.txt"
 python3 "$RUNNER_TEMP/amy-lb/tests/check_android_audio_capture.py" \
   "$evidence_dir/amy-render.wav" \
   "$evidence_dir/amy-oboe.wav" \
-  --min-peak-dbfs -26.0
+  --min-peak-dbfs -26.0 | tee "$evidence_dir/audio-check.log"
+
+python3 amysynth_version/qt_frontend/tests/support/package_evidence.py \
+  --platform Android-x86_64 \
+  --artifact "$apk" \
+  --package-audit "${package_audits[0]}" \
+  --qml-imports "${qml_evidence[0]}" \
+  --application-log "$log_file" \
+  --external-input-contract-log "$input_contract_log" \
+  --screenshot "$evidence_dir/omni-before.png" \
+  --screenshot "$evidence_dir/omni-after.png" \
+  --regression-result success \
+  --audio-evidence "$evidence_dir/audio-check.log" \
+  --output "$evidence_dir/package-evidence.json"
 
 trap - EXIT

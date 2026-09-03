@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "recorded": "2026-09-03",
+  "requirement_groups": {
+    "portable": "requirements-portable.txt",
+    "runtime": "requirements.txt",
+    "build": "requirements-build.txt",
+    "test_quality": "requirements-test.txt",
+    "android_host": "requirements-android-host.txt"
+  },
+  "direct_imports": {
+    "PyInstaller": {
+      "distribution": "PyInstaller",
+      "owner": "build",
+      "used_by": ["package-size collection hooks"]
+    },
+    "PySide6": {
+      "distribution": "PySide6",
+      "owner": "runtime",
+      "used_by": ["runtime", "tests", "diagnostics", "release tools"]
+    },
+    "serial": {
+      "distribution": "pyserial",
+      "owner": "runtime",
+      "used_by": ["runtime", "tests"]
+    },
+    "fastjsonschema": {
+      "distribution": "fastjsonschema",
+      "owner": "runtime",
+      "used_by": ["versioned startup configuration validation"]
+    },
+    "pythonosc": {
+      "distribution": "python-osc",
+      "owner": "runtime",
+      "used_by": ["portable OSC 1.0 input parsing"]
+    },
+    "numpy": {
+      "distribution": "numpy",
+      "owner": "test_quality",
+      "used_by": ["native instrument-balance renderer"]
+    },
+    "amy": {
+      "component_exception": "lb_amy",
+      "used_by": ["local AMY service", "native tests"]
+    },
+    "c_amy": {
+      "component_exception": "lb_amy",
+      "used_by": ["local AMY service", "native tests"]
+    }
+  },
+  "invoked_python_tools": {
+    "PyInstaller": {
+      "distribution": "PyInstaller",
+      "owner": "build"
+    },
+    "Cython": {
+      "distribution": "Cython",
+      "owner": "android_host"
+    },
+    "ruff": {
+      "distribution": "ruff",
+      "owner": "test_quality"
+    },
+    "mypy": {
+      "distribution": "mypy",
+      "owner": "test_quality"
+    },
+    "types-pyserial": {
+      "distribution": "types-pyserial",
+      "owner": "test_quality"
+    },
+    "coverage": {
+      "distribution": "coverage",
+      "owner": "test_quality"
+    }
+  },
+  "component_exceptions": {
+    "lb_amy": {
+      "release_inputs": "packaging/release_inputs.json",
+      "contract": "packaging/AMY_RELEASE.md"
+    }
+  }
+}

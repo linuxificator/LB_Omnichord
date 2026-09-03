@@ -1,0 +1,9 @@
+# Exact Python 3.12 Raspberry Pi/Ubuntu 22.04 aarch64 release inputs.
+PySide6==6.7.3
+PySide6_Addons==6.7.3
+PySide6_Essentials==6.7.3
+shiboken6==6.7.3
+altgraph==0.17.5
+packaging==26.3
+pyinstaller-hooks-contrib==2026.6
+setuptools==84.0.0

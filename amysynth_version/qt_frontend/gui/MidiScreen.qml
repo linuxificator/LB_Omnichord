@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
+import "physical_controls"
 
 Item {
     id: root
@@ -9,6 +10,7 @@ Item {
     property bool tuningCoupled: true
     property int activeMidiRow: 0
     property var midiControlModel: []
+    property var inputTechModel: backend.midiPlayer.midiInputTechs
     readonly property bool tuningMidiLocked:
         root.hostWindow.midiTuningMidiBound
         || (
@@ -29,7 +31,7 @@ Item {
 
     Timer {
         interval: 100
-        running: root.visible || backend.midiPlayer.testCcLogging
+        running: root.visible
         repeat: true
         triggeredOnStart: true
         onTriggered: {
@@ -39,19 +41,6 @@ Item {
             root.midiControlModel = backend.midiPlayer
                 .commonControls(-1)
                 .slice(0, midiControlBar.indicatorCapacity)
-            backend.midiPlayer.testLogControlIndicatorLayout(
-                midiControlBar.x,
-                midiControlBar.width,
-                midiControlBar.indicatorCapacity,
-                midiControlRow.implicitWidth,
-                midiControlRepeater.count,
-                midiControlBar.x
-                + midiControlBar.horizontalPadding
-                + midiControlRow.implicitWidth
-            )
-            backend.midiPlayer.testLogControlIndicatorState(
-                root.midiControlModel
-            )
         }
     }
 
@@ -116,7 +105,7 @@ Item {
         }
 
         onIndicatorCapacityChanged: {
-            if (root.visible || backend.midiPlayer.testCcLogging) {
+            if (root.visible) {
                 publishCapacity()
             }
         }
@@ -322,6 +311,7 @@ Item {
     }
 
     Rectangle {
+        id: midiCcPanel
         x:
             omniButton.x
             + omniButton.width
@@ -390,41 +380,54 @@ Item {
                         }
                     }
 
-                    Rectangle {
-                        id: radioKnob
+                    Item {
+                        id: hardwareControl
                         anchors.horizontalCenter: parent.horizontalCenter
-                        y: 12
-                        width: 40
-                        height: 40
-                        radius: 20
-                        color: modelData.evicting ? "#d62f2f" : "#686864"
-                        border.color: "#e8e8df"
-                        border.width: 2
-                        rotation:
-                            Number(modelData.displayValue) * 270 / 127 - 135
+                        y: 9
+                        width: 52
+                        height: 52
+                        readonly property bool pitchBend:
+                            modelData.displayType === "pitch_bend"
+                        readonly property bool noteButton:
+                            modelData.displayType === "note_button"
+                            || modelData.displayType === "button"
 
-                        Rectangle {
-                            x: parent.width / 2 - 2
-                            y: 4
-                            width: 4
-                            height: 14
-                            radius: 2
-                            color: "#f2d56b"
+                        PhysicalRotary {
+                            visible: !hardwareControl.noteButton
+                            anchors.centerIn: parent
+                            width: 52
+                            height: 52
+                            family:
+                                modelData.displayProtocol === "osc" ? 1 : 6
+                            encoder: hardwareControl.pitchBend
+                            from: 0
+                            to: 127
+                            value: Number(modelData.displayValue)
+                            physicalInteractive: false
+                            opacity: modelData.evicting ? 0.55 : 1.0
                         }
 
-                        Behavior on rotation {
-                            NumberAnimation { duration: 90 }
+                        PhysicalPushButton {
+                            visible: hardwareControl.noteButton
+                            anchors.centerIn: parent
+                            width: 58
+                            height: 42
+                            family:
+                                modelData.displayProtocol === "osc" ? 1 : 6
+                            forcedDown:
+                                modelData.buttonDown && !modelData.evicting
                         }
                     }
 
                     Text {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text:
-                            "CH" + modelData.displayChannel
-                            + " CC" + modelData.displayController
+                        width: parent.width
+                        text: modelData.displayLabel
                         color: "#292927"
                         font.pixelSize: 11
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideMiddle
                     }
 
                     SequentialAnimation on opacity {
@@ -435,11 +438,55 @@ Item {
                     }
 
                     onClicked: {
-                        backend.midiPlayer.selectControlIndicator(
+                        backend.midiPlayer.clickControlIndicator(
                             modelData.channel,
                             modelData.controller
                         )
                     }
+                }
+            }
+        }
+    }
+
+    Item {
+        id: midiInputTechPanel
+
+        readonly property int panelY:
+            root.hostWindow.rhythmY
+            + 6 * root.hostWindow.sectionHeight
+            + 5 * root.hostWindow.sectionGap
+        readonly property int panelBottom:
+            root.hostWindow.chordRowsY
+            + 3 * (
+                root.hostWindow.rowHeight
+                + root.hostWindow.rowSpacing
+            )
+
+        x: root.hostWindow.contentX
+        y: panelY
+        width:
+            Math.max(
+                0,
+                midiCcPanel.x
+                + midiCcPanel.width
+                - root.hostWindow.contentX
+            )
+        height: Math.max(0, panelBottom - panelY)
+        visible:
+            height >= 24
+            && root.inputTechModel.length > 0
+
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 18
+
+            Repeater {
+                model: root.inputTechModel
+
+                delegate: InputTechnologyIndicator {
+                    required property var modelData
+                    technology: modelData
                 }
             }
         }

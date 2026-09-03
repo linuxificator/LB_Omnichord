@@ -19,6 +19,11 @@ Item {
     property color selectedColor: "#cb981d"
     property color borderColor: "#96720f"
     property color selectedTextColor: "#fff9dd"
+    property var midiControlRouter: null
+    property var activityMidiTargetForLevel: null
+    property var arpeggioMidiTarget: ({})
+    property var rateMidiTargetForRate: null
+    property var directionMidiTarget: ({})
 
     signal activitySelected(int level)
     signal arpeggioToggled()
@@ -91,6 +96,14 @@ Item {
                         index < 4
                         ? root.currentLevel === index + 1
                         : root.arpeggioEnabled
+                    property var midiTarget:
+                        index < 4
+                        ? (
+                            root.activityMidiTargetForLevel === null
+                            ? ({})
+                            : root.activityMidiTargetForLevel(index + 1)
+                        )
+                        : root.arpeggioMidiTarget
 
                     font.pixelSize: 13
                     font.bold: true
@@ -118,6 +131,14 @@ Item {
                             )
                         border.color: root.borderColor
                         border.width: topButton.selectedState ? 2 : 1
+                    }
+
+                    MidiButtonLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 3
+                        z: 2
+                        midiControlRouter: root.midiControlRouter
+                        midiTarget: topButton.midiTarget
                     }
 
                     onClicked: {
@@ -162,6 +183,14 @@ Item {
                         index < 4
                         ? root.arpeggioRate === index + 1
                         : root.arpeggioDescending
+                    property var midiTarget:
+                        index < 4
+                        ? (
+                            root.rateMidiTargetForRate === null
+                            ? ({})
+                            : root.rateMidiTargetForRate(index + 1)
+                        )
+                        : root.directionMidiTarget
 
                     font.pixelSize: 13
                     font.bold: true
@@ -189,6 +218,14 @@ Item {
                             )
                         border.color: root.borderColor
                         border.width: bottomButton.selectedState ? 2 : 1
+                    }
+
+                    MidiButtonLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 3
+                        z: 2
+                        midiControlRouter: root.midiControlRouter
+                        midiTarget: bottomButton.midiTarget
                     }
 
                     onClicked: {

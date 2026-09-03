@@ -1,334 +1,484 @@
-# Codex Session Handoff
+# Codex session handoff — AMY/LB Omnichord state and code-quality audit
 
-Updated 2026-08-28 for the merge of `refactoring/ui_changes` into `main`.
-Inspect `git status`, the current branch and the latest GitHub Actions run
-before continuing; the release build triggered by this merge may still be in
-progress when the next session begins.
+Updated: 2026-09-03.
 
-This file records operational state and completed work from the AMY/Qt UI,
-performance, MIDI-control and native-Windows sessions. It supplements, but does
-not override, `AGENTS.md`, the current user request or the authoritative
-contracts under `amysynth_version/design/`.
+This file is intentionally written for future Codex sessions. It records the
+working state, decisions, lessons learned and branch/release discipline from
+the AMY socket, Android, nested-sequencer, rhythm-fill, Gamma9001 and release
+automation work. It supplements `AGENTS.md` and the authoritative design
+contracts under `amysynth_version/design/`; it does not override either of
+them or the current user's request.
 
-## Mandatory continuation route
+## 2026-09-03 sequencer-group rework supersedes the old pattern design
 
-Before changing active AMY code, follow the complete startup route in
-`AGENTS.md` and `amysynth_version/design/README.md`. For Windows work, also read
-all of:
+The active implementation no longer uses the nested-pattern wire API described
+later in this historical handoff. Treat the old `zQB`/`zQE`/`zQC`/`zQT`/
+`zQA`/`zQS`/`zQM`/`zQR`, pattern-bank and one-child-per-arpeggio-note sections
+as regression history only.
 
-- `amysynth_version/qt_frontend/docs/WINDOWS_NATIVE.md`;
-- `amysynth_version/qt_frontend/README.md`;
-- `amysynth_version/qt_frontend/INSTALL.md`;
-- `.github/workflows/desktop-release.yml`.
+The clean upstream-directed AMY branch is `rework/sequencer` at
+`109852803bd1385100448e49965dff949d3ba5dd`. It extends the existing `H` tuple
+with an optional fourth group tag and adds one generic sequence-control family,
+`zQ<group>,<action>,<value>,<quantize>[,<execution-tag>]Z`. Groups support
+atomic immutable revisions, one/N/infinite execution, quantized start/stop,
+one level of nesting and finite payload-agnostic event gating. Existing root
+sequencer behavior remains unchanged and is covered by compatibility tests.
 
-Do not use this handoff as a replacement for those contracts.
+The Omnichord integration release is
+`releases/amy_omnichord_R20260903T202802` at
+`890ec66de2677db5bdf9a5dda9f53f01628d2b58`. It layers the already-maintained
+socket, Android/Oboe, Gamma9001 and offline-render support plus the explicit
+11-bus/336-oscillator and 1024-group/64-local-tag/40-execution profile. The
+abandoned bus-mixer experiment is not included. ESP32-P4 validation is
+deliberately deferred for this rework.
 
-At the merge audit, `origin/main` contained no commit missing from
-`refactoring/ui_changes`. The only other remote branch not merged into main was
-`origin/codex_info`: it is an old, heavily diverged documentation line and was
-intentionally not merged. Current design contracts plus this automatically read
-handoff supersede it.
+This release also applies lossless backpressure to the bounded Unix-socket
+receiver queue. When the realtime handoff queue is full, AMY temporarily stops
+reading and lets the kernel socket buffer throttle the sender. This preserves
+large startup transactions such as the preloaded rhythm-group library instead
+of acknowledging and discarding excess wire packets.
 
-## Current architectural state
+LB branch `rework/sequencer` uses only AMY wire commands. It preloads fills as
+groups, runs each base drum role as a stable loop execution, and publishes each
+complete chord/arpeggio phrase as one immutable group revision. Musical role
+ownership and fill continuation policy remain in LB; AMY receives only generic
+group operations. The current authoritative contracts are
+`amysynth_version/design/sequencer_groups.md`,
+`amysynth_version/qt_frontend/docs/SEQUENCER_TAGS.md` and
+`amysynth_version/qt_frontend/docs/RHYTHM_PATTERNS.md`.
 
-- The active implementation is Qt/PySide6 plus AMY. Sonic Pi is frozen
-  historical material.
-- Qt generates AMY wire requests only. It does not import `amy`/`c_amy`, link
-  AMY or control the synth service from application code.
-- Desktop packages contain two separate runtime components. A packaging
-  launcher may start and supervise both processes without changing their wire
-  boundary.
-- Linux uses `AF_UNIX/SOCK_SEQPACKET` between Qt and the Python AMY service.
-- macOS uses LF-framed `AF_UNIX/SOCK_STREAM` because Darwin has no Unix-domain
-  `SOCK_SEQPACKET`.
-- Native Windows uses Qt `QLocalSocket` to a private Windows named pipe owned by
-  the native C `amy_service.exe`. It does not use TCP and does not use WSL.
-- ESP32-P4 uses LF-delimited AMY wire requests over UART. Android's proven
-  design likewise keeps the app and AMY service in separate processes.
+The branch intended for analysis/continuation is `rework/code_quality` in
+`linuxificator/LB_Omnichord`. T01-T25 and package slimming were merged to
+`main`, released as `R20260901T212205`, and fast-forwarded back into the
+retained rework branch with both release fixes and the validated screenshot
+follow-up. Read
+`amysynth_version/design/code_quality_tasks/POST_T25_MAIN_RELEASE_20260901.md`
+for the exact release timeline and lessons. Analysis documents still do not
+authorize new product refactoring without a current user request.
 
-## Current musical/UI baseline
+## Mandatory startup route
 
-The 2026-08-28 merge contains the UI/performance series beginning at `6f006ee`
-and the subsequent LDR audit. Treat these details as current behavior, not a
-future plan.
+Before changing active AMY/LB code, read:
 
-### Shared visual layout
+1. `AGENTS.md`;
+2. `amysynth_version/README.md`;
+3. `amysynth_version/design/README.md`;
+4. the baseline contracts listed there: `principles.md`, `architecture.md`,
+   `behavior.md`, `testing.md`;
+5. the routed subsystem documents for the task.
 
-- OMNI and MIDI use the same utility, reverb and preset header geometry. The
-  OMNI-centered title position is reused on MIDI so it never jumps on a screen
-  switch.
-- The pink reverb and purple preset bars share one height and a normal section
-  gap. The purple bar is fitted to Store plus P1–P18/M1–M18 with equal edge and
-  button spacing; the pink bar receives the freed width.
-- Store is the same size as every round preset button and is visibly darker
-  purple. Pointer-down never shrinks a preset. The active preset keeps the
-  normal single border and width, with only the border color changed to white.
-- The blue APG/LDR panel matches the reverb/preset height and bottom-aligns with
-  the utility area. MIDI intentionally has no APG/LDR button.
-- Tuning is at the top. Brown independent master controls sit between tuning and
-  `PNC!`; `PNC!` and `FSC`/`ESC` align to the reverb panel's right edge.
-- The chord-row RST/UP/DWN block ends at row two and distributes its controls
-  evenly. Percussion, chord and bass activity each show four equal, top-aligned
-  buttons; chord activity has no user-selectable zero.
+For `rework/external_controls`, also read at minimum:
 
-The public images are real 1920x850 Qt renders at
-`amysynth_version/qt_frontend/screenshots/omni.png` and `midi.png`. The root
-README embeds them. Run `amysynth_version/qt_frontend/capture_screenshots.py`
-with the frontend Python environment to refresh both deterministically. It uses
-an isolated temporary home and pseudo-serial endpoint; the MIDI frame contains
-three representative CC knobs in the grey bar.
+- `amysynth_version/design/midi.md`;
+- `amysynth_version/design/midi_control.md`;
+- `amysynth_version/design/presets.md`;
+- `amysynth_version/design/sound_balance.md`;
+- `amysynth_version/design/amy_interface.md`;
+- `amysynth_version/qt_frontend/docs/CONTROL_SAFETY.md`;
+- `amysynth_version/qt_frontend/tests/USE_CASES.md`.
 
-### Strum modes and note guide
+Also read `amysynth_version/design/CODEX_HANDOVER_EXTERNAL_CONTROLS.md` before
+changing slider or MIDI-learn interaction. It records why stable QML delegates
+are required during a drag and why manual movement of a bound numeric control
+is now an intentional release-before-edit operation rather than an incidental
+side effect. Indicator clicks use the explicit grey/blue-to-learn,
+green-to-unlinked-blue and red-to-grey state machine documented there.
 
-- APG/LDR is backend-owned OMNI preset state stored as `strum_mode`; legacy
-  presets default to APG.
-- The narrow gap beside the strum surface shows one blue round marker per
-  available pitch class. Labels use uppercase, chord-aware spelling such as
-  C/E-flat/G rather than C/D-sharp/G.
-- Every one of the 36 suffixes in `music/chords.csv` has an explicit LDR mapping
-  in `app_core.py`. The mapping must contain every chord tone; an unmapped new
-  suffix raises an error rather than falling through a family heuristic.
-- LDR uses consonant chord-scale subsets appropriate to a mechanical strum. It
-  omits avoid/opposite alterations unless named by the chord. In particular,
-  G minor-major 7 is `G A B-flat D E F-sharp` and never adds F natural.
+For code-quality/refactoring work, start at
+`amysynth_version/design/CODEX_HANDOVER_CODE_QUALITY_BASELINE.md`, read the
+dedicated handover for the selected boundary and then
+`CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md`. Each future implementation must still
+read the authoritative subsystem contracts and obtain normal user direction;
+analysis findings are not a behavioral specification.
 
-### Chords, sequencer and live presets
+If the task touches rhythm, platform packages, Windows, Android, ESP32-P4 or
+the AMY fork, follow the additional rows in `design/README.md` before editing.
 
-- A quick chord tap starts/stops manual synth 3 and selects the new active chord
-  for manual play, strum, bass and automatic-chord pitches. It never closes or
-  drains the automatic synth-4 lane.
-- A contact held beyond the 160 ms tap window is promoted to manual takeover.
-  Promotion clears only future synth-4 note-ons while retaining the sequenced
-  synth-4 all-off tags, so the currently sounding accompaniment reaches its own
-  rhythmic note-off instead of hanging or being cut short. Drums, bass,
-  transport and timebase continue.
-- `CHORD ON/OFF` owns only automatic synth 4 and keeps state independent of
-  chord selection. OFF performs the same deferred-release drain; ON reinstalls
-  the lane and never triggers a one-shot manual chord.
-- While rhythm is running, preset switches preserve live tempo, percussion,
-  chord and bass activity, bass voicing, and the octave of the active chord row.
-  Inactive chord-row octaves may load from the preset. When rhythm is stopped,
-  all those stored values load normally.
-- Physical chord-button ownership, active row/root and chord-gate state survive
-  a preset switch. A held chord converges to the destination voicing/timbre but
-  remains held and releasable by its original button-up.
+## Current repository state
 
-### MIDI feedback and output ownership
+### LB Omnichord
 
-- Genuine incoming CC movement updates its bound numeric value and visible
-  slider. A green binding has exclusive numeric authority until explicit
-  double-tap unlink; reset/copy/nudge/preset/manual edits cannot override it.
-- Incoming activity for a binding on the other screen always flashes the green
-  LED left of `MIDI`/`OMNI`, whether that other-screen target is visible or
-  hidden under a preset. A same-screen inactive preset instead flashes its
-  small green LED above the preset label. This feedback never loads a preset or
-  switches screens.
-- The red MIDI-learn LED is larger and appears only while blinking, to the right
-  of `MIDI` in the rainbow button. It is not rendered when off.
-- Destination presets win same-controller/different-target conflicts; outgoing
-  and incoming handles show the documented red/blue two-second handoff.
-- OMNI master/mute owns buses 0–3; MIDI master/mute owns buses 4–10. Their live
-  values are independent and survive preset changes. `MUT` applies zero without
-  discarding the retained slider value; `UMT` restores it.
-- Reverb level is consistently 0.00–3.00 through QML, backend clamps, CC mapping
-  and owned AMY bus commands.
+- Own origin: `git@github.com:linuxificator/LB_Omnichord.git`.
+- Current `main` before this documentation-only rework continuation:
+  `6ccebe9a66bdd8d6fe72a095082d9162ee194836` (`Refresh README screenshots`).
+- Latest successful full release: `R20260901T212205`, produced from commit
+  `3740191e9ae44c17e83188c78cf67c0668f20d58` by GitHub Actions run
+  `33560667071`. All seven regression groups, five platform packages, Android
+  emulator, exact manifest, SPDX SBOM, signed attestations, publication and
+  screenshot refresh passed. The release uses Gamma9001 AMY commit
+  `7c34aa514f10c33f02692f735166d65f4e20374a` and contains exactly five
+  packages, five SHA-256 companions and four release-evidence files.
+- Branch `rework/external_controls` was merged into `main` by
+  `50118fb18c952a27c64a77a6486527a64559ebb5`. It is retained as branch history;
+  continuation analysis now belongs on `rework/code_quality`.
+- Historical run `33372709995` built and published `R20260831T082359`, but
+  its screenshot-refresh job failed because `refresh-readme-screenshots` did
+  not include `release-metadata` in `needs`, so the release tag output was out
+  of scope. Commit `026272d` fixed that by making the dependency explicit.
+- Branch `feature/drum_fills` ended at
+  `57f627ac060bc4cb3d84298ea313211ec1232226`
+  (`Remove obsolete rhythm rework task`) and has been merged into `main`.
+- Historical branch `features/gamma9001` ended at
+  `067e7437b85b1613783160f764b1042de14bce07`
+  (`Make native wire waits ingestion-aware`) and remains a separate
+  Gamma9001 implementation. It was not merged into `main`; configuration
+  revision 5 and AMY release `R20260901T201533` restore it as the hosted
+  published-package default on `rework/code_quality`.
 
-The authoritative details are in `amysynth_version/design/gui.md`,
-`sound_balance.md`, `midi_control.md`, `presets.md`, `rhythm_bahavior.md`,
-`tuning.md`, `amysynth_version/qt_frontend/docs/CONTROL_SAFETY.md`,
-`SEQUENCER_TAGS.md` and `tests/USE_CASES.md`.
+### AMY fork
 
-## Native Windows implementation
+Local convention: `/home/jeroen/omnichord/amyfork/amy`.
 
-### Stable transport decision
+Relevant fork branches and exact commits:
 
-The supported Windows path is:
+- `origin/upstream/amy_socket_api_xtra`:
+  `e501d497316d6bea1666c7c8e7bcd118d13b9a05`
+  (`Document Android integration lessons`).
+- `origin/upstream/nested_sequencer`:
+  `4de6d4ffd58964edd519eb14b2dc0046663ed1d1`
+  (`Document arpeggio one-shot use case`).
+- Historical Tiny-bank LB release branch:
+  `origin/releases/amy_omnichord_R20260831T042456` at
+  `14240031c135fdcd76a7a3a8ec81da8ef405c4b0`
+  (`Support deterministic offline live configuration`).
+- Historical Gamma9001 LB release branch:
+  `origin/releases/amy_omnichord_R20260831T001253` at
+  `00157856312de89f6dc293f90efb1889f0ceff23`
+  (`Register Gamma9001 PCM in Android service`).
+- Current hosted Gamma9001 LB release branch:
+  `origin/releases/amy_omnichord_R20260901T201533` at
+  `7c34aa514f10c33f02692f735166d65f4e20374a`
+  (`Record unified Gamma9001 Omnichord release`).
 
-```text
-LB_Omnichord.exe (frozen PySide6 frontend)
-    -> QLocalSocket
-    -> private \\.\pipe\LB_Omnichord_AMY_<unique-guid>
-    -> amy_service.exe
-    -> AMY C engine/miniaudio
-```
+On 2026-08-31, `gh pr list --repo shorepine/amy --state all --head
+linuxificator:upstream/amy_socket_api_xtra` and the same command for
+`upstream/nested_sequencer` returned no matching PRs. Before changing or
+commenting on Shorepine PRs, re-check the actual GitHub state rather than
+relying on this note.
 
-Important implementation details:
+## Branch and release discipline
 
-- `code/amy_transport.py` owns `_QtLocalSocketWriter`. The `QLocalSocket`
-  object is created, connected, written and closed entirely on the existing
-  command-writer thread to preserve QObject thread affinity and keep blocking
-  writes away from the UI thread.
-- `app_core.py --amy-local-name NAME` selects this transport. It is mutually
-  exclusive with Unix `--amy-socket`.
-- `packaging/windows/amy_service.c` uses `CreateNamedPipeA` with
-  `PIPE_REJECT_REMOTE_CLIENTS`, one client, byte mode and blocking reads.
-- Every logical AMY request ends in `Z` and is followed by LF. The service
-  buffers partial/multiple `ReadFile()` results and splits only on LF.
-- `packaging/windows/run_windows.ps1` creates a unique pipe name. It starts the
-  service, waits for a short-lived `%LOCALAPPDATA%/LB_Omnichord/amy.pipe` ready
-  file, verifies that its content is the expected name, deletes it, then starts
-  the frontend. The ready file is discovery only, never command transport.
-- The launcher owns child-process cleanup. The Qt application still does not
-  own or import AMY.
-- `packaging/build_windows.ps1` builds native `amy_service.exe`, freezes the Qt
-  frontend independently with PyInstaller `--onedir`, and packages both plus
-  the launcher in a self-contained zip.
-- Frozen assets resolve from `sys._MEIPASS`; source-tree-relative lookup is
-  wrong for the final PyInstaller layout.
+- Do not implement directly on `main`. Use an explicit feature/fix/rework
+  branch and push it to the LB fork origin.
+- "Own origin" means `linuxificator/LB_Omnichord` for LB and
+  `linuxificator/amy` for AMY. Do not push work branches to Shorepine remotes.
+- Pushing ordinary commits to LB `main` intentionally runs the complete release
+  workflow. Use that only after explicit merge/release approval.
+- A screenshot-only post-release commit is different: it contains only
+  `README.md` plus the two release-tagged PNGs and includes both trailers:
+  `skip-rebuild: README screenshots only` and `skip-checks:true`.
+  `skip-rebuild` is the human-readable project marker; `skip-checks:true` is
+  the GitHub-recognized trailer that prevents another workflow loop.
+- AMY release branches consumed by LB are immutable integration branches.
+  Create a new release branch when the pinned AMY dependency changes. LB CI
+  must pin both branch and exact SHA.
+- Clean AMY upstream-offer branches must not contain Codex handoff text,
+  LB-specific implementation policy or abandoned experiments.
 
-### Why this is not AF_UNIX or TCP
+## Primary engineering rules established in this work
 
-Windows has native `AF_UNIX/SOCK_STREAM` since Windows 10 build 17063, and the
-CI runner is Windows Server 2025 build 26100. Old Windows compatibility was not
-the problem. Official CPython for Windows still does not expose
-`socket.AF_UNIX`. Adding a ctypes Winsock implementation or custom Python
-extension would duplicate Qt's already-supported local IPC layer.
+- Keep generic AMY functionality in AMY; keep LB/Omnichord musical policy in
+  LB. AMY may know about pattern instances and tags; it must not know that a
+  tag means "kick", "hi-hat", "fill", "bass riff" or "Omnichord chord lane".
+- Minimize AMY changes. If LB behavior can be expressed through generic AMY
+  primitives and wire messages, do not extend AMY for LB-specific convenience.
+- Existing AMY sequencer behavior, both C/Python API and wire `H` commands,
+  must remain compatible. New nested-pattern behavior lives under the existing
+  `zQ` extended-control family.
+- Do not resurrect the bus-mixer experiment. It was abandoned for upstream and
+  is not required by the current LB rhythm/fill design.
+- Qt remains a wire-only client. It must not import `amy` or `c_amy`, link AMY
+  directly, or manage AMY internals. Platform wrappers may supervise processes.
+- Use existing working platform references before inventing new architecture.
+  Android is an AMY/Oboe service over a private Unix socket, not Kivy and not
+  a PulseAudio design. Windows is a native service over a private named pipe,
+  not TCP and not WSL.
+- For input bugs, first identify the failing boundary: QML event, backend
+  state, wire generation, transport, AMY parsing, sequencer execution, or audio
+  output. Fix the failing layer without redesigning unrelated layers.
 
-Several commits are deliberate failed/diagnostic history and must not be read
-as the current architecture:
+## AMY changes and rationale
 
-- `6eace68` through `78376ce` diagnosed the Windows AF_UNIX startup failure;
-- `df0899d` temporarily used loopback TCP to prove the rest of the package;
-- `fbaa1ce` hardened that temporary service behavior;
-- `906b4c5` replaced both experiments with the final native named-pipe design.
+### Minimal socket API / Android portability offer
 
-Do not restore TCP or the earlier Python AF_UNIX writer unless a new explicit
-requirement changes the architectural decision.
+The reduced Shorepine-facing socket offer is `upstream/amy_socket_api_xtra`.
+It was created after the earlier full Android/Godot branches proved too large
+for upstream maintenance.
 
-### AMY and drum-bank compatibility
+What belongs in that minimal offer:
 
-The release workflow pins the AMY fork at
-`25213785696dd40e6cce59ab428e560a410d240f`.
+- `src/amy_unix_socket.[ch]`: a small Linux/Android pathname `AF_UNIX`
+  `SOCK_SEQPACKET` transport helper.
+- A plain Linux regression for the socket helper.
+- Documentation for Android/porting facts, including references to the larger
+  retained fork branches.
 
-- Linux and macOS apply `packaging/amy-tiny-bank.patch`, install with
-  `AMY_PCM_BANK=tiny`, and Linux CI rejects Gamma9001 symbols.
-- The Windows build does not go through AMY `setup.py`. Its CMake target
-  compiles `amy.c`/`pcm.c` without defining `GAMMA9001` and does not link the
-  optional generated `drums_bin.c`.
-- At the pinned AMY revision, that selects `pcm_tiny.h` and the tiny version of
-  MIDI drum patch 258 by construction.
-- OMNI rhythm commands use direct preset/native-note pairs 0–10 from
-  `config/amy_config.json`; these meanings match Linux, macOS and ESP32-P4.
-- Defining `GAMMA9001` on Windows would make identical wire requests select
-  different drums and is therefore a compatibility regression.
+What intentionally does not belong there:
 
-The current Windows smoke proves non-silent PCM rendering, but it does not yet
-identify each tiny-bank drum acoustically. If the AMY pin/build inputs change,
-add or run an explicit bank-identity regression rather than relying only on a
-nonzero-sample check.
+- the full Android AAR/service implementation;
+- Godot Android project code;
+- LB Omnichord release wrappers;
+- bus mixer code;
+- Codex handoff files.
 
-### Windows build and release status
+The generic socket rule is: the socket thread receives packets and queues them;
+AMY processing happens at a safe owner boundary such as immediately before an
+Oboe render block. The transport is packet/wire framing only, not an audio
+backend and not a language-specific AMY API.
 
-The native package work began at `7a7ed04`. MSVC/CMake/path/launcher corrections
-continued through `a711123`. Package smoke work began at `0223166`; diagnostics
-and asset-resolution fixes continued through `ddc64e7`; named pipes landed in
-`906b4c5`; `7962956` selects Visual Studio 2026 when available and falls back to
-Visual Studio 2022.
+Android lessons:
 
-The dedicated `testing/windows_smoke` branch builds only the Windows package
-and does not publish a release. On `main`, all six frontend suites gate Linux,
-Raspberry Pi, macOS and Windows jobs, and one release is published only after
-all four packages pass.
+- The client and AMY service remain separate processes in the same Android
+  package/UID.
+- The AMY process owns Oboe/AAudio.
+- The service publishes `amy.sock` only after Oboe has started and the audio
+  callback has run at least once.
+- The Qt/Godot/client side opens the app-private socket and sends normal AMY
+  wire messages. It does not start/stop `AmyService` directly.
+- Emulator host logs may mention PulseAudio because the emulator host uses it;
+  the app-level proof is the guest service reporting Oboe/AAudio and the test
+  comparing AMY render samples with the exact Oboe callback buffer.
 
-GitHub Actions run `33021825480`, from main commit
-`33455020101744ffa9c360b1a3cbf04dabd3009d`, completed successfully on
-2026-08-26:
+Windows lesson:
 
-- all six frontend suite jobs passed;
-- Linux x86_64 AppImage passed;
-- Raspberry Pi aarch64 AppImage passed;
-- macOS arm64 DMG passed;
-- native Windows x86_64 zip passed;
-- release publication passed.
+- LB's Windows release did not require AMY core changes. The adaptation is a
+  wrapper/service design: PySide6 connects via Qt `QLocalSocket` to a private
+  Windows named pipe; a separate native `amy_service.exe` owns AMY/miniaudio.
+  The pipe is LF-framed because Windows named pipes are byte streams.
 
-The Windows Server 2025 job extracted only the final zip and then observed:
+### Nested sequencer / finite pattern primitives
 
-- `amy_service.exe --self-test`: 6,140 nonzero rendered samples;
-- packaged launcher smoke: 209 real wire commands and 13,138 nonzero rendered
-  samples;
-- offscreen/software Qt/QML startup, packaged asset loading, initial-state
-  publication, test-chord note-on/release, named-pipe delivery and clean Qt
-  event-loop exit;
-- no leaked `amy_service.exe` and no leftover ready file.
+The nested-sequencer upstream branch is `upstream/nested_sequencer`. The
+motivation came from LB Omnichord rhythm fills and chord arpeggios: sending
+large root-sequencer blocks for every fill or arpeggio state change is
+unnecessarily heavy, fragile over serial, and makes note-off ownership hard to
+reason about.
 
-The resulting four-platform release is `R20260826T230234`. It contains:
+The chosen AMY abstraction is stored finite patterns with an explicit
+one-shot/loop lifetime:
 
-- `LB_Omnichord.R20260826230234.Linux-x86_64.AppImage`;
-- `LB_Omnichord.R20260826230234.RaspberryPi-aarch64.AppImage`;
-- `LB_Omnichord.R20260826230234.macOS-arm64.dmg`;
-- `LB_Omnichord.R20260826230234.Windows-x86_64.zip`;
-- one matching SHA-256 file per package.
+- `LOOP` expresses a repeating base role.
+- `ONE_SHOT` expresses a finite phrase such as a drum fill, whole automatic
+  chord or one arpeggio note.
+- A triggered instance adds only lifetime, phase and optional public tag; the
+  committed pattern definition stays immutable for already-running instances.
 
-### What Windows CI does not prove
+This deliberately reuses sequencer concepts instead of adding an Omnichord
+special case. One musical nesting level is enough in practice and prevents
+recursive nesting. Pattern payloads reject root sequencer commands and
+pattern-creating `zQ` controls; finite `zQM` is the only allowed leaf-control
+exception.
 
-- No physical Windows speaker/interface output was heard or measured.
-- No physical Windows MIDI controller was tested. Native Windows MIDI input is
-  not implemented; the current reader is ALSA raw-MIDI only.
-- Command-to-audio latency, jitter, drop-outs and behavior under heavy
-  patches/reverb were not measured.
-- The current host profile still defaults to 44.1 kHz/256 samples, tries
-  DirectSound before WASAPI and requests roughly 20 ms x 4 periods. It is not a
-  proven realtime/low-latency profile.
-- Do not copy the ESP32-P4 48 kHz/64-sample/2x32-DMA baseline blindly to
-  Windows. Establish a measured native WASAPI profile.
-- Raspberry Pi and macOS release packages also still need their first physical
-  device/audio validation. The Linux x64 package has prior physical UI/audio
-  validation.
+Wire/API shape:
 
-## Android/fork audit context
+- `zQB`: begin or replace a staging pattern;
+- `zQE`: add a pattern event using the familiar tick/period/tag semantics;
+- `zQC`: atomically commit a staged pattern;
+- `zQT`: trigger a pattern as one-shot or loop;
+- `zQA`: schedule root events that trigger patterns;
+- `zQS`: stop tagged instances;
+- `zQM`: finite muting of tagged instances, currently used by fills;
+- `zQR`: clear a pattern definition.
 
-The local AMY fork convention is `/home/jeroen/omnichord/amyfork/amy`.
-`origin/upstream/android-oboe` contains the separate Android `:amy` process,
-private `amy.sock`, service-only JNI and transport-only Java client used as the
-process-separation reference. That branch was not an ancestor of the active
-`feature/bus-mixer` line during the audit, so Android service work and the
-desktop bus-mixer fork are not assumed to be unified. Preserve the proven
-service/wire boundary when those lines are eventually reconciled.
+The earlier temporary top-level pattern command was removed. Keeping authoring
+under `zQ` avoids introducing a new top-level wire syntax family and keeps the
+new behavior grouped with sequencer control.
 
-## Verification already completed
+The portable AMY default remains small (`max_patterns` defaults to 32). LB's
+release profiles configure 1024 stored patterns, 64 events per pattern and 32
+active/pending instances because the Omnichord fill/arpeggio catalogue is large
+but only a few instances run at once.
 
-- The complete 2026-08-28 local matrix passed 147 individual tests: 106 unit,
-  13 frontend, 10 serial/program, 13 preset, 3 native-control and 2
-  native-rhythm tests. This includes the exhaustive 36-chord LDR audit and the
-  screenshot/README contract.
-- The screenshot helper completed twice consecutively with byte-identical
-  1920x850 results. The final SHA-256 values at handoff were
-  `ab071b66e33e8cfd5f8e5105e85616f53df9b6bfac4916a8acc80e557a60c04c`
-  for OMNI and
-  `e792e63f5c223526179b9768ff27a4db24433ce5063b91bc82808e81d8048df1`
-  for MIDI.
-- `3345502` made the preset integration test wait deterministically for live
-  preset continuation instead of racing the frontend.
-- GitHub Actions run `33021825480` independently passed each of the six suites
-  and all release jobs as described above.
-- `git diff --check` and Python compilation were run during the implementation
-  work before its commits.
+Behavioral proof required and maintained:
 
-The standard complete local command, from
-`amysynth_version/qt_frontend`, is:
+- legacy sequencer API and wire behavior remains compatible;
+- existing `H` semantics are tested;
+- new `zQ` operations have API/wire equivalence tests;
+- one-shot/loop timing, quantization, immutable commits, reset and stop
+  behavior are tested in AMY;
+- LB native tests then prove the real deployed AMY release accepts the complete
+  Omnichord wire stream.
+
+### Optional future onset gate
+
+Do not implement this unless explicitly requested. It remains documented as an
+optional route in
+`amysynth_version/design/rhythm_rework/new_patterns/CODEX_HANDOVER_OPTIONAL_SEQUENCER_ONSET_GATE.md`.
+
+The desired future primitive would behave like explicit gate-on/gate-off for
+future note-ons of a tagged instance while allowing already-sounding notes to
+receive their normal note-offs. It should be generic AMY sequencer functionality,
+not an Omnichord role command. It is not required for the current fill or
+arpeggio implementation.
+
+## LB rhythm/fill/arpeggio implementation decisions
+
+- Five percussion activity levels are complete alternatives, not cumulative
+  layers.
+- Current data has 54 rhythms, five levels and 270 fills. The design reserves
+  enough pattern IDs for more than 700 fills.
+- At startup LB validates and authors every fill into AMY once. A fill is a
+  compact `ONE_SHOT`; runtime scheduling sends root trigger events rather than
+  streaming the fill content repeatedly.
+- Base percussion roles are independent tagged `LOOP` pattern instances.
+- Fill continuation is LB policy. LB uses
+  `music/drums/drum_fill_continuation_roles.json` to decide which roles
+  continue. For roles not continuing, LB stores generic finite
+  `zQM<tag,duration>` controls in the fill. AMY only sees tagged-instance
+  muting.
+- It is not necessary to synthetically add every continuing base instrument
+  into each fill. The per-role `zQM` approach suppresses only the roles that
+  should pause.
+- No bus mixer is used or required for this behavior.
+- Pressing rhythm Start must sound the already-visible selected percussion
+  level immediately; the user must not need to reselect one of the five levels.
+- Live rhythm/preset/control changes must not stop `zY`, reset the AMY
+  timebase or create an artificial gap.
+
+The chord/arpeggio regression path produced two important conclusions:
+
+- Stopping/replacing future arpeggio root triggers must not delete or defer the
+  note-off of an already-started arpeggio note.
+- The robust solution is immutable `ONE_SHOT` children. Each whole chord or
+  arpeggio note owns its own note-on and matching note-off. `/1`, `/2`, `/3`
+  and `/4` use disjoint child-pattern families, so switching rate replaces only
+  future triggers; a sounding `/2` note still releases at its original `/2`
+  gate and is not shortened.
+
+Manual chord ownership remains separate:
+
+- synth 3 is manually held chord input and stops on real pointer-up;
+- synth 4 is automatic rhythm chord/arpeggio output;
+- manual long-press takeover clears future synth-4 triggers but does not issue
+  immediate synth-4 all-off and does not alter percussion, bass, transport or
+  timebase.
+
+## Drum banks and Gamma9001
+
+The hosted published default is Gamma9001. ESP32-P4 remains a separately
+declared Tiny-bank firmware target because its current flash/storage profile
+does not contain the Gamma9001 blob.
+
+Supported concepts:
+
+- `tiny`: compact built-in PCM bank; used by the current ESP32-P4 target.
+- `gamma9001`: AMY built with Gamma9001 sample data and GM-mapped kit patches.
+- `general_midi`: AMY's patch-258 drum-note map; it is still AMY audio, not
+  external MIDI output.
+
+Do not assume the same wire preset/note means the same sound across tiny and
+Gamma9001 builds. A Gamma9001 release must use an AMY release branch built
+for Gamma9001 on all locally hosted targets being tested. On Android that means
+defining `GAMMA9001`, generating/linking the Gamma9001 blob with AMY's
+`gamma9001-blob-c` generator, and verifying that presets 0..18 select the full
+Gamma808 ROM while presets 256..391 use the larger blob.
+
+The native drum-kit audio smoke tests render every distinct realization and
+reject silence:
 
 ```bash
-ALSA_CONFIG_PATH="$PWD/tests/alsa-null.conf" \
-  /home/jeroen/omnichord/omnichord-env/bin/python \
-  tests/run_tests.py --suite all
+python tests/drum_kit_audio_smoke.py tiny
+python tests/drum_kit_audio_smoke.py gamma9001
+python tests/drum_kit_audio_smoke.py general_midi
 ```
 
-Use `testing/windows_smoke` only for isolated Windows package iteration. Merge
-or apply the final Windows changes to `main` to exercise the full gated
-four-platform release.
+Run each one with an AMY extension built for the selected bank.
 
-## Remaining work / safe next steps
+Observed warning in manual Gamma9001 testing:
 
-1. Physically test the released Windows zip on a recent Windows 10/11 x64 host:
-   UI, native audio, shutdown and representative heavy patches/rhythms.
-2. Implement a native Windows MIDI input adapter behind the existing MIDI
-   callback boundary, without changing CC-learning/application semantics.
-3. Measure and tune a WASAPI-first realtime audio profile on physical hardware.
-4. Add an explicit Windows tiny-bank identity regression if AMY build inputs or
-   the pinned revision change; the current smoke checks non-silence only.
-5. Reconcile relevant Android service work with the active AMY bus-mixer line
-   only when that fork task is explicitly in scope.
+```text
+**_instrument_push_forgotten_note: forgotten pool overflow synth 0 note 292/60
+```
 
-WSL2/WSLg documentation remains an optional way to experiment with the Linux
-artifact. It is not the Windows implementation, release gate or realtime-audio
-baseline.
+No audible malfunction was reported at that time, but future Gamma work should
+treat this as a real diagnostic to investigate rather than ignoring it.
+
+## Platform/release lessons learned
+
+- Android packaging uses the PySide6 Android deployment path, not Kivy.
+- The Android release gate builds x86_64 and arm64 APKs, installs the x86_64
+  APK in an emulator, drives packaged QML tap/hold behavior and verifies AMY
+  render samples match Oboe callback samples.
+- Qt Android library ordering matters. `Quick` must load before
+  `QuickControls2`; tests guard against accidental ordering from Python set
+  iteration.
+- Windows package validation must run the packaged entry point, not just source
+  scripts. It verifies native AMY compilation, non-silent offline rendering and
+  the named-pipe boundary, but does not prove physical audio, MIDI, latency or
+  drop-out behavior.
+- macOS/Windows packaged QML chord tests must wait for the real packaged
+  `TapHandler` hold promotion and then observe immediate release on pointer-up.
+- Release screenshots are captured from the real production Qt scene after a
+  successful `main` release. They are stored as
+  `screenshots/omni-RYYYYMMDDTHHMMSS.png` and
+  `screenshots/midi-RYYYYMMDDTHHMMSS.png`, and README links are updated to
+  those exact files.
+- Screenshot sanity validation checks that files are readable PNGs, are
+  1920x850 and have enough sampled color variation to reject a blank or obvious
+  error screen. Pixel-perfect screenshot comparison was removed because sparse
+  renderer jitter of a few pixels caused false churn.
+
+## Local verification commands
+
+From `amysynth_version/qt_frontend` in the frontend environment:
+
+```bash
+/home/jeroen/omnichord/omnichord-env/bin/python tests/run_tests.py --list
+/home/jeroen/omnichord/omnichord-env/bin/python tests/run_tests.py --suite unit
+/home/jeroen/omnichord/omnichord-env/bin/python tests/run_tests.py --suite all
+```
+
+In the managed Codex sandbox, Unix-socket tests can fail with:
+
+```text
+PermissionError: [Errno 1] Operation not permitted
+```
+
+That is a sandbox restriction around local socket `bind()`. Re-run the suite
+outside the sandbox before treating it as a product failure.
+
+Targeted screenshot/release-contract checks:
+
+```bash
+/home/jeroen/omnichord/omnichord-env/bin/python tests/test_release_screenshots.py
+/home/jeroen/omnichord/omnichord-env/bin/python tests/test_packaging.py
+/home/jeroen/omnichord/omnichord-env/bin/python tests/test_static_contracts.py
+git diff --check
+```
+
+For AMY itself, use the branch-specific tests documented in that repository,
+including `make test`, `tests/run_amy_unix_socket_test.sh`, and the nested
+sequencer C/Python tests when changing the relevant subsystem.
+
+## Safe next work on `rework/external_controls`
+
+The likely next feature area is external control/MIDI behavior. Keep the work
+inside LB unless a generic AMY primitive is demonstrably required.
+
+Recommended first steps:
+
+1. Read the mandatory startup route and the MIDI/control documents listed
+   above.
+2. Inspect existing tests before changing behavior:
+   `test_midi_control_bindings.py`, `test_midi_cc_qt.py`,
+   `test_midi_engine.py`, `test_sound_balance_features.py`,
+   `test_static_contracts.py` and the MIDI/control sections of
+   `tests/USE_CASES.md`.
+3. Preserve the wire-only frontend boundary and the current AMY pin unless the
+   user explicitly asks for an AMY release update.
+4. Add or update executable tests before relying on manual testing.
+5. Do not change release packaging or `main` workflow behavior as a side effect
+   of external-control work.
+
+## Known unresolved or deliberately deferred items
+
+- Physical validation is still separate from hosted CI for Windows audio/MIDI,
+  Android touch/audio-route/latency, Raspberry Pi audio and macOS physical
+  devices.
+- Native Windows MIDI input remains future work behind the existing MIDI
+  callback boundary.
+- The optional AMY onset gate is not implemented and must not be added to the
+  already-offered nested-sequencer work without a separate explicit request.
+- Gamma9001 is the hosted LB release contract. Do not change it independently
+  on only one package target; the exact AMY pin, compiled symbols and revision-5
+  drum map must move together.

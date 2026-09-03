@@ -1,0 +1,43 @@
+{
+  "schema_revision": 1,
+  "public_qobject_surface": {
+    "InstrumentBackend": {
+      "property_count": 57,
+      "property_sha256": "9136f289fdbb3f81d12c2b940a5b7fa3feffa94cdbe556fe9fcf2ae0583d5398",
+      "method_count": 134,
+      "method_sha256": "c2223a07d27d17a2d3734a8c1fd98985cac6051035eaed3ca80850e098a9eea1"
+    },
+    "MidiPlayerBackend": {
+      "property_count": 18,
+      "property_sha256": "5de684b1c5bef029d60655ab5ddc806e45e91cc0673b5850db464c2635ca9aea",
+      "method_count": 49,
+      "method_sha256": "7aca75bcb11a2ca5e024f958a383836d3994fb73c23366ee0e39cd04de4b8d82"
+    }
+  },
+  "supported_config_entrypoints": [
+    "config_loader.load_amy_config",
+    "amy_serial.load_amy_config",
+    "main.load_amy_config",
+    "app_core.load_amy_config",
+    "local_amy_service.load_resolved_amy_config",
+    "tests/integration/headless_app.py"
+  ],
+  "wire_contract_tests": [
+    "test_instrument_defaults.py::InstrumentDefaultTests.test_repeater_sustain_command_does_not_touch_filter",
+    "test_instrument_defaults.py::InstrumentDefaultTests.test_chord_patch_and_restore_commands_are_adjacent_per_synth",
+    "test_midi_engine.py::MidiAmyEngineTests.test_rom_patch_waits_before_parameters_and_routing",
+    "test_drum_patterns.py::DrumPatternTests.test_preloaded_library_fits_64_events_and_uses_all_fill_groups",
+    "test_drum_patterns.py::DrumPatternTests.test_fill_policy_is_encoded_as_generic_role_tag_mutes",
+    "test_sequencer_tags.py::SequencerTagTests.test_one_tag_tracks_one_event_and_clear_is_targeted",
+    "test_sequencer_tags.py::SequencerTagTests.test_arpeggio_uses_all_notes_wraps_and_reverses"
+  ],
+  "slider_regression_tests": [
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_midi_bound_slider_press_without_movement_stays_bound",
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_midi_bound_slider_track_click_is_a_manual_value_edit",
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_midi_bound_slider_handle_drag_still_moves",
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_plain_slider_handle_drag_still_moves",
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_labeled_slider_drag_does_not_depend_on_immediate_backend_echo",
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_parameter_slider_drag_ignores_stale_model_replacement_during_press",
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_parameter_slider_touch_drag_keeps_value_and_visuals_after_release"
+  ]
+}

@@ -8,6 +8,24 @@ from catalog import control_default, patch_for_index, synth_index
 from harness import HeadlessApp
 
 
+CHORD_GROUP_START = 937
+DRUM_BASE_GROUP_START = 1001
+
+
+def is_chord_trigger(line: str) -> bool:
+    match = re.match(
+        r"^H\d+,\d+,(?P<tag>\d+)zQ(?P<group>\d+),1,1,0Z$",
+        line,
+    )
+    return bool(
+        match
+        and 112 <= int(match.group("tag")) < 252
+        and CHORD_GROUP_START
+        <= int(match.group("group"))
+        < DRUM_BASE_GROUP_START
+    )
+
+
 def normalized_timbre(commands: list[str]) -> list[str]:
     # Voice-pool metadata and synth 4's intentional no-warning policy are not
     # timbre. Normalize those and compare every oscillator command exactly.
@@ -31,6 +49,35 @@ def wire_float(value: float) -> str:
 
 
 class NativeRhythmTests(unittest.TestCase):
+    def test_cold_start_activates_visible_percussion_level_immediately(self) -> None:
+        with HeadlessApp(native_amy=True) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            self.assertEqual(int(app.query("rhythmBusyness")), 1)
+
+            start = app.bridge.count()
+            app.bridge.reset_audio_peak()
+            app.action("toggleRhythm")
+            app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+
+            produced_audio = app.bridge.render_until_audio(1.0)
+
+            lines = app.bridge.lines_since(start)
+            triggers = [
+                line
+                for line in lines
+                if re.match(r"^zQ\d+,1,0,\d+,\d+Z$", line)
+            ]
+            self.assertTrue(triggers, "cold Start authored no drum loop trigger")
+            self.assertTrue(
+                all(line.split(",")[3] == "0" for line in triggers),
+                "cold Start delayed the visible percussion level by a bar",
+            )
+            self.assertTrue(
+                produced_audio,
+                "visible percussion level produced no audio within one second",
+            )
+
     def test_preset7_start_keeps_native_manual_and_rhythm_filter_state_equal(self) -> None:
         chorus_index = synth_index("Chorus Vibes")
         cutoff = control_default(chorus_index, "filter_hz")
@@ -180,7 +227,7 @@ class NativeRhythmTests(unittest.TestCase):
             scheduled_chords = [
                 line
                 for line in switched_lines
-                if line.startswith("H") and "i4Z" in line
+                if is_chord_trigger(line)
             ]
             self.assertTrue(
                 scheduled_chords,

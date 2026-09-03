@@ -1,0 +1,1067 @@
+{
+  "schema_version": 1,
+  "title": "LB Omnichord drum activity instrument realization — tiny",
+  "timing_catalogue": "drum_activity_timing.json",
+  "kit_family": "tiny",
+  "separation_contract": {
+    "timing_owned_by_timing_catalogue": true,
+    "this_file_may_not_change_ticks": true,
+    "this_file_may_not_add_or_remove_timing_events": true,
+    "role_resolution_only": true,
+    "rule": "Resolve each event logical_role using the profile selected for that rhythm. Velocity comes from the timing catalogue and may be scaled but not used to move events."
+  },
+  "source_info": {
+    "implementation": "AMY pcm_tiny 11-sample ROM set",
+    "upstream": "shorepine/amy src/pcm_tiny.h",
+    "project_mapping": "amysynth_version/qt_frontend/config/amy_config.json",
+    "constraint": "Tiny has no true ride, ride bell, crash, rim/side-stick, conga/bongo/timbale set; marked surrogate mappings are intentional."
+  },
+  "profiles": {
+    "tiny_default": {
+      "low_primary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "low_secondary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_primary": {
+        "preset": 2,
+        "note": 45,
+        "source_sample": "808-SNR 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_soft": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "ghost_detail": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_primary": {
+        "preset": 6,
+        "note": 53,
+        "source_sample": "808-C-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_open": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_foot": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_primary": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_bell": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "section_accent": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "tonal_high": {
+        "preset": 8,
+        "note": 73,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_mid": {
+        "preset": 8,
+        "note": 63,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timeline_primary": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "texture_shaker": {
+        "preset": 0,
+        "note": 89,
+        "source_sample": "808-MARACA-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "hand_high": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_accent": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "dry_click": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "electronic_detail": {
+        "preset": 4,
+        "note": 51,
+        "source_sample": "808-SNR 10D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      }
+    },
+    "tiny_jazz": {
+      "low_primary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "low_secondary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_primary": {
+        "preset": 2,
+        "note": 45,
+        "source_sample": "808-SNR 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_soft": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "ghost_detail": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_primary": {
+        "preset": 6,
+        "note": 53,
+        "source_sample": "808-C-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "timekeeper_open": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_foot": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_primary": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_bell": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "section_accent": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "tonal_high": {
+        "preset": 8,
+        "note": 73,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_mid": {
+        "preset": 8,
+        "note": 63,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timeline_primary": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "texture_shaker": {
+        "preset": 0,
+        "note": 89,
+        "source_sample": "808-MARACA-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "hand_high": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_accent": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "dry_click": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "electronic_detail": {
+        "preset": 4,
+        "note": 51,
+        "source_sample": "808-SNR 10D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      }
+    },
+    "tiny_latin": {
+      "low_primary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "low_secondary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_primary": {
+        "preset": 2,
+        "note": 45,
+        "source_sample": "808-SNR 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_soft": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "ghost_detail": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_primary": {
+        "preset": 6,
+        "note": 53,
+        "source_sample": "808-C-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_open": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_foot": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_primary": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_bell": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "section_accent": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "tonal_high": {
+        "preset": 8,
+        "note": 73,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_mid": {
+        "preset": 8,
+        "note": 63,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timeline_primary": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "texture_shaker": {
+        "preset": 0,
+        "note": 89,
+        "source_sample": "808-MARACA-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "hand_high": {
+        "preset": 8,
+        "note": 73,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_accent": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "dry_click": {
+        "preset": 3,
+        "note": 52,
+        "source_sample": "808-SNR 7-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "electronic_detail": {
+        "preset": 4,
+        "note": 51,
+        "source_sample": "808-SNR 10D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      }
+    },
+    "tiny_electronic": {
+      "low_primary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "low_secondary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_primary": {
+        "preset": 4,
+        "note": 51,
+        "source_sample": "808-SNR 10D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_soft": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "ghost_detail": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_primary": {
+        "preset": 6,
+        "note": 53,
+        "source_sample": "808-C-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_open": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_foot": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_primary": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_bell": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "section_accent": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "tonal_high": {
+        "preset": 8,
+        "note": 73,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_mid": {
+        "preset": 8,
+        "note": 63,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timeline_primary": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "texture_shaker": {
+        "preset": 0,
+        "note": 89,
+        "source_sample": "808-MARACA-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "hand_high": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_accent": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "dry_click": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "electronic_detail": {
+        "preset": 3,
+        "note": 52,
+        "source_sample": "808-SNR 7-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      }
+    },
+    "tiny_reggae": {
+      "low_primary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "low_secondary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_primary": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_soft": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "ghost_detail": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_primary": {
+        "preset": 6,
+        "note": 53,
+        "source_sample": "808-C-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_open": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_foot": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_primary": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_bell": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "section_accent": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "tonal_high": {
+        "preset": 8,
+        "note": 73,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_mid": {
+        "preset": 8,
+        "note": 63,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timeline_primary": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "texture_shaker": {
+        "preset": 0,
+        "note": 89,
+        "source_sample": "808-MARACA-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "hand_high": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_accent": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "dry_click": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "electronic_detail": {
+        "preset": 4,
+        "note": 51,
+        "source_sample": "808-SNR 10D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      }
+    },
+    "tiny_power": {
+      "low_primary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "low_secondary": {
+        "preset": 1,
+        "note": 39,
+        "source_sample": "808-KIK 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_primary": {
+        "preset": 2,
+        "note": 45,
+        "source_sample": "808-SNR 4-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "backbeat_soft": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "ghost_detail": {
+        "preset": 5,
+        "note": 41,
+        "source_sample": "808-SNR 12-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_primary": {
+        "preset": 6,
+        "note": 53,
+        "source_sample": "808-C-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_open": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timekeeper_foot": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_primary": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "sustain_bell": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "section_accent": {
+        "preset": 7,
+        "note": 56,
+        "source_sample": "808-O-HAT1-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "tonal_high": {
+        "preset": 8,
+        "note": 73,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_mid": {
+        "preset": 8,
+        "note": 63,
+        "source_sample": "808-LTOM M-D",
+        "pitch_shifted": true,
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "tonal_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "timeline_primary": {
+        "preset": 10,
+        "note": 69,
+        "source_sample": "808-CWBELL-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "texture_shaker": {
+        "preset": 0,
+        "note": 89,
+        "source_sample": "808-MARACA-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "hand_high": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_low": {
+        "preset": 8,
+        "note": 61,
+        "source_sample": "808-LTOM M-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "hand_accent": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      },
+      "dry_click": {
+        "preset": 9,
+        "note": 94,
+        "source_sample": "808-DRYCLP-D",
+        "engine": "amy_pcm",
+        "realization": "surrogate"
+      },
+      "electronic_detail": {
+        "preset": 4,
+        "note": 51,
+        "source_sample": "808-SNR 10D",
+        "engine": "amy_pcm",
+        "realization": "native"
+      }
+    }
+  },
+  "rhythm_profile": {
+    "pop_8": "tiny_power",
+    "pop_16": "tiny_default",
+    "slow_ballad": "tiny_default",
+    "six_eight_ballad": "tiny_default",
+    "rock": "tiny_power",
+    "shuffle": "tiny_jazz",
+    "punk": "tiny_power",
+    "metal": "tiny_power",
+    "country_train": "tiny_default",
+    "country_waltz": "tiny_default",
+    "waltz": "tiny_default",
+    "polka": "tiny_default",
+    "march": "tiny_power",
+    "straight_blues": "tiny_power",
+    "twelve_eight_blues": "tiny_power",
+    "jazz_swing": "tiny_jazz",
+    "jazz_waltz": "tiny_jazz",
+    "jazz_shuffle": "tiny_jazz",
+    "funk": "tiny_default",
+    "jazz_funk": "tiny_default",
+    "soul": "tiny_default",
+    "soul_shuffle": "tiny_jazz",
+    "gospel_6_8": "tiny_default",
+    "rnb": "tiny_default",
+    "disco": "tiny_electronic",
+    "house": "tiny_electronic",
+    "techno": "tiny_electronic",
+    "trance": "tiny_electronic",
+    "garage_2step": "tiny_electronic",
+    "breakbeat": "tiny_electronic",
+    "drum_and_bass": "tiny_electronic",
+    "dubstep": "tiny_electronic",
+    "hip_hop": "tiny_electronic",
+    "boom_bap": "tiny_electronic",
+    "trap": "tiny_electronic",
+    "bossa": "tiny_latin",
+    "samba": "tiny_latin",
+    "salsa": "tiny_latin",
+    "cha_cha": "tiny_latin",
+    "mambo": "tiny_latin",
+    "merengue": "tiny_latin",
+    "cumbia": "tiny_latin",
+    "bolero": "tiny_latin",
+    "tango": "tiny_default",
+    "son_clave_3_2": "tiny_latin",
+    "rumba_clave_3_2": "tiny_latin",
+    "afro_cuban_6_8": "tiny_latin",
+    "reggae": "tiny_reggae",
+    "calypso_soca": "tiny_latin",
+    "five_four": "tiny_power",
+    "seven_eight": "tiny_power",
+    "seven_four_funk": "tiny_default",
+    "nine_eight": "tiny_power",
+    "eleven_eight": "tiny_power"
+  },
+  "tiny_pcm_inventory": [
+    {
+      "alias": "maraca",
+      "preset": 0,
+      "note": 89,
+      "source_sample": "808-MARACA-D"
+    },
+    {
+      "alias": "kick",
+      "preset": 1,
+      "note": 39,
+      "source_sample": "808-KIK 4-D"
+    },
+    {
+      "alias": "snare_hard",
+      "preset": 2,
+      "note": 45,
+      "source_sample": "808-SNR 4-D"
+    },
+    {
+      "alias": "snare_alt1",
+      "preset": 3,
+      "note": 52,
+      "source_sample": "808-SNR 7-D"
+    },
+    {
+      "alias": "snare_alt2",
+      "preset": 4,
+      "note": 51,
+      "source_sample": "808-SNR 10D"
+    },
+    {
+      "alias": "snare_soft",
+      "preset": 5,
+      "note": 41,
+      "source_sample": "808-SNR 12-D"
+    },
+    {
+      "alias": "hat_closed",
+      "preset": 6,
+      "note": 53,
+      "source_sample": "808-C-HAT1-D"
+    },
+    {
+      "alias": "hat_open",
+      "preset": 7,
+      "note": 56,
+      "source_sample": "808-O-HAT1-D"
+    },
+    {
+      "alias": "tom_low",
+      "preset": 8,
+      "note": 61,
+      "source_sample": "808-LTOM M-D"
+    },
+    {
+      "alias": "tom_mid",
+      "preset": 8,
+      "note": 63,
+      "source_sample": "808-LTOM M-D",
+      "pitch_shifted": true
+    },
+    {
+      "alias": "tom_high",
+      "preset": 8,
+      "note": 73,
+      "source_sample": "808-LTOM M-D",
+      "pitch_shifted": true
+    },
+    {
+      "alias": "clap",
+      "preset": 9,
+      "note": 94,
+      "source_sample": "808-DRYCLP-D"
+    },
+    {
+      "alias": "cowbell",
+      "preset": 10,
+      "note": 69,
+      "source_sample": "808-CWBELL-D"
+    }
+  ],
+  "project_note": "Current Omnichord amy_config maps presets 1..10 used by rhythm code; this design also exposes preset 0 maraca explicitly for shaker/texture roles."
+}

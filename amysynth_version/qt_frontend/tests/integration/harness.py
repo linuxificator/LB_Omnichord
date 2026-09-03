@@ -82,7 +82,6 @@ class SerialAmyBridge:
         os.set_blocking(self.master_fd, False)
 
         self.lines: list[str] = []
-        self.line_times: list[float] = []
         self.raw_chunks: list[bytes] = []
         self._buffer = bytearray()
         self._line_condition = threading.Condition()
@@ -90,6 +89,7 @@ class SerialAmyBridge:
         self._closed = False
         self._thread: threading.Thread | None = None
         self._amy_lock = threading.Lock()
+        self._native_peak = 0
         self._native_log_path = artifact_dir / "native_amy_state.log"
         self._serial_log_path = artifact_dir / "serial_rx.log"
 
@@ -102,17 +102,25 @@ class SerialAmyBridge:
                 import c_amy  # type: ignore
             except ImportError as exc:
                 raise RuntimeError(
-                    "native AMY suite requires the LB Omnichord AMY bus-mixer "
-                    "fork installed"
+                    "native AMY suite requires the pinned LB Omnichord AMY "
+                    "release installed"
                 ) from exc
             self.amy = amy
             self.c_amy = c_amy
             try:
-                c_amy.live(default_synths=0, max_buses=11, max_oscs=336)
+                c_amy.live(
+                    audio=False,
+                    default_synths=0,
+                    max_buses=11,
+                    max_oscs=336,
+                    max_sequence_groups=1024,
+                    max_sequence_group_tags=64,
+                    max_sequence_group_executions=40,
+                )
             except (AttributeError, TypeError) as exc:
                 raise RuntimeError(
-                    "installed AMY does not support configurable buses; "
-                    "install linuxificator/amy feature/bus-mixer"
+                    "installed AMY lacks the pinned configurable nested "
+                    "sequencer/offline-render API"
                 ) from exc
             self._block_seconds = float(amy.AMY_BLOCK_SIZE) / float(
                 amy.AMY_SAMPLE_RATE
@@ -124,6 +132,7 @@ class SerialAmyBridge:
                     "sample_rate": int(amy.AMY_SAMPLE_RATE),
                     "max_buses": 11,
                     "max_oscs": 336,
+                    "max_sequence_groups": 1024,
                 },
             )
 
@@ -142,34 +151,56 @@ class SerialAmyBridge:
                 f"{json.dumps(value, ensure_ascii=False, default=str)}\n"
             )
 
-    def _record_line(self, line: str) -> None:
-        line = line.strip("\r")
-        if not line:
+    def _record_lines(self, lines: list[str]) -> None:
+        accepted = [line.strip("\r") for line in lines if line.strip("\r")]
+        if not accepted:
             return
+
+        for line in accepted:
+            if self.native_amy:
+                assert self.amy is not None
+                with self._amy_lock:
+                    self.amy.send_wire(line)
+                    reset_match = re.fullmatch(r"S(\d+)Z", line)
+                    if reset_match:
+                        reset_flags = int(reset_match.group(1))
+                        if reset_flags & int(self.amy.RESET_SEQUENCER):
+                            # The real audio callback keeps running independently
+                            # while the application's serial writer observes its
+                            # post-reset barrier.  This test bridge receives and
+                            # renders on one thread, so an unlucky busy read loop
+                            # can otherwise ingest the later pattern triggers
+                            # before it renders the queued reset.  Process the
+                            # reset delta here; a timebase reset needs one further
+                            # block because AMY deliberately applies that part at
+                            # the following block boundary.
+                            self._render_native_block_locked()
+                            if reset_flags & int(self.amy.RESET_TIMEBASE):
+                                self._render_native_block_locked()
+                self._write_native_log("WIRE", line)
+
+        # In native mode lines become observable only after AMY has ingested
+        # the complete batch.  Otherwise wait_for_lines(zY1) could wake the
+        # test before the bridge called amy.send_wire(zY1), letting a fast test
+        # render ahead of the transport-start event it was waiting for.
         with self._line_condition:
-            self.lines.append(line)
-            self.line_times.append(time.monotonic())
-            self._last_rx = self.line_times[-1]
+            self.lines.extend(accepted)
+            self._last_rx = time.monotonic()
             self._line_condition.notify_all()
         with self._serial_log_path.open("a", encoding="utf-8") as handle:
-            handle.write(line + "\n")
-
-        if self.native_amy:
-            assert self.amy is not None
-            with self._amy_lock:
-                self.amy.send_wire(line)
-            self._write_native_log("WIRE", line)
+            handle.write("".join(f"{line}\n" for line in accepted))
 
     def _read_serial(self) -> None:
+        lines: list[str] = []
         while True:
             try:
                 chunk = os.read(self.master_fd, 65536)
             except BlockingIOError:
-                return
+                break
             except OSError:
-                return
+                break
             if not chunk:
-                return
+                break
             self.raw_chunks.append(chunk)
             self._buffer.extend(chunk)
             while b"\n" in self._buffer:
@@ -179,14 +210,49 @@ class SerialAmyBridge:
                     line = raw.decode("ascii")
                 except UnicodeDecodeError:
                     line = raw.decode("ascii", errors="replace")
-                self._record_line(line)
+                lines.append(line)
+        self._record_lines(lines)
+
+    def _render_native_block_locked(self) -> None:
+        assert self.c_amy is not None
+        block = self.c_amy.render_to_list()
+        if block:
+            self._native_peak = max(
+                self._native_peak,
+                max(abs(int(sample)) for sample in block),
+            )
 
     def _render_block(self) -> None:
         if not self.native_amy:
             return
-        assert self.c_amy is not None
         with self._amy_lock:
-            self.c_amy.render_to_list()
+            self._render_native_block_locked()
+
+    def reset_audio_peak(self) -> None:
+        if not self.native_amy:
+            raise RuntimeError("native AMY is not enabled")
+        with self._amy_lock:
+            self._native_peak = 0
+
+    def audio_peak(self) -> int:
+        if not self.native_amy:
+            raise RuntimeError("native AMY is not enabled")
+        with self._amy_lock:
+            return int(self._native_peak)
+
+    def render_until_audio(self, duration_seconds: float) -> bool:
+        """Advance a bounded amount of AMY time independent of runner load."""
+        if not self.native_amy:
+            raise RuntimeError("native AMY is not enabled")
+        maximum_blocks = max(
+            1,
+            int(max(0.0, float(duration_seconds)) / self._block_seconds) + 1,
+        )
+        for _ in range(maximum_blocks):
+            self._render_block()
+            if self.audio_peak() > 0:
+                return True
+        return False
 
     def _run(self) -> None:
         next_render = time.monotonic()
@@ -223,10 +289,6 @@ class SerialAmyBridge:
     def lines_since(self, start: int) -> list[str]:
         with self._line_condition:
             return list(self.lines[start:])
-
-    def timed_lines(self) -> list[tuple[str, float]]:
-        with self._line_condition:
-            return list(zip(self.lines, self.line_times))
 
     def wait_for_lines(
         self,
@@ -439,6 +501,29 @@ class HeadlessApp:
         if not result.get("ok"):
             raise AssertionError(f"query {name} failed: {result}")
         return result.get("result")
+
+    def wait_for_frontend_log(
+        self,
+        needle: str,
+        *,
+        timeout: float = 5.0,
+    ) -> str:
+        """Wait until the asynchronous transport log contains ``needle``."""
+
+        deadline = time.monotonic() + timeout
+        latest = ""
+        while time.monotonic() < deadline:
+            try:
+                latest = self.frontend_log.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                latest = ""
+            if needle in latest:
+                return latest
+            time.sleep(0.01)
+        raise AssertionError(
+            f"frontend transport log did not contain {needle!r}; log was:\n"
+            + latest
+        )
 
     def copy_frontend_log(self) -> None:
         if self.frontend_log.exists():

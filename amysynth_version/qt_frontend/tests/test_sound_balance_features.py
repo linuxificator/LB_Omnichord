@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import stat
 import sys
 import tempfile
 import unittest
@@ -12,8 +13,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 import app_core  # noqa: E402
-import midi_player  # noqa: E402
+from config_migrations import CURRENT_CONFIG_REVISION  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
+from midi_input import (  # noqa: E402
+    MidiByteStreamParser,
+    MidiByteStreamState,
+    MidiInputEvent,
+    OrderedMidiInputEmitter,
+)
 import user_data  # noqa: E402
 import instrument_balance  # noqa: E402
 
@@ -74,43 +81,162 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             root = Path(directory)
             shipped = root / "shipped"
             shipped.mkdir()
-            (shipped / "amy_config.json").write_text('{"serial": 1}', encoding="utf-8")
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
+            (shipped / "amy_config.json").write_text(
+                json.dumps(shipped_config),
+                encoding="utf-8",
+            )
             original = user_data.USER_CONFIG_DIR
             try:
                 user_data.USER_CONFIG_DIR = root / "user"
-                with mock.patch.object(
-                    user_data.shutil,
-                    "copy2",
-                    side_effect=AssertionError("metadata copy is not portable"),
-                ):
-                    selected = user_data.ensure_user_configs(shipped)
+                selected = user_data.ensure_user_configs(shipped)
                 target = selected / "amy_config.json"
-                self.assertEqual(json.loads(target.read_text())["serial"], 1)
-                target.write_text('{"serial": 2}', encoding="utf-8")
+                self.assertEqual(
+                    json.loads(target.read_text())["serial"]["baud"],
+                    1_000_000,
+                )
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
+                edited = json.loads(target.read_text(encoding="utf-8"))
+                edited["serial"]["baud"] = 230_400
+                target.write_text(json.dumps(edited), encoding="utf-8")
                 user_data.ensure_user_configs(shipped)
-                self.assertEqual(json.loads(target.read_text())["serial"], 2)
+                self.assertEqual(
+                    json.loads(target.read_text())["serial"]["baud"],
+                    230_400,
+                )
+            finally:
+                user_data.USER_CONFIG_DIR = original
+
+    def test_old_arpeggio_voice_default_is_migrated_without_losing_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shipped = root / "shipped"
+            shipped.mkdir()
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
+            (shipped / "amy_config.json").write_text(
+                json.dumps(shipped_config), encoding="utf-8"
+            )
+            original = user_data.USER_CONFIG_DIR
+            try:
+                user_data.USER_CONFIG_DIR = root / "user"
+                user_data.USER_CONFIG_DIR.mkdir()
+                target = user_data.USER_CONFIG_DIR / "amy_config.json"
+                legacy = json.loads(json.dumps(shipped_config))
+                legacy.pop("config_revision")
+                legacy["serial"]["baud"] = 230_400
+                legacy["voices"]["rhythm_chord"] = 4
+                legacy["midi_input"]["tech_profile"] = "linux"
+                target.write_text(json.dumps(legacy), encoding="utf-8")
+
+                user_data.ensure_user_configs(shipped)
+                migrated = json.loads(target.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    migrated["config_revision"], CURRENT_CONFIG_REVISION
+                )
+                self.assertEqual(migrated["voices"]["rhythm_chord"], 7)
+                self.assertEqual(migrated["serial"]["baud"], 230_400)
+                self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")
+                previous = json.loads(
+                    target.with_suffix(".json.previous").read_text(encoding="utf-8")
+                )
+                self.assertEqual(previous, legacy)
+
+                # The revision makes the migration idempotent: later edits
+                # are authoritative and are never repeatedly rewritten.
+                migrated["voices"]["rhythm_chord"] = 8
+                target.write_text(json.dumps(migrated), encoding="utf-8")
+                user_data.ensure_user_configs(shipped)
+                self.assertEqual(
+                    json.loads(target.read_text())["voices"]["rhythm_chord"],
+                    8,
+                )
+            finally:
+                user_data.USER_CONFIG_DIR = original
+
+    def test_revision_two_user_config_gains_pattern_capacities_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shipped = root / "shipped"
+            shipped.mkdir()
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
+            (shipped / "amy_config.json").write_text(
+                json.dumps(shipped_config), encoding="utf-8"
+            )
+            original = user_data.USER_CONFIG_DIR
+            try:
+                user_data.USER_CONFIG_DIR = root / "user"
+                user_data.USER_CONFIG_DIR.mkdir()
+                target = user_data.USER_CONFIG_DIR / "amy_config.json"
+                legacy = json.loads(json.dumps(shipped_config))
+                legacy["config_revision"] = 2
+                legacy["serial"]["baud"] = 230_400
+                legacy["rhythm"].pop("group_ranges")
+                for key in (
+                    "amy_max_sequence_groups",
+                    "amy_max_sequence_group_tags",
+                    "amy_max_sequence_group_executions",
+                ):
+                    legacy.pop(key)
+                legacy["midi_input"].pop("tech_profile")
+                legacy["midi_input"].pop("alsa_raw_globs")
+                legacy["midi_input"].pop("oss_midi_globs")
+                legacy["drums"].pop("kit")
+                target.write_text(json.dumps(legacy), encoding="utf-8")
+
+                user_data.ensure_user_configs(shipped)
+
+                migrated = json.loads(target.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    migrated["config_revision"], CURRENT_CONFIG_REVISION
+                )
+                self.assertEqual(migrated["amy_max_sequence_groups"], 1024)
+                self.assertEqual(migrated["amy_max_sequence_group_tags"], 64)
+                self.assertEqual(
+                    migrated["amy_max_sequence_group_executions"], 40
+                )
+                self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")
+                self.assertEqual(
+                    migrated["midi_input"]["alsa_raw_globs"],
+                    [legacy["midi_input"]["device_glob"]],
+                )
+                self.assertEqual(
+                    migrated["midi_input"]["oss_midi_globs"],
+                    ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"],
+                )
+                self.assertEqual(migrated["drums"]["kit"], "gamma9001")
+                self.assertEqual(migrated["serial"]["baud"], 230_400)
+                self.assertEqual(
+                    json.loads(
+                        target.with_suffix(".json.previous").read_text(
+                            encoding="utf-8"
+                        )
+                    ),
+                    legacy,
+                )
             finally:
                 user_data.USER_CONFIG_DIR = original
 
     def test_midi_running_status_parses_control_changes(self) -> None:
-        notes = []
-        controls = []
-        reader = midi_player._LinuxRawMidiReader.__new__(midi_player._LinuxRawMidiReader)
-        reader._callback = lambda *args: notes.append(args)
-        reader._control_callback = lambda *args: controls.append(args)
-        state = {}
-        reader._parse_stream(bytes([0xB2, 7, 10, 74, 99]), state)
-        self.assertEqual(controls, [(3, 7, 10), (3, 74, 99)])
-        self.assertEqual(notes, [])
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(OrderedMidiInputEmitter(events.append), "test")
+        parser.feed(bytes([0xB2, 7, 10, 74, 99]), MidiByteStreamState())
+        self.assertEqual(
+            [(event.channel, event.data, event.value) for event in events],
+            [(3, 7, 10), (3, 74, 99)],
+        )
+        self.assertTrue(all(event.kind == "control" for event in events))
 
     def test_midi_channel_status_without_cc_data_adds_no_indicator(self) -> None:
-        controls = []
-        reader = midi_player._LinuxRawMidiReader.__new__(midi_player._LinuxRawMidiReader)
-        reader._callback = lambda *_args: None
-        reader._control_callback = lambda *args: controls.append(args)
-        state = {}
-        reader._parse_stream(bytes([0xB0, 0xB1, 0xB2]), state)
-        self.assertEqual(controls, [])
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(OrderedMidiInputEmitter(events.append), "test")
+        parser.feed(bytes([0xB0, 0xB1, 0xB2]), MidiByteStreamState())
+        self.assertEqual(events, [])
 
     def test_midi_indicators_fill_capacity_before_lru_replacement(self) -> None:
         state = MidiControlState(capacity=17)

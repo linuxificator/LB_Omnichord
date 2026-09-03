@@ -14,7 +14,21 @@ def bind_control(
 ) -> None:
     app.action("injectMidiControl", channel, controller, 0)
     app.action("injectMidiControl", channel, controller, 1)
-    app.action("selectMidiControlIndicator", channel, controller)
+    states = {
+        (item["channel"], item["controller"]): item["state"]
+        for item in app.action("midiControlIndicators")
+    }
+    if states.get((channel, controller)) == "bound":
+        # The first click intentionally only unlinks green to blue. Reusing
+        # this controller requires a second, separate blue-to-red learn click.
+        app.action("clickMidiControlIndicator", channel, controller)
+        unlinked = {
+            (item["channel"], item["controller"]): item["state"]
+            for item in app.action("midiControlIndicators")
+        }
+        if unlinked.get((channel, controller)) != "blue":
+            raise AssertionError("green indicator click did not unlink to blue")
+    app.action("clickMidiControlIndicator", channel, controller)
     if not app.action("activateMidiControlTarget", target):
         raise AssertionError(f"could not bind MIDI target {target}")
 
@@ -547,7 +561,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             }
             app.action("injectMidiControl", 1, 74, 0)
             app.action("injectMidiControl", 1, 74, 1)
-            app.action("selectMidiControlIndicator", 1, 74)
+            app.action("clickMidiControlIndicator", 1, 74)
             self.assertTrue(app.action("activateMidiControlTarget", midi_target))
 
             other_midi = 1 if midi_index != 1 else 2
@@ -567,7 +581,7 @@ class FrontendIntegrationTests(unittest.TestCase):
                 float(mapped["maximum"]),
             )
 
-            app.action("doubleTapMidiControlTarget", midi_target)
+            app.action("manuallyEditMidiControlTarget", midi_target)
             states = {
                 (item["channel"], item["controller"]): item["state"]
                 for item in app.action("midiControlIndicators")
@@ -587,7 +601,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             }
             app.action("injectMidiControl", 2, 75, 0)
             app.action("injectMidiControl", 2, 75, 1)
-            app.action("selectMidiControlIndicator", 2, 75)
+            app.action("clickMidiControlIndicator", 2, 75)
             self.assertTrue(app.action("activateMidiControlTarget", omni_target))
 
             other_omni = 1 if omni_index != 1 else 2
@@ -616,18 +630,22 @@ class FrontendIntegrationTests(unittest.TestCase):
 
             app.action("injectMidiControl", 3, 76, 0)
             app.action("injectMidiControl", 3, 76, 1)
-            app.action("selectMidiControlIndicator", 3, 76)
+            app.action("clickMidiControlIndicator", 3, 76)
             self.assertTrue(app.action("activateMidiControlTarget", target))
 
             checkpoint = app.bridge.count()
             app.action("injectMidiControl", 3, 76, 127)
-            app.bridge.wait_idle(timeout=3.0)
+            expected = [f"y{bus}h3,0.5,0.5Z" for bus in (1, 2, 3)]
+            mapped_lines = app.bridge.wait_for_lines(
+                expected,
+                start=checkpoint,
+                timeout=3.0,
+            )
             self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
-            mapped_lines = app.bridge.lines_since(checkpoint)
-            for bus in (1, 2, 3):
-                self.assertIn(f"y{bus}h3,0.5,0.5Z", mapped_lines)
+            for command in expected:
+                self.assertIn(command, mapped_lines)
 
-            app.action("moveMidiControlTarget", target)
+            app.action("manuallyEditMidiControlTarget", target)
             states = {
                 (item["channel"], item["controller"]): item["state"]
                 for item in app.action("midiControlIndicators")
@@ -648,7 +666,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             target = {"screen": "midi", "kind": "reverb_level"}
             app.action("injectMidiControl", 4, 77, 0)
             app.action("injectMidiControl", 4, 77, 1)
-            app.action("selectMidiControlIndicator", 4, 77)
+            app.action("clickMidiControlIndicator", 4, 77)
             self.assertTrue(app.action("activateMidiControlTarget", target))
 
             checkpoint = app.bridge.count()
@@ -694,11 +712,11 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("activeRowIndex")), -1)
             start = app.bridge.count()
             app.action("midiPreviewStart", 0, 0.5, True)
-            app.bridge.wait_idle(timeout=3.0)
-            synth_lines = app.bridge.lines_since(start)
-            self.assertTrue(
-                any("i5" in line and "n" in line and "l" in line for line in synth_lines),
-                "MIDI synth preview emitted no synth-5 note",
+            synth_lines = app.bridge.wait_for_line_match(
+                lambda line: "i5" in line and "n" in line and "l" in line,
+                "MIDI synth-5 preview note",
+                start=start,
+                timeout=3.0,
             )
             app.action("midiPreviewEnd")
             app.action("finishMidiPreview")
@@ -710,11 +728,11 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("setMidiSynthIndex", 0, len(names) - 1)
             start = app.bridge.count()
             app.action("midiPreviewStart", 0, 0.5, True)
-            app.bridge.wait_idle(timeout=3.0)
-            drum_lines = app.bridge.lines_since(start)
-            self.assertTrue(
-                any(line.startswith("p") and "i11Z" in line for line in drum_lines),
-                "Drum Kit 0 preview emitted no synth-11 sample hit",
+            drum_lines = app.bridge.wait_for_line_match(
+                lambda line: line.startswith("p") and "i11Z" in line,
+                "Drum Kit 0 synth-11 sample hit",
+                start=start,
+                timeout=3.0,
             )
             self.assertFalse(
                 any("drum_kit_0" in line for line in drum_lines),

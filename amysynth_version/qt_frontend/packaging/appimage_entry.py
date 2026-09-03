@@ -12,24 +12,40 @@ import time
 from pathlib import Path
 
 
-APP_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
+
+
+def packaged_asset_root(
+    meipass: object | None = None,
+    executable: Path | None = None,
+) -> Path:
+    """Resolve both PyInstaller root and `_internal` onedir layouts."""
+
+    packaged = meipass if meipass is not None else getattr(sys, "_MEIPASS", None)
+    executable_path = executable or Path(sys.executable)
+    candidates = []
+    if packaged is not None:
+        root = Path(str(packaged))
+        candidates.extend((root, root / "_internal"))
+    candidates.extend(
+        (
+            executable_path.resolve().parent / "_internal",
+            executable_path.resolve().parent,
+            Path(__file__).resolve().parents[1],
+            Path(__file__).resolve().parent,
+        )
+    )
+    for candidate in candidates:
+        if all((candidate / name).is_dir() for name in ASSET_DIRECTORIES):
+            return candidate
+    raise RuntimeError("packaged frontend assets are unavailable")
+
+
+APP_ROOT = packaged_asset_root()
 CONFIG_PATH = APP_ROOT / "config" / "amy_config.json"
 
 
-def configure_frontend_asset_paths(core: object) -> None:
-    core.FRONTEND_DIR = APP_ROOT
-    core.GUI_DIR = APP_ROOT / "gui"
-    core.CONFIG_DIR = APP_ROOT / "config"
-    core.INSTRUMENT_DIR = APP_ROOT / "instruments"
-    core.MUSIC_DIR = APP_ROOT / "music"
-
-
 def import_frontend() -> object:
-    # Configure app_core before importing main: main imports midi_player, whose
-    # factory-preset constant is deliberately resolved once at import time.
-    import app_core
-
-    configure_frontend_asset_paths(app_core)
     import main
 
     return main
@@ -40,29 +56,6 @@ def run_service(arguments: list[str]) -> int:
 
     sys.argv = [sys.argv[0], *arguments]
     return int(local_amy_service.main())
-
-
-def self_test() -> int:
-    import amy  # noqa: F401
-    import c_amy  # noqa: F401
-    import PySide6  # noqa: F401
-    import local_amy_service  # noqa: F401
-    import_frontend()
-
-    required = (
-        APP_ROOT / "licence.txt",
-        CONFIG_PATH,
-        APP_ROOT / "config" / "defaults.json",
-        APP_ROOT / "gui" / "Main.qml",
-        APP_ROOT / "instruments" / "synths.json",
-        APP_ROOT / "music" / "rhythms.json",
-        APP_ROOT / "music" / "omnichord_bass_riffs.json",
-    )
-    missing = [str(path) for path in required if not path.is_file()]
-    if missing:
-        raise RuntimeError("missing packaged assets: " + ", ".join(missing))
-    print("LB Omnichord AppImage self-test passed")
-    return 0
 
 
 def socket_path() -> Path:
@@ -114,8 +107,9 @@ def run_frontend(arguments: list[str]) -> int:
 
         main = import_frontend()
 
-        sys.argv = [sys.argv[0], "--amy-socket", str(socket), *arguments]
-        return int(main._core.main())
+        frontend_arguments = ["--amy-socket", str(socket), *arguments]
+        sys.argv = [sys.argv[0], *frontend_arguments]
+        return int(main.main(frontend_arguments, asset_root=APP_ROOT))
     finally:
         stop_service()
         socket.unlink(missing_ok=True)
@@ -125,8 +119,6 @@ def main_entry() -> int:
     arguments = sys.argv[1:]
     if arguments and arguments[0] == "--amy-service":
         return run_service(arguments[1:])
-    if arguments in (["--package-self-test"], ["--appimage-self-test"]):
-        return self_test()
     return run_frontend(arguments)
 
 

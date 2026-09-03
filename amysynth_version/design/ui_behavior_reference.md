@@ -1,5 +1,10 @@
 # AMY Omnichord UI Behavior Reference
 
+Status: authoritative UI interaction contract
+Owner: Qt/QML interaction behavior
+Applies to: active `amysynth_version` implementation
+Last verified: 2026-09-01
+
 ## Purpose
 
 This document collects user interface and interaction decisions for the AMY Omnichord application. It is intended as a behavioral reference for future implementation work and regression testing.

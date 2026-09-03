@@ -25,15 +25,20 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout exact source commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           # For pull requests, build the branch head rather than GitHub's
           # synthetic merge commit. This makes the artifact match the exact
           # commit a local `git pull` checks out.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
+      - name: Load exact release inputs
+        run: >-
+          python3 amysynth_version/qt_frontend/packaging/release_inputs.py
+          github-env --output "$GITHUB_ENV"
+
       - name: Build with ESP-IDF 6.0.2
-        uses: espressif/esp-idf-ci-action@v1
+        uses: espressif/esp-idf-ci-action@9d38657f3d789ca759b2b37aaf5ceffbc42c4f0d # v1 branch, verified 2026-09-01
         with:
           esp_idf_version: v6.0.2
           target: esp32p4
@@ -100,7 +105,7 @@ jobs:
 
       - name: Upload portable firmware artifact
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: esp32p4-firmware
           path: amysynth_version/esp32p4/ci-flash/

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import math
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -15,6 +17,14 @@ from amy_serial import (  # noqa: E402
     AmySerialClient,
     _TaggedSequencerLane,
     _compact_repeating_events,
+)
+from drum_patterns import load_drum_pattern_catalog  # noqa: E402
+from config_loader import load_resolved_amy_config  # noqa: E402
+from rhythm_command_plan import (  # noqa: E402
+    SEQUENCE_CONTROL_GATE,
+    SEQUENCE_CONTROL_PUBLISH,
+    compile_group_definition,
+    sequence_control_command,
 )
 
 
@@ -38,6 +48,9 @@ class SequencerTagTests(unittest.TestCase):
         cls.config = json.loads(
             (FRONTEND / "config" / "amy_config.json").read_text(encoding="utf-8")
         )
+        cls.resolved_config = load_resolved_amy_config(
+            FRONTEND / "config" / "amy_config.json"
+        )
         cls.rhythms = json.loads(
             (FRONTEND / "music" / "rhythms.json").read_text(encoding="utf-8")
         )["rhythms"]
@@ -46,6 +59,9 @@ class SequencerTagTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )["riffs"]
+        cls.drum_catalog = load_drum_pattern_catalog(
+            FRONTEND / "music" / "drums"
+        )
 
     def test_reserved_ranges_are_disjoint_and_inside_current_amy_limit(self) -> None:
         rhythm_cfg = self.config["rhythm"]
@@ -70,16 +86,11 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(len(occupied), 252)
         self.assertEqual(int(self.config["voices"]["rhythm_chord"]), 7)
 
-    def test_every_catalogue_pattern_fits_its_reserved_range(self) -> None:
+    def test_every_catalogue_phrase_fits_group_and_execution_limits(self) -> None:
         ranges = self.config["rhythm"]["tag_ranges"]
-        max_chord_notes = int(self.config["rhythm"]["max_rhythm_chord_notes"])
-
-        worst = {"drums": (0, ""), "bass": (0, ""), "chords": (0, "")}
+        worst_bass = (0, "")
+        worst_chord_roots = (0, "")
         for rhythm in self.rhythms:
-            drum_events = sum(
-                len(layer.get("events", []))
-                for layer in rhythm.get("percussion_layers", [])
-            )
             bass_hits = max(
                 (len(level) for level in rhythm.get("bass_levels", [])),
                 default=0,
@@ -88,59 +99,134 @@ class SequencerTagTests(unittest.TestCase):
                 (len(level) for level in rhythm.get("chord_levels", [])),
                 default=0,
             )
-            required = {
-                "drums": drum_events,
-                "bass": bass_hits * 2,
-                "chords": chord_hits * (max_chord_notes + 1),
-            }
-            for lane, count in required.items():
-                if count > worst[lane][0]:
-                    worst[lane] = (count, str(rhythm["id"]))
-                self.assertLessEqual(
-                    count,
-                    int(ranges[lane]["count"]),
-                    f"{rhythm['id']} needs {count} {lane} tags",
-                )
+            if bass_hits * 2 > worst_bass[0]:
+                worst_bass = (bass_hits * 2, str(rhythm["id"]))
+            if chord_hits > worst_chord_roots[0]:
+                worst_chord_roots = (chord_hits, str(rhythm["id"]))
 
-        self.assertEqual(worst["drums"], (56, "trance"))
-        self.assertEqual(worst["bass"], (56, "seven_four_funk"))
-        self.assertEqual(worst["chords"], (140, "seven_four_funk"))
+        self.assertEqual(worst_bass, (56, "seven_four_funk"))
+        self.assertLessEqual(worst_bass[0], int(ranges["bass"]["count"]))
+        self.assertEqual(worst_chord_roots, (28, "seven_four_funk"))
+        self.assertLessEqual(
+            worst_chord_roots[0],
+            int(ranges["chords"]["count"]),
+        )
 
-        chord_capacity = int(ranges["chords"]["count"])
-        chord_counts = (2, 3, 4, 5, 6, 7)
-        worst_arpeggio = (0, "")
+        max_instances = int(self.config["amy_max_sequence_group_executions"])
+        worst_total = (0, ())
+        worst_group_count = (0, ())
         for rhythm in self.rhythms:
             period = round(float(rhythm["length_beats"]) * 48)
             for source_level in (0, 1, 2, 4):
                 chord_events = rhythm["chord_levels"][source_level]
-                for note_count in chord_counts:
+                velocity_count = len({
+                    float(event.get("amp", 1.0))
+                    for event in chord_events
+                })
+                for note_count in range(2, 8):
+                    group_count = velocity_count
+                    if group_count > worst_group_count[0]:
+                        worst_group_count = (
+                            group_count,
+                            (str(rhythm["id"]), source_level, note_count),
+                        )
+                    self.assertLessEqual(group_count, 64)
                     for rate in range(1, 5):
-                        step = 48 // rate
-                        gate = max(1, round(0.72 * step))
-                        note_offs: list[tuple[int, str]] = []
-                        note_ons: list[tuple[int, str]] = []
-                        for event in chord_events:
-                            start = round(float(event["time"]) * 48)
-                            velocity = float(event.get("amp", 1.0))
-                            for note in range(note_count):
-                                tick = start + note * step
-                                note_offs.append((tick + gate, f"n{note}l0i4"))
-                                note_ons.append((
-                                    tick,
-                                    f"n{note}l{velocity:.9g}i4",
-                                ))
-                        required = len(
-                            _compact_repeating_events(note_offs, period)
-                        ) + len(_compact_repeating_events(note_ons, period))
-                        if required > worst_arpeggio[0]:
-                            worst_arpeggio = (required, str(rhythm["id"]))
+                        client = AmySerialClient.__new__(AmySerialClient)
+                        client.resolved_config = self.resolved_config
+                        client._group_ranges = {
+                            name: (start, count)
+                            for name, start, count in (
+                                self.resolved_config.layout.sequencer_group_ranges
+                            )
+                        }
+                        client._group_tag_high_waters = {}
+                        client.synth_id = {"rhythm_chord": 4}
+                        client.rhythm_chord_enabled = True
+                        client.chord_notes = [
+                            float(60 + index) for index in range(note_count)
+                        ]
+                        client.rhythm_config = {
+                            "id": rhythm["id"],
+                            "length_beats": rhythm["length_beats"],
+                            "chord_events": chord_events,
+                            "chord_arpeggio": {
+                                "enabled": True,
+                                "notes_per_beat": rate,
+                                "direction": "up",
+                            },
+                        }
+                        group_commands, triggers = (
+                            client._chord_group_plan()
+                        )
+                        group_ids = {
+                            int(match.group(1))
+                            for command in group_commands
+                            if (match := re.match(r"^zQ(\d+),3,", command))
+                        }
+                        self.assertEqual(
+                            len(group_ids), velocity_count
+                        )
+                        self.assertTrue(all(
+                            937
+                            <= group
+                            < 1001
+                            for group in group_ids
+                        ))
                         self.assertLessEqual(
-                            required,
-                            chord_capacity,
-                            f"{rhythm['id']} arpeggio needs {required} tags",
+                            len(triggers),
+                            int(ranges["chords"]["count"]),
                         )
 
-        self.assertEqual(worst_arpeggio, (84, "pop_16"))
+                        gate = max(1, round(0.72 * round(48 / rate)))
+                        step = max(1, round(48 / rate))
+                        length = (note_count - 1) * step + gate + 1
+                        copies = math.ceil(length / period) + 2
+                        base_starts = [
+                            start
+                            for tick, repeat, _ in triggers
+                            for start in range(tick, period, repeat)
+                        ]
+                        starts = [
+                            start + copy * period
+                            for start in base_starts
+                            for copy in range(-copies - 1, copies + 2)
+                        ]
+                        chord_instances = max(
+                            (
+                                sum(
+                                    start <= tick < start + length
+                                    for start in starts
+                                )
+                                for tick in range(period)
+                            ),
+                            default=0,
+                        )
+                        drum_roles = max(
+                            len({event.role for event in level})
+                            for level in self.drum_catalog.rhythm(
+                                str(rhythm["id"])
+                            ).levels
+                        )
+                        total = drum_roles + chord_instances + 1
+                        details = (
+                            str(rhythm["id"]),
+                            source_level,
+                            rate,
+                            note_count,
+                            drum_roles,
+                            chord_instances,
+                        )
+                        if total > worst_total[0]:
+                            worst_total = (total, details)
+                        self.assertLessEqual(total, max_instances, details)
+
+        self.assertEqual(worst_group_count[0], 2)
+        self.assertEqual(
+            worst_total,
+            (34, ("merengue", 4, 1, 7, 6, 27)),
+        )
+        self.assertLessEqual(worst_total[0], max_instances)
 
         riff_tags = max(
             len(riff["timing"]["events"]) * 2
@@ -170,39 +256,75 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(commands[0], "H0,16,10n60l1i1Z")
         self.assertEqual(commands[1], "H0,16,11n64l1i1Z")
 
-    def test_lane_can_clear_onsets_while_retaining_existing_note_offs(self) -> None:
-        writer = _WriterProbe()
-        lane = _TaggedSequencerLane("chords", 112, 5, writer)
-        events = [
-            (0, 192, "n48l0.8i4"),
-            (0, 192, "n52l0.8i4"),
-            (35, 192, "l0i4"),
-            (96, 192, "n48l0.8i4"),
-            (227, 192, "l0i4"),
-        ]
-        lane.commands(events)
+    def test_group_wire_adapter_uses_ticks_namespace_and_atomic_publish(self) -> None:
+        plan = compile_group_definition(
+            group=7,
+            length=48,
+            events=((0, 48, "i2n60l1"), (35, 0, "i2n60l0Z")),
+            previous_high_water=3,
+        )
+        self.assertEqual(
+            plan.commands,
+            (
+                "H0,48,0,7i2n60l1Z",
+                "H35,0,1,7i2n60l0Z",
+                "H0,0,2,7Z",
+                f"zQ7,{SEQUENCE_CONTROL_PUBLISH},48,0Z",
+            ),
+        )
+        self.assertEqual(plan.tag_count, 2)
+        self.assertEqual(plan.high_water, 3)
+        self.assertEqual(
+            sequence_control_command(7, SEQUENCE_CONTROL_GATE, 48, 0, 11),
+            "zQ7,2,48,0,11Z",
+        )
 
-        lane.retain_only(events, {2, 4})
+    def test_group_wire_adapter_rejects_invalid_identity_and_bounds(self) -> None:
+        with self.assertRaisesRegex(ValueError, "start at 1"):
+            compile_group_definition(group=0, length=48, events=())
+        with self.assertRaisesRegex(ValueError, "outside length"):
+            compile_group_definition(
+                group=1,
+                length=48,
+                events=((48, 0, "i2n60l1"),),
+            )
+
+    def test_lane_clear_removes_only_future_child_triggers(self) -> None:
+        writer = _WriterProbe()
+        lane = _TaggedSequencerLane("chords", 112, 3, writer)
+        events = [
+            (0, 192, "zQ940,1,1,0"),
+            (48, 192, "zQ941,1,1,0"),
+            (96, 192, "zQ942,1,1,0"),
+        ]
+        self.assertEqual(
+            lane.commands(events),
+            [
+                "H0,192,112zQ940,1,1,0Z",
+                "H48,192,113zQ941,1,1,0Z",
+                "H96,192,114zQ942,1,1,0Z",
+            ],
+        )
 
         self.assertEqual(
-            [command for _, _, command in writer.commands],
+            lane.commands([]),
             [
-                "H35,192,114l0i4Z",
-                "H35,192,116l0i4Z",
                 "H0,0,112Z",
                 "H0,0,113Z",
-                "H0,0,115Z",
+                "H0,0,114Z",
             ],
         )
 
     def test_arpeggio_uses_all_notes_wraps_and_reverses(self) -> None:
         client = AmySerialClient.__new__(AmySerialClient)
-        client.config = {
-            "rhythm": {
-                "chord_gate_beats": 0.72,
-                "max_rhythm_chord_notes": 4,
-            }
+        client.resolved_config = self.resolved_config
+        client._group_ranges = {
+            name: (start, count)
+            for name, start, count in (
+                self.resolved_config.layout.sequencer_group_ranges
+            )
         }
+        client._group_tag_high_waters = {}
         client.synth_id = {"rhythm_chord": 4}
         client.rhythm_chord_enabled = True
         client.chord_notes = [60.0, 64.0, 67.0, 71.0, 74.0]
@@ -216,19 +338,23 @@ class SequencerTagTests(unittest.TestCase):
             },
         }
 
-        events = client._lane_events("chords")
-        note_ons = [event for event in events if "l0.8i4" in event[2]]
+        commands, events = client._chord_group_plan()
         self.assertEqual(
-            note_ons,
-            [
-                (0, 192, "n74l0.8i4"),
-                (48, 192, "n71l0.8i4"),
-                (96, 192, "n67l0.8i4"),
-                (144, 192, "n64l0.8i4"),
-                (0, 192, "n60l0.8i4"),
-            ],
+            events,
+            [(0, 192, "zQ937,1,1,0Z")],
         )
-        self.assertEqual(len(events), 10)
+        for sequence_index, note in enumerate(reversed(client.chord_notes)):
+            tick = sequence_index * 48
+            self.assertIn(
+                f"H{tick},{228 if tick == 0 else 0},{sequence_index * 2},937"
+                f"n{note:g}l0.8i4Z",
+                commands,
+            )
+            self.assertIn(
+                f"H{tick + 35},0,{sequence_index * 2 + 1},937n{note:g}l0i4Z",
+                commands,
+            )
+        self.assertIn("zQ937,3,228,0Z", commands)
 
     def test_dense_arpeggio_is_compacted_without_changing_tick_set(self) -> None:
         period = 192
