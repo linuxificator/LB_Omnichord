@@ -657,8 +657,14 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 **RHYTHM-04 — starting automatic chords converges synth 4 first**
 
-- Starting rhythm from stopped state installs the authoritative tagged drum/bass/chord ranges and resumes transport only after those definitions are queued ahead of `zY1`.
-- Starting rhythm must not require `RESET_SEQUENCER`; tagged replacement itself removes stale lane entries.
+- Starting rhythm from stopped state sends
+  `RESET_TIMEBASE | RESET_SEQUENCER`, waits for the reset's audio-block
+  boundary, installs the authoritative runtime drum groups and tagged
+  bass/chord/fill-launch ranges, and resumes transport only after those
+  commands are queued ahead of `zY1`.
+- Persistent fill definitions survive that reset and are not resent. Root
+  events and old active executions do not survive it, making explicit Start a
+  clean transport-run boundary.
 
 **RHYTHM-05 — stopping transport releases sounding accompaniment**
 

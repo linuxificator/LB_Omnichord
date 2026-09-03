@@ -18,6 +18,19 @@ from synth_programs import resolve_program  # noqa: E402
 
 
 class ProgramArchitectureTests(unittest.TestCase):
+    @staticmethod
+    def _class_method(
+        tree: ast.Module,
+        class_name: str,
+        method_name: str,
+    ) -> ast.FunctionDef:
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and node.name == class_name:
+                for child in node.body:
+                    if isinstance(child, ast.FunctionDef) and child.name == method_name:
+                        return child
+        raise AssertionError(f"missing {class_name}.{method_name}")
+
     def test_package_input_stimulus_is_not_generated_by_production_code(self) -> None:
         self.assertFalse((CODE / "package_smoke.py").exists())
         self.assertFalse((CODE / "package_test_hooks.py").exists())
@@ -119,6 +132,93 @@ class ProgramArchitectureTests(unittest.TestCase):
         public_transport = (CODE / "amy_serial.py").read_text(encoding="utf-8")
         self.assertNotIn("DEFAULT_CONFIG", public_transport.split("for _name", 1)[0])
         self.assertIn("from config_loader import load_amy_config", public_transport)
+
+    def test_sequencer_execution_mechanics_remain_owned_by_amy(self) -> None:
+        transport_source = (CODE / "amy_transport.py").read_text(encoding="utf-8")
+        planner_source = (CODE / "rhythm_command_plan.py").read_text(
+            encoding="utf-8"
+        )
+        transport_tree = ast.parse(transport_source)
+        planner_tree = ast.parse(planner_source)
+
+        # Persistent fill definitions are authored at construction only. A
+        # transport Start resets runtime state and must not resend the static
+        # catalogue.
+        preload_owners: list[str] = []
+        for method in (
+            node
+            for class_node in transport_tree.body
+            if isinstance(class_node, ast.ClassDef)
+            and class_node.name == "AmySerialClient"
+            for node in class_node.body
+            if isinstance(node, ast.FunctionDef)
+        ):
+            if any(
+                isinstance(call, ast.Call)
+                and isinstance(call.func, ast.Attribute)
+                and call.func.attr == "_preload_drum_library"
+                for call in ast.walk(method)
+            ):
+                preload_owners.append(method.name)
+        self.assertEqual(preload_owners, ["__init__"])
+
+        # Beat-accurate phrases are pure wire plans. Host scheduling remains
+        # valid for manual strum/tail ownership, but not for rhythm groups.
+        self.assertFalse(any(
+            isinstance(node, (ast.Import, ast.ImportFrom))
+            and any(alias.name in {"time", "threading"} for alias in node.names)
+            for node in planner_tree.body
+        ))
+        rhythm_methods = (
+            "_chord_group_plan",
+            "_drum_activity_commands",
+            "_fill_schedule_commands",
+            "_drum_commands",
+            "_replace_drums",
+            "_start_rhythm",
+        )
+        for method_name in rhythm_methods:
+            method = self._class_method(
+                transport_tree,
+                "AmySerialClient",
+                method_name,
+            )
+            with self.subTest(method=method_name):
+                self.assertFalse(any(
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute)
+                    and node.func.attr in {"schedule", "singleShot"}
+                    for node in ast.walk(method)
+                ))
+
+        # LB keeps definition-authoring high-water marks, never AMY execution
+        # phase, definition revisions or generation ownership.
+        for forbidden in (
+            "current_amy_tick",
+            "amy_sequencer_tick",
+            "group_execution_generation",
+            "active_group_revision",
+            "group_end_tick",
+        ):
+            self.assertNotIn(forbidden, transport_source)
+            self.assertNotIn(forbidden, planner_source)
+
+    def test_frontend_sequencer_path_is_wire_only(self) -> None:
+        for filename in (
+            "amy_serial.py",
+            "amy_transport.py",
+            "program_amy.py",
+            "rhythm_command_plan.py",
+        ):
+            tree = ast.parse((CODE / filename).read_text(encoding="utf-8"))
+            imported_modules = {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, (ast.Import, ast.ImportFrom))
+                for alias in node.names
+            }
+            with self.subTest(filename=filename):
+                self.assertNotIn("amy", imported_modules)
 
     def test_missing_config_is_an_error_not_a_hidden_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
