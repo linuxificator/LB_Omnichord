@@ -165,3 +165,17 @@ evidence now has separate suite/checkpoint names, but duplicated package-smoke
 checkpoint assertions and platform workflow orchestration remain. V1, V4, V5
 and V6 remain open and are deliberately reported rather than hidden by this
 focused change.
+
+## Five-platform validation result
+
+Commit `6613941dc94e8f1e1fc54ae7dd76399d9cd45f53` passed the complete manual
+feature-branch package workflow in GitHub Actions run `33767634170`. That run
+executed all regression suites, Linux x86_64, Raspberry Pi aarch64, Windows,
+macOS, both Android package architectures and the installed Android emulator
+test.
+
+The Android application observed rotary, button and activity OSC events sent
+by an independent host process through Android Emulator UDP redirection. This
+is transport/process evidence for OSC. The platform-capability checkpoint does
+not claim a native Android MIDI bridge, and no portable parser result is
+labelled as physical MIDI evidence.

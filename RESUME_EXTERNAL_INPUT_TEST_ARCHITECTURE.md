@@ -1,6 +1,6 @@
 # Resume: external-input test architecture
 
-Status: resumable checkpoint
+Status: implemented and validated checkpoint
 Recorded: 2026-09-03, Europe/Amsterdam
 Repository: `/home/jeroen/omnichord/LB_Omnichord`
 Branch: `rework/external_input_test_architecture`
@@ -15,6 +15,11 @@ were pushed through the working SSH deploy key. The relevant history is:
 - `6be53d1` — Separate external input test processes
 - `9d02120` — Document portable and platform input evidence
 - `68bd738` — Separate unit and platform input suites
+- `bc0e0e2` — Record external input architecture resume state
+- `9adcbe2` — Install Android OSC test peer dependency
+- `2b75cb9` — Keep Android test dependency declaration explicit
+- `6b6bfc3` — Route Android OSC test across emulator network
+- `6613941` — Avoid Android OSC sender teardown race
 
 Do not resume from `main`; resume from the remote branch above. This branch is
 based on `main` commit `20ad1ba` and has not been merged to `main`.
@@ -57,32 +62,32 @@ The following passed locally at `68bd738`:
 The remote branch was verified at
 `68bd7387bc1c57482892fa8b48a132f3e84d962b` before adding this resume file.
 
-## Current blocker: GitHub CLI authentication
+## Remote platform validation
 
-The five-platform non-publishing workflow has **not** run for this branch.
-Attempting to start it with:
+GitHub CLI authentication was restored. The definitive non-publishing
+five-platform workflow is
+[run 33767634170](https://github.com/linuxificator/LB_Omnichord/actions/runs/33767634170)
+at commit `6613941dc94e8f1e1fc54ae7dd76399d9cd45f53`. It completed successfully.
 
-```bash
-gh workflow run desktop-release.yml \
-  --ref rework/external_input_test_architecture
-```
+The successful run covers:
 
-failed with:
+- all nine regression suites, including the portable external-process and
+  Linux platform-input suites;
+- Linux x86_64 AppImage and Raspberry Pi aarch64 AppImage;
+- the Windows native service plus portable application;
+- the macOS DMG;
+- Android x86_64 and arm64 APKs; and
+- the installed x86_64 Android application in an emulator.
 
-```text
-HTTP 401: Requires authentication
-```
+The Android evidence contains an independent host sender process targeting
+`127.0.0.1:8000` through emulator UDP redirection. The app observed the OSC
+rotary, button and activity events and also passed its AMY/Oboe audio,
+chord-input and slider-drag checkpoints. The sender is deliberately terminated
+when the app finishes; the test therefore requires its start record and the
+three receiver-side observations, not an unreachable normal-exit record.
 
-`gh auth status` reports that the active `linuxificator` token in
-`~/.config/gh/hosts.yml` is invalid. This is independent of Git transport:
-`git push origin rework/external_input_test_architecture` succeeds with the SSH
-deploy key. Do not change the working Git remote or SSH key to repair `gh`.
-
-To resume platform validation, authenticate `gh` for the `linuxificator`
-account with permission to dispatch Actions, then run the command above. A
-manual dispatch on this featurebranch builds/tests all platforms but does not
-publish a release because publication is restricted to `main`. Follow all jobs
-and repair failures on this branch before proposing a merge.
+This manual feature-branch run did not publish a release and this branch has
+not been merged to `main`.
 
 ## Remaining architecture violations
 
@@ -100,9 +105,10 @@ The current work intentionally does not conceal these open findings:
 6. Evidence classes are described accurately, but are not yet emitted through
    one central machine-readable evidence manifest.
 
-The next action is platform CI validation, not a merge and not an unrelated
-refactor. After CI is green, report the exact run and any still-unverified
-physical hardware paths to the user.
+The focused process-separation work is validated. A merge remains a separate
+decision. CoreMIDI, WinMM and Android physical/native MIDI input remain
+unverified because those product adapters do not currently exist; portable
+parser evidence is not presented as physical-input evidence.
 
 ## Validation continuation after `gh` recovery
 
@@ -119,4 +125,9 @@ Run `33763712771` confirmed that dependency repair and progressed to the real
 Android app, but the `toybox nc` guest-shell sender produced no observable
 datagrams. The follow-up replaces that implementation with Android Emulator's
 documented `redir add udp:host-port:guest-port` boundary and runs the shared
-Python OSC peer as an independent host process.
+Python OSC peer as an independent host process. Run `33765963115` proved that
+this boundary delivers all three OSC event classes to the app, then exposed a
+false teardown assertion: the sender was intentionally terminated before it
+could write its normal-exit packet count. Commit `6613941` removed only that
+assertion, retaining the sender-start and receiver-observation requirements;
+the definitive run above is green.
