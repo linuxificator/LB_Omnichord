@@ -649,9 +649,7 @@ jobs:
           ref: ${{ github.sha }}
 
       - name: Install external-input test peer dependencies
-        run: >-
-          python3 -m pip install
-          -r amysynth_version/qt_frontend/requirements-portable.txt
+        run: python3 -m pip install -r amysynth_version/qt_frontend/requirements-portable.txt
 
       - name: Load exact release inputs
         run: >-
