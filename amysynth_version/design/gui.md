@@ -3,7 +3,7 @@
 Status: authoritative GUI structure contract
 Owner: Qt/QML user interface
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-01
+Last verified: 2026-09-03
 
 ## Screens
 
@@ -159,7 +159,13 @@ Setting only visual `width` and `height` can leave `implicitHandleWidth` at
 zero, which makes the visible knob differ from Qt's actual drag handle.
 While `Slider.pressed` is true, Qt owns the interactive slider value. Backend
 property echoes or repeater model replacements must not force the handle back
-to an older value during that press; synchronization resumes after release.
+to an older value during that press. After a real move, the native value and
+its visible handle/fill remain at the accepted user value across release even
+when the backend deliberately suppresses a live model refresh. A later external
+backend change resumes synchronization. A press without movement and a gesture
+consumed by MIDI learn synchronize immediately. This contract is identical for
+mouse and touchscreen input on Linux, macOS, Windows and Android; application
+code must not classify either gesture itself.
 
 `BindableSlider.qml` is the single implementation of that native horizontal
 slider interaction, visual-position mapping and semantic MIDI binding

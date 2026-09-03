@@ -41,6 +41,9 @@ Post-plan regression fixes:
 - `POST_T25_CONFIG_REVISION_4.md` — legacy pattern-capacity migration.
 - `POST_T25_GAMMA_RELEASE_LINEAGE.md` — restore and prove the Gamma9001
   hosted-release profile after its feature branch was not merged to main.
+- `POST_T25_MAIN_RELEASE_20260901.md` — first slimmed `main` release, the PTY
+  timing-observer fix, package/evidence artifact separation and final release
+  proof for `R20260901T212205`.
 
 Continuation planning:
 

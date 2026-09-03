@@ -23,6 +23,7 @@ Item {
 
     property bool midiBindingGesture: false
     property bool midiManualTakeoverPending: false
+    property bool editedDuringPress: false
     readonly property bool traceGestures:
         typeof sliderTrace !== "undefined" && sliderTrace
     readonly property real displayValue: slider.value
@@ -115,14 +116,22 @@ Item {
             root.traceSlider("pressedChanged", value)
             if (pressed) {
                 root.beginSliderDrag()
+                root.editedDuringPress = false
                 root.midiBindingGesture = root.beginMidiInteraction()
                 root.midiManualTakeoverPending =
                     !root.midiBindingGesture && root.midiBound
                 root.activated()
             } else {
-                root.synchronizeFromBackend()
+                // A live backend edit may intentionally suppress its model
+                // notification so the native pointer grab remains stable.
+                // Keep Qt's accepted value visible across release in that
+                // case. A later external currentValue change restores the
+                // binding through onCurrentValueChanged.
+                if (!root.editedDuringPress || root.midiBindingGesture)
+                    root.synchronizeFromBackend()
                 root.midiBindingGesture = false
                 root.midiManualTakeoverPending = false
+                root.editedDuringPress = false
             }
         }
 
@@ -136,6 +145,8 @@ Item {
                 root.releaseMidiBindingForManualEdit()
                 root.midiManualTakeoverPending = false
             }
+            if (slider.pressed)
+                root.editedDuringPress = true
             root.edited(value)
         }
 

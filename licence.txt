@@ -5,7 +5,7 @@ By using this software you agree to:
 * Have fun with it
 * Wish Luciel a happy birthday! It's her birthday today*, so please send her a card or a present.
 * Do your best to make this world a better place
-* Ask Apple why I need to pay them if I want to make an iOS version of this Omnichord software and give it away for free without any ads or restrictions
+* Ask Apple why I need to pay them if I want to make an iOS version of this Omnichord software and give it away for free without any ads or restrictions, no strings attached! (ehhm, well, actually it does use the Amy Physical modelling strings, but you are free to remove them by editting some json's) 
 
 If you use it or perform with it, I would like to know!
 

@@ -35,6 +35,9 @@ Core rules:
 - `CODEX_HANDOVER_EXTERNAL_CONTROLS.md` records the branch-local lessons from
   the external-control rework: smooth Qt slider drag, backend echo boundaries,
   MIDI input tech indicators and scoped hardware button takeover.
+- `CODEX_HANDOVER_FRITS_SLIDER_FIX.md` records the macOS mouse-visible slider
+  regression, its shared mouse/touch cause and the package-level proof added to
+  prevent recurrence without platform-specific UI code.
 - `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md` indexes the 2026-08-31
   repository-wide code-quality audit. Those files are analysis and proposed
   refactoring guidance, not authority to change product behavior.
@@ -83,6 +86,9 @@ small, behavior-preserving phase:
   size/audit gates and the deliberately deferred production-signing boundary.
 - `code_quality_tasks/README.md` — actual T01-T25 result handovers, verification
   evidence and newly discovered follow-up work.
+- `code_quality_tasks/POST_T25_MAIN_RELEASE_20260901.md` — merge-to-main
+  incident record, deterministic allocation-guard proof, release/evidence
+  staging boundary and final `R20260901T212205` release evidence.
 
 ## Required reading route for Codex
 

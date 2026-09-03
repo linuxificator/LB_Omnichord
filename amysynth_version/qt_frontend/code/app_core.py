@@ -3918,7 +3918,7 @@ def run_application(
 
         def smoke_input() -> None:
             try:
-                from package_smoke import exercise_chord_input
+                from package_smoke import exercise_chord_input, exercise_slider_input
 
                 exercise_chord_input(
                     app,
@@ -3926,10 +3926,15 @@ def run_application(
                     backend,
                     smoke_checkpoint,
                 )
+                exercise_slider_input(
+                    app,
+                    window,
+                    smoke_checkpoint,
+                )
             except Exception as exc:
-                message = f"Package chord-input smoke failed: {type(exc).__name__}: {exc}"
+                message = f"Package input smoke failed: {type(exc).__name__}: {exc}"
                 print(message, file=sys.stderr, flush=True)
-                smoke_checkpoint(f"chord-input-failed {type(exc).__name__}: {exc}")
+                smoke_checkpoint(f"input-failed {type(exc).__name__}: {exc}")
                 app.exit(3)
                 return
 

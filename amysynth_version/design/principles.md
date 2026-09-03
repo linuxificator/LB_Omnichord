@@ -3,7 +3,7 @@
 Status: authoritative baseline contract
 Owner: application architecture
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-01
+Last verified: 2026-09-03
 
 ## Wire protocol boundary
 
@@ -36,3 +36,12 @@ dependency.
 ## Simplicity
 
 New abstractions are added only when they reduce coupling or prevent regressions.
+
+## Code-quality non-regression
+
+Bug fixes must preserve the architectural and code-quality improvements already
+recorded in this design tree. In particular, a platform-specific symptom does
+not justify platform-specific application behavior when the affected framework
+primitive is shared. Reproduce the behavior at the narrowest shared boundary,
+add a behavioral regression test, and fix that shared boundary without adding
+duplicate input policy, cross-layer state ownership or source-text assertions.
