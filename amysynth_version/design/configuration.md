@@ -8,17 +8,19 @@ Last verified: 2026-09-03
 ## Authority and revision
 
 `qt_frontend/config/amy_config.json` is the shipped configuration authority.
-It declares `config_revision`; current revision 6 is structurally defined by
-`config/schema/amy_config_v6.schema.json`. Historical revisions 1–5 remain
-packaged so their contracts are inspectable; the three pattern capacities are
-optional there, as are the later MIDI discovery fields and drum-kit identity;
-all are required from revision 4 onward. Unknown keys inside stable objects,
-missing required values and wrong types are startup errors. Required operational
-values must not reappear as consumer fallbacks.
+It declares `config_revision`; current revision 7 is structurally defined by
+`config/schema/amy_config_v7.schema.json`. Historical revisions 1–6 remain
+packaged so their contracts are inspectable. The retired pattern capacities
+are optional in revisions 1–3 and required in revisions 4–6; revision 7
+replaces them with the required sequencer-group capacities. The later MIDI
+discovery fields and drum-kit identity follow their own versioned schemas.
+Unknown keys inside stable objects, missing required values and wrong types are
+startup errors. Required operational values must not reappear as consumer
+fallbacks.
 
 The schema owns structure. Python validation owns cross-field and musical
 invariants: unique synth and bus ownership, seven-note chord capacity,
-non-overlapping sequencer tag ranges, bus bounds, pattern capacity and known
+non-overlapping sequencer tag ranges, bus bounds, group capacity and known
 default synth references. Every error carries a JSON path. Validation finishes
 before serial, MIDI, socket or AMY resources are created.
 
@@ -31,7 +33,7 @@ before serial, MIDI, socket or AMY resources are created.
 - portable OSC UDP input;
 - voice and AMY runtime capacities;
 - synth, bus and sequencer-tag layout;
-- contiguous fill/chord/drum-base sequencer-pattern ownership;
+- contiguous fill/chord/drum-base sequencer-group ownership;
 - synth defaults, drum kit/gain/sample map, rhythm/performance timing;
 - synth programs/patches, optional balance levels and patch corrections;
 - debug settings;
@@ -91,6 +93,14 @@ consumers receive the frozen resolved section and have no fallback constants.
 A revision-6 user may omit the section or its address/port pair to make OSC an
 explicitly unconfigured capability; this opens no socket and shows no OSC tech
 item. Address and port must either both be present or both be absent.
+Revision 6 to 7 retires the experimental pattern vocabulary. It renames
+`rhythm.pattern_ranges` to `rhythm.group_ranges`, changes the zero-based
+pattern IDs into non-zero sequence-group tags, and renames the three capacity
+keys to `amy_max_sequence_groups`, `amy_max_sequence_group_tags` and
+`amy_max_sequence_group_executions`. The migrated execution capacity is raised
+from the former shipped 32 to 40, matching the exhaustive 34-execution rhythm
+overlap proof while retaining headroom. These are explicit migration rules,
+not consumer aliases; revision-7 runtime code knows only the group names.
 Because revision-1 full documents cannot distinguish that old default from an
 intentional diagnostic selection, a user who deliberately forced `linux` must
 reapply it after migration. Future and malformed revisions fail at

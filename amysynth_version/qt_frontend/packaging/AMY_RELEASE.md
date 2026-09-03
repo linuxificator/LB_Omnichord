@@ -3,11 +3,11 @@
 Status: authoritative external-component release contract
 Owner: AMY fork integration and five-platform packaging
 Applies to: native tests, desktop services, Android Oboe and ESP32-P4
-Last verified: 2026-09-01
+Last verified: 2026-09-03
 
 Every LB Omnichord build uses AMY from the fork release branch
-`releases/amy_omnichord_R20260901T201533` at exact commit
-`7c34aa514f10c33f02692f735166d65f4e20374a`.
+`releases/amy_omnichord_R20260903T201525` at exact commit
+`3462b266e4990ab6fa617bb8fa5c5ad8b43959d5`.
 
 The machine authority for those values is `release_inputs.json` beside this
 document. Workflows and the ESP32 preparation script load it through
@@ -41,11 +41,12 @@ used to silently select Tiny for Linux, Raspberry Pi, macOS, Windows or Android.
 
 1. Fetch `shorepine/amy` and fast-forward the fork's `main` to shorepine
    `main`; never merge feature work into fork `main`.
-2. Start the next `releases/amy_omnichord_R<YYYYMMDD>T<HHMMSS>` branch from the
-   preceding Omnichord release branch.
-3. Incorporate the verified new shorepine changes and required LB integration
-   work. Include the fork's internal `work/codex_info` handoff material only on
-   the internal release branch, never on a branch offered upstream.
+2. Complete and test generic work on its clean upstream-directed branch, with
+   no downstream project material on that branch.
+3. Start `releases/amy_omnichord_R<YYYYMMDD>T<HHMMSS>` from that clean commit,
+   then layer only the required socket, Android, PCM-bank and capacity profile.
+   Never merge abandoned experiments or internal handoff material into the
+   upstream-directed branch.
 4. Run the AMY native and platform tests, then update the branch and SHA
    together in `release_inputs.json`, this contract, and the platform docs.
    The workflow/static tests reject reintroducing copies of the active pin.

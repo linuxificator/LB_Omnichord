@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 6
+CURRENT_CONFIG_REVISION = 7
 JsonObject = dict[str, Any]
 
 
@@ -253,6 +253,57 @@ def _revision_five_to_six(data: JsonObject) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def _revision_six_to_seven(data: JsonObject) -> tuple[str, ...]:
+    """Rename the retired pattern API capacities to sequencer groups."""
+
+    rhythm = data.get("rhythm")
+    if not isinstance(rhythm, dict):
+        raise ConfigMigrationError(
+            "$.rhythm",
+            "must be an object before revision 6 can migrate",
+        )
+    pattern_ranges = rhythm.pop("pattern_ranges", None)
+    if not isinstance(pattern_ranges, dict):
+        raise ConfigMigrationError(
+            "$.rhythm.pattern_ranges",
+            "must be an object before revision 6 can migrate",
+        )
+    group_ranges: JsonObject = {}
+    for name in ("fills", "chords", "drum_bases"):
+        item = pattern_ranges.get(name)
+        if not isinstance(item, dict):
+            raise ConfigMigrationError(
+                f"$.rhythm.pattern_ranges.{name}",
+                "must be an object before revision 6 can migrate",
+            )
+        group_ranges[name] = {
+            "start": int(item["start"]) + 1,
+            "count": int(item["count"]),
+        }
+    rhythm["group_ranges"] = group_ranges
+
+    renamed = (
+        ("amy_max_patterns", "amy_max_sequence_groups"),
+        ("amy_max_pattern_tags", "amy_max_sequence_group_tags"),
+        ("amy_max_pattern_instances", "amy_max_sequence_group_executions"),
+    )
+    changed = ["$.rhythm.pattern_ranges", "$.rhythm.group_ranges"]
+    for old_name, new_name in renamed:
+        if old_name not in data:
+            raise ConfigMigrationError(
+                f"$.{old_name}",
+                "must be present before revision 6 can migrate",
+            )
+        value = data.pop(old_name)
+        if new_name == "amy_max_sequence_group_executions":
+            value = max(40, int(value))
+        data[new_name] = value
+        changed.extend((f"$.{old_name}", f"$.{new_name}"))
+    data["config_revision"] = 7
+    changed.append("$.config_revision")
+    return tuple(changed)
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
@@ -263,6 +314,7 @@ MIGRATIONS: dict[int, Migration] = {
     3: _revision_three_to_four,
     4: _revision_four_to_five,
     5: _revision_five_to_six,
+    6: _revision_six_to_seven,
 }
 
 

@@ -145,7 +145,7 @@ component suites in parallel.
 Without `--suite`, the runner executes `unit`. The serial suite exercises the
 production `pyserial` writer through a Linux PTY. Native suites feed that same
 wire stream into the pinned LB Omnichord AMY release, started with 11 buses,
-336 oscillators and the nested-pattern capacities in `INSTALL.md`, and verify
+336 oscillators and the sequencer-group capacities in `INSTALL.md`, and verify
 resulting AMY synth state. A passing
 native test is therefore stronger than merely finding an expected command in
 the host log. See `../design/testing.md` for the complete local/CI inventory.

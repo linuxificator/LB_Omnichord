@@ -15,32 +15,36 @@ stored at 96 PPQ and every shipped event is exactly representable at AMY's
 
 At process startup the frontend validates the complete timing, continuation
 and selected-kit mapping, then authors every fill into AMY exactly once. Fill
-indexes 1..936 map to stored pattern IDs 0..935. IDs 936..999 are reserved for
-small automatic-chord one-shots and IDs 1000 and above for the currently active
-base-role loops. The integration
-profile therefore configures 1024 stored patterns, 64 events per pattern and
-32 active or pending instances. The shipped 270-fill library, and a future
+indexes 1..936 map directly to sequence-group tags 1..936. Tags 937..1000 are
+reserved for automatic-chord phrases and tags 1001..1024 for base percussion
+roles. The integration profile therefore configures 1024 stored groups, 64
+local events per group and 40 active or pending executions. The shipped
+270-fill library, and a future
 library of more than 700 fills, fit without creating hundreds of active
-players. Only the current base roles and the few one-shots that are actually
-sounding consume instance slots.
+players. Only base-role loops and phrases that are actually sounding consume
+execution slots.
 
-The chord bank holds separate `/1`, `/2`, `/3` and `/4` note-one-shot
-families. Each child contains one note-on and its normal note-off; whole chords
-use the same ownership model in a compact multi-note child. The complete
-catalogue needs at most 58 of the 64 reserved chord patterns. An exhaustive
-tick audit includes every overlapping chord child, the maximum current drum
-roles and one fill, and reaches 30 of the configured 32 instances.
+Each distinct velocity in the selected chord rhythm uses one phrase group.
+For an arpeggio that group contains every note-on and its matching note-off;
+for a block chord it contains all note-ons and the group release. `/1` through
+`/4`, direction, pitch and chord changes atomically publish a replacement
+revision under the same stable group tag. An execution which already started
+retains its old revision and therefore its original releases. No rate banks or
+host-side release timers are needed. An exhaustive tick audit includes every
+overlapping chord phrase, the maximum current drum roles and one fill, and
+reaches 34 of the configured 40 executions.
 
-Stored events use AMY's `zQE<pattern>,<tick>[,<period>[,<tag>]]<event>Z`
-operation. It carries the root sequencer's familiar tick/period/tag model
-inside the existing `zQ` extended-control family; LB does not use or require a
-separate top-level pattern-authoring command.
+Stored events extend AMY's normal ticks tuple with a group tag:
+`H<tick>,<period>,<local-tag>,<group-tag><event>Z`. A
+`zQ<group>,3,<length>,0Z` control atomically publishes the staged revision.
+Starts, stops and finite gates use the same `zQ` sequence-control family.
 
 The inherited tag semantics make `tick=0,period=0,tag=N` a clear operation,
 not a stored onset. LB therefore writes every tagged local-tick-zero event with
-the pattern length as its period. It fires once in a `ONE_SHOT` and once per
-cycle in a `LOOP`; tagged events at later local ticks use period zero. This
-applies equally to drum hits and the `zQM` controls embedded in fills.
+the group length as its period. It fires once in a one-shot execution and once
+per cycle in a looping execution; tagged events at later local ticks use period
+zero. This applies equally to drum hits and generic finite gate controls
+embedded in fills.
 
 These enlarged limits are wrapper configuration on the LB release branch for
 Python/local Unix, Windows, Android/Oboe and ESP32-P4. AMY's portable upstream
@@ -49,7 +53,8 @@ defaults remain deliberately smaller.
 ## Base rhythm
 
 Each logical percussion role in the selected activity level is authored as a
-separate AMY `LOOP` pattern and receives a stable instance tag. Splitting the
+separate indefinitely repeating AMY group and receives a stable execution tag.
+Splitting the
 roles is what makes per-fill suppression generic: AMY does not know that a tag
 means kick, hi-hat or another musical role.
 
@@ -74,11 +79,12 @@ lower `F1`..`F5` row is independent and multi-select:
 Fill density is stored as bars between launches and has the exact choices
 `/32`, `/16`, `/8`, `/6`, `/4`, `/3`, `/2`, `/1`. The frontend expands the
 selected fills and their allowed starts into the smallest finite supercycle.
-It installs that schedule with AMY root `zQA` events, relative to the next
-whole-bar boundary. AMY owns the musical clock; there is no host timer and no
-continuous stream of fill data.
+It installs that schedule as ordinary tagged root `H` events whose payload is
+a one-shot group start. Their absolute modulo periods keep live replacements
+on AMY's musical clock; there is no host timer, AMY-clock replica or continuous
+stream of fill data.
 
-Every fill is a `ONE_SHOT`. Its data-set duration covers whole beats, including
+Every fill starts as a one-shot group. Its data-set duration covers whole beats, including
 the silent lead-in or tail needed by a syncopated musical phrase. Suppression
 therefore begins at the chosen whole-beat launch and lasts for the complete
 stored duration.
@@ -86,17 +92,18 @@ stored duration.
 ## Continuation policy
 
 The data file `drum_fill_continuation_roles.json` is an LB Omnichord whitelist.
-When a fill is preloaded, LB adds a generic `zQM<instance-tag>,<duration>` event
-for every base role that is not on that fill's continuation list. AMY mutes
-only future onsets for that tagged loop; already-ringing audio is not cut off,
-the loop phase keeps advancing, and it resumes on the first tick after the
-fill. A whitelisted role which is absent from the current activity level is a
-no-op and is never introduced by the fill.
+When a fill is preloaded, LB adds a generic finite `sequence_control` gate for
+every base-role execution that is not on that fill's continuation list. AMY
+suppresses event dispatch for that tagged execution; already-ringing audio is
+not cut off, the loop phase keeps advancing, and dispatch resumes at its
+unchanged phase after the fill. A whitelisted role which is absent from the
+current activity level is a no-op and is never introduced by the fill.
 
 This is the intentional ownership boundary:
 
-- AMY implements stored one-shot/loop patterns, quantized trigger/stop,
-  root scheduling and tag-targeted finite onset muting;
+- AMY implements persistent groups, immutable execution revisions,
+  one/N/infinite repeats, quantized control, root scheduling and finite
+  payload-agnostic event gating;
 - LB Omnichord decides which drum role owns each tag and which roles continue
   for each fill.
 
@@ -137,8 +144,8 @@ they cover 13 tiny, 62 Gamma9001 and 24 General-MIDI realizations.
 ## Transport boundary
 
 Explicit Start is a clean run boundary. It sends
-`S(RESET_TIMEBASE|RESET_SEQUENCER)`; stored definitions survive, while frozen
-instances and old root triggers are removed. Reset is applied by AMY at an
+`S(RESET_TIMEBASE|RESET_SEQUENCER)`; stored definitions survive, while group
+executions and old root triggers are removed. Reset is applied by AMY at an
 audio-block boundary, so the host waits across several blocks before creating
 new instances. It then installs the current base loops immediately at tick
 zero, plus the fill schedule, bass and chords, and sends `zY1` last. The
@@ -178,7 +185,7 @@ whose output is byte-stable and compared with the complete existing mapping.
 
 Unit tests validate every catalogue entry, all kit mappings, exact complete
 activity-level selection, all 270 preloaded definitions, the 64-event limit,
-continuation mutes, fill-order supercycles and the 1024/64/32 integration
+continuation gates, fill-order supercycles and the 1024/64/40 integration
 profile. Serial and native suites additionally exercise the real wire path
 against the exact AMY release pinned in both workflows. The native cold-start
 gate renders real audio and requires the visible default level to become

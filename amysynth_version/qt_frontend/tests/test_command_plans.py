@@ -15,10 +15,10 @@ sys.path.insert(0, str(CODE))
 from amy_parameter_plan import compile_parameter_commands  # noqa: E402
 from rhythm_command_plan import (  # noqa: E402
     compile_bass_events,
-    compile_chord_pattern_plan,
-    compile_drum_activity_commands,
-    compile_fill_definition,
-    compile_fill_schedule_commands,
+    compile_chord_group_plan,
+    compile_drum_activity_groups,
+    compile_fill_group,
+    compile_fill_schedule,
     compile_tagged_lane,
 )
 
@@ -142,7 +142,7 @@ class PureCommandPlanTests(unittest.TestCase):
         )
 
     def test_chord_plan_owns_note_on_and_matching_release(self) -> None:
-        plan = compile_chord_pattern_plan(
+        plan = compile_chord_group_plan(
             config={
                 "length_beats": 4,
                 "chord_events": [{"time": 0, "amp": 0.8}],
@@ -156,23 +156,25 @@ class PureCommandPlanTests(unittest.TestCase):
             chord_notes=(60.0, 64.0),
             max_chord_notes=7,
             chord_gate_beats=0.5,
-            pattern_start=100,
-            pattern_count=20,
+            group_start=100,
+            group_count=20,
+            previous_tag_high_waters={},
             synth=4,
             ppq=48,
         )
         self.assertEqual(
-            plan.definitions[:4],
+            plan.definitions,
             (
-                "zQB103,13Z",
-                "zQE103,0,13,0n60l0.8i4Z",
-                "zQE103,12,0,1n60l0i4Z",
-                "zQC103Z",
+                "H0,37,0,100n60l0.8i4Z",
+                "H12,0,1,100n60l0i4Z",
+                "H24,0,2,100n64l0.8i4Z",
+                "H36,0,3,100n64l0i4Z",
+                "zQ100,3,37,0Z",
             ),
         )
         self.assertEqual(
             plan.triggers,
-            ((0, 192, "zQT103,0,0"), (24, 192, "zQT104,0,0")),
+            ((0, 192, "zQ100,1,1,0Z"),),
         )
 
     def test_bass_plan_supports_activity_and_riff_inputs(self) -> None:
@@ -233,44 +235,44 @@ class PureCommandPlanTests(unittest.TestCase):
             levels=((_Event(0, "kick", 127),),) * 5,
             fills=(fill,),
         )
-        self.assertEqual(
-            compile_drum_activity_commands(
-                rhythm=rhythm,
-                percussion_activity=1,
-                roles=("hat", "kick"),
-                pattern_start=10,
-                rhythm_running=True,
-                quantize_live=True,
-                hit_body=_hit_body,
-            ),
-            (
-                "zQS10,192Z",
-                "zQB11,192Z",
-                "zQE11,0,192,0ar1:kick:127Z",
-                "zQC11Z",
-                "zQT11,1,192,11Z",
-            ),
-        )
-        definition = compile_fill_definition(
-            rhythm_id="r1",
-            fill=fill,
-            pattern=30,
-            roles=("hat", "kick", "snare"),
-            role_indexes={"hat": 0, "kick": 1, "snare": 2},
-            drum_pattern_start=10,
+        drum_plan = compile_drum_activity_groups(
+            rhythm=rhythm,
+            percussion_activity=1,
+            roles=("hat", "kick"),
+            group_start=10,
+            previous_tag_high_waters={},
+            rhythm_running=True,
+            quantize_live=True,
             hit_body=_hit_body,
         )
         self.assertEqual(
-            definition,
+            drum_plan.commands,
             (
-                "zQB30,96Z",
-                "zQE30,0,96,0zQM11,96Z",
-                "zQE30,0,96,1zQM12,96Z",
-                "zQE30,0,96,2fr1:snare:100Z",
-                "zQC30Z",
+                "zQ10,0,0,192,10Z",
+                "H0,192,0,11ar1:kick:127Z",
+                "zQ11,3,192,0Z",
+                "zQ11,1,0,192,11Z",
             ),
         )
-        schedule = compile_fill_schedule_commands(
+        definition = compile_fill_group(
+            rhythm_id="r1",
+            fill=fill,
+            group=30,
+            roles=("hat", "kick", "snare"),
+            role_indexes={"hat": 0, "kick": 1, "snare": 2},
+            drum_group_start=10,
+            hit_body=_hit_body,
+        )
+        self.assertEqual(
+            definition.commands,
+            (
+                "H0,96,0,30zQ11,2,96,0,11Z",
+                "H0,96,1,30zQ12,2,96,0,12Z",
+                "H0,96,2,30fr1:snare:100Z",
+                "zQ30,3,96,0Z",
+            ),
+        )
+        schedule = compile_fill_schedule(
             fills=(fill,),
             order=(0,),
             density_bars=4,
@@ -278,13 +280,12 @@ class PureCommandPlanTests(unittest.TestCase):
             lane_start=40,
             lane_count=2,
             previous_high_water=2,
-            quantize_live=True,
-            pattern_id=lambda item: 29 + item.index,
+            group_tag=lambda item: 29 + item.index,
         )
         self.assertEqual(schedule.high_water, 2)
         self.assertEqual(
             schedule.commands,
-            ("zQA30,0,96,768,192,40Z", "H0,0,41Z"),
+            ("H96,768,40zQ30,1,1,0Z", "H0,0,41Z"),
         )
 
 

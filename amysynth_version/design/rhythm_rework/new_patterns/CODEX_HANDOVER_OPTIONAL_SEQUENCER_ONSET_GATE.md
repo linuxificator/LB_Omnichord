@@ -2,8 +2,16 @@
 
 ## Status and scope
 
-This is an optional future route. It is not implemented and it is not required
-by the current LB Omnichord rhythm implementation.
+Historical note, superseded for current implementation details by
+`../../sequencer_groups.md`. The optional future idea here is an explicit
+indefinite gate-on/gate-off state. It is not implemented and is not required by
+the current LB Omnichord rhythm implementation.
+
+Finite payload-agnostic event gating is now implemented by the generic AMY
+sequence-control action `zQ<group>,2,<duration>,<quantize>,<execution-tag>Z`.
+The old `zQM` pattern command, pattern-instance terminology and disjoint
+arpeggio pattern banks described below are retained only as design history and
+must not be used by current code.
 
 The current application already solves automatic-chord/arpeggio lifetime with
 short immutable AMY `ONE_SHOT` children. Every sounding child owns its note-on

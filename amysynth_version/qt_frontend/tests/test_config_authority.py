@@ -30,9 +30,9 @@ REQUIRED_SECTIONS = {
     "midi_player",
     "midi_input",
     "amy_max_oscs",
-    "amy_max_patterns",
-    "amy_max_pattern_tags",
-    "amy_max_pattern_instances",
+    "amy_max_sequence_groups",
+    "amy_max_sequence_group_tags",
+    "amy_max_sequence_group_executions",
     "amy_max_buses",
 }
 
@@ -85,16 +85,16 @@ class ConfigAuthorityTests(unittest.TestCase):
                     offenders.append(f"{name}:{node.lineno}:{node.args[0].value}")
         self.assertEqual(offenders, [])
 
-    def test_pattern_layout_has_one_runtime_owner_and_independent_oracle(self) -> None:
+    def test_group_layout_has_one_runtime_owner_and_independent_oracle(self) -> None:
         config = json.loads(
             (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
         )
         self.assertEqual(
-            config["rhythm"]["pattern_ranges"],
+            config["rhythm"]["group_ranges"],
             {
-                "fills": {"start": 0, "count": 936},
-                "chords": {"start": 936, "count": 64},
-                "drum_bases": {"start": 1000, "count": 24},
+                "fills": {"start": 1, "count": 936},
+                "chords": {"start": 937, "count": 64},
+                "drum_bases": {"start": 1001, "count": 24},
             },
         )
         transport = (CODE / "amy_transport.py").read_text(encoding="utf-8")
@@ -103,6 +103,7 @@ class ConfigAuthorityTests(unittest.TestCase):
             "CHORD_PATTERN_CAPACITY",
             "DRUM_BASE_PATTERN_START",
             "DRUM_PATTERN_CAPACITY",
+            "_pattern_ranges",
         ):
             self.assertNotIn(obsolete, transport)
 

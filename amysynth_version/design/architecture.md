@@ -145,13 +145,18 @@ is opened, written and closed by the same worker; a timed-out close never
 closes a resource still used by a live worker. Debug logging is a separate
 bounded, non-blocking queue with one rotated predecessor and visible loss.
 
-Delayed work has three explicit timing owners. AMY sequencer/pattern commands
+Delayed work has three explicit timing owners. AMY sequencer-group commands
 own beat-accurate rhythm and arpeggio time. Qt `QTimer` owns presentation and
 UI feedback in the QObject thread. Remaining host note-release/tail callbacks
 use one bounded monotonic application scheduler shared by OMNI and MIDI; no
 user event creates a new timer thread. Transport `delay` records are only
 ordered device/reset allocation guards on the existing writer worker, not a
 second application timer service.
+
+Persistent phrase execution follows the stricter ownership contract in
+`sequencer_groups.md`: the frontend neither mirrors AMY's sequencer clock nor
+owns group execution revisions, repeat completion, phrase releases or finite
+gate expiry.
 
 Tuning, active-chord identity and live-performance context cross the OMNI/MIDI
 boundary only as frozen values from `musical_state.py`. That pure module owns

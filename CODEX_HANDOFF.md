@@ -1,6 +1,6 @@
 # Codex session handoff — AMY/LB Omnichord state and code-quality audit
 
-Updated: 2026-09-02.
+Updated: 2026-09-03.
 
 This file is intentionally written for future Codex sessions. It records the
 working state, decisions, lessons learned and branch/release discipline from
@@ -8,6 +8,38 @@ the AMY socket, Android, nested-sequencer, rhythm-fill, Gamma9001 and release
 automation work. It supplements `AGENTS.md` and the authoritative design
 contracts under `amysynth_version/design/`; it does not override either of
 them or the current user's request.
+
+## 2026-09-03 sequencer-group rework supersedes the old pattern design
+
+The active implementation no longer uses the nested-pattern wire API described
+later in this historical handoff. Treat the old `zQB`/`zQE`/`zQC`/`zQT`/
+`zQA`/`zQS`/`zQM`/`zQR`, pattern-bank and one-child-per-arpeggio-note sections
+as regression history only.
+
+The clean upstream-directed AMY branch is `rework/sequencer` at
+`109852803bd1385100448e49965dff949d3ba5dd`. It extends the existing `H` tuple
+with an optional fourth group tag and adds one generic sequence-control family,
+`zQ<group>,<action>,<value>,<quantize>[,<execution-tag>]Z`. Groups support
+atomic immutable revisions, one/N/infinite execution, quantized start/stop,
+one level of nesting and finite payload-agnostic event gating. Existing root
+sequencer behavior remains unchanged and is covered by compatibility tests.
+
+The Omnichord integration release is
+`releases/amy_omnichord_R20260903T201525` at
+`3462b266e4990ab6fa617bb8fa5c5ad8b43959d5`. It layers the already-maintained
+socket, Android/Oboe, Gamma9001 and offline-render support plus the explicit
+11-bus/336-oscillator and 1024-group/64-local-tag/40-execution profile. The
+abandoned bus-mixer experiment is not included. ESP32-P4 validation is
+deliberately deferred for this rework.
+
+LB branch `rework/sequencer` uses only AMY wire commands. It preloads fills as
+groups, runs each base drum role as a stable loop execution, and publishes each
+complete chord/arpeggio phrase as one immutable group revision. Musical role
+ownership and fill continuation policy remain in LB; AMY receives only generic
+group operations. The current authoritative contracts are
+`amysynth_version/design/sequencer_groups.md`,
+`amysynth_version/qt_frontend/docs/SEQUENCER_TAGS.md` and
+`amysynth_version/qt_frontend/docs/RHYTHM_PATTERNS.md`.
 
 The branch intended for analysis/continuation is `rework/code_quality` in
 `linuxificator/LB_Omnichord`. T01-T25 and package slimming were merged to

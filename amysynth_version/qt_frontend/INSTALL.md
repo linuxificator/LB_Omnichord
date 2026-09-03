@@ -149,7 +149,7 @@ Start both processes with:
 ./run_local.sh --windowed
 ```
 
-Install the pinned nested-sequencer/Gamma9001 AMY release into the environment
+Install the pinned sequencer-group/Gamma9001 AMY release into the environment
 used by the service. The Qt process remains independent of AMY.
 `OMNICHORD_VENV` can override the launcher's
 default `../omnichord-env`; `OMNICHORD_AMY_SOCKET` can override
@@ -301,8 +301,8 @@ $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 ```
 
 The zip and checksum are written below `dist`. The release workflow pins both
-AMY fork branch `releases/amy_omnichord_R20260901T201533` and commit
-`7c34aa514f10c33f02692f735166d65f4e20374a`; local release candidates must use
+AMY fork branch `releases/amy_omnichord_R20260903T201525` and commit
+`3462b266e4990ab6fa617bb8fa5c5ad8b43959d5`; local release candidates must use
 that exact commit unless the shared release contract and its compatibility
 tests are deliberately updated together.
 
@@ -357,9 +357,9 @@ python tests/run_tests.py --suite all
 The command without `--suite` runs all automatically discovered unit tests.
 `all` additionally needs Linux PTY/local-socket support, PySide6, pyserial and
 the pinned LB Omnichord AMY release. Native suites start AMY with 11 buses, 336
-oscillators, 1024 stored patterns, 64 events per pattern and 32 active pattern
-instances. Run `./prepare_local_amy.sh` first when that release is not
-installed. The full suite and CI layout is documented in
+oscillators, 1024 stored sequence groups, 64 local events per group and 40
+active or pending group executions. Run `./prepare_local_amy.sh` first when
+that release is not installed. The full suite and CI layout is documented in
 `../design/testing.md`.
 
 ## Install a released Linux x86_64 AppImage

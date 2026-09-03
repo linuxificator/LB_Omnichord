@@ -82,9 +82,9 @@ class VoiceCapacities:
 @dataclass(frozen=True, slots=True)
 class RuntimeCapacities:
     max_oscs: int
-    max_patterns: int
-    max_pattern_tags: int
-    max_pattern_instances: int
+    max_sequence_groups: int
+    max_sequence_group_tags: int
+    max_sequence_group_executions: int
     max_buses: int
     voices: VoiceCapacities
 
@@ -98,7 +98,7 @@ class SynthBusLayout:
     midi_row_buses: tuple[int, ...]
     midi_drum_bus: int
     sequencer_tag_ranges: tuple[tuple[str, int, int], ...]
-    sequencer_pattern_ranges: tuple[tuple[str, int, int], ...]
+    sequencer_group_ranges: tuple[tuple[str, int, int], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -408,40 +408,40 @@ def _domain_issues(data: JsonObject) -> list[ConfigIssue]:
             )
         occupied.update(current)
 
-    pattern_ranges = cast(dict[str, Any], rhythm["pattern_ranges"])
-    expected_start = 0
+    group_ranges = cast(dict[str, Any], rhythm["group_ranges"])
+    expected_start = 1
     for name in ("fills", "chords", "drum_bases"):
-        item = cast(dict[str, Any], pattern_ranges[name])
+        item = cast(dict[str, Any], group_ranges[name])
         start = int(item["start"])
         count = int(item["count"])
         if start != expected_start:
             issues.append(
                 ConfigIssue(
-                    f"$.rhythm.pattern_ranges.{name}.start",
-                    f"must be {expected_start} so pattern ranges are contiguous",
+                    f"$.rhythm.group_ranges.{name}.start",
+                    f"must be {expected_start} so group ranges are contiguous",
                 )
             )
         expected_start = start + count
-    if expected_start != int(data["amy_max_patterns"]):
+    if expected_start != int(data["amy_max_sequence_groups"]) + 1:
         issues.append(
             ConfigIssue(
-                "$.amy_max_patterns",
-                "must equal the end of rhythm.pattern_ranges.drum_bases",
+                "$.amy_max_sequence_groups",
+                "must equal the number of addressable rhythm groups",
             )
         )
 
-    if int(data["amy_max_pattern_tags"]) < 64:
+    if int(data["amy_max_sequence_group_tags"]) < 64:
         issues.append(
             ConfigIssue(
-                "$.amy_max_pattern_tags",
-                "must be at least 64 for the largest authored one-shot pattern",
+                "$.amy_max_sequence_group_tags",
+                "must be at least 64 for the largest authored sequence group",
             )
         )
-    if int(data["amy_max_pattern_instances"]) < 32:
+    if int(data["amy_max_sequence_group_executions"]) < 34:
         issues.append(
             ConfigIssue(
-                "$.amy_max_pattern_instances",
-                "must be at least 32 for the characterized worst-case rhythm",
+                "$.amy_max_sequence_group_executions",
+                "must be at least 34 for the characterized worst-case rhythm",
             )
         )
 
@@ -550,7 +550,7 @@ def _to_resolved(
     buses = cast(dict[str, Any], data["buses"])
     rhythm = cast(dict[str, Any], data["rhythm"])
     tag_ranges = cast(dict[str, Any], rhythm["tag_ranges"])
-    pattern_ranges = cast(dict[str, Any], rhythm["pattern_ranges"])
+    group_ranges = cast(dict[str, Any], rhythm["group_ranges"])
     debug = cast(dict[str, Any], data["debug"])
     defaults = cast(dict[str, Any], data["default_synths"])
     drums = cast(dict[str, Any], data["drums"])
@@ -599,9 +599,11 @@ def _to_resolved(
         ),
         capacities=RuntimeCapacities(
             max_oscs=int(data["amy_max_oscs"]),
-            max_patterns=int(data["amy_max_patterns"]),
-            max_pattern_tags=int(data["amy_max_pattern_tags"]),
-            max_pattern_instances=int(data["amy_max_pattern_instances"]),
+            max_sequence_groups=int(data["amy_max_sequence_groups"]),
+            max_sequence_group_tags=int(data["amy_max_sequence_group_tags"]),
+            max_sequence_group_executions=int(
+                data["amy_max_sequence_group_executions"]
+            ),
             max_buses=int(data["amy_max_buses"]),
             voices=VoiceCapacities(
                 drums=int(voices["drums"]),
@@ -630,11 +632,11 @@ def _to_resolved(
                 )
                 for name in ("drums", "bass", "chords")
             ),
-            sequencer_pattern_ranges=tuple(
+            sequencer_group_ranges=tuple(
                 (
                     name,
-                    int(cast(dict[str, Any], pattern_ranges[name])["start"]),
-                    int(cast(dict[str, Any], pattern_ranges[name])["count"]),
+                    int(cast(dict[str, Any], group_ranges[name])["start"]),
+                    int(cast(dict[str, Any], group_ranges[name])["count"]),
                 )
                 for name in ("fills", "chords", "drum_bases")
             ),

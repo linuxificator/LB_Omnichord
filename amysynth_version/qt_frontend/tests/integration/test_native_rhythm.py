@@ -8,21 +8,21 @@ from catalog import control_default, patch_for_index, synth_index
 from harness import HeadlessApp
 
 
-CHORD_PATTERN_START = 936
-DRUM_BASE_PATTERN_START = 1000
+CHORD_GROUP_START = 937
+DRUM_BASE_GROUP_START = 1001
 
 
 def is_chord_trigger(line: str) -> bool:
     match = re.match(
-        r"^H\d+,\d+,(?P<tag>\d+)zQT(?P<pattern>\d+),0,0Z$",
+        r"^H\d+,\d+,(?P<tag>\d+)zQ(?P<group>\d+),1,1,0Z$",
         line,
     )
     return bool(
         match
         and 112 <= int(match.group("tag")) < 252
-        and CHORD_PATTERN_START
-        <= int(match.group("pattern"))
-        < DRUM_BASE_PATTERN_START
+        and CHORD_GROUP_START
+        <= int(match.group("group"))
+        < DRUM_BASE_GROUP_START
     )
 
 
@@ -63,10 +63,14 @@ class NativeRhythmTests(unittest.TestCase):
             produced_audio = app.bridge.render_until_audio(1.0)
 
             lines = app.bridge.lines_since(start)
-            triggers = [line for line in lines if line.startswith("zQT")]
+            triggers = [
+                line
+                for line in lines
+                if re.match(r"^zQ\d+,1,0,\d+,\d+Z$", line)
+            ]
             self.assertTrue(triggers, "cold Start authored no drum loop trigger")
             self.assertTrue(
-                all(line.split(",")[2] == "0" for line in triggers),
+                all(line.split(",")[3] == "0" for line in triggers),
                 "cold Start delayed the visible percussion level by a bar",
             )
             self.assertTrue(
