@@ -9,8 +9,8 @@ from harness import HeadlessApp
 
 
 _NOTE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
-CHORD_PATTERN_START = 936
-DRUM_BASE_PATTERN_START = 1000
+CHORD_GROUP_START = 937
+DRUM_BASE_GROUP_START = 1001
 
 
 def wire_float(value: float) -> str:
@@ -22,49 +22,44 @@ def scheduled_note_ons(lines: list[str], synth: int) -> list[float]:
         rf"^H\d+,\d+,\d+n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
     )
     definition_pattern = re.compile(
-        rf"^zQE(?P<pattern>\d+),\d+,\d+,\d+"
+        rf"^H\d+,\d+,\d+,(?P<group>\d+)"
         rf"n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
     )
     trigger_pattern = re.compile(
-        r"^H\d+,\d+,\d+zQT(?P<pattern>\d+),0,0Z$"
+        r"^H\d+,\d+,\d+zQ(?P<group>\d+),1,1,0Z$"
     )
-    begin_pattern = re.compile(r"^zQB(?P<pattern>\d+),\d+Z$")
     definitions: dict[int, list[float]] = {}
     notes: list[float] = []
     for line in lines:
-        match = begin_pattern.match(line)
-        if match:
-            definitions[int(match.group("pattern"))] = []
-            continue
         match = direct_pattern.match(line)
         if match and float(match.group("vel")) > 0.0:
             notes.append(float(match.group("note")))
             continue
         match = definition_pattern.match(line)
         if match and float(match.group("vel")) > 0.0:
-            definitions.setdefault(int(match.group("pattern")), []).append(
+            definitions.setdefault(int(match.group("group")), []).append(
                 float(match.group("note"))
             )
         match = trigger_pattern.match(line)
         if match:
-            notes.extend(definitions.get(int(match.group("pattern")), []))
+            notes.extend(definitions.get(int(match.group("group")), []))
     return notes
 
 
 def chord_trigger(line: str) -> tuple[int, int] | None:
     match = re.match(
-        r"^H\d+,\d+,(?P<tag>\d+)zQT(?P<pattern>\d+),0,0Z$",
+        r"^H\d+,\d+,(?P<tag>\d+)zQ(?P<group>\d+),1,1,0Z$",
         line,
     )
     if match is None:
         return None
     tag = int(match.group("tag"))
-    pattern = int(match.group("pattern"))
+    group = int(match.group("group"))
     if not 112 <= tag < 252:
         return None
-    if not CHORD_PATTERN_START <= pattern < DRUM_BASE_PATTERN_START:
+    if not CHORD_GROUP_START <= group < DRUM_BASE_GROUP_START:
         return None
-    return tag, pattern
+    return tag, group
 
 
 def immediate_note_ons(lines: list[str], synth: int) -> list[float]:
@@ -109,15 +104,15 @@ class SerialIntegrationTests(unittest.TestCase):
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=12.0)
             startup = app.bridge.lines_since(0)
-            self.assertIn("zQB0,48Z", startup)
+            self.assertIn("zQ1,3,48,0Z", startup)
             self.assertTrue(
-                any(line.startswith("zQB269,") for line in startup),
+                any(line.startswith("zQ270,3,") for line in startup),
                 "last fill definition was not preloaded",
             )
             self.assertEqual(
                 sum(
-                    line.startswith("zQC")
-                    and int(line[3:-1]) < 1000
+                    (match := re.match(r"^zQ(\d+),3,", line)) is not None
+                    and int(match.group(1)) < 1001
                     for line in startup
                 ),
                 270,
@@ -126,17 +121,19 @@ class SerialIntegrationTests(unittest.TestCase):
             fill_start = app.bridge.count()
             app.action("toggleRhythmFill", 0)
             app.bridge.wait_for_line_match(
-                lambda line: line.startswith("zQA"),
+                lambda line: line.startswith("H") and "zQ" in line,
                 "updated fill root schedule",
                 start=fill_start,
                 timeout=8.0,
             )
             app.bridge.wait_idle(timeout=8.0)
             fill_lines = app.bridge.lines_since(fill_start)
-            self.assertTrue(any(line.startswith("zQA") for line in fill_lines))
+            self.assertTrue(
+                any(line.startswith("H") and "zQ" in line for line in fill_lines)
+            )
             self.assertFalse(
                 any(
-                    line.startswith(("zQB", "zQE", "zQC"))
+                    re.match(r"^H\d+,\d+,\d+,[1-9]\d*", line)
                     for line in fill_lines
                 ),
                 "fill selection resent its stored event block",
@@ -145,21 +142,23 @@ class SerialIntegrationTests(unittest.TestCase):
             activity_start = app.bridge.count()
             app.action("setRhythmBusyness", 5.0)
             app.bridge.wait_for_line_match(
-                lambda line: line.startswith("zQB10"),
-                "replacement base-drum pattern definition",
+                lambda line: line.startswith("zQ100") and ",3," in line,
+                "replacement base-drum group definition",
                 start=activity_start,
                 timeout=8.0,
             )
             app.bridge.wait_idle(timeout=8.0)
             activity_lines = app.bridge.lines_since(activity_start)
-            self.assertTrue(any(line.startswith("zQB10") for line in activity_lines))
             self.assertTrue(
-                any(line.startswith("zQE10") for line in activity_lines)
+                any(line.startswith("zQ100") and ",3," in line for line in activity_lines)
+            )
+            self.assertTrue(
+                any(re.match(r"^H\d+,\d+,\d+,100\d", line) for line in activity_lines)
             )
             self.assertFalse(
                 any(
-                    line.startswith("zQB")
-                    and int(line[3:].split(",", 1)[0]) < 1000
+                    (match := re.match(r"^zQ(\d+),3,", line)) is not None
+                    and int(match.group(1)) < 937
                     for line in activity_lines
                 ),
                 "activity change rebuilt a preloaded fill",
@@ -851,13 +850,14 @@ class SerialIntegrationTests(unittest.TestCase):
     def test_arpeggio_rate_switch_keeps_running_note_gate_owned_by_old_rate(
         self,
     ) -> None:
-        """A /2 child keeps its 17-tick off when future triggers become /4."""
-        begin_pattern = re.compile(r"^zQB(?P<pattern>\d+),(?P<length>\d+)Z$")
+        """Rate changes atomically publish a new revision of the same group."""
+        publish_group = re.compile(
+            r"^zQ(?P<group>\d+),3,(?P<length>\d+),0Z$"
+        )
         off_pattern = re.compile(
-            rf"^zQE(?P<pattern>\d+),(?P<tick>\d+),0,1"
+            rf"^H(?P<tick>\d+),0,\d+,(?P<group>\d+)"
             rf"n(?P<note>{_NOTE})l0i4Z$"
         )
-        any_definition = re.compile(r"^zQ[BEC](?P<pattern>\d+)")
 
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=10.0)
@@ -885,25 +885,29 @@ class SerialIntegrationTests(unittest.TestCase):
             )
             app.bridge.wait_idle(timeout=10.0)
             rate2_lines = app.bridge.lines_since(rate2_start)
-            rate2_patterns = {
-                int(match.group("pattern"))
+            rate2_groups = {
+                int(match.group("group"))
                 for line in rate2_lines
-                if (match := begin_pattern.match(line)) is not None
-                and int(match.group("length")) == 18
+                if (match := publish_group.match(line)) is not None
+                and int(match.group("length")) == 162
             }
             rate2_offs = {
-                int(match.group("pattern")): float(match.group("note"))
+                (int(match.group("group")), int(match.group("tick"))): float(
+                    match.group("note")
+                )
                 for line in rate2_lines
                 if (match := off_pattern.match(line)) is not None
-                and int(match.group("tick")) == 17
             }
             rate2_triggers = {
                 trigger[1]
                 for line in rate2_lines
                 if (trigger := chord_trigger(line)) is not None
             }
-            self.assertEqual(rate2_patterns, set(rate2_offs))
-            self.assertTrue(rate2_triggers <= rate2_patterns)
+            self.assertEqual(rate2_groups, rate2_triggers)
+            self.assertTrue(
+                all(group in rate2_groups for group, _tick in rate2_offs)
+            )
+            self.assertIn((937, 161), rate2_offs)
             self.assertGreaterEqual(len(set(rate2_offs.values())), 7)
 
             rate4_start = app.bridge.count()
@@ -916,32 +920,32 @@ class SerialIntegrationTests(unittest.TestCase):
             )
             app.bridge.wait_idle(timeout=10.0)
             rate4_lines = app.bridge.lines_since(rate4_start)
-            rate4_patterns = {
-                int(match.group("pattern"))
+            rate4_groups = {
+                int(match.group("group"))
                 for line in rate4_lines
-                if (match := begin_pattern.match(line)) is not None
-                and int(match.group("length")) == 10
+                if (match := publish_group.match(line)) is not None
+                and int(match.group("length")) == 82
             }
             rate4_offs = {
-                int(match.group("pattern")): float(match.group("note"))
+                (int(match.group("group")), int(match.group("tick"))): float(
+                    match.group("note")
+                )
                 for line in rate4_lines
                 if (match := off_pattern.match(line)) is not None
-                and int(match.group("tick")) == 9
             }
             rate4_triggers = {
                 trigger[1]
                 for line in rate4_lines
                 if (trigger := chord_trigger(line)) is not None
             }
-            self.assertEqual(rate4_patterns, set(rate4_offs))
-            self.assertTrue(rate4_triggers <= rate4_patterns)
-            self.assertTrue(rate2_patterns.isdisjoint(rate4_patterns))
-            rewritten_patterns = {
-                int(match.group("pattern"))
-                for line in rate4_lines
-                if (match := any_definition.match(line)) is not None
-            }
-            self.assertFalse(rate2_patterns & rewritten_patterns)
+            self.assertEqual(rate4_groups, rate4_triggers)
+            self.assertTrue(
+                all(group in rate4_groups for group, _tick in rate4_offs)
+            )
+            self.assertIn((937, 81), rate4_offs)
+            # Group identity is stable. AMY's immutable revisions, covered by
+            # its native tests, let already-running /2 notes retain releases.
+            self.assertEqual(rate2_groups, rate4_groups)
             self.assertNotIn("l0i4Z", rate4_lines)
             self.assertNotIn("zY0Z", rate4_lines)
             self.assertNotIn("zY1Z", rate4_lines)
