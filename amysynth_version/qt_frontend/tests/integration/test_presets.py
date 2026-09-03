@@ -11,13 +11,13 @@ from harness import HeadlessApp
 
 def chord_child_note(line: str, expected_note: float) -> bool:
     match = re.match(
-        r"^zQE(?P<pattern>\d+),\d+,\d+,\d+"
+        r"^H\d+,\d+,\d+,(?P<group>\d+)"
         r"n(?P<note>[-+]?\d+(?:\.\d+)?)l(?P<velocity>[-+]?\d+(?:\.\d+)?)i4Z$",
         line,
     )
     return bool(
         match
-        and 936 <= int(match.group("pattern")) < 1000
+        and 937 <= int(match.group("group")) < 1001
         and float(match.group("velocity")) > 0.0
         and abs(float(match.group("note")) - expected_note) < 1e-6
     )
@@ -694,13 +694,15 @@ class PresetIntegrationTests(unittest.TestCase):
 
             self.assertTrue(
                 any(
-                    line.startswith("zQE") and "i0Z" in line
+                    line.startswith("H")
+                    and re.match(r"^H\d+,\d+,\d+,1\d{3}", line)
+                    and "i0Z" in line
                     for line in switched
                 ),
                 "live style switch did not author nested drum events",
             )
             self.assertTrue(
-                any(line.startswith("zQT") for line in switched),
+                any(re.match(r"^zQ1\d{3},1,0,", line) for line in switched),
                 "live style switch did not quantize new drum role loops",
             )
 
@@ -810,7 +812,7 @@ class PresetIntegrationTests(unittest.TestCase):
             )
             self.assertTrue(
                 any(
-                    line.startswith("H") and "zQT" in line
+                    line.startswith("H") and re.search(r"zQ\d+,1,1,0Z$", line)
                     for line in switched
                 ),
                 "running preset switch installed no chord child triggers",
