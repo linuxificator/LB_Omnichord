@@ -83,7 +83,8 @@ class PackageSizePolicyTests(unittest.TestCase):
             tuple(manifest["source_qml_imports"]),
         )
         self.assertEqual(manifest["quick_controls_style"], "Basic")
-        self.assertIn("PySide6.QtWidgets", manifest["python_modules"])
+        self.assertNotIn("PySide6.QtTest", manifest["python_modules"])
+        self.assertNotIn("PySide6.QtWidgets", manifest["python_modules"])
         self.assertIn("QtQuick/Controls/Basic", manifest["qml_modules"])
         self.assertNotIn("QtQuick/Controls/Material", manifest["qml_modules"])
 

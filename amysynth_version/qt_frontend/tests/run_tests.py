@@ -30,7 +30,6 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
     "platform-input-linux": (
         TESTS / "platform" / "linux" / "test_midi_input.py",
-        TESTS / "platform" / "linux" / "test_source_package_smoke.py",
     ),
     "frontend": (
         TESTS / "integration" / "test_frontend.py",

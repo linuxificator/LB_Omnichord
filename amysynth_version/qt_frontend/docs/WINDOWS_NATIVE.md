@@ -150,7 +150,7 @@ settings must not be copied without measuring Windows device behavior.
    GitHub's hosted runner covers offline PCM rendering and packaged process/
    socket/QML startup, but is not evidence of audible device output.
 
-## Windows package smoke test
+## Windows package acceptance
 
 The desktop release workflow has a dedicated `testing/windows_smoke` push path.
 On that branch it runs the Windows package job independently; the shared Linux
@@ -160,40 +160,34 @@ that branch. On `main`, the shared regression matrix is again mandatory and the
 exact same Windows validation participates in the complete gated release as
 before.
 
-Validation uses only files extracted from the final zip:
+Validation uses only files extracted from the final zip, while all test
+decisions stay outside that zip:
 
-1. `amy_service.exe --self-test` initializes native AMY without an audio device,
-   sends real wire note-on/off commands, renders PCM blocks and requires
-   non-silent output.
-2. `LB_Omnichord.cmd -SmokeTest` exercises the same user-facing wrapper that is
-   double-clicked after extraction. It starts `run_windows.ps1` with a
-   process-only execution-policy bypass; the supervisor starts the separate
-   service with offline rendering and one-client lifetime, then the frozen Qt
-   executable with its offscreen/software renderer.
-3. The frontend must load the packaged QML/assets, connect through the native
-   Windows named pipe, publish initial state, send quick-tap and framework-long-
-   press pointer events through a real QML chord key, observe its active border
-   and release both manual chords successfully.
-4. The service must report both received wire commands and nonzero rendered PCM,
-   exit after disconnect, and leave no process or ready file behind.
+1. The workflow runs the shared independent-process MIDI/OSC contract.
+2. `LB_Omnichord.cmd -Windowed -CaptureScreenshotsDir ...` exercises the same
+   user-facing wrapper that is double-clicked after extraction. Screenshot
+   capture is a supported application tool, not a hidden test mode.
+3. The wrapper starts the separate native service with ordinary offline and
+   one-client lifecycle options. The frozen frontend loads packaged QML/assets,
+   connects through the named pipe, publishes state and renders OMNI and MIDI
+   PNGs.
+4. The service reports received wire commands and nonzero rendered PCM, exits
+   after disconnect and leaves no process or ready file behind.
+5. The test-only `package_evidence.py` validates the package audit, QML
+   inventory, process-contract log, service/application log and PNG signatures,
+   then emits one machine-readable evidence manifest.
 
 Frozen frontend assets are resolved from PyInstaller's bundle root
 (`sys._MEIPASS`). Deriving their location from the source-tree parent of
 `app_core.py` is incorrect for the Windows `--onedir` layout, where that would
 skip the packaged `config`, `gui`, `instruments` and `music` directories.
 
-This smoke path deliberately does not substitute a mock transport or import AMY
-into the frontend. It verifies the packaged two-process boundary and the QML
-pointer path while avoiding an unreliable dependency on audio hardware in a
-hosted CI runner. Synthesized Qt pointer events still do not prove a physical
-mouse, trackpad or touchscreen.
-
-The successful four-platform run above observed 6,140 nonzero samples in the
-service's standalone offline self-test. Its packaged end-to-end smoke delivered
-209 real wire commands through the named pipe and observed 13,138 nonzero
-rendered samples. These counts are evidence for that run, not fixed golden
-values. The current smoke proves that PCM rendering is non-silent; it does not
-yet identify every Gamma9001 drum sample acoustically.
+This acceptance path does not substitute a mock transport or import AMY into
+the frontend. It verifies the packaged two-process boundary and rendered QML
+while avoiding an unreliable dependency on audio hardware in a hosted runner.
+Source-level Qt gesture tests cover mouse and touch semantics; this hosted
+Windows package job does not claim a physical mouse, trackpad, touchscreen or
+audible output.
 
 `WSL_APPIMAGE_TESTING.md` remains only an optional experiment for the Linux
 artifact, not the Windows implementation plan or release gate.

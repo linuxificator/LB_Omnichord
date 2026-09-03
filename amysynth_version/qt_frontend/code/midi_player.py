@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import threading
 import time
 from pathlib import Path
@@ -461,8 +460,6 @@ class MidiPlayerBackend(QObject):
         self._binding_version = 0
         self._applying_midi_control = 0
         self._held_midi_button_targets: set[str] = set()
-        raw_cc_log = os.environ.get("OMNICHORD_TEST_MIDI_CC_LOG", "")
-        self._midi_cc_test_log = Path(raw_cc_log) if raw_cc_log else None
         self._queuedMidiInputEvent.connect(self._accept_midi_input_event)
         self._midi_input_event_relay = _QueuedMidiInputEventRelay(self._queuedMidiInputEvent.emit)
         self._last_midi_input_sequence = 0
@@ -537,10 +534,6 @@ class MidiPlayerBackend(QObject):
     def omniControlLedState(self) -> str:
         with self._midi_control_lock:
             return self._midi_control_state.omni_led_state()
-
-    @Property(bool, constant=True)
-    def testCcLogging(self) -> bool:
-        return self._midi_cc_test_log is not None
 
     @Property("QVariantList", constant=True)
     def synthNames(self) -> list[str]:
@@ -736,16 +729,6 @@ class MidiPlayerBackend(QObject):
             )
             if not changed or key is None:
                 return
-            self._write_cc_test_log(
-                {
-                    "event": "osc-change",
-                    "address": str(address),
-                    "argument": int(argument),
-                    "sourceType": self._midi_control_state.source_type(key),
-                    "clock": self._midi_control_state.clock,
-                    "mapped": target is not None,
-                }
-            )
             blue_cleared = (
                 was_blue and control_key not in self._midi_control_state.blue_since
             )
@@ -770,9 +753,6 @@ class MidiPlayerBackend(QObject):
         control_key = self._midi_control_state.key(channel, controller)
         with self._midi_control_lock:
             was_blue = control_key in self._midi_control_state.blue_since
-            before = {
-                (item["channel"], item["controller"]) for item in self._midi_control_state.controls
-            }
             changed, target, key = self._midi_control_state.observe(
                 channel,
                 controller,
@@ -781,22 +761,6 @@ class MidiPlayerBackend(QObject):
             )
             if not changed or key is None:
                 return
-            after = {
-                (item["channel"], item["controller"]) for item in self._midi_control_state.controls
-            }
-            evicted = next(iter(before - after), None)
-            self._write_cc_test_log(
-                {
-                    "event": "change",
-                    "channel": key[0],
-                    "controller": key[1],
-                    "clock": self._midi_control_state.clock,
-                    "capacity": self._midi_control_state.capacity,
-                    "count": len(self._midi_control_state.controls),
-                    "evicted": list(evicted) if evicted else None,
-                    "mapped": target is not None,
-                }
-            )
             blue_cleared = was_blue and control_key not in self._midi_control_state.blue_since
         if blue_cleared:
             self._sync_blue_timer()
@@ -822,15 +786,6 @@ class MidiPlayerBackend(QObject):
             )
             if not changed or key is None:
                 return
-            self._write_cc_test_log(
-                {
-                    "event": "button-change",
-                    "channel": key[0],
-                    "note": key[1] - NOTE_BUTTON_OFFSET,
-                    "clock": self._midi_control_state.clock,
-                    "mapped": target is not None,
-                }
-            )
             blue_cleared = was_blue and control_key not in self._midi_control_state.blue_since
         if blue_cleared:
             self._sync_blue_timer()
@@ -842,55 +797,6 @@ class MidiPlayerBackend(QObject):
                 self._apply_control_target(target, int(velocity), key)
         self._emit_binding_location_feedback(key, target)
 
-    def _write_cc_test_log(self, record: dict[str, Any]) -> None:
-        if getattr(self, "_midi_cc_test_log", None) is None:
-            return
-        with self._midi_cc_test_log.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record, separators=(",", ":")) + "\n")
-
-    @Slot(float, float, int, float, int, float)
-    def testLogControlIndicatorLayout(
-        self,
-        bar_x: float,
-        bar_width: float,
-        capacity: int,
-        row_width: float,
-        count: int,
-        last_right: float,
-    ) -> None:
-        with self._midi_control_lock:
-            self._write_cc_test_log(
-                {
-                    "event": "layout",
-                    "barX": float(bar_x),
-                    "barWidth": float(bar_width),
-                    "capacity": int(capacity),
-                    "rowWidth": float(row_width),
-                    "count": int(count),
-                    "lastRight": float(last_right),
-                }
-            )
-
-    @Slot("QVariantList")
-    def testLogControlIndicatorState(self, items: list[dict[str, Any]]) -> None:
-        if self._midi_cc_test_log is None:
-            return
-        self._write_cc_test_log(
-            {
-                "event": "indicator-state",
-                "items": [
-                    {
-                        "channel": int(item.get("channel", 0)),
-                        "controller": int(item.get("controller", -1)),
-                        "state": str(item.get("state", "idle")),
-                        "evicting": bool(item.get("evicting", False)),
-                    }
-                    for item in items
-                    if isinstance(item, dict)
-                ],
-            }
-        )
-
     @Slot(int)
     def setControlIndicatorCapacity(self, capacity: int) -> None:
         """Match the LRU pool to the number of indicators visible in QML."""
@@ -900,17 +806,6 @@ class MidiPlayerBackend(QObject):
 
     def _bump_binding_state(self) -> None:
         self._binding_version += 1
-        with self._midi_control_lock:
-            led_state = self._midi_control_state.omni_led_state()
-            bindings = len(self._midi_control_state.bindings)
-        self._write_cc_test_log(
-            {
-                "event": "binding-state",
-                "version": self._binding_version,
-                "omniLed": led_state,
-                "bindings": bindings,
-            }
-        )
         self.bindingStateChanged.emit()
 
     def _sync_blue_timer(self) -> None:
@@ -926,7 +821,6 @@ class MidiPlayerBackend(QObject):
             changed = self._midi_control_state.expire_blue()
         self._sync_blue_timer()
         if changed:
-            self._write_cc_test_log({"event": "blue-expired"})
             self._bump_binding_state()
 
     def _sync_preset_feedback_timer(self) -> None:
@@ -942,7 +836,6 @@ class MidiPlayerBackend(QObject):
             changed = self._midi_control_state.expire_preset_feedback()
         self._sync_preset_feedback_timer()
         if changed:
-            self._write_cc_test_log({"event": "preset-feedback-expired"})
             self._bump_binding_state()
 
     def _definition_for_target(
@@ -1285,15 +1178,6 @@ class MidiPlayerBackend(QObject):
         elif kind == "bass_riff_selector":
             self._apply_midi_setter(self.owner.setBassRiffSelector, value)
 
-        self._write_cc_test_log(
-            {
-                "event": "apply",
-                "target": target["id"],
-                "midiValue": int(midi_value),
-                "mappedValue": float(value),
-            }
-        )
-
     @staticmethod
     def _is_button_target(target: dict[str, Any]) -> bool:
         return str(target.get("kind", "")) == "button"
@@ -1412,18 +1296,8 @@ class MidiPlayerBackend(QObject):
     def clickControlIndicator(self, channel: int, controller: int) -> None:
         key = (int(channel), int(controller))
         with self._midi_control_lock:
-            was_bound = self._midi_control_state.status(key) == "bound"
             changed = self._midi_control_state.indicator_clicked(key)
         if changed:
-            if was_bound:
-                self._write_cc_test_log(
-                    {
-                        "event": "unbind",
-                        "reason": "indicator-click",
-                        "channel": key[0],
-                        "controller": key[1],
-                    }
-                )
             self._sync_blue_timer()
             self._bump_binding_state()
 
@@ -1446,7 +1320,6 @@ class MidiPlayerBackend(QObject):
                     self._midi_control_state.default_value_for_key(learned_key),
                     learned_key,
                 )
-            self._write_cc_test_log({"event": "bind", "target": target["id"]})
             self._sync_blue_timer()
             self._bump_binding_state()
         return learned
@@ -1476,37 +1349,8 @@ class MidiPlayerBackend(QObject):
         with self._midi_control_lock:
             changed = self._midi_control_state.release_target_for_manual_edit(target)
         if changed:
-            self._write_cc_test_log(
-                {
-                    "event": "unbind",
-                    "reason": "manual-ui-edit",
-                    "target": target["id"],
-                }
-            )
             self._sync_blue_timer()
             self._bump_binding_state()
-
-    @Slot(int, int, int)
-    def injectControl(self, channel: int, controller: int, value: int) -> None:
-        self.process_midi_control(channel, controller, value)
-
-    @Slot(str, int, float, str)
-    def injectOscControl(
-        self,
-        address: str,
-        argument: int,
-        value: float,
-        value_type: str = "continuous",
-    ) -> None:
-        self.process_osc_control(address, argument, value, value_type)
-
-    @Slot(int, int)
-    def injectPitchBend(self, channel: int, value: int) -> None:
-        self.process_midi_control(channel, PITCH_BEND_CONTROLLER, value)
-
-    @Slot(int, int, int)
-    def injectButton(self, channel: int, note: int, velocity: int) -> None:
-        self.process_midi_button(channel, note, velocity)
 
     def control_bindings_snapshot(self, screen: str) -> list[dict[str, Any]]:
         result = self._binding_service().serialize(screen)
@@ -1562,17 +1406,6 @@ class MidiPlayerBackend(QObject):
             key,
             active_target,
         ):
-            self._write_cc_test_log(
-                {
-                    "event": "binding-location",
-                    "channel": int(key[0]),
-                    "controller": int(key[1]),
-                    "sourceType": self._midi_control_state.source_type(key),
-                    "screen": screen,
-                    "preset": preset_number,
-                    "active": active_target is not None,
-                }
-            )
             self.bindingLocationRequested.emit(screen, preset_number)
 
     def _refresh_preset_binding_locations(self) -> None:
@@ -1797,13 +1630,6 @@ class MidiPlayerBackend(QObject):
         self._sync_blue_timer()
         self._sync_preset_feedback_timer()
         self._bump_binding_state()
-        self._write_cc_test_log(
-            {
-                "event": "load-bindings",
-                "screen": str(screen),
-                "count": len(entries),
-            }
-        )
 
     def _emit_state(self) -> None:
         self._state_version += 1
@@ -2326,16 +2152,6 @@ class MidiPlayerBackend(QObject):
                     int(channel),
                     int(note),
                 )
-
-    @Slot(int, int, int, bool)
-    def injectNote(
-        self,
-        channel: int,
-        note: int,
-        velocity: int,
-        is_on: bool,
-    ) -> None:
-        self.process_midi_note(channel, note, velocity, is_on)
 
     def _preview_notes(self) -> tuple[list[int], int]:
         root, pitch_classes = self._chord_context()

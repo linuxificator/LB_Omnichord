@@ -25,7 +25,6 @@ from application_composition import (  # noqa: E402
     load_application_resources,
 )
 from config_loader import load_resolved_amy_config  # noqa: E402
-from package_test_hooks import PackageTestHooks  # noqa: E402
 from runtime_platform_adapters import RuntimeOverrides  # noqa: E402
 
 
@@ -124,9 +123,7 @@ class ApplicationCompositionTests(unittest.TestCase):
             resolve_package_runtime=lambda **kwargs: RuntimeOverrides(
                 kwargs["amy_socket"],
                 kwargs["amy_local_name"],
-                kwargs["package_smoke_test"],
             ),
-            package_test_hooks=lambda enabled: PackageTestHooks(enabled, None),
             display_diagnostics=lambda qpa: (f"QPA {qpa}",),
             backend=backend_factory,
         )
@@ -246,7 +243,7 @@ class ApplicationCompositionTests(unittest.TestCase):
                     user_config_dir=user_dir,
                 )
 
-    def test_resource_loading_uses_injected_paths_and_preserves_checkpoint_order(self) -> None:
+    def test_resource_loading_uses_injected_paths(self) -> None:
         calls: list[tuple[str, Path]] = []
         client_calls: list[tuple[str, dict[str, Any]]] = []
         backend_calls: list[dict[str, Any]] = []
@@ -278,18 +275,15 @@ class ApplicationCompositionTests(unittest.TestCase):
                 calls.append(("intonation", path)) or ()
             ),
         )
-        checkpoints: list[str] = []
         warnings: list[tuple[str, str, str]] = []
 
         resources = load_application_resources(
             dependencies,
             user_config_dir=ROOT / "user-config",
-            checkpoint=checkpoints.append,
             synth_fallback_notice=lambda *values: warnings.append(values),
         )
 
         self.assertEqual(resources.synths[0].key, "fallback")
-        self.assertEqual(checkpoints[-1], "startup-synths-selected")
         self.assertEqual(len(warnings), 3)
         self.assertEqual(calls[0][1], ROOT / "user-config" / "defaults.json")
         self.assertEqual(calls[1][1], ROOT / "music" / "chords.csv")

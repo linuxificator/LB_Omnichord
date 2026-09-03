@@ -48,7 +48,7 @@ static BOOL WINAPI console_handler(DWORD type) {
 static void usage(void) {
     printf(
         "amy_service.exe --pipe-name NAME --ready-file PATH "
-        "[--no-audio] [--once] | --self-test\n"
+        "[--no-audio] [--once]\n"
     );
 }
 
@@ -59,38 +59,6 @@ static uint64_t render_offline_block(void) {
         if (block[i] != 0) ++nonzero;
     }
     return nonzero;
-}
-
-static int run_self_test(void) {
-    amy_config_t config = amy_default_config();
-    config.audio = AMY_AUDIO_IS_NONE;
-    config.features.default_synths = 0;
-    config.max_buses = 11;
-    config.max_oscs = 336;
-    config.max_patterns = 1024;
-    config.max_pattern_tags = 64;
-    config.max_pattern_instances = 32;
-
-    configure_pcm_bank();
-    amy_start(config);
-    amy_add_message("v0w0f440a1n69l1Z");
-
-    uint64_t nonzero = 0;
-    for (int i = 0; i < 12; ++i) nonzero += render_offline_block();
-
-    amy_add_message("v0l0Z");
-    for (int i = 0; i < 4; ++i) render_offline_block();
-    amy_stop();
-
-    if (nonzero == 0) {
-        fprintf(stderr, "AMY offline render self-test produced silent PCM\n");
-        return 1;
-    }
-    printf(
-        "AMY offline render self-test passed: %llu nonzero PCM samples\n",
-        (unsigned long long)nonzero
-    );
-    return 0;
 }
 
 static int publish_ready_file(const char *path, const char *pipe_name) {
@@ -238,17 +206,11 @@ static int run_service(
     {
         int client_result = serve_client(pipe);
         if (client_result < 0) {
-            fprintf(stderr, "AMY smoke client sent an invalid wire record\n");
-            result = 1;
-        } else if (once && g_wire_records == 0) {
-            fprintf(stderr, "AMY smoke client sent no wire records\n");
-            result = 1;
-        } else if (once && no_audio && g_nonzero_samples == 0) {
-            fprintf(stderr, "AMY smoke client produced silent PCM\n");
+            fprintf(stderr, "AMY client sent an invalid wire record\n");
             result = 1;
         } else if (once) {
             printf(
-                "AMY service smoke passed: %llu wire commands, "
+                "AMY service session completed: %llu wire commands, "
                 "%llu nonzero PCM samples\n",
                 (unsigned long long)g_wire_records,
                 (unsigned long long)g_nonzero_samples
@@ -275,7 +237,6 @@ cleanup:
 int main(int argc, char **argv) {
     const char *pipe_name = NULL;
     const char *ready_file = NULL;
-    int self_test = 0;
     int no_audio = 0;
     int once = 0;
     for (int i = 1; i < argc; ++i) {
@@ -283,12 +244,10 @@ int main(int argc, char **argv) {
             pipe_name = argv[++i];
         else if (strcmp(argv[i], "--ready-file") == 0 && i + 1 < argc)
             ready_file = argv[++i];
-        else if (strcmp(argv[i], "--self-test") == 0) self_test = 1;
         else if (strcmp(argv[i], "--no-audio") == 0) no_audio = 1;
         else if (strcmp(argv[i], "--once") == 0) once = 1;
         else { usage(); return 2; }
     }
-    if (self_test) return run_self_test();
     if (pipe_name == NULL || ready_file == NULL) { usage(); return 2; }
     return run_service(pipe_name, ready_file, no_audio, once);
 }

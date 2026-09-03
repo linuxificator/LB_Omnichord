@@ -164,10 +164,17 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("AMY backend: external socket", android_smoke)
         self.assertIn("Audio capture armed: 384000 frames", android_smoke)
         self.assertIn("--min-peak-dbfs -26.0", android_smoke)
-        self.assertIn("smoke-audio-levels-full", android_smoke)
-        self.assertIn("--windowed --package-smoke-test", release)
-        self.assertIn("qml-chord-hold-promoted", android_smoke)
-        self.assertIn("qml-slider-release-visible", android_smoke)
+        self.assertIn("package_evidence.py", android_smoke)
+        self.assertIn("--capture-screenshots-dir", release)
+        self.assertIn("adb shell input swipe", android_smoke)
+        self.assertIn("rendered_viewport=0", android_smoke)
+        self.assertIn("stat -c %s", android_smoke)
+        self.assertIn("did not produce a detailed rendered frame", android_smoke)
+        self.assertIn('adb exec-out screencap -p > "$before_screenshot"', android_smoke)
+        self.assertIn('struct.unpack(">II", header[16:24])', android_smoke)
+        self.assertIn("display_width <= display_height", android_smoke)
+        self.assertNotIn("SurfaceOrientation:", android_smoke)
+        self.assertIn("external-input-contract.log", android_smoke)
         self.assertLess(
             android_smoke.index('am force-stop "$package"'),
             android_smoke.index("amy-audio-capture.enable"),
@@ -259,36 +266,22 @@ class PackagingContracts(unittest.TestCase):
         release = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
         ).read_text(encoding="utf-8")
-        windows = (
-            FRONTEND / "packaging" / "windows" / "run_windows.ps1"
-        ).read_text(encoding="utf-8")
         android = (
             FRONTEND / "packaging" / "android" / "test_android_apk.sh"
         ).read_text(encoding="utf-8")
-        package_test = (
-            FRONTEND
-            / "tests"
-            / "platform"
-            / "linux"
-            / "test_source_package_smoke.py"
+        evidence = (
+            FRONTEND / "tests" / "support" / "package_evidence.py"
         ).read_text(encoding="utf-8")
 
-        self.assertGreaterEqual(release.count("--package-smoke-test"), 2)
-        for checkpoint in (
-            "midi-native-capability-verified",
-            "osc-external-process-rotary-observed",
-            "osc-external-process-button-observed",
-            "osc-external-process-activity-observed",
-        ):
-            with self.subTest(checkpoint=checkpoint):
-                self.assertGreaterEqual(release.count(checkpoint), 2)
-                self.assertIn(checkpoint, windows)
-                self.assertIn(checkpoint, android)
-                self.assertIn(checkpoint, package_test)
-        self.assertGreaterEqual(
-            release.count("tests/support/external_input_peer.py osc"),
-            2,
-        )
+        self.assertNotIn("--package-smoke-test", release)
+        self.assertNotIn("OMNICHORD_PACKAGE_SMOKE_STATUS", release)
+        self.assertGreaterEqual(release.count("package_evidence.py"), 3)
+        self.assertIn("package_evidence.py", android)
+        self.assertIn("external-input-process-contract", evidence)
+        self.assertIn("package-integration", evidence)
+        self.assertIn("platform-native", evidence)
+        self.assertIn("--capture-screenshots-dir", release)
+        self.assertIn("adb shell input swipe", android)
         self.assertIn("external_input_peer.py", android)
         self.assertIn('adb emu redir add "udp:${osc_port}:${osc_port}"', android)
         self.assertIn('osc --config "$osc_config" --duration 30', android)
@@ -430,11 +423,15 @@ class PackagingContracts(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("windows-native:", workflow)
         self.assertIn("windows-native,", workflow)
+        self.assertIn('$env:QT_QPA_PLATFORM = "offscreen"', workflow)
+        self.assertIn('$launcher.WaitForExit(60000)', workflow)
+        self.assertIn("timeout-minutes: 4", workflow)
+        self.assertIn("Windows package launcher exceeded its external", workflow)
         self.assertIn("amy_service.exe", build)
         self.assertIn("--name LB_Omnichord", build)
         self.assertIn("LB_Omnichord.cmd", build)
-        self.assertIn("--hidden-import package_smoke", build)
-        self.assertIn("--hidden-import PySide6.QtTest", build)
+        self.assertNotIn("--hidden-import package_smoke", build)
+        self.assertNotIn("--hidden-import PySide6.QtTest", build)
         self.assertIn("cmake --help", build)
         self.assertIn("Visual Studio 18 2026", build)
         self.assertIn("Visual Studio 17 2022", build)
@@ -448,52 +445,39 @@ class PackagingContracts(unittest.TestCase):
         self.assertNotIn("AF_INET", service)
         self.assertNotIn("--tcp-port", launcher)
         self.assertNotIn("--amy-socket", launcher)
-        self.assertIn("$SmokeTest", launcher)
-        self.assertIn("--package-smoke-test", launcher)
-        self.assertIn("QT_QPA_PLATFORM", launcher)
-        self.assertIn("WaitForExit(30000)", launcher)
-        self.assertIn("OMNICHORD_PACKAGE_SMOKE_STATUS", launcher)
-        self.assertIn("Service errors:", launcher)
-        self.assertNotIn("$service.ExitCode", launcher)
-        self.assertIn(
-            "AMY service smoke passed: [1-9][0-9]* wire commands, "
-            "[1-9][0-9]* nonzero PCM samples",
-            launcher,
-        )
-        self.assertIn("event-loop-exited", launcher)
-        self.assertIn("qml-chord-press-observed", launcher)
-        self.assertIn("active-chord-visible", launcher)
-        self.assertIn("qml-chord-tap-released", launcher)
-        self.assertIn("qml-chord-hold-promoted", launcher)
-        self.assertIn("qml-chord-hold-released", launcher)
-        self.assertIn("qml-slider-drag-visible", launcher)
-        self.assertIn("qml-slider-release-visible", launcher)
+        self.assertIn("$CaptureScreenshotsDir", launcher)
+        self.assertIn("--capture-screenshots-dir", launcher)
+        self.assertIn('@("--no-audio", "--once")', launcher)
+        self.assertIn('$frontend = Start-Process -FilePath', launcher)
+        self.assertIn('$frontend.WaitForExit()', launcher)
+        self.assertIn('$service.WaitForExit(5000)', launcher)
+        self.assertNotIn("$SmokeTest", launcher)
+        self.assertNotIn("--package-smoke-test", launcher)
+        self.assertNotIn("OMNICHORD_PACKAGE_SMOKE_STATUS", launcher)
         self.assertIn("-ExecutionPolicy Bypass", click_launcher)
         self.assertIn('"%~dp0run_windows.ps1" %*', click_launcher)
         self.assertIn("pause", click_launcher)
         self.assertIn("prepare_windowed_console_streams()", main)
-        self.assertIn("guarded_package_main(main)", main)
+        self.assertNotIn("guarded_package_main", main)
         self.assertIn("if sys.stdout is None:", windows_adapter)
         self.assertIn("if sys.stderr is None:", windows_adapter)
-        self.assertIn("fatal-error", windows_adapter)
+        self.assertNotIn("fatal-error", windows_adapter)
         self.assertIn("resolve_frontend_asset_root", runtime_paths)
         self.assertIn('getattr(sys, "_MEIPASS", None)', runtime_paths)
         self.assertIn("amy_add_message", service)
-        self.assertIn("run_self_test", service)
         self.assertIn("amy_simple_fill_buffer", service)
         self.assertIn("AMY named-pipe connect failed:", service)
         self.assertIn("AMY named-pipe read failed:", service)
-        self.assertIn("AMY service smoke passed:", service)
+        self.assertIn("AMY service session completed:", service)
+        self.assertNotIn("run_self_test", service)
         self.assertIn("GAMMA9001=1", cmake)
         self.assertIn("gamma9001-blob-c", cmake)
         self.assertIn("${GAMMA9001_PCM_C}", cmake)
         self.assertIn("amy_set_gamma9001_pcm(gamma9001_pcm_data)", service)
-        self.assertEqual(service.count("configure_pcm_bank();"), 2)
+        self.assertEqual(service.count("configure_pcm_bank();"), 1)
         self.assertIn("runs-on: windows-2025", workflow)
-        self.assertIn(
-            '& "$root\\LB_Omnichord.cmd" -Windowed -SmokeTest',
-            workflow,
-        )
+        self.assertIn('Start-Process -FilePath "powershell.exe"', workflow)
+        self.assertIn('$quotedScript = \'"\' + "$root\\run_windows.ps1"', workflow)
 
     def test_appimage_launcher_preserves_the_process_boundary(self) -> None:
         entry = (FRONTEND / "packaging" / "appimage_entry.py").read_text(
@@ -512,22 +496,12 @@ class PackagingContracts(unittest.TestCase):
             entry,
         )
         self.assertIn("main.main(frontend_arguments, asset_root=APP_ROOT)", entry)
-        for asset in (
-            "drum_activity_timing.json",
-            "drum_fills_timing.json",
-            "drum_fill_continuation_roles.json",
-            "drum_activity_instruments_tiny.json",
-            "drum_fills_instruments_tiny.json",
-            "drum_activity_instruments_gamma9001.json",
-            "drum_fills_instruments_gamma9001.json",
-            "drum_activity_instruments_general_midi.json",
-            "drum_fills_instruments_general_midi.json",
-        ):
-            self.assertIn(asset, entry)
+        self.assertEqual(entry.count('ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")'), 1)
         self.assertNotIn("core.FRONTEND_DIR =", entry)
         self.assertNotIn("amy.live(", entry)
-        self.assertIn("--hidden-import package_smoke", build)
-        self.assertIn("--hidden-import PySide6.QtTest", build)
+        self.assertNotIn("package-self-test", entry)
+        self.assertNotIn("--hidden-import package_smoke", build)
+        self.assertNotIn("--hidden-import PySide6.QtTest", build)
 
     def test_release_stamp_validation_matches_asset_format(self) -> None:
         build_script = (FRONTEND / "packaging" / "build_appimage.sh").read_text(
@@ -543,8 +517,8 @@ class PackagingContracts(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("LB_Omnichord.${release_stamp}.macOS-arm64.dmg", dmg_script)
-        self.assertIn("--hidden-import package_smoke", dmg_script)
-        self.assertIn("--hidden-import PySide6.QtTest", dmg_script)
+        self.assertNotIn("--hidden-import package_smoke", dmg_script)
+        self.assertNotIn("--hidden-import PySide6.QtTest", dmg_script)
 
 
 if __name__ == "__main__":

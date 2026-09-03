@@ -19,28 +19,77 @@ from synth_programs import resolve_program  # noqa: E402
 
 class ProgramArchitectureTests(unittest.TestCase):
     def test_package_input_stimulus_is_not_generated_by_production_code(self) -> None:
-        package_smoke = CODE / "package_smoke.py"
-        tree = ast.parse(package_smoke.read_text(encoding="utf-8"))
-        imports = {
-            alias.name
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Import)
-            for alias in node.names
-        }
-        calls = {
-            node.func.attr
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-        }
-        self.assertNotIn("socket", imports)
-        self.assertTrue(
-            calls.isdisjoint(
-                {"sendto", "injectControl", "injectButton", "injectOscControl"}
-            )
-        )
+        self.assertFalse((CODE / "package_smoke.py").exists())
+        self.assertFalse((CODE / "package_test_hooks.py").exists())
         self.assertTrue(
             (ROOT / "tests" / "support" / "external_input_peer.py").is_file()
         )
+
+    def test_synthetic_input_hooks_exist_only_in_test_support(self) -> None:
+        forbidden = (
+            "injectMidiControl",
+            "injectMidiPitchBend",
+            "injectMidiButton",
+            "injectMidiNote",
+            "injectOscControl",
+            "OMNICHORD_TEST_MIDI_CC_LOG",
+            "testCcLogging",
+            "testLogControl",
+        )
+        for path in CODE.glob("*.py"):
+            source = path.read_text(encoding="utf-8")
+            for marker in forbidden:
+                with self.subTest(path=path.name, marker=marker):
+                    self.assertNotIn(marker, source)
+        adapter = ROOT / "tests" / "support" / "backend_control_surface.py"
+        self.assertTrue(adapter.is_file())
+        self.assertIn("injectMidiControl", adapter.read_text(encoding="utf-8"))
+
+    def test_shipped_launchers_contain_no_test_mode_or_assertions(self) -> None:
+        shipped = (
+            ROOT / "packaging" / "appimage_entry.py",
+            ROOT / "packaging" / "windows" / "run_windows.ps1",
+            ROOT / "packaging" / "windows" / "amy_service.c",
+        )
+        forbidden = (
+            "package-smoke-test",
+            "OMNICHORD_PACKAGE_SMOKE",
+            "lb-android-package-smoke",
+            "run_self_test",
+            '"--self-test"',
+            "requiredCheckpoints",
+        )
+        for path in shipped:
+            source = path.read_text(encoding="utf-8")
+            for marker in forbidden:
+                with self.subTest(path=path.name, marker=marker):
+                    self.assertNotIn(marker, source)
+
+    def test_package_scenarios_have_one_test_side_owner(self) -> None:
+        workflow = (
+            ROOT.parents[1] / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+        android = (
+            ROOT / "packaging" / "android" / "test_android_apk.sh"
+        ).read_text(encoding="utf-8")
+        evidence = (
+            ROOT / "tests" / "support" / "package_evidence.py"
+        ).read_text(encoding="utf-8")
+        self.assertGreaterEqual(workflow.count("package_evidence.py"), 3)
+        self.assertIn("package_evidence.py", android)
+        self.assertNotIn("for checkpoint", workflow)
+        self.assertNotIn("requiredCheckpoints", workflow)
+        for scenario in (
+            "artifact-present",
+            "package-content-policy",
+            "qml-import-policy",
+            "external-input-process-contract",
+            "packaged-runtime",
+            "rendered-ui",
+            "regression-prerequisite",
+        ):
+            with self.subTest(scenario=scenario):
+                self.assertEqual(evidence.count(f'"{scenario}"'), 1)
 
     def test_portable_input_contract_has_no_platform_branches(self) -> None:
         contract = (

@@ -19,6 +19,7 @@ from application_composition import (  # noqa: E402
     load_application_resources,
 )
 from control_server import TestControlServer  # noqa: E402
+from backend_control_surface import BackendControlSurface  # noqa: E402
 
 
 def main() -> int:
@@ -41,7 +42,7 @@ def main() -> int:
     backend = graph.backend
 
     port = int(os.environ.get("OMNICHORD_TEST_API_PORT", "18765"))
-    test_server = TestControlServer(backend, port)
+    test_server = TestControlServer(BackendControlSurface(backend), port)
     print(
         f"TEST_API_PORT={test_server.port}",
         file=sys.stderr,

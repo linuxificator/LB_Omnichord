@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class LinuxMidiInputIntegrationTests(unittest.TestCase):
-    def test_real_midi_bytes_fit_bar_and_replace_true_lru(self) -> None:
+    def test_real_midi_bytes_reach_a_bound_application_control(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
             config_dir = temp / ".omnichord" / "config"
@@ -76,20 +76,22 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
             preset_dir.joinpath("p2.json").write_text(
                 json.dumps(inactive_preset), encoding="utf-8"
             )
-            log = temp / "midi-cc.jsonl"
             socket_path = temp / "amy.sock"
             listener = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
             listener.settimeout(15.0)
             listener.bind(str(socket_path))
             listener.listen(1)
             socket_error: list[BaseException] = []
+            wire_packets: list[str] = []
+            application_connected = threading.Event()
 
             def drain_amy_commands() -> None:
                 try:
                     connection, _ = listener.accept()
+                    application_connected.set()
                     with connection:
-                        while connection.recv(65536):
-                            pass
+                        while packet := connection.recv(65536):
+                            wire_packets.append(packet.decode("ascii"))
                 except OSError:
                     # The test closes the listener during teardown.
                     pass
@@ -107,7 +109,6 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
                 HOME=str(temp),
                 QT_QPA_PLATFORM="offscreen",
                 QT_QUICK_BACKEND="software",
-                OMNICHORD_TEST_MIDI_CC_LOG=str(log),
             )
             process = subprocess.Popen(
                 [
@@ -124,29 +125,17 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
                 text=True,
             )
             try:
-                deadline = time.monotonic() + 10.0
-                while time.monotonic() < deadline and process.poll() is None:
-                    if log.is_file() and '"event":"layout"' in log.read_text(
-                        encoding="utf-8"
-                    ):
+                self.assertTrue(application_connected.wait(timeout=10.0))
+                time.sleep(0.5)
+                wire_packets.clear()
+                os.write(midi_master, bytes((0xB0, 74, 0, 0xB0, 74, 1)))
+                deadline = time.monotonic() + 5.0
+                while time.monotonic() < deadline:
+                    if any("h0.02" in packet for packet in wire_packets):
+                        break
+                    if process.poll() is not None:
                         break
                     time.sleep(0.05)
-
-                def change(controller: int, start: int = 0) -> None:
-                    os.write(
-                        midi_master,
-                        bytes((0xB0, controller, start, 0xB0, controller, start + 1)),
-                    )
-
-                if process.poll() is None and log.is_file():
-                    change(74, 0)
-                    change(75, 0)
-                    for controller in range(32):
-                        change(controller)
-                    time.sleep(0.5)
-                    change(0, 1)  # make CC0 newest before forcing another replacement
-                    change(99)
-                    time.sleep(0.5)
             finally:
                 if process.poll() is None:
                     process.terminate()
@@ -162,80 +151,9 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
             self.assertNotIn("QQmlApplicationEngine failed", output)
             self.assertNotIn("Cannot assign to non-existent property", output)
             self.assertNotIn("Required property", output)
-            self.assertTrue(log.is_file(), output)
-            records = [
-                json.loads(line)
-                for line in log.read_text(encoding="utf-8").splitlines()
-            ]
-            layouts = [item for item in records if item["event"] == "layout"]
-            changes = [item for item in records if item["event"] == "change"]
-            indicator_states = [
-                item for item in records if item["event"] == "indicator-state"
-            ]
-            self.assertTrue(layouts, output)
-            self.assertTrue(indicator_states)
-            full = max(layouts, key=lambda item: item["count"])
-            self.assertLessEqual(full["count"], full["capacity"], full)
-            self.assertLessEqual(
-                full["lastRight"],
-                full["barX"] + full["barWidth"],
-                full,
-            )
-            self.assertTrue(any(item["evicted"] is not None for item in changes))
             self.assertTrue(
-                any(
-                    item["evicting"]
-                    for record in indicator_states
-                    for item in record["items"]
-                )
-            )
-            last = changes[-1]
-            self.assertEqual(last["controller"], 99)
-            capacity = last["capacity"]
-            self.assertEqual(last["evicted"], [1, 33 - capacity])
-            applied = [item for item in records if item["event"] == "apply"]
-            self.assertTrue(applied)
-            self.assertEqual(
-                applied[-1]["target"],
-                "omni:reverb_level",
-            )
-            self.assertAlmostEqual(float(applied[-1]["mappedValue"]), 0.02)
-            self.assertNotIn(
-                "omni:reverb_liveness",
-                {item["target"] for item in applied},
-            )
-            locations = [
-                item for item in records if item["event"] == "binding-location"
-            ]
-            self.assertTrue(
-                any(
-                    item["screen"] == "omni"
-                    and item["preset"] == 1
-                    and item["active"]
-                    for item in locations
-                )
-            )
-            self.assertEqual(
-                [
-                    item
-                    for item in locations
-                    if (
-                        item["screen"] == "omni"
-                        and item["preset"] == 2
-                        and not item["active"]
-                    )
-                ],
-                [
-                    {
-                        "event": "binding-location",
-                        "channel": 1,
-                        "controller": 75,
-                        "sourceType": "cc",
-                        "screen": "omni",
-                        "preset": 2,
-                        "active": False,
-                    }
-                ],
+                any("h0.02" in packet for packet in wire_packets),
+                f"bound CC did not change AMY reverb: {wire_packets!r}",
             )
 
 

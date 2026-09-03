@@ -116,7 +116,7 @@ ApplicationWindow {
 
     // Screen mode is deliberately presentation-only. Switching never sends a
     // transport, note, patch or effect command to AMY.
-    property bool midiScreen: backend.midiPlayer.testCcLogging
+    property bool midiScreen: false
     property bool tuningCoupled: true
     property bool strumLadderMode: backend.strumLadderMode
     readonly property bool omniTuningMidiBound: {

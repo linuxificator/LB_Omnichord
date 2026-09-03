@@ -1,6 +1,7 @@
 # Codex handover: test-process and platform-equivalence audit
 
-Status: current implementation audit against `test_process_architecture.md`
+Status: historical pre-implementation audit; superseded by
+`CODEX_HANDOVER_TEST_SEPARATION_IMPLEMENTATION.md`
 Audit date: 2026-09-03
 Audit branch start: `main` at `20ad1ba77981d9c28a4a0821a2b178d27a7debea`
 

@@ -142,9 +142,9 @@ class StaticContractTests(unittest.TestCase):
         screenshot_state = (ROOT / "code" / "screenshot_state.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("injectMidiControl", screenshot_state)
-        self.assertIn("injectMidiButton", screenshot_state)
-        self.assertIn("injectOscControl", screenshot_state)
+        self.assertIn("process_midi_control", screenshot_state)
+        self.assertIn("process_midi_button", screenshot_state)
+        self.assertIn("process_osc_control", screenshot_state)
         self.assertIn('"continuous"', screenshot_state)
         self.assertIn('"button"', screenshot_state)
 

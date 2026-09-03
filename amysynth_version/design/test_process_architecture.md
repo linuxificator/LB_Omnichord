@@ -120,3 +120,30 @@ artifacts; they are not bundled into the user package.
 Physical validation remains a separate evidence class. Hosted success may not
 claim physical MIDI, touch, audio-route, firewall or latency behavior unless
 that hardware path was actually exercised.
+
+All package jobs feed their artifacts to
+`qt_frontend/tests/support/package_evidence.py`. This is the sole owner of the
+cross-platform scenario identifiers and pass/fail rules. It writes one JSON
+manifest per artifact with distinct `regression`, `portable-integration`,
+`package`, `package-integration` and, where present, `platform-native`
+evidence classes. Shell, PowerShell and workflow files may prepare native
+processes and collect files, but must not copy semantic checkpoint lists.
+
+Package acceptance is compositional and labels each claim at its real
+boundary:
+
+- package audit proves shipped files, size policy and forbidden-runtime
+  absence;
+- QML scanner/prune evidence proves the reviewed QML module set;
+- the portable input contract proves independent MIDI/OSC sender and receiver
+  processes without claiming a native hardware adapter;
+- normal screenshot capture proves that the final application artifact starts,
+  loads QML, communicates with its separate AMY service and renders non-trivial
+  frames;
+- Android additionally uses external `adb input` and real Oboe capture;
+- regression success supplies source-level gesture, state and native-capability
+  contracts without embedding those test drivers in the product.
+
+The repository screenshot mode is an explicitly supported production tool and
+is allowed to stage deterministic display state inside the application. It is
+not evidence of physical MIDI/OSC input and must never be reported as such.

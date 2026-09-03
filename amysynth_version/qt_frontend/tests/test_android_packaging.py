@@ -18,6 +18,7 @@ from build_android import (  # noqa: E402
     P4A_COMMIT,
     PYSIDE_VERSION,
     QT_MODULE_LOAD_ORDER,
+    configured_android_qt_modules,
     create_buildozer_sdk_compat,
     patch_buildozer_spec,
     pin_pyside_qt_module_order,
@@ -32,6 +33,30 @@ from prune_pyside_wheel import native_closure, qml_module_for  # noqa: E402
 
 
 class AndroidPackagingTests(unittest.TestCase):
+    def test_android_qt_load_order_comes_from_runtime_manifest(self) -> None:
+        manifest = json.loads(
+            (FRONTEND / "packaging" / "qt_runtime_manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(
+            QT_MODULE_LOAD_ORDER,
+            tuple(manifest["android_load_order"]),
+        )
+        self.assertNotIn("Test", QT_MODULE_LOAD_ORDER)
+
+    def test_android_qt_load_order_rejects_duplicate_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest = Path(directory) / "runtime.json"
+            manifest.write_text(
+                json.dumps({"android_load_order": ["Core", "Core"]}),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "non-empty and unique"):
+                configured_android_qt_modules(manifest)
+
     def test_staging_reset_preserves_only_the_p4a_build_cache(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -238,7 +263,7 @@ class AndroidPackagingTests(unittest.TestCase):
             spec = Path(directory) / "pysidedeploy.spec"
             spec.write_text(
                 "[qt]\n"
-                "modules = Qml,QuickControls2,Core,Test,Network,Gui,Quick,OpenGL\n",
+                f"modules = {','.join(reversed(QT_MODULE_LOAD_ORDER))}\n",
                 encoding="utf-8",
             )
 
@@ -357,8 +382,10 @@ class AndroidPackagingTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertIn("PySide6.QtWidgets", manifest["python_modules"])
+        self.assertNotIn("PySide6.QtTest", manifest["python_modules"])
+        self.assertNotIn("PySide6.QtWidgets", manifest["python_modules"])
         self.assertIn("PySide6.QtOpenGL", manifest["python_modules"])
+        self.assertNotIn("Test", manifest["android_load_order"])
         self.assertNotIn("Widgets", manifest["android_load_order"])
 
 

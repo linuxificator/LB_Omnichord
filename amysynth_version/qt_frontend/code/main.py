@@ -18,7 +18,6 @@ from config_loader import load_amy_config, load_resolved_amy_config
 from midi_integration import InstrumentBackend
 from midi_platform_adapters import production_midi_input_port
 from osc_input import production_osc_input_port
-from package_test_hooks import PackageTestHooks
 from program_amy import (
     ProgramAmyLocalClient,
     ProgramAmySerialClient,
@@ -27,7 +26,7 @@ from program_amy import (
 from runtime_diagnostics import display_diagnostic_lines
 from runtime_paths import qt_private_files_dir
 from runtime_platform_adapters import resolve_package_runtime
-from windows_launcher import guarded_package_main, prepare_windowed_console_streams
+from windows_launcher import prepare_windowed_console_streams
 
 
 prepare_windowed_console_streams()
@@ -83,7 +82,6 @@ def production_dependencies(
         osc_input_port=production_osc_input_port,
         private_files_dir=qt_private_files_dir,
         resolve_package_runtime=resolve_package_runtime,
-        package_test_hooks=PackageTestHooks.from_environment,
         display_diagnostics=display_diagnostic_lines,
         backend=cast(BackendFactory, InstrumentBackend),
     )
@@ -102,9 +100,5 @@ def main(
     return app_core.run_application(args, dependencies)
 
 
-def _guarded_main() -> int:
-    return guarded_package_main(main)
-
-
 if __name__ == "__main__":
-    raise SystemExit(_guarded_main())
+    raise SystemExit(main())
