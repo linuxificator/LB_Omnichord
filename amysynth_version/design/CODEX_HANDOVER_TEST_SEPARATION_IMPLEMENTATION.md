@@ -64,7 +64,21 @@ OSC/MIDI input.
 
 Focused composition, runtime, MIDI-engine, screenshot-state, package-policy,
 Android-packaging, packaging-contract and evidence tests passed during the
-implementation. `tests/run_quality.py` also passed. Run the complete suite and
-a manually dispatched five-platform release workflow before merging this
-branch to `main`; Android's externally calculated chord coordinate must be
-confirmed on the hosted Pixel 2 emulator.
+implementation. `tests/run_quality.py` also passed.
+
+The complete regression and package workflow passed for implementation commit
+`5ae403d` in GitHub Actions run `33783248461`. The run built and exercised the
+Linux x86_64, Raspberry Pi aarch64, Windows x86_64, macOS arm64, Android x86_64
+and Android arm64 outputs. Every runnable desktop package emitted a passing
+seven-scenario evidence manifest. The installed Android x86_64 APK emitted a
+passing eight-scenario manifest, including separate-process OSC input, rendered
+UI, AMY/Oboe audio and byte-identical AMY/Oboe output evidence.
+
+An earlier hosted emulator run also exposed an important timing boundary: the
+Android QPA-ready message can precede the first rendered QML frame. Input sent
+at that boundary was correctly external, but arrived while the surface was
+still blank and therefore generated no audio. The Android harness now waits
+for a detailed screenshot from the installed application before sending its
+adb long press. Both the pre-input and post-input captures in the successful
+run contain the rendered application, and the captured audio peaked at
+`-15.765 dBFS` with zero AMY/Oboe sample mismatches.
