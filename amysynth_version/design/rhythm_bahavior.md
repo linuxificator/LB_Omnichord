@@ -357,12 +357,13 @@ The intended behavior is conceptually:
 
 ```text
 old rhythm events  -------------------->
-                       replace pattern events
+                       replace affected root/group events
 new rhythm events                       -------------------->
 sequencer clock      --------------------------------------->
 ```
 
-The clock remains continuous. Only the pattern events associated with the rhythm are replaced.
+The clock remains continuous. Only the root events and group definitions
+associated with the rhythm are replaced.
 
 A live pattern change must therefore use AMY's running sequencer/event replacement mechanism rather than transport stop/reset/start behavior.
 
@@ -578,7 +579,7 @@ The already-visible percussion activity is part of that configuration: its
 first tick must become audible immediately after Start, without reselecting an
 activity button and without an artificial one-bar wait. Because AMY applies a
 sequencer reset at an audio-block boundary, wrapper transports must not submit
-new nested instances until that reset has crossed the boundary.
+new group executions until that reset has crossed the boundary.
 
 ### RHYTHM-016 — manual chord takeover preserves the sequenced gate
 
@@ -594,7 +595,7 @@ the contact with another timer. That promotion performs the established
 accompaniment takeover:
 while automatic rhythm chords are enabled it temporarily closes the effective
 automatic-chord lane without changing the independent `CHORD ON/OFF` state. It
-must remove the repeating future `zQT` triggers. Root tags contain no synth-4
+must remove the repeating future root `H...zQ<group>,1,...` triggers. Root tags contain no synth-4
 release: every already-running immutable child owns its own whole-chord or
 note-specific off and reaches that original gate without an immediate all-off.
 Manual synth-3 note-ons begin at

@@ -13,8 +13,8 @@ legacy material and is outside these tests and workflows.
 `unit` suite automatically discovers every top-level `test_*.py`; integration
 suites remain explicit because they have different runtime/native-AMY needs.
 The native suites start AMY with the production capacity of 11 buses, 336
-oscillators, 1024 stored patterns, 64 events per pattern and 32 active pattern
-instances. CI installs the exact pinned LB Omnichord AMY release so a passing
+oscillators, 1024 persistent sequence groups, 64 local events per group and 40
+active or pending executions. CI installs the exact pinned LB Omnichord AMY release so a passing
 run tests the deployed architecture reproducibly.
 
 ## Local suites

@@ -732,7 +732,7 @@ class SerialIntegrationTests(unittest.TestCase):
                 app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
                 app.bridge.wait_idle(timeout=8.0)
 
-            # First establish real bass/chord tagged patterns. The cancellation
+            # First establish real bass/chord root events. The cancellation
             # assertion below is meaningful only for tags that were installed.
             seed = app.bridge.count()
             app.action("selectChord", 0, 0)

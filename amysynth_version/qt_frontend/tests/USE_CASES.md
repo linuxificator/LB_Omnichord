@@ -636,7 +636,7 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
   percussion or stop transport.
 - A live rhythm-style or preset change must preserve tempo, all three activity
   values, chord-arpeggio mode/rate/direction, bass voicing, the active-row
-  octave and sequencer timebase. It may replace tagged pattern events but may
+  octave and sequencer timebase. It may replace affected root events or group definitions but may
   not stop/restart transport or issue `RESET_SEQUENCER`.
 
 **Failure history:** whole-sequencer rebuilds were used for chord hold/release, pitch changes and other lane-local operations. On the ESP32-P4 this could make the rhythm audibly disappear while a manual chord was held and then return on release.
