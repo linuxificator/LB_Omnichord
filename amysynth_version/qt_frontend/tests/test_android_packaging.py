@@ -131,6 +131,14 @@ class AndroidPackagingTests(unittest.TestCase):
                     staging
                     / "config"
                     / "schema"
+                    / "amy_config_v6.schema.json"
+                ).is_file()
+            )
+            self.assertTrue(
+                (
+                    staging
+                    / "config"
+                    / "schema"
                     / "amy_config_v2.schema.json"
                 ).is_file()
             )
@@ -180,8 +188,10 @@ class AndroidPackagingTests(unittest.TestCase):
                 app["android.sdk_path"], str((root / "sdk-compat").resolve())
             )
             self.assertEqual(app["p4a.commit"], P4A_COMMIT)
-            self.assertIn("pyserial", app["requirements"])
+            self.assertIn("pyserial==3.5", app["requirements"])
             self.assertIn("fastjsonschema==2.22.2", app["requirements"])
+            self.assertIn("python-osc==1.10.2", app["requirements"])
+            self.assertEqual(app["android.permissions"], "INTERNET")
             self.assertEqual(app["android.add_aars"], str(aar.resolve()))
             self.assertEqual(
                 app["android.add_gradle_repositories"], "flatDir { dirs 'libs' }"

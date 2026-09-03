@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "recorded": "2026-09-01",
+  "recorded": "2026-09-03",
   "requirement_groups": {
     "portable": "requirements-portable.txt",
     "runtime": "requirements.txt",
@@ -28,6 +28,11 @@
       "distribution": "fastjsonschema",
       "owner": "runtime",
       "used_by": ["versioned startup configuration validation"]
+    },
+    "pythonosc": {
+      "distribution": "python-osc",
+      "owner": "runtime",
+      "used_by": ["portable OSC 1.0 input parsing"]
     },
     "numpy": {
       "distribution": "numpy",

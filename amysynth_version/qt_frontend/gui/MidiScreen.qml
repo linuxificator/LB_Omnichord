@@ -394,7 +394,7 @@ Item {
                     }
 
                     Item {
-                        id: f06Control
+                        id: hardwareControl
                         anchors.horizontalCenter: parent.horizontalCenter
                         y: 9
                         width: 52
@@ -406,12 +406,13 @@ Item {
                             || modelData.displayType === "button"
 
                         PhysicalRotary {
-                            visible: !f06Control.noteButton
+                            visible: !hardwareControl.noteButton
                             anchors.centerIn: parent
                             width: 52
                             height: 52
-                            family: 6
-                            encoder: f06Control.pitchBend
+                            family:
+                                modelData.displayProtocol === "osc" ? 1 : 6
+                            encoder: hardwareControl.pitchBend
                             from: 0
                             to: 127
                             value: Number(modelData.displayValue)
@@ -420,11 +421,12 @@ Item {
                         }
 
                         PhysicalPushButton {
-                            visible: f06Control.noteButton
+                            visible: hardwareControl.noteButton
                             anchors.centerIn: parent
                             width: 58
                             height: 42
-                            family: 6
+                            family:
+                                modelData.displayProtocol === "osc" ? 1 : 6
                             forcedDown:
                                 modelData.buttonDown && !modelData.evicting
                         }
@@ -433,9 +435,12 @@ Item {
                     Text {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
+                        width: parent.width
                         text: modelData.displayLabel
                         color: "#292927"
                         font.pixelSize: 11
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideMiddle
                     }
 
                     SequentialAnimation on opacity {

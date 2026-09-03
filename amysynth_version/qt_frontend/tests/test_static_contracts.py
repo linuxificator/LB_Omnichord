@@ -167,7 +167,8 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('import "physical_controls"', screen)
         self.assertIn("PhysicalRotary", screen)
         self.assertIn("PhysicalPushButton", screen)
-        self.assertIn("encoder: f06Control.pitchBend", screen)
+        self.assertIn("encoder: hardwareControl.pitchBend", screen)
+        self.assertIn('modelData.displayProtocol === "osc" ? 1 : 6', screen)
 
         rotary = (ROOT / "gui" / "physical_controls" / "PhysicalRotary.qml").read_text(
             encoding="utf-8"
@@ -197,6 +198,8 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn("shadow", button.lower())
         self.assertNotIn("MultiEffect", button)
         self.assertNotIn("QtQuick.Effects", button)
+        self.assertIn("control.family !== 1", rotary)
+        self.assertIn("control.family !== 1", button)
 
     def test_local_launcher_validates_but_never_builds_amy(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")

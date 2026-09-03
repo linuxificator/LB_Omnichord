@@ -35,6 +35,23 @@ class PackagingContracts(unittest.TestCase):
             5,
         )
 
+    def test_network_permissions_match_current_release_targets(self) -> None:
+        macos = (
+            FRONTEND / "packaging" / "build_macos_dmg.sh"
+        ).read_text(encoding="utf-8")
+        android = (
+            FRONTEND / "packaging" / "android" / "build_android.py"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("NSLocalNetworkUsageDescription", macos)
+        self.assertLess(
+            macos.index("NSLocalNetworkUsageDescription"),
+            macos.index("codesign --force"),
+        )
+        self.assertIn('"android.api": "36"', android)
+        self.assertIn('"android.permissions": "INTERNET"', android)
+        self.assertNotIn("ACCESS_LOCAL_NETWORK", android)
+
     def test_every_platform_uses_one_amy_release_branch_and_commit(self) -> None:
         workflows = [
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml",

@@ -14,7 +14,7 @@ AMY work.
 
 ## Layout
 
-- `code/` — Python application/backend, including synth, transport and MIDI-control state
+- `code/` — Python application/backend, including synth, transport and shared MIDI/OSC-control state
 - `gui/` — QML interface components and GUI assets
 - `config/` — serial/application defaults
 - `instruments/` — curated AMY Juno/DX7 catalogue and 18 factory presets
@@ -107,6 +107,15 @@ Linux MIDI input opens ALSA raw-MIDI devices and an ALSA sequencer input port
 named `LB Omnichord / MIDI In`. Graph tools such as `qpwgraph` can connect VMPK,
 BLE MIDI bridges and MIDI Through directly to that port. See
 `../design/midi.md`.
+
+OSC control input is portable across release platforms. By default it listens
+for OSC 1.0 UDP messages on every IPv4 interface at port 8000. Edit the
+`osc_input.listen_address` and `osc_input.listen_port` values in the user copy
+of `config/amy_config.json` to restrict or move it; use `127.0.0.1` for local-
+only control. Changing numeric or switch addresses appears in the same grey
+learn bar as MIDI, with flat F01 controls. OSC and MIDI share one-to-one target
+ownership and the same click/manual-takeover behavior. See
+`../design/osc_control.md` for message, security and persistence rules.
 
 The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
 

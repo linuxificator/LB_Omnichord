@@ -128,6 +128,88 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_flat_f01_osc_controls_keep_mechanical_value_feedback(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "physical_controls"
+
+Window {
+    width: 180
+    height: 90
+    visible: true
+
+    PhysicalRotary {
+        objectName: "oscRotary"
+        x: 10
+        y: 10
+        width: 64
+        height: 64
+        family: 1
+        value: 0
+    }
+    PhysicalPushButton {
+        objectName: "oscButton"
+        x: 90
+        y: 10
+        width: 70
+        height: 54
+        family: 1
+    }
+}
+""",
+        )
+        rotary = window.findChild(QObject, "oscRotary")
+        cap = window.findChild(QObject, "physicalRotaryCap")
+        button = window.findChild(QObject, "oscButton")
+        plunger = window.findChild(QObject, "physicalButtonPlunger")
+        self.assertIsNotNone(rotary)
+        self.assertIsNotNone(cap)
+        self.assertIsNotNone(button)
+        self.assertIsNotNone(plunger)
+        assert rotary is not None
+        assert cap is not None
+        assert button is not None
+        assert plunger is not None
+        self.assertEqual(int(rotary.property("family")), 1)
+        start_rotation = float(cap.property("rotation"))
+        start_y = float(plunger.property("y"))
+        rotary_stops = [
+            window.findChild(QObject, f"physicalRotaryGradientStop{index}")
+            for index in range(4)
+        ]
+        button_stops = [
+            window.findChild(QObject, f"physicalButtonGradientStop{index}")
+            for index in range(4)
+        ]
+        self.assertTrue(all(stop is not None for stop in rotary_stops))
+        self.assertTrue(all(stop is not None for stop in button_stops))
+        self.assertEqual(
+            len({str(stop.property("color")) for stop in rotary_stops if stop}),
+            1,
+        )
+        self.assertEqual(
+            len({str(stop.property("color")) for stop in button_stops if stop}),
+            1,
+        )
+
+        rotary.setProperty("value", 127)
+        button.setProperty("forcedDown", True)
+        QTest.qWait(120)
+        QCoreApplication.processEvents()
+
+        self.assertGreater(float(cap.property("rotation")), start_rotation)
+        self.assertAlmostEqual(float(plunger.property("y")), start_y + 3.0)
+        self.assertEqual(
+            len({str(stop.property("color")) for stop in button_stops if stop}),
+            1,
+        )
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
     def test_midi_bound_slider_press_without_movement_stays_bound(self) -> None:
         engine, component, window = self.create_window(
             b"""

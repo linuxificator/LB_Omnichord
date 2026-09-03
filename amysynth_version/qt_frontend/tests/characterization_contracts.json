@@ -8,10 +8,10 @@
       "method_sha256": "55ad2ba9df2ac41d83ce6bb4366a72684ba7782191a729e04809b9742310b5cc"
     },
     "MidiPlayerBackend": {
-      "property_count": 17,
-      "property_sha256": "52fdcd2c026f1b6f258cb0cf6f60d94965f9428c6f5b5e76c1fa22e70edde027",
-      "method_count": 55,
-      "method_sha256": "fa2e5842d0b12d30e7808e493c4248df8cb6413fa60c5070f6cc9788bc1fa07f"
+      "property_count": 19,
+      "property_sha256": "af1c05ec6ae306e941236446c98ea6d410b8026c680adccf8541b5bcca15c794",
+      "method_count": 56,
+      "method_sha256": "ecb8fb6cd8b1c79bb5d7c077d96c05033a592547eed3e1be27d4691e6bcdd94c"
     }
   },
   "supported_config_entrypoints": [

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import threading
 import unittest
 from pathlib import Path
 
@@ -13,6 +14,7 @@ from midi_control import (  # noqa: E402
     PITCH_BEND_CONTROLLER,
     MidiControlState,
 )
+from midi_binding_service import MidiBindingService  # noqa: E402
 
 
 def target(name: str, screen: str = "midi") -> dict[str, object]:
@@ -411,6 +413,84 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertTrue(state.expire_preset_feedback(now=12.0))
         self.assertEqual(state.target_visual_state(displaced, now=12.0), "idle")
         self.assertEqual(state.target_visual_state(incoming, now=12.0), "bound")
+
+    def test_osc_continuous_and_button_sources_share_indicator_contract(self) -> None:
+        state = MidiControlState(capacity=4)
+        changed, _target, key = state.observe_osc(
+            "/surface/filter", 0, 0.25, "continuous", now=1.0
+        )
+        self.assertFalse(changed)
+        self.assertIsNone(key)
+
+        changed, _target, key = state.observe_osc(
+            "/surface/filter", 0, 0.5, "continuous", now=2.0
+        )
+        self.assertTrue(changed)
+        self.assertIsNotNone(key)
+        button_changed, _target, button_key = state.observe_osc(
+            "/surface/mute", 0, 1.0, "button", now=3.0
+        )
+        self.assertTrue(button_changed)
+        self.assertIsNotNone(button_key)
+
+        models = {item["displayLabel"]: item for item in state.visible_model(now=3.0)}
+        self.assertEqual(models["/surface/filter"]["displayProtocol"], "osc")
+        self.assertEqual(models["/surface/filter"]["displayType"], "osc")
+        self.assertEqual(models["/surface/mute"]["displayType"], "button")
+        self.assertTrue(models["/surface/mute"]["buttonDown"])
+
+    def test_midi_and_osc_enforce_one_global_target_owner(self) -> None:
+        state = MidiControlState(capacity=4)
+        shared = target("shared")
+        change(state, 7, now=1.0)
+        state.indicator_clicked((1, 7), now=1.1)
+        state.bind_learned_target(shared, now=1.2)
+
+        state.observe_osc("/surface/volume", 0, 0.1, "continuous", now=2.0)
+        _changed, _target, osc_key = state.observe_osc(
+            "/surface/volume", 0, 0.2, "continuous", now=2.1
+        )
+        self.assertIsNotNone(osc_key)
+        assert osc_key is not None
+        state.indicator_clicked(osc_key, now=2.2)
+        state.bind_learned_target(shared, now=2.3)
+
+        self.assertEqual(state.status((1, 7)), "blue")
+        self.assertEqual(state.status(osc_key), "bound")
+        self.assertEqual(state.bindings[osc_key], shared)
+
+    def test_osc_binding_serializes_stable_address_not_runtime_surrogate(self) -> None:
+        state = MidiControlState(capacity=4)
+        osc_key = state.osc_key("/bank/cutoff", 1, "continuous")
+        state.replace_screen_bindings(
+            "omni",
+            [(osc_key, target("cutoff", screen="omni"))],
+            now=1.0,
+        )
+
+        self.assertEqual(
+            state.serialize_bindings("omni"),
+            [
+                {
+                    "source_type": "osc",
+                    "address": "/bank/cutoff",
+                    "argument": 1,
+                    "value_type": "continuous",
+                    "target": target("cutoff", screen="omni"),
+                }
+            ],
+        )
+
+        restored = MidiControlState(capacity=4)
+        service = MidiBindingService(restored, threading.Lock())
+        serialized = state.serialize_bindings("omni")
+        normalized = service.normalize_entries(
+            "omni",
+            serialized,
+            lambda raw: dict(raw),
+        )
+        self.assertTrue(service.replace_screen("omni", normalized))
+        self.assertEqual(restored.serialize_bindings("omni"), serialized)
 
 
 if __name__ == "__main__":

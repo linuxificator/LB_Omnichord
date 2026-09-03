@@ -11,6 +11,7 @@ from config_loader import (
     apply_transport_overrides,
 )
 from midi_input import MidiInputPortFactory
+from osc_input import OscInputPortFactory
 from package_test_hooks import PackageTestHooks
 from runtime_platform_adapters import RuntimeOverrides
 
@@ -81,6 +82,7 @@ class ApplicationDependencies:
     socket_client: ClientFactory
     local_client: ClientFactory
     midi_input_port: MidiInputPortFactory
+    osc_input_port: OscInputPortFactory
     private_files_dir: Callable[[], Path]
     resolve_package_runtime: RuntimeResolver
     package_test_hooks: Callable[[bool], PackageTestHooks]
@@ -349,6 +351,7 @@ def compose_application_graph(
         debug_enabled=bool(args.debug or args.debug_file is not None),
         debug_file=args.debug_file,
         midi_input_port_factory=dependencies.midi_input_port,
+        osc_input_port_factory=dependencies.osc_input_port,
     )
     # Constructors establish object invariants only. Preset I/O, cross-facade
     # wiring and MIDI reader startup begin after the complete concrete object

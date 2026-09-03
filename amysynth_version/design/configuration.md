@@ -3,13 +3,13 @@
 Status: authoritative startup configuration contract
 Owner: configuration loading, migration and composition
 Applies to: shipped and per-user AMY frontend configuration on all platforms
-Last verified: 2026-09-01
+Last verified: 2026-09-03
 
 ## Authority and revision
 
 `qt_frontend/config/amy_config.json` is the shipped configuration authority.
-It declares `config_revision`; current revision 5 is structurally defined by
-`config/schema/amy_config_v5.schema.json`. Historical revisions 1–4 remain
+It declares `config_revision`; current revision 6 is structurally defined by
+`config/schema/amy_config_v6.schema.json`. Historical revisions 1–5 remain
 packaged so their contracts are inspectable; the three pattern capacities are
 optional there, as are the later MIDI discovery fields and drum-kit identity;
 all are required from revision 4 onward. Unknown keys inside stable objects,
@@ -28,6 +28,7 @@ before serial, MIDI, socket or AMY resources are created.
 
 - serial transport;
 - MIDI input and whether its platform profile is derived or overridden;
+- portable OSC UDP input;
 - voice and AMY runtime capacities;
 - synth, bus and sequencer-tag layout;
 - contiguous fill/chord/drum-base sequencer-pattern ownership;
@@ -83,6 +84,10 @@ preserved. A customized Tiny map fails with a path-specific error because
 silently translating user-authored timbres would be data loss. The ESP32-P4
 firmware remains a separately declared Tiny-bank target; it does not change the
 desktop/mobile configuration contract.
+Revision 5 to 6 adds the portable OSC input section. Its historical migration
+defaults are enabled, IPv4 wildcard address `0.0.0.0` and UDP port 8000. Those
+values exist only in the shipped configuration and explicit migration; OSC
+consumers receive the frozen resolved section and have no fallback constants.
 Because revision-1 full documents cannot distinguish that old default from an
 intentional diagnostic selection, a user who deliberately forced `linux` must
 reapply it after migration. Future and malformed revisions fail at

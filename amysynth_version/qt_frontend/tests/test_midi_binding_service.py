@@ -36,6 +36,7 @@ class MidiBindingServiceTests(unittest.TestCase):
                 {"channel": 1, "controller": 7, "target": {"id": "volume"}},
                 {"channel": 2, "source_type": "pitch_bend", "target": {"id": "bend"}},
                 {"channel": 3, "source_type": "note_button", "note": 60, "target": {"id": "tap"}},
+                {"source_type": "osc", "address": "/fader", "argument": 0, "value_type": "continuous", "target": {"id": "osc"}},
                 {"channel": 4, "source_type": "unknown", "target": {"id": "bad"}},
                 {"channel": 4, "controller": 8, "target": {}},
             ],
@@ -44,8 +45,25 @@ class MidiBindingServiceTests(unittest.TestCase):
 
         self.assertEqual(
             tuple(entry.key for entry in entries),
-            ((1, 7), (2, PITCH_BEND_CONTROLLER), (3, NOTE_BUTTON_OFFSET + 60)),
+            (
+                (1, 7),
+                (2, PITCH_BEND_CONTROLLER),
+                (3, NOTE_BUTTON_OFFSET + 60),
+                self.state.osc_key("/fader", 0),
+            ),
         )
+
+    def test_rejects_invalid_osc_binding_identity(self) -> None:
+        entries = self.service.normalize_entries(
+            "midi",
+            [
+                {"source_type": "osc", "address": "missing-slash", "target": {"id": "bad"}},
+                {"source_type": "osc", "address": "/bad", "argument": -1, "target": {"id": "bad"}},
+                {"source_type": "osc", "address": "/bad", "value_type": "unknown", "target": {"id": "bad"}},
+            ],
+            normalize_target,
+        )
+        self.assertEqual(entries, ())
 
     def test_screen_replacement_is_separate_and_round_trips(self) -> None:
         midi = self.service.normalize_entries(

@@ -2,6 +2,21 @@
 
 function family(id) {
     switch (Number(id)) {
+    case 1:
+        return {
+            panel: "#c8c8c4",
+            bezel: "#777772",
+            capTop: "#60605c",
+            capMid: "#60605c",
+            capBottom: "#60605c",
+            highlight: "transparent",
+            index: "#f2d56b",
+            slot: "#080909",
+            metalTop: "#b6b9b4",
+            metalMid: "#b6b9b4",
+            metalBottom: "#b6b9b4",
+            accent: "#d8d8d2"
+        }
     case 6:
         return {
             panel: "#d5d0c2",

@@ -116,6 +116,11 @@ genuine changes to numeric controls as specified in `midi_control.md`. Capacity
 is calculated from the available width; eligible indicators use genuine-change
 LRU replacement and the outgoing knob flashes red twice.
 
+Portable OSC controller activity shares that bar and the same binding state.
+OSC uses flat F01 hardware visuals and stable address/argument identity; MIDI
+keeps F06. A target can have only one owner across both protocols. Network and
+value rules are in `osc_control.md`.
+
 ## Physical strings
 
 Karplus-Strong feedback remains the decay control. The strum path applies a

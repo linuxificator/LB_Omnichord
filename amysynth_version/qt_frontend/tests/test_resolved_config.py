@@ -40,6 +40,9 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertEqual(resolved.transport.serial_baud, 1_000_000)
         self.assertEqual(resolved.midi_input.configured_profile, "auto")
         self.assertEqual(resolved.midi_input.profile_source, "runtime-adapter")
+        self.assertTrue(resolved.osc_input.enabled)
+        self.assertEqual(resolved.osc_input.listen_address, "0.0.0.0")
+        self.assertEqual(resolved.osc_input.listen_port, 8000)
         self.assertEqual(resolved.capacities.voices.manual_chord, 7)
         self.assertEqual(resolved.capacities.max_patterns, 1024)
         self.assertEqual(resolved.layout.midi_row_buses, (4, 5, 6, 7, 8, 9))
@@ -118,6 +121,7 @@ class ResolvedConfigTests(unittest.TestCase):
 
     def test_domain_invariants_aggregate_independent_path_errors(self) -> None:
         invalid = copy.deepcopy(self.shipped)
+        invalid["osc_input"]["listen_address"] = "all interfaces"
         invalid["synth_ids"]["bass"] = invalid["synth_ids"]["drums"]
         invalid["voices"]["manual_chord"] = 4
         invalid["voices"]["rhythm_chord"] = 4
@@ -141,6 +145,7 @@ class ResolvedConfigTests(unittest.TestCase):
         paths = {issue.path for issue in caught.exception.issues}
         self.assertTrue(
             {
+                "$.osc_input.listen_address",
                 "$.synth_ids",
                 "$.voices.manual_chord",
                 "$.voices.rhythm_chord",

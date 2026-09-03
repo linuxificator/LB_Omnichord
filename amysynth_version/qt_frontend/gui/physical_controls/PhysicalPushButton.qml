@@ -35,21 +35,50 @@ Button {
         // 2-4: physical plunger/cap with lamp material
         Rectangle {
             id: plunger
+            objectName: "physicalButtonPlunger"
             x: parent.width * 0.15
             y: parent.height * 0.20 + (control.physicallyDown ? 3 : 0)
             width: parent.width * 0.70
             height: parent.height * 0.44
             radius: 5
             border.width: 1
-            border.color: control.physicallyDown ? "#fff7f7" : "#efe8df"
+            border.color:
+                control.family === 1
+                ? control.s.bezel
+                : (control.physicallyDown ? "#fff7f7" : "#efe8df")
             gradient: Gradient {
-                GradientStop { position: 0.00; color: control.physicallyDown ? "#fff3f3" : "#ffe3dc" }
-                GradientStop { position: 0.22; color: control.physicallyDown ? "#ffb6b6" : "#ff9b91" }
-                GradientStop { position: 0.62; color: control.physicallyDown ? "#ff6868" : "#f45d5d" }
-                GradientStop { position: 1.00; color: control.physicallyDown ? "#bd2d2d" : "#cf3e3e" }
+                GradientStop {
+                    objectName: "physicalButtonGradientStop0"
+                    position: 0.00
+                    color: control.family === 1
+                        ? (control.physicallyDown ? "#c64545" : "#d95555")
+                        : (control.physicallyDown ? "#fff3f3" : "#ffe3dc")
+                }
+                GradientStop {
+                    objectName: "physicalButtonGradientStop1"
+                    position: 0.22
+                    color: control.family === 1
+                        ? (control.physicallyDown ? "#c64545" : "#d95555")
+                        : (control.physicallyDown ? "#ffb6b6" : "#ff9b91")
+                }
+                GradientStop {
+                    objectName: "physicalButtonGradientStop2"
+                    position: 0.62
+                    color: control.family === 1
+                        ? (control.physicallyDown ? "#c64545" : "#d95555")
+                        : (control.physicallyDown ? "#ff6868" : "#f45d5d")
+                }
+                GradientStop {
+                    objectName: "physicalButtonGradientStop3"
+                    position: 1.00
+                    color: control.family === 1
+                        ? (control.physicallyDown ? "#c64545" : "#d95555")
+                        : (control.physicallyDown ? "#bd2d2d" : "#cf3e3e")
+                }
             }
 
             Rectangle {
+                visible: control.family !== 1
                 x: 5
                 y: control.physicallyDown ? 3 : 2
                 width: parent.width - 10

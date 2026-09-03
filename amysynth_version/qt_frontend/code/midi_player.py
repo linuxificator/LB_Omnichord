@@ -27,6 +27,7 @@ from midi_input import (
     MidiInputPort,
     MidiInputPortFactory,
 )
+from osc_input import OscInputEvent, OscInputPort, OscInputPortFactory
 from musical_state import TuningSnapshot, tune_note
 from synth_programs import resolve_program
 from synth_state import SynthState
@@ -66,6 +67,16 @@ class _QueuedMidiInputEventRelay:
         self._emit = emit
 
     def __call__(self, event: MidiInputEvent) -> None:
+        self._emit(event)
+
+
+class _QueuedOscInputEventRelay:
+    """Non-QObject callable used by the OSC worker to emit one Qt signal."""
+
+    def __init__(self, emit: Any) -> None:
+        self._emit = emit
+
+    def __call__(self, event: OscInputEvent) -> None:
         self._emit(event)
 
 
@@ -375,7 +386,7 @@ class MidiAmyEngine:
 
 @final
 class MidiPlayerBackend(QObject):
-    """Independent MIDI-player state, presets, USB input and AMY routing."""
+    """MIDI-player state, shared control binding, inputs and AMY routing."""
 
     stateChanged = Signal()
     tuningChanged = Signal()
@@ -390,6 +401,7 @@ class MidiPlayerBackend(QObject):
     bindingStateChanged = Signal()
     bindingLocationRequested = Signal(str, int)
     _queuedMidiInputEvent = Signal(object)
+    _queuedOscInputEvent = Signal(object)
     midiInputTechsChanged = Signal()
 
     def __init__(
@@ -398,6 +410,7 @@ class MidiPlayerBackend(QObject):
         synths: tuple[Any, ...],
         client: Any,
         midi_input_port_factory: MidiInputPortFactory,
+        osc_input_port_factory: OscInputPortFactory,
     ) -> None:
         super().__init__(owner)
         self.owner = owner
@@ -449,6 +462,13 @@ class MidiPlayerBackend(QObject):
         self._last_midi_input_sequence = 0
         self._pending_midi_input_events: dict[int, MidiInputEvent] = {}
         self._midi_input_closed = False
+        self._queuedOscInputEvent.connect(self._accept_osc_input_event)
+        self._osc_input_event_relay = _QueuedOscInputEventRelay(
+            self._queuedOscInputEvent.emit
+        )
+        self._last_osc_input_sequence = 0
+        self._pending_osc_input_events: dict[int, OscInputEvent] = {}
+        self._osc_input_closed = False
         self._blue_expiry_timer = QTimer(self)
         self._blue_expiry_timer.setInterval(250)
         self._blue_expiry_timer.timeout.connect(self._expire_blue_controls)
@@ -479,6 +499,11 @@ class MidiPlayerBackend(QObject):
             client.resolved_config.midi_input,
         )
         self._midi_input_port.start()
+        self._osc_input_port: OscInputPort = osc_input_port_factory(
+            self._osc_input_event_relay,
+            client.resolved_config.osc_input,
+        )
+        self._osc_input_port.start()
         self._refresh_midi_input_techs()
         self._midi_input_refresh_timer.start()
 
@@ -486,7 +511,10 @@ class MidiPlayerBackend(QObject):
         self._midi_input_refresh_timer.stop()
         self._midi_input_activity_timer.stop()
         self._midi_input_closed = True
+        self._osc_input_closed = True
         self._pending_midi_input_events.clear()
+        self._pending_osc_input_events.clear()
+        self._osc_input_port.close()
         self._midi_input_port.close()
         self.engine.close()
 
@@ -559,6 +587,14 @@ class MidiPlayerBackend(QObject):
     def midiInputTechs(self) -> list[dict[str, Any]]:
         return list(self._midi_input_tech_snapshot)
 
+    @Property(str, constant=True)
+    def oscInputState(self) -> str:
+        return str(self._osc_input_port.lifecycle)
+
+    @Property(str, constant=True)
+    def oscInputFailureReason(self) -> str:
+        return str(self._osc_input_port.failure_reason)
+
     @Slot(str)
     def _mark_midi_tech_activity(self, key: str) -> None:
         self._midi_input_activity_until[str(key)] = time.monotonic() + MIDI_INPUT_ACTIVITY_SECONDS
@@ -626,6 +662,79 @@ class MidiPlayerBackend(QObject):
                 ),
             ),
         )
+
+    @Slot(object)
+    def _accept_osc_input_event(self, event: object) -> None:
+        """Drain the one ordered OSC-worker-to-Qt event stream."""
+
+        if self._osc_input_closed or not isinstance(event, OscInputEvent):
+            return
+        if event.sequence <= self._last_osc_input_sequence:
+            return
+        self._pending_osc_input_events[event.sequence] = event
+        sequence = self._last_osc_input_sequence + 1
+        while sequence in self._pending_osc_input_events:
+            current = self._pending_osc_input_events.pop(sequence)
+            self.process_osc_control(
+                current.address,
+                current.argument,
+                current.value,
+                current.value_type,
+            )
+            self._last_osc_input_sequence = sequence
+            sequence += 1
+
+    def process_osc_control(
+        self,
+        address: str,
+        argument: int,
+        value: float,
+        value_type: str,
+    ) -> None:
+        with self._midi_control_lock:
+            control_key = self._midi_control_state.osc_key(
+                address,
+                argument,
+                value_type,
+            )
+            was_blue = control_key in self._midi_control_state.blue_since
+            changed, target, key = self._midi_control_state.observe_osc(
+                address,
+                argument,
+                value,
+                value_type,
+                now=time.monotonic(),
+            )
+            if not changed or key is None:
+                return
+            self._write_cc_test_log(
+                {
+                    "event": "osc-change",
+                    "address": str(address),
+                    "argument": int(argument),
+                    "sourceType": self._midi_control_state.source_type(key),
+                    "clock": self._midi_control_state.clock,
+                    "mapped": target is not None,
+                }
+            )
+            blue_cleared = (
+                was_blue and control_key not in self._midi_control_state.blue_since
+            )
+        if blue_cleared:
+            self._sync_blue_timer()
+            self._bump_binding_state()
+        scaled_value = int(
+            round(
+                max(0.0, min(1.0, float(value)))
+                * self._midi_control_state.value_max_for_key(key)
+            )
+        )
+        if target is not None:
+            if self._is_button_target(target):
+                self._apply_button_target(target, scaled_value > 0)
+            else:
+                self._apply_control_target(target, scaled_value, key)
+        self._emit_binding_location_feedback(key, target)
 
     @Slot(int, int, int)
     def process_midi_control(self, channel: int, controller: int, value: int) -> None:
@@ -1351,6 +1460,16 @@ class MidiPlayerBackend(QObject):
     @Slot(int, int, int)
     def injectControl(self, channel: int, controller: int, value: int) -> None:
         self.process_midi_control(channel, controller, value)
+
+    @Slot(str, int, float, str)
+    def injectOscControl(
+        self,
+        address: str,
+        argument: int,
+        value: float,
+        value_type: str = "continuous",
+    ) -> None:
+        self.process_osc_control(address, argument, value, value_type)
 
     @Slot(int, int)
     def injectPitchBend(self, channel: int, value: int) -> None:

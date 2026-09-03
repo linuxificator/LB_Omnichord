@@ -383,6 +383,41 @@ JSON and AMY output. The offscreen Qt test feeds real raw-MIDI bytes, records
 JSONL indicator/layout state and verifies the replacement transition fits the
 actual bar.
 
+### OSC-CTRL — portable OSC controller input
+
+**OSC-CTRL-01 — configured UDP input and source identity**
+
+- The shipped configuration enables OSC on `0.0.0.0:8000`; both address and
+  port are editable and no consumer fallback duplicates them.
+- A valid OSC 1.0 UDP message or bundle is decoded off the Qt thread. Each
+  numeric argument is identified by exact address and zero-based argument
+  index, reaches the Qt thread once and preserves packet order.
+- Malformed packets and unsupported argument types create no indicators and do
+  not stop the listener. Bind failure is reported as failed rather than ready.
+
+**OSC-CTRL-02 — common learn and ownership state**
+
+- A changing normalized OSC value appears in the same grey capacity/LRU bar as
+  MIDI, labelled with its address and argument index.
+- OSC uses flat F01 rotary/pushbutton visuals; MIDI remains F06. F01 contains no
+  virtual light, highlight or shadow effect.
+- Grey/blue/red/green click behavior, target learning, manual takeover, blue
+  expiry, hidden binding behavior and button takeover exactly match MIDI.
+- MIDI and OSC share global one-to-one ownership. Binding an OSC source to a
+  MIDI-owned target displaces the MIDI source to blue, and vice versa.
+
+**OSC-CTRL-03 — mapping and preset compatibility**
+
+- Numeric `0.0..1.0` maps over the target's complete declared range and calls
+  the existing target setter/AMY convergence path. OSC never calls AMY itself.
+- Boolean or endpoint-only control messages can drive application buttons;
+  zero is released and any positive normalized value is pressed.
+- OSC bindings persist by address/index/type inside the existing screen-owned
+  binding list. Existing MIDI binding JSON round-trips byte-for-shape without
+  acquiring OSC fields.
+- All five release packages install and exercise `python-osc`; startup and
+  package tests retain the separate wire-only frontend/AMY process boundary.
+
 ### INSTRUMENT — selected patch identity
 
 **INST-01 — selecting an instrument changes the manual chord synth**
