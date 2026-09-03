@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import re
+import tempfile
 import time
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import serial
 
 from catalog import control_default, patch_for_index, synth_index
-from harness import HeadlessApp
+from harness import HeadlessApp, SerialAmyBridge
 
 
 _NOTE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
@@ -97,6 +102,42 @@ def wait_for_immediate_note_ons(
 
 def contains_fractional_pitch(notes: list[float]) -> bool:
     return any(abs(note - round(note)) > 1e-5 for note in notes)
+
+
+class SerialHarnessTests(unittest.TestCase):
+    def test_diagnostic_logging_does_not_backpressure_a_serial_burst(self) -> None:
+        line_count = 4_096
+        lines = [f"H{index},0,0n60l1i0Z" for index in range(line_count)]
+        payload = ("\n".join(lines) + "\n").encode("ascii")
+
+        with tempfile.TemporaryDirectory() as directory:
+            bridge = SerialAmyBridge(Path(directory), native_amy=False)
+            log_path = bridge._serial_log_path
+            original_open = Path.open
+
+            def delayed_artifact_open(
+                path: Path, *args: object, **kwargs: object
+            ) -> object:
+                if path == log_path:
+                    time.sleep(0.002)
+                return original_open(path, *args, **kwargs)
+
+            try:
+                with serial.Serial(
+                    bridge.serial_port,
+                    baudrate=1_000_000,
+                    write_timeout=0.5,
+                ) as sender:
+                    with patch.object(Path, "open", delayed_artifact_open):
+                        self.assertEqual(sender.write(payload), len(payload))
+                        bridge.wait_for_lines([lines[-1]], timeout=5.0)
+                self.assertEqual(bridge.count(), line_count)
+            finally:
+                bridge.close()
+            self.assertEqual(
+                log_path.read_text(encoding="utf-8").splitlines(),
+                lines,
+            )
 
 
 class SerialIntegrationTests(unittest.TestCase):

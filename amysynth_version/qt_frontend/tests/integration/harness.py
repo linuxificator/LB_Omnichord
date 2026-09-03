@@ -151,54 +151,56 @@ class SerialAmyBridge:
                 f"{json.dumps(value, ensure_ascii=False, default=str)}\n"
             )
 
-    def _record_line(self, line: str) -> None:
-        line = line.strip("\r")
-        if not line:
+    def _record_lines(self, lines: list[str]) -> None:
+        accepted = [line.strip("\r") for line in lines if line.strip("\r")]
+        if not accepted:
             return
 
-        if self.native_amy:
-            assert self.amy is not None
-            with self._amy_lock:
-                self.amy.send_wire(line)
-                reset_match = re.fullmatch(r"S(\d+)Z", line)
-                if reset_match:
-                    reset_flags = int(reset_match.group(1))
-                    if reset_flags & int(self.amy.RESET_SEQUENCER):
-                        # The real audio callback keeps running independently
-                        # while the application's serial writer observes its
-                        # post-reset barrier.  This test bridge receives and
-                        # renders on one thread, so an unlucky busy read loop
-                        # can otherwise ingest the later pattern triggers
-                        # before it renders the queued reset.  Process the
-                        # reset delta here; a timebase reset needs one further
-                        # block because AMY deliberately applies that part at
-                        # the following block boundary.
-                        self._render_native_block_locked()
-                        if reset_flags & int(self.amy.RESET_TIMEBASE):
+        for line in accepted:
+            if self.native_amy:
+                assert self.amy is not None
+                with self._amy_lock:
+                    self.amy.send_wire(line)
+                    reset_match = re.fullmatch(r"S(\d+)Z", line)
+                    if reset_match:
+                        reset_flags = int(reset_match.group(1))
+                        if reset_flags & int(self.amy.RESET_SEQUENCER):
+                            # The real audio callback keeps running independently
+                            # while the application's serial writer observes its
+                            # post-reset barrier.  This test bridge receives and
+                            # renders on one thread, so an unlucky busy read loop
+                            # can otherwise ingest the later pattern triggers
+                            # before it renders the queued reset.  Process the
+                            # reset delta here; a timebase reset needs one further
+                            # block because AMY deliberately applies that part at
+                            # the following block boundary.
                             self._render_native_block_locked()
-            self._write_native_log("WIRE", line)
+                            if reset_flags & int(self.amy.RESET_TIMEBASE):
+                                self._render_native_block_locked()
+                self._write_native_log("WIRE", line)
 
-        # In native mode a line is observable only after AMY has ingested it.
-        # Otherwise wait_for_lines(zY1) could wake the test before the bridge
-        # called amy.send_wire(zY1), letting a fast test render ahead of the
-        # transport-start event it was supposedly waiting for.
+        # In native mode lines become observable only after AMY has ingested
+        # the complete batch.  Otherwise wait_for_lines(zY1) could wake the
+        # test before the bridge called amy.send_wire(zY1), letting a fast test
+        # render ahead of the transport-start event it was waiting for.
         with self._line_condition:
-            self.lines.append(line)
+            self.lines.extend(accepted)
             self._last_rx = time.monotonic()
             self._line_condition.notify_all()
         with self._serial_log_path.open("a", encoding="utf-8") as handle:
-            handle.write(line + "\n")
+            handle.write("".join(f"{line}\n" for line in accepted))
 
     def _read_serial(self) -> None:
+        lines: list[str] = []
         while True:
             try:
                 chunk = os.read(self.master_fd, 65536)
             except BlockingIOError:
-                return
+                break
             except OSError:
-                return
+                break
             if not chunk:
-                return
+                break
             self.raw_chunks.append(chunk)
             self._buffer.extend(chunk)
             while b"\n" in self._buffer:
@@ -208,7 +210,8 @@ class SerialAmyBridge:
                     line = raw.decode("ascii")
                 except UnicodeDecodeError:
                     line = raw.decode("ascii", errors="replace")
-                self._record_line(line)
+                lines.append(line)
+        self._record_lines(lines)
 
     def _render_native_block_locked(self) -> None:
         assert self.c_amy is not None
