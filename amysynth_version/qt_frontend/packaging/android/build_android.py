@@ -7,6 +7,7 @@ import argparse
 import calendar
 import configparser
 import hashlib
+import json
 import re
 import shlex
 import shutil
@@ -22,16 +23,6 @@ from prune_pyside_wheel import prune_wheel
 PYSIDE_VERSION = "6.11.2"
 P4A_COMMIT = "3762c88c56e3443efb8eba2a02a2604b680240fd"
 APP_ID = "org.linuxificator.lb_omnichord"
-QT_MODULE_LOAD_ORDER = (
-    "Core",
-    "Gui",
-    "Network",
-    "OpenGL",
-    "Qml",
-    "Quick",
-    "QuickControls2",
-    "Test",
-)
 ARCHITECTURES = {
     "x86_64": ("x86_64", "x86_64"),
     "aarch64": ("arm64-v8a", "arm64"),
@@ -39,6 +30,22 @@ ARCHITECTURES = {
 ASSET_DIRECTORIES = ("config", "gui", "instruments", "music")
 SOURCE_EXTENSIONS = "py,qml,js,json,csv,png,jpg,jpeg"
 PORTABLE_REQUIREMENTS = Path(__file__).resolve().parents[2] / "requirements-portable.txt"
+RUNTIME_MANIFEST = Path(__file__).resolve().parents[1] / "qt_runtime_manifest.json"
+
+
+def configured_android_qt_modules(
+    path: Path = RUNTIME_MANIFEST,
+) -> tuple[str, ...]:
+    """Read the sole authoritative Android Qt load order."""
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    modules = tuple(str(module) for module in data["android_load_order"])
+    if not modules or len(modules) != len(set(modules)):
+        raise ValueError("Android Qt module load order must be non-empty and unique")
+    return modules
+
+
+QT_MODULE_LOAD_ORDER = configured_android_qt_modules()
 
 
 def run(command: list[str], *, cwd: Path) -> None:
