@@ -110,11 +110,29 @@ for _ in {1..120}; do
   sleep 0.5
 done
 
-# Drive the packaged UI from the adb process. Use the actual screenshot
-# viewport: `wm size` reports natural panel dimensions and Android 35 no longer
-# exposes SurfaceOrientation in `dumpsys input`.
+# Drive the packaged UI from the adb process. A QPA-ready log line precedes the
+# first rendered QML frame on a cold emulator, so wait for visual evidence
+# before injecting input. A blank Android system surface compresses to only a
+# few KiB; the real, detailed Omnichord surface is comfortably larger than
+# this conservative lower bound on every packaged Android viewport.
 readonly before_screenshot="$evidence_dir/omni-before.png"
-adb exec-out screencap -p > "$before_screenshot"
+rendered_viewport=0
+for _ in {1..40}; do
+  adb exec-out screencap -p > "$before_screenshot"
+  if (( $(stat -c %s "$before_screenshot") >= 65536 )); then
+    rendered_viewport=1
+    break
+  fi
+  sleep 0.25
+done
+if (( rendered_viewport != 1 )); then
+  echo "Android application did not produce a detailed rendered frame" >&2
+  exit 1
+fi
+
+# Use the actual screenshot viewport: `wm size` reports natural panel
+# dimensions and Android 35 no longer exposes SurfaceOrientation in
+# `dumpsys input`.
 read -r display_width display_height < <(
   python3 - "$before_screenshot" <<'PY'
 import struct
