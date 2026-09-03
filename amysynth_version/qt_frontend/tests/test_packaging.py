@@ -416,8 +416,9 @@ class PackagingContracts(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("windows-native:", workflow)
         self.assertIn("windows-native,", workflow)
-        self.assertIn('$startInfo.Environment["QT_QPA_PLATFORM"] = "offscreen"', workflow)
+        self.assertIn('$env:QT_QPA_PLATFORM = "offscreen"', workflow)
         self.assertIn('$launcher.WaitForExit(60000)', workflow)
+        self.assertIn("timeout-minutes: 4", workflow)
         self.assertIn("Windows package launcher exceeded its external", workflow)
         self.assertIn("amy_service.exe", build)
         self.assertIn("--name LB_Omnichord", build)
@@ -465,8 +466,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("amy_set_gamma9001_pcm(gamma9001_pcm_data)", service)
         self.assertEqual(service.count("configure_pcm_bank();"), 1)
         self.assertIn("runs-on: windows-2025", workflow)
-        self.assertIn('[Diagnostics.ProcessStartInfo]::new()', workflow)
-        self.assertIn('"-File", "$root\\run_windows.ps1"', workflow)
+        self.assertIn('Start-Process -FilePath "powershell.exe"', workflow)
+        self.assertIn('$quotedScript = \'"\' + "$root\\run_windows.ps1"', workflow)
 
     def test_appimage_launcher_preserves_the_process_boundary(self) -> None:
         entry = (FRONTEND / "packaging" / "appimage_entry.py").read_text(

@@ -364,6 +364,7 @@ jobs:
       - name: Validate separate native service and frontend
         shell: pwsh
         working-directory: amysynth_version/qt_frontend
+        timeout-minutes: 4
         run: |
           $package = "dist\LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.Windows-x86_64.zip"
           Expand-Archive -Path $package -DestinationPath "$env:RUNNER_TEMP\lb-package"
@@ -381,32 +382,33 @@ jobs:
           $env:CI = "true"
           python tests\contracts\test_external_input_processes.py *> $inputLog
           if ($LASTEXITCODE -ne 0) { throw "External input process contract failed" }
-          $startInfo = [Diagnostics.ProcessStartInfo]::new()
-          $startInfo.FileName = "powershell.exe"
-          foreach ($argument in @(
+          $appOut = Join-Path $capture "application.stdout.log"
+          $appErr = Join-Path $capture "application.stderr.log"
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          $quotedScript = '"' + "$root\run_windows.ps1" + '"'
+          $quotedCapture = '"' + $capture + '"'
+          $launcherArguments = @(
             "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
-            "-File", "$root\run_windows.ps1",
-            "-Windowed", "-CaptureScreenshotsDir", $capture
-          )) {
-            $startInfo.ArgumentList.Add($argument)
-          }
-          $startInfo.UseShellExecute = $false
-          $startInfo.RedirectStandardOutput = $true
-          $startInfo.RedirectStandardError = $true
-          $startInfo.Environment["QT_QPA_PLATFORM"] = "offscreen"
-          $startInfo.Environment["QT_QUICK_BACKEND"] = "software"
-          $launcher = [Diagnostics.Process]::new()
-          $launcher.StartInfo = $startInfo
-          if (-not $launcher.Start()) { throw "Could not start Windows package launcher" }
-          $stdout = $launcher.StandardOutput.ReadToEndAsync()
-          $stderr = $launcher.StandardError.ReadToEndAsync()
-          if (-not $launcher.WaitForExit(60000)) {
+            "-File", $quotedScript,
+            "-Windowed", "-CaptureScreenshotsDir", $quotedCapture
+          )
+          $launcher = Start-Process -FilePath "powershell.exe" `
+            -ArgumentList $launcherArguments -PassThru -NoNewWindow `
+            -RedirectStandardOutput $appOut -RedirectStandardError $appErr
+          $timedOut = -not $launcher.WaitForExit(60000)
+          if ($timedOut) {
             taskkill.exe /PID $launcher.Id /T /F | Out-Null
-            throw "Windows package launcher exceeded its external 60 second deadline"
           }
           $launcher.WaitForExit()
-          @($stdout.GetAwaiter().GetResult(), $stderr.GetAwaiter().GetResult()) |
-            Set-Content -Path $appLog
+          @(
+            if (Test-Path $appOut) { Get-Content -Raw $appOut }
+            if (Test-Path $appErr) { Get-Content -Raw $appErr }
+          ) | Set-Content -Path $appLog
+          if ($timedOut) {
+            Get-Content $appLog
+            throw "Windows package launcher exceeded its external 60 second deadline"
+          }
           if ($launcher.ExitCode -ne 0) {
             Get-Content $appLog
             throw "Windows package launcher failed with status $($launcher.ExitCode)"
