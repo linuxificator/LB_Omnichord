@@ -103,3 +103,14 @@ The current work intentionally does not conceal these open findings:
 The next action is platform CI validation, not a merge and not an unrelated
 refactor. After CI is green, report the exact run and any still-unverified
 physical hardware paths to the user.
+
+## Validation continuation after `gh` recovery
+
+GitHub CLI authentication was restored and manual run `33761942285` was
+started for checkpoint `bc0e0e2`. All regression suites, both Linux packages,
+macOS, Windows and both Android APK builds passed. The Android emulator alone
+failed before sending a packet because its host-side test controller invoked
+`external_input_peer.py` without installing its declared `python-osc`
+dependency (`ModuleNotFoundError: No module named 'pythonosc'`). The repair
+installs the shared pinned `requirements-portable.txt` only in the emulator
+test job; it does not add anything to the Android application package.

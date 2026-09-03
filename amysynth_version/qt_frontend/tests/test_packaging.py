@@ -291,6 +291,11 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("external_input_peer.py", android)
         self.assertIn("toybox nc -u", android)
+        self.assertIn("Install external-input test peer dependencies", release)
+        self.assertIn(
+            "-r amysynth_version/qt_frontend/requirements-portable.txt",
+            release,
+        )
         self.assertEqual(
             release.count("Run portable external-input process contract"),
             4,
