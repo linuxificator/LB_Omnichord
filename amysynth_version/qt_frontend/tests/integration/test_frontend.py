@@ -635,11 +635,15 @@ class FrontendIntegrationTests(unittest.TestCase):
 
             checkpoint = app.bridge.count()
             app.action("injectMidiControl", 3, 76, 127)
-            app.bridge.wait_idle(timeout=3.0)
+            expected = [f"y{bus}h3,0.5,0.5Z" for bus in (1, 2, 3)]
+            mapped_lines = app.bridge.wait_for_lines(
+                expected,
+                start=checkpoint,
+                timeout=3.0,
+            )
             self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
-            mapped_lines = app.bridge.lines_since(checkpoint)
-            for bus in (1, 2, 3):
-                self.assertIn(f"y{bus}h3,0.5,0.5Z", mapped_lines)
+            for command in expected:
+                self.assertIn(command, mapped_lines)
 
             app.action("manuallyEditMidiControlTarget", target)
             states = {
