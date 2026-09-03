@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 
-# Startup authors more than 700 fill patterns. Keep the queue finite while
+# Startup authors more than 700 persistent fill groups. Keep the queue finite while
 # admitting that characterized burst even when a 1-Mbaud target drains slowly.
 HIGH_QUEUE_CAPACITY = 65536
 LOW_QUEUE_CAPACITY = 4096

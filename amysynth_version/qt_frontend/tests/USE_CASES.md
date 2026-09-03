@@ -622,10 +622,10 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 
 - Current AMY stores exactly one sequencer entry per user tag; reusing a tag replaces that entry, and `H0,0,<tag>` clears only that entry. Multiple simultaneous events therefore require distinct tags.
 - The application reserves non-overlapping ranges sized from the complete rhythm catalogue: drums 0..55, bass 56..111 and automatic chords 112..251. Tags 252..255 remain unused.
-- Stored patterns reserve 0..935 for fills, 936..999 for automatic-chord
-  one-shots and 1000 upward for base drum roles. The current chord bank needs
-  at most 58 definitions and the complete overlap audit reaches 30 of 32
-  active instances.
+- Sequence groups reserve 1..936 for fills, 937..1000 for automatic-chord
+  phrases and 1001 upward for base drum roles. The current chord state needs
+  at most two velocity-specific definitions and the complete overlap audit
+  reaches 34 of 40 active executions.
 - Every scheduled wire body owns deterministic lane tags. Exact circular
   repetitions may share one shorter-period tag only when expanding that tag
   reproduces the complete original tick/body set.
@@ -672,8 +672,8 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 **RHYTHM-06 — manual chord input lets the current automatic chord finish**
 
 - Finger-down immediately starts manual synth 3 and selects the new active
-  chord for strum, bass and future automatic-child definitions. An already
-  running child keeps its immutable old definition and release.
+  chord for strum, bass and future automatic-phrase definitions. An already
+  running execution keeps its immutable old definition and releases.
 - Every real finger-up immediately stops the manual synth-3 voice, including a
   release shortly after hold promotion. Its release is neither delayed by a
   dropout-grace timer nor quantized to rhythm. A tap must not change effective
@@ -681,8 +681,8 @@ Expected: Piano returns with its edited Piano values, while Organ retains its ow
 - If Qt reports a long press using its platform style hint, hold promotion
   suppresses the effective automatic-chord lane without changing the `CHORD
   ON/OFF` state or sending an immediate `l0i4`.
-- Future synth-4 `zQT` root triggers are cleared. Root tags own no release;
-  every currently sounding whole-chord or single-note child executes its own
+- Future synth-4 group-start root triggers are cleared. Root tags own no release;
+  every currently sounding whole-chord or arpeggio execution executes its own
   original `l0` event and completes the configured gate.
 - No later automatic-chord note-on may occur while the manual chord is held.
   The lane is reinstalled on release.
@@ -698,7 +698,7 @@ that prevented hanging but audibly shortened the accompaniment gate. A later
 arpeggio implementation exposed a second form: finger-down rewrote the lane to
 new pitches before hold promotion, so one old pitch-specific release could be
 replaced and one arpeggio note remained indefinitely. The final design moved
-release ownership into immutable `ONE_SHOT` children. The serial regression
+release ownership into immutable one-shot group revisions. The serial regression
 proves that hold promotion clears only root triggers and emits no immediate
 `l0i4`.
 
@@ -771,8 +771,8 @@ proves that hold promotion clears only root triggers and emits no immediate
   at beats 1, 2, 3 and 4 and repeats from beat 1.
 - The tag audit expands every compacted period and proves exact timing for all
   catalogue rhythms, activity levels, rates and 2–7-note chords. Root tags
-  launch short one-shot children; the worst arpeggio uses 42 of the existing
-  140 chord tags.
+  launch one-shot phrases; the worst rhythm uses 28 of the existing 140 chord
+  tags.
 - The real serial test proves a seven-note dominant-13 chord is sent in both
   directions using only tags 112..251. Disabling `A` restores the old four-note
   whole-chord limit. Arpeggio changes never touch drums, bass, transport or
@@ -781,11 +781,12 @@ proves that hold promotion clears only root triggers and emits no immediate
   1 migrates only the former shipped `rhythm_chord: 4` default to 7 while
   retaining other user overrides; startup validation rejects smaller custom
   pools instead of silently allowing voice stealing to truncate an arpeggio.
-- `/1..4` use disjoint child-pattern families. The `/2 -> /4` serial regression
-  proves that `/2` children own a 17-tick release, `/4` children own a 9-tick
-  release and the switch does not rewrite any `/2` definition. The exhaustive
-  instance audit includes every overlap, all current drum roles and one fill;
-  its worst case is 30 of the configured 32 instances.
+- `/1..4` atomically publish revisions under stable group tags. The `/2 -> /4`
+  serial regression proves the resulting phrases contain their 17-tick and
+  9-tick note gates; AMY's native test proves an already-running revision keeps
+  its old releases after publication. The exhaustive execution audit includes
+  every overlap, all current drum roles and one fill; its worst case is 34 of
+  the configured 40 executions.
 
 **RHYTHM-12 — cold Start plays the visible percussion level immediately**
 

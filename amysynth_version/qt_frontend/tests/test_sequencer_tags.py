@@ -293,16 +293,16 @@ class SequencerTagTests(unittest.TestCase):
         writer = _WriterProbe()
         lane = _TaggedSequencerLane("chords", 112, 3, writer)
         events = [
-            (0, 192, "zQT940,0,0"),
-            (48, 192, "zQT941,0,0"),
-            (96, 192, "zQT942,0,0"),
+            (0, 192, "zQ940,1,1,0"),
+            (48, 192, "zQ941,1,1,0"),
+            (96, 192, "zQ942,1,1,0"),
         ]
         self.assertEqual(
             lane.commands(events),
             [
-                "H0,192,112zQT940,0,0Z",
-                "H48,192,113zQT941,0,0Z",
-                "H96,192,114zQT942,0,0Z",
+                "H0,192,112zQ940,1,1,0Z",
+                "H48,192,113zQ941,1,1,0Z",
+                "H96,192,114zQ942,1,1,0Z",
             ],
         )
 
