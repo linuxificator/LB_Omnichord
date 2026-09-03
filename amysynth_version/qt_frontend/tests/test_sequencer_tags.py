@@ -20,6 +20,12 @@ from amy_serial import (  # noqa: E402
 )
 from drum_patterns import load_drum_pattern_catalog  # noqa: E402
 from config_loader import load_resolved_amy_config  # noqa: E402
+from rhythm_command_plan import (  # noqa: E402
+    SEQUENCE_CONTROL_GATE,
+    SEQUENCE_CONTROL_PUBLISH,
+    compile_group_definition,
+    sequence_control_command,
+)
 
 
 class _WriterProbe:
@@ -246,6 +252,39 @@ class SequencerTagTests(unittest.TestCase):
         )
         self.assertEqual(commands[0], "H0,16,10n60l1i1Z")
         self.assertEqual(commands[1], "H0,16,11n64l1i1Z")
+
+    def test_group_wire_adapter_uses_ticks_namespace_and_atomic_publish(self) -> None:
+        plan = compile_group_definition(
+            group=7,
+            length=48,
+            events=((0, 48, "i2n60l1"), (35, 0, "i2n60l0Z")),
+            previous_high_water=3,
+        )
+        self.assertEqual(
+            plan.commands,
+            (
+                "H0,48,0,7i2n60l1Z",
+                "H35,0,1,7i2n60l0Z",
+                "H0,0,2,7Z",
+                f"zQ7,{SEQUENCE_CONTROL_PUBLISH},48,0Z",
+            ),
+        )
+        self.assertEqual(plan.tag_count, 2)
+        self.assertEqual(plan.high_water, 3)
+        self.assertEqual(
+            sequence_control_command(7, SEQUENCE_CONTROL_GATE, 48, 0, 11),
+            "zQ7,2,48,0,11Z",
+        )
+
+    def test_group_wire_adapter_rejects_invalid_identity_and_bounds(self) -> None:
+        with self.assertRaisesRegex(ValueError, "start at 1"):
+            compile_group_definition(group=0, length=48, events=())
+        with self.assertRaisesRegex(ValueError, "outside length"):
+            compile_group_definition(
+                group=1,
+                length=48,
+                events=((48, 0, "i2n60l1"),),
+            )
 
     def test_lane_clear_removes_only_future_child_triggers(self) -> None:
         writer = _WriterProbe()

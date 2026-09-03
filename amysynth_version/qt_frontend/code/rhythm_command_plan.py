@@ -9,6 +9,12 @@ from amy_parameter_plan import format_amy_float
 
 
 ScheduledEvent = tuple[int, int, str]
+GroupedEvent = tuple[int, int, str]
+
+SEQUENCE_CONTROL_STOP = 0
+SEQUENCE_CONTROL_START = 1
+SEQUENCE_CONTROL_GATE = 2
+SEQUENCE_CONTROL_PUBLISH = 3
 
 
 class DrumEventLike(Protocol):
@@ -68,6 +74,76 @@ class DrumHitBody(Protocol):
 
 
 FillT = TypeVar("FillT", bound=FillLike)
+
+
+def sequence_control_command(
+    group: int,
+    action: int,
+    value: int = 0,
+    quantize: int = 0,
+    execution_tag: int | None = None,
+) -> str:
+    """Encode AMY's generic sequencer-group control operation."""
+
+    if int(group) <= 0:
+        raise ValueError("sequencer group tags start at 1")
+    values = [int(group), int(action), int(value), max(0, int(quantize))]
+    if execution_tag is not None:
+        values.append(int(execution_tag))
+    return f"zQ{','.join(str(item) for item in values)}Z"
+
+
+@dataclass(frozen=True, slots=True)
+class GroupDefinitionPlan:
+    commands: tuple[str, ...]
+    tag_count: int
+    high_water: int
+
+
+def compile_group_definition(
+    *,
+    group: int,
+    length: int,
+    events: Sequence[GroupedEvent],
+    previous_high_water: int = 0,
+) -> GroupDefinitionPlan:
+    """Stage and atomically publish one complete sequencer-group revision."""
+
+    group_value = int(group)
+    length_value = int(length)
+    if group_value <= 0:
+        raise ValueError("sequencer group tags start at 1")
+    if length_value <= 0:
+        raise ValueError("sequencer group length must be positive")
+
+    commands: list[str] = []
+    for tag, (tick, period, body) in enumerate(events):
+        tick_value = int(tick)
+        period_value = int(period)
+        if tick_value < 0 or tick_value >= length_value:
+            raise ValueError(
+                f"group {group_value} event tick {tick_value} is outside length {length_value}"
+            )
+        if period_value < 0:
+            raise ValueError("grouped event period must not be negative")
+        command_body = str(body)
+        if command_body.endswith("Z"):
+            command_body = command_body[:-1]
+        commands.append(
+            f"H{tick_value},{period_value},{tag},{group_value}{command_body}Z"
+        )
+
+    high_water = max(len(events), max(0, int(previous_high_water)))
+    for tag in range(len(events), high_water):
+        commands.append(f"H0,0,{tag},{group_value}Z")
+    commands.append(
+        sequence_control_command(
+            group_value,
+            SEQUENCE_CONTROL_PUBLISH,
+            length_value,
+        )
+    )
+    return GroupDefinitionPlan(tuple(commands), len(events), high_water)
 
 
 def _period_divisors(period: int) -> tuple[int, ...]:
