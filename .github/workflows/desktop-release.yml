@@ -381,8 +381,36 @@ jobs:
           $env:CI = "true"
           python tests\contracts\test_external_input_processes.py *> $inputLog
           if ($LASTEXITCODE -ne 0) { throw "External input process contract failed" }
-          & "$root\LB_Omnichord.cmd" -Windowed -CaptureScreenshotsDir $capture *> $appLog
-          if ($LASTEXITCODE -ne 0) { throw "Windows package launcher failed" }
+          $startInfo = [Diagnostics.ProcessStartInfo]::new()
+          $startInfo.FileName = "powershell.exe"
+          foreach ($argument in @(
+            "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+            "-File", "$root\run_windows.ps1",
+            "-Windowed", "-CaptureScreenshotsDir", $capture
+          )) {
+            $startInfo.ArgumentList.Add($argument)
+          }
+          $startInfo.UseShellExecute = $false
+          $startInfo.RedirectStandardOutput = $true
+          $startInfo.RedirectStandardError = $true
+          $startInfo.Environment["QT_QPA_PLATFORM"] = "offscreen"
+          $startInfo.Environment["QT_QUICK_BACKEND"] = "software"
+          $launcher = [Diagnostics.Process]::new()
+          $launcher.StartInfo = $startInfo
+          if (-not $launcher.Start()) { throw "Could not start Windows package launcher" }
+          $stdout = $launcher.StandardOutput.ReadToEndAsync()
+          $stderr = $launcher.StandardError.ReadToEndAsync()
+          if (-not $launcher.WaitForExit(60000)) {
+            taskkill.exe /PID $launcher.Id /T /F | Out-Null
+            throw "Windows package launcher exceeded its external 60 second deadline"
+          }
+          $launcher.WaitForExit()
+          @($stdout.GetAwaiter().GetResult(), $stderr.GetAwaiter().GetResult()) |
+            Set-Content -Path $appLog
+          if ($launcher.ExitCode -ne 0) {
+            Get-Content $appLog
+            throw "Windows package launcher failed with status $($launcher.ExitCode)"
+          }
           Get-Content $appLog
           if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked after package capture" }
           python tests\support\package_evidence.py `
