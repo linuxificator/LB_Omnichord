@@ -89,6 +89,8 @@ for checkpoint in \
   qml-chord-tap-released \
   qml-chord-hold-promoted \
   qml-chord-hold-released \
+  qml-slider-drag-visible \
+  qml-slider-release-visible \
   event-loop-exited; do
   grep -q "$checkpoint" "$status_file"
 done

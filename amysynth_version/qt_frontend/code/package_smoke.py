@@ -15,6 +15,134 @@ def _visual_items(item: Any) -> list[Any]:
     return items
 
 
+def _require_slider_geometry(slider: Any, items: list[Any]) -> None:
+    track = next(
+        (item for item in items if item.objectName() == "sliderTrack"),
+        None,
+    )
+    fill = next(
+        (item for item in items if item.objectName() == "sliderFill"),
+        None,
+    )
+    handle = next(
+        (item for item in items if item.objectName() == "sliderHandle"),
+        None,
+    )
+    if track is None or fill is None or handle is None:
+        raise RuntimeError("packaged slider visual items were not found")
+
+    visual = float(slider.property("visualPosition"))
+    expected_fill = visual * float(track.property("width"))
+    expected_handle = float(slider.property("leftPadding")) + visual * (
+        float(slider.property("availableWidth"))
+        - float(handle.property("width"))
+    )
+    if not math.isclose(
+        float(fill.property("width")),
+        expected_fill,
+        abs_tol=0.75,
+    ):
+        raise RuntimeError("packaged slider fill does not follow visualPosition")
+    if not math.isclose(
+        float(handle.property("x")),
+        expected_handle,
+        abs_tol=0.75,
+    ):
+        raise RuntimeError("packaged slider handle does not follow visualPosition")
+
+
+def exercise_slider_input(
+    app: QGuiApplication,
+    window: Any,
+    checkpoint: Callable[[str], None],
+) -> None:
+    """Drag a real visible parameter slider and verify its rendered geometry."""
+
+    items = _visual_items(window.contentItem())
+    candidates = [
+        item
+        for item in items
+        if item.objectName() == "nativeSlider"
+        and item.isVisible()
+        and item.isEnabled()
+        and float(item.property("width")) >= 40.0
+        and item.parentItem() is not None
+        and str(item.parentItem().property("traceKind")) == "parameter"
+    ]
+    if not candidates:
+        raise RuntimeError("visible packaged parameter slider was not found")
+
+    slider = candidates[0]
+    slider_items = _visual_items(slider)
+    handle = next(
+        (item for item in slider_items if item.objectName() == "sliderHandle"),
+        None,
+    )
+    if handle is None:
+        raise RuntimeError("packaged slider handle was not found")
+
+    initial = float(slider.property("value"))
+    minimum = float(slider.property("from"))
+    maximum = float(slider.property("to"))
+    span = maximum - minimum
+    if not math.isfinite(span) or span <= 0.0:
+        raise RuntimeError("packaged slider has an invalid range")
+    initial_visual = float(slider.property("visualPosition"))
+    target_visual = 0.75 if initial_visual < 0.5 else 0.25
+
+    start = handle.mapToScene(
+        QPointF(
+            float(handle.property("width")) / 2.0,
+            float(handle.property("height")) / 2.0,
+        )
+    ).toPoint()
+    target_x = (
+        float(slider.property("leftPadding"))
+        + target_visual
+        * (
+            float(slider.property("availableWidth"))
+            - float(handle.property("width"))
+        )
+        + float(handle.property("width")) / 2.0
+    )
+    target = slider.mapToScene(
+        QPointF(target_x, float(slider.property("height")) / 2.0)
+    ).toPoint()
+
+    QTest.mousePress(
+        window,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        start,
+    )
+    app.processEvents()
+    if not bool(slider.property("pressed")):
+        raise RuntimeError("packaged slider did not retain the mouse press")
+    QTest.mouseMove(window, target, delay=20)
+    app.processEvents()
+    moved = float(slider.property("value"))
+    if abs(moved - initial) < span * 0.2:
+        raise RuntimeError("packaged slider value did not follow the mouse drag")
+    _require_slider_geometry(slider, slider_items)
+    checkpoint("qml-slider-drag-visible")
+
+    QTest.mouseRelease(
+        window,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+        target,
+    )
+    app.processEvents()
+    if not math.isclose(
+        float(slider.property("value")),
+        moved,
+        abs_tol=max(abs(span) * 0.001, 1e-6),
+    ):
+        raise RuntimeError("packaged slider returned to a stale value on release")
+    _require_slider_geometry(slider, slider_items)
+    checkpoint("qml-slider-release-visible")
+
+
 def exercise_chord_input(
     app: QGuiApplication,
     window: Any,

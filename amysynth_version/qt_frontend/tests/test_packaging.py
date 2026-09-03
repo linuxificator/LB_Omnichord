@@ -150,6 +150,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("smoke-audio-levels-full", android_smoke)
         self.assertIn("--windowed --package-smoke-test", release)
         self.assertIn("qml-chord-hold-promoted", android_smoke)
+        self.assertIn("qml-slider-release-visible", android_smoke)
         self.assertLess(
             android_smoke.index('am force-stop "$package"'),
             android_smoke.index("amy-audio-capture.enable"),
@@ -393,6 +394,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("qml-chord-tap-released", launcher)
         self.assertIn("qml-chord-hold-promoted", launcher)
         self.assertIn("qml-chord-hold-released", launcher)
+        self.assertIn("qml-slider-drag-visible", launcher)
+        self.assertIn("qml-slider-release-visible", launcher)
         self.assertIn("-ExecutionPolicy Bypass", click_launcher)
         self.assertIn('"%~dp0run_windows.ps1" %*', click_launcher)
         self.assertIn("pause", click_launcher)

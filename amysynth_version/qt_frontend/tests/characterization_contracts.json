@@ -37,6 +37,7 @@
     "test_qml_gesture_controls.py::QmlGestureControlTests.test_midi_bound_slider_handle_drag_still_moves",
     "test_qml_gesture_controls.py::QmlGestureControlTests.test_plain_slider_handle_drag_still_moves",
     "test_qml_gesture_controls.py::QmlGestureControlTests.test_labeled_slider_drag_does_not_depend_on_immediate_backend_echo",
-    "test_qml_gesture_controls.py::QmlGestureControlTests.test_parameter_slider_drag_ignores_stale_model_replacement_during_press"
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_parameter_slider_drag_ignores_stale_model_replacement_during_press",
+    "test_qml_gesture_controls.py::QmlGestureControlTests.test_parameter_slider_touch_drag_keeps_value_and_visuals_after_release"
   ]
 }

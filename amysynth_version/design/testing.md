@@ -172,14 +172,16 @@ acceptance steps.
 
 The macOS and Windows package jobs drive both a quick tap and a long press
 classified by the real packaged QML `TapHandler`, using synthesized Qt pointer
-events and Qt's platform long-press interval.
-They require the active-border state, tap release, hold takeover and hold
-release checkpoints before publication; hold release must be visible on the
-first event-loop turn rather than after a grace timer. The Windows job invokes
-the packaged `LB_Omnichord.cmd` double-click entry point, which in turn starts
-the PowerShell supervisor with a process-only execution-policy bypass. These
-hosted tests do not replace physical trackpad/touchscreen or audible-output
-validation.
+events and Qt's platform long-press interval. The same package smoke drags a
+visible production synth-parameter slider and verifies that its native value,
+custom handle and fill remain aligned both during the drag and after release.
+They require the active-border state, tap release, hold takeover, hold release
+and slider-visual checkpoints before publication; hold release must be visible
+on the first event-loop turn rather than after a grace timer. The Windows job
+invokes the packaged `LB_Omnichord.cmd` double-click entry point, which in turn
+starts the PowerShell supervisor with a process-only execution-policy bypass.
+These hosted tests do not replace physical trackpad/touchscreen or
+audible-output validation.
 
 `packaging/build_appimage.sh` builds either Linux AppImage;
 `packaging/build_macos_dmg.sh` builds the Apple Silicon application/DMG. The
@@ -306,3 +308,7 @@ Important regression tests:
 - packaged macOS and Windows QML chord input observes pointer-down/up, retains
   the selected chord border after a tap, promotes a hold and releases both
   gestures without leaving synth 3 active
+- packaged slider input changes a production parameter through the native Qt
+  mouse path and retains aligned value/handle/fill geometry after release;
+  component coverage repeats the same accepted-value contract with a Qt test
+  touchscreen device

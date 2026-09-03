@@ -41,7 +41,37 @@ class QmlGestureControlTests(unittest.TestCase):
         )
         assert window is not None
         QCoreApplication.processEvents()
+        self.assertTrue(QTest.qWaitForWindowExposed(window))
+        window.requestActivate()
+        self.assertTrue(QTest.qWaitForWindowActive(window))
         return engine, component, window
+
+    def assert_slider_visuals_match_value(self, slider: QObject) -> None:
+        track = slider.findChild(QObject, "sliderTrack")
+        fill = slider.findChild(QObject, "sliderFill")
+        handle = slider.findChild(QObject, "sliderHandle")
+        self.assertIsNotNone(track)
+        self.assertIsNotNone(fill)
+        self.assertIsNotNone(handle)
+        assert track is not None
+        assert fill is not None
+        assert handle is not None
+
+        visual = float(slider.property("visualPosition"))
+        self.assertAlmostEqual(
+            float(fill.property("width")),
+            visual * float(track.property("width")),
+            places=5,
+        )
+        expected_handle_x = float(slider.property("leftPadding")) + visual * (
+            float(slider.property("availableWidth"))
+            - float(handle.property("width"))
+        )
+        self.assertAlmostEqual(
+            float(handle.property("x")),
+            expected_handle_x,
+            places=5,
+        )
 
     def test_tap_number_uses_qt_button_auto_repeat(self) -> None:
         engine, component, window = self.create_window(
@@ -545,6 +575,7 @@ Window {
         for x in (60, 90, 120, 145):
             QTest.mouseMove(window, QPoint(x, 65), delay=20)
             QCoreApplication.processEvents()
+            self.assert_slider_visuals_match_value(slider)
         self.assertGreater(float(slider.property("value")), 500.0)
         QTest.mouseRelease(
             window,
@@ -556,6 +587,96 @@ Window {
 
         self.assertGreater(float(window.property("lastEditedValue")), 500.0)
         self.assertGreater(int(window.property("editCount")), 0)
+        self.assertAlmostEqual(
+            float(slider.property("value")),
+            float(window.property("lastEditedValue")),
+            delta=1.0,
+        )
+        self.assert_slider_visuals_match_value(slider)
+
+        # A later external update is authoritative once the gesture is over.
+        active_control = window.property("activeControl")
+        active_control.setProperty("value", 250.0)
+        QCoreApplication.processEvents()
+        self.assertAlmostEqual(float(slider.property("value")), 250.0, places=5)
+        self.assert_slider_visuals_match_value(slider)
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
+    def test_parameter_slider_touch_drag_keeps_value_and_visuals_after_release(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 190
+    height: 90
+    visible: true
+    property real lastEditedValue: 100
+    property int editCount: 0
+
+    QtObject {
+        id: staleControl
+        property string key: "decay"
+        property string label: "Decay"
+        property real value: 100
+        property real minimum: 0
+        property real maximum: 1000
+        property real step: 1
+        property int decimals: 0
+        property string unit: "ms"
+        property string scale: "linear"
+    }
+
+    ParameterSlider {
+        objectName: "touchParameter"
+        x: 15
+        y: 10
+        width: 160
+        height: 70
+        control: staleControl
+        onEdited: (key, value) => {
+            window.lastEditedValue = value
+            window.editCount += 1
+            // Live backend edits deliberately do not publish a replacement
+            // control model for every pointer move.
+        }
+    }
+}
+""",
+        )
+        root = window.findChild(QObject, "touchParameter")
+        self.assertIsNotNone(root)
+        assert root is not None
+        slider = root.findChild(QObject, "nativeSlider")
+        self.assertIsNotNone(slider)
+        assert slider is not None
+
+        device = QTest.createTouchDevice()
+        sequence = QTest.touchEvent(window, device, False)
+        sequence.press(0, QPoint(30, 65), window).commit()
+        QTest.qWait(20)
+        self.assertTrue(bool(slider.property("pressed")))
+        for x in (60, 90, 120, 145):
+            sequence.move(0, QPoint(x, 65), window).commit()
+            QTest.qWait(20)
+            self.assert_slider_visuals_match_value(slider)
+        self.assertGreater(float(slider.property("value")), 500.0)
+        sequence.release(0, QPoint(145, 65), window).commit()
+        QTest.qWait(20)
+
+        self.assertGreater(int(window.property("editCount")), 0)
+        self.assertAlmostEqual(
+            float(slider.property("value")),
+            float(window.property("lastEditedValue")),
+            delta=1.0,
+        )
+        self.assert_slider_visuals_match_value(slider)
         window.deleteLater()
         component.deleteLater()
         engine.deleteLater()

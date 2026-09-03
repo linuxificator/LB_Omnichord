@@ -103,6 +103,8 @@ try {
             "qml-chord-tap-released",
             "qml-chord-hold-promoted",
             "qml-chord-hold-released",
+            "qml-slider-drag-visible",
+            "qml-slider-release-visible",
             "event-loop-exited"
         )
         foreach ($checkpoint in $requiredCheckpoints) {

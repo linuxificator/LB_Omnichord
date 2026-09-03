@@ -35,6 +35,9 @@ Core rules:
 - `CODEX_HANDOVER_EXTERNAL_CONTROLS.md` records the branch-local lessons from
   the external-control rework: smooth Qt slider drag, backend echo boundaries,
   MIDI input tech indicators and scoped hardware button takeover.
+- `CODEX_HANDOVER_FRITS_SLIDER_FIX.md` records the macOS mouse-visible slider
+  regression, its shared mouse/touch cause and the package-level proof added to
+  prevent recurrence without platform-specific UI code.
 - `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md` indexes the 2026-08-31
   repository-wide code-quality audit. Those files are analysis and proposed
   refactoring guidance, not authority to change product behavior.

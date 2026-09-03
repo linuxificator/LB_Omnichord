@@ -468,7 +468,8 @@ Expected:
 - A later external backend update remains authoritative and synchronizes all
   three visual/value representations.
 
-**Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the control; negative values also caused the numeric text to disappear. After the
+**Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the
+control; negative values also caused the numeric text to disappear. After the
 shared slider primitive was consolidated, release always restored its backend
 binding. Synth-control live edits intentionally suppress model publication to
 preserve the pointer grab, so a macOS mouse edit could reach the backend while
