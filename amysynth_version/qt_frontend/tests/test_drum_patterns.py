@@ -25,6 +25,11 @@ from drum_patterns import (  # noqa: E402
     load_drum_pattern_catalog,
 )
 from config_loader import load_resolved_amy_config  # noqa: E402
+from rhythm_command_plan import (  # noqa: E402
+    SEQUENCE_CONTROL_GATE,
+    compile_fill_group,
+    sequence_control_command,
+)
 
 
 class _WriterProbe:
@@ -169,6 +174,132 @@ class DrumPatternTests(unittest.TestCase):
             assert match is not None
             tick, period = (int(value) for value in match.groups())
             self.assertEqual(period, group_length if tick == 0 else 0)
+
+    def test_grouped_activity_preserves_every_catalogue_event_exactly(self) -> None:
+        event_pattern = re.compile(
+            r"^H(?P<tick>\d+),(?P<period>\d+),(?P<tag>\d+),"
+            r"(?P<group>\d+)(?P<body>.+)Z$"
+        )
+        for rhythm in self.catalog.rhythms.values():
+            for level_index, level in enumerate(rhythm.levels, start=1):
+                client = self.client()
+                client.rhythm_running = False
+                client.rhythm_config = {
+                    "id": rhythm.rhythm_id,
+                    "percussion_activity": level_index,
+                }
+                actual = []
+                for command in client._drum_activity_commands(
+                    quantize_live=False
+                ):
+                    match = event_pattern.match(command)
+                    if match is not None:
+                        actual.append(
+                            (
+                                int(match.group("group")),
+                                int(match.group("tick")),
+                                int(match.group("period")),
+                                int(match.group("tag")),
+                                match.group("body"),
+                            )
+                        )
+
+                expected = []
+                length = rhythm.period_ticks // 2
+                by_role: dict[str, list[object]] = {}
+                for event in level:
+                    by_role.setdefault(event.role, []).append(event)
+                for role_index, role in enumerate(client._drum_roles):
+                    group = 1001 + role_index
+                    for tag, event in enumerate(by_role.get(role, [])):
+                        tick = event.tick // 2
+                        expected.append(
+                            (
+                                group,
+                                tick,
+                                length if tick == 0 else 0,
+                                tag,
+                                client._drum_hit_body(
+                                    rhythm.rhythm_id,
+                                    role,
+                                    event.velocity,
+                                    fill=False,
+                                ),
+                            )
+                        )
+                self.assertEqual(actual, expected, (rhythm.rhythm_id, level_index))
+
+    def test_grouped_fills_preserve_events_and_only_add_generic_gates(self) -> None:
+        event_pattern = re.compile(
+            r"^H(?P<tick>\d+),(?P<period>\d+),(?P<tag>\d+),"
+            r"(?P<group>\d+)(?P<body>.+)Z$"
+        )
+        client = self.client()
+        for rhythm in self.catalog.rhythms.values():
+            for fill in rhythm.fills:
+                group = client._fill_group_tag(fill)
+                definition = compile_fill_group(
+                    rhythm_id=rhythm.rhythm_id,
+                    fill=fill,
+                    group=group,
+                    roles=client._drum_roles,
+                    role_indexes=client._drum_role_index,
+                    drum_group_start=1001,
+                    hit_body=client._drum_hit_body,
+                )
+                actual = []
+                for command in definition.commands:
+                    match = event_pattern.match(command)
+                    if match is not None:
+                        actual.append(
+                            (
+                                int(match.group("tick")),
+                                int(match.group("period")),
+                                int(match.group("tag")),
+                                int(match.group("group")),
+                                match.group("body"),
+                            )
+                        )
+
+                length = fill.duration_ticks // 2
+                expected = []
+                tag = 0
+                for role in client._drum_roles:
+                    if role in fill.continue_roles:
+                        continue
+                    role_group = 1001 + client._drum_role_index[role]
+                    gate = sequence_control_command(
+                        role_group,
+                        SEQUENCE_CONTROL_GATE,
+                        length,
+                        0,
+                        role_group,
+                    )[:-1]
+                    expected.append((0, length, tag, group, gate))
+                    tag += 1
+                for event in fill.events:
+                    tick = event.tick // 2
+                    expected.append(
+                        (
+                            tick,
+                            length if tick == 0 else 0,
+                            tag,
+                            group,
+                            client._drum_hit_body(
+                                rhythm.rhythm_id,
+                                event.role,
+                                event.velocity,
+                                fill=True,
+                            ),
+                        )
+                    )
+                    tag += 1
+
+                self.assertEqual(actual, expected, fill.fill_id)
+                self.assertFalse(
+                    any(re.match(r"^zQ\d+,1,", body) for *_, body in actual),
+                    fill.fill_id,
+                )
 
     def test_every_kit_resolves_without_changing_timing(self) -> None:
         for rhythm in self.catalog.rhythms.values():
