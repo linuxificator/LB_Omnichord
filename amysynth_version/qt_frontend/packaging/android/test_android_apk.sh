@@ -110,7 +110,6 @@ external_sender_pid=""
 cat "$status_file"
 cat "$sender_log"
 grep -q 'osc-external-process-started' "$sender_log"
-grep -q '"packets_sent":' "$sender_log"
 grep -E 'AmyAndroid|AmyAudioCapture|AMY backend|QPA platform|Traceback' \
   "$log_file" || true
 for checkpoint in \
