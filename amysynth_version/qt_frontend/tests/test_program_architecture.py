@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import sys
 import tempfile
@@ -17,6 +18,48 @@ from synth_programs import resolve_program  # noqa: E402
 
 
 class ProgramArchitectureTests(unittest.TestCase):
+    def test_package_input_stimulus_is_not_generated_by_production_code(self) -> None:
+        package_smoke = CODE / "package_smoke.py"
+        tree = ast.parse(package_smoke.read_text(encoding="utf-8"))
+        imports = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        calls = {
+            node.func.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+        self.assertNotIn("socket", imports)
+        self.assertTrue(
+            calls.isdisjoint(
+                {"sendto", "injectControl", "injectButton", "injectOscControl"}
+            )
+        )
+        self.assertTrue(
+            (ROOT / "tests" / "support" / "external_input_peer.py").is_file()
+        )
+
+    def test_portable_input_contract_has_no_platform_branches(self) -> None:
+        contract = (
+            ROOT / "tests" / "contracts" / "test_external_input_processes.py"
+        ).read_text(encoding="utf-8")
+        for platform_probe in (
+            "sys.platform",
+            "os.name",
+            "platform.system",
+            "platform.machine",
+            "runner.os",
+        ):
+            with self.subTest(platform_probe=platform_probe):
+                self.assertNotIn(platform_probe, contract)
+
+        runner = (ROOT / "tests" / "run_tests.py").read_text(encoding="utf-8")
+        self.assertIn('"portable-input-processes"', runner)
+        self.assertIn('"platform-input-linux"', runner)
+
     def test_shipped_json_is_the_authoritative_config(self) -> None:
         raw = json.loads(
             (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")

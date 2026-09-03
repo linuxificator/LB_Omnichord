@@ -215,6 +215,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertTrue((FRONTEND / "tests" / "alsa-null.conf").is_file())
         for suite in (
             "unit",
+            "portable-input-processes",
+            "platform-input-linux",
             "frontend",
             "serial",
             "presets",
@@ -264,23 +266,47 @@ class PackagingContracts(unittest.TestCase):
             FRONTEND / "packaging" / "android" / "test_android_apk.sh"
         ).read_text(encoding="utf-8")
         package_test = (
-            FRONTEND / "tests" / "test_package_chord_input.py"
+            FRONTEND
+            / "tests"
+            / "platform"
+            / "linux"
+            / "test_source_package_smoke.py"
         ).read_text(encoding="utf-8")
 
         self.assertGreaterEqual(release.count("--package-smoke-test"), 2)
         for checkpoint in (
-            "midi-input-profile-verified",
-            "midi-control-simulation-observed",
-            "midi-button-simulation-observed",
-            "osc-udp-rotary-observed",
-            "osc-udp-button-observed",
-            "osc-tech-activity-observed",
+            "midi-native-capability-verified",
+            "osc-external-process-rotary-observed",
+            "osc-external-process-button-observed",
+            "osc-external-process-activity-observed",
         ):
             with self.subTest(checkpoint=checkpoint):
                 self.assertGreaterEqual(release.count(checkpoint), 2)
                 self.assertIn(checkpoint, windows)
                 self.assertIn(checkpoint, android)
                 self.assertIn(checkpoint, package_test)
+        self.assertGreaterEqual(
+            release.count("tests/support/external_input_peer.py osc"),
+            2,
+        )
+        self.assertIn("external_input_peer.py", android)
+        self.assertIn('adb emu redir add "udp:${osc_port}:${osc_port}"', android)
+        self.assertIn('osc --config "$osc_config" --duration 30', android)
+        self.assertIn("Install external-input test peer dependencies", release)
+        self.assertIn(
+            "-r amysynth_version/qt_frontend/requirements-portable.txt",
+            release,
+        )
+        self.assertEqual(
+            release.count("Run portable external-input process contract"),
+            4,
+        )
+        self.assertIn("tests/contracts/test_external_input_processes.py", release)
+        self.assertTrue(
+            (FRONTEND / "tests" / "platform" / "linux" / "test_midi_input.py")
+            .is_file()
+        )
+        self.assertFalse((FRONTEND / "tests" / "test_midi_cc_qt.py").exists())
 
     def test_screenshots_refresh_only_after_a_successful_release(self) -> None:
         release = (

@@ -106,14 +106,16 @@ client/port.
 
 Release acceptance loads the real shipped configuration inside every final
 package and verifies that this platform profile, and no Linux technology on a
-non-Linux target, is published. It then exercises the common packaged CC and
-explicit controller-button route through the public simulation boundary.
-Linux additionally has an end-to-end Qt test that writes real MIDI bytes to a
-PTY-backed raw device. These tests do not claim physical CoreMIDI, WinMM or
-Android MIDI support: those bridges are not bundled, so their tested result is
-red/unavailable. A future native adapter must add platform-runner contract
-tests and physical-device acceptance rather than reclassifying simulation as
-hardware evidence.
+non-Linux target, is published. One unchanged portable contract runs a MIDI
+byte sender and parser receiver as different processes on every package
+runner. Linux additionally has an end-to-end platform test in
+`tests/platform/linux`: its controller process writes real MIDI bytes to a
+PTY-backed raw device while an independently launched Omnichord consumes them.
+These tests do not claim that the portable pipe is native MIDI or that physical
+CoreMIDI, WinMM or Android MIDI works. Those bridges are not bundled, so their
+tested package result is red/unavailable. A future native adapter must add a
+named platform-runner contract and physical-device acceptance rather than
+reclassifying parser simulation as hardware evidence.
 
 ## Pitch handling
 

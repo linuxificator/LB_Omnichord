@@ -11,11 +11,12 @@ import unittest
 from pathlib import Path
 
 
-FRONTEND = Path(__file__).resolve().parents[1]
+FRONTEND = Path(__file__).resolve().parents[3]
 MAIN = FRONTEND / "code" / "main.py"
+EXTERNAL_INPUT_PEER = FRONTEND / "tests" / "support" / "external_input_peer.py"
 
 
-class PackageChordInputTests(unittest.TestCase):
+class LinuxSourcePackageSmokeTests(unittest.TestCase):
     def test_package_smoke_drives_qml_tap_hold_and_active_border(self) -> None:
         with tempfile.TemporaryDirectory(prefix="omnichord-qml-smoke-") as raw:
             root = Path(raw)
@@ -58,6 +59,22 @@ class PackageChordInputTests(unittest.TestCase):
                     "OMNICHORD_PACKAGE_SMOKE_STATUS": str(status_path),
                 }
             )
+            sender = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(EXTERNAL_INPUT_PEER),
+                    "osc",
+                    "--config",
+                    str(FRONTEND / "config" / "amy_config.json"),
+                    "--duration",
+                    "15",
+                ],
+                cwd=FRONTEND,
+                env=environment,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
             completed = subprocess.run(
                 [
                     sys.executable,
@@ -75,6 +92,9 @@ class PackageChordInputTests(unittest.TestCase):
                 timeout=25,
                 check=False,
             )
+            if sender.poll() is None:
+                sender.terminate()
+            sender_stdout, sender_stderr = sender.communicate(timeout=3)
             listener.close()
             receiver.join(timeout=3.0)
 
@@ -87,16 +107,16 @@ class PackageChordInputTests(unittest.TestCase):
             )
             self.assertEqual(server_error, [])
             self.assertFalse(receiver.is_alive())
+            self.assertIn("osc-external-process-started", sender_stdout)
+            self.assertEqual(sender_stderr, "")
 
             status = status_path.read_text(encoding="utf-8")
             for checkpoint in (
                 "qml-root-ready",
-                "midi-input-profile-verified",
-                "midi-control-simulation-observed",
-                "midi-button-simulation-observed",
-                "osc-udp-rotary-observed",
-                "osc-udp-button-observed",
-                "osc-tech-activity-observed",
+                "midi-native-capability-verified",
+                "osc-external-process-rotary-observed",
+                "osc-external-process-button-observed",
+                "osc-external-process-activity-observed",
                 "smoke-audio-levels-full",
                 "qml-chord-press-observed",
                 "active-chord-visible",

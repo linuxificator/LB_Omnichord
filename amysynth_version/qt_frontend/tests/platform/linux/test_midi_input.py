@@ -14,10 +14,10 @@ import unittest
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 
 
-class MidiCcQtIntegrationTests(unittest.TestCase):
+class LinuxMidiInputIntegrationTests(unittest.TestCase):
     def test_real_midi_bytes_fit_bar_and_replace_true_lru(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)

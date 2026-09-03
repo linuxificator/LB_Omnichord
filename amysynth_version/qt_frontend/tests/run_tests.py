@@ -25,6 +25,13 @@ SUITES: dict[str, tuple[Path, ...]] = {
     # discovery prevents a new unit test from silently being omitted locally
     # and in CI, as happened with the MIDI engine and socket tests.
     "unit": tuple(sorted(TESTS.glob("test_*.py"))),
+    "portable-input-processes": (
+        TESTS / "contracts" / "test_external_input_processes.py",
+    ),
+    "platform-input-linux": (
+        TESTS / "platform" / "linux" / "test_midi_input.py",
+        TESTS / "platform" / "linux" / "test_source_package_smoke.py",
+    ),
     "frontend": (
         TESTS / "integration" / "test_frontend.py",
     ),
@@ -45,6 +52,8 @@ SUITES: dict[str, tuple[Path, ...]] = {
 ALL_ORDER = (
     "quality",
     "unit",
+    "portable-input-processes",
+    "platform-input-linux",
     "frontend",
     "serial",
     "presets",

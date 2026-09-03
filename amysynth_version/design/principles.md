@@ -45,3 +45,12 @@ not justify platform-specific application behavior when the affected framework
 primitive is shared. Reproduce the behavior at the narrowest shared boundary,
 add a behavioral regression test, and fix that shared boundary without adding
 duplicate input policy, cross-layer state ownership or source-text assertions.
+
+Production application modules must not contain integration/package test
+drivers, synthetic input generators, expected test outcomes or test-only
+status protocols. Unit tests may directly exercise narrow objects, but an
+integration or package sender/controller runs in a separate process and uses a
+normal production boundary. Cross-platform tests apply one portable semantic
+contract everywhere and isolate unavoidable native setup and capability
+expectations in named platform test adapters. The complete rules are owned by
+`test_process_architecture.md`.

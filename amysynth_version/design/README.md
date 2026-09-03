@@ -26,6 +26,9 @@ Core rules:
 - `testing.md` defines the maintained local suites and CI responsibilities;
   it also defines five-platform release packaging and validation.
   Detailed executable scenarios live in `../qt_frontend/tests/USE_CASES.md`.
+- `test_process_architecture.md` defines the production/test process boundary,
+  equivalent cross-platform acceptance and the separation between portable
+  contract tests and platform-adapter tests.
 - `sound_balance.md` defines user storage/config overrides, strum modes, MIDI
   control indicators and the instrument-balance measurement contract.
 - `configuration.md` defines versioned startup configuration, typed resolution,
@@ -124,6 +127,7 @@ Then add every row that matches the task:
 | ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |
 | Architecture, code quality or refactoring | `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md`, the relevant dedicated audit handover, `CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md`, plus every owning subsystem contract touched by the proposed change |
+| Test harnesses, package smoke or cross-platform acceptance | `test_process_architecture.md`, `testing.md`, `CODEX_HANDOVER_TEST_ARCHITECTURE.md`, `CODEX_HANDOVER_TEST_PROCESS_ARCHITECTURE_AUDIT.md`, plus the platform contracts selected above |
 | Selecting or executing the next code-quality task | `CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md`, `CODEX_HANDOVER_POST_T25_REMAINING_WORK.md`, its cited detailed handovers and every owning subsystem contract listed for that task |
 | Platform-dependent application code or adapter extraction | `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md`, `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md`, `CODEX_HANDOVER_PORTABILITY_RELEASE_AND_SECURITY.md`, plus the platform/package contracts selected above |
 | Python dependency, third-party library or local-versus-external implementation choice | `CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md`, `CODEX_HANDOVER_PORTABILITY_RELEASE_AND_SECURITY.md`, `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md`, plus the owning subsystem contract |

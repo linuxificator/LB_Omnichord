@@ -98,12 +98,10 @@ try {
         } else { "" }
         $requiredCheckpoints = @(
             "qml-root-ready",
-            "midi-input-profile-verified",
-            "midi-control-simulation-observed",
-            "midi-button-simulation-observed",
-            "osc-udp-rotary-observed",
-            "osc-udp-button-observed",
-            "osc-tech-activity-observed",
+            "midi-native-capability-verified",
+            "osc-external-process-rotary-observed",
+            "osc-external-process-button-observed",
+            "osc-external-process-activity-observed",
             "qml-chord-press-observed",
             "active-chord-visible",
             "qml-chord-tap-released",
