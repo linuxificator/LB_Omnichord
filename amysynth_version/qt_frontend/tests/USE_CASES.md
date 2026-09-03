@@ -815,8 +815,9 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 - `capture_screenshots.py` runs the production QML scene offscreen with an
   isolated temporary home and writes `screenshots/omni.png` and
   `screenshots/midi.png`.
-- The OMNI frame shows an active C-minor strum-note guide; the MIDI frame shows
-  three representative CC knobs in the grey lower bar.
+- The OMNI frame shows an active C-minor strum-note guide. The MIDI frame is
+  staged through the public simulation inputs and shows MIDI and OSC rotaries
+  plus a released pushbutton for each protocol in the grey lower bar.
 - Release refreshes store timestamped screenshot files such as
   `screenshots/omni-RYYYYMMDDTHHMMSS.png` and update the repository README to
   embed those files. Screenshot refreshes may not use a hand-drawn or generated

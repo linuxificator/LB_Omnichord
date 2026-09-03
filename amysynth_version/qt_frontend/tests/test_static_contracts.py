@@ -139,8 +139,14 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("skip-rebuild: README screenshots only", workflow)
         self.assertIn("skip-checks:true", workflow)
 
-        app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
-        self.assertIn("(2, 7, 104)", app_core)
+        screenshot_state = (ROOT / "code" / "screenshot_state.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("injectMidiControl", screenshot_state)
+        self.assertIn("injectMidiButton", screenshot_state)
+        self.assertIn("injectOscControl", screenshot_state)
+        self.assertIn('"continuous"', screenshot_state)
+        self.assertIn('"button"', screenshot_state)
 
     def test_midi_qml_uses_its_own_bindable_metaobject(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")

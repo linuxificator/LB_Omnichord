@@ -57,6 +57,7 @@ from preset_plan import (
     compile_omni_preset_plan,
 )
 from runtime_paths import production_frontend_asset_root
+from screenshot_state import populate_screenshot_input_controls
 from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
@@ -3851,16 +3852,9 @@ def run_application(
         capture_dir.mkdir(parents=True, exist_ok=True)
         window = engine.rootObjects()[0]
 
-        # Populate the MIDI screen's grey controller bar with representative
-        # genuine CC movements. The first packet establishes the previous
-        # value; the second is the movement that makes the knob visible.
-        for channel, controller, value in (
-            (2, 7, 104),
-            (2, 11, 72),
-            (2, 92, 38),
-        ):
-            backend.injectMidiControl(channel, controller, 0)
-            backend.injectMidiControl(channel, controller, value)
+        # Exercise the same public input paths used by controller simulations.
+        # The resulting bar contains MIDI and OSC rotaries and pushbuttons.
+        populate_screenshot_input_controls(backend, backend.midiPlayer)
         # Select C minor from factory preset 1 so the OMNI capture also
         # demonstrates the active chord and its correctly spelled C/E-flat/G
         # strum-note guide.

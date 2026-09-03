@@ -61,8 +61,9 @@ python capture_screenshots.py
 
 The helper runs the real frontend and QML scene through Qt's offscreen software
 renderer, uses an isolated temporary home and a drained pseudo-serial endpoint,
-selects C minor for the OMNI strum-note guide, and injects three representative
-MIDI CC movements for the grey MIDI controller bar. It overwrites only
+selects C minor for the OMNI strum-note guide, and uses the public simulation
+inputs to stage MIDI and OSC rotary and pushbutton events in the grey controller
+bar. It overwrites only
 `screenshots/omni.png` and `screenshots/midi.png`; it does not read or alter the
 user's presets or connect to AMY hardware.
 
