@@ -98,6 +98,10 @@ jobs:
           nm -D "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null
           nm -D "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null
 
+      - name: Run portable external-input process contract
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/contracts/test_external_input_processes.py
+
       - name: Download verified AppImage tools
         env:
           APPIMAGE_ARCH: ${{ matrix.arch }}
@@ -133,7 +137,12 @@ jobs:
           package="dist/LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.${{ matrix.platform }}.AppImage"
           "$package" --package-self-test
           smoke_status=/tmp/omnichord-package-smoke.status
+          sender_log=/tmp/omnichord-external-osc-sender.log
           rm -f "$smoke_status"
+          python tests/support/external_input_peer.py osc \
+            --config config/amy_config.json --duration 20 \
+            > "$sender_log" 2>&1 &
+          sender_pid=$!
           set +e
           OMNICHORD_PACKAGE_SMOKE_STATUS="$smoke_status" \
             QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
@@ -143,20 +152,25 @@ jobs:
           set -e
           cat /tmp/omnichord-package-smoke.log
           if [[ "$app_status" -ne 0 ]]; then
+            kill -TERM "$sender_pid" 2>/dev/null || true
+            wait "$sender_pid" || true
+            cat "$sender_log"
             echo "Packaged AppImage exit status: $app_status" >&2
             cat "$smoke_status" >&2 || true
             exit "$app_status"
           fi
           grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
           grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
+          kill -TERM "$sender_pid" 2>/dev/null || true
+          wait "$sender_pid" || true
+          cat "$sender_log"
+          grep -q 'osc-external-process-started' "$sender_log"
           for checkpoint in \
             qml-root-ready \
-            midi-input-profile-verified \
-            midi-control-simulation-observed \
-            midi-button-simulation-observed \
-            osc-udp-rotary-observed \
-            osc-udp-button-observed \
-            osc-tech-activity-observed \
+            midi-native-capability-verified \
+            osc-external-process-rotary-observed \
+            osc-external-process-button-observed \
+            osc-external-process-activity-observed \
             qml-chord-press-observed \
             active-chord-visible \
             qml-chord-tap-released \
@@ -236,6 +250,10 @@ jobs:
           nm -gU "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null
           nm -gU "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null
 
+      - name: Run portable external-input process contract
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/contracts/test_external_input_processes.py
+
       - name: Build and validate DMG
         working-directory: amysynth_version/qt_frontend
         env:
@@ -260,7 +278,12 @@ jobs:
           app="$mountpoint/LB_Omnichord.app/Contents/MacOS/LB_Omnichord"
           "$app" --package-self-test
           smoke_status=/tmp/omnichord-package-smoke.status
+          sender_log=/tmp/omnichord-external-osc-sender.log
           rm -f "$smoke_status"
+          python tests/support/external_input_peer.py osc \
+            --config config/amy_config.json --duration 20 \
+            > "$sender_log" 2>&1 &
+          sender_pid=$!
           set +e
           OMNICHORD_PACKAGE_SMOKE_STATUS="$smoke_status" \
             QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
@@ -270,20 +293,25 @@ jobs:
           set -e
           cat /tmp/omnichord-package-smoke.log
           if [[ "$app_status" -ne 0 ]]; then
+            kill -TERM "$sender_pid" 2>/dev/null || true
+            wait "$sender_pid" || true
+            cat "$sender_log"
             echo "Packaged macOS application exit status: $app_status" >&2
             cat "$smoke_status" >&2 || true
             exit "$app_status"
           fi
           grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
           grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
+          kill -TERM "$sender_pid" 2>/dev/null || true
+          wait "$sender_pid" || true
+          cat "$sender_log"
+          grep -q 'osc-external-process-started' "$sender_log"
           for checkpoint in \
             qml-root-ready \
-            midi-input-profile-verified \
-            midi-control-simulation-observed \
-            midi-button-simulation-observed \
-            osc-udp-rotary-observed \
-            osc-udp-button-observed \
-            osc-tech-activity-observed \
+            midi-native-capability-verified \
+            osc-external-process-rotary-observed \
+            osc-external-process-button-observed \
+            osc-external-process-activity-observed \
             qml-chord-press-observed \
             active-chord-visible \
             qml-chord-tap-released \
@@ -360,6 +388,11 @@ jobs:
         run: |
           python -m pip install -c amysynth_version/qt_frontend/packaging/constraints/desktop-current.txt -r amysynth_version/qt_frontend/requirements-build.txt
 
+      - name: Run portable external-input process contract
+        shell: pwsh
+        working-directory: amysynth_version/qt_frontend
+        run: python tests\contracts\test_external_input_processes.py
+
       - name: Checkout pinned AMY fork
         shell: pwsh
         run: |
@@ -391,8 +424,26 @@ jobs:
           New-Item -ItemType Directory -Force -Path $smokeUser | Out-Null
           $env:USERPROFILE = $smokeUser
           $env:LOCALAPPDATA = $smokeUser
-          & "$root\LB_Omnichord.cmd" -Windowed -SmokeTest
-          if ($LASTEXITCODE -ne 0) { throw "Windows package launcher failed" }
+          $senderOut = "$env:RUNNER_TEMP\lb-external-osc-sender.out"
+          $senderErr = "$env:RUNNER_TEMP\lb-external-osc-sender.err"
+          $sender = Start-Process -FilePath python -ArgumentList @(
+            "tests\support\external_input_peer.py", "osc",
+            "--config", "config\amy_config.json", "--duration", "30"
+          ) -PassThru -NoNewWindow -RedirectStandardOutput $senderOut `
+            -RedirectStandardError $senderErr
+          try {
+            & "$root\LB_Omnichord.cmd" -Windowed -SmokeTest
+            if ($LASTEXITCODE -ne 0) { throw "Windows package launcher failed" }
+          }
+          finally {
+            if (-not $sender.HasExited) { Stop-Process -Id $sender.Id -Force }
+            $sender.WaitForExit()
+          }
+          Get-Content $senderOut
+          if (Test-Path $senderErr) { Get-Content $senderErr }
+          if ((Get-Content -Raw $senderOut) -notmatch "osc-external-process-started") {
+            throw "External OSC sender did not start"
+          }
           if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked during package smoke test" }
 
       - name: Upload Windows package
@@ -503,6 +554,10 @@ jobs:
               check=True,
           )
           PY
+
+      - name: Run portable external-input process contract
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/contracts/test_external_input_processes.py
 
       - name: Build pinned AMY service AAR
         run: |

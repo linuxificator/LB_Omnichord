@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import math
-import socket
 import time
 from typing import Any, Callable
 
 from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
-from pythonosc.osc_message_builder import OscMessageBuilder
-
 from midi_platform_profile import current_midi_tech_profile
 from resolved_config import MidiInputConfig, OscInputConfig
 
@@ -81,12 +78,6 @@ def _wait_for(
     raise RuntimeError(message)
 
 
-def _osc_datagram(address: str, value: bool | float) -> bytes:
-    builder = OscMessageBuilder(address=address)
-    builder.add_arg(value)
-    return builder.build().dgram
-
-
 def _verify_midi_package_input(
     player: Any,
     midi_config: MidiInputConfig,
@@ -111,31 +102,7 @@ def _verify_midi_package_input(
         if str(item.get("protocol", "midi")) == "midi"
     ):
         raise RuntimeError("an unbundled native MIDI bridge was reported as available")
-    checkpoint("midi-input-profile-verified")
-
-    # The package smoke cannot manufacture CoreMIDI/WinMM/Android hardware.
-    # These public simulation slots do prove that each frozen package retains
-    # the same MIDI CC/button-to-controller-model path after adapter selection.
-    player.injectControl(16, 119, 24)
-    player.injectControl(16, 119, 96)
-    player.injectButton(16, 118, 127)
-    player.injectButton(16, 118, 0)
-    midi_controls = list(player.commonControls(-1))
-    if not any(
-        str(item.get("displayLabel", "")) == "CH16 CC119"
-        and str(item.get("sourceProtocol", "")) == "midi"
-        for item in midi_controls
-    ):
-        raise RuntimeError("packaged MIDI CC simulation did not reach the control model")
-    checkpoint("midi-control-simulation-observed")
-    if not any(
-        str(item.get("displayLabel", "")) == "CH16 N118"
-        and str(item.get("displayType", "")) == "note_button"
-        and str(item.get("sourceProtocol", "")) == "midi"
-        for item in midi_controls
-    ):
-        raise RuntimeError("packaged MIDI button simulation did not reach the control model")
-    checkpoint("midi-button-simulation-observed")
+    checkpoint("midi-native-capability-verified")
 
 
 def _exercise_osc_package_input(
@@ -155,52 +122,40 @@ def _exercise_osc_package_input(
         reason = str(player.oscInputFailureReason)
         raise RuntimeError(f"packaged OSC input is not ready: {reason}")
 
-    listen_address = str(osc_config.listen_address)
-    target_address = "127.0.0.1" if listen_address == "0.0.0.0" else listen_address
-    target = (target_address, int(osc_config.listen_port))
     rotary_address = "/package-smoke/rotary"
     button_address = "/package-smoke/button"
-    sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        # A continuous source intentionally needs a baseline and movement.
-        sender.sendto(_osc_datagram(rotary_address, 0.25), target)
-        QTest.qWait(20)
 
-        def received_all() -> bool:
-            sender.sendto(_osc_datagram(rotary_address, 0.75), target)
-            sender.sendto(_osc_datagram(button_address, True), target)
-            sender.sendto(_osc_datagram(button_address, False), target)
-            controls = list(player.commonControls(-1))
-            has_rotary = any(
-                str(item.get("displayLabel", "")) == rotary_address
-                and str(item.get("displayType", "")) == "osc"
-                and str(item.get("sourceProtocol", "")) == "osc"
-                for item in controls
-            )
-            has_button = any(
-                str(item.get("displayLabel", "")) == button_address
-                and str(item.get("displayType", "")) == "button"
-                and str(item.get("sourceProtocol", "")) == "osc"
-                for item in controls
-            )
-            osc_activity = any(
-                str(item.get("key", "")) == "osc"
-                and str(item.get("state", "")) == "activity"
-                for item in player.midiInputTechs
-            )
-            return has_rotary and has_button and osc_activity
-
-        _wait_for(
-            app,
-            received_all,
-            "packaged OSC UDP input did not reach its control and activity models",
+    def received_all() -> bool:
+        controls = list(player.commonControls(-1))
+        has_rotary = any(
+            str(item.get("displayLabel", "")) == rotary_address
+            and str(item.get("displayType", "")) == "osc"
+            and str(item.get("sourceProtocol", "")) == "osc"
+            for item in controls
         )
-    finally:
-        sender.close()
+        has_button = any(
+            str(item.get("displayLabel", "")) == button_address
+            and str(item.get("displayType", "")) == "button"
+            and str(item.get("sourceProtocol", "")) == "osc"
+            for item in controls
+        )
+        osc_activity = any(
+            str(item.get("key", "")) == "osc"
+            and str(item.get("state", "")) == "activity"
+            for item in player.midiInputTechs
+        )
+        return has_rotary and has_button and osc_activity
 
-    checkpoint("osc-udp-rotary-observed")
-    checkpoint("osc-udp-button-observed")
-    checkpoint("osc-tech-activity-observed")
+    _wait_for(
+        app,
+        received_all,
+        "external OSC process did not reach the packaged control/activity models",
+        timeout=8.0,
+    )
+
+    checkpoint("osc-external-process-rotary-observed")
+    checkpoint("osc-external-process-button-observed")
+    checkpoint("osc-external-process-activity-observed")
 
 
 def exercise_external_control_input(

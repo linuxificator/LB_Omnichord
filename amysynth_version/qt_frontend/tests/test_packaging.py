@@ -269,18 +269,22 @@ class PackagingContracts(unittest.TestCase):
 
         self.assertGreaterEqual(release.count("--package-smoke-test"), 2)
         for checkpoint in (
-            "midi-input-profile-verified",
-            "midi-control-simulation-observed",
-            "midi-button-simulation-observed",
-            "osc-udp-rotary-observed",
-            "osc-udp-button-observed",
-            "osc-tech-activity-observed",
+            "midi-native-capability-verified",
+            "osc-external-process-rotary-observed",
+            "osc-external-process-button-observed",
+            "osc-external-process-activity-observed",
         ):
             with self.subTest(checkpoint=checkpoint):
                 self.assertGreaterEqual(release.count(checkpoint), 2)
                 self.assertIn(checkpoint, windows)
                 self.assertIn(checkpoint, android)
                 self.assertIn(checkpoint, package_test)
+        self.assertGreaterEqual(
+            release.count("tests/support/external_input_peer.py osc"),
+            2,
+        )
+        self.assertIn("external_input_peer.py", android)
+        self.assertIn("toybox nc -u", android)
 
     def test_screenshots_refresh_only_after_a_successful_release(self) -> None:
         release = (

@@ -26,6 +26,8 @@ on:
         options:
           - quality
           - unit
+          - portable-input-processes
+          - platform-input-linux
           - frontend
           - serial
           - presets
@@ -56,6 +58,8 @@ jobs:
         suite:
           - quality
           - unit
+          - portable-input-processes
+          - platform-input-linux
           - frontend
           - serial
           - presets

@@ -5,14 +5,24 @@ readonly package=org.linuxificator.lb_omnichord
 readonly evidence_dir=android-audio-capture
 readonly status_file="$evidence_dir/lb-android-smoke.status"
 readonly log_file="$evidence_dir/lb-android.log"
+readonly sender_log="$evidence_dir/lb-android-external-osc-sender.log"
 mkdir -p "$evidence_dir"
+external_sender_pid=""
 
 capture_diagnostics() {
   adb logcat -d > "$log_file" 2>/dev/null || true
   adb exec-out run-as "$package" cat \
     files/lb-android-package-smoke.status > "$status_file" 2>/dev/null || true
 }
-trap capture_diagnostics EXIT
+
+cleanup() {
+  if [[ -n "$external_sender_pid" ]]; then
+    kill -TERM "$external_sender_pid" 2>/dev/null || true
+    wait "$external_sender_pid" 2>/dev/null || true
+  fi
+  capture_diagnostics
+}
+trap cleanup EXIT
 
 mapfile -t apks < <(find android-package -type f -name '*.apk' -print)
 if [[ ${#apks[@]} -ne 1 ]]; then
@@ -61,9 +71,27 @@ test "$warmup_ready" -eq 1
 ! grep -q 'Traceback (most recent call last)' /tmp/lb-android-warmup.log
 adb shell am force-stop "$package"
 
+osc_fixture_dir=/tmp/lb-android-osc-fixtures
+rm -rf "$osc_fixture_dir"
+python amysynth_version/qt_frontend/tests/support/external_input_peer.py \
+  osc-fixtures \
+  --config amysynth_version/qt_frontend/config/amy_config.json \
+  --output "$osc_fixture_dir"
+osc_port=$(<"$osc_fixture_dir/port.txt")
+adb push "$osc_fixture_dir"/osc-*.bin /data/local/tmp/
+
 adb shell run-as "$package" touch files/lb-android-package-smoke.enable
 adb shell run-as "$package" touch files/amy-audio-capture.enable
 adb logcat -c
+(
+  adb shell "i=0; while [ \$i -lt 400 ]; do \
+    for packet in /data/local/tmp/osc-*.bin; do \
+      toybox nc -u -w 1 127.0.0.1 $osc_port < \$packet; \
+    done; \
+    i=\$((i + 1)); sleep 0.05; \
+  done"
+) > "$sender_log" 2>&1 &
+external_sender_pid=$!
 adb shell monkey -p "$package" 1
 
 for _ in {1..120}; do
@@ -76,19 +104,22 @@ for _ in {1..120}; do
   sleep 0.5
 done
 capture_diagnostics
+kill -TERM "$external_sender_pid" 2>/dev/null || true
+wait "$external_sender_pid" 2>/dev/null || true
+external_sender_pid=""
 cat "$status_file"
+cat "$sender_log"
+! grep -Eiq 'not found|unknown option|invalid option|permission denied' "$sender_log"
 grep -E 'AmyAndroid|AmyAudioCapture|AMY backend|QPA platform|Traceback' \
   "$log_file" || true
 for checkpoint in \
   android-runtime-configured \
   qml-root-ready \
   initial-state-sent \
-  midi-input-profile-verified \
-  midi-control-simulation-observed \
-  midi-button-simulation-observed \
-  osc-udp-rotary-observed \
-  osc-udp-button-observed \
-  osc-tech-activity-observed \
+  midi-native-capability-verified \
+  osc-external-process-rotary-observed \
+  osc-external-process-button-observed \
+  osc-external-process-activity-observed \
   smoke-audio-levels-full \
   qml-chord-press-observed \
   active-chord-visible \
