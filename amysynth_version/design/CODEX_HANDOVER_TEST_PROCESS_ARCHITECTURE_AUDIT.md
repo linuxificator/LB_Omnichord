@@ -130,3 +130,35 @@ external-process transport, native adapter and physical validation.
 - weakening existing AMY, QML or audio package gates;
 - moving platform branches into shared application code;
 - bundling a general test-control server in release packages.
+
+## Implementation result on this branch
+
+Commits `61f1f6b` and `6be53d1` establish the contract and the first boundary
+correction. The following evidence now exists:
+
+- `tests/contracts/test_external_input_processes.py` runs identical portable
+  OSC and MIDI semantics without OS branches. Both scenarios assert that the
+  sender PID differs from the receiver PID.
+- `tests/support/external_input_peer.py` owns OSC datagrams and MIDI bytes;
+  `external_input_probe.py` owns portable receiving/parsing. Neither is staged
+  into application packages.
+- Linux/Raspberry Pi, macOS, Windows and Android package builders run that same
+  portable process contract. It proves parser/transport portability, not a
+  native MIDI bridge.
+- Every desktop artifact receives OSC from a separately launched Python
+  process. Android receives the same binary OSC messages from a separate
+  `adb shell` process inside the emulator.
+- the former self-sending OSC socket and direct packaged MIDI injection were
+  removed from `code/package_smoke.py`;
+- Linux native MIDI moved from top-level unit discovery to
+  `tests/platform/linux/test_midi_input.py`. Its controller process owns the
+  PTY bytes and the Omnichord runs as an independent process.
+- macOS, Windows and Android retain an honest package assertion that their
+  currently unbundled native MIDI bridge is unavailable. No fake native MIDI
+  event is reported under those platform names.
+
+V2 and V3 are resolved. V7 and V8 are improved: portable versus Linux-native
+evidence now has separate suite/checkpoint names, but duplicated package-smoke
+checkpoint assertions and platform workflow orchestration remain. V1, V4, V5
+and V6 remain open and are deliberately reported rather than hidden by this
+focused change.

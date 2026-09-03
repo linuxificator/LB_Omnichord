@@ -215,6 +215,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertTrue((FRONTEND / "tests" / "alsa-null.conf").is_file())
         for suite in (
             "unit",
+            "portable-input-processes",
+            "platform-input-linux",
             "frontend",
             "serial",
             "presets",
@@ -285,6 +287,16 @@ class PackagingContracts(unittest.TestCase):
         )
         self.assertIn("external_input_peer.py", android)
         self.assertIn("toybox nc -u", android)
+        self.assertEqual(
+            release.count("Run portable external-input process contract"),
+            4,
+        )
+        self.assertIn("tests/contracts/test_external_input_processes.py", release)
+        self.assertTrue(
+            (FRONTEND / "tests" / "platform" / "linux" / "test_midi_input.py")
+            .is_file()
+        )
+        self.assertFalse((FRONTEND / "tests" / "test_midi_cc_qt.py").exists())
 
     def test_screenshots_refresh_only_after_a_successful_release(self) -> None:
         release = (

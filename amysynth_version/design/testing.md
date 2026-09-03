@@ -33,6 +33,8 @@ The maintained suites are:
 | --- | --- | --- |
 | `quality` | compileall, shipped JSON, Markdown/status/routing, import/dependency boundaries, Ruff and mypy ratchets | declared test/quality requirements; no AMY/audio/display |
 | `unit` | all top-level `tests/test_*.py` contracts | none beyond frontend dependencies |
+| `portable-input-processes` | identical OSC-over-UDP and MIDI-byte/parser contracts with distinct sender/receiver PIDs | portable frontend dependencies; runs unchanged on every package runner |
+| `platform-input-linux` | real Omnichord subprocess receiving MIDI through a PTY-backed Linux raw-MIDI endpoint | Linux PTY, Qt offscreen and local AMY socket |
 | `frontend` | headless QML/backend interaction | PySide6 and local TCP/PTY support |
 | `serial` | production pyserial output over a Linux PTY | pyserial and PTY support |
 | `presets` | factory/user preset loading and migration | PySide6 and PTY support |
@@ -80,7 +82,7 @@ new shape at runtime is not sufficient review evidence.
 
 Four repository workflows are maintained:
 
-- `AMY frontend regression` runs the quality gate and six component suites in parallel for AMY
+- `AMY frontend regression` runs the quality gate and eight component suites in parallel for AMY
   frontend pull requests, is reused as the test gate of the release workflow,
   and accepts a selected suite or `all` through manual dispatch. Native jobs
   install the AMY fork at the commit pinned in the workflow and record that SHA
@@ -170,23 +172,31 @@ buffer. The published arm64 APK is debug-signed and explicitly experimental;
 stable distribution signing and physical-device validation remain separate
 acceptance steps.
 
-All five package jobs run the complete packaged-input smoke. It sends real OSC
-1.0 UDP datagrams through the package's configured listener and requires a
-rotary, pushbutton and green activity state to reach the shared Qt control
-model. It also verifies the package's actual MIDI profile: Linux exposes only
-ALSA raw, ALSA sequencer and OSS MIDI, while macOS, Windows and Android expose
-their platform-relevant native technology as explicitly unavailable until a
-bridge is bundled. Public MIDI simulation slots exercise the frozen package's
-shared CC and controller-button model after that adapter selection. Separately,
-the Linux Qt integration test writes real MIDI bytes through a PTY-backed raw
-device and verifies the native reader, parser, queued Qt boundary, model and
-binding path end to end.
+All five package jobs run packaged-input acceptance. A test-only sender process
+sends real OSC 1.0 UDP datagrams through the artifact's configured listener;
+the artifact must expose the rotary, pushbutton and green activity state in the
+shared Qt control model. On Android the sender is a separate `adb shell`
+process in the emulator, not code inside the activity. The test-only sender
+and probe are workflow inputs and are never staged into a release package.
+
+The same portable process contract runs unchanged on the Linux/Raspberry Pi,
+macOS, Windows and Android build runners. It requires distinct sender and
+receiver PIDs for OSC UDP and for a MIDI byte-stream/parser pipe. This proves
+the portable OSC transport/parser and MIDI parser without claiming a native
+MIDI device. Package acceptance separately verifies the actual MIDI profile:
+Linux exposes only ALSA raw, ALSA sequencer and OSS MIDI, while macOS, Windows
+and Android expose their platform-relevant native technology as explicitly
+unavailable until a bridge is bundled. The Linux-only platform suite writes
+real MIDI bytes from its controller process through a PTY-backed raw device to
+an independently launched Omnichord process and verifies the native reader,
+parser, queued Qt boundary, model and binding path end to end.
 
 This is the maximum deterministic hosted-CI boundary currently available. OSC
-loopback proves socket creation, packet parsing and application delivery but
-not firewall permission or packets from a second physical host. The simulated
-MIDI portion is not physical MIDI evidence, and CoreMIDI, WinMM and Android
-MIDI cannot be physical-input tested while those native bridges remain
+loopback proves socket creation, packet parsing, a separate process and
+application delivery, but not firewall permission or packets from a second
+physical host. The portable MIDI pipe is not native or physical MIDI evidence,
+and CoreMIDI, WinMM and Android MIDI cannot be physical-input tested while
+those native bridges remain
 unimplemented. Their red unavailable state is therefore an intentional,
 tested capability result rather than a false support claim.
 

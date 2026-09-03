@@ -45,6 +45,8 @@ A static regression test rejects reintroduction of the former parallel `SynthRun
 | Suite | Purpose | Hardware/AMY |
 | --- | --- | --- |
 | `unit` | all top-level `test_*.py`: catalogue/state, MIDI engine, socket framing, migration and structural invariants | none |
+| `portable-input-processes` | identical OSC UDP and MIDI parser scenarios with external sender and receiver PIDs | all package build runners; no hardware claim |
+| `platform-input-linux` | real raw-MIDI bytes from the controller process into a separately launched Omnichord | Linux PTY + Qt offscreen |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
 | `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned Gamma9001 LB AMY fork |
@@ -428,16 +430,18 @@ actual bar.
 **OSC-CTRL-04 — final-package input acceptance and evidence limit**
 
 - Every Linux x64, Raspberry Pi aarch64, macOS arm64, Windows x64 and Android
-  arm64 artifact sends real OSC rotary and pushbutton datagrams through its
-  configured UDP listener and observes both controls plus the green activity
-  state in the shared Qt model before publication.
+  arm64 artifact receives real OSC rotary and pushbutton datagrams from a
+  separate test process through its configured UDP listener and exposes both
+  controls plus the green activity state in the shared Qt model before
+  publication. Android uses a separate emulator shell process beside the app.
 - The same package smoke verifies the runtime-selected MIDI technology keys
-  and the packaged common CC/controller-button model. Linux separately feeds
-  real bytes through a PTY-backed raw-MIDI reader.
-- Hosted loopback does not prove an external OSC sender, firewall approval or
-  physical network. MIDI simulation is not hardware evidence; CoreMIDI,
-  WinMM and Android MIDI remain deliberately red/unavailable because their
-  native bridges are not currently bundled.
+  and availability. An identical two-process MIDI byte/parser contract runs on
+  every package builder; Linux separately feeds real bytes through a PTY-backed
+  raw-MIDI reader into a separately launched Omnichord.
+- Hosted loopback proves a separate local OSC process, not firewall approval,
+  a second host or a physical network. The portable MIDI parser pipe is not
+  native-hardware evidence; CoreMIDI, WinMM and Android MIDI remain deliberately
+  red/unavailable because their native bridges are not currently bundled.
 
 ### INSTRUMENT — selected patch identity
 

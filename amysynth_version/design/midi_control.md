@@ -359,8 +359,9 @@ The behavior is intentionally split along existing responsibilities:
   `LabeledSlider.qml`, `VerticalVolume.qml` and `TapNumber.qml` implement the
   shared bind/manual-takeover behavior used by their owning sections.
 - `../qt_frontend/tests/test_midi_control_bindings.py` tests the pure state
-  machine; `test_midi_engine.py` tests mapping; `test_midi_cc_qt.py` tests real
-  Qt/raw-MIDI indicator behavior; `test_static_contracts.py` protects QML
+  machine; `test_midi_engine.py` tests mapping;
+  `tests/platform/linux/test_midi_input.py` tests real Qt/raw-MIDI indicator
+  behavior across a process boundary; `test_static_contracts.py` protects QML
   wiring and layout; integration tests in `tests/integration/test_frontend.py`
   and `test_presets.py` cover AMY convergence and screen-owned persistence.
 

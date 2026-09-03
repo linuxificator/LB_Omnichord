@@ -42,6 +42,24 @@ class ProgramArchitectureTests(unittest.TestCase):
             (ROOT / "tests" / "support" / "external_input_peer.py").is_file()
         )
 
+    def test_portable_input_contract_has_no_platform_branches(self) -> None:
+        contract = (
+            ROOT / "tests" / "contracts" / "test_external_input_processes.py"
+        ).read_text(encoding="utf-8")
+        for platform_probe in (
+            "sys.platform",
+            "os.name",
+            "platform.system",
+            "platform.machine",
+            "runner.os",
+        ):
+            with self.subTest(platform_probe=platform_probe):
+                self.assertNotIn(platform_probe, contract)
+
+        runner = (ROOT / "tests" / "run_tests.py").read_text(encoding="utf-8")
+        self.assertIn('"portable-input-processes"', runner)
+        self.assertIn('"platform-input-linux"', runner)
+
     def test_shipped_json_is_the_authoritative_config(self) -> None:
         raw = json.loads(
             (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
