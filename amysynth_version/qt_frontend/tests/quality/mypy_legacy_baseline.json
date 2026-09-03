@@ -19,7 +19,6 @@
     "code/midi_control.py",
     "code/midi_integration.py",
     "code/midi_player.py",
-    "code/package_smoke.py",
     "code/performance_backend.py",
     "code/performance_logic.py",
     "code/program_amy.py",

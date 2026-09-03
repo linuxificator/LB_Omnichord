@@ -32,7 +32,6 @@ python -m PyInstaller --noconfirm --clean --windowed --onedir `
     --name LB_Omnichord --distpath $pyDist --workpath (Join-Path $buildRoot "pyinstaller-work") `
     --specpath $buildRoot --paths (Join-Path $frontend "code") `
     --additional-hooks-dir (Join-Path $frontend "packaging\pyinstaller_hooks") `
-    --hidden-import package_smoke --hidden-import PySide6.QtTest `
     --add-data "$(Join-Path $frontend 'licence.txt');." `
     --add-data "$(Join-Path $frontend 'config');config" `
     --add-data "$(Join-Path $frontend 'gui');gui" `

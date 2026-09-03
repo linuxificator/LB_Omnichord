@@ -433,8 +433,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("amy_service.exe", build)
         self.assertIn("--name LB_Omnichord", build)
         self.assertIn("LB_Omnichord.cmd", build)
-        self.assertIn("--hidden-import package_smoke", build)
-        self.assertIn("--hidden-import PySide6.QtTest", build)
+        self.assertNotIn("--hidden-import package_smoke", build)
+        self.assertNotIn("--hidden-import PySide6.QtTest", build)
         self.assertIn("cmake --help", build)
         self.assertIn("Visual Studio 18 2026", build)
         self.assertIn("Visual Studio 17 2022", build)
@@ -526,8 +526,8 @@ class PackagingContracts(unittest.TestCase):
             self.assertIn(asset, entry)
         self.assertNotIn("core.FRONTEND_DIR =", entry)
         self.assertNotIn("amy.live(", entry)
-        self.assertIn("--hidden-import package_smoke", build)
-        self.assertIn("--hidden-import PySide6.QtTest", build)
+        self.assertNotIn("--hidden-import package_smoke", build)
+        self.assertNotIn("--hidden-import PySide6.QtTest", build)
 
     def test_release_stamp_validation_matches_asset_format(self) -> None:
         build_script = (FRONTEND / "packaging" / "build_appimage.sh").read_text(
@@ -543,8 +543,8 @@ class PackagingContracts(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("LB_Omnichord.${release_stamp}.macOS-arm64.dmg", dmg_script)
-        self.assertIn("--hidden-import package_smoke", dmg_script)
-        self.assertIn("--hidden-import PySide6.QtTest", dmg_script)
+        self.assertNotIn("--hidden-import package_smoke", dmg_script)
+        self.assertNotIn("--hidden-import PySide6.QtTest", dmg_script)
 
 
 if __name__ == "__main__":

@@ -73,13 +73,14 @@ PySide6 6.11.2 internally collects detected Android modules through Python
 sets, but python-for-Android writes the resulting list directly into Qt's JNI
 startup array. The build therefore makes a second deploy initialization pass
 with the explicit dependency order `Core`, `Gui`, `Network`, `OpenGL`, `Qml`,
-`Quick`, `QuickControls2`, `Test`. It then checks that same order in the
+`Quick`, `QuickControls2`. It then checks that same order in the
 compiled APK resource table. In particular, `Quick` must load before
 `QuickControls2`; otherwise the latter can pull in the former as an ordinary
 native dependency before its Android JNI initialization is ready.
-`QtWidgets` is retained as a Python binding because the packaged acceptance
-path's `QtTest` binding imports it transitively; it is not an extra JNI startup
-module or a product UI framework.
+
+QtTest and QtWidgets are test dependencies only. Package acceptance drives the
+final artifact from a separate process, so neither binding nor its native Qt
+runtime is shipped in the product APK.
 
 ## Volume notation
 

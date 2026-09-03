@@ -357,8 +357,10 @@ class AndroidPackagingTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertIn("PySide6.QtWidgets", manifest["python_modules"])
+        self.assertNotIn("PySide6.QtTest", manifest["python_modules"])
+        self.assertNotIn("PySide6.QtWidgets", manifest["python_modules"])
         self.assertIn("PySide6.QtOpenGL", manifest["python_modules"])
+        self.assertNotIn("Test", manifest["android_load_order"])
         self.assertNotIn("Widgets", manifest["android_load_order"])
 
 
