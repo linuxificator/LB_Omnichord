@@ -135,53 +135,28 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
           package="dist/LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.${{ matrix.platform }}.AppImage"
-          "$package" --package-self-test
-          smoke_status=/tmp/omnichord-package-smoke.status
-          sender_log=/tmp/omnichord-external-osc-sender.log
-          rm -f "$smoke_status"
-          python tests/support/external_input_peer.py osc \
-            --config config/amy_config.json --duration 20 \
-            > "$sender_log" 2>&1 &
-          sender_pid=$!
-          set +e
-          OMNICHORD_PACKAGE_SMOKE_STATUS="$smoke_status" \
-            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
-            "$package" --windowed --package-smoke-test \
-            > /tmp/omnichord-package-smoke.log 2>&1
-          app_status=$?
-          set -e
-          cat /tmp/omnichord-package-smoke.log
-          if [[ "$app_status" -ne 0 ]]; then
-            kill -TERM "$sender_pid" 2>/dev/null || true
-            wait "$sender_pid" || true
-            cat "$sender_log"
-            echo "Packaged AppImage exit status: $app_status" >&2
-            cat "$smoke_status" >&2 || true
-            exit "$app_status"
-          fi
-          grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
-          grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
-          kill -TERM "$sender_pid" 2>/dev/null || true
-          wait "$sender_pid" || true
-          cat "$sender_log"
-          grep -q 'osc-external-process-started' "$sender_log"
-          for checkpoint in \
-            qml-root-ready \
-            midi-native-capability-verified \
-            osc-external-process-rotary-observed \
-            osc-external-process-button-observed \
-            osc-external-process-activity-observed \
-            qml-chord-press-observed \
-            active-chord-visible \
-            qml-chord-tap-released \
-            qml-chord-hold-promoted \
-            qml-chord-hold-released \
-            qml-slider-drag-visible \
-            qml-slider-release-visible \
-            event-loop-exited; do
-            grep -q "$checkpoint" "$smoke_status"
-          done
           package_name="$(basename "$package")"
+          capture="dist/${package_name}.acceptance"
+          app_log="$capture/application.log"
+          input_log="$capture/external-input-contract.log"
+          mkdir -p "$capture"
+          python tests/contracts/test_external_input_processes.py \
+            > "$input_log" 2>&1
+          QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            "$package" --windowed --capture-screenshots-dir "$capture" \
+            > "$app_log" 2>&1
+          cat "$app_log"
+          python tests/support/package_evidence.py \
+            --platform "${{ matrix.platform }}" \
+            --artifact "$package" \
+            --package-audit "$package.package-audit.json" \
+            --qml-imports "$package.qml-imports.json" \
+            --application-log "$app_log" \
+            --external-input-contract-log "$input_log" \
+            --screenshot "$capture/omni.png" \
+            --screenshot "$capture/midi.png" \
+            --regression-result success \
+            --output "$package.evidence.json"
           (cd dist && sha256sum "$package_name" > "$package_name.sha256")
 
       - name: Upload Linux package
@@ -201,6 +176,8 @@ jobs:
           path: |
             amysynth_version/qt_frontend/dist/*.AppImage.package-audit.json
             amysynth_version/qt_frontend/dist/*.AppImage.qml-imports.json
+            amysynth_version/qt_frontend/dist/*.AppImage.evidence.json
+            amysynth_version/qt_frontend/dist/*.AppImage.acceptance/**
           if-no-files-found: error
           retention-days: 14
 
@@ -276,55 +253,30 @@ jobs:
           }
           trap cleanup_dmg EXIT
           app="$mountpoint/LB_Omnichord.app/Contents/MacOS/LB_Omnichord"
-          "$app" --package-self-test
-          smoke_status=/tmp/omnichord-package-smoke.status
-          sender_log=/tmp/omnichord-external-osc-sender.log
-          rm -f "$smoke_status"
-          python tests/support/external_input_peer.py osc \
-            --config config/amy_config.json --duration 20 \
-            > "$sender_log" 2>&1 &
-          sender_pid=$!
-          set +e
-          OMNICHORD_PACKAGE_SMOKE_STATUS="$smoke_status" \
-            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
-            "$app" --windowed --package-smoke-test \
-            > /tmp/omnichord-package-smoke.log 2>&1
-          app_status=$?
-          set -e
-          cat /tmp/omnichord-package-smoke.log
-          if [[ "$app_status" -ne 0 ]]; then
-            kill -TERM "$sender_pid" 2>/dev/null || true
-            wait "$sender_pid" || true
-            cat "$sender_log"
-            echo "Packaged macOS application exit status: $app_status" >&2
-            cat "$smoke_status" >&2 || true
-            exit "$app_status"
-          fi
-          grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
-          grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
-          kill -TERM "$sender_pid" 2>/dev/null || true
-          wait "$sender_pid" || true
-          cat "$sender_log"
-          grep -q 'osc-external-process-started' "$sender_log"
-          for checkpoint in \
-            qml-root-ready \
-            midi-native-capability-verified \
-            osc-external-process-rotary-observed \
-            osc-external-process-button-observed \
-            osc-external-process-activity-observed \
-            qml-chord-press-observed \
-            active-chord-visible \
-            qml-chord-tap-released \
-            qml-chord-hold-promoted \
-            qml-chord-hold-released \
-            qml-slider-drag-visible \
-            qml-slider-release-visible \
-            event-loop-exited; do
-            grep -q "$checkpoint" "$smoke_status"
-          done
+          package_name="$(basename "$package")"
+          capture="dist/${package_name}.acceptance"
+          app_log="$capture/application.log"
+          input_log="$capture/external-input-contract.log"
+          mkdir -p "$capture"
+          python tests/contracts/test_external_input_processes.py \
+            > "$input_log" 2>&1
+          QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            "$app" --windowed --capture-screenshots-dir "$capture" \
+            > "$app_log" 2>&1
+          cat "$app_log"
+          python tests/support/package_evidence.py \
+            --platform macOS-arm64 \
+            --artifact "$package" \
+            --package-audit "$package.package-audit.json" \
+            --qml-imports "$package.qml-imports.json" \
+            --application-log "$app_log" \
+            --external-input-contract-log "$input_log" \
+            --screenshot "$capture/omni.png" \
+            --screenshot "$capture/midi.png" \
+            --regression-result success \
+            --output "$package.evidence.json"
           cleanup_dmg
           trap - EXIT
-          package_name="$(basename "$package")"
           (cd dist && shasum -a 256 "$package_name" > "$package_name.sha256")
 
       - name: Upload macOS package
@@ -344,6 +296,8 @@ jobs:
           path: |
             amysynth_version/qt_frontend/dist/*.dmg.package-audit.json
             amysynth_version/qt_frontend/dist/*.dmg.qml-imports.json
+            amysynth_version/qt_frontend/dist/*.dmg.evidence.json
+            amysynth_version/qt_frontend/dist/*.dmg.acceptance/**
           if-no-files-found: error
           retention-days: 14
 
@@ -414,37 +368,34 @@ jobs:
           $package = "dist\LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.Windows-x86_64.zip"
           Expand-Archive -Path $package -DestinationPath "$env:RUNNER_TEMP\lb-package"
           $root = "$env:RUNNER_TEMP\lb-package"
-          & "$root\amy_service.exe" --self-test
-          if ($LASTEXITCODE -ne 0) { throw "Native AMY service self-test failed" }
           if (-not (Test-Path "$root\LB_Omnichord.exe")) { throw "Frontend executable missing" }
           if (-not (Test-Path "$root\run_windows.ps1")) { throw "Launcher missing" }
           if (-not (Test-Path "$root\LB_Omnichord.cmd")) { throw "Double-click launcher missing" }
-          if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked during self-test" }
-          $smokeUser = "$env:RUNNER_TEMP\lb-omnichord-smoke-user"
-          New-Item -ItemType Directory -Force -Path $smokeUser | Out-Null
-          $env:USERPROFILE = $smokeUser
-          $env:LOCALAPPDATA = $smokeUser
-          $senderOut = "$env:RUNNER_TEMP\lb-external-osc-sender.out"
-          $senderErr = "$env:RUNNER_TEMP\lb-external-osc-sender.err"
-          $sender = Start-Process -FilePath python -ArgumentList @(
-            "tests\support\external_input_peer.py", "osc",
-            "--config", "config\amy_config.json", "--duration", "30"
-          ) -PassThru -NoNewWindow -RedirectStandardOutput $senderOut `
-            -RedirectStandardError $senderErr
-          try {
-            & "$root\LB_Omnichord.cmd" -Windowed -SmokeTest
-            if ($LASTEXITCODE -ne 0) { throw "Windows package launcher failed" }
-          }
-          finally {
-            if (-not $sender.HasExited) { Stop-Process -Id $sender.Id -Force }
-            $sender.WaitForExit()
-          }
-          Get-Content $senderOut
-          if (Test-Path $senderErr) { Get-Content $senderErr }
-          if ((Get-Content -Raw $senderOut) -notmatch "osc-external-process-started") {
-            throw "External OSC sender did not start"
-          }
-          if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked during package smoke test" }
+          $testUser = "$env:RUNNER_TEMP\lb-omnichord-package-user"
+          $capture = Join-Path (Get-Location) "dist\$([IO.Path]::GetFileName($package)).acceptance"
+          $appLog = Join-Path $capture "application.log"
+          $inputLog = Join-Path $capture "external-input-contract.log"
+          New-Item -ItemType Directory -Force -Path $testUser, $capture | Out-Null
+          $env:USERPROFILE = $testUser
+          $env:LOCALAPPDATA = $testUser
+          $env:CI = "true"
+          python tests\contracts\test_external_input_processes.py *> $inputLog
+          if ($LASTEXITCODE -ne 0) { throw "External input process contract failed" }
+          & "$root\LB_Omnichord.cmd" -Windowed -CaptureScreenshotsDir $capture *> $appLog
+          if ($LASTEXITCODE -ne 0) { throw "Windows package launcher failed" }
+          Get-Content $appLog
+          if ((Get-Process -Name amy_service -ErrorAction SilentlyContinue)) { throw "Service leaked after package capture" }
+          python tests\support\package_evidence.py `
+            --platform Windows-x86_64 `
+            --artifact $package `
+            --package-audit "$package.package-audit.json" `
+            --qml-imports "$package.qml-imports.json" `
+            --application-log $appLog `
+            --external-input-contract-log $inputLog `
+            --screenshot (Join-Path $capture "omni.png") `
+            --screenshot (Join-Path $capture "midi.png") `
+            --regression-result success `
+            --output "$package.evidence.json"
 
       - name: Upload Windows package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -463,6 +414,8 @@ jobs:
           path: |
             amysynth_version/qt_frontend/dist/*.zip.package-audit.json
             amysynth_version/qt_frontend/dist/*.zip.qml-imports.json
+            amysynth_version/qt_frontend/dist/*.zip.evidence.json
+            amysynth_version/qt_frontend/dist/*.zip.acceptance/**
           if-no-files-found: error
           retention-days: 14
 
@@ -661,6 +614,12 @@ jobs:
         with:
           name: android-emulator-x86_64
           path: android-package
+
+      - name: Download x86_64 Android package evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: evidence-android-emulator-x86_64
+          path: android-package-evidence
 
       - name: Checkout pinned AMY audio analyzer
         run: |
