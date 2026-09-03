@@ -328,7 +328,7 @@ def compile_chord_group_plan(
         note_indexes.reverse()
     for velocity_index, velocity in enumerate(velocities):
         group = group_start + velocity_index
-        grouped_events: list[GroupedEvent] = []
+        grouped_events = []
         for sequence_index, note_index in enumerate(note_indexes):
             note_text = format_amy_float(chord_notes[note_index])
             start_tick = sequence_index * step
