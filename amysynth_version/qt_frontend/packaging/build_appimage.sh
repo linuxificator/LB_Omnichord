@@ -51,6 +51,8 @@ python -m PyInstaller \
     --paths "$frontend_dir/code" \
     --additional-hooks-dir "$frontend_dir/packaging/pyinstaller_hooks" \
     --hidden-import c_amy \
+    --hidden-import package_smoke \
+    --hidden-import PySide6.QtTest \
     --collect-all amy \
     --add-data "$frontend_dir/licence.txt:." \
     --add-data "$frontend_dir/config:config" \

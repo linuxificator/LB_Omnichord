@@ -3912,7 +3912,19 @@ def run_application(
 
         def smoke_input() -> None:
             try:
-                from package_smoke import exercise_chord_input, exercise_slider_input
+                from package_smoke import (
+                    exercise_chord_input,
+                    exercise_external_control_input,
+                    exercise_slider_input,
+                )
+
+                exercise_external_control_input(
+                    app,
+                    backend.midiPlayer,
+                    graph.resolved_config.midi_input,
+                    graph.resolved_config.osc_input,
+                    smoke_checkpoint,
+                )
 
                 exercise_chord_input(
                     app,

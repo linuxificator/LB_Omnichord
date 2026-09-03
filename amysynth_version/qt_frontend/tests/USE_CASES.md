@@ -425,6 +425,20 @@ actual bar.
 - All five release packages install and exercise `python-osc`; startup and
   package tests retain the separate wire-only frontend/AMY process boundary.
 
+**OSC-CTRL-04 — final-package input acceptance and evidence limit**
+
+- Every Linux x64, Raspberry Pi aarch64, macOS arm64, Windows x64 and Android
+  arm64 artifact sends real OSC rotary and pushbutton datagrams through its
+  configured UDP listener and observes both controls plus the green activity
+  state in the shared Qt model before publication.
+- The same package smoke verifies the runtime-selected MIDI technology keys
+  and the packaged common CC/controller-button model. Linux separately feeds
+  real bytes through a PTY-backed raw-MIDI reader.
+- Hosted loopback does not prove an external OSC sender, firewall approval or
+  physical network. MIDI simulation is not hardware evidence; CoreMIDI,
+  WinMM and Android MIDI remain deliberately red/unavailable because their
+  native bridges are not currently bundled.
+
 ### INSTRUMENT — selected patch identity
 
 **INST-01 — selecting an instrument changes the manual chord synth**

@@ -132,26 +132,41 @@ jobs:
         run: |
           package="dist/LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.${{ matrix.platform }}.AppImage"
           "$package" --package-self-test
-          QT_QPA_PLATFORM=offscreen "$package" --windowed \
-            > /tmp/omnichord-package-smoke.log 2>&1 &
-          app_pid=$!
-          for _ in {1..80}; do
-            if ! kill -0 "$app_pid" 2>/dev/null; then
-              cat /tmp/omnichord-package-smoke.log
-              echo 'AppImage stopped during startup' >&2
-              exit 1
-            fi
-            if grep -q 'AMY backend: external socket' \
-              /tmp/omnichord-package-smoke.log; then
-              break
-            fi
-            sleep 0.1
-          done
+          smoke_status=/tmp/omnichord-package-smoke.status
+          rm -f "$smoke_status"
+          set +e
+          OMNICHORD_PACKAGE_SMOKE_STATUS="$smoke_status" \
+            QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+            "$package" --windowed --package-smoke-test \
+            > /tmp/omnichord-package-smoke.log 2>&1
+          app_status=$?
+          set -e
           cat /tmp/omnichord-package-smoke.log
+          if [[ "$app_status" -ne 0 ]]; then
+            echo "Packaged AppImage exit status: $app_status" >&2
+            cat "$smoke_status" >&2 || true
+            exit "$app_status"
+          fi
           grep -q 'AMY service ready:' /tmp/omnichord-package-smoke.log
           grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
-          kill -TERM "$app_pid"
-          wait "$app_pid" || true
+          for checkpoint in \
+            qml-root-ready \
+            midi-input-profile-verified \
+            midi-control-simulation-observed \
+            midi-button-simulation-observed \
+            osc-udp-rotary-observed \
+            osc-udp-button-observed \
+            osc-tech-activity-observed \
+            qml-chord-press-observed \
+            active-chord-visible \
+            qml-chord-tap-released \
+            qml-chord-hold-promoted \
+            qml-chord-hold-released \
+            qml-slider-drag-visible \
+            qml-slider-release-visible \
+            event-loop-exited; do
+            grep -q "$checkpoint" "$smoke_status"
+          done
           package_name="$(basename "$package")"
           (cd dist && sha256sum "$package_name" > "$package_name.sha256")
 
@@ -263,6 +278,12 @@ jobs:
           grep -q 'AMY backend: external socket' /tmp/omnichord-package-smoke.log
           for checkpoint in \
             qml-root-ready \
+            midi-input-profile-verified \
+            midi-control-simulation-observed \
+            midi-button-simulation-observed \
+            osc-udp-rotary-observed \
+            osc-udp-button-observed \
+            osc-tech-activity-observed \
             qml-chord-press-observed \
             active-chord-visible \
             qml-chord-tap-released \

@@ -104,6 +104,17 @@ OSS MIDI become green when readable byte-stream devices exist. ALSA sequencer
 becomes green when the backend successfully creates the `LB Omnichord` sequencer
 client/port.
 
+Release acceptance loads the real shipped configuration inside every final
+package and verifies that this platform profile, and no Linux technology on a
+non-Linux target, is published. It then exercises the common packaged CC and
+explicit controller-button route through the public simulation boundary.
+Linux additionally has an end-to-end Qt test that writes real MIDI bytes to a
+PTY-backed raw device. These tests do not claim physical CoreMIDI, WinMM or
+Android MIDI support: those bridges are not bundled, so their tested result is
+red/unavailable. A future native adapter must add platform-runner contract
+tests and physical-device acceptance rather than reclassifying simulation as
+hardware evidence.
+
 ## Pitch handling
 
 Incoming MIDI notes are converted using the active tuning configuration before generating AMY commands.
