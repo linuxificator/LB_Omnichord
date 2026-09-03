@@ -46,7 +46,7 @@ A static regression test rejects reintroduction of the former parallel `SynthRun
 | --- | --- | --- |
 | `unit` | all top-level `test_*.py`: catalogue/state, MIDI engine, socket framing, migration and structural invariants | none |
 | `portable-input-processes` | identical OSC UDP and MIDI parser scenarios with external sender and receiver PIDs | all package build runners; no hardware claim |
-| `platform-input-linux` | real raw-MIDI bytes from the controller process into a separately launched Omnichord | Linux PTY + Qt offscreen |
+| `platform-input-linux` | real raw-MIDI bytes and source-package OSC from external controller processes into a separately launched Omnichord | Linux PTY/socket + Qt offscreen |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
 | `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned Gamma9001 LB AMY fork |

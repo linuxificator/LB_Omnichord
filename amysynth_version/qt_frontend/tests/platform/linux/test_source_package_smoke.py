@@ -11,12 +11,12 @@ import unittest
 from pathlib import Path
 
 
-FRONTEND = Path(__file__).resolve().parents[1]
+FRONTEND = Path(__file__).resolve().parents[3]
 MAIN = FRONTEND / "code" / "main.py"
 EXTERNAL_INPUT_PEER = FRONTEND / "tests" / "support" / "external_input_peer.py"
 
 
-class PackageChordInputTests(unittest.TestCase):
+class LinuxSourcePackageSmokeTests(unittest.TestCase):
     def test_package_smoke_drives_qml_tap_hold_and_active_border(self) -> None:
         with tempfile.TemporaryDirectory(prefix="omnichord-qml-smoke-") as raw:
             root = Path(raw)

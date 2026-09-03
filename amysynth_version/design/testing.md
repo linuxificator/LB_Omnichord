@@ -34,7 +34,7 @@ The maintained suites are:
 | `quality` | compileall, shipped JSON, Markdown/status/routing, import/dependency boundaries, Ruff and mypy ratchets | declared test/quality requirements; no AMY/audio/display |
 | `unit` | all top-level `tests/test_*.py` contracts | none beyond frontend dependencies |
 | `portable-input-processes` | identical OSC-over-UDP and MIDI-byte/parser contracts with distinct sender/receiver PIDs | portable frontend dependencies; runs unchanged on every package runner |
-| `platform-input-linux` | real Omnichord subprocess receiving MIDI through a PTY-backed Linux raw-MIDI endpoint | Linux PTY, Qt offscreen and local AMY socket |
+| `platform-input-linux` | real Omnichord subprocess receiving MIDI through a PTY-backed Linux raw-MIDI endpoint; source-package smoke with external OSC | Linux PTY, Qt offscreen and local AMY socket |
 | `frontend` | headless QML/backend interaction | PySide6 and local TCP/PTY support |
 | `serial` | production pyserial output over a Linux PTY | pyserial and PTY support |
 | `presets` | factory/user preset loading and migration | PySide6 and PTY support |

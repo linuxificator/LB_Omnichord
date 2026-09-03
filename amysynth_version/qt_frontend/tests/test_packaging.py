@@ -266,7 +266,11 @@ class PackagingContracts(unittest.TestCase):
             FRONTEND / "packaging" / "android" / "test_android_apk.sh"
         ).read_text(encoding="utf-8")
         package_test = (
-            FRONTEND / "tests" / "test_package_chord_input.py"
+            FRONTEND
+            / "tests"
+            / "platform"
+            / "linux"
+            / "test_source_package_smoke.py"
         ).read_text(encoding="utf-8")
 
         self.assertGreaterEqual(release.count("--package-smoke-test"), 2)

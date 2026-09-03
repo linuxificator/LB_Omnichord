@@ -153,6 +153,9 @@ correction. The following evidence now exists:
 - Linux native MIDI moved from top-level unit discovery to
   `tests/platform/linux/test_midi_input.py`. Its controller process owns the
   PTY bytes and the Omnichord runs as an independent process.
+- the Unix source-package smoke likewise moved out of automatic unit discovery
+  to `tests/platform/linux/test_source_package_smoke.py`; unit tests no longer
+  conceal a platform/process integration scenario under the unit label.
 - macOS, Windows and Android retain an honest package assertion that their
   currently unbundled native MIDI bridge is unavailable. No fake native MIDI
   event is reported under those platform names.
