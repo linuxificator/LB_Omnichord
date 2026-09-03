@@ -110,16 +110,27 @@ for _ in {1..120}; do
   sleep 0.5
 done
 
-# Drive the packaged UI from the adb process. Scale the first-row chord-key
-# coordinate from the landscape Pixel 2 reference viewport. A swipe with equal
-# endpoints is an external long press and exercises press and release delivery.
-display_size=$(adb shell wm size | tr -d '\r' | tail -1 | sed 's/.*: //')
-display_width=${display_size%x*}
-display_height=${display_size#*x}
-if (( display_width <= display_height )); then
-  echo "Android application did not enter landscape: $display_size" >&2
+# Drive the packaged UI from the adb process. `wm size` always reports the
+# panel's natural dimensions, so determine the active rotation separately and
+# swap the viewport axes for a 90/270-degree landscape rotation.
+surface_rotation=""
+for _ in {1..40}; do
+  surface_rotation=$(adb shell dumpsys input | tr -d '\r' | \
+    sed -n 's/.*SurfaceOrientation: \([0-3]\).*/\1/p' | head -1)
+  if [[ "$surface_rotation" == 1 || "$surface_rotation" == 3 ]]; then
+    break
+  fi
+  sleep 0.25
+done
+if [[ "$surface_rotation" != 1 && "$surface_rotation" != 3 ]]; then
+  echo "Android application did not enter landscape; rotation=$surface_rotation" >&2
   exit 1
 fi
+natural_size=$(adb shell wm size | tr -d '\r' | tail -1 | sed 's/.*: //')
+natural_width=${natural_size%x*}
+natural_height=${natural_size#*x}
+display_width=$natural_height
+display_height=$natural_width
 chord_x=$((display_width * 250 / 1920))
 chord_y=$((display_height * 735 / 1080))
 adb exec-out screencap -p > "$evidence_dir/omni-before.png"
