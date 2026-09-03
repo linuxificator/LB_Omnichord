@@ -51,12 +51,13 @@ class DrumPatternTests(unittest.TestCase):
     def client(self) -> AmySerialClient:
         client = AmySerialClient.__new__(AmySerialClient)
         client.resolved_config = self.resolved_config
-        client._pattern_ranges = {
+        client._group_ranges = {
             name: (start, count)
             for name, start, count in (
-                self.resolved_config.layout.sequencer_pattern_ranges
+                self.resolved_config.layout.sequencer_group_ranges
             )
         }
+        client._group_tag_high_waters = {}
         client.drum_catalog = self.catalog
         client.drum_kit = "tiny"
         client.synth_id = {"drums": 0}
@@ -151,22 +152,23 @@ class DrumPatternTests(unittest.TestCase):
         }
         commands = client._drum_activity_commands()
         authored_events = [
-            command for command in commands if command.startswith("zQE")
+            command
+            for command in commands
+            if command.startswith("H") and command.count(",") >= 3
         ]
         self.assertEqual(len(authored_events), len(pop.levels[1]))
         self.assertNotEqual(
             len(authored_events),
             len(pop.levels[0]) + len(pop.levels[1]),
         )
-        self.assertTrue(any(command.startswith("zQT") for command in commands))
-        self.assertFalse(any(command.startswith("H") for command in commands))
-        pattern_length = pop.period_ticks // 2
+        self.assertTrue(any(re.match(r"^zQ\d+,1,0,", command) for command in commands))
+        group_length = pop.period_ticks // 2
         for command in authored_events:
-            match = re.match(r"^zQE\d+,(\d+),(\d+),\d+", command)
+            match = re.match(r"^H(\d+),(\d+),\d+,\d+", command)
             self.assertIsNotNone(match, command)
             assert match is not None
             tick, period = (int(value) for value in match.groups())
-            self.assertEqual(period, pattern_length if tick == 0 else 0)
+            self.assertEqual(period, group_length if tick == 0 else 0)
 
     def test_every_kit_resolves_without_changing_timing(self) -> None:
         for rhythm in self.catalog.rhythms.values():
@@ -251,42 +253,39 @@ class DrumPatternTests(unittest.TestCase):
         self.assertTrue(general_midi.startswith("n36"))
         self.assertNotIn("p258", general_midi)
 
-    def test_preloaded_library_fits_64_events_and_uses_all_fill_slots(self) -> None:
+    def test_preloaded_library_fits_64_events_and_uses_all_fill_groups(self) -> None:
         client = self.client()
         commands: list[str] = []
         client._wire = commands.append  # type: ignore[method-assign]
         client._preload_drum_library()
-        begins = [command for command in commands if command.startswith("zQB")]
-        commits = [command for command in commands if command.startswith("zQC")]
-        self.assertEqual(len(begins), 270)
-        self.assertEqual(len(commits), 270)
-        self.assertIn("zQB0,48Z", begins)
-        self.assertTrue(any(command.startswith("zQB269,") for command in begins))
+        publishes = [
+            command for command in commands if re.match(r"^zQ\d+,3,", command)
+        ]
+        self.assertEqual(len(publishes), 270)
+        self.assertIn("zQ1,3,48,0Z", publishes)
+        self.assertTrue(any(command.startswith("zQ270,3,") for command in publishes))
 
         current_count = 0
         current_length = 0
         maximum = 0
         for command in commands:
-            if command.startswith("zQB"):
-                match = re.fullmatch(r"zQB\d+,(\d+)Z", command)
-                self.assertIsNotNone(match, command)
-                assert match is not None
-                current_length = int(match.group(1))
-                current_count = 0
-            elif command.startswith("zQE"):
-                match = re.match(r"^zQE\d+,(\d+),(\d+),\d+", command)
+            if command.startswith("H"):
+                match = re.match(r"^H(\d+),(\d+),\d+,\d+", command)
                 self.assertIsNotNone(match, command)
                 assert match is not None
                 tick, period = (int(value) for value in match.groups())
-                self.assertEqual(
-                    period,
-                    current_length if tick == 0 else 0,
-                    command,
-                )
                 current_count += 1
-            elif command.startswith("zQC"):
+            elif (publish := re.match(r"^zQ\d+,3,(\d+),0Z$", command)):
+                current_length = int(publish.group(1))
+                group_events = commands[commands.index(command) - current_count : commands.index(command)]
+                for event_command in group_events:
+                    event_match = re.match(r"^H(\d+),(\d+),", event_command)
+                    assert event_match is not None
+                    tick, period = (int(value) for value in event_match.groups())
+                    self.assertEqual(period, current_length if tick == 0 else 0)
                 maximum = max(maximum, current_count)
                 self.assertLessEqual(current_count, 64)
+                current_count = 0
         self.assertGreater(maximum, 0)
 
     def test_fill_policy_is_encoded_as_generic_role_tag_mutes(self) -> None:
@@ -294,22 +293,19 @@ class DrumPatternTests(unittest.TestCase):
         commands: list[str] = []
         client._wire = commands.append  # type: ignore[method-assign]
         client._preload_drum_library()
-        first_commit = commands.index("zQC0Z")
+        first_commit = commands.index("zQ1,3,48,0Z")
         first = commands[:first_commit]
         fill = self.catalog.rhythm("pop_8").fills[0]
         length = fill.duration_ticks // 2
         for role in client._drum_roles:
-            tag = (
-                1000
-                + client._drum_role_index[role]
-            )
+            tag = 1001 + client._drum_role_index[role]
             mute_commands = [
-                command for command in first if f"zQM{tag},{length}Z" in command
+                command for command in first if f"zQ{tag},2,{length},0,{tag}" in command
             ]
             muted = bool(mute_commands)
             self.assertEqual(muted, role not in fill.continue_roles)
             for command in mute_commands:
-                self.assertRegex(command, rf"^zQE0,0,{length},\d+zQM")
+                self.assertRegex(command, rf"^H0,{length},\d+,1zQ{tag},2,")
 
     def test_fill_order_and_allowed_starts_form_a_finite_supercycle(self) -> None:
         client = self.client()
@@ -326,13 +322,13 @@ class DrumPatternTests(unittest.TestCase):
         self.assertEqual(occurrences[0][0], self.catalog.rhythm("pop_8").fills[1])
         commands = client._fill_schedule_commands()
         self.assertEqual(
-            sum(command.startswith("zQA") for command in commands),
+            sum(command.startswith("H") for command in commands),
             len(occurrences),
         )
         self.assertTrue(all(
-            f",{index}Z" in command
+            f",{index}zQ" in command
             for index, command in enumerate(
-                command for command in commands if command.startswith("zQA")
+                command for command in commands if command.startswith("H")
             )
         ))
 
@@ -347,17 +343,16 @@ class DrumPatternTests(unittest.TestCase):
 
         cold = client._drum_commands(quantize_live=False)
         live = client._drum_commands(quantize_live=True)
-        cold_triggers = [line for line in cold if line.startswith("zQT")]
-        live_triggers = [line for line in live if line.startswith("zQT")]
-        cold_roots = [line for line in cold if line.startswith("zQA")]
-        live_roots = [line for line in live if line.startswith("zQA")]
+        cold_triggers = [line for line in cold if re.match(r"^zQ\d+,1,0,", line)]
+        live_triggers = [line for line in live if re.match(r"^zQ\d+,1,0,", line)]
+        cold_roots = [line for line in cold if line.startswith("H") and "zQ" in line]
+        live_roots = [line for line in live if line.startswith("H") and "zQ" in line]
 
         self.assertTrue(cold_triggers)
         self.assertTrue(cold_roots)
-        self.assertTrue(all(line.split(",")[2] == "0" for line in cold_triggers))
-        self.assertTrue(all(line.split(",")[-2] == "0" for line in cold_roots))
-        self.assertTrue(all(line.split(",")[2] == "192" for line in live_triggers))
-        self.assertTrue(all(line.split(",")[-2] == "192" for line in live_roots))
+        self.assertTrue(all(line.split(",")[3] == "0" for line in cold_triggers))
+        self.assertTrue(all(line.split(",")[3] == "192" for line in live_triggers))
+        self.assertEqual(cold_roots, live_roots)
 
     def test_every_fill_subset_fits_root_lane_and_whole_beat_schedule(self) -> None:
         maximum = 0
@@ -388,9 +383,9 @@ class DrumPatternTests(unittest.TestCase):
         self.assertEqual(maximum, 10)
 
     def test_lb_runtime_reserves_storage_but_not_hundreds_of_players(self) -> None:
-        self.assertEqual(self.config["amy_max_patterns"], 1024)
-        self.assertEqual(self.config["amy_max_pattern_tags"], 64)
-        self.assertEqual(self.config["amy_max_pattern_instances"], 32)
+        self.assertEqual(self.config["amy_max_sequence_groups"], 1024)
+        self.assertEqual(self.config["amy_max_sequence_group_tags"], 64)
+        self.assertEqual(self.config["amy_max_sequence_group_executions"], 40)
 
 
 if __name__ == "__main__":

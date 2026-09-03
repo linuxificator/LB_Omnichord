@@ -398,13 +398,14 @@ class StaticContractTests(unittest.TestCase):
             "if not self._set_rhythm_chord_enabled(enabled):",
             transport_py,
         )
-        self.assertIn("def _chord_pattern_plan(", transport_py)
-        self.assertIn("compile_chord_pattern_plan(", transport_py)
-        self.assertIn('f"zQT{pattern},0,0"', rhythm_plan_py)
+        self.assertIn("def _chord_group_plan(", transport_py)
+        self.assertIn("compile_chord_group_plan(", transport_py)
         self.assertIn(
-            'f"zQE{pattern},{gate},0,1n{format_amy_float(note)}l0i{synth}Z"',
+            "sequence_control_command(group, SEQUENCE_CONTROL_START, 1)",
             rhythm_plan_py,
         )
+        for retired_wire_family in ("zQB", "zQE", "zQC", "zQT", "zQM", "zQA"):
+            self.assertNotIn(retired_wire_family, rhythm_plan_py)
 
         # Rhythm is now independent tagged lanes. Reintroducing the previous
         # whole-sequencer rebuild helpers would again make lane-local edits able

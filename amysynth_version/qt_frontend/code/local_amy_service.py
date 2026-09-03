@@ -46,9 +46,9 @@ def main() -> int:
         if args.max_oscs is None
         else args.max_oscs
     )
-    max_patterns = config.capacities.max_patterns
-    max_pattern_tags = config.capacities.max_pattern_tags
-    max_pattern_instances = config.capacities.max_pattern_instances
+    max_sequence_groups = config.capacities.max_sequence_groups
+    max_sequence_group_tags = config.capacities.max_sequence_group_tags
+    max_sequence_group_executions = config.capacities.max_sequence_group_executions
     if max_buses < 11:
         raise ValueError("LB Omnichord requires at least 11 AMY buses")
     args.socket = args.socket.expanduser().resolve()
@@ -67,9 +67,9 @@ def main() -> int:
         default_synths=0,
         max_buses=max_buses,
         max_oscs=max_oscs,
-        max_patterns=max_patterns,
-        max_pattern_tags=max_pattern_tags,
-        max_pattern_instances=max_pattern_instances,
+        max_sequence_groups=max_sequence_groups,
+        max_sequence_group_tags=max_sequence_group_tags,
+        max_sequence_group_executions=max_sequence_group_executions,
     )
 
     running = True

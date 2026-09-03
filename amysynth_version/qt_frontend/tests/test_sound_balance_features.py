@@ -176,11 +176,11 @@ class SoundBalanceFeatureTests(unittest.TestCase):
                 legacy = json.loads(json.dumps(shipped_config))
                 legacy["config_revision"] = 2
                 legacy["serial"]["baud"] = 230_400
-                legacy["rhythm"].pop("pattern_ranges")
+                legacy["rhythm"].pop("group_ranges")
                 for key in (
-                    "amy_max_patterns",
-                    "amy_max_pattern_tags",
-                    "amy_max_pattern_instances",
+                    "amy_max_sequence_groups",
+                    "amy_max_sequence_group_tags",
+                    "amy_max_sequence_group_executions",
                 ):
                     legacy.pop(key)
                 legacy["midi_input"].pop("tech_profile")
@@ -195,9 +195,11 @@ class SoundBalanceFeatureTests(unittest.TestCase):
                 self.assertEqual(
                     migrated["config_revision"], CURRENT_CONFIG_REVISION
                 )
-                self.assertEqual(migrated["amy_max_patterns"], 1024)
-                self.assertEqual(migrated["amy_max_pattern_tags"], 64)
-                self.assertEqual(migrated["amy_max_pattern_instances"], 32)
+                self.assertEqual(migrated["amy_max_sequence_groups"], 1024)
+                self.assertEqual(migrated["amy_max_sequence_group_tags"], 64)
+                self.assertEqual(
+                    migrated["amy_max_sequence_group_executions"], 40
+                )
                 self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")
                 self.assertEqual(
                     migrated["midi_input"]["alsa_raw_globs"],

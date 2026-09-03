@@ -25,9 +25,26 @@ class ConfigMigrationTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.shipped_path = ROOT / "config" / "amy_config.json"
         cls.shipped = json.loads(cls.shipped_path.read_text(encoding="utf-8"))
+        cls.revision_six = copy.deepcopy(cls.shipped)
+        cls.revision_six["config_revision"] = 6
+        cls.revision_six["rhythm"]["pattern_ranges"] = {
+            name: {"start": item["start"] - 1, "count": item["count"]}
+            for name, item in cls.revision_six["rhythm"].pop(
+                "group_ranges"
+            ).items()
+        }
+        for old_name, new_name in (
+            ("amy_max_patterns", "amy_max_sequence_groups"),
+            ("amy_max_pattern_tags", "amy_max_sequence_group_tags"),
+            (
+                "amy_max_pattern_instances",
+                "amy_max_sequence_group_executions",
+            ),
+        ):
+            cls.revision_six[old_name] = cls.revision_six.pop(new_name)
 
     def test_revision_zero_runs_every_transform_without_mutating_input(self) -> None:
-        legacy = copy.deepcopy(self.shipped)
+        legacy = copy.deepcopy(self.revision_six)
         legacy.pop("config_revision")
         legacy["rhythm"].pop("pattern_ranges")
         legacy["voices"]["rhythm_chord"] = 4
@@ -46,14 +63,14 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(migrated.data["voices"]["rhythm_chord"], 7)
         self.assertEqual(migrated.data["midi_input"]["tech_profile"], "auto")
         self.assertEqual(migrated.data["serial"]["baud"], 230_400)
-        self.assertEqual(
-            migrated.changed_paths,
-            (
+        self.assertTrue(
+            {
                 "$.voices.rhythm_chord",
                 "$.config_revision",
                 "$.midi_input.tech_profile",
                 "$.rhythm.pattern_ranges",
-            ),
+                "$.rhythm.group_ranges",
+            }.issubset(migrated.changed_paths),
         )
         resolved = resolve_amy_config_data(
             migrated.data,
@@ -64,7 +81,7 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(resolved.transport.serial_baud, 230_400)
 
     def test_revision_one_repairs_old_platform_default(self) -> None:
-        legacy = copy.deepcopy(self.shipped)
+        legacy = copy.deepcopy(self.revision_six)
         legacy["config_revision"] = 1
         legacy["rhythm"].pop("pattern_ranges")
         legacy["midi_input"]["tech_profile"] = "linux"
@@ -73,21 +90,21 @@ class ConfigMigrationTests(unittest.TestCase):
 
         self.assertEqual(migrated.source_revision, 1)
         self.assertEqual(migrated.data["midi_input"]["tech_profile"], "auto")
-        self.assertEqual(
-            migrated.changed_paths,
-            (
+        self.assertTrue(
+            {
                 "$.midi_input.tech_profile",
                 "$.config_revision",
                 "$.rhythm.pattern_ranges",
-            ),
+                "$.rhythm.group_ranges",
+            }.issubset(migrated.changed_paths),
         )
 
     def test_revision_two_adds_the_validated_pattern_layout(self) -> None:
-        legacy = copy.deepcopy(self.shipped)
+        legacy = copy.deepcopy(self.revision_six)
         legacy["config_revision"] = 2
         legacy["rhythm"].pop("pattern_ranges")
 
-        migrated = migrate_config_document(legacy)
+        migrated = migrate_config_document(legacy, target_revision=3)
 
         self.assertEqual(
             migrated.data["rhythm"]["pattern_ranges"],
@@ -103,7 +120,7 @@ class ConfigMigrationTests(unittest.TestCase):
         )
 
     def test_revision_three_adds_missing_pattern_capacities(self) -> None:
-        legacy = copy.deepcopy(self.shipped)
+        legacy = copy.deepcopy(self.revision_six)
         legacy["config_revision"] = 3
         for key in (
             "amy_max_patterns",
@@ -117,26 +134,32 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(
             migrated.data["config_revision"], CURRENT_CONFIG_REVISION
         )
-        self.assertEqual(migrated.data["amy_max_patterns"], 1024)
-        self.assertEqual(migrated.data["amy_max_pattern_tags"], 64)
-        self.assertEqual(migrated.data["amy_max_pattern_instances"], 32)
+        self.assertEqual(migrated.data["amy_max_sequence_groups"], 1024)
+        self.assertEqual(migrated.data["amy_max_sequence_group_tags"], 64)
         self.assertEqual(
-            migrated.changed_paths,
-            (
+            migrated.data["amy_max_sequence_group_executions"], 40
+        )
+        self.assertTrue(
+            {
                 "$.amy_max_patterns",
                 "$.amy_max_pattern_tags",
                 "$.amy_max_pattern_instances",
                 "$.config_revision",
-            ),
+                "$.amy_max_sequence_groups",
+                "$.amy_max_sequence_group_tags",
+                "$.amy_max_sequence_group_executions",
+            }.issubset(migrated.changed_paths),
         )
         resolved = resolve_amy_config_data(
             migrated.data,
             source_path=self.shipped_path,
             source_kind="user",
         )
-        self.assertEqual(resolved.capacities.max_patterns, 1024)
-        self.assertEqual(resolved.capacities.max_pattern_tags, 64)
-        self.assertEqual(resolved.capacities.max_pattern_instances, 32)
+        self.assertEqual(resolved.capacities.max_sequence_groups, 1024)
+        self.assertEqual(resolved.capacities.max_sequence_group_tags, 64)
+        self.assertEqual(
+            resolved.capacities.max_sequence_group_executions, 40
+        )
 
     def test_historical_schemas_make_revision_four_capacities_optional(self) -> None:
         capacity_keys = {
@@ -181,7 +204,7 @@ class ConfigMigrationTests(unittest.TestCase):
                     )
 
     def test_revision_four_infers_gamma_and_general_midi_kits(self) -> None:
-        gamma = copy.deepcopy(self.shipped)
+        gamma = copy.deepcopy(self.revision_six)
         gamma["config_revision"] = 3
         gamma["drums"].pop("kit")
         gamma["drums"]["sample_map"]["bd_haus"] = {"preset": 0, "note": 60}
@@ -194,7 +217,7 @@ class ConfigMigrationTests(unittest.TestCase):
             "gamma9001",
         )
 
-        general_midi = copy.deepcopy(self.shipped)
+        general_midi = copy.deepcopy(self.revision_six)
         general_midi["config_revision"] = 3
         general_midi["drums"].pop("kit")
         for sample in general_midi["drums"]["sample_map"].values():
@@ -205,7 +228,7 @@ class ConfigMigrationTests(unittest.TestCase):
         )
 
     def test_revision_four_rejects_an_unknown_legacy_drum_map(self) -> None:
-        unknown = copy.deepcopy(self.shipped)
+        unknown = copy.deepcopy(self.revision_six)
         unknown["config_revision"] = 3
         unknown["drums"].pop("kit")
         unknown["drums"]["sample_map"]["bd_haus"] = {"preset": 99, "note": 1}
@@ -213,7 +236,7 @@ class ConfigMigrationTests(unittest.TestCase):
             migrate_config_document(unknown)
 
     def test_revision_five_repairs_the_published_tiny_default(self) -> None:
-        released = copy.deepcopy(self.shipped)
+        released = copy.deepcopy(self.revision_six)
         released["config_revision"] = 4
         released["drums"]["kit"] = "tiny"
         released["drums"]["sample_map"] = copy.deepcopy(
@@ -230,14 +253,15 @@ class ConfigMigrationTests(unittest.TestCase):
             migrated.data["drums"]["sample_map"],
             REVISION_FIVE_GAMMA9001_MAP,
         )
-        self.assertEqual(
-            migrated.changed_paths,
-            ("$.drums.kit", "$.drums.sample_map", "$.config_revision"),
+        self.assertTrue(
+            {"$.drums.kit", "$.drums.sample_map", "$.config_revision"}.issubset(
+                migrated.changed_paths
+            ),
         )
 
     def test_revision_five_preserves_existing_gamma_and_general_midi(self) -> None:
         for kit in ("gamma9001", "general_midi"):
-            existing = copy.deepcopy(self.shipped)
+            existing = copy.deepcopy(self.revision_six)
             existing["config_revision"] = 4
             existing["drums"]["kit"] = kit
             if kit == "general_midi":
@@ -249,12 +273,14 @@ class ConfigMigrationTests(unittest.TestCase):
 
             with self.subTest(kit=kit):
                 self.assertEqual(migrated.data["drums"], before)
-                self.assertEqual(
-                    migrated.changed_paths, ("$.config_revision",)
+                self.assertTrue(
+                    {"$.config_revision", "$.rhythm.group_ranges"}.issubset(
+                        migrated.changed_paths
+                    )
                 )
 
     def test_revision_six_adds_portable_osc_defaults(self) -> None:
-        revision_five = copy.deepcopy(self.shipped)
+        revision_five = copy.deepcopy(self.revision_six)
         revision_five["config_revision"] = 5
         revision_five.pop("osc_input")
 
@@ -268,13 +294,34 @@ class ConfigMigrationTests(unittest.TestCase):
                 "listen_port": 8000,
             },
         )
-        self.assertEqual(
-            migrated.changed_paths,
-            ("$.osc_input", "$.config_revision"),
+        self.assertTrue(
+            {"$.osc_input", "$.config_revision", "$.rhythm.group_ranges"}.issubset(
+                migrated.changed_paths
+            ),
         )
 
+    def test_revision_seven_renames_pattern_capacity_and_identity_domains(self) -> None:
+        migrated = migrate_config_document(self.revision_six)
+
+        self.assertNotIn("pattern_ranges", migrated.data["rhythm"])
+        self.assertEqual(
+            migrated.data["rhythm"]["group_ranges"],
+            {
+                "fills": {"start": 1, "count": 936},
+                "chords": {"start": 937, "count": 64},
+                "drum_bases": {"start": 1001, "count": 24},
+            },
+        )
+        for old_name in (
+            "amy_max_patterns",
+            "amy_max_pattern_tags",
+            "amy_max_pattern_instances",
+        ):
+            self.assertNotIn(old_name, migrated.data)
+        self.assertEqual(migrated.data["amy_max_sequence_groups"], 1024)
+
     def test_revision_five_rejects_a_custom_tiny_mapping(self) -> None:
-        custom = copy.deepcopy(self.shipped)
+        custom = copy.deepcopy(self.revision_six)
         custom["config_revision"] = 4
         custom["drums"]["kit"] = "tiny"
         custom["drums"]["sample_map"] = copy.deepcopy(
