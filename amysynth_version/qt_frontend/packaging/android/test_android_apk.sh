@@ -110,30 +110,29 @@ for _ in {1..120}; do
   sleep 0.5
 done
 
-# Drive the packaged UI from the adb process. `wm size` always reports the
-# panel's natural dimensions, so determine the active rotation separately and
-# swap the viewport axes for a 90/270-degree landscape rotation.
-surface_rotation=""
-for _ in {1..40}; do
-  surface_rotation=$(adb shell dumpsys input | tr -d '\r' | \
-    sed -n 's/.*SurfaceOrientation: \([0-3]\).*/\1/p' | head -1)
-  if [[ "$surface_rotation" == 1 || "$surface_rotation" == 3 ]]; then
-    break
-  fi
-  sleep 0.25
-done
-if [[ "$surface_rotation" != 1 && "$surface_rotation" != 3 ]]; then
-  echo "Android application did not enter landscape; rotation=$surface_rotation" >&2
+# Drive the packaged UI from the adb process. Use the actual screenshot
+# viewport: `wm size` reports natural panel dimensions and Android 35 no longer
+# exposes SurfaceOrientation in `dumpsys input`.
+readonly before_screenshot="$evidence_dir/omni-before.png"
+adb exec-out screencap -p > "$before_screenshot"
+read -r display_width display_height < <(
+  python3 - "$before_screenshot" <<'PY'
+import struct
+import sys
+from pathlib import Path
+
+header = Path(sys.argv[1]).read_bytes()[:24]
+if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n":
+    raise SystemExit("Android screencap did not produce a PNG")
+print(*struct.unpack(">II", header[16:24]))
+PY
+)
+if (( display_width <= display_height )); then
+  echo "Android application did not render landscape: ${display_width}x${display_height}" >&2
   exit 1
 fi
-natural_size=$(adb shell wm size | tr -d '\r' | tail -1 | sed 's/.*: //')
-natural_width=${natural_size%x*}
-natural_height=${natural_size#*x}
-display_width=$natural_height
-display_height=$natural_width
 chord_x=$((display_width * 250 / 1920))
 chord_y=$((display_height * 735 / 1080))
-adb exec-out screencap -p > "$evidence_dir/omni-before.png"
 adb shell input swipe "$chord_x" "$chord_y" "$chord_x" "$chord_y" 700
 sleep 1
 adb exec-out screencap -p > "$evidence_dir/omni-after.png"

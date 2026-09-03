@@ -167,9 +167,10 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("package_evidence.py", android_smoke)
         self.assertIn("--capture-screenshots-dir", release)
         self.assertIn("adb shell input swipe", android_smoke)
-        self.assertIn("SurfaceOrientation:", android_smoke)
-        self.assertIn("display_width=$natural_height", android_smoke)
-        self.assertNotIn("display_width <= display_height", android_smoke)
+        self.assertIn('adb exec-out screencap -p > "$before_screenshot"', android_smoke)
+        self.assertIn('struct.unpack(">II", header[16:24])', android_smoke)
+        self.assertIn("display_width <= display_height", android_smoke)
+        self.assertNotIn("SurfaceOrientation:", android_smoke)
         self.assertIn("external-input-contract.log", android_smoke)
         self.assertLess(
             android_smoke.index('am force-stop "$package"'),
