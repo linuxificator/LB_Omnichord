@@ -3,7 +3,7 @@
 Status: authoritative executable regression-scenario contract
 Owner: frontend integration/native/package tests
 Applies to: active `amysynth_version/qt_frontend` implementation
-Last verified: 2026-09-01
+Last verified: 2026-09-03
 
 This file is the executable-test contract for the active `amysynth_version/qt_frontend` application. The Sonic Pi version is frozen and is intentionally outside this test plan.
 
@@ -11,7 +11,7 @@ The application has three observable layers:
 
 1. **Frontend/backend state** — Qt `InstrumentBackend`, preset state and slider models.
 2. **Transport** — logical events translated to AMY wire commands and, in the Raspberry Pi setup, framed as 1,000,000-baud 8N1 serial lines.
-3. **AMY engine state/output** — the commands must actually configure the supported AMY runtime as intended. Native-Linux tests use the exact `linuxificator/amy` nested-sequencer release pinned by CI and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
+3. **AMY engine state/output** — the commands must actually configure the supported AMY runtime as intended. Native-Linux tests use the exact `linuxificator/amy` sequencer-group release pinned by CI and inspect native synth state / `dump_state()` after the same wire stream has been delivered.
 
 Every defect below must have a permanent regression test before it is considered fixed.
 
@@ -109,8 +109,8 @@ The serial regression requires the factory patch to remain authoritative for nat
   corresponding strum, bass and automatic-chord pitches while transport keeps
   running.
 - When Qt's `TapHandler` reports a platform-defined long press, the contact must
-  enter the existing manual-hold takeover: future automatic child triggers are
-  removed, already-running children retain their own note-offs, and release
+  enter the existing manual-hold takeover: future automatic group starts are
+  removed, already-running executions retain their own note-offs, and release
   stops manual synth 3 immediately before reinstating the automatic chord lane. The backend must
   not run a second gesture-classification timer.
 

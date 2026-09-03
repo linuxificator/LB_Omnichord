@@ -3,7 +3,7 @@
 Status: authoritative rhythm/tempo/continuity contract
 Owner: OMNI rhythm subsystem
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-01
+Last verified: 2026-09-03
 
 This document defines the required behavior of the Omnichord rhythm/drum subsystem. It is a behavioral contract for the GUI, backend, AMY wire-command generation, presets, and regression tests.
 
@@ -21,9 +21,9 @@ controls shape the accompaniment that is already in progress and therefore
 remain live while transport runs.
 
 The five percussion levels are complete pattern alternatives, not cumulative
-layers. Drum fills are compact AMY one-shot patterns, preloaded once at startup
-and launched by the AMY root sequencer. The frontend never follows AMY's
-musical clock with a host timer.
+layers. Drum fills are compact AMY one-shot sequence groups, preloaded once at
+startup and launched by the AMY root sequencer. The frontend never follows
+AMY's musical clock with a host timer.
 
 ## 1. State model
 
@@ -109,13 +109,15 @@ preset switch loads them. A running preset switch preserves their current live
 values. Toggling `A` or changing an effective arpeggio control replaces only
 the automatic-chord tag range and never stops or resets transport.
 
-The root range schedules only `ONE_SHOT` child triggers. A whole-chord child
-owns all of its onsets and its all-off; an arpeggio child owns one note-on and
-that note's normal off. `/1` through `/4` use disjoint child-pattern families.
-Changing rate removes old future triggers and installs new-rate triggers, but a
-child which has already begun remains immutable and completes its original
-gate. Thus `/2 -> /4` may not cut a sounding `/2` note short, nor may it defer
-that note's off until `/4` next reaches the same pitch.
+The root range schedules one-shot group starts. A whole-chord group revision
+owns all of its onsets and its all-off. An arpeggio group revision owns the
+complete ordered phrase, including every note-on and matching note-off. Each
+distinct source velocity uses one stable group tag; `/1` through `/4`, chord,
+pitch and direction changes atomically publish new revisions under those same
+tags and replace future root starts. An execution which has already begun
+retains its immutable old revision and completes its original gates. Thus
+`/2 -> /4` may not cut a sounding `/2` note short, nor may it defer that note's
+off until `/4` next reaches the same pitch.
 
 ## 2. Application startup
 
@@ -595,9 +597,10 @@ the contact with another timer. That promotion performs the established
 accompaniment takeover:
 while automatic rhythm chords are enabled it temporarily closes the effective
 automatic-chord lane without changing the independent `CHORD ON/OFF` state. It
-must remove the repeating future root `H...zQ<group>,1,...` triggers. Root tags contain no synth-4
-release: every already-running immutable child owns its own whole-chord or
-note-specific off and reaches that original gate without an immediate all-off.
+must remove the repeating future root `H...zQ<group>,1,...` triggers. Root tags
+contain no synth-4 release: every already-running immutable group execution
+owns its own whole-chord or note-specific off and reaches that original gate
+without an immediate all-off.
 Manual synth-3 note-ons begin at
 finger-down and may overlap the remainder of the automatic chord's normal gate
 and release. Drums, bass, transport, effects and sequencer timebase continue.
@@ -615,7 +618,7 @@ non-active chord rows load from the destination preset. When
 
 ### RHYTHM-018 — CHORD ON/OFF owns only automatic sequencer chords
 
-`CHORD OFF` removes future synth-4 child triggers; already-running children
+`CHORD OFF` removes future synth-4 group starts; already-running executions
 retain their immutable sequenced note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
 chord identity. Neither action may start, retrigger, release or otherwise
 control a manual synth-3 chord. A physically held chord remains owned by its
@@ -662,10 +665,10 @@ period, but expanding those tags over the rhythm cycle must reproduce exactly
 the generated circular trigger set. Arpeggio changes replace only tags 112..251.
 Every catalogue rhythm, every activity selection, `/1..4` and every supported
 2–7-note chord must fit that existing range. Disabling automatic chords or
-promoting a manual hold clears future triggers while active children retain
+promoting a manual hold clears future triggers while active executions retain
 their whole-chord or note-specific offs. The exhaustive catalogue proof also
-counts overlapping chord children together with the maximum active drum roles
-and one fill; the current worst case is 30 of 32 configured instances.
+counts overlapping chord executions together with the maximum active drum
+roles and one fill; the current worst case is 34 of 40 configured executions.
 
 ## 16. Drum-fill behavior
 
@@ -679,13 +682,14 @@ Enabling another fill while a cycle exists puts it first in the next schedule.
 Disabling one removes future launches, but a fill which is already playing is
 immutable and always finishes.
 
-Each base percussion role is an independent tagged AMY loop. The LB data for a
-fill lists the musical roles which continue. During the fill, every other
-active role suppresses new onsets for the complete, whole-beat fill duration;
+Each base percussion role is an independent tagged AMY group execution. The LB
+data for a fill lists the musical roles which continue. During the fill, every
+other active role suppresses event dispatch for the complete, whole-beat fill
+duration;
 already-ringing sound is not cut off and the loop phase is not reset. A listed
 role which is absent from the selected activity level remains absent. This
 musical continuation decision is LB Omnichord policy; AMY implements only the
-generic tag-targeted mute operation.
+generic execution-tag-targeted finite event gate.
 
 Fill selection and density are preset configuration. A stopped preset switch
 loads them. A running preset switch preserves the current live fill order and

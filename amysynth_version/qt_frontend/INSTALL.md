@@ -149,7 +149,7 @@ Start both processes with:
 ./run_local.sh --windowed
 ```
 
-Install the pinned nested-sequencer/Gamma9001 AMY release into the environment
+Install the pinned sequencer-group/Gamma9001 AMY release into the environment
 used by the service. The Qt process remains independent of AMY.
 `OMNICHORD_VENV` can override the launcher's
 default `../omnichord-env`; `OMNICHORD_AMY_SOCKET` can override
