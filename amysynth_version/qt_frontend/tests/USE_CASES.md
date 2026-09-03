@@ -460,9 +460,20 @@ Expected:
 - Dragging a synth-parameter slider must not republish/reset the QML
   `Repeater` control-list model on every movement. The live edit still updates
   backend state and AMY immediately, but the active delegate must keep Qt's
-  mouse grab until release.
+  pointer grab until release.
+- Mouse and touchscreen drags use the same native Qt Slider path. During every
+  move and after release, `Slider.value`, the custom handle and the filled track
+  must remain aligned with the value accepted from that gesture, even when the
+  live backend intentionally leaves the QML model at its previous value.
+- A later external backend update remains authoritative and synchronizes all
+  three visual/value representations.
 
-**Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the control; negative values also caused the numeric text to disappear.
+**Failure history:** Sustain had a range of `-1..1`, placing 0 halfway along the control; negative values also caused the numeric text to disappear. After the
+shared slider primitive was consolidated, release always restored its backend
+binding. Synth-control live edits intentionally suppress model publication to
+preserve the pointer grab, so a macOS mouse edit could reach the backend while
+the visible handle/fill returned to an old value. Tests that asserted only the
+emitted/backend value did not detect that visual regression.
 
 **CTRL-03 — one slider changes only its intended AMY parameters**
 
