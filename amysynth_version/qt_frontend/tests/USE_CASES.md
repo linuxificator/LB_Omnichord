@@ -389,6 +389,8 @@ actual bar.
 
 - The shipped configuration enables OSC on `0.0.0.0:8000`; both address and
   port are editable and no consumer fallback duplicates them.
+- Removing the complete endpoint (or disabling OSC) opens no socket and omits
+  OSC from the input-technology row.
 - A valid OSC 1.0 UDP message or bundle is decoded off the Qt thread. Each
   numeric argument is identified by exact address and zero-based argument
   index, reaches the Qt thread once and preserves packet order.
@@ -405,6 +407,11 @@ actual bar.
   expiry, hidden binding behavior and button takeover exactly match MIDI.
 - MIDI and OSC share global one-to-one ownership. Binding an OSC source to a
   MIDI-owned target displaces the MIDI source to blue, and vice versa.
+- The MIDI input-technology row contains one `OSC` item for a configured
+  endpoint. Its LED is off while idle, flashes green on accepted data and turns
+  red on bind failure or loss of the configured network.
+- The OMNI rainbow button says `OSC` above `MIDI`; its existing red learn and
+  green binding-location LEDs represent both protocols without duplication.
 
 **OSC-CTRL-03 — mapping and preset compatibility**
 

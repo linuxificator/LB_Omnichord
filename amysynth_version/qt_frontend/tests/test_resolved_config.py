@@ -43,6 +43,7 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertTrue(resolved.osc_input.enabled)
         self.assertEqual(resolved.osc_input.listen_address, "0.0.0.0")
         self.assertEqual(resolved.osc_input.listen_port, 8000)
+        self.assertTrue(resolved.osc_input.configured)
         self.assertEqual(resolved.capacities.voices.manual_chord, 7)
         self.assertEqual(resolved.capacities.max_patterns, 1024)
         self.assertEqual(resolved.layout.midi_row_buses, (4, 5, 6, 7, 8, 9))
@@ -176,6 +177,20 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertIn("$.rhythm.pattern_ranges.chords.start", paths)
         self.assertIn("$.rhythm.pattern_ranges.drum_bases.start", paths)
         self.assertIn("$.amy_max_patterns", paths)
+
+    def test_absent_osc_endpoint_is_an_explicit_unconfigured_capability(self) -> None:
+        unconfigured = copy.deepcopy(self.shipped)
+        unconfigured["osc_input"] = {"enabled": True}
+
+        with tempfile.TemporaryDirectory() as directory:
+            resolved = load_resolved_amy_config(
+                self.write_config(Path(directory), unconfigured)
+            )
+
+        self.assertTrue(resolved.osc_input.enabled)
+        self.assertFalse(resolved.osc_input.configured)
+        self.assertIsNone(resolved.osc_input.listen_address)
+        self.assertIsNone(resolved.osc_input.listen_port)
 
     def test_bad_config_fails_before_transport_is_opened(self) -> None:
         invalid = copy.deepcopy(self.shipped)

@@ -3,16 +3,19 @@ from __future__ import annotations
 import math
 import socket
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from pythonosc.osc_packet import OscPacket, ParseError
 
+from input_technology import InputTechnologyState, InputTechnologyStatus
 from resolved_config import OscInputConfig
 
 
 OscValueType = Literal["continuous", "button"]
+OSC_INPUT_ACTIVITY_SECONDS = 0.45
 OscInputLifecycle = Literal[
     "constructed",
     "starting",
@@ -45,6 +48,13 @@ class OscInputPort(Protocol):
     def failure_reason(self) -> str: ...
 
     def start(self) -> None: ...
+
+    def status_snapshot(
+        self,
+        activity_until: float,
+        network_available: bool,
+        now: float | None = None,
+    ) -> InputTechnologyStatus | None: ...
 
     def close(self) -> None: ...
 
@@ -156,15 +166,19 @@ class PythonOscUdpInputPort:
             if self._lifecycle != "constructed":
                 return
             self._lifecycle = "starting"
-        if not self._config.enabled:
+        if not self._config.enabled or not self._config.configured:
+            self._set_state("ready")
+            return
+
+        listen_address = self._config.listen_address
+        listen_port = self._config.listen_port
+        if listen_address is None or listen_port is None:
             self._set_state("ready")
             return
 
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            udp_socket.bind(
-                (self._config.listen_address, self._config.listen_port)
-            )
+            udp_socket.bind((listen_address, listen_port))
             udp_socket.settimeout(0.1)
         except OSError as exc:
             udp_socket.close()
@@ -179,6 +193,41 @@ class PythonOscUdpInputPort:
         )
         self._thread.start()
         self._set_state("ready")
+
+    def status_snapshot(
+        self,
+        activity_until: float,
+        network_available: bool,
+        now: float | None = None,
+    ) -> InputTechnologyStatus | None:
+        if not self._config.enabled or not self._config.configured:
+            return None
+        listen_address = self._config.listen_address
+        listen_port = self._config.listen_port
+        if listen_address is None or listen_port is None:
+            return None
+        instant = time.monotonic() if now is None else float(now)
+        lifecycle = self.lifecycle
+        if lifecycle == "failed":
+            state: InputTechnologyState = "unavailable"
+            reason = self.failure_reason or "OSC listener unavailable"
+        elif not network_available:
+            state = "unavailable"
+            reason = "no network for configured OSC listen address"
+        elif lifecycle == "ready":
+            state = "activity" if activity_until > instant else "listening"
+            reason = f"{listen_address}:{listen_port}"
+        else:
+            state = "unavailable"
+            reason = f"OSC listener is {lifecycle}"
+        return InputTechnologyStatus(
+            key="osc",
+            label="OSC",
+            state=state,
+            reason=reason,
+            protocol="osc",
+            idle_led_visible=False,
+        )
 
     def _read_loop(self) -> None:
         udp_socket = self._socket

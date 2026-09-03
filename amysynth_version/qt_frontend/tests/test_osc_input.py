@@ -87,6 +87,19 @@ class OscUdpInputPortTests(unittest.TestCase):
         )
         port.start()
         self.assertEqual(port.lifecycle, "ready")
+        listening = port.status_snapshot(0.0, True)
+        self.assertIsNotNone(listening)
+        assert listening is not None
+        self.assertEqual(listening.state, "listening")
+        self.assertFalse(listening.idle_led_visible)
+        active = port.status_snapshot(float("inf"), True)
+        self.assertIsNotNone(active)
+        assert active is not None
+        self.assertEqual(active.state, "activity")
+        disconnected = port.status_snapshot(float("inf"), False)
+        self.assertIsNotNone(disconnected)
+        assert disconnected is not None
+        self.assertEqual(disconnected.state, "unavailable")
         sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
             sender.sendto(b"malformed", ("127.0.0.1", port_number))
@@ -112,7 +125,16 @@ class OscUdpInputPortTests(unittest.TestCase):
         )
         disabled.start()
         self.assertEqual(disabled.lifecycle, "ready")
+        self.assertIsNone(disabled.status_snapshot(float("inf"), True))
         disabled.close()
+
+        unconfigured = PythonOscUdpInputPort(
+            lambda _event: None,
+            OscInputConfig(False, None, None, configured=False),
+        )
+        unconfigured.start()
+        self.assertIsNone(unconfigured.status_snapshot(float("inf"), False))
+        unconfigured.close()
 
         occupied = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         occupied.bind(("127.0.0.1", 0))
@@ -125,6 +147,10 @@ class OscUdpInputPortTests(unittest.TestCase):
             failed.start()
             self.assertEqual(failed.lifecycle, "failed")
             self.assertTrue(failed.failure_reason)
+            failed_status = failed.status_snapshot(0.0, True)
+            self.assertIsNotNone(failed_status)
+            assert failed_status is not None
+            self.assertEqual(failed_status.state, "unavailable")
             failed.close()
         finally:
             occupied.close()
@@ -139,6 +165,8 @@ class OscUdpInputPortTests(unittest.TestCase):
         backend._pending_osc_input_events = {}
         backend._osc_input_closed = False
         backend._midi_control_state = MidiControlState()
+        activity: list[bool] = []
+        backend._mark_osc_input_activity = lambda: activity.append(True)
         observed: list[tuple[str, int, float, str]] = []
         backend.process_osc_control = (
             lambda address, argument, value, value_type: observed.append(
@@ -165,6 +193,7 @@ class OscUdpInputPortTests(unittest.TestCase):
             OscInputEvent(3, "/late", 0, 0.0, "button")
         )
         self.assertEqual(len(observed), 2)
+        self.assertEqual(activity, [True, True])
 
 
 if __name__ == "__main__":

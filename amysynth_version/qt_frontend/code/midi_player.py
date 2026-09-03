@@ -27,7 +27,13 @@ from midi_input import (
     MidiInputPort,
     MidiInputPortFactory,
 )
-from osc_input import OscInputEvent, OscInputPort, OscInputPortFactory
+from network_availability import qt_listener_network_available
+from osc_input import (
+    OSC_INPUT_ACTIVITY_SECONDS,
+    OscInputEvent,
+    OscInputPort,
+    OscInputPortFactory,
+)
 from musical_state import TuningSnapshot, tune_note
 from synth_programs import resolve_program
 from synth_state import SynthState
@@ -469,6 +475,7 @@ class MidiPlayerBackend(QObject):
         self._last_osc_input_sequence = 0
         self._pending_osc_input_events: dict[int, OscInputEvent] = {}
         self._osc_input_closed = False
+        self._osc_input_activity_until = 0.0
         self._blue_expiry_timer = QTimer(self)
         self._blue_expiry_timer.setInterval(250)
         self._blue_expiry_timer.timeout.connect(self._expire_blue_controls)
@@ -476,13 +483,13 @@ class MidiPlayerBackend(QObject):
         self._preset_feedback_timer.setInterval(100)
         self._preset_feedback_timer.timeout.connect(self._expire_preset_feedback)
         self._midi_input_activity_until: dict[str, float] = {}
-        self._midi_input_tech_snapshot: list[dict[str, Any]] = []
-        self._midi_input_refresh_timer = QTimer(self)
-        self._midi_input_refresh_timer.setInterval(1000)
-        self._midi_input_refresh_timer.timeout.connect(self._refresh_midi_input_techs)
-        self._midi_input_activity_timer = QTimer(self)
-        self._midi_input_activity_timer.setInterval(120)
-        self._midi_input_activity_timer.timeout.connect(self._refresh_midi_input_techs)
+        self._input_tech_snapshot: list[dict[str, Any]] = []
+        self._input_tech_refresh_timer = QTimer(self)
+        self._input_tech_refresh_timer.setInterval(1000)
+        self._input_tech_refresh_timer.timeout.connect(self._refresh_input_techs)
+        self._input_tech_activity_timer = QTimer(self)
+        self._input_tech_activity_timer.setInterval(120)
+        self._input_tech_activity_timer.timeout.connect(self._refresh_input_techs)
 
         self.engine = MidiAmyEngine(client)
         self._preview_row = -1
@@ -504,12 +511,12 @@ class MidiPlayerBackend(QObject):
             client.resolved_config.osc_input,
         )
         self._osc_input_port.start()
-        self._refresh_midi_input_techs()
-        self._midi_input_refresh_timer.start()
+        self._refresh_input_techs()
+        self._input_tech_refresh_timer.start()
 
     def close(self) -> None:
-        self._midi_input_refresh_timer.stop()
-        self._midi_input_activity_timer.stop()
+        self._input_tech_refresh_timer.stop()
+        self._input_tech_activity_timer.stop()
         self._midi_input_closed = True
         self._osc_input_closed = True
         self._pending_midi_input_events.clear()
@@ -585,7 +592,9 @@ class MidiPlayerBackend(QObject):
 
     @Property("QVariantList", notify=midiInputTechsChanged)
     def midiInputTechs(self) -> list[dict[str, Any]]:
-        return list(self._midi_input_tech_snapshot)
+        """Return the shared input-tech row under its compatibility name."""
+
+        return list(self._input_tech_snapshot)
 
     @Property(str, constant=True)
     def oscInputState(self) -> str:
@@ -598,21 +607,40 @@ class MidiPlayerBackend(QObject):
     @Slot(str)
     def _mark_midi_tech_activity(self, key: str) -> None:
         self._midi_input_activity_until[str(key)] = time.monotonic() + MIDI_INPUT_ACTIVITY_SECONDS
-        self._refresh_midi_input_techs()
-        if not self._midi_input_activity_timer.isActive():
-            self._midi_input_activity_timer.start()
+        self._refresh_input_techs()
+        if not self._input_tech_activity_timer.isActive():
+            self._input_tech_activity_timer.start()
 
-    def _refresh_midi_input_techs(self) -> None:
+    def _mark_osc_input_activity(self) -> None:
+        self._osc_input_activity_until = (
+            time.monotonic() + OSC_INPUT_ACTIVITY_SECONDS
+        )
+        self._refresh_input_techs()
+        if not self._input_tech_activity_timer.isActive():
+            self._input_tech_activity_timer.start()
+
+    def _refresh_input_techs(self) -> None:
         snapshot = [
             status.presentation()
             for status in self._midi_input_port.status_snapshot(self._midi_input_activity_until)
         ]
-        if snapshot != self._midi_input_tech_snapshot:
-            self._midi_input_tech_snapshot = snapshot
+        osc_address = self.client.resolved_config.osc_input.listen_address
+        network_available = bool(
+            osc_address is not None
+            and qt_listener_network_available(osc_address)
+        )
+        osc_status = self._osc_input_port.status_snapshot(
+            self._osc_input_activity_until,
+            network_available,
+        )
+        if osc_status is not None:
+            snapshot.append(osc_status.presentation())
+        if snapshot != self._input_tech_snapshot:
+            self._input_tech_snapshot = snapshot
             self.midiInputTechsChanged.emit()
         active = any(item.get("state") == "activity" for item in snapshot)
         if not active:
-            self._midi_input_activity_timer.stop()
+            self._input_tech_activity_timer.stop()
 
     @Slot(object)
     def _accept_midi_input_event(self, event: object) -> None:
@@ -671,6 +699,7 @@ class MidiPlayerBackend(QObject):
             return
         if event.sequence <= self._last_osc_input_sequence:
             return
+        self._mark_osc_input_activity()
         self._pending_osc_input_events[event.sequence] = event
         sequence = self._last_osc_input_sequence + 1
         while sequence in self._pending_osc_input_events:

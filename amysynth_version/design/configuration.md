@@ -88,6 +88,9 @@ Revision 5 to 6 adds the portable OSC input section. Its historical migration
 defaults are enabled, IPv4 wildcard address `0.0.0.0` and UDP port 8000. Those
 values exist only in the shipped configuration and explicit migration; OSC
 consumers receive the frozen resolved section and have no fallback constants.
+A revision-6 user may omit the section or its address/port pair to make OSC an
+explicitly unconfigured capability; this opens no socket and shows no OSC tech
+item. Address and port must either both be present or both be absent.
 Because revision-1 full documents cannot distinguish that old default from an
 intentional diagnostic selection, a user who deliberately forced `linux` must
 reapply it after migration. Future and malformed revisions fail at

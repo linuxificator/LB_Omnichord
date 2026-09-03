@@ -453,6 +453,7 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertIsNotNone(osc_key)
         assert osc_key is not None
         state.indicator_clicked(osc_key, now=2.2)
+        self.assertEqual(state.omni_led_state(), "learn")
         state.bind_learned_target(shared, now=2.3)
 
         self.assertEqual(state.status((1, 7)), "blue")

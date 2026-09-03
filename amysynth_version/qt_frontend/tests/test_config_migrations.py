@@ -169,7 +169,16 @@ class ConfigMigrationTests(unittest.TestCase):
                 if revision < 6:
                     self.assertNotIn("osc_input", required)
                 else:
-                    self.assertIn("osc_input", required)
+                    self.assertNotIn("osc_input", required)
+                    osc_schema = schema["properties"]["osc_input"]
+                    self.assertEqual(osc_schema["required"], ["enabled"])
+                    self.assertEqual(
+                        osc_schema["dependencies"],
+                        {
+                            "listen_address": ["listen_port"],
+                            "listen_port": ["listen_address"],
+                        },
+                    )
 
     def test_revision_four_infers_gamma_and_general_midi_kits(self) -> None:
         gamma = copy.deepcopy(self.shipped)

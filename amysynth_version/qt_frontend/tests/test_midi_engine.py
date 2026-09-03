@@ -212,7 +212,12 @@ class MidiAmyEngineTests(unittest.TestCase):
         backend._write_cc_test_log = lambda *_args, **_kwargs: None
         backend._sync_blue_timer = lambda *_args, **_kwargs: None
         backend._bump_binding_state = lambda *_args, **_kwargs: None
-        backend._emit_binding_location_feedback = lambda *_args, **_kwargs: None
+        location_feedback: list[tuple[tuple[int, int], dict[str, object] | None]] = []
+        backend._emit_binding_location_feedback = (
+            lambda key, target: location_feedback.append(
+                (key, dict(target) if target is not None else None)
+            )
+        )
         applied: list[tuple[dict[str, object], int, tuple[int, int]]] = []
         backend._apply_control_target = (
             lambda target, value, key: applied.append((dict(target), value, key))
@@ -236,6 +241,7 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(applied[0][0]["id"], "midi:master_volume")
         self.assertEqual(applied[0][1], 750_000)
         self.assertEqual(applied[0][2], key)
+        self.assertEqual(location_feedback, [(key, applied[0][0])])
 
     def test_midi_button_takeover_blocks_other_button_targets(self) -> None:
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)

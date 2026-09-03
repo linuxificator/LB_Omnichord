@@ -1521,7 +1521,8 @@ ApplicationWindow {
                     - window.controlSpacing
                     + midiModeButton.extensionWidth
                 height: window.rowHeight
-                text: "MIDI"
+                text: "OSC\nMIDI"
+                font.pixelSize: height * 0.31
                 midiControlRouter: backend.midiPlayer
                 bindingLocationScreen: "midi"
                 midiLearnActive:

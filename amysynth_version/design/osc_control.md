@@ -36,6 +36,11 @@ The default listens on every local IPv4 interface because remote controllers
 are a primary OSC use case. UDP port 8000 is a widespread controller-to-host
 convention, including common TouchOSC setups; OSC itself defines no mandatory
 port. Both values are editable. `127.0.0.1` restricts input to local software.
+The complete `osc_input` section is optional in a revision-6 user document. If
+the section, listen address or listen port is absent, OSC is explicitly
+unconfigured: no socket opens and no `OSC` technology is shown. Consumers do
+not silently restore the shipped endpoint. An explicitly disabled endpoint is
+also absent from the technology row.
 
 OSC UDP has no authentication, encryption or delivery guarantee. Listening on
 `0.0.0.0` therefore means that any host which can reach the configured port can
@@ -101,6 +106,23 @@ The label is the exact OSC address for argument zero and appends `[N]` for
 later arguments. It may elide visually but the persisted identity is never
 shortened.
 
+## Input-technology and mode-button feedback
+
+One `OSC` item shares the MIDI input-technology row when a complete, enabled
+listen endpoint is configured. Its LED is invisible while the socket is merely
+listening, flashes green for 450 ms after accepted OSC control data, and is red
+when the socket cannot bind or the configured network is unavailable. The
+network state is polled through Qt's portable network-interface API; a
+loopback-only endpoint remains available without an external interface, while
+the wildcard endpoint requires one running non-loopback IPv4 interface.
+
+On the OMNI screen the rainbow mode button says `OSC` above `MIDI`, using the
+same typeface at a smaller size. The button deliberately does not gain separate
+protocol LEDs: its blinking red learn LED represents the one shared MIDI/OSC
+learn state, and its blinking green location LED reports bindings from either
+protocol. OSC movement therefore restarts the same cross-screen location
+feedback as MIDI movement.
+
 ## Persistence and compatibility
 
 OSC bindings use the existing screen-owned optional
@@ -136,6 +158,8 @@ binding and musical/application state.
 Tests must prove:
 
 - exact config migration/default/validation and no consumer fallback;
+- omission/disablement, idle-hidden/activity-green/network-red technology
+  presentation and live network recovery;
 - real loopback UDP reception, message/bundle decoding, ordering, malformed
   packet survival, configured bind address/port and idempotent shutdown;
 - continuous and switch baselines, multi-argument identity and normalized
@@ -144,6 +168,8 @@ Tests must prove:
   preset handoff, manual takeover and legacy MIDI JSON compatibility;
 - the shared QML bar renders MIDI as F06 and OSC as flat F01, with identical
   click transitions and no shadow/effect nodes for F01;
+- the OMNI rainbow button renders `OSC` above `MIDI` and reuses the shared red
+  learn and green binding-location LEDs;
 - import/install and exercised parser behavior in every release package,
   including Android; and
 - unchanged MIDI tests, AMY wire convergence and all code-quality gates.

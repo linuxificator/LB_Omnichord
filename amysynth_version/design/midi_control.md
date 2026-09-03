@@ -278,8 +278,8 @@ of those valid locations are reported.
 
 Screen routing is deliberately independent of preset status. As soon as either
 the active binding set or the inactive-preset index locates the controller on
-the other screen, the visible `MIDI`/`OMNI` mode button flashes. The mode button
-therefore does not distinguish between a binding in that screen's selected
+the other screen, the visible `OSC`/`MIDI` or `OMNI` mode button flashes. The
+mode button therefore does not distinguish between a binding in that screen's selected
 preset and one in any of its non-selected presets; its purpose is to say
 "look on the other screen". Only after that screen is visible does preset
 status affect the indication: a non-selected destination preset flashes its
@@ -312,12 +312,12 @@ this feedback.
 
 ## OMNI learn LED
 
-On the OMNI screen, a blinking red learn LED appears inside the large `MIDI`
-mode button, immediately to the right of the `MIDI` label so it does not sit on
-the red end of the rainbow background. It is completely invisible whenever no
-controller is in learn state. The existing green binding-location LED remains
-on the left side of the button and follows its independent location-feedback
-rules.
+On the OMNI screen, a blinking red learn LED appears inside the large rainbow
+mode button beside the two-line `OSC`/`MIDI` label, away from the red end of its
+background. It is completely invisible whenever no external controller is in
+learn state. The existing green binding-location LED remains on the left side
+of the button and follows its independent location-feedback rules. Both LEDs
+represent the one shared MIDI/OSC state; they are not duplicated per protocol.
 
 Blue/unbound state remains visible on the detailed MIDI-screen controller
 indicator; it does not create a separate OMNI status LED. Switching screens
