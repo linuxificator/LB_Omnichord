@@ -146,8 +146,8 @@ correction. The following evidence now exists:
   portable process contract. It proves parser/transport portability, not a
   native MIDI bridge.
 - Every desktop artifact receives OSC from a separately launched Python
-  process. Android receives the same binary OSC messages from a separate
-  `adb shell` process inside the emulator.
+  process. Android receives the same messages from a separate host Python
+  process through the emulator's UDP host/guest redirection.
 - the former self-sending OSC socket and direct packaged MIDI injection were
   removed from `code/package_smoke.py`;
 - Linux native MIDI moved from top-level unit discovery to

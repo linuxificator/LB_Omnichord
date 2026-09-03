@@ -99,14 +99,8 @@ def send_osc(config_path: Path, duration: float, interval: float) -> int:
     return 0
 
 
-def write_osc_fixtures(config_path: Path, output: Path) -> int:
-    target = _osc_endpoint(config_path)
-    output.mkdir(parents=True, exist_ok=True)
-    for index, (address, value) in enumerate(OSC_MESSAGES):
-        output.joinpath(f"osc-{index}.bin").write_bytes(
-            _osc_datagram(address, value)
-        )
-    output.joinpath("port.txt").write_text(f"{target[1]}\n", encoding="ascii")
+def print_osc_port(config_path: Path) -> int:
+    print(_osc_endpoint(config_path)[1])
     return 0
 
 
@@ -129,9 +123,8 @@ def parse_args() -> argparse.Namespace:
     osc.add_argument("--duration", type=float, default=20.0)
     osc.add_argument("--interval", type=float, default=0.05)
 
-    fixtures = subparsers.add_parser("osc-fixtures")
-    fixtures.add_argument("--config", type=Path, required=True)
-    fixtures.add_argument("--output", type=Path, required=True)
+    port = subparsers.add_parser("osc-port")
+    port.add_argument("--config", type=Path, required=True)
 
     midi = subparsers.add_parser("midi")
     midi.add_argument("--output", required=True)
@@ -142,8 +135,8 @@ def main() -> int:
     args = parse_args()
     if args.command == "osc":
         return send_osc(args.config, args.duration, args.interval)
-    if args.command == "osc-fixtures":
-        return write_osc_fixtures(args.config, args.output)
+    if args.command == "osc-port":
+        return print_osc_port(args.config)
     if args.command == "midi":
         return write_midi(args.output)
     raise AssertionError(args.command)

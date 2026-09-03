@@ -175,9 +175,10 @@ acceptance steps.
 All five package jobs run packaged-input acceptance. A test-only sender process
 sends real OSC 1.0 UDP datagrams through the artifact's configured listener;
 the artifact must expose the rotary, pushbutton and green activity state in the
-shared Qt control model. On Android the sender is a separate `adb shell`
-process in the emulator, not code inside the activity. The test-only sender
-and probe are workflow inputs and are never staged into a release package.
+shared Qt control model. On Android the sender is a separate host Python
+process; the official emulator UDP redirection carries its datagrams across
+the host/guest network boundary to the activity. The test-only sender and
+probe are workflow inputs and are never staged into a release package.
 
 The same portable process contract runs unchanged on the Linux/Raspberry Pi,
 macOS, Windows and Android build runners. It requires distinct sender and

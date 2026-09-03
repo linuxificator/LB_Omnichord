@@ -172,8 +172,8 @@ Tests must prove:
   learn and green binding-location LEDs;
 - a real OSC rotary and pushbutton UDP datagram sent by a separate test process
   and traversing the configured listener, worker, Qt boundary and shared
-  control/activity models inside every final release package, including an
-  `adb shell` sender beside the Android activity;
+  control/activity models inside every final release package, including a
+  separate host sender through emulator UDP redirection for Android;
 - explicit acknowledgement that host-local loopback does not prove a firewall
   permission prompt, a second physical host or physical network path; and
 - unchanged MIDI tests, AMY wire convergence and all code-quality gates.

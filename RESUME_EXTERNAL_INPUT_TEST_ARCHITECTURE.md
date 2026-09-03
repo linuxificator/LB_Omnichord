@@ -30,7 +30,7 @@ based on `main` commit `20ad1ba` and has not been merged to `main`.
 - Test-only senders and probes live under `qt_frontend/tests/support/` and are
   not staged into user packages.
 - Desktop package tests receive OSC from a separate Python process. Android
-  receives the same OSC fixtures from a separate `adb shell` process.
+  receives it from a separate host process through emulator UDP redirection.
 - Linux native MIDI and the Unix source-package smoke are isolated under
   `qt_frontend/tests/platform/linux/`.
 - `unit`, `portable-input-processes` and `platform-input-linux` are separate
@@ -114,3 +114,9 @@ failed before sending a packet because its host-side test controller invoked
 dependency (`ModuleNotFoundError: No module named 'pythonosc'`). The repair
 installs the shared pinned `requirements-portable.txt` only in the emulator
 test job; it does not add anything to the Android application package.
+
+Run `33763712771` confirmed that dependency repair and progressed to the real
+Android app, but the `toybox nc` guest-shell sender produced no observable
+datagrams. The follow-up replaces that implementation with Android Emulator's
+documented `redir add udp:host-port:guest-port` boundary and runs the shared
+Python OSC peer as an independent host process.

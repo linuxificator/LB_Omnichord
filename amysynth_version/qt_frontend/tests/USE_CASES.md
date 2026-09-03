@@ -433,7 +433,8 @@ actual bar.
   arm64 artifact receives real OSC rotary and pushbutton datagrams from a
   separate test process through its configured UDP listener and exposes both
   controls plus the green activity state in the shared Qt model before
-  publication. Android uses a separate emulator shell process beside the app.
+  publication. Android uses a separate host process through emulator UDP
+  redirection into the guest app.
 - The same package smoke verifies the runtime-selected MIDI technology keys
   and availability. An identical two-process MIDI byte/parser contract runs on
   every package builder; Linux separately feeds real bytes through a PTY-backed

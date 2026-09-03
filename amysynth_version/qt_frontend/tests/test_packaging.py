@@ -290,7 +290,8 @@ class PackagingContracts(unittest.TestCase):
             2,
         )
         self.assertIn("external_input_peer.py", android)
-        self.assertIn("toybox nc -u", android)
+        self.assertIn('adb emu redir add "udp:${osc_port}:${osc_port}"', android)
+        self.assertIn('osc --config "$osc_config" --duration 30', android)
         self.assertIn("Install external-input test peer dependencies", release)
         self.assertIn(
             "-r amysynth_version/qt_frontend/requirements-portable.txt",

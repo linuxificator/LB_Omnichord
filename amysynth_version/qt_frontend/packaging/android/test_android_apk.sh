@@ -8,6 +8,7 @@ readonly log_file="$evidence_dir/lb-android.log"
 readonly sender_log="$evidence_dir/lb-android-external-osc-sender.log"
 mkdir -p "$evidence_dir"
 external_sender_pid=""
+osc_port=""
 
 capture_diagnostics() {
   adb logcat -d > "$log_file" 2>/dev/null || true
@@ -19,6 +20,9 @@ cleanup() {
   if [[ -n "$external_sender_pid" ]]; then
     kill -TERM "$external_sender_pid" 2>/dev/null || true
     wait "$external_sender_pid" 2>/dev/null || true
+  fi
+  if [[ -n "$osc_port" ]]; then
+    adb emu redir del "udp:$osc_port" >/dev/null 2>&1 || true
   fi
   capture_diagnostics
 }
@@ -71,26 +75,22 @@ test "$warmup_ready" -eq 1
 ! grep -q 'Traceback (most recent call last)' /tmp/lb-android-warmup.log
 adb shell am force-stop "$package"
 
-osc_fixture_dir=/tmp/lb-android-osc-fixtures
-rm -rf "$osc_fixture_dir"
-python amysynth_version/qt_frontend/tests/support/external_input_peer.py \
-  osc-fixtures \
-  --config amysynth_version/qt_frontend/config/amy_config.json \
-  --output "$osc_fixture_dir"
-osc_port=$(<"$osc_fixture_dir/port.txt")
-adb push "$osc_fixture_dir"/osc-*.bin /data/local/tmp/
+readonly osc_config=amysynth_version/qt_frontend/config/amy_config.json
+osc_port=$(python3 \
+  amysynth_version/qt_frontend/tests/support/external_input_peer.py \
+  osc-port --config "$osc_config")
+redir_result=$(adb emu redir add "udp:${osc_port}:${osc_port}")
+if [[ "$redir_result" != OK* ]]; then
+  echo "Could not configure emulator OSC UDP redirection: $redir_result" >&2
+  exit 1
+fi
 
 adb shell run-as "$package" touch files/lb-android-package-smoke.enable
 adb shell run-as "$package" touch files/amy-audio-capture.enable
 adb logcat -c
-(
-  adb shell "i=0; while [ \$i -lt 400 ]; do \
-    for packet in /data/local/tmp/osc-*.bin; do \
-      toybox nc -u -w 1 127.0.0.1 $osc_port < \$packet; \
-    done; \
-    i=\$((i + 1)); sleep 0.05; \
-  done"
-) > "$sender_log" 2>&1 &
+python3 amysynth_version/qt_frontend/tests/support/external_input_peer.py \
+  osc --config "$osc_config" --duration 30 \
+  > "$sender_log" 2>&1 &
 external_sender_pid=$!
 adb shell monkey -p "$package" 1
 
@@ -109,7 +109,8 @@ wait "$external_sender_pid" 2>/dev/null || true
 external_sender_pid=""
 cat "$status_file"
 cat "$sender_log"
-! grep -Eiq 'not found|unknown option|invalid option|permission denied' "$sender_log"
+grep -q 'osc-external-process-started' "$sender_log"
+grep -q '"packets_sent":' "$sender_log"
 grep -E 'AmyAndroid|AmyAudioCapture|AMY backend|QPA platform|Traceback' \
   "$log_file" || true
 for checkpoint in \
