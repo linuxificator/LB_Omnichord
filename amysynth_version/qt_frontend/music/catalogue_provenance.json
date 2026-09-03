@@ -7,7 +7,7 @@
     "path": "code/drum_gamma9001.py",
     "decision": "retain as Python data snapshot",
     "reason": "The mapping is static data derived from the pinned AMY Gamma9001 manifest/headers, but repository history records no deterministic generator. Moving it before establishing a generator would change format without improving reproducibility.",
-    "amy_commit": "3d6ec079eb73bf5d021312ff8ac07ebae8e5eae7",
+    "amy_commit": "3462b266e4990ab6fa617bb8fa5c5ad8b43959d5",
     "entries": 121
   },
   "catalogues": [

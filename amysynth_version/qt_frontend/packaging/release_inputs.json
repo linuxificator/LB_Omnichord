@@ -4,7 +4,7 @@
   "amy": {
     "repository": "https://github.com/linuxificator/amy.git",
     "release_branch": "releases/amy_omnichord_R20260903T201525",
-    "commit": "3d6ec079eb73bf5d021312ff8ac07ebae8e5eae7",
+    "commit": "3462b266e4990ab6fa617bb8fa5c5ad8b43959d5",
     "pcm_bank": "gamma9001"
   },
   "python": {
