@@ -91,15 +91,22 @@ Relevant hardware characteristics:
 
 ### Audio baseline
 
-The proven low-latency baseline is:
+The most recent physically tested performance baseline is:
 
 - Sample rate: **48 kHz**.
-- AMY render block: **64 samples**.
-- I2S DMA configuration proven clean at this setting: **2 × 32 frames**.
-- Removing `vTaskDelay()` from the render loop was essential; reintroducing scheduler delays into the audio render path can cause periodic distortion.
-- Measured GPIO-to-audio latency with the working 64-sample setup is below approximately 2 ms.
+- AMY render block: **128 samples**.
+- I2S DMA configuration: **2 × 64 frames**.
+- Preserve AMY's upstream short-DMA scheduling fix from PR #1119. It yields
+  only after an over-budget render iteration in which I2S barely blocked; do
+  not add an unconditional task delay or restore the older local no-delay
+  source patch.
 
-Do not casually increase the block size or add blocking/delay behavior to the audio loop. If a heavier patch requires a different DMA configuration, measure the consequences rather than assuming it is harmless.
+The older 64-sample / 2 × 32 notes are stale and must not be used as the
+production profile.
+
+Do not casually change the block size or add blocking/delay behavior to the
+audio loop. If a heavier patch requires a different DMA configuration, measure
+the consequences rather than assuming it is harmless.
 
 The maintained firmware has separate `v1` (silicon 1.0–1.99, matching the
 observed v1.3 board) and `v3` (3.1+) build profiles because ESP-IDF treats those

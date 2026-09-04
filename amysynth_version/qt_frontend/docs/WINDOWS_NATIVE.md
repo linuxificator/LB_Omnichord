@@ -136,7 +136,7 @@ The current Windows AMY service profile is not yet a low-latency baseline: the
 fork's host defaults are 44.1 kHz and 256 samples, its Windows backend tries
 DirectSound before WASAPI, and requests 20 ms periods with four periods.
 Native Windows removes WSL's forwarding layer, but this audio profile still
-needs measurement and tuning before release. The ESP32-P4 48 kHz/64-sample
+needs measurement and tuning before release. The ESP32-P4 48 kHz/128-sample
 settings must not be copied without measuring Windows device behavior.
 
 ## Remaining implementation work

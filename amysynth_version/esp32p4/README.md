@@ -14,7 +14,7 @@ The image includes:
 - 11 independent AMY buses;
 - 1024 stored sequence groups, 64 local event tags per group and 40 concurrent
   executions;
-- a 48 kHz, 64-sample AMY render block and 2 x 32-frame I2S DMA ring.
+- a 48 kHz, 128-sample AMY render block and 2 x 64-frame I2S DMA ring.
 
 Large persistent AMY pools use PSRAM. Render/DMA scratch remains in internal
 RAM. Startup aborts clearly when less than 8 MB PSRAM is available.
@@ -164,7 +164,7 @@ boundary. Adding a special emulator-only firmware path would stop testing the
 production topology. A physical v1.3 acceptance run must therefore confirm:
 
 1. PSRAM initialization and the printed board/chip profile;
-2. clean 48 kHz I2S output with the 64-sample / 2 x 32 profile;
+2. clean 48 kHz I2S output with the 128-sample / 2 x 64 profile;
 3. sustained 1 Mbaud LP-UART command reception without ring overflow;
 4. distinct Gamma9001 kick, snare, tom and cymbal presets;
 5. independent routing across all 11 buses;

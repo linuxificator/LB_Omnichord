@@ -52,5 +52,5 @@ python -m esptool --chip esp32p4 --port /dev/ttyACM0 \
 
 The merged image is configured for 32 MB flash. After flashing, reset and
 monitor the board. The expected log names the selected build profile, detected
-chip revision, PSRAM size, AMY 48 kHz / 64-sample configuration and LP-UART
+chip revision, PSRAM size, AMY 48 kHz / 128-sample configuration and LP-UART
 GPIO/baud before reporting readiness for native AMY commands.

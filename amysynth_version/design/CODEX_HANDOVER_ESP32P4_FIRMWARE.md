@@ -19,7 +19,7 @@ The firmware contains the same capabilities used by the application packages:
 - 11 independent buses;
 - 1024 stored groups, 64 local event tags per group and 40 concurrent group
   executions;
-- 48 kHz rendering in 64-sample blocks with a 2 x 32-frame I2S DMA ring.
+- 48 kHz rendering in 128-sample blocks with a 2 x 64-frame I2S DMA ring.
 
 The old four-bus/Tiny image and source-patching preparation flow are superseded.
 They remain history, not an alternate product profile.
@@ -113,8 +113,8 @@ capacity agreement, retired pattern vocabulary, generated Gamma symbols,
 PSRAM/partition sizing, configurable pins, separate silicon profiles,
 standalone/reusable workflow and full-release publication path.
 
-Both profiles have built locally with ESP-IDF 6.0.2 after restoring the proven
-64-sample / 2 x 32-frame audio geometry. Each image fits its 8 MB partition with
+Both profiles have built locally with ESP-IDF 6.0.2 using the most recently
+physically tested 128-sample / 2 x 64-frame audio geometry. Each image fits its 8 MB partition with
 about 42 percent free space, contains the Gamma registration/data symbols and
 packages successfully.
 
@@ -141,6 +141,7 @@ and PSRAM, I2S audio, sustained LP UART at 1 Mbaud, distinct Gamma percussion,
 all buses, complete group preload, group execution/gating and worst-case
 underrun behavior. Repeat it separately for the newer board with the v3 image.
 
-Do not hide a physical failure with a larger render block or task delay. The
-64-sample geometry and delay-free render loop are measured latency contracts;
-any proposed change requires new latency and distortion evidence.
+Do not hide a physical failure with an untested render geometry or task delay.
+The 128-sample geometry and AMY's conditional upstream short-DMA scheduling
+fix are the current performance contract; the older 64-sample documentation
+was stale. Any proposed change requires new latency and distortion evidence.
