@@ -24,6 +24,12 @@ private named pipe; Android embeds the lifecycle AAR and uses its app-private
 `amy.sock`; neither target runs the Linux AppImage through a compatibility
 layer.
 
+The complete release also publishes a separately attested ESP32-P4 v1 firmware
+image for the physically observed revision-1.3 board. It uses the same pinned
+Gamma9001 AMY release and wire protocol as the hosted applications, with 11
+buses and 1024 sequence groups. The firmware can also be built independently;
+see [`esp32p4/README.md`](esp32p4/README.md).
+
 The first four-platform release is `R20260826T230234`: all frontend suites and
 all four native package jobs passed before publication. The Windows job proved
 offline AMY rendering and the packaged Qt/named-pipe/service boundary. The

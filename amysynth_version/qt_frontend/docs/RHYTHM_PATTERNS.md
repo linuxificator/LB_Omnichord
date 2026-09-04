@@ -115,7 +115,7 @@ Timing and sound choice are separate assets. `drums.kit` in
 `config/amy_config.json` selects one of:
 
 - `gamma9001` (hosted-release default): AMY compiled with the Gamma9001 bank;
-- `tiny`: AMY's compact PCM bank, retained for the separate ESP32-P4 target;
+- `tiny`: AMY's compact PCM bank, retained for compatibility/testing;
 - `general_midi`: AMY's engine-side patch-258 drum-note map.
 
 `general_midi` describes familiar drum-note assignments, but remains AMY audio:
@@ -127,8 +127,9 @@ role without changing any timing.
 The hosted packages intentionally use Gamma9001. `prepare_local_amy.sh` reads
 the exact bank, release branch and commit from `packaging/release_inputs.json`,
 builds that source with `AMY_PCM_BANK=gamma9001`, and requires both the
-registration and linked PCM-data symbols. The ESP32-P4 firmware remains Tiny
-until its separate storage profile can support Gamma9001.
+registration and linked PCM-data symbols. The ESP32-P4 firmware generates,
+links and registers the same Gamma9001 data in its dedicated 32 MB flash
+profile.
 The repeatable native audio checks are:
 
 ```sh

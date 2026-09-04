@@ -276,9 +276,9 @@ The supervisor gives each run a unique private pipe name. Qt connects with
 not linked into the frontend.
 
 The Windows service is built with Gamma9001, matching Linux, Raspberry Pi,
-macOS and Android. Its CMake target generates, links and registers the PCM blob;
-using a Tiny service with the shipped Gamma map is a release-blocking mismatch.
-ESP32-P4 remains a separately declared Tiny-bank firmware target.
+macOS, Android and ESP32-P4. Its CMake target generates, links and registers the
+PCM blob; using a Tiny service with the shipped Gamma map is a release-blocking
+mismatch.
 
 The package is currently experimental. GitHub's Windows Server 2025 job proves
 native compilation, offline non-silent PCM rendering, frozen QML/assets,
@@ -301,8 +301,8 @@ $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 ```
 
 The zip and checksum are written below `dist`. The release workflow pins both
-AMY fork branch `releases/amy_omnichord_R20260903T202802` and commit
-`890ec66de2677db5bdf9a5dda9f53f01628d2b58`; local release candidates must use
+AMY fork branch `releases/amy_omnichord_R20260904T130059` and commit
+`7d66ae637f75a53d45cc5ffb3392c07f1d6ff876`; local release candidates must use
 that exact commit unless the shared release contract and its compatibility
 tests are deliberately updated together.
 

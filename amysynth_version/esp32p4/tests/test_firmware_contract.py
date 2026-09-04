@@ -81,6 +81,9 @@ class FirmwareContractTests(unittest.TestCase):
         self.assertIn("CONFIG_ESP32P4_REV_MIN_100=y", old)
         self.assertIn("CONFIG_ESP32P4_REV_MIN_301=y", new)
         self.assertIn("SELECTS_REV_LESS_V3 is not set", new)
+        package = (ROOT / "package_firmware.sh").read_text()
+        self.assertIn("CONFIG_ESP32P4_REV_MAX_FULL=199", package)
+        self.assertIn("CONFIG_ESP32P4_REV_MAX_FULL=399", package)
 
     def test_flash_and_psram_are_sized_for_gamma9001(self) -> None:
         defaults = (ROOT / "sdkconfig.defaults").read_text()

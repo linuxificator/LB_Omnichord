@@ -1,6 +1,6 @@
 # Codex session handoff — AMY/LB Omnichord state and code-quality audit
 
-Updated: 2026-09-03.
+Updated: 2026-09-04.
 
 This file is intentionally written for future Codex sessions. It records the
 working state, decisions, lessons learned and branch/release discipline from
@@ -24,13 +24,14 @@ atomic immutable revisions, one/N/infinite execution, quantized start/stop,
 one level of nesting and finite payload-agnostic event gating. Existing root
 sequencer behavior remains unchanged and is covered by compatibility tests.
 
-The Omnichord integration release is
-`releases/amy_omnichord_R20260903T202802` at
-`890ec66de2677db5bdf9a5dda9f53f01628d2b58`. It layers the already-maintained
+The current Omnichord integration release is
+`releases/amy_omnichord_R20260904T130059` at
+`7d66ae637f75a53d45cc5ffb3392c07f1d6ff876`. It layers the already-maintained
 socket, Android/Oboe, Gamma9001 and offline-render support plus the explicit
 11-bus/336-oscillator and 1024-group/64-local-tag/40-execution profile. The
-abandoned bus-mixer experiment is not included. ESP32-P4 validation is
-deliberately deferred for this rework.
+abandoned bus-mixer experiment is not included. It also supplies generic
+embedded audio-geometry overrides and correct ESP-IDF task signatures used by
+the new P4 build; all upstream defaults remain unchanged.
 
 This release also applies lossless backpressure to the bounded Unix-socket
 receiver queue. When the realtime handoff queue is full, AMY temporarily stops
@@ -355,13 +356,13 @@ Manual chord ownership remains separate:
 
 ## Drum banks and Gamma9001
 
-The hosted published default is Gamma9001. ESP32-P4 remains a separately
-declared Tiny-bank firmware target because its current flash/storage profile
-does not contain the Gamma9001 blob.
+Every current target, including ESP32-P4, uses Gamma9001 from the immutable AMY
+release. P4 has a dedicated 32 MB flash layout, 8 MB application partition and
+PSRAM-backed capacity profile.
 
 Supported concepts:
 
-- `tiny`: compact built-in PCM bank; used by the current ESP32-P4 target.
+- `tiny`: compact built-in PCM bank retained for compatibility/testing.
 - `gamma9001`: AMY built with Gamma9001 sample data and GM-mapped kit patches.
 - `general_midi`: AMY's patch-258 drum-note map; it is still AMY audio, not
   external MIDI output.

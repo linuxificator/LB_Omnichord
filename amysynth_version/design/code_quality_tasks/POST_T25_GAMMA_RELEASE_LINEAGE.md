@@ -5,6 +5,11 @@ Owner: LB Omnichord configuration and AMY release integration
 Applies to: `rework/code_quality` and the next hosted-platform release
 Recorded: 2026-09-01
 
+Superseded for ESP32-P4 on 2026-09-04: the complete P4 firmware now uses the
+same Gamma9001 release contract. See
+`../CODEX_HANDOVER_ESP32P4_FIRMWARE.md`. The incident analysis below remains
+historical evidence for why a bank/config mismatch must fail the build.
+
 ## Finding
 
 The intended product line used Gamma9001, and `features/gamma9001` implemented
@@ -43,11 +48,11 @@ only the resolved typed configuration.
 
 ## Platform boundary
 
-Linux, Raspberry Pi, macOS, Windows and Android are hosted targets and must all
-prove Gamma9001. ESP32-P4 remains a separately declared Tiny-bank firmware
-target until a Gamma9001 flash/storage layout is designed and tested. Its
-constraint must not cause hosted package workflows or user configuration to
-fall back to Tiny.
+Linux, Raspberry Pi, macOS, Windows and Android were the hosted targets covered
+by this correction. At the time of this record, ESP32-P4 was still a separate
+Tiny target; the 2026-09-04 firmware work later supplied its Gamma9001
+flash/storage layout. MCU constraints must never cause hosted workflows or user
+configuration to fall back to Tiny.
 
 ## Regression contract
 

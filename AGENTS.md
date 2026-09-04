@@ -101,6 +101,14 @@ The proven low-latency baseline is:
 
 Do not casually increase the block size or add blocking/delay behavior to the audio loop. If a heavier patch requires a different DMA configuration, measure the consequences rather than assuming it is harmless.
 
+The maintained firmware has separate `v1` (silicon 1.0–1.99, matching the
+observed v1.3 board) and `v3` (3.1+) build profiles because ESP-IDF treats those
+families as binary-incompatible. Board label, I2S pins, LP-UART RX pin and baud
+are Kconfig/build inputs owned by `amysynth_version/esp32p4`; the values below
+are defaults, not permission to hard-code them in the frontend. The complete
+image uses Gamma9001, 11 buses and 1024 sequence groups. Read the routed P4
+handover before modifying these capacities or release integration.
+
 ### External PCM5102A DAC
 
 Confirmed working wiring on the ESP32-P4 Pico M:

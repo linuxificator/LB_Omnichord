@@ -244,7 +244,9 @@ This is intentional and reviewable.
 
 Codex must **not** pretend that a surrogate is the same acoustic instrument. It is simply the best realization available within the tiny ROM constraint.
 
-Tiny remains the target realization for the ESP32-P4 product until a different sample-bank decision is explicitly made.
+This was the original constraint when the handover was written. The explicit
+Gamma9001 decision and complete ESP32-P4 flash/PSRAM profile made on 2026-09-04
+supersede it; see `../../CODEX_HANDOVER_ESP32P4_FIRMWARE.md`.
 
 ---
 

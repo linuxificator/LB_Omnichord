@@ -45,6 +45,9 @@ Core rules:
 - `CODEX_HANDOVER_FRITS_SLIDER_FIX.md` records the macOS mouse-visible slider
   regression, its shared mouse/touch cause and the package-level proof added to
   prevent recurrence without platform-specific UI code.
+- `CODEX_HANDOVER_ESP32P4_FIRMWARE.md` records the complete Gamma9001 P4
+  firmware profile, immutable AMY input, silicon ABI split, standalone/full
+  build paths and the remaining physical acceptance boundary.
 - `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md` indexes the 2026-08-31
   repository-wide code-quality audit. Those files are analysis and proposed
   refactoring guidance, not authority to change product behavior.
@@ -126,7 +129,7 @@ Then add every row that matches the task:
 | Instrument catalogue, defaults or balance | `sound_balance.md`, `presets.md`, `../qt_frontend/instruments/README_defaults.md` |
 | Platform packages, releases, Android or native Windows | `../qt_frontend/README.md`, `../qt_frontend/INSTALL.md`, `../qt_frontend/packaging/android/README.md`, `../qt_frontend/docs/WINDOWS_NATIVE.md`, `../../.github/workflows/desktop-release.yml` |
 | Optional historical WSL experiment | `../qt_frontend/docs/WSL_APPIMAGE_TESTING.md`, plus the desktop documents above |
-| ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
+| ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md`, `CODEX_HANDOVER_ESP32P4_FIRMWARE.md`, `../qt_frontend/packaging/AMY_RELEASE.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |
 | Architecture, code quality or refactoring | `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md`, the relevant dedicated audit handover, `CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md`, plus every owning subsystem contract touched by the proposed change |
 | Test harnesses, package smoke or cross-platform acceptance | `test_process_architecture.md`, `testing.md`, `CODEX_HANDOVER_TEST_ARCHITECTURE.md`, `CODEX_HANDOVER_TEST_PROCESS_ARCHITECTURE_AUDIT.md`, plus the platform contracts selected above |

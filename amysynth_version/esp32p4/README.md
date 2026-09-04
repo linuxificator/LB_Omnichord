@@ -1,415 +1,176 @@
 # ESP32-P4 AMY firmware
 
-This directory is a standalone ESP-IDF project for the AMY-based LB Omnichord target running on the Waveshare ESP32-P4 Pico M.
+This standalone ESP-IDF project builds the AMY service used by LB Omnichord on
+a Waveshare ESP32-P4 Pico M. The high-performance cores synthesize stereo audio
+and the low-power core receives newline-framed native AMY wire commands from a
+Raspberry Pi at 1 Mbaud. The frontend and synth remain fully separated: the
+firmware has no Omnichord UI or musical-policy API.
 
-The project builds AMY for the ESP32-P4, outputs stereo I2S to an external PCM5102A DAC, and receives native AMY wire-protocol messages on the ESP32-P4 low-power UART. The LP core receives the UART bytes and forwards complete AMY messages to the high-performance cores through the LP mailbox.
+The image includes:
 
-The repository intentionally does **not** vendor ESP-IDF, AMY, or build output.
-`prepare_amy.sh` fetches the exact pinned AMY fork release and applies the small
-target-specific changes required by this firmware. The same script is used
-locally and by GitHub Actions.
+- the pinned Omnichord AMY release with sequencer groups;
+- the complete Gamma9001 PCM bank;
+- 336 oscillators and 16 Karplus-Strong buffers;
+- 11 independent AMY buses;
+- 1024 stored sequence groups, 64 local event tags per group and 40 concurrent
+  executions;
+- a 48 kHz, 64-sample AMY render block and 2 x 32-frame I2S DMA ring.
 
-## Hardware
+Large persistent AMY pools use PSRAM. Render/DMA scratch remains in internal
+RAM. Startup aborts clearly when less than 8 MB PSRAM is available.
 
-### ESP32-P4 board
+## Hardware defaults
 
-Current target: Waveshare ESP32-P4 Pico M.
+The defaults preserve the previously proven wiring:
 
-### PCM5102A
+| Function | ESP32-P4 pin | Other side |
+| --- | ---: | --- |
+| I2S LRCK / WS | GPIO16 | PCM5102A LRCK/LCK |
+| I2S data out | GPIO17 | PCM5102A DIN |
+| I2S bit clock | GPIO18 | PCM5102A BCK |
+| LP UART receive | GPIO15 | Raspberry Pi GPIO14/TXD, physical pin 8 |
+| Ground | GND | common ground |
 
-The known-good wiring is:
+Tie PCM5102A SCK to ground. No MCLK is used. The UART format is 1,000,000 baud,
+8 data bits, no parity and one stop bit at 3.3 V. Each AMY request ends in `Z`;
+the serial transport appends LF, for example `v0w0f440Q0l0.2Z\n`.
 
-| ESP32-P4 | PCM5102A |
-| --- | --- |
-| GPIO16 | LRCK / LCK |
-| GPIO17 | DIN |
-| GPIO18 | BCK |
-| GND | GND |
-| — | SCK tied to GND |
-
-AMY is configured for stereo I2S output. The PCM5102A does not require MCLK in this setup.
-
-### AMY command UART
-
-The Qt frontend sends native AMY wire protocol over a one-way UART connection:
-
-| Raspberry Pi | ESP32-P4 |
-| --- | --- |
-| GPIO14 / TXD, physical pin 8 | GPIO15 / LP-UART RX |
-| GND | GND |
-
-Serial format:
-
-```text
-1,000,000 baud
-8 data bits
-no parity
-1 stop bit
-3.3 V logic
-```
-
-Each native AMY command ends in `Z`; the transport adds LF after the AMY message. Example:
+These are build defaults, not application constants. `main/Kconfig.projbuild`
+owns the firmware settings and `build_firmware.sh` accepts these environment
+overrides:
 
 ```text
-v0w0f440Q0l0.2Z\n
+ESP32P4_I2S_LRCK_GPIO
+ESP32P4_I2S_DOUT_GPIO
+ESP32P4_I2S_BCLK_GPIO
+ESP32P4_UART_RX_GPIO
+ESP32P4_UART_BAUD
+ESP32P4_BOARD_LABEL
 ```
 
-## Repository layout
-
-```text
-esp32p4/
-├── CMakeLists.txt
-├── README.md
-├── sdkconfig
-├── prepare_amy.sh
-├── main/
-│   ├── CMakeLists.txt
-│   ├── main.c
-│   └── lp_core/
-│       ├── main.c
-│       └── amy_uart_shared.h
-└── components/
-    └── amy/              generated, ignored by git
-```
-
-`build/` and `components/amy/` are intentionally ignored.
-
-## Versions
-
-The checked-in project configuration was generated with ESP-IDF **6.0.2**. The CI build is pinned to the official Espressif `v6.0.2` environment.
-
-AMY is pinned to our immutable Omnichord fork release
-`releases/amy_omnichord_R20260831T042456` at commit
-`14240031c135fdcd76a7a3a8ec81da8ef405c4b0`. That release contains the nested
-sequencer API used by this firmware. `prepare_amy.sh` verifies that the branch
-tip and requested commit match, so it cannot silently compile against
-incompatible Shorepine `main`.
-
-The short-DMA scheduling fix from upstream AMY PR #1119 is required by this target. `prepare_amy.sh` checks that the selected AMY revision contains that merged fix; it does **not** carry the older local workaround that removed `vTaskDelay()`.
-
-## Ubuntu: install ESP-IDF 6.0.2
-
-The following is the normal native development setup.
-
-Install the Ubuntu packages required by ESP-IDF:
+For example:
 
 ```bash
-sudo apt update
-sudo apt install -y \
-    git wget flex bison gperf \
-    python3 python3-pip python3-venv \
-    cmake ninja-build ccache \
-    libffi-dev libssl-dev \
-    dfu-util libusb-1.0-0
+ESP32P4_I2S_LRCK_GPIO=20 \
+ESP32P4_I2S_DOUT_GPIO=21 \
+ESP32P4_I2S_BCLK_GPIO=22 \
+ESP32P4_UART_RX_GPIO=23 \
+ESP32P4_BOARD_LABEL=my-p4-carrier \
+./build_firmware.sh --profile v1
 ```
 
-Install ESP-IDF 6.0.2 under `~/esp`:
+## Silicon profiles
+
+ESP-IDF treats ESP32-P4 revisions before v3.0 and revisions v3.0 or later as
+binary-incompatible. One image cannot support both families.
+
+- `v1` supports revisions 1.0 through 1.99. The connected board reported chip
+  revision 1.3, so this is the default target. Its wiring and low-latency audio
+  geometry were proven by the earlier firmware; this new complete image still
+  requires the acceptance run below.
+- `v3` targets revision 3.1 and later. It compiles in local and CI builds, but
+  remains hardware-unverified until the newer board is tested.
+
+Always select the profile from the chip revision, not from a marketing board
+revision printed on a carrier PCB.
+
+## Exact dependencies
+
+The build uses ESP-IDF 6.0.2. `prepare_amy.sh` reads the repository, immutable
+commit and immutable release branch from
+`../qt_frontend/packaging/release_inputs.json`, verifies that the branch tip is
+the requested commit, generates Gamma9001 from its source dataset and creates
+the ignored ESP-IDF AMY component. It does not patch AMY source files.
+
+For local AMY development, all three values may be overridden together:
 
 ```bash
-mkdir -p ~/esp
-cd ~/esp
-git clone --recursive --branch v6.0.2 \
-    https://github.com/espressif/esp-idf.git
-cd esp-idf
-./install.sh esp32p4
+AMY_REPO=/path/to/amy \
+AMY_RELEASE_BRANCH=rework/esp32p4 \
+AMY_REF=<40-character-commit> \
+./build_firmware.sh --profile v1
 ```
 
-Load the IDF environment in each shell before using `idf.py`:
+## Local build
+
+Install and activate ESP-IDF 6.0.2, then run from this directory:
 
 ```bash
 . "$HOME/esp/esp-idf/export.sh"
+./build_firmware.sh --profile v1
 ```
 
-An optional shell alias is convenient:
-
-```bash
-echo "alias get_idf='. \$HOME/esp/esp-idf/export.sh'" >> ~/.bashrc
-. ~/.bashrc
-```
-
-Then a new terminal can simply use:
-
-```bash
-get_idf
-```
-
-Check the installation:
-
-```bash
-idf.py --version
-```
-
-It should report ESP-IDF 6.0.2.
-
-## Clone and prepare the firmware
-
-Clone this repository and enter the firmware project:
-
-```bash
-git clone https://github.com/linuxificator/LB_Omnichord.git
-cd LB_Omnichord/amysynth_version/esp32p4
-```
-
-Fetch and patch AMY:
-
-```bash
-bash prepare_amy.sh
-```
-
-The script:
-
-1. removes any previously generated `components/amy/` tree;
-2. clones and verifies the pinned Omnichord AMY fork release;
-3. changes AMY to a 128-sample block at 48 kHz;
-4. selects Philips I2S framing for the PCM5102A;
-5. uses two DMA descriptors with 64 frames each;
-6. verifies that the selected AMY contains the merged #1119 short-DMA scheduling fix;
-7. fixes FreeRTOS task entry-point signatures when required by the selected upstream revision;
-8. enables the P4-only shared-aux-reverb implementation;
-9. writes the ESP-IDF component `CMakeLists.txt` used by this project;
-10. prints the exact AMY commit that was prepared.
-
-To deliberately test another release, override the repository, release branch
-and exact commit together:
-
-```bash
-AMY_REPO=<amy-fork-url> \
-AMY_RELEASE_BRANCH=<release-branch> \
-AMY_REF=<40-character-commit-sha> \
-bash prepare_amy.sh
-```
-
-A deliberately old commit from before AMY PR #1119 will be rejected because its render-task scheduling is not compatible with the short 2×64 DMA ring used here.
-
-## Build
-
-Load ESP-IDF if necessary:
-
-```bash
-get_idf
-```
-
-Then, from `amysynth_version/esp32p4`:
-
-```bash
-idf.py build
-```
-
-The generated files are placed under `build/` and are ignored by git.
-
-For a completely clean rebuild:
-
-```bash
-idf.py fullclean
-bash prepare_amy.sh
-idf.py build
-```
-
-Do **not** run `idf.py set-target` as part of the normal build procedure. The checked-in `sdkconfig` is the project configuration and should remain authoritative unless the target configuration is deliberately being changed.
-
-## Flash and monitor
-
-Connect the ESP32-P4 board over USB and make sure your user can access the serial device.
-
-On Ubuntu, add your account to `dialout` if necessary:
-
-```bash
-sudo usermod -aG dialout "$USER"
-```
-
-Log out and back in after changing group membership.
-
-With the IDF environment loaded:
-
-```bash
-idf.py flash monitor
-```
-
-If several serial ports exist, specify the port explicitly, for example:
-
-```bash
-idf.py -p /dev/ttyACM0 flash monitor
-```
-
-Exit the IDF monitor with `Ctrl-]`.
-
-Expected startup output includes the AMY sample rate/block size, AMY startup, LP UART initialization, and the final message that GPIO15 is ready for native AMY commands.
-
-## Build with Docker instead of installing ESP-IDF
-
-Espressif publishes an official IDF Docker image. This is useful for a clean build or on a machine where ESP-IDF is not installed natively.
-
-From this directory:
-
-```bash
-bash prepare_amy.sh
-
-docker run --rm \
-    -v "$PWD:/project" \
-    -w /project \
-    -u "$(id -u):$(id -g)" \
-    -e HOME=/tmp \
-    espressif/idf:v6.0.2 \
-    idf.py build
-```
-
-The Docker image is large, but it contains the complete Espressif toolchain and IDF environment. Build output is written into the local ignored `build/` directory.
-
-## GitHub Actions build
-
-`.github/workflows/esp32p4-build.yml` performs the same firmware build automatically when ESP32-P4 project files change.
-
-It uses Espressif's official `esp-idf-ci-action@v1`, pinned to ESP-IDF `v6.0.2` and target `esp32p4`. The action runs the build inside the official Espressif IDF container.
-
-The CI command is intentionally the same sequence as a local build:
-
-```bash
-bash prepare_amy.sh
-idf.py build
-```
-
-Successful CI runs upload the generated firmware `.bin`, `.elf`, `.map`, bootloader, partition table and flash arguments as a short-lived GitHub Actions artifact.
-
-The workflow has concurrency cancellation enabled, so a newer commit to the same PR cancels an obsolete in-progress firmware build instead of producing another full set of redundant jobs/notifications.
-
-## Current AMY target modifications
-
-The firmware deliberately differs from the pinned Omnichord AMY release only
-in target-specific areas. `prepare_amy.sh` applies these changes after checking
-out that exact release commit.
-
-### 48 kHz, 128-sample blocks
-
-Stock AMY normally builds with 256-sample blocks at 44.1 kHz on this path. This target uses:
+Use `--profile v3` for newer silicon. Each profile has an independent,
+incremental build directory:
 
 ```text
-AMY_SAMPLE_RATE = 48000
-AMY_BLOCK_SIZE  = 128
-BLOCK_SIZE_BITS = 7
+build/v1/merged-flash.bin
+build/v3/merged-flash.bin
 ```
 
-This 128-sample block size is intentional: it is the best performance/latency operating point established by the ESP32-P4 tests for this project.
+`--skip-prepare` reuses an already prepared AMY component while iterating on
+firmware code. A normal reproducible build prepares AMY again.
 
-### I2S and DMA
+Build parameters are written only to the selected build directory; tracked
+profile defaults remain unchanged. The generated 32 MB flash image contains an
+8 MB factory application partition, which leaves roughly 42% headroom after
+linking Gamma9001 with the current build.
 
-The external PCM5102A uses Philips I2S framing. The firmware uses:
+## Standalone CI build
 
-```text
-GPIO16 = LRCK
-GPIO17 = DOUT
-GPIO18 = BCLK
-no MCLK
-```
+The `ESP32-P4 firmware build` workflow is independent of the full application
+release. Run it manually with profile `v1`, `v3`, or `all`. Pull requests that
+touch the firmware build both ABIs. Each successful job publishes a portable
+artifact named `esp32p4-firmware-v1` or `esp32p4-firmware-v3` containing:
 
-The DMA configuration is explicitly:
+- a directly flashable merged image;
+- application, bootloader and partition-table images;
+- portable esptool argument files;
+- ELF and map files for diagnosis;
+- SHA-256 checksums and exact source/AMY/profile metadata.
 
-```text
-dma_desc_num  = 2
-dma_frame_num = AMY_BLOCK_SIZE / 2 = 64
-```
+The full Omnichord release calls the same workflow for the `v1` profile that
+matches the observed revision-1.3 board and publishes its firmware zip,
+checksum and build-provenance
+attestation beside the five application packages.
 
-Current upstream AMY contains the merged #1119 fix that only yields the max-priority audio task when rendering really exceeds the block budget and I2S did not block. That upstream logic is retained unchanged.
+## Flash
 
-### Shared aux reverb
-
-This section records the proven four-bus OMNI-only ESP32-P4 baseline. The full
-Qt OMNI+MIDI design now requires eleven buses and independent OMNI/MIDI reverb
-state as specified in `../design/architecture.md`. In particular, this
-single-shared-room build cannot independently retain both sections' liveness
-and damping; target-side multibus/effect work and hardware validation are still
-required before claiming feature parity with the Linux service.
-
-The Omnichord keeps four separate dry AMY buses for role isolation:
-
-```text
-bus 0 = drums
-bus 1 = bass
-bus 2 = strum
-bus 3 = chords
-```
-
-EQ, chorus, echo, bus volume, and patch isolation therefore remain per bus. Reverb is different: the P4 target compiles AMY with `AMY_SHARED_REVERB=1` and uses **one** stereo room reverb as an aux effect for all four buses.
-
-The native AMY wire syntax is unchanged:
-
-```text
-yNh<level>,<liveness>,<damping>Z
-```
-
-On this P4 build:
-
-- `N` still selects the source bus;
-- `level` is that bus's send gain into the shared room;
-- `liveness` and `damping` configure the single shared room;
-- the Qt frontend sends the user reverb level to bass, strum, and chord buses;
-- the drum send is zero when DRM is off and follows the same user level when DRM is on.
-
-The audio path is:
-
-```text
-bus EQ/chorus/echo
-        |
-        +-------------------------------> dry final mix
-        |
-        +-- post-fader reverb send --\
-        +-- post-fader reverb send ---+--> one stereo reverb --> wet return
-        +-- post-fader reverb send ---+
-        +-- DRM-gated drum send ------/
-```
-
-The send is formed after each bus's volume scaling, so lowering a role volume also lowers the amount of that role entering the room. AMY runs the reverb engine exactly once per 128-sample block and adds only its wet return to the normal dry mix. Reverb tails continue to run when the current input block is silent.
-
-This removes the previous failure mode where enabling reverb on several buses attempted to allocate several complete reverb delay networks. One AMY stereo reverb contains 27,648 delay samples (about 111 kB of sample storage when `SAMPLE` is 32-bit), plus small state/scratch allocations; four independent instances would require roughly four times the delay storage and four reverb DSP passes per audio block.
-
-### LP-core UART
-
-The low-power core receives the 1 Mbaud serial stream on GPIO15. Complete messages are placed into a shared ring and signalled to the HP side through the ESP32-P4 LP mailbox. A high-priority HP FreeRTOS task then calls `amy_add_message()`.
-
-The UART forwarding task runs one priority below AMY's render task, so audio rendering can preempt command forwarding.
-
-## Delay memory / PSRAM note
-
-AMY exposes a separate `ram_caps_delay` allocator for echo and reverb delay lines. The checked-in `sdkconfig` currently has ESP PSRAM disabled, so the generic ESP-IDF AMY defaults allocate these delay lines from normal/default-capability RAM.
-
-The shared-reverb design means room reverb no longer needs one large allocation per musical bus. This should make the current internal-RAM configuration practical for the room effect while preserving the four-bus architecture.
-
-PSRAM can still be enabled later and selected for large delay/effect storage if measurements show that echo, chorus, future effects, or sample caching need more memory. Render-critical AMY state can remain in internal RAM while bulk delay/sample storage uses PSRAM.
-
-## Cleaning generated files
-
-Normal cleanup:
+For a local build:
 
 ```bash
-idf.py fullclean
-rm -rf components/amy
+idf.py -B build/v1 -p /dev/ttyACM0 flash monitor
 ```
 
-The following are generated and must not be committed:
-
-```text
-build/
-components/amy/
-managed_components/
-sdkconfig.old*
-compile_commands.json
-*.elf
-*.map
-*.bin
-```
-
-The project-local `.gitignore` enforces these rules.
-
-## Updating AMY
-
-To regenerate the component from the pinned release:
+For the exact CI artifact matching the checked-out commit:
 
 ```bash
-bash prepare_amy.sh
-idf.py build
+ESP32P4_PROFILE=v1 ./flash_ci.sh /dev/ttyACM0
 ```
 
-When adopting a newer fork release, update the repository, branch and commit
-pin together. If that AMY revision changes one of the source locations patched
-for the P4 target, `prepare_amy.sh` deliberately fails instead of silently
-producing a differently configured firmware. Update the preparation script and
-CI together when that happens.
+See [CI_FLASH.md](CI_FLASH.md) for manual artifact flashing.
+
+## Verification boundary
+
+CI compiles both incompatible silicon profiles and verifies the flash size,
+partition fit, Gamma9001 symbols, AMY release pin, capacities, checksums and
+portable flash metadata. AMY's host tests separately cover the wire protocol,
+legacy sequencer compatibility and sequence-group behavior.
+
+There is no useful full-system emulator test for this image today. Espressif's
+P4 emulator does not model the LP core, while this firmware deliberately uses
+that core for UART reception; I2S output is also a physical integration
+boundary. Adding a special emulator-only firmware path would stop testing the
+production topology. A physical v1.3 acceptance run must therefore confirm:
+
+1. PSRAM initialization and the printed board/chip profile;
+2. clean 48 kHz I2S output with the 64-sample / 2 x 32 profile;
+3. sustained 1 Mbaud LP-UART command reception without ring overflow;
+4. distinct Gamma9001 kick, snare, tom and cymbal presets;
+5. independent routing across all 11 buses;
+6. preloading the full rhythm catalogue within 1024 groups;
+7. starting, replacing, gating and stopping sequence-group executions;
+8. no audio underruns or overload reset under realistic maximum rhythm load.
+
+Do not describe the v3 profile as hardware-supported until the same test has
+been completed on the newer board.

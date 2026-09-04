@@ -111,9 +111,13 @@ Four repository workflows are maintained:
   builder also verifies Qt's compiled Android library array is dependency
   ordered, with `Quick` loaded before `QuickControls2`, so JNI initialization
   cannot depend on Python set iteration order.
-- `ESP32-P4 firmware build` builds and validates the firmware package when the
-  ESP32-P4 project changes. It is a build/package check, not part of the Python
-  frontend suite.
+- `ESP32-P4 firmware build` is reusable and independently dispatchable for v1,
+  v3 or both silicon ABIs. Pull requests touching the firmware compile both;
+  the complete release calls it for v1, matching the observed revision-1.3
+  hardware, and publishes the resulting flash package separately from the five
+  application packages. It
+  is a build/image-structure check, not a substitute for physical LP-UART and
+  I2S acceptance and not part of the Python frontend suite.
 - `Mirror to Codeberg` mirrors branches and tags. It is delivery automation,
   not a test; concurrency ensures branch-cleanup events collapse to one final
   authoritative mirror.

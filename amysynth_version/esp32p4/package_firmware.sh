@@ -43,10 +43,12 @@ grep -q 'amy_set_gamma9001_pcm' "$build_dir/amy_p4_test.map"
 if [[ "$profile" == v1 ]]; then
     grep -q '^CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y$' "$build_dir/sdkconfig"
     grep -q '^CONFIG_ESP32P4_REV_MIN_FULL=100$' "$build_dir/sdkconfig"
-    revision_range="1.0-1.99 (physically proven target: 1.3)"
+    grep -q '^CONFIG_ESP32P4_REV_MAX_FULL=199$' "$build_dir/sdkconfig"
+    revision_range="1.0-1.99 (observed target hardware: 1.3)"
 else
     grep -q '^# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set$' "$build_dir/sdkconfig"
     grep -q '^CONFIG_ESP32P4_REV_MIN_FULL=301$' "$build_dir/sdkconfig"
+    grep -q '^CONFIG_ESP32P4_REV_MAX_FULL=399$' "$build_dir/sdkconfig"
     revision_range=">=3.1 (compile-tested only)"
 fi
 

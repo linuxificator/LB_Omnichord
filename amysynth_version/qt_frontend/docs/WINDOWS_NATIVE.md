@@ -119,18 +119,18 @@ native-runner package validation, not a physical Windows audio/MIDI test.
 
 ## PCM/drum compatibility
 
-All hosted targets must give PCM preset numbers 0–18 the same meaning. The
-Windows service is built from pinned AMY release branch
-`releases/amy_omnichord_R20260903T202802` at commit
-`890ec66de2677db5bdf9a5dda9f53f01628d2b58`. Its CMake target defines
+All targets must give PCM preset numbers 0–18 the same meaning. The Windows
+service is built from pinned AMY release branch
+`releases/amy_omnichord_R20260904T130059` at commit
+`7d66ae637f75a53d45cc5ffb3392c07f1d6ff876`. Its CMake target defines
 `GAMMA9001`, generates and links `drums_bin.c`, and registers the linked data
 before both self-test and service `amy_start()` calls.
 
 This is equivalent to the explicit `AMY_PCM_BANK=gamma9001` used by Linux,
-Raspberry Pi and macOS Python-extension builds and to the pinned Android AAR.
-The environment variable belongs to AMY's `setup.py` path; Windows reaches the
-same bank through its native CMake target. ESP32-P4 remains a separately
-declared Tiny-bank target until a Gamma9001 flash/storage profile exists.
+Raspberry Pi and macOS Python-extension builds, the pinned Android AAR and the
+ESP32-P4 native component. The environment variable belongs to AMY's `setup.py`
+path; the other native builds generate, link and register the same data in
+their own build definitions.
 
 The current Windows AMY service profile is not yet a low-latency baseline: the
 fork's host defaults are 44.1 kHz and 256 samples, its Windows backend tries

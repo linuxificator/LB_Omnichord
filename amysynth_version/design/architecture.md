@@ -187,9 +187,9 @@ playing unrelated timbres.
 The native Windows CMake build reaches the same result through AMY's C
 preprocessor contract rather than its Python `setup.py` option. It defines
 `GAMMA9001`, generates and links `drums_bin.c`, and registers the data before
-every `amy_start()`. Android's pinned AAR follows the same sequence. ESP32-P4
-is explicitly outside this hosted profile and remains Tiny until a separately
-tested flash/storage layout exists.
+every `amy_start()`. Android's pinned AAR and ESP32-P4 component follow the
+same sequence. P4 uses a dedicated, separately tested 32 MB flash/PSRAM profile
+but does not change the bank seen by the frontend.
 
 ## Audio ownership
 
@@ -231,11 +231,8 @@ whether bus 10 joins the MIDI room.
 
 ## ESP32-P4 direction
 
-ESP32 firmware must provide at least eleven buses before this complete MIDI bus
-layout is deployed there. This does not change the wire-protocol boundary.
-
-The older four-bus ESP32-P4 documentation describes the proven OMNI-only audio
-baseline, not the resource contract of the complete OMNI+MIDI application. The
-complete target also has to preserve independent OMNI and MIDI reverb state;
-a build exposing only one shared room's liveness/damping cannot satisfy that
-contract without extending the target-side mixer/effect implementation.
+ESP32 firmware provides the same eleven independent AMY buses as the hosted
+targets. Its 336-oscillator and 1024-group capacity profile is build-time
+configuration in the firmware project and does not change the wire-protocol
+boundary. The old four-bus/Tiny experiment is no longer an active resource
+contract.

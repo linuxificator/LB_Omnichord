@@ -3,17 +3,19 @@
 Status: active open-items register; not authoritative over subsystem contracts
 Owner: design index (`README.md`)
 Applies to: unresolved active `amysynth_version` questions only
-Last verified: 2026-09-01
+Last verified: 2026-09-04
 
 Resolved decisions have been moved to their authoritative design documents.
 This file contains only genuinely open work.
 
-## ESP32-P4 complete resource build
+## ESP32-P4 physical firmware acceptance
 
-The logical allocation is fixed: synths 0–4 for OMNI, synths 5–10 for MIDI
-rows, synth 11 for MIDI drums, and buses 0–10 as documented in
-`architecture.md`. The remaining work is validating/finalizing those resource
-limits and independent OMNI/MIDI room behavior in the ESP32-P4 AMY build.
+The complete Gamma9001 firmware now builds with 336 oscillators, eleven buses,
+1024 sequence groups, 64 local tags per group and 40 concurrent executions.
+Both incompatible silicon profiles compile and package; v1 targets the observed
+revision-1.3 board. The remaining work is physical validation of LP-UART input,
+I2S output, all capacities under load and independent OMNI/MIDI buses. The exact
+acceptance list is in `../esp32p4/README.md`.
 
 ## MIDI input selection and non-Linux native bridges
 

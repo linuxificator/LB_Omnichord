@@ -64,8 +64,8 @@ provenance, not portable frontend runtime intent.
 
 All synthesis targets use
 `https://github.com/linuxificator/amy.git`, release branch
-`releases/amy_omnichord_R20260903T202802`, immutable commit
-`890ec66de2677db5bdf9a5dda9f53f01628d2b58`. CI proves that the commit belongs
+`releases/amy_omnichord_R20260904T130059`, immutable commit
+`7d66ae637f75a53d45cc5ffb3392c07f1d6ff876`. CI proves that the commit belongs
 to the declared branch before using it.
 
 This is intentionally not a normal Python requirement. It supplies the C AMY
@@ -75,12 +75,12 @@ LB-required sequencer behavior and therefore must advance as one tested release
 input across all platforms.
 
 Python/native test and hosted desktop service builds select Gamma9001 with
-`AMY_PCM_BANK=gamma9001` where `setup.py` is used. Windows and Android generate,
-link and register the same Gamma data through native build definitions. ESP32
-uses the same source lineage but remains an explicitly declared Tiny-bank
-target until its storage profile changes. Exact options and verification are owned by
-[`AMY_RELEASE.md`](../packaging/AMY_RELEASE.md) and the
-platform documentation. ESP32-P4 additionally defines `AMY_SHARED_REVERB=1`.
+`AMY_PCM_BANK=gamma9001` where `setup.py` is used. Windows, Android and ESP32-P4
+generate, link and register the same Gamma data through their native build
+definitions. P4 adds only its explicit flash, PSRAM, bus, oscillator and
+sequence-group capacities; it does not patch AMY or select a different effects
+model. Exact options and verification are owned by
+[`AMY_RELEASE.md`](../packaging/AMY_RELEASE.md) and the platform documentation.
 Never update only one consumer.
 
 ## Android toolchain sources

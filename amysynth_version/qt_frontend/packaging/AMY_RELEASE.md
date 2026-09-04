@@ -1,13 +1,13 @@
 # AMY release input contract
 
 Status: authoritative external-component release contract
-Owner: AMY fork integration and five-platform packaging
+Owner: AMY fork integration, five-platform application packaging and P4 firmware
 Applies to: native tests, desktop services, Android Oboe and ESP32-P4
-Last verified: 2026-09-03
+Last verified: 2026-09-04
 
 Every LB Omnichord build uses AMY from the fork release branch
-`releases/amy_omnichord_R20260903T202802` at exact commit
-`890ec66de2677db5bdf9a5dda9f53f01628d2b58`.
+`releases/amy_omnichord_R20260904T130059` at exact commit
+`7d66ae637f75a53d45cc5ffb3392c07f1d6ff876`.
 
 The machine authority for those values is `release_inputs.json` beside this
 document. Workflows and the ESP32 preparation script load it through
@@ -33,9 +33,11 @@ production sizing configuration while making the test bridge the only AMY
 clock and sample consumer; a background miniaudio callback cannot steal the
 block whose peak is being asserted.
 
-The ESP32-P4 image remains a separately declared Tiny-bank target until its
-flash/storage profile can hold Gamma9001. That hardware exception must never be
-used to silently select Tiny for Linux, Raspberry Pi, macOS, Windows or Android.
+The ESP32-P4 image uses that same release and Gamma9001 data. It has a dedicated
+32 MB flash configuration, 8 MB application partition and PSRAM-backed AMY
+capacity profile. P4 silicon revisions before v3 and v3-or-later have separate
+binary profiles; the release publishes the v1 profile matching the observed
+revision-1.3 hardware while the standalone workflow also compile-tests v3.
 
 ## Updating AMY
 

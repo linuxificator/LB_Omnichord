@@ -83,9 +83,10 @@ Revision 4 to 5 restores the intended Gamma9001 hosted-release profile. The
 exact Tiny sample map published by revision 4 is migrated atomically to the
 reviewed Gamma9001 map. Existing Gamma9001 and General MIDI selections are
 preserved. A customized Tiny map fails with a path-specific error because
-silently translating user-authored timbres would be data loss. The ESP32-P4
-firmware remains a separately declared Tiny-bank target; it does not change the
-desktop/mobile configuration contract.
+silently translating user-authored timbres would be data loss. ESP32-P4 now
+uses the same Gamma9001 map and immutable AMY release as desktop/mobile; its
+flash and memory profile remain firmware build configuration rather than user
+configuration.
 Revision 5 to 6 adds the portable OSC input section. Its historical migration
 defaults are enabled, IPv4 wildcard address `0.0.0.0` and UDP port 8000. Those
 values exist only in the shipped configuration and explicit migration; OSC

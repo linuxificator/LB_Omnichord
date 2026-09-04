@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: Silicon ABI profile (v1 includes the verified v1.3 board)
+        description: Silicon ABI profile (v1 includes the observed v1.3 board)
         required: true
         type: choice
         options: [v1, v3, all]
