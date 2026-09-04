@@ -8,7 +8,8 @@ components/amy/
 managed_components/
 dependencies.lock
 
-# Generated/local configuration backups. The real sdkconfig is tracked.
+# Generated/local configuration. Profile defaults are tracked instead.
+sdkconfig
 sdkconfig.old
 sdkconfig.old.*
 
