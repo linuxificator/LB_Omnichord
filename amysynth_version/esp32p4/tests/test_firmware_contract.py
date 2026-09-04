@@ -60,6 +60,8 @@ class FirmwareContractTests(unittest.TestCase):
         source = (ROOT / "main/main.c").read_text()
         self.assertIn("gamma9001-blob-c", prepare)
         self.assertIn("GAMMA9001=1", prepare)
+        self.assertIn("AMY_BLOCK_SIZE=64", prepare)
+        self.assertIn("AMY_ESP_I2S_DMA_FRAME_NUM=32", prepare)
         self.assertIn("amy_set_gamma9001_pcm(gamma9001_pcm_data)", source)
         self.assertIn("MALLOC_CAP_SPIRAM", source)
         self.assertIn("esp_psram_is_initialized", source)
@@ -93,6 +95,14 @@ class FirmwareContractTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn('"v1","v3"', workflow)
         self.assertIn("package_firmware.sh", workflow)
+
+    def test_full_release_requires_and_publishes_v1_firmware(self) -> None:
+        workflow = (REPO_ROOT / ".github/workflows/desktop-release.yml").read_text()
+        self.assertIn("esp32p4-firmware:", workflow)
+        self.assertIn("uses: ./.github/workflows/esp32p4-build.yml", workflow)
+        self.assertIn("android-emulator, esp32p4-firmware]", workflow)
+        self.assertIn("LB_Omnichord.${RELEASE_STAMP}.ESP32P4-v1.zip", workflow)
+        self.assertIn("Attest ESP32-P4 firmware provenance", workflow)
 
 
 if __name__ == "__main__":

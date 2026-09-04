@@ -58,9 +58,10 @@ LF-framed AMY wire request at a time. Every request still ends in `Z`.
 - Every locally hosted AMY service uses the full Gamma9001 bank. Windows CMake
   must define `GAMMA9001`, generate and link `drums_bin.c`, and register that
   data before `amy_start()`.
-- ESP32-P4 remains a separately declared Tiny-bank target until its flash and
-  storage profile can support Gamma9001. Never use that exception to change a
-  hosted package or its user configuration back to Tiny.
+- ESP32-P4 uses the same Gamma9001 bank as the hosted packages. Its dedicated
+  32 MB flash profile and 8 MB application partition must remain large enough
+  for that bank; never use MCU constraints to change a hosted package or its
+  user configuration back to Tiny.
 - Windows CI proves native compilation, offline PCM rendering and the packaged
   Qt/named-pipe/AMY process boundary. It does not prove physical audio, MIDI,
   low latency or absence of drop-outs. State those limitations explicitly.
