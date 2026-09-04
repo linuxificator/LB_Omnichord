@@ -13,10 +13,12 @@ Implementation commits on the clean AMY branch:
   zero-reference destruction;
 - `7c98ad2b` — make the public control/wire boundary the guaranteed reclaimer
   and structurally bypass it for render-fired wires.
+- `b6f559a5` — route a root-scheduled definition reset through the same deferred
+  destruction path and cover it explicitly.
 
 LB consumes the same commits through immutable integration branch
 `releases/amy_omnichord_R20260904T194050` at
-`f710148089b7e58f6c101be2b190e58f79521aa6`.
+`a26fa6ca6c347d2a8c8480169127353f5f87899e`.
 
 ## Decision summary
 
@@ -332,7 +334,7 @@ deadline misses, heap low-water mark and worst retained-list depth while active
 
 The implementation was also compiled and linked with ESP-IDF 6.0.2 using the
 physically established `rework/esp32p4` v1 profile at LB commit `65d95d1` and
-the new AMY integration release at `f7101480`. The first compile exposed the
+the final AMY integration release at `a26fa6ca`. The first compile exposed the
 expected API migration in the P4 application: its three assignments still used
 the retired group field names. In the temporary validation worktree they were
 mapped one-for-one as follows:
@@ -344,8 +346,8 @@ mapped one-for-one as follows:
 | `max_sequence_group_executions` | `max_sequence_executions` |
 
 With only that integration rename, the v1 build completed, linked Gamma9001,
-and produced a merged flash image. The application binary was `0x4ad6c0` bytes
-in the 8 MiB app partition, leaving `0x352940` bytes (42%). This proves source,
+and produced a merged flash image. The application binary was `0x4ad720` bytes
+in the 8 MiB app partition, leaving `0x3528e0` bytes (42%). This proves source,
 ABI-at-build-time and linker compatibility for the new reclamation code on the
 ESP32-P4 toolchain. It does not prove runtime timing, sound, heap high-water or
 physical board behavior.

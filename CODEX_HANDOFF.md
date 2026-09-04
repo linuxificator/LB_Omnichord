@@ -30,9 +30,9 @@ A two-buffer ping-pong is not sufficient for overlapping long-lived
 executions; a tracing collector is unnecessary because ownership is explicit.
 Physical ESP32-P4 timing proof is still open.
 
-AMY feature head is `7c98ad2b`. The exact Omnichord AMY release is
+AMY feature head is `b6f559a5`. The exact Omnichord AMY release is
 `releases/amy_omnichord_R20260904T194050` at
-`f710148089b7e58f6c101be2b190e58f79521aa6`. LB uses one stable root tag per
+`a26fa6ca6c347d2a8c8480169127353f5f87899e`. LB uses one stable root tag per
 fill-launch, bass and automatic-chord lane and keeps no AMY clock, execution,
 note-release or authoring high-water state.
 

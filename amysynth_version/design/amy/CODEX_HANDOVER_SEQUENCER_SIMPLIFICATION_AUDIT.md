@@ -10,13 +10,13 @@ Comparison base: Shorepine `main` at
 ## Post-audit implementation update
 
 The table and coverage snapshot below describe the original audited head. The
-authorized realtime follow-up adds 273 lines and removes 46 relative to that
-head (net +227), including 64 lines of focused generation tests and public AMY
+authorized realtime follow-up adds 288 lines and removes 46 relative to that
+head (net +242), including focused generation/root-reset tests and public AMY
 documentation. The clean feature head is now
-`7c98ad2bae4d6934bd097de9052a55a47d2ee9b6`; its total diff against the same
-Shorepine base is +1,731/-139 (net +1,592).
+`b6f559a55d67f2d1dc4509a3e59fabca4fbfbd70`; its total diff against the same
+Shorepine base is +1,746/-139 (net +1,607).
 
-Commits `2669c3ae`, `b2a88659` and `7c98ad2b` now exercise and implement the
+Commits `2669c3ae`, `b2a88659`, `7c98ad2b` and `b6f559a5` now exercise and implement the
 previously missing COW path: candidate construction occurs outside the shared
 render lock, publication is a checked pointer swap, and render-side final
 releases use deferred intrusive reclamation. The exact rationale, transition

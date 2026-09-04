@@ -65,6 +65,7 @@ Relevant commits:
 - `2669c3ae Cover concurrent sequence definition generations`
 - `b2a88659 Move sequence version reclamation off render path`
 - `7c98ad2b Reclaim sequence versions at control boundary`
+- `b6f559a5 Defer render-fired sequence reset cleanup`
 
 No Codex documents, Omnichord policy or downstream release configuration may
 be committed on that branch.
@@ -72,7 +73,7 @@ be committed on that branch.
 LB integration release:
 
 - branch `releases/amy_omnichord_R20260904T194050`;
-- exact commit `f710148089b7e58f6c101be2b190e58f79521aa6`;
+- exact commit `a26fa6ca6c347d2a8c8480169127353f5f87899e`;
 - generic cumulative-sequence commits are cherry-picked above the existing
   Omnichord release profile;
 - release-only sizing remains 11 buses, 336 oscillators, 1280 public sequence
