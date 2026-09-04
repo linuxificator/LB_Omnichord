@@ -6,8 +6,8 @@ Applies to: native tests, desktop services, Android Oboe and ESP32-P4
 Last verified: 2026-09-04
 
 Every LB Omnichord build uses AMY from the fork release branch
-`releases/amy_omnichord_R20260904T194050` at exact commit
-`a26fa6ca6c347d2a8c8480169127353f5f87899e`.
+`releases/amy_omnichord_R20260904T205341` at exact commit
+`c9cd85425c34be8952af43f937edd8b31bfa1f56`.
 
 The machine authority for those values is `release_inputs.json` beside this
 document. Workflows and the ESP32 preparation script load it through

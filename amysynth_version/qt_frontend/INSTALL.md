@@ -301,8 +301,8 @@ $env:OMNICHORD_AMY_ROOT = "C:\path\to\amy"
 ```
 
 The zip and checksum are written below `dist`. The release workflow pins both
-AMY fork branch `releases/amy_omnichord_R20260904T194050` and commit
-`a26fa6ca6c347d2a8c8480169127353f5f87899e`; local release candidates must use
+AMY fork branch `releases/amy_omnichord_R20260904T205341` and commit
+`c9cd85425c34be8952af43f937edd8b31bfa1f56`; local release candidates must use
 that exact commit unless the shared release contract and its compatibility
 tests are deliberately updated together.
 
