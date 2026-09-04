@@ -262,8 +262,10 @@ The concise substance for the PR discussion is:
 
 The original items above have mostly been completed. The remaining order is:
 
-1. Prepare and test the coordinated Tulip migration for the intentional tag
-   semantics change.
+1. Coordinate the Tulip migration for the intentional tag semantics change.
+   An 11-line disposable wrapper prototype now proves the clock-free
+   next-sequence-boundary option; Shorepine still needs to choose whether that
+   live-edit latency is acceptable.
 2. Run the physical ESP32-P4 timing and heap-retention measurements described
    in `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
 3. Add Godot runtime behavior coverage when the runtime is available.

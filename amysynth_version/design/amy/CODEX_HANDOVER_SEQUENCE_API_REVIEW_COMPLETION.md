@@ -110,6 +110,24 @@ make its live-update phase choice explicit. This is bounded to the wrapper and
 its consumers, but it is not zero impact. No external Tulip repository was
 modified in this work.
 
+A disposable clone was used to prototype the migration. The central wrapper
+needs 11 added and 2 removed lines: `update()` sends aligned stop, reset,
+ordinary tagged definition and aligned start; `remove()` sends next-tick stop
+and reset. A fake-boundary unit test covers add/update/remove and passes. The
+prototype keeps no AMY clock, execution or note state, and repeated updates
+before the boundary remain safe because each later stop captures the earlier
+pending execution.
+
+There is one real product choice for Tulip's owners. Aligning replacement to
+the sequence period preserves the global rhythmic phase without querying the
+clock, but a newly added or edited pad becomes effective at the next full
+sequence boundary. The old active root event could take effect at its next
+position inside the current cycle. Preserving that exact mid-cycle latency
+would require either caller clock/phase bookkeeping or another generic AMY
+phase-start facility. The prototype deliberately chooses the simple
+next-boundary behavior; it is evidence for review, not a committed Tulip
+policy decision.
+
 The two added `amy_config_t` fields still require callers to rebuild against
 the new header. Placing them at the end preserves offsets of older fields and
 reduces accidental ABI damage; it does not promise binary compatibility for a
@@ -166,8 +184,9 @@ Android. ESP32-P4 remains a separately validated hardware task.
 1. Physically measure ESP32-P4 render deadlines, publication critical-section
    time, heap low-water, largest block and retire-list depth at the established
    48 kHz / 128-sample / 2x64-DMA baseline and under maximum expected effects.
-2. Prepare and test the coordinated Tulip wrapper migration before claiming a
-   Shorepine-wide transition is complete.
+2. Let Shorepine choose the Tulip live-edit phase policy, then turn the tested
+   disposable wrapper prototype into a coordinated Tulip change before
+   claiming a Shorepine-wide transition is complete.
 3. Add a Godot runtime behavior test when a Godot executable is available;
    generated source freshness and parser syntax currently pass, and behavior
    remains in the common C core.
@@ -180,4 +199,3 @@ Android. ESP32-P4 remains a separately validated hardware task.
 6. Replace PR 1151 only after deciding how to preserve its discussion history;
    its current head is still the superseded `rework/sequencer` branch. Do not
    force-rewrite that branch merely to make GitHub show the new implementation.
-
