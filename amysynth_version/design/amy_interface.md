@@ -3,7 +3,7 @@
 Status: authoritative AMY wire/transport boundary contract
 Owner: AMY command and transport integration
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-01
+Last verified: 2026-09-04
 
 ## Wire command boundary
 
@@ -44,9 +44,10 @@ those values remain the independent role/row volume and balance controls.
 
 Reusable phrases remain wire-only. Repeated ordinary tagged `H` events
 cumulate a persistent AMY definition; `HR` resets future contents and `HC`
-uses note-like velocity zero/positive values to stop/start, with operation 2
-reserved for finite gating. Its final field selects alignment. LB owns musical
-data and policy; AMY owns local phase, execution lifetime, repeats and immutable
+uses the strict integer run state `0`/`1` to stop/start, with operation `2`
+reserved for finite gating. Its final field selects alignment. This run state
+is not note velocity; fractional values are invalid. LB owns musical data and
+policy; AMY owns local phase, execution lifetime, repeats and immutable
 execution snapshots. The complete boundary and regression rules are in
 `sequencer_sequences.md`.
 

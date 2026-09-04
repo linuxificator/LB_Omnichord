@@ -3,37 +3,38 @@
 Status: implemented, pinned and host-tested; not yet substituted into PR 1151
 Date: 2026-09-04
 AMY feature branch: `rework/sequencer_simplification`
-AMY feature head: `380f20e15260b100ffd788b8467e740f04532e9d`
+AMY feature head: `cc2407ff`
 LB branch: `rework/sequencer_simplification`
 
 ## Review input and resulting API
 
-Dan Ellis' latest review comment on Shorepine AMY PR 1151 values a broad
-feature set with few parameters and asks whether starting a stored sequence can
-look more like sending a note-on. The examples in that comment also show a
-controller-friendly value in a sequence wire template. The implementation now
-answers that request without exposing another public group, revision or
-execution abstraction:
+Dan Ellis' review comment on Shorepine AMY PR 1151 values a broad feature set
+with few parameters and asks whether starting a stored sequence can look more
+like sending a note-on. A first implementation overloaded `vel`, but subsequent
+review exposed a semantic mismatch: sequence execution is boolean, whereas
+velocity describes how strongly a note is played. The final API remains small
+without conflating those concepts or exposing another public group, revision
+or execution abstraction:
 
 ```python
-amy.send(sequence=100, vel=1, alignment_period=48)
-amy.send(sequence=100, vel=0, alignment_period=48)
+amy.send(sequence=100, run=True, alignment_period=48)
+amy.send(sequence=100, run=False, alignment_period=48)
 ```
 
-`vel` in `(0, 1]` starts and `vel=0` stops. This is Python convenience syntax;
-it normalizes to the existing low-level `sequence_control` field. A caller may
-still schedule that control as an ordinary event by also supplying `ticks`.
-The raw wire equivalent is:
+`run` is boolean Python convenience syntax; it normalizes to the existing
+low-level `sequence_control` field. A caller may still schedule that control as
+an ordinary event by also supplying `ticks`. The raw wire equivalent is:
 
 ```text
 HC100,1,48Z
 HC100,0,48Z
 ```
 
-The raw second field deliberately accepts fractional velocity in `0..1`, so a
-wire template such as `HC100,%v,48` works with normalized MIDI/controller
-values. Value `2` remains the distinct gate operation and takes duration plus
-alignment. Values outside these domains are rejected with a specific error.
+The raw second field is strictly integer `1` for start or `0` for stop. Value
+`2` remains the distinct gate operation and takes duration plus alignment.
+Fractional values and note-velocity templates are rejected rather than being
+silently interpreted as execution state. A controller maps its input to a
+boolean before sending sequence control.
 
 The comment used `-1` in an illustrative `ticks` period. This branch does not
 add another sentinel because AMY already has a complete finite/repeating rule:
@@ -46,7 +47,8 @@ Python documentation is primary. Wire commands remain fully documented as a
 secondary interface because LB Omnichord deliberately uses them as its stable
 cross-process boundary over Unix sockets, Windows named pipes, Android private
 IPC and ESP32 serial. JavaScript and Godot callers retain the generated raw
-`sequence_control` binding; the note-like keyword sugar is Python-specific.
+`sequence_control` binding; the boolean `sequence=..., run=...` convenience is
+Python-specific.
 
 Source discussion:
 <https://github.com/shorepine/amy/pull/1151#issuecomment-5544095824>
@@ -72,28 +74,29 @@ Source discussion:
 
 ## Diagnostic AMY commits after the realtime-publication baseline
 
-- `0198b50e` — note-like Python trigger syntax and strict Python/C control
-  shapes;
+- `0198b50e` — initial note-like Python trigger experiment and strict Python/C
+  control shapes (its `vel` syntax is superseded below);
 - `361ac404` — migrate AMY's own examples, audio tests and sampler experiments;
 - `3060cc0b` — allocation-failure injection for immutable publication;
 - `f22307a3` — deterministic two-writer compare/retry coverage;
 - `dcbd2842` — bounded cycles and current-execution aligned stop/gate rules;
-- `092941ca` — accept normalized fractional trigger velocity and reject
-  malformed/overflowing raw fields;
+- `092941ca` — test normalized fractional trigger velocity while rejecting
+  malformed/overflowing raw fields (the fractional behavior is superseded);
 - `33f4c01c` — append new `amy_config_t` members so existing member offsets do
   not move, plus the source-rebuild migration note;
 - `ab5f3020` — executable JavaScript serialization coverage and expanded
   compatibility documentation;
 - `36aa150e` — replace the one-field stored-slot wrapper with direct pointers;
-- `380f20e1` — ignore the three generated sequence-test executables.
+- `380f20e1` — ignore the three generated sequence-test executables;
+- `4aab0fcb` — replace overloaded trigger velocity with boolean `run` and
+  reject fractional wire actions;
+- `cc2407ff` — update public documentation and examples to the boolean model.
 
 The final feature diff against Shorepine base `0fb0a00b` is 35 files,
-2,378 insertions and 167 deletions. Its handwritten runtime portion is
-+953/-44; tests are +899/-42, public documentation +429/-23, generated
-bindings +64/-50, build hygiene +30/-3 and examples +3/-5. The main C addition
-remains the immutable stored-definition/execution implementation; the public
-model is smaller than the superseded group design even though robust ownership,
-validation and concurrency tests cost real lines.
+2,391 insertions and 167 deletions. The main C addition remains the immutable
+stored-definition/execution implementation; the public model is smaller than
+the superseded group design even though robust ownership, validation and
+concurrency tests cost real lines.
 
 ## Compatibility evidence
 
@@ -167,8 +170,8 @@ which is not a product defect.
 
 The new fork release is:
 
-- branch `releases/amy_omnichord_R20260904T205341`;
-- commit `c9cd85425c34be8952af43f937edd8b31bfa1f56`;
+- branch `releases/amy_omnichord_R20260904T213713`;
+- commit `be6fa83afdc2a98ca6a90f095be476c13b930af9`;
 - PCM bank `gamma9001`;
 - 11 buses, 336 oscillators, 1280 stored tags, 64 events per definition and 40
   active/alignment-pending executions;

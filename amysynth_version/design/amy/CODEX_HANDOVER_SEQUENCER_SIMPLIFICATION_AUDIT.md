@@ -25,10 +25,11 @@ from the old COW and ESP32-P4 validation boundary are recorded in
 
 A second completion pass closed the original OOM, competing-writer, cyclic
 composition, aligned-current-execution, rollover, JavaScript, ABI-note and
-first-party AMY migration gaps. It also adopted note-like Python trigger
-syntax and fractional wire-template velocity following the latest PR review.
-The final clean feature head is `380f20e15260b100ffd788b8467e740f04532e9d`;
-against the same Shorepine base it changes 35 files by +2,378/-167. See
+first-party AMY migration gaps. An initial note-like trigger experiment was
+then replaced by explicit Python `run=True/False` and strict wire `1/0`, so
+note velocity is no longer overloaded. The final clean feature head is
+`cc2407ff8898e42694c0dee9b4b67444659fdede`; against the same Shorepine base it
+changes 35 files by +2,391/-167. See
 `CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` for the final categorized
 size, test evidence, immutable LB release and remaining gaps.
 

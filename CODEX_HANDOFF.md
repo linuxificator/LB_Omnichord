@@ -32,9 +32,11 @@ A two-buffer ping-pong is not sufficient for overlapping long-lived
 executions; a tracing collector is unnecessary because ownership is explicit.
 Physical ESP32-P4 timing proof is still open.
 
-AMY feature head is `380f20e1`. The exact Omnichord AMY release is
-`releases/amy_omnichord_R20260904T205341` at
-`c9cd85425c34be8952af43f937edd8b31bfa1f56`. LB uses one stable root tag per
+AMY feature head is `cc2407ff`. Sequence start/stop uses the Python boolean
+`run=True/False` and strict wire integers `1/0`; `vel` is reserved for note
+velocity. The exact Omnichord AMY release is
+`releases/amy_omnichord_R20260904T213713` at
+`be6fa83afdc2a98ca6a90f095be476c13b930af9`. LB uses one stable root tag per
 fill-launch, bass and automatic-chord lane and keeps no AMY clock, execution,
 note-release or authoring high-water state.
 

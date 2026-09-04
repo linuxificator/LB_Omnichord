@@ -17,8 +17,8 @@ Implementation commits on the clean AMY branch:
   destruction path and cover it explicitly.
 
 LB consumes the same commits through immutable integration branch
-`releases/amy_omnichord_R20260904T205341` at
-`c9cd85425c34be8952af43f937edd8b31bfa1f56`.
+`releases/amy_omnichord_R20260904T213713` at
+`be6fa83afdc2a98ca6a90f095be476c13b930af9`.
 
 ## Decision summary
 
@@ -360,5 +360,5 @@ branch is rebased or merged into cumulative-sequence work, migrate its Kconfig,
 firmware contract tests and package metadata together instead of leaving old
 “group” terminology around the new fields.
 
-The finalized host integration release is now `c9cd8542`; a physical P4 build
+The finalized host integration release is now `be6fa83a`; a physical P4 build
 and timing run against that exact head has deliberately not yet been claimed.
