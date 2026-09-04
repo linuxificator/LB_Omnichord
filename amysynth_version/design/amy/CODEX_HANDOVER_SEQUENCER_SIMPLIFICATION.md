@@ -48,6 +48,12 @@ is Python-first; exact wire equivalents remain documented because LB's
 multi-platform process boundary uses sockets, a Windows named pipe, Android
 service IPC and ESP32 serial.
 
+Following the latest PR review, Python starts and stops with note-like syntax:
+`amy.send(sequence=tag, vel=1|0, alignment_period=period)`. Low-level `HC`
+accepts normalized trigger velocity in `0..1`, including fractional template
+values, while operation value `2` remains the finite gate. See
+`CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` for the decision trail.
+
 ## AMY branches and diagnostic commits
 
 Clean upstream-directed worktree:
@@ -66,14 +72,24 @@ Relevant commits:
 - `b2a88659 Move sequence version reclamation off render path`
 - `7c98ad2b Reclaim sequence versions at control boundary`
 - `b6f559a5 Defer render-fired sequence reset cleanup`
+- `0198b50e Make sequence triggers note-like and strict`
+- `361ac404 Migrate first-party sequencer callers`
+- `3060cc0b Test sequence publication allocation failures`
+- `f22307a3 Cover concurrent sequence publication retry`
+- `dcbd2842 Define bounded sequence composition semantics`
+- `092941ca Accept note-like sequence control velocity`
+- `33f4c01c Preserve existing config member offsets`
+- `ab5f3020 Document and test sequence API migration`
+- `36aa150e Simplify stored sequence slots`
+- `380f20e1 Ignore generated sequence test binaries`
 
 No Codex documents, Omnichord policy or downstream release configuration may
 be committed on that branch.
 
 LB integration release:
 
-- branch `releases/amy_omnichord_R20260904T194050`;
-- exact commit `a26fa6ca6c347d2a8c8480169127353f5f87899e`;
+- branch `releases/amy_omnichord_R20260904T205341`;
+- exact commit `c9cd85425c34be8952af43f937edd8b31bfa1f56`;
 - generic cumulative-sequence commits are cherry-picked above the existing
   Omnichord release profile;
 - release-only sizing remains 11 buses, 336 oscillators, 1280 public sequence
@@ -142,6 +158,10 @@ LB targeted tests:
 The architecture regression explicitly forbids host sequence clock/execution
 state, authoring high-water state and reintroduction of an `HA` wire adapter.
 Before merging, rerun `tests/run_tests.py --suite all` and the quality suite.
+
+That complete LB suite was rerun after pinning the final release and passed.
+The detailed API-feedback, compatibility, analyzer and sanitizer evidence is
+in `CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md`.
 
 ## Lessons and future constraints
 

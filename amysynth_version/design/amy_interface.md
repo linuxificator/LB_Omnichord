@@ -44,9 +44,11 @@ those values remain the independent role/row volume and balance controls.
 
 Reusable phrases remain wire-only. Repeated ordinary tagged `H` events
 cumulate a persistent AMY definition; `HR` resets future contents and `HC`
-starts, stops, aligns or gates it. LB owns musical data and policy; AMY owns
-local phase, execution lifetime, repeats and immutable execution snapshots.
-The complete boundary and regression rules are in `sequencer_sequences.md`.
+uses note-like velocity zero/positive values to stop/start, with operation 2
+reserved for finite gating. Its final field selects alignment. LB owns musical
+data and policy; AMY owns local phase, execution lifetime, repeats and immutable
+execution snapshots. The complete boundary and regression rules are in
+`sequencer_sequences.md`.
 
 ## Testing
 

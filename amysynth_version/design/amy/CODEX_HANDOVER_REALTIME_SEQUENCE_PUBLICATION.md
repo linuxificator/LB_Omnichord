@@ -17,8 +17,8 @@ Implementation commits on the clean AMY branch:
   destruction path and cover it explicitly.
 
 LB consumes the same commits through immutable integration branch
-`releases/amy_omnichord_R20260904T194050` at
-`a26fa6ca6c347d2a8c8480169127353f5f87899e`.
+`releases/amy_omnichord_R20260904T205341` at
+`c9cd85425c34be8952af43f937edd8b31bfa1f56`.
 
 ## Decision summary
 
@@ -323,8 +323,10 @@ append-while-active snapshot isolation and three simultaneously retained
 generations. The complete C suite also proves that separating render dispatch
 from public reclamation preserves root controls and same-tick child starts.
 
-Allocation-failure injection, a genuine simultaneous-writer stress test and
-physical P4 timing remain open. The next action is a hardware stress run at the
+Allocation-failure injection and a deterministic simultaneous-writer
+compare/retry test now pass. A ThreadSanitizer build of that targeted test also
+passes when the unrelated Linux MIDI backend is excluded. Physical P4 timing
+remains open. The next action is a hardware stress run at the
 48 kHz / 128-sample / 2x64 DMA baseline before describing the implementation as
 hard real-time safe. In particular, measure publication-lock time, render
 deadline misses, heap low-water mark and worst retained-list depth while active
@@ -334,7 +336,7 @@ deadline misses, heap low-water mark and worst retained-list depth while active
 
 The implementation was also compiled and linked with ESP-IDF 6.0.2 using the
 physically established `rework/esp32p4` v1 profile at LB commit `65d95d1` and
-the final AMY integration release at `a26fa6ca`. The first compile exposed the
+the earlier AMY integration release at `a26fa6ca`. The first compile exposed the
 expected API migration in the P4 application: its three assignments still used
 the retired group field names. In the temporary validation worktree they were
 mapped one-for-one as follows:
@@ -357,3 +359,6 @@ not committed onto the older sequencer-group P4 product branch. When that P4
 branch is rebased or merged into cumulative-sequence work, migrate its Kconfig,
 firmware contract tests and package metadata together instead of leaving old
 “group” terminology around the new fields.
+
+The finalized host integration release is now `c9cd8542`; a physical P4 build
+and timing run against that exact head has deliberately not yet been claimed.

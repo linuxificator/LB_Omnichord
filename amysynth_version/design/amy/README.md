@@ -20,6 +20,9 @@ Read these documents in order for current reusable-sequence work:
 3. `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md` — implemented
    publication/reclamation design, its route from COW and the remaining
    physical ESP32 timing proof.
+4. `CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` — latest PR API feedback,
+   final note-like trigger syntax, compatibility evidence, completed host
+   verification, immutable LB release and remaining work.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful

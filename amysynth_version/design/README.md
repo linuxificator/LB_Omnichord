@@ -50,6 +50,9 @@ Core rules:
 - `amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` records the cumulative-tag AMY
   contract, exact fork/release commits, the simplified LB planner and the
   diagnostic/test trail that supersedes the sequencer-group experiment.
+- `amy/CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` records the latest
+  Shorepine API feedback, finalized note-like trigger syntax, compatibility
+  audit, host verification and immutable integration release.
 - `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md` indexes the 2026-08-31
   repository-wide code-quality audit. Those files are analysis and proposed
   refactoring guidance, not authority to change product behavior.

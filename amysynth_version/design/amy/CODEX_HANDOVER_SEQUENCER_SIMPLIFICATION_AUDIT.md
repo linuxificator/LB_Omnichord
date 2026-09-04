@@ -23,6 +23,15 @@ releases use deferred intrusive reclamation. The exact rationale, transition
 from the old COW and ESP32-P4 validation boundary are recorded in
 `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
 
+A second completion pass closed the original OOM, competing-writer, cyclic
+composition, aligned-current-execution, rollover, JavaScript, ABI-note and
+first-party AMY migration gaps. It also adopted note-like Python trigger
+syntax and fractional wire-template velocity following the latest PR review.
+The final clean feature head is `380f20e15260b100ffd788b8467e740f04532e9d`;
+against the same Shorepine base it changes 35 files by +2,378/-167. See
+`CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` for the final categorized
+size, test evidence, immutable LB release and remaining gaps.
+
 ## Purpose
 
 This records the review requested before replacing Shorepine AMY PR 1151. It
@@ -251,10 +260,12 @@ The concise substance for the PR discussion is:
 
 ## Next implementation order
 
-1. Add OOM injection, simultaneous-writer, cycle and maximum-load tests.
-2. Resolve and migrate AMY's own examples/tests and prepare a tested Tulip
-   migration for the intentional tag-semantics change.
-3. Run the physical ESP32-P4 timing and heap-retention measurements described
+The original items above have mostly been completed. The remaining order is:
+
+1. Prepare and test the coordinated Tulip migration for the intentional tag
+   semantics change.
+2. Run the physical ESP32-P4 timing and heap-retention measurements described
    in `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
+3. Add Godot runtime behavior coverage when the runtime is available.
 4. Re-run binding and audio suites after any resulting change.
-5. Only then update the Shorepine PR branch and discussion.
+5. Replace the Shorepine PR without force-rewriting its historical head.
