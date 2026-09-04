@@ -23,8 +23,8 @@ Core rules:
 - OMNI and MIDI remain separate subsystems.
 - Shared state is explicit; tuning is shared only when coupling is enabled.
 - `rhythm_bahavior.md` is the authoritative rhythm transport/tempo contract.
-- `sequencer_groups.md` defines the ownership boundary between LB musical
-  policy and AMY's persistent groups and active executions.
+- `sequencer_sequences.md` defines the ownership boundary between LB musical
+  policy and AMY's reusable definitions and active executions.
 - `testing.md` defines the maintained local suites and CI responsibilities;
   it also defines five-platform release packaging and validation.
   Detailed executable scenarios live in `../qt_frontend/tests/USE_CASES.md`.
@@ -45,6 +45,9 @@ Core rules:
 - `CODEX_HANDOVER_FRITS_SLIDER_FIX.md` records the macOS mouse-visible slider
   regression, its shared mouse/touch cause and the package-level proof added to
   prevent recurrence without platform-specific UI code.
+- `CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` records the cumulative-tag AMY
+  contract, exact fork/release commits, the simplified LB planner and the
+  diagnostic/test trail that supersedes the sequencer-group experiment.
 - `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md` indexes the 2026-08-31
   repository-wide code-quality audit. Those files are analysis and proposed
   refactoring guidance, not authority to change product behavior.
@@ -120,7 +123,7 @@ Then add every row that matches the task:
 | OSC input or external-control learn | `osc_control.md`, `midi_control.md`, `presets.md`, `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Presets, user state or migration | `presets.md`, `sound_balance.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Startup configuration, schema or config migration | `configuration.md`, `CODEX_HANDOVER_CONFIGURATION_AND_DRY.md`, `../qt_frontend/docs/DEPENDENCIES.md` |
-| Rhythm, tempo or sequencer behavior | `rhythm_bahavior.md`, `sequencer_groups.md`, `../qt_frontend/docs/SEQUENCER_TAGS.md`, `../qt_frontend/tests/USE_CASES.md` |
+| Rhythm, tempo or sequencer behavior | `rhythm_bahavior.md`, `sequencer_sequences.md`, `../qt_frontend/docs/SEQUENCER_TAGS.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Tuning, pitch or note conversion | `tuning.md`, `use_cases.md`, `../qt_frontend/tests/USE_CASES.md` |
 | AMY commands, sockets, serial or buses | `amy_interface.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |
 | Instrument catalogue, defaults or balance | `sound_balance.md`, `presets.md`, `../qt_frontend/instruments/README_defaults.md` |

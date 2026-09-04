@@ -254,7 +254,7 @@ def _revision_five_to_six(data: JsonObject) -> tuple[str, ...]:
 
 
 def _revision_six_to_seven(data: JsonObject) -> tuple[str, ...]:
-    """Rename the retired pattern API capacities to sequencer groups."""
+    """Create the historical revision-7 sequencer-group intermediate form."""
 
     rhythm = data.get("rhythm")
     if not isinstance(rhythm, dict):

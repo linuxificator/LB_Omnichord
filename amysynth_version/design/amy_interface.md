@@ -40,13 +40,13 @@ current owning master gain after configuring a synth or rebuilding its buses.
 This bus-level gain must not be folded into the individual synth `iV` values:
 those values remain the independent role/row volume and balance controls.
 
-## Sequencer groups
+## Reusable sequences
 
-Reusable phrases remain wire-only. Grouped `H` events author persistent AMY
-definitions and `zQ` controls publish, start, stop or gate them. LB owns the
-musical data and policy; AMY owns local phase, execution lifetime, repeat and
-immutable-revision semantics. The complete boundary and its regression rules
-are in `sequencer_groups.md`.
+Reusable phrases remain wire-only. Repeated ordinary tagged `H` events
+cumulate a persistent AMY definition; `HR` resets future contents and `HC`
+starts, stops, aligns or gates it. LB owns musical data and policy; AMY owns
+local phase, execution lifetime, repeats and immutable execution snapshots.
+The complete boundary and regression rules are in `sequencer_sequences.md`.
 
 ## Testing
 

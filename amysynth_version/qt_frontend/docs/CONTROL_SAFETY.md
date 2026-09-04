@@ -57,17 +57,17 @@ The ESP32-P4 also exhibited low-frequency rumble when an exact `h0` reverb comma
 Manual chord hold is another timing-sensitive path. Finger-down immediately
 starts manual synth 3 and selects the chord for strum, bass and future
 automatic-chord triggers. Each automatic whole chord or complete arpeggio
-phrase runs as a one-shot AMY group execution whose immutable definition owns
+phrase runs as a finite AMY sequence execution whose immutable snapshot owns
 its note-ons and matching note-offs. Replacing the root schedule or publishing
-a new group revision therefore cannot retarget or delete the release owned by
+a new future definition therefore cannot retarget or delete the release owned by
 an already-running execution. Every real finger-up immediately stops the
 manual voice, with no release-grace timer and no dependency on sequencer phase.
 A tap never closes or drains the automatic-chord lane. Qt's `TapHandler`
 classifies a long press using the platform style hint and only that semantic
 event promotes the contact to takeover; the Python backend owns no gesture
 timer. Promotion must not stop percussion or bass and must not change the
-`CHORD ON/OFF` state: it clears
-future group starts, while every execution already sounding executes its own
+`CHORD ON/OFF` state: it stops
+future child starts, while every execution already sounding executes its own
 original release and completes its normal rhythmic gate. There is no immediate
 synth-4 all-off. The
 serial regression holds a chord for one second and requires rhythm transport

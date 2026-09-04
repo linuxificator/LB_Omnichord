@@ -3,7 +3,7 @@
 ## Status and scope
 
 Historical note, superseded for current implementation details by
-`../../sequencer_groups.md`. The optional future idea here is an explicit
+`../../sequencer_sequences.md`. The optional future idea here is an explicit
 indefinite gate-on/gate-off state. It is not implemented and is not required by
 the current LB Omnichord rhythm implementation.
 

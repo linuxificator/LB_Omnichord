@@ -1,6 +1,6 @@
 # Codex session handoff — AMY/LB Omnichord state and code-quality audit
 
-Updated: 2026-09-03.
+Updated: 2026-09-04.
 
 This file is intentionally written for future Codex sessions. It records the
 working state, decisions, lessons learned and branch/release discipline from
@@ -9,7 +9,24 @@ automation work. It supplements `AGENTS.md` and the authoritative design
 contracts under `amysynth_version/design/`; it does not override either of
 them or the current user's request.
 
-## 2026-09-03 sequencer-group rework supersedes the old pattern design
+## 2026-09-04 cumulative sequence simplification supersedes group rework
+
+The active work is now `rework/sequencer_simplification` in both repositories.
+Read
+`amysynth_version/design/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` first.
+Repeated ordinary AMY tagged `H` events now cumulate behind one reusable
+sequence tag; `HR` resets future contents and `HC` controls execution. The
+separate `HA` append and `zQ`/group abstractions are retired.
+
+AMY feature head is `21395160`. The exact Omnichord AMY release is
+`releases/amy_omnichord_R20260904T165605` at
+`071e2b5f85edc39fd7726635a1ee97793a38f176`. LB uses one stable root tag per
+fill-launch, bass and automatic-chord lane and keeps no AMY clock, execution,
+note-release or authoring high-water state.
+
+The 2026-09-03 sequencer-group section below is now historical rationale only.
+
+## 2026-09-03 sequencer-group rework superseded the old pattern design
 
 The active implementation no longer uses the nested-pattern wire API described
 later in this historical handoff. Treat the old `zQB`/`zQE`/`zQC`/`zQT`/
@@ -37,7 +54,7 @@ groups, runs each base drum role as a stable loop execution, and publishes each
 complete chord/arpeggio phrase as one immutable group revision. Musical role
 ownership and fill continuation policy remain in LB; AMY receives only generic
 group operations. The current authoritative contracts are
-`amysynth_version/design/sequencer_groups.md`,
+`amysynth_version/design/sequencer_sequences.md`,
 `amysynth_version/qt_frontend/docs/SEQUENCER_TAGS.md` and
 `amysynth_version/qt_frontend/docs/RHYTHM_PATTERNS.md`.
 
