@@ -28,8 +28,8 @@ this document and `sequencer_sequences.md` supersede them.
 - `sequence_control` / `HC` starts, stops, aligns or temporarily gates a tag.
 - A definition containing only period-zero events is finite. A nonzero period
   makes an execution repeat until stopped.
-- A finite parent may start a child. Recursive/cyclic graphs are rejected or
-  bounded; LB authors only one parent/child level.
+- A sequence may control another sequence. Cyclic graphs cannot exceed the
+  bounded execution pool; LB authors only one parent/child level.
 - Multiple finite executions of one tag may overlap.
 - An active execution retains a reference-counted copy-on-write snapshot.
   Resetting/rebuilding future contents cannot delete its pending note-offs or

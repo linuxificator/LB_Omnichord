@@ -2,7 +2,7 @@
 
 This is the implementation contract for LB Omnichord's five-level drum
 patterns and five selectable fills per rhythm. AMY supplies generic reusable
-sequences with one parent/child control level. Instrument roles, fill order,
+sequences; LB uses exactly one parent/child control level. Instrument roles, fill order,
 continuation policy, kit selection and user controls are LB behavior.
 
 ## Catalogue and storage
