@@ -65,6 +65,11 @@ class FirmwareContractTests(unittest.TestCase):
         self.assertIn("amy_set_gamma9001_pcm(gamma9001_pcm_data)", source)
         self.assertIn("MALLOC_CAP_SPIRAM", source)
         self.assertIn("esp_psram_is_initialized", source)
+        package = (ROOT / "package_firmware.sh").read_text()
+        self.assertIn('audio_block_size=128', package)
+        self.assertIn('i2s_dma_frames=64', package)
+        self.assertIn('"audio_block_size=$audio_block_size"', package)
+        self.assertIn('"i2s_dma_frames=$i2s_dma_frames"', package)
 
     def test_pins_are_build_configuration_not_main_constants(self) -> None:
         source = (ROOT / "main/main.c").read_text()

@@ -373,6 +373,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("Android-arm64.apk", release)
         self.assertIn("ESP32P4-v1.zip", release)
         self.assertIn("## ESP32-P4 firmware", release)
+        self.assertIn("128-sample / 2 x 64-frame", release)
         self.assertIn("## Android arm64", release)
         self.assertIn("CI debug-signed", release)
         self.assertIn("## Windows native", release)

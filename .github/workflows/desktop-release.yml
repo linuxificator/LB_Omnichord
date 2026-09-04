@@ -864,7 +864,7 @@ jobs:
             echo
             echo "Download \`$esp32p4_file\` and its SHA-256 file. It contains a directly flashable merged image plus the bootloader, partition table, application image and portable esptool argument files. This image supports ESP32-P4 revision 1.0 through 1.99 and targets the physically observed revision 1.3 board. Do not flash it on revision 3.x silicon; build the separate v3 profile instead."
             echo
-            echo 'The firmware receives native AMY wire commands through the LP UART at 1,000,000 baud, includes Gamma9001, 11 buses and storage for 1024 sequence groups. CI proves compilation and image structure; I2S audio and LP-UART operation still require the physical-board test.'
+            echo 'The firmware receives native AMY wire commands through the LP UART at 1,000,000 baud, includes Gamma9001, 11 buses, storage for 1024 sequence groups and the physically selected 48 kHz / 128-sample / 2 x 64-frame audio geometry. CI proves compilation and image structure; I2S audio and LP-UART operation still require the physical-board test.'
             echo
             echo '## Build provenance'
             echo
