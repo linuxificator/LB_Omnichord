@@ -6,6 +6,11 @@ repo_root="$(git -C "$project_dir" rev-parse --show-toplevel)"
 profile="${1:-v1}"
 build_dir="$project_dir/build/$profile"
 package_dir="${2:-$project_dir/ci-flash/$profile}"
+amy_component_cmake="$project_dir/components/amy/CMakeLists.txt"
+audio_sample_rate=48000
+audio_block_size=128
+i2s_dma_descriptors=2
+i2s_dma_frames=64
 
 case "$profile" in
     v1|v3) ;;
@@ -39,6 +44,10 @@ grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_GROUP_TAGS=64$' "$build_dir/sdkconfig
 grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_GROUP_EXECUTIONS=40$' "$build_dir/sdkconfig"
 grep -q 'gamma9001_pcm_data' "$build_dir/amy_p4_test.map"
 grep -q 'amy_set_gamma9001_pcm' "$build_dir/amy_p4_test.map"
+grep -q "AMY_SAMPLE_RATE=$audio_sample_rate" "$amy_component_cmake"
+grep -q "AMY_BLOCK_SIZE=$audio_block_size" "$amy_component_cmake"
+grep -q "AMY_ESP_I2S_DMA_DESC_NUM=$i2s_dma_descriptors" "$amy_component_cmake"
+grep -q "AMY_ESP_I2S_DMA_FRAME_NUM=$i2s_dma_frames" "$amy_component_cmake"
 
 if [[ "$profile" == v1 ]]; then
     grep -q '^CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y$' "$build_dir/sdkconfig"
@@ -85,6 +94,10 @@ printf '%s\n' \
     "amy_release_branch=$amy_branch" \
     "amy_commit=$amy_commit" \
     "pcm_bank=gamma9001" \
+    "audio_sample_rate=$audio_sample_rate" \
+    "audio_block_size=$audio_block_size" \
+    "i2s_dma_descriptors=$i2s_dma_descriptors" \
+    "i2s_dma_frames=$i2s_dma_frames" \
     "max_oscs=336" \
     "max_buses=11" \
     "max_sequence_groups=1024" \
