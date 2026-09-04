@@ -58,6 +58,7 @@ Relevant commits:
 - `29aa50a8 Make sequencer tags cumulative sequences`
 - `06309fa9 Document cumulative sequencer tags`
 - `21395160 Align sequence test terminology`
+- `fca15795 Remove retired sequence append from Godot`
 
 No Codex documents, Omnichord policy or downstream release configuration may
 be committed on that branch.
@@ -65,7 +66,7 @@ be committed on that branch.
 LB integration release:
 
 - branch `releases/amy_omnichord_R20260904T165605`;
-- exact commit `071e2b5f85edc39fd7726635a1ee97793a38f176`;
+- exact commit `3746474b3765c25e0e338834bf4e8b45d47d1dcd`;
 - generic cumulative-sequence commits are cherry-picked above the existing
   Omnichord release profile;
 - release-only sizing remains 11 buses, 336 oscillators, 1280 public sequence

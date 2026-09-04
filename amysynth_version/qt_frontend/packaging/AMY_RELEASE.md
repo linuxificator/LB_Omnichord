@@ -7,7 +7,7 @@ Last verified: 2026-09-04
 
 Every LB Omnichord build uses AMY from the fork release branch
 `releases/amy_omnichord_R20260904T165605` at exact commit
-`071e2b5f85edc39fd7726635a1ee97793a38f176`.
+`3746474b3765c25e0e338834bf4e8b45d47d1dcd`.
 
 The machine authority for those values is `release_inputs.json` beside this
 document. Workflows and the ESP32 preparation script load it through

@@ -18,9 +18,9 @@ Repeated ordinary AMY tagged `H` events now cumulate behind one reusable
 sequence tag; `HR` resets future contents and `HC` controls execution. The
 separate `HA` append and `zQ`/group abstractions are retired.
 
-AMY feature head is `21395160`. The exact Omnichord AMY release is
+AMY feature head is `fca15795`. The exact Omnichord AMY release is
 `releases/amy_omnichord_R20260904T165605` at
-`071e2b5f85edc39fd7726635a1ee97793a38f176`. LB uses one stable root tag per
+`3746474b3765c25e0e338834bf4e8b45d47d1dcd`. LB uses one stable root tag per
 fill-launch, bass and automatic-chord lane and keeps no AMY clock, execution,
 note-release or authoring high-water state.
 
