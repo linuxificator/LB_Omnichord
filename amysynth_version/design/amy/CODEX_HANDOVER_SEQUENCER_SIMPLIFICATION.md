@@ -34,8 +34,11 @@ this document and `sequencer_sequences.md` supersede them.
 - An active execution retains a reference-counted copy-on-write snapshot.
   Resetting/rebuilding future contents cannot delete its pending note-offs or
   change any other scheduled payload.
-- Stop targets all active executions of the public tag. AMY, not the caller,
-  owns cleanup of note state started by those executions.
+- Stop targets all active executions of the public tag and cancels their future
+  dispatch. It does not infer or synthesize inverse events for arbitrary
+  payloads. A parent stop can leave already-started finite child executions
+  alive so the note-offs stored in those children still run; an explicit stop
+  of a leaf execution also cancels its pending note-off.
 - Gating suppresses ordinary events while phase advances. Control events keep
   running so a finite controller can restore state.
 
@@ -143,3 +146,7 @@ Before merging, rerun `tests/run_tests.py --suite all` and the quality suite.
    examples are historical only.
 6. Never add Codex traces to an upstream-directed AMY branch. Put all handover
    material in LB Omnichord.
+7. Copy-on-write publication is semantically correct but its current clone and
+   release paths are not yet suitable evidence of bounded real-time behavior.
+   See `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md` before changing that
+   implementation.

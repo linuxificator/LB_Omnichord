@@ -13,10 +13,20 @@ them or the current user's request.
 
 The active work is now `rework/sequencer_simplification` in both repositories.
 Read
-`amysynth_version/design/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` first.
+`amysynth_version/design/amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` first.
 Repeated ordinary AMY tagged `H` events now cumulate behind one reusable
 sequence tag; `HR` resets future contents and `HC` controls execution. The
 separate `HA` append and `zQ`/group abstractions are retired.
+
+The differential review, Shorepine/Tulip compatibility evidence and open test
+findings now live in
+`amysynth_version/design/amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION_AUDIT.md`.
+Its ESP32 real-time follow-up is
+`amysynth_version/design/amy/CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
+The recommended direction is immutable dynamically numbered generations,
+short pointer publication, execution-held references and deferred reclamation
+outside the render task; a two-buffer ping-pong is not sufficient for
+overlapping long-lived executions.
 
 AMY feature head is `fca15795`. The exact Omnichord AMY release is
 `releases/amy_omnichord_R20260904T165605` at
