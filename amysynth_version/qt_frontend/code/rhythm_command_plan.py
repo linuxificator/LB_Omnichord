@@ -135,7 +135,7 @@ def compile_sequence_definition(
             command_body = command_body[:-1]
         if not command_body:
             raise ValueError("sequence events require an AMY payload")
-        commands.append(f"HA{tag_value},{tick_value},{period_value}{command_body}Z")
+        commands.append(f"H{tick_value},{period_value},{tag_value}{command_body}Z")
     return SequenceDefinitionPlan(tuple(commands), len(events))
 
 
@@ -187,7 +187,6 @@ def compact_repeating_events(
 @dataclass(frozen=True, slots=True)
 class TaggedLanePlan:
     commands: tuple[str, ...]
-    high_water: int
 
 
 def compile_tagged_lane(
@@ -195,30 +194,30 @@ def compile_tagged_lane(
     name: str,
     start: int,
     count: int,
-    previous_high_water: int,
     events: list[ScheduledEvent],
 ) -> TaggedLanePlan:
-    """Compile a complete replace/clear transaction for one AMY tag range."""
+    """Replace one running AMY sequence without host-side clock state."""
 
     if start < 0 or count <= 0:
         raise ValueError(f"invalid sequencer tag range for {name}")
-    if len(events) > count:
-        raise ValueError(
-            f"sequencer lane {name} requires {len(events)} tags; range capacity is {count}"
+    normalized_events = [
+        (max(0, int(tick)) % max(1, int(period)), max(1, int(period)), body)
+        for tick, period, body in events
+    ]
+    periods = [period for _, period, _ in normalized_events]
+    alignment = math.lcm(*periods) if periods else 0
+    commands = [
+        sequence_control_command(start, SEQUENCE_CONTROL_STOP, alignment=alignment),
+        *compile_sequence_definition(
+            sequence_tag=start,
+            events=normalized_events,
+        ).commands,
+    ]
+    if events:
+        commands.append(
+            sequence_control_command(start, SEQUENCE_CONTROL_START, alignment=alignment)
         )
-    high_water = max(int(previous_high_water), len(events))
-    commands: list[str] = []
-    for index, (tick, period, body) in enumerate(events):
-        tag = start + index
-        period_value = max(1, int(period))
-        tick_value = max(0, int(tick)) % period_value
-        command_body = str(body)
-        if command_body.endswith("Z"):
-            command_body = command_body[:-1]
-        commands.append(f"H{tick_value},{period_value},{tag}{command_body}Z")
-    for index in range(len(events), high_water):
-        commands.append(f"H0,0,{start + index}Z")
-    return TaggedLanePlan(tuple(commands), high_water)
+    return TaggedLanePlan(tuple(commands))
 
 
 @dataclass(frozen=True, slots=True)
@@ -564,7 +563,6 @@ def fill_occurrences(
 @dataclass(frozen=True, slots=True)
 class FillSchedulePlan:
     commands: tuple[str, ...]
-    high_water: int
 
 
 def compile_fill_schedule(
@@ -575,7 +573,6 @@ def compile_fill_schedule(
     bar_ticks: int,
     lane_start: int,
     lane_count: int,
-    previous_high_water: int,
     sequence_tag: Callable[[FillT], int],
 ) -> FillSchedulePlan:
     """Compile a repeating fill cycle and stale-tag clears."""
@@ -585,7 +582,6 @@ def compile_fill_schedule(
         raise ValueError(
             f"fill cycle needs {len(occurrences)} root tags; drum range has {lane_count}"
         )
-    high_water = max(previous_high_water, len(occurrences))
     density = max(1, int(density_bars))
     period = max(1, len(occurrences) * density * bar_ticks)
     events: list[ScheduledEvent] = []
@@ -608,7 +604,6 @@ def compile_fill_schedule(
         name="drums",
         start=lane_start,
         count=lane_count,
-        previous_high_water=previous_high_water,
         events=events,
     )
-    return FillSchedulePlan(lane.commands, lane.high_water)
+    return FillSchedulePlan(lane.commands)

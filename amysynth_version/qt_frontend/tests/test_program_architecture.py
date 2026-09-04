@@ -191,9 +191,11 @@ class ProgramArchitectureTests(unittest.TestCase):
                     for node in ast.walk(method)
                 ))
 
-        # LB keeps only root-lane replacement high-water marks, never AMY
-        # sequence execution phase, revisions or generation ownership.
+        # AMY owns sequence definitions, execution phase, revisions and note
+        # lifetime. LB emits reset/definition/control transactions and keeps
+        # none of that runtime state (including no authoring high-water mark).
         for forbidden in (
+            "high_water",
             "current_amy_tick",
             "amy_sequencer_tick",
             "sequence_execution_generation",
@@ -202,6 +204,10 @@ class ProgramArchitectureTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, transport_source)
             self.assertNotIn(forbidden, planner_source)
+
+        # Repeating ordinary H tags is AMY's cumulative definition syntax.
+        # Keeping this guard prevents the retired HA adapter from returning.
+        self.assertNotIn('f"HA', planner_source)
 
     def test_frontend_sequencer_path_is_wire_only(self) -> None:
         for filename in (

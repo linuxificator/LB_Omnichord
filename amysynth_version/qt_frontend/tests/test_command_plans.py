@@ -123,21 +123,20 @@ class PureCommandPlanTests(unittest.TestCase):
             ("v0a,,,1A8,1,90,0.75,120,0i9Z",),
         )
 
-    def test_tagged_lane_replaces_and_clears_to_high_water(self) -> None:
+    def test_tagged_lane_replaces_one_cumulative_sequence_at_a_boundary(self) -> None:
         plan = compile_tagged_lane(
             name="bass",
             start=20,
             count=4,
-            previous_high_water=3,
             events=[(9, 8, "n60l1i2Z")],
         )
-        self.assertEqual(plan.high_water, 3)
         self.assertEqual(
             plan.commands,
             (
+                "HC20,0,8Z",
+                "HR20Z",
                 "H1,8,20n60l1i2Z",
-                "H0,0,21Z",
-                "H0,0,22Z",
+                "HC20,1,8Z",
             ),
         )
 
@@ -165,10 +164,10 @@ class PureCommandPlanTests(unittest.TestCase):
             plan.definitions,
             (
                 "HR100Z",
-                "HA100,0,0n60l0.8i4Z",
-                "HA100,12,0n60l0i4Z",
-                "HA100,24,0n64l0.8i4Z",
-                "HA100,36,0n64l0i4Z",
+                "H0,0,100n60l0.8i4Z",
+                "H12,0,100n60l0i4Z",
+                "H24,0,100n64l0.8i4Z",
+                "H36,0,100n64l0i4Z",
             ),
         )
         self.assertEqual(
@@ -249,7 +248,7 @@ class PureCommandPlanTests(unittest.TestCase):
                 "HR10Z",
                 "HC10,0,192Z",
                 "HR11Z",
-                "HA11,0,192ar1:kick:127Z",
+                "H0,192,11ar1:kick:127Z",
                 "HC11,0,192Z",
                 "HC11,1,192Z",
             ),
@@ -267,9 +266,9 @@ class PureCommandPlanTests(unittest.TestCase):
             definition.commands,
             (
                 "HR30Z",
-                "HA30,0,0HC11,2,96,0Z",
-                "HA30,0,0HC12,2,96,0Z",
-                "HA30,0,0fr1:snare:100Z",
+                "H0,0,30HC11,2,96,0Z",
+                "H0,0,30HC12,2,96,0Z",
+                "H0,0,30fr1:snare:100Z",
             ),
         )
         schedule = compile_fill_schedule(
@@ -279,13 +278,16 @@ class PureCommandPlanTests(unittest.TestCase):
             bar_ticks=192,
             lane_start=40,
             lane_count=2,
-            previous_high_water=2,
             sequence_tag=lambda item: 29 + item.index,
         )
-        self.assertEqual(schedule.high_water, 2)
         self.assertEqual(
             schedule.commands,
-            ("H96,768,40HC30,1,1Z", "H0,0,41Z"),
+            (
+                "HC40,0,768Z",
+                "HR40Z",
+                "H96,768,40HC30,1,1Z",
+                "HC40,1,768Z",
+            ),
         )
 
 

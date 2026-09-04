@@ -231,15 +231,7 @@ class _QtLocalSocketWriter(_ScheduledWriter):
 
 
 class _TaggedSequencerLane:
-    """One logical AMY sequencer lane backed by a reserved user-tag range.
-
-    AMY tags are one-to-one with stored events. Reusing a tag replaces the
-    previous event; H0,0,<tag> clears exactly that event. A lane therefore owns
-    a contiguous range and assigns one deterministic tag to every scheduled
-    event. The high-water mark is intentionally monotonic: if a queued update
-    is superseded halfway through, the next update still clears every tag that
-    could contain an older definition.
-    """
+    """One logical AMY sequencer lane stored behind one deterministic tag."""
 
     def __init__(
         self,
@@ -252,7 +244,6 @@ class _TaggedSequencerLane:
         self.start = int(start)
         self.count = int(count)
         self.writer = writer
-        self.high_water = 0
         if self.start < 0 or self.count <= 0:
             raise ValueError(f"invalid sequencer tag range for {self.name}")
 
@@ -268,10 +259,8 @@ class _TaggedSequencerLane:
             name=self.name,
             start=self.start,
             count=self.count,
-            previous_high_water=self.high_water,
             events=events,
         )
-        self.high_water = plan.high_water
         return list(plan.commands)
 
     def enqueue(self, events: list[tuple[int, int, str]]) -> None:
@@ -1185,10 +1174,8 @@ class AmySerialClient:
             bar_ticks=self._drum_quantum(),
             lane_start=lane.start,
             lane_count=lane.count,
-            previous_high_water=lane.high_water,
             sequence_tag=self._fill_sequence_tag,
         )
-        lane.high_water = plan.high_water
         return list(plan.commands)
 
     def _drum_commands(

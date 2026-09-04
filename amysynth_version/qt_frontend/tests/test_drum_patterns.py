@@ -158,7 +158,7 @@ class DrumPatternTests(unittest.TestCase):
         authored_events = [
             command
             for command in commands
-            if command.startswith("HA")
+            if re.match(r"^H\d", command)
         ]
         self.assertEqual(len(authored_events), len(pop.levels[1]))
         self.assertNotEqual(
@@ -168,7 +168,7 @@ class DrumPatternTests(unittest.TestCase):
         self.assertTrue(any(re.match(r"^HC\d+,1,", command) for command in commands))
         sequence_period = pop.period_ticks // 2
         for command in authored_events:
-            match = re.match(r"^HA\d+,(\d+),(\d+)", command)
+            match = re.match(r"^H(\d+),(\d+),\d+", command)
             self.assertIsNotNone(match, command)
             assert match is not None
             tick, period = (int(value) for value in match.groups())
@@ -176,7 +176,7 @@ class DrumPatternTests(unittest.TestCase):
 
     def test_sequence_activity_preserves_every_catalogue_event_exactly(self) -> None:
         event_pattern = re.compile(
-            r"^HA(?P<sequence>\d+),(?P<tick>\d+),(?P<period>\d+)"
+            r"^H(?P<tick>\d+),(?P<period>\d+),(?P<sequence>\d+)"
             r"(?P<body>.+)Z$"
         )
         for rhythm in self.catalog.rhythms.values():
@@ -228,7 +228,7 @@ class DrumPatternTests(unittest.TestCase):
 
     def test_fill_sequences_preserve_events_and_only_add_generic_gates(self) -> None:
         event_pattern = re.compile(
-            r"^HA(?P<sequence>\d+),(?P<tick>\d+),(?P<period>\d+)"
+            r"^H(?P<tick>\d+),(?P<period>\d+),(?P<sequence>\d+)"
             r"(?P<body>.+)Z$"
         )
         client = self.client()
@@ -388,11 +388,11 @@ class DrumPatternTests(unittest.TestCase):
 
         counts: dict[int, int] = {}
         for command in commands:
-            if command.startswith("HA"):
-                match = re.match(r"^HA(\d+),(\d+),(\d+)", command)
+            if re.match(r"^H\d", command):
+                match = re.match(r"^H(\d+),(\d+),(\d+)", command)
                 self.assertIsNotNone(match, command)
                 assert match is not None
-                tag, _tick, period = (int(value) for value in match.groups())
+                _tick, period, tag = (int(value) for value in match.groups())
                 self.assertEqual(period, 0)
                 counts[tag] = counts.get(tag, 0) + 1
         self.assertEqual(set(counts), set(range(256, 526)))
@@ -416,7 +416,7 @@ class DrumPatternTests(unittest.TestCase):
             muted = bool(mute_commands)
             self.assertEqual(muted, role not in fill.continue_roles)
             for command in mute_commands:
-                self.assertRegex(command, rf"^HA256,0,0HC{tag},2,")
+                self.assertRegex(command, rf"^H0,0,256HC{tag},2,")
 
     def test_fill_order_and_allowed_starts_form_a_finite_supercycle(self) -> None:
         client = self.client()
@@ -432,15 +432,11 @@ class DrumPatternTests(unittest.TestCase):
         self.assertGreaterEqual(len(occurrences), 2)
         self.assertEqual(occurrences[0][0], self.catalog.rhythm("pop_8").fills[1])
         commands = client._fill_schedule_commands()
-        self.assertEqual(
-            sum(command.startswith("H") for command in commands),
-            len(occurrences),
-        )
+        authored = [command for command in commands if re.match(r"^H\d", command)]
+        self.assertEqual(len(authored), len(occurrences))
         self.assertTrue(all(
-            f",{index}HC" in command
-            for index, command in enumerate(
-                command for command in commands if command.startswith("H")
-            )
+            re.match(r"^H\d+,\d+,0HC\d+,1,1Z$", command)
+            for command in authored
         ))
 
     def test_cold_start_is_immediate_but_live_drum_edits_are_quantized(self) -> None:

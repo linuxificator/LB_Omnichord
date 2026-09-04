@@ -119,8 +119,8 @@ class SerialAmyBridge:
                 )
             except (AttributeError, TypeError) as exc:
                 raise RuntimeError(
-                    "installed AMY lacks the pinned configurable nested "
-                    "sequencer/offline-render API"
+                    "installed AMY lacks the pinned reusable-sequence and "
+                    "offline-render API"
                 ) from exc
             self._block_seconds = float(amy.AMY_BLOCK_SIZE) / float(
                 amy.AMY_SAMPLE_RATE

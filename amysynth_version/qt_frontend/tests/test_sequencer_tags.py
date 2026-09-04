@@ -252,18 +252,20 @@ class SequencerTagTests(unittest.TestCase):
         # note-offs whose gate crosses the bar boundary from becoming events
         # that can never match AMY's modulo-period tick offset.
         commands = lane.commands([(17, 16, "n60l1i1")])
-        self.assertEqual(commands, ["H1,16,10n60l1i1Z"])
+        self.assertEqual(
+            commands,
+            ["HC10,0,16Z", "HR10Z", "H1,16,10n60l1i1Z", "HC10,1,16Z"],
+        )
 
         # Removing that one event addresses exactly its tag.
-        self.assertEqual(lane.commands([]), ["H0,0,10Z"])
+        self.assertEqual(lane.commands([]), ["HC10,0,0Z", "HR10Z"])
 
-        # Two simultaneous events require two tags; the lane never groups them
-        # under one tag because current AMY stores one sequencer entry per tag.
+        # Simultaneous events accumulate behind the lane's one sequence tag.
         commands = lane.commands(
             [(0, 16, "n60l1i1"), (0, 16, "n64l1i1")]
         )
-        self.assertEqual(commands[0], "H0,16,10n60l1i1Z")
-        self.assertEqual(commands[1], "H0,16,11n64l1i1Z")
+        self.assertIn("H0,16,10n60l1i1Z", commands)
+        self.assertIn("H0,16,10n64l1i1Z", commands)
 
     def test_sequence_wire_adapter_uses_explicit_h_family_operations(self) -> None:
         plan = compile_sequence_definition(
@@ -274,8 +276,8 @@ class SequencerTagTests(unittest.TestCase):
             plan.commands,
             (
                 "HR7Z",
-                "HA7,0,48i2n60l1Z",
-                "HA7,35,0i2n60l0Z",
+                "H0,48,7i2n60l1Z",
+                "H35,0,7i2n60l0Z",
             ),
         )
         self.assertEqual(plan.event_count, 2)
@@ -309,18 +311,20 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(
             lane.commands(events),
             [
+                "HC112,0,192Z",
+                "HR112Z",
                 "H0,192,112HC1195,1,1Z",
-                "H48,192,113HC1196,1,1Z",
-                "H96,192,114HC1197,1,1Z",
+                "H48,192,112HC1196,1,1Z",
+                "H96,192,112HC1197,1,1Z",
+                "HC112,1,192Z",
             ],
         )
 
         self.assertEqual(
             lane.commands([]),
             [
-                "H0,0,112Z",
-                "H0,0,113Z",
-                "H0,0,114Z",
+                "HC112,0,0Z",
+                "HR112Z",
             ],
         )
 
@@ -354,11 +358,11 @@ class SequencerTagTests(unittest.TestCase):
         for sequence_index, note in enumerate(reversed(client.chord_notes)):
             tick = sequence_index * 48
             self.assertIn(
-                f"HA1192,{tick},0n{note:g}l0.8i4Z",
+                f"H{tick},0,1192n{note:g}l0.8i4Z",
                 commands,
             )
             self.assertIn(
-                f"HA1192,{tick + 35},0n{note:g}l0i4Z",
+                f"H{tick + 35},0,1192n{note:g}l0i4Z",
                 commands,
             )
         self.assertEqual(commands[0], "HR1192Z")
