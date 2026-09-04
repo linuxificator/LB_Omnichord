@@ -44,12 +44,12 @@ those values remain the independent role/row volume and balance controls.
 
 Reusable phrases remain wire-only. Repeated ordinary tagged `H` events
 cumulate a persistent AMY definition; `HR` resets future contents and `HC`
-uses the strict integer run state `0`/`1` to stop/start, with operation `2`
-reserved for finite gating. Its final field selects alignment. This run state
-is not note velocity; fractional values are invalid. LB owns musical data and
-policy; AMY owns local phase, execution lifetime, repeats and immutable
-execution snapshots. The complete boundary and regression rules are in
-`sequencer_sequences.md`.
+uses the strict integer actions `0`/`1`/`2` for stop/start/finite gate. Its
+final field selects alignment, while gate also carries a duration. These are
+sequence actions, not note velocities; fractional values are invalid. LB owns
+musical data and policy; AMY owns local phase, execution lifetime, repeats and
+immutable execution snapshots. The complete boundary and regression rules are
+in `sequencer_sequences.md`.
 
 ## Testing
 

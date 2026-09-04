@@ -21,7 +21,7 @@ Read these documents in order for current reusable-sequence work:
    publication/reclamation design, its route from COW and the remaining
    physical ESP32 timing proof.
 4. `CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` — latest PR API feedback,
-   final boolean run syntax, compatibility evidence, completed host
+   final named-action syntax, compatibility evidence, completed host
    verification, immutable LB release and remaining work.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,

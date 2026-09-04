@@ -48,11 +48,11 @@ is Python-first; exact wire equivalents remain documented because LB's
 multi-platform process boundary uses sockets, a Windows named pipe, Android
 service IPC and ESP32 serial.
 
-Python starts and stops with explicit boolean syntax:
-`amy.send(sequence=tag, run=True|False, alignment_period=period)`. Low-level
-`HC` uses the strict integer run values `1` and `0`, while operation value `2`
-remains the finite gate. This avoids overloading note velocity and rejects
-fractional control values. See
+Python exposes the full operation with explicit named actions:
+`amy.send(sequence=tag, action='start'|'stop'|'gate', ...)`. Gate requires a
+duration. Low-level `HC` uses the strict integer action values `1`, `0`, and
+`2`. This avoids both a misleading partial boolean and overloaded note
+velocity, and rejects fractional control values. See
 `CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` for the decision trail.
 
 ## AMY branches and diagnostic commits
@@ -85,14 +85,16 @@ Relevant commits:
 - `380f20e1 Ignore generated sequence test binaries`
 - `4aab0fcb Use explicit run state for sequence control`
 - `cc2407ff Document boolean sequence run control`
+- `841ccd29 Expose named sequence control actions`
+- `f03875f2 Document start stop and gate actions`
 
 No Codex documents, Omnichord policy or downstream release configuration may
 be committed on that branch.
 
 LB integration release:
 
-- branch `releases/amy_omnichord_R20260904T213713`;
-- exact commit `be6fa83afdc2a98ca6a90f095be476c13b930af9`;
+- branch `releases/amy_omnichord_R20260904T215233`;
+- exact commit `8a896e9319957ed8eea49f26fe16378fcc2a27c5`;
 - generic cumulative-sequence commits are cherry-picked above the existing
   Omnichord release profile;
 - release-only sizing remains 11 buses, 336 oscillators, 1280 public sequence

@@ -3,7 +3,7 @@
 Status: implemented, pinned and host-tested; not yet substituted into PR 1151
 Date: 2026-09-04
 AMY feature branch: `rework/sequencer_simplification`
-AMY feature head: `cc2407ff`
+AMY feature head: `f03875f239d85f44d7d3d4115e0b51bf6482318d`
 LB branch: `rework/sequencer_simplification`
 
 ## Review input and resulting API
@@ -11,30 +11,32 @@ LB branch: `rework/sequencer_simplification`
 Dan Ellis' review comment on Shorepine AMY PR 1151 values a broad feature set
 with few parameters and asks whether starting a stored sequence can look more
 like sending a note-on. A first implementation overloaded `vel`, but subsequent
-review exposed a semantic mismatch: sequence execution is boolean, whereas
-velocity describes how strongly a note is played. The final API remains small
-without conflating those concepts or exposing another public group, revision
-or execution abstraction:
+review exposed a semantic mismatch: velocity describes how strongly a note is
+played, while sequence control has three distinct operations. A short-lived
+boolean `run` API still hid the gate operation. The final API remains small and
+exposes all operations without another public group, revision or execution
+abstraction:
 
 ```python
-amy.send(sequence=100, run=True, alignment_period=48)
-amy.send(sequence=100, run=False, alignment_period=48)
+amy.send(sequence=100, action='start', alignment_period=48)
+amy.send(sequence=100, action='stop', alignment_period=48)
+amy.send(sequence=100, action='gate', duration=24, alignment_period=1)
 ```
 
-`run` is boolean Python convenience syntax; it normalizes to the existing
+The named action is Python convenience syntax; it normalizes to the existing
 low-level `sequence_control` field. A caller may still schedule that control as
-an ordinary event by also supplying `ticks`. The raw wire equivalent is:
+an ordinary event by also supplying `ticks`. The raw wire equivalents are:
 
 ```text
 HC100,1,48Z
 HC100,0,48Z
+HC100,2,24,1Z
 ```
 
-The raw second field is strictly integer `1` for start or `0` for stop. Value
-`2` remains the distinct gate operation and takes duration plus alignment.
-Fractional values and note-velocity templates are rejected rather than being
-silently interpreted as execution state. A controller maps its input to a
-boolean before sending sequence control.
+The raw second field is strictly integer `1` for start, `0` for stop, or `2`
+for gate. Gate additionally takes duration plus alignment. Fractional values
+and note-velocity templates are rejected rather than being silently
+interpreted as an action.
 
 The comment used `-1` in an illustrative `ticks` period. This branch does not
 add another sentinel because AMY already has a complete finite/repeating rule:
@@ -47,8 +49,8 @@ Python documentation is primary. Wire commands remain fully documented as a
 secondary interface because LB Omnichord deliberately uses them as its stable
 cross-process boundary over Unix sockets, Windows named pipes, Android private
 IPC and ESP32 serial. JavaScript and Godot callers retain the generated raw
-`sequence_control` binding; the boolean `sequence=..., run=...` convenience is
-Python-specific.
+`sequence_control` binding; the named `sequence=..., action=...` convenience
+is Python-specific.
 
 Source discussion:
 <https://github.com/shorepine/amy/pull/1151#issuecomment-5544095824>
@@ -91,9 +93,12 @@ Source discussion:
 - `4aab0fcb` — replace overloaded trigger velocity with boolean `run` and
   reject fractional wire actions;
 - `cc2407ff` — update public documentation and examples to the boolean model.
+- `841ccd29` — replace the partial boolean API with named start, stop and gate
+  actions, including strict duration validation;
+- `f03875f2` — document the complete named-action model.
 
 The final feature diff against Shorepine base `0fb0a00b` is 35 files,
-2,391 insertions and 167 deletions. The main C addition remains the immutable
+2,415 insertions and 167 deletions. The main C addition remains the immutable
 stored-definition/execution implementation; the public model is smaller than
 the superseded group design even though robust ownership, validation and
 concurrency tests cost real lines.
@@ -170,8 +175,8 @@ which is not a product defect.
 
 The new fork release is:
 
-- branch `releases/amy_omnichord_R20260904T213713`;
-- commit `be6fa83afdc2a98ca6a90f095be476c13b930af9`;
+- branch `releases/amy_omnichord_R20260904T215233`;
+- commit `8a896e9319957ed8eea49f26fe16378fcc2a27c5`;
 - PCM bank `gamma9001`;
 - 11 buses, 336 oscillators, 1280 stored tags, 64 events per definition and 40
   active/alignment-pending executions;

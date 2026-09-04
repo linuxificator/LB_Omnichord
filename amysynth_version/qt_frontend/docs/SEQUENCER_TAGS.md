@@ -17,13 +17,13 @@ Already-running executions retain the immutable definition with which they
 started. Untagged one- or two-field `H` messages retain their direct global
 sequencer behavior.
 
-`HC<tag>,<run>,<alignment>Z` starts for integer `run=1` and stops for integer
-`run=0`. It is a boolean execution state, not note velocity; fractional values
-are invalid. `HC<tag>,2,<duration>,<alignment>Z` gates current executions. A
-sequence made only of period-zero events is a finite one-shot; one containing
-a nonzero period repeats until stopped. A sequence may control another
-sequence, but the Omnichord uses only one parent/child level and never
-constructs recursive control graphs.
+`HC<tag>,<action>,<alignment>Z` stops for action `0` and starts for action `1`.
+`HC<tag>,2,<duration>,<alignment>Z` gates current executions. The action is a
+three-way stop/start/gate operation, not a boolean or note velocity;
+fractional values are invalid. A sequence made only of period-zero events is a
+finite one-shot; one containing a nonzero period repeats until stopped. A
+sequence may control another sequence, but the Omnichord uses only one
+parent/child level and never constructs recursive control graphs.
 
 ## Reserved tags
 

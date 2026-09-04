@@ -25,9 +25,10 @@ ESP32 serial are transport adapters behind the same wire boundary.
 
 An ordinary `H<tick>,<period>,<tag><payload>Z` appends an event to a stopped
 reusable definition. Repeating the tag cumulates. `HR<tag>Z` resets the future
-definition. `HC<tag>,<run>,<alignment>Z` starts for integer `run=1` and stops
-for integer `run=0`; `HC<tag>,2,<duration>,<alignment>Z` applies a finite gate.
-Run is deliberately not a note velocity and fractional values are invalid.
+definition. `HC<tag>,<action>,<alignment>Z` stops for action `0` and starts for
+action `1`; `HC<tag>,2,<duration>,<alignment>Z` applies a finite gate. These
+three operations are explicit sequence actions, not note velocities;
+fractional values are invalid.
 Untagged `H` messages keep their direct global-clock behavior.
 
 There is no separate group namespace, append command, publication revision,
