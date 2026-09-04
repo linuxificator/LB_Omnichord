@@ -1,9 +1,22 @@
 # Codex handover: real-time-safe reusable-sequence publication
 
-Status: design analysis; not implemented
+Status: implemented and host-tested; physical ESP32-P4 timing still required
 Date: 2026-09-04
 Affected AMY branch: `rework/sequencer_simplification`
 Primary target of concern: ESP32-P4 at 48 kHz, 128-sample AMY blocks
+
+Implementation commits on the clean AMY branch:
+
+- `2669c3ae` — exercise append-while-active COW and three overlapping
+  definition generations;
+- `b2a88659` — construct versions outside the render-blocking lock and defer
+  zero-reference destruction;
+- `7c98ad2b` — make the public control/wire boundary the guaranteed reclaimer
+  and structurally bypass it for render-fired wires.
+
+LB consumes the same commits through immutable integration branch
+`releases/amy_omnichord_R20260904T194050` at
+`f710148089b7e58f6c101be2b190e58f79521aa6`.
 
 ## Decision summary
 
@@ -14,12 +27,47 @@ add a tracing garbage collector. The most practical design for this code is:
 2. build a new definition version outside the AMY/audio queue lock;
 3. publish it with one short, synchronized pointer swap;
 4. let each execution hold a reference for its complete lifetime;
-5. retire zero-reference old versions to a bounded queue;
+5. link zero-reference old versions onto an allocation-free intrusive list;
 6. reclaim their heap memory only from a non-rendering command/control context.
 
 This is a small read-copy-update-like design with explicit reference counting
 and deferred reclamation. It evolves the current ownership model rather than
-introducing a general garbage collector.
+introducing a general garbage collector. It is now implemented. “Real-time
+safe” remains a measured hardware claim, not a conclusion from source review.
+
+## Path from the original COW to the implemented design
+
+The original copy-on-write semantics were worth keeping: an execution retained
+the exact definition it started with, and an edit made a new definition for
+future starts. The problem was where the work happened, not the snapshot rule.
+The implementation was changed incrementally:
+
+1. Add tests which force the old COW branch by appending while an execution is
+   active. Add a second test with A, B and C alive together, proving that two
+   physical buffers cannot represent the valid state space.
+2. Split “drop a reference” from “destroy the object”. Reference changes stay
+   inside the existing short AMY queue-lock boundary.
+3. Give a writer a temporary reference to the observed source. This makes the
+   source immutable and alive after the writer releases the lock.
+4. Allocate the candidate definition, its event array and all copied strings
+   outside the lock.
+5. Re-enter the lock, compare the slot pointer with the captured source and
+   publish with a pointer swap only if it still matches. A losing writer drops
+   its private candidate and retries against the newer cumulative definition.
+6. Preserve the `refs == 1` in-place append fast path. Bulk preload therefore
+   stays O(n); it does not clone the growing definition for every event.
+7. When render drops the last reference, link the object through a pointer in
+   the definition itself. No queue node is allocated and no heap object is
+   freed there.
+8. Stop routing render-fired wires through public `amy_add_message()`. Internal
+   playback dispatches directly, while the public wire boundary drains and
+   destroys the detached retire list after parsing. This is a structural
+   control/render separation and does not depend on observing a global firing
+   flag which another thread could change concurrently.
+
+This route keeps the already-tested COW behavior and changes only publication
+and destruction ownership. It does not add a public revision, buffer, garbage
+collector or execution-lifetime concept.
 
 ## Why the current path is a real-time risk
 
@@ -143,33 +191,26 @@ event by event. Keep that fast path, but make its exclusivity test safe.
 An execution owns its immutable definition for its lifetime. The render loop
 can read through that stable pointer without allocating, cloning or freeing.
 When the execution ends, it clears the execution slot and performs one bounded
-atomic reference decrement. If that was the final reference, it pushes the
-definition pointer into a preallocated retire ring and returns immediately.
+reference decrement while already inside the AMY lock. If that was the final
+reference, it prepends the definition to an intrusive retire list and returns.
+The list link lives in the definition, so this operation needs no allocation,
+fixed-capacity queue or queue-full policy.
 
-The render path must never wait for space in the retire ring. Practical
-policies are:
-
-- size the ring for at least the maximum number of distinct obsolete versions
-  which active executions can retain, bounded by the configured execution
-  count, plus one publication/candidate allowance;
-- drain it from the UART/parser/control task before or after message work;
-- if a non-rendering writer observes a full ring, it may reclaim there;
-- treat render-side ring exhaustion as a counted diagnostic/configuration
-  defect, not as permission to call `free()` or block.
-
-Because many executions can share one version, the actual queue demand is
-normally well below the execution count. A control-side edit must drain the
-ring before it can create another obsolete version; nested render-side starts
-can create executions but cannot create definition versions. Those rules make
-the bound defensible rather than an estimate based only on expected traffic.
+This was chosen over the initially considered preallocated retire ring. A ring
+would need a defensible capacity and an overflow policy, while the retired
+definition itself already provides the only node required. Memory use remains
+bounded by the definitions actually created and not yet reclaimed. Every
+ordinary public wire-ingest completion drains the list, and direct non-render
+sequence operations also drain opportunistically. Deinitialization performs a
+final synchronous drain.
 
 ### Reclaimer
 
-No dedicated task is required solely for this feature. On ESP32-P4 the
-existing HP UART command task is a natural reclamation owner. On desktop, the
-message-ingestion/control context can drain the same portable retire API. A
-small dedicated low-priority task is acceptable only if another platform
-already needs one; it should not be mandatory architecture for AMY.
+No dedicated task is required solely for this feature. The portable public
+wire-ingest boundary is the reclamation owner. On ESP32-P4 that boundary is
+normally entered by the HP UART command task; on desktop it is entered by the
+socket, pipe or local command/control context. Render-fired wires use a direct
+internal dispatch path and therefore cannot accidentally run reclamation.
 
 The reclaimer frees all wire strings, the event array and the definition. It
 also owns cleanup of unpublished candidates after a failed compare or OOM.
@@ -202,7 +243,6 @@ is:
 - Publication takes only the bounded pointer/ownership critical section.
 - The audio task never blocks for a writer and never performs heap work.
 - A full execution pool remains an explicit start failure.
-- A full retirement queue is observable; it must not silently leak forever.
 - Reset and deinit have a defined quiescent phase before final reclamation.
 
 The slot pointer exchange itself can be an aligned pointer store under AMY's
@@ -226,7 +266,8 @@ last critical section is worth the more complex atomic ownership protocol.
 - reset, stop, global reset and shutdown reclaim every version exactly once;
 - ThreadSanitizer stress with simultaneous ingestion and tick processing where
   supported;
-- retirement-queue saturation follows its documented non-blocking policy.
+- public dispatch retains root controls and same-tick child launch behavior
+  after render dispatch is separated from the public reclamation boundary.
 
 ### ESP32-P4
 
@@ -237,8 +278,8 @@ last critical section is worth the more complex atomic ownership protocol.
 - test with the project baseline: 48 kHz, 128-sample AMY blocks and 2x64-frame
   DMA descriptors;
 - repeat with effects and the maximum expected active execution load;
-- record internal heap low-water mark, largest free block and retire-ring high
-  water;
+- record internal heap low-water mark, largest free block and maximum retired
+  list depth;
 - if PSRAM is enabled later, repeat the same test with explicit memory-capability
   placement and cache-stressing background work.
 
@@ -271,9 +312,18 @@ do not silently widen the current PR to fix it without scope agreement.
 - ESP32-P4 performance/task-priority guidance:
   <https://docs.espressif.com/projects/esp-idf/en/stable/esp32p4/api-guides/performance/speed.html>
 
-## Next action
+## Verification completed and next action
 
-Before editing AMY, agree the stop semantics and publication ownership model,
-then add the failing COW correctness and allocation-failure tests. Implement
-the minimal external-clone plus deferred-reclaim change first. Validate it on
-host, then on the physical ESP32-P4 before describing it as real-time safe.
+The clean feature branch and the LB integration release both pass
+`make ctest -j2`, `python3 tests/test_sequence_api.py` and `make check-c-api`. GCC
+`-fanalyzer` reports no finding for `src/sequencer.c`. The new tests prove
+append-while-active snapshot isolation and three simultaneously retained
+generations. The complete C suite also proves that separating render dispatch
+from public reclamation preserves root controls and same-tick child starts.
+
+Allocation-failure injection, a genuine simultaneous-writer stress test and
+physical P4 timing remain open. The next action is a hardware stress run at the
+48 kHz / 128-sample / 2x64 DMA baseline before describing the implementation as
+hard real-time safe. In particular, measure publication-lock time, render
+deadline misses, heap low-water mark and worst retained-list depth while active
+64-event definitions are repeatedly edited under maximum expected FX load.

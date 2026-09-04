@@ -1,11 +1,27 @@
 # Codex handover: reusable-sequence simplification audit
 
-Status: analysis; no AMY implementation change made by this audit
+Status: original audit plus implemented realtime-publication follow-up
 Audit date: 2026-09-04
 AMY feature branch: `rework/sequencer_simplification`
 Feature head: `fca1579591cb4301d0f0583cc5ae8d8d2cb531aa`
 Comparison base: Shorepine `main` at
 `0fb0a00b5a9f9443d7e1f85261cc7e70a0adb76b`
+
+## Post-audit implementation update
+
+The table and coverage snapshot below describe the original audited head. The
+authorized realtime follow-up adds 273 lines and removes 46 relative to that
+head (net +227), including 64 lines of focused generation tests and public AMY
+documentation. The clean feature head is now
+`7c98ad2bae4d6934bd097de9052a55a47d2ee9b6`; its total diff against the same
+Shorepine base is +1,731/-139 (net +1,592).
+
+Commits `2669c3ae`, `b2a88659` and `7c98ad2b` now exercise and implement the
+previously missing COW path: candidate construction occurs outside the shared
+render lock, publication is a checked pointer swap, and render-side final
+releases use deferred intrusive reclamation. The exact rationale, transition
+from the old COW and ESP32-P4 validation boundary are recorded in
+`CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
 
 ## Purpose
 
@@ -98,14 +114,15 @@ Instrumented C-test coverage for `src/sequencer.c` was:
 - calls: 75.00%.
 
 That is useful breadth, not proof of complete behavior or real-time safety.
-The actual copy-on-write clone helpers received no calls in the coverage run.
-The immutable-definition test resets the public definition before rebuilding;
-it proves old-execution lifetime but does not exercise append-to-an-active-
-definition cloning.
+The original coverage run did not call the copy-on-write clone helpers. That
+gap is now closed by explicit append-while-active and three-overlapping-
+generation tests. A new instrumented coverage percentage has not been recorded
+after the change, so retain the original percentages only as historical
+evidence.
 
 Missing or incomplete proof:
 
-- a direct copy-on-write append test, including allocation failure;
+- allocation-failure injection throughout candidate construction;
 - cyclic control graphs and deterministic same-tick behavior;
 - whether a future aligned stop/gate affects executions started after the
   control command but before the boundary;
@@ -234,10 +251,10 @@ The concise substance for the PR discussion is:
 
 ## Next implementation order
 
-1. Lock down semantics for stop, future-aligned controls and live replacement.
-2. Add the missing COW, OOM, cycle and maximum-load tests.
-3. Move clone/allocation/free work out of the audio-blocking critical path as
-   described in `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
-4. Migrate AMY's own examples/tests and prepare a tested Tulip migration.
-5. Re-run the C, Python, API, binding and audio suites plus ESP32 timing proof.
-6. Only then update the Shorepine PR branch and discussion.
+1. Add OOM injection, simultaneous-writer, cycle and maximum-load tests.
+2. Resolve and migrate AMY's own examples/tests and prepare a tested Tulip
+   migration for the intentional tag-semantics change.
+3. Run the physical ESP32-P4 timing and heap-retention measurements described
+   in `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
+4. Re-run binding and audio suites after any resulting change.
+5. Only then update the Shorepine PR branch and discussion.

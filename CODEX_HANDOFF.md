@@ -23,14 +23,16 @@ findings now live in
 `amysynth_version/design/amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION_AUDIT.md`.
 Its ESP32 real-time follow-up is
 `amysynth_version/design/amy/CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
-The recommended direction is immutable dynamically numbered generations,
-short pointer publication, execution-held references and deferred reclamation
-outside the render task; a two-buffer ping-pong is not sufficient for
-overlapping long-lived executions.
+That direction is now implemented as immutable dynamically retained
+generations, checked short pointer publication, execution-held references and
+an intrusive retire list reclaimed at the non-rendering public wire boundary.
+A two-buffer ping-pong is not sufficient for overlapping long-lived
+executions; a tracing collector is unnecessary because ownership is explicit.
+Physical ESP32-P4 timing proof is still open.
 
-AMY feature head is `fca15795`. The exact Omnichord AMY release is
-`releases/amy_omnichord_R20260904T165605` at
-`3746474b3765c25e0e338834bf4e8b45d47d1dcd`. LB uses one stable root tag per
+AMY feature head is `7c98ad2b`. The exact Omnichord AMY release is
+`releases/amy_omnichord_R20260904T194050` at
+`f710148089b7e58f6c101be2b190e58f79521aa6`. LB uses one stable root tag per
 fill-launch, bass and automatic-chord lane and keeps no AMY clock, execution,
 note-release or authoring high-water state.
 

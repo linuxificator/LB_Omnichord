@@ -17,8 +17,9 @@ Read these documents in order for current reusable-sequence work:
 2. `CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION_AUDIT.md` — differential audit
    against Shorepine main, compatibility impact, tests, defects and possible
    simplifications.
-3. `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md` — analysis and proposed
-   bounded publication/reclamation design for desktop and ESP32 targets.
+3. `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md` — implemented
+   publication/reclamation design, its route from COW and the remaining
+   physical ESP32 timing proof.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful

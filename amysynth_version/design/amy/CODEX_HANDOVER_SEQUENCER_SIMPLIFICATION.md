@@ -62,20 +62,32 @@ Relevant commits:
 - `06309fa9 Document cumulative sequencer tags`
 - `21395160 Align sequence test terminology`
 - `fca15795 Remove retired sequence append from Godot`
+- `2669c3ae Cover concurrent sequence definition generations`
+- `b2a88659 Move sequence version reclamation off render path`
+- `7c98ad2b Reclaim sequence versions at control boundary`
 
 No Codex documents, Omnichord policy or downstream release configuration may
 be committed on that branch.
 
 LB integration release:
 
-- branch `releases/amy_omnichord_R20260904T165605`;
-- exact commit `3746474b3765c25e0e338834bf4e8b45d47d1dcd`;
+- branch `releases/amy_omnichord_R20260904T194050`;
+- exact commit `f710148089b7e58f6c101be2b190e58f79521aa6`;
 - generic cumulative-sequence commits are cherry-picked above the existing
   Omnichord release profile;
 - release-only sizing remains 11 buses, 336 oscillators, 1280 public sequence
   tags, 64 events per definition and 40 executions;
 - Gamma9001 and maintained socket/Android/offline-render support remain;
 - the abandoned bus-mixer experiment remains absent.
+
+The active-definition COW path now pins its source briefly, performs all
+allocation and copying after releasing the AMY queue lock, and publishes with
+a checked short pointer swap. Render-side last releases link definitions onto
+an intrusive retire list; the public control/wire boundary owns destruction.
+This supports more than two simultaneously retained versions without a fixed
+buffer pool or tracing collector. See
+`CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md` for the exact migration and
+the still-open physical ESP32 timing proof.
 
 ## LB implementation
 
