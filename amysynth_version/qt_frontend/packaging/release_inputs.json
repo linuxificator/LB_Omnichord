@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "recorded": "2026-09-03",
+  "recorded": "2026-09-04",
   "amy": {
     "repository": "https://github.com/linuxificator/amy.git",
-    "release_branch": "releases/amy_omnichord_R20260903T202802",
-    "commit": "890ec66de2677db5bdf9a5dda9f53f01628d2b58",
+    "release_branch": "releases/amy_omnichord_R20260904T130059",
+    "commit": "7d66ae637f75a53d45cc5ffb3392c07f1d6ff876",
     "pcm_bank": "gamma9001"
   },
   "python": {
