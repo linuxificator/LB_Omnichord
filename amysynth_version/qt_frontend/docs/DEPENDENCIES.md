@@ -64,8 +64,8 @@ provenance, not portable frontend runtime intent.
 
 All synthesis targets use
 `https://github.com/linuxificator/amy.git`, release branch
-`releases/amy_omnichord_R20260904T213713`, immutable commit
-`be6fa83afdc2a98ca6a90f095be476c13b930af9`. CI proves that the commit belongs
+`releases/amy_omnichord_R20260904T215233`, immutable commit
+`8a896e9319957ed8eea49f26fe16378fcc2a27c5`. CI proves that the commit belongs
 to the declared branch before using it.
 
 This is intentionally not a normal Python requirement. It supplies the C AMY
