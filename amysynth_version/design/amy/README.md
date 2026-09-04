@@ -23,6 +23,9 @@ Read these documents in order for current reusable-sequence work:
 4. `CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` — latest PR API feedback,
    final named-action syntax, compatibility evidence, completed host
    verification, immutable LB release and remaining work.
+5. `CODEX_HANDOVER_SEQUENCE_FINAL_QUALITY_AUDIT.md` — final pre-merge
+   differential audit, reproduced concurrency/slot-order defects and the
+   ordered repair and re-audit plan.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful
