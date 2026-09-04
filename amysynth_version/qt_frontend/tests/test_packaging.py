@@ -152,7 +152,11 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("needs: [tests, release-metadata]", release)
         self.assertIn("android-packages:", release)
         self.assertIn("android-emulator:", release)
-        self.assertIn("android-packages, android-emulator]", release)
+        self.assertIn("esp32p4-firmware:", release)
+        self.assertIn(
+            "android-packages, android-emulator, esp32p4-firmware]",
+            release,
+        )
         self.assertIn("hdiutil attach", release)
         self.assertIn(
             "bash amysynth_version/qt_frontend/packaging/android/"
@@ -348,7 +352,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("release_sbom.py", release)
         self.assertIn("https://spdx.dev/Document/v2.3", release)
         self.assertIn("actions/attest@", release)
-        self.assertEqual(release.count("actions/attest@"), 2)
+        self.assertEqual(release.count("actions/attest@"), 3)
+        self.assertIn("Attest ESP32-P4 firmware provenance", release)
         self.assertIn("gh attestation verify", release)
         self.assertIn("provenance.sigstore.json", release)
         self.assertIn("sbom.sigstore.json", release)
@@ -366,6 +371,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("macOS-arm64.dmg", release)
         self.assertIn("Windows-x86_64.zip", release)
         self.assertIn("Android-arm64.apk", release)
+        self.assertIn("ESP32P4-v1.zip", release)
+        self.assertIn("## ESP32-P4 firmware", release)
         self.assertIn("## Android arm64", release)
         self.assertIn("CI debug-signed", release)
         self.assertIn("## Windows native", release)
