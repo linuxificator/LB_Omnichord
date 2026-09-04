@@ -1,10 +1,12 @@
 #pragma once
 
+#include "sdkconfig.h"
+
 /*
  * UI-P4 -> AMY-P4 serial link.
  */
-#define AMY_UART_BAUD              1000000
-#define AMY_UART_RX_GPIO           15
+#define AMY_UART_BAUD              CONFIG_OMNICHORD_P4_UART_BAUD
+#define AMY_UART_RX_GPIO           CONFIG_OMNICHORD_P4_UART_RX_GPIO
 
 /*
  * Shared LP-RAM message ring.
