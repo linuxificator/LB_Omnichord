@@ -327,3 +327,31 @@ physical P4 timing remain open. The next action is a hardware stress run at the
 hard real-time safe. In particular, measure publication-lock time, render
 deadline misses, heap low-water mark and worst retained-list depth while active
 64-event definitions are repeatedly edited under maximum expected FX load.
+
+### ESP-IDF compile proof
+
+The implementation was also compiled and linked with ESP-IDF 6.0.2 using the
+physically established `rework/esp32p4` v1 profile at LB commit `65d95d1` and
+the new AMY integration release at `f7101480`. The first compile exposed the
+expected API migration in the P4 application: its three assignments still used
+the retired group field names. In the temporary validation worktree they were
+mapped one-for-one as follows:
+
+| Retired field | Cumulative-sequence field |
+| --- | --- |
+| `max_sequence_groups` | `max_sequencer_tags` |
+| `max_sequence_group_tags` | `max_sequence_events` |
+| `max_sequence_group_executions` | `max_sequence_executions` |
+
+With only that integration rename, the v1 build completed, linked Gamma9001,
+and produced a merged flash image. The application binary was `0x4ad6c0` bytes
+in the 8 MiB app partition, leaving `0x352940` bytes (42%). This proves source,
+ABI-at-build-time and linker compatibility for the new reclamation code on the
+ESP32-P4 toolchain. It does not prove runtime timing, sound, heap high-water or
+physical board behavior.
+
+The field mapping was deliberately tested in a disposable worktree and was
+not committed onto the older sequencer-group P4 product branch. When that P4
+branch is rebased or merged into cumulative-sequence work, migrate its Kconfig,
+firmware contract tests and package metadata together instead of leaving old
+“group” terminology around the new fields.
