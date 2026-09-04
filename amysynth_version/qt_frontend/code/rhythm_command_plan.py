@@ -9,12 +9,11 @@ from amy_parameter_plan import format_amy_float
 
 
 ScheduledEvent = tuple[int, int, str]
-GroupedEvent = tuple[int, int, str]
+SequenceEvent = tuple[int, int, str]
 
 SEQUENCE_CONTROL_STOP = 0
 SEQUENCE_CONTROL_START = 1
 SEQUENCE_CONTROL_GATE = 2
-SEQUENCE_CONTROL_PUBLISH = 3
 
 
 class DrumEventLike(Protocol):
@@ -77,73 +76,67 @@ FillT = TypeVar("FillT", bound=FillLike)
 
 
 def sequence_control_command(
-    group: int,
+    sequence_tag: int,
     action: int,
-    value: int = 0,
-    quantize: int = 0,
-    execution_tag: int | None = None,
+    *,
+    alignment: int = 0,
+    duration: int | None = None,
 ) -> str:
-    """Encode AMY's generic sequencer-group control operation."""
+    """Encode one AMY reusable-sequence control operation."""
 
-    if int(group) <= 0:
-        raise ValueError("sequencer group tags start at 1")
-    values = [int(group), int(action), int(value), max(0, int(quantize))]
-    if execution_tag is not None:
-        values.append(int(execution_tag))
-    return f"zQ{','.join(str(item) for item in values)}Z"
+    tag_value = int(sequence_tag)
+    action_value = int(action)
+    if tag_value < 0:
+        raise ValueError("sequence tags must not be negative")
+    alignment_value = max(0, int(alignment))
+    if action_value == SEQUENCE_CONTROL_GATE:
+        if duration is None:
+            raise ValueError("sequence gate control requires a duration")
+        return f"HC{tag_value},{action_value},{max(0, int(duration))},{alignment_value}Z"
+    if action_value not in (SEQUENCE_CONTROL_STOP, SEQUENCE_CONTROL_START):
+        raise ValueError(f"unknown sequence control action {action_value}")
+    if duration is not None:
+        raise ValueError("sequence start/stop controls do not accept a duration")
+    return f"HC{tag_value},{action_value},{alignment_value}Z"
 
 
 @dataclass(frozen=True, slots=True)
-class GroupDefinitionPlan:
+class SequenceDefinitionPlan:
     commands: tuple[str, ...]
-    tag_count: int
-    high_water: int
+    event_count: int
 
 
-def compile_group_definition(
+def compile_sequence_definition(
     *,
-    group: int,
-    length: int,
-    events: Sequence[GroupedEvent],
-    previous_high_water: int = 0,
-) -> GroupDefinitionPlan:
-    """Stage and atomically publish one complete sequencer-group revision."""
+    sequence_tag: int,
+    events: Sequence[SequenceEvent],
+) -> SequenceDefinitionPlan:
+    """Replace one reusable sequence through AMY's explicit cumulative API."""
 
-    group_value = int(group)
-    length_value = int(length)
-    if group_value <= 0:
-        raise ValueError("sequencer group tags start at 1")
-    if length_value <= 0:
-        raise ValueError("sequencer group length must be positive")
+    tag_value = int(sequence_tag)
+    if tag_value < 0:
+        raise ValueError("sequence tags must not be negative")
 
-    commands: list[str] = []
-    for tag, (tick, period, body) in enumerate(events):
+    commands = [f"HR{tag_value}Z"]
+    for tick, period, body in events:
         tick_value = int(tick)
         period_value = int(period)
-        if tick_value < 0 or tick_value >= length_value:
-            raise ValueError(
-                f"group {group_value} event tick {tick_value} is outside length {length_value}"
-            )
+        if tick_value < 0:
+            raise ValueError("sequence event ticks must not be negative")
         if period_value < 0:
-            raise ValueError("grouped event period must not be negative")
+            raise ValueError("sequence event periods must not be negative")
+        if period_value and tick_value >= period_value:
+            raise ValueError(
+                f"sequence {tag_value} event tick {tick_value} must be below "
+                f"its period {period_value}"
+            )
         command_body = str(body)
         if command_body.endswith("Z"):
             command_body = command_body[:-1]
-        commands.append(
-            f"H{tick_value},{period_value},{tag},{group_value}{command_body}Z"
-        )
-
-    high_water = max(len(events), max(0, int(previous_high_water)))
-    for tag in range(len(events), high_water):
-        commands.append(f"H0,0,{tag},{group_value}Z")
-    commands.append(
-        sequence_control_command(
-            group_value,
-            SEQUENCE_CONTROL_PUBLISH,
-            length_value,
-        )
-    )
-    return GroupDefinitionPlan(tuple(commands), len(events), high_water)
+        if not command_body:
+            raise ValueError("sequence events require an AMY payload")
+        commands.append(f"HA{tag_value},{tick_value},{period_value}{command_body}Z")
+    return SequenceDefinitionPlan(tuple(commands), len(events))
 
 
 def _period_divisors(period: int) -> tuple[int, ...]:
@@ -229,32 +222,30 @@ def compile_tagged_lane(
 
 
 @dataclass(frozen=True, slots=True)
-class ChordGroupPlan:
+class ChordSequencePlan:
     definitions: tuple[str, ...]
     triggers: tuple[ScheduledEvent, ...]
-    tag_high_waters: tuple[tuple[int, int], ...]
 
 
-def compile_chord_group_plan(
+def compile_chord_sequence_plan(
     *,
     config: Mapping[str, Any] | None,
     enabled: bool,
     chord_notes: Sequence[float],
     max_chord_notes: int,
     chord_gate_beats: float,
-    group_start: int,
-    group_count: int,
-    previous_tag_high_waters: Mapping[int, int],
+    sequence_start: int,
+    sequence_count: int,
     synth: int,
     ppq: int,
-) -> ChordGroupPlan:
-    """Compile chord/arpeggio phrase groups and repeating root triggers."""
+) -> ChordSequencePlan:
+    """Compile finite chord phrases and repeating root launch events."""
 
     if not config or not enabled or not chord_notes:
-        return ChordGroupPlan((), (), ())
+        return ChordSequencePlan((), ())
     source_events = [event for event in config.get("chord_events", []) if isinstance(event, dict)]
     if not source_events:
-        return ChordGroupPlan((), (), ())
+        return ChordSequencePlan((), ())
 
     period = max(1, round(float(config["length_beats"]) * ppq))
     velocities = sorted(
@@ -264,14 +255,13 @@ def compile_chord_group_plan(
         format_amy_float(velocity): index for index, velocity in enumerate(velocities)
     }
     required = len(velocities)
-    if required > group_count:
+    if required > sequence_count:
         raise ValueError(
-            f"chord phrases need {required} AMY groups; reserved capacity is {group_count}"
+            f"chord phrases need {required} AMY sequences; reserved capacity is {sequence_count}"
         )
 
     commands: list[str] = []
     occurrences: list[tuple[int, str]] = []
-    tag_high_waters: list[tuple[int, int]] = []
     raw_arpeggio = config.get("chord_arpeggio", {})
     arpeggio = raw_arpeggio if isinstance(raw_arpeggio, dict) else {}
     if not bool(arpeggio.get("enabled", False)):
@@ -279,43 +269,39 @@ def compile_chord_group_plan(
         gate = max(1, round(chord_gate_beats * ppq))
         length = gate + 1
         for velocity_index, velocity in enumerate(velocities):
-            group = group_start + velocity_index
-            grouped_events = [
+            sequence_tag = sequence_start + velocity_index
+            sequence_events = [
                 (
                     0,
-                    length,
+                    0,
                     f"n{format_amy_float(note)}"
                     f"l{format_amy_float(velocity)}i{synth}",
                 )
                 for note in rhythm_notes
             ]
-            grouped_events.append((gate, 0, f"l0i{synth}"))
-            definition = compile_group_definition(
-                group=group,
-                length=length,
-                events=grouped_events,
-                previous_high_water=previous_tag_high_waters.get(group, 0),
+            sequence_events.append((gate, 0, f"l0i{synth}"))
+            definition = compile_sequence_definition(
+                sequence_tag=sequence_tag,
+                events=sequence_events,
             )
             commands.extend(definition.commands)
-            tag_high_waters.append((group, definition.high_water))
         for event in source_events:
             tick = round(float(event.get("time", 0.0)) * ppq)
             velocity = max(0.0, min(1.0, float(event.get("amp", 1.0))))
-            group = group_start + velocity_slots[format_amy_float(velocity)]
+            sequence_tag = sequence_start + velocity_slots[format_amy_float(velocity)]
             occurrences.append(
                 (
                     tick,
                     sequence_control_command(
-                        group,
+                        sequence_tag,
                         SEQUENCE_CONTROL_START,
-                        1,
+                        alignment=1,
                     ),
                 )
             )
-        return ChordGroupPlan(
+        return ChordSequencePlan(
             tuple(commands),
             tuple(compact_repeating_events(occurrences, period)),
-            tuple(tag_high_waters),
         )
 
     note_count = len(chord_notes)
@@ -327,44 +313,44 @@ def compile_chord_group_plan(
     if str(arpeggio.get("direction", "up")).lower() == "down":
         note_indexes.reverse()
     for velocity_index, velocity in enumerate(velocities):
-        group = group_start + velocity_index
-        grouped_events = []
+        sequence_tag = sequence_start + velocity_index
+        sequence_events = []
         for sequence_index, note_index in enumerate(note_indexes):
             note_text = format_amy_float(chord_notes[note_index])
             start_tick = sequence_index * step
-            grouped_events.extend(
+            sequence_events.extend(
                 (
                     (
                         start_tick,
-                        length if start_tick == 0 else 0,
+                        0,
                         f"n{note_text}l{format_amy_float(velocity)}i{synth}",
                     ),
                     (start_tick + gate, 0, f"n{note_text}l0i{synth}"),
                 )
             )
-        definition = compile_group_definition(
-            group=group,
-            length=length,
-            events=grouped_events,
-            previous_high_water=previous_tag_high_waters.get(group, 0),
+        definition = compile_sequence_definition(
+            sequence_tag=sequence_tag,
+            events=sequence_events,
         )
         commands.extend(definition.commands)
-        tag_high_waters.append((group, definition.high_water))
     for event in source_events:
         start_tick = round(float(event.get("time", 0.0)) * ppq)
         velocity = max(0.0, min(1.0, float(event.get("amp", 1.0))))
         velocity_index = velocity_slots[format_amy_float(velocity)]
-        group = group_start + velocity_index
+        sequence_tag = sequence_start + velocity_index
         occurrences.append(
             (
                 start_tick,
-                sequence_control_command(group, SEQUENCE_CONTROL_START, 1),
+                sequence_control_command(
+                    sequence_tag,
+                    SEQUENCE_CONTROL_START,
+                    alignment=1,
+                ),
             )
         )
-    return ChordGroupPlan(
+    return ChordSequencePlan(
         tuple(commands),
         tuple(compact_repeating_events(occurrences, period)),
-        tuple(tag_high_waters),
     )
 
 
@@ -451,23 +437,21 @@ def drum_quantum(rhythm: RhythmLike) -> int:
 
 
 @dataclass(frozen=True, slots=True)
-class DrumGroupPlan:
+class DrumSequencePlan:
     commands: tuple[str, ...]
-    tag_high_waters: tuple[tuple[int, int], ...]
 
 
-def compile_drum_activity_groups(
+def compile_drum_activity_sequences(
     *,
     rhythm: RhythmLike,
     percussion_activity: int,
     roles: Sequence[str],
-    group_start: int,
-    previous_tag_high_waters: Mapping[int, int],
+    sequence_start: int,
     rhythm_running: bool,
     quantize_live: bool,
     hit_body: DrumHitBody,
-) -> DrumGroupPlan:
-    """Compile role phrase groups and optional quantized replacements."""
+) -> DrumSequencePlan:
+    """Compile periodic role sequences and optional quantized replacements."""
 
     level_index = max(0, min(4, int(percussion_activity) - 1))
     by_role: dict[str, list[DrumEventLike]] = {}
@@ -476,96 +460,82 @@ def compile_drum_activity_groups(
     length = rhythm.period_ticks // 2
     quantum = drum_quantum(rhythm) if quantize_live else 0
     commands: list[str] = []
-    tag_high_waters: list[tuple[int, int]] = []
     for role_index, role in enumerate(roles):
-        group = group_start + role_index
+        sequence_tag = sequence_start + role_index
         events = by_role.get(role, [])
-        if not events:
-            if rhythm_running:
-                commands.append(
-                    sequence_control_command(
-                        group,
-                        SEQUENCE_CONTROL_STOP,
-                        0,
-                        quantum,
-                        group,
-                    )
-                )
-            continue
-        grouped_events: list[GroupedEvent] = []
+        sequence_events: list[SequenceEvent] = []
         for event in events:
             event_tick = event.tick // 2
-            event_period = length if event_tick == 0 else 0
-            grouped_events.append(
+            sequence_events.append(
                 (
                     event_tick,
-                    event_period,
+                    length,
                     hit_body(rhythm.rhythm_id, role, event.velocity, fill=False),
                 )
             )
-        definition = compile_group_definition(
-            group=group,
-            length=length,
-            events=grouped_events,
-            previous_high_water=previous_tag_high_waters.get(group, 0),
+        definition = compile_sequence_definition(
+            sequence_tag=sequence_tag,
+            events=sequence_events,
         )
         commands.extend(definition.commands)
-        tag_high_waters.append((group, definition.high_water))
         if rhythm_running:
             commands.append(
                 sequence_control_command(
-                    group,
-                    SEQUENCE_CONTROL_START,
-                    0,
-                    quantum,
-                    group,
+                    sequence_tag,
+                    SEQUENCE_CONTROL_STOP,
+                    alignment=quantum,
                 )
             )
-    return DrumGroupPlan(tuple(commands), tuple(tag_high_waters))
+            if events:
+                commands.append(
+                    sequence_control_command(
+                        sequence_tag,
+                        SEQUENCE_CONTROL_START,
+                        alignment=quantum,
+                    )
+                )
+    return DrumSequencePlan(tuple(commands))
 
 
-def compile_fill_group(
+def compile_fill_sequence(
     *,
     rhythm_id: str,
     fill: FillLike,
-    group: int,
+    sequence_tag: int,
     roles: Sequence[str],
     role_indexes: Mapping[str, int],
-    drum_group_start: int,
+    drum_sequence_start: int,
     hit_body: DrumHitBody,
-) -> GroupDefinitionPlan:
-    """Compile one persistent fill phrase group."""
+) -> SequenceDefinitionPlan:
+    """Compile one persistent finite fill sequence."""
 
     length = fill.duration_ticks // 2
-    events: list[GroupedEvent] = []
+    events: list[SequenceEvent] = []
     for role in roles:
         if role in fill.continue_roles:
             continue
-        role_group = drum_group_start + role_indexes[role]
+        role_sequence = drum_sequence_start + role_indexes[role]
         events.append(
             (
                 0,
-                length,
+                0,
                 sequence_control_command(
-                    role_group,
+                    role_sequence,
                     SEQUENCE_CONTROL_GATE,
-                    length,
-                    0,
-                    role_group,
+                    duration=length,
                 ),
             )
         )
     for event in fill.events:
         event_tick = event.tick // 2
-        event_period = length if event_tick == 0 else 0
         events.append(
             (
                 event_tick,
-                event_period,
+                0,
                 hit_body(rhythm_id, event.role, event.velocity, fill=True),
             )
         )
-    return compile_group_definition(group=group, length=length, events=events)
+    return compile_sequence_definition(sequence_tag=sequence_tag, events=events)
 
 
 def fill_occurrences(
@@ -606,7 +576,7 @@ def compile_fill_schedule(
     lane_start: int,
     lane_count: int,
     previous_high_water: int,
-    group_tag: Callable[[FillT], int],
+    sequence_tag: Callable[[FillT], int],
 ) -> FillSchedulePlan:
     """Compile a repeating fill cycle and stale-tag clears."""
 
@@ -628,9 +598,9 @@ def compile_fill_schedule(
                 offset,
                 period,
                 sequence_control_command(
-                    group_tag(fill),
+                    sequence_tag(fill),
                     SEQUENCE_CONTROL_START,
-                    1,
+                    alignment=1,
                 ),
             )
         )

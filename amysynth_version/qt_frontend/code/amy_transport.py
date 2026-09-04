@@ -22,9 +22,9 @@ from drum_patterns import (
 from rhythm_command_plan import (
     compact_repeating_events,
     compile_bass_events,
-    compile_chord_group_plan,
-    compile_drum_activity_groups,
-    compile_fill_group,
+    compile_chord_sequence_plan,
+    compile_drum_activity_sequences,
+    compile_fill_sequence,
     compile_fill_schedule,
     compile_tagged_lane,
     drum_quantum,
@@ -399,24 +399,20 @@ class AmySerialClient:
                 }
             )
         )
-        self._group_ranges = {
+        self._sequence_ranges = {
             name: (start, count)
-            for name, start, count in resolved_config.layout.sequencer_group_ranges
+            for name, start, count in resolved_config.layout.sequencer_sequence_ranges
         }
-        _, drum_group_count = self._group_ranges["drum_bases"]
-        if len(self._drum_roles) > drum_group_count:
-            raise ValueError("logical drum roles exceed reserved AMY group slots")
+        _, drum_sequence_count = self._sequence_ranges["drum_bases"]
+        if len(self._drum_roles) > drum_sequence_count:
+            raise ValueError("logical drum roles exceed reserved AMY sequence slots")
         self._drum_role_index = {role: index for index, role in enumerate(self._drum_roles)}
-        # High-water marks only grow. If an asynchronous definition update is
-        # superseded, a later transaction may clear extra local tags but can
-        # never overlook a tag still present in AMY.
-        self._group_tag_high_waters: dict[int, int] = {}
 
         tag_config = {
             name: (start, count)
             for name, start, count in resolved_config.layout.sequencer_tag_ranges
         }
-        max_tags = resolved_config.rhythm.max_sequencer_tags
+        max_tags = resolved_config.capacities.max_sequencer_tags
         self._sequencer_lanes: dict[str, _TaggedSequencerLane] = {}
         occupied: set[int] = set()
         for lane_name in ("drums", "bass", "chords"):
@@ -517,22 +513,12 @@ class AmySerialClient:
         preset = "" if sound.preset is None else f"p{sound.preset}"
         return f"{preset}n{self._f(float(sound.note))}l{self._f(level)}i{self.synth_id['drums']}"
 
-    def _fill_group_tag(self, fill: DrumFill) -> int:
-        start, count = self._group_ranges["fills"]
-        group = start + int(fill.index) - 1
-        if not start <= group < start + count:
+    def _fill_sequence_tag(self, fill: DrumFill) -> int:
+        start, count = self._sequence_ranges["fills"]
+        sequence_tag = start + int(fill.index) - 1
+        if not start <= sequence_tag < start + count:
             raise ValueError(f"fill {fill.fill_id!r} has unsupported index {fill.index}")
-        return group
-
-    def _remember_group_tag_high_waters(
-        self,
-        values: tuple[tuple[int, int], ...],
-    ) -> None:
-        for group, high_water in values:
-            self._group_tag_high_waters[group] = max(
-                self._group_tag_high_waters.get(group, 0),
-                high_water,
-            )
+        return sequence_tag
 
     def _preload_drum_library(self) -> None:
         """Author every fill once; runtime changes only schedule definitions."""
@@ -542,26 +528,25 @@ class AmySerialClient:
             for fill in rhythm.fills
         }
         for _, (rhythm_id, fill) in sorted(fills.items()):
-            group = self._fill_group_tag(fill)
-            drum_base, _ = self._group_ranges["drum_bases"]
-            definition = compile_fill_group(
+            sequence_tag = self._fill_sequence_tag(fill)
+            drum_base, _ = self._sequence_ranges["drum_bases"]
+            definition = compile_fill_sequence(
                 rhythm_id=rhythm_id,
                 fill=fill,
-                group=group,
+                sequence_tag=sequence_tag,
                 roles=self._drum_roles,
                 role_indexes=self._drum_role_index,
-                drum_group_start=drum_base,
+                drum_sequence_start=drum_base,
                 hit_body=self._drum_hit_body,
             )
             if (
-                definition.tag_count
-                > self.resolved_config.capacities.max_sequence_group_tags
+                definition.event_count
+                > self.resolved_config.capacities.max_sequence_events
             ):
                 raise ValueError(
-                    f"fill {fill.fill_id!r} needs {definition.tag_count} "
-                    "AMY sequence-group tags"
+                    f"fill {fill.fill_id!r} needs {definition.event_count} "
+                    "AMY sequence events"
                 )
-            self._remember_group_tag_high_waters(((group, definition.high_water),))
             writer = getattr(self, "writer", None)
             high_many = getattr(writer, "high_many", None)
             if callable(high_many):
@@ -1095,35 +1080,33 @@ class AmySerialClient:
             return AMY_PPQ
         return max(1, round(float(config["length_beats"]) * AMY_PPQ))
 
-    def _chord_group_plan(
+    def _chord_sequence_plan(
     self,
     ) -> tuple[list[str], list[tuple[int, int, str]]]:
-        """Build note-owner groups and repeating root triggers.
+        """Build note-owner sequences and repeating root triggers.
 
         The pure planner keeps each note's matching release in its immutable
         one-shot revision. Replacing a root schedule therefore cannot shorten
         an already-sounding arpeggio note.
         """
         rhythm_cfg = self.resolved_config.rhythm
-        group_start, group_count = self._group_ranges["chords"]
-        plan = compile_chord_group_plan(
+        sequence_start, sequence_count = self._sequence_ranges["chords"]
+        plan = compile_chord_sequence_plan(
             config=self.rhythm_config,
             enabled=self.rhythm_chord_enabled,
             chord_notes=self.chord_notes,
             max_chord_notes=rhythm_cfg.max_rhythm_chord_notes,
             chord_gate_beats=rhythm_cfg.chord_gate_beats,
-            group_start=group_start,
-            group_count=group_count,
-            previous_tag_high_waters=self._group_tag_high_waters,
+            sequence_start=sequence_start,
+            sequence_count=sequence_count,
             synth=self.synth_id["rhythm_chord"],
             ppq=AMY_PPQ,
         )
-        self._remember_group_tag_high_waters(plan.tag_high_waters)
         return list(plan.definitions), list(plan.triggers)
 
     def _lane_events(self, lane_name: str) -> list[tuple[int, int, str]]:
         if lane_name == "drums":
-            # Percussion uses sequence groups; this lane carries fill triggers.
+            # Percussion uses reusable sequences; this lane carries fill triggers.
             return []
         if lane_name == "bass":
             rhythm_cfg = self.resolved_config.rhythm
@@ -1139,7 +1122,7 @@ class AmySerialClient:
                 )
             )
         if lane_name == "chords":
-            return self._chord_group_plan()[1]
+            return self._chord_sequence_plan()[1]
         raise KeyError(lane_name)
 
     def _drum_quantum(self) -> int:
@@ -1160,18 +1143,16 @@ class AmySerialClient:
         use_live_quantization = (
             self.rhythm_running if quantize_live is None else bool(quantize_live)
         )
-        drum_base, _ = self._group_ranges["drum_bases"]
-        plan = compile_drum_activity_groups(
+        drum_base, _ = self._sequence_ranges["drum_bases"]
+        plan = compile_drum_activity_sequences(
             rhythm=rhythm,
             percussion_activity=int(config.get("percussion_activity", 1)),
             roles=self._drum_roles,
-            group_start=drum_base,
-            previous_tag_high_waters=self._group_tag_high_waters,
+            sequence_start=drum_base,
             rhythm_running=self.rhythm_running,
             quantize_live=use_live_quantization,
             hit_body=self._drum_hit_body,
         )
-        self._remember_group_tag_high_waters(plan.tag_high_waters)
         return list(plan.commands)
 
     @staticmethod
@@ -1205,7 +1186,7 @@ class AmySerialClient:
             lane_start=lane.start,
             lane_count=lane.count,
             previous_high_water=lane.high_water,
-            group_tag=self._fill_group_tag,
+            sequence_tag=self._fill_sequence_tag,
         )
         lane.high_water = plan.high_water
         return list(plan.commands)
@@ -1305,8 +1286,8 @@ class AmySerialClient:
                     self.writer.low("drums", generation, command)
             elif lane_name == "chords":
                 generation = self.writer.new_low_generation("chords")
-                group_commands, events = self._chord_group_plan()
-                for command in group_commands + lane.commands(events):
+                sequence_commands, events = self._chord_sequence_plan()
+                for command in sequence_commands + lane.commands(events):
                     self.writer.low("chords", generation, command)
             else:
                 lane.enqueue(self._lane_events(lane_name))
@@ -1351,8 +1332,8 @@ class AmySerialClient:
             lane = self._sequencer_lanes[lane_name]
             try:
                 if lane_name == "chords":
-                    group_commands, events = self._chord_group_plan()
-                    commands.extend(group_commands)
+                    sequence_commands, events = self._chord_sequence_plan()
+                    commands.extend(sequence_commands)
                 else:
                     events = self._lane_events(lane_name)
                 commands.extend(lane.commands(events))
@@ -1435,10 +1416,10 @@ class AmySerialClient:
         if self.rhythm_running:
             return
         self.rhythm_running = True
-        # Stored group definitions survive RESET_SEQUENCER, while executions
-        # and old root H events do not. Starting is therefore a clean transport
-        # boundary even after an earlier stop mid-phrase.
-        self._wire(f"S{RESET_TIMEBASE | RESET_SEQUENCER}Z")
+        # Reset the AMY clock and discard old executions while retaining the
+        # preloaded reusable definitions. The deterministic root-tag lanes
+        # below replace or clear every future launch event they own.
+        self._wire(f"S{RESET_TIMEBASE}Z")
         # Reset is an ordinary AMY event and takes effect at the next audio
         # block boundary, whereas group control is handled immediately on
         # ingest. Keep new executions behind several 128-sample blocks so reset can
@@ -1538,6 +1519,7 @@ class AmySerialClient:
 
         self._configured_synths.clear()
         self._configure_fixed_synths()
+        self._preload_drum_library()
 
         if self.rhythm_config is not None:
             tempo = float(self.rhythm_config.get("tempo", 108.0))

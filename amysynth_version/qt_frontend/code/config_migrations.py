@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 7
+CURRENT_CONFIG_REVISION = 8
 JsonObject = dict[str, Any]
 
 
@@ -304,6 +304,76 @@ def _revision_six_to_seven(data: JsonObject) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def _revision_seven_to_eight(data: JsonObject) -> tuple[str, ...]:
+    """Move stored sequences into AMY's shared sequencer-tag namespace."""
+
+    rhythm = data.get("rhythm")
+    if not isinstance(rhythm, dict):
+        raise ConfigMigrationError(
+            "$.rhythm",
+            "must be an object before revision 7 can migrate",
+        )
+    group_ranges = rhythm.pop("group_ranges", None)
+    if not isinstance(group_ranges, dict):
+        raise ConfigMigrationError(
+            "$.rhythm.group_ranges",
+            "must be an object before revision 7 can migrate",
+        )
+    root_tag_capacity = rhythm.pop("max_sequencer_tags", None)
+    if not isinstance(root_tag_capacity, int) or root_tag_capacity < 1:
+        raise ConfigMigrationError(
+            "$.rhythm.max_sequencer_tags",
+            "must be a positive integer before revision 7 can migrate",
+        )
+
+    sequence_ranges: JsonObject = {}
+    for name in ("fills", "chords", "drum_bases"):
+        item = group_ranges.get(name)
+        if not isinstance(item, dict):
+            raise ConfigMigrationError(
+                f"$.rhythm.group_ranges.{name}",
+                "must be an object before revision 7 can migrate",
+            )
+        sequence_ranges[name] = {
+            "start": root_tag_capacity + int(item["start"]) - 1,
+            "count": int(item["count"]),
+        }
+    rhythm["sequence_ranges"] = sequence_ranges
+
+    required = (
+        "amy_max_sequence_groups",
+        "amy_max_sequence_group_tags",
+        "amy_max_sequence_group_executions",
+    )
+    for name in required:
+        if name not in data:
+            raise ConfigMigrationError(
+                f"$.{name}",
+                "must be present before revision 7 can migrate",
+            )
+    group_capacity = int(data.pop("amy_max_sequence_groups"))
+    data["amy_max_sequencer_tags"] = root_tag_capacity + group_capacity
+    data["amy_max_sequence_events"] = int(
+        data.pop("amy_max_sequence_group_tags")
+    )
+    data["amy_max_sequence_executions"] = int(
+        data.pop("amy_max_sequence_group_executions")
+    )
+    data["config_revision"] = 8
+    return (
+        "$.rhythm.max_sequencer_tags",
+        "$.rhythm.group_ranges",
+        "$.rhythm.sequence_ranges",
+        "$.amy_max_sequence_groups",
+        "$.amy_max_sequence_group_tags",
+        "$.amy_max_sequence_group_executions",
+        "$.amy_max_sequencer_tags",
+        "$.amy_max_sequence_events",
+        "$.amy_max_sequence_executions",
+        "$.config_revision",
+    )
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
@@ -315,6 +385,7 @@ MIGRATIONS: dict[int, Migration] = {
     4: _revision_four_to_five,
     5: _revision_five_to_six,
     6: _revision_six_to_seven,
+    7: _revision_seven_to_eight,
 }
 
 

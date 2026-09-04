@@ -46,9 +46,9 @@ def main() -> int:
         if args.max_oscs is None
         else args.max_oscs
     )
-    max_sequence_groups = config.capacities.max_sequence_groups
-    max_sequence_group_tags = config.capacities.max_sequence_group_tags
-    max_sequence_group_executions = config.capacities.max_sequence_group_executions
+    max_sequencer_tags = config.capacities.max_sequencer_tags
+    max_sequence_events = config.capacities.max_sequence_events
+    max_sequence_executions = config.capacities.max_sequence_executions
     if max_buses < 11:
         raise ValueError("LB Omnichord requires at least 11 AMY buses")
     args.socket = args.socket.expanduser().resolve()
@@ -67,9 +67,9 @@ def main() -> int:
         default_synths=0,
         max_buses=max_buses,
         max_oscs=max_oscs,
-        max_sequence_groups=max_sequence_groups,
-        max_sequence_group_tags=max_sequence_group_tags,
-        max_sequence_group_executions=max_sequence_group_executions,
+        max_sequencer_tags=max_sequencer_tags,
+        max_sequence_events=max_sequence_events,
+        max_sequence_executions=max_sequence_executions,
     )
 
     running = True
