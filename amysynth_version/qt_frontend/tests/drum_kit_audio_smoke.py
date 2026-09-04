@@ -66,9 +66,9 @@ def main() -> int:
         default_synths=0,
         max_buses=11,
         max_oscs=336,
-        max_sequence_groups=1024,
-        max_sequence_group_tags=64,
-        max_sequence_group_executions=40,
+        max_sequencer_tags=1280,
+        max_sequence_events=64,
+        max_sequence_executions=40,
     )
     try:
         amy.send_wire("S12288Z")

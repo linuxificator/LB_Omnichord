@@ -313,6 +313,36 @@ def _revision_seven_to_eight(data: JsonObject) -> tuple[str, ...]:
             "$.rhythm",
             "must be an object before revision 7 can migrate",
         )
+    if (
+        isinstance(rhythm.get("sequence_ranges"), dict)
+        and all(
+            name in data
+            for name in (
+                "amy_max_sequencer_tags",
+                "amy_max_sequence_events",
+                "amy_max_sequence_executions",
+            )
+        )
+    ):
+        # A current-format file whose revision marker was removed has already
+        # passed through the older additive migrations. Discard only the
+        # intermediate legacy fields those migrations may have reconstructed.
+        changed: list[str] = []
+        for name in ("group_ranges", "max_sequencer_tags"):
+            if name in rhythm:
+                rhythm.pop(name)
+                changed.append(f"$.rhythm.{name}")
+        for name in (
+            "amy_max_sequence_groups",
+            "amy_max_sequence_group_tags",
+            "amy_max_sequence_group_executions",
+        ):
+            if name in data:
+                data.pop(name)
+                changed.append(f"$.{name}")
+        data["config_revision"] = 8
+        changed.append("$.config_revision")
+        return tuple(changed)
     group_ranges = rhythm.pop("group_ranges", None)
     if not isinstance(group_ranges, dict):
         raise ConfigMigrationError(

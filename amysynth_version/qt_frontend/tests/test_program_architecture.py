@@ -163,14 +163,14 @@ class ProgramArchitectureTests(unittest.TestCase):
         self.assertEqual(preload_owners, ["__init__"])
 
         # Beat-accurate phrases are pure wire plans. Host scheduling remains
-        # valid for manual strum/tail ownership, but not for rhythm groups.
+        # valid for manual strum/tail ownership, but not for rhythm sequences.
         self.assertFalse(any(
             isinstance(node, (ast.Import, ast.ImportFrom))
             and any(alias.name in {"time", "threading"} for alias in node.names)
             for node in planner_tree.body
         ))
         rhythm_methods = (
-            "_chord_group_plan",
+            "_chord_sequence_plan",
             "_drum_activity_commands",
             "_fill_schedule_commands",
             "_drum_commands",
@@ -191,14 +191,14 @@ class ProgramArchitectureTests(unittest.TestCase):
                     for node in ast.walk(method)
                 ))
 
-        # LB keeps definition-authoring high-water marks, never AMY execution
-        # phase, definition revisions or generation ownership.
+        # LB keeps only root-lane replacement high-water marks, never AMY
+        # sequence execution phase, revisions or generation ownership.
         for forbidden in (
             "current_amy_tick",
             "amy_sequencer_tick",
-            "group_execution_generation",
-            "active_group_revision",
-            "group_end_tick",
+            "sequence_execution_generation",
+            "active_sequence_revision",
+            "sequence_end_tick",
         ):
             self.assertNotIn(forbidden, transport_source)
             self.assertNotIn(forbidden, planner_source)

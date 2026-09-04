@@ -1506,11 +1506,13 @@ class AmySerialClient:
         self._manual_active_notes = []
         self._scheduled_rhythm_id = None
 
-        # Stop transport first, then reset both sequencer and complete
-        # oscillator/instrument allocation.  RESET_ALL_OSCS also guarantees
-        # that a synth which had failed or disappeared is genuinely gone.
+        # Stop transport first, discard active sequence executions and reset
+        # complete oscillator/instrument allocation. RESET_TIMEBASE deliberately
+        # retains the reusable fill catalogue; deterministic root lanes are
+        # replaced before transport starts again. RESET_ALL_OSCS guarantees that
+        # a synth which had failed or disappeared is genuinely gone.
         self._wire("zY0Z")
-        self._wire(f"S{RESET_SEQUENCER | RESET_ALL_OSCS}Z")
+        self._wire(f"S{RESET_TIMEBASE | RESET_ALL_OSCS}Z")
 
         # 128 samples / 48 kHz = 2.667 ms.  20 ms crosses more than seven
         # render boundaries before definitions are recreated.  This delay is
@@ -1519,7 +1521,6 @@ class AmySerialClient:
 
         self._configured_synths.clear()
         self._configure_fixed_synths()
-        self._preload_drum_library()
 
         if self.rhythm_config is not None:
             tempo = float(self.rhythm_config.get("tempo", 108.0))

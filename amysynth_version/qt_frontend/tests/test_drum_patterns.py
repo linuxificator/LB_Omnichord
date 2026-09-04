@@ -27,7 +27,7 @@ from drum_patterns import (  # noqa: E402
 from config_loader import load_resolved_amy_config  # noqa: E402
 from rhythm_command_plan import (  # noqa: E402
     SEQUENCE_CONTROL_GATE,
-    compile_fill_group,
+    compile_fill_sequence,
     sequence_control_command,
 )
 
@@ -56,13 +56,12 @@ class DrumPatternTests(unittest.TestCase):
     def client(self) -> AmySerialClient:
         client = AmySerialClient.__new__(AmySerialClient)
         client.resolved_config = self.resolved_config
-        client._group_ranges = {
+        client._sequence_ranges = {
             name: (start, count)
             for name, start, count in (
-                self.resolved_config.layout.sequencer_group_ranges
+                self.resolved_config.layout.sequencer_sequence_ranges
             )
         }
-        client._group_tag_high_waters = {}
         client.drum_catalog = self.catalog
         client.drum_kit = "tiny"
         client.synth_id = {"drums": 0}
@@ -159,26 +158,26 @@ class DrumPatternTests(unittest.TestCase):
         authored_events = [
             command
             for command in commands
-            if command.startswith("H") and command.count(",") >= 3
+            if command.startswith("HA")
         ]
         self.assertEqual(len(authored_events), len(pop.levels[1]))
         self.assertNotEqual(
             len(authored_events),
             len(pop.levels[0]) + len(pop.levels[1]),
         )
-        self.assertTrue(any(re.match(r"^zQ\d+,1,0,", command) for command in commands))
-        group_length = pop.period_ticks // 2
+        self.assertTrue(any(re.match(r"^HC\d+,1,", command) for command in commands))
+        sequence_period = pop.period_ticks // 2
         for command in authored_events:
-            match = re.match(r"^H(\d+),(\d+),\d+,\d+", command)
+            match = re.match(r"^HA\d+,(\d+),(\d+)", command)
             self.assertIsNotNone(match, command)
             assert match is not None
             tick, period = (int(value) for value in match.groups())
-            self.assertEqual(period, group_length if tick == 0 else 0)
+            self.assertEqual(period, sequence_period)
 
-    def test_grouped_activity_preserves_every_catalogue_event_exactly(self) -> None:
+    def test_sequence_activity_preserves_every_catalogue_event_exactly(self) -> None:
         event_pattern = re.compile(
-            r"^H(?P<tick>\d+),(?P<period>\d+),(?P<tag>\d+),"
-            r"(?P<group>\d+)(?P<body>.+)Z$"
+            r"^HA(?P<sequence>\d+),(?P<tick>\d+),(?P<period>\d+)"
+            r"(?P<body>.+)Z$"
         )
         for rhythm in self.catalog.rhythms.values():
             for level_index, level in enumerate(rhythm.levels, start=1):
@@ -196,10 +195,9 @@ class DrumPatternTests(unittest.TestCase):
                     if match is not None:
                         actual.append(
                             (
-                                int(match.group("group")),
+                                int(match.group("sequence")),
                                 int(match.group("tick")),
                                 int(match.group("period")),
-                                int(match.group("tag")),
                                 match.group("body"),
                             )
                         )
@@ -210,15 +208,14 @@ class DrumPatternTests(unittest.TestCase):
                 for event in level:
                     by_role.setdefault(event.role, []).append(event)
                 for role_index, role in enumerate(client._drum_roles):
-                    group = 1001 + role_index
-                    for tag, event in enumerate(by_role.get(role, [])):
+                    sequence_tag = 1256 + role_index
+                    for event in by_role.get(role, []):
                         tick = event.tick // 2
                         expected.append(
                             (
-                                group,
+                                sequence_tag,
                                 tick,
-                                length if tick == 0 else 0,
-                                tag,
+                                length,
                                 client._drum_hit_body(
                                     rhythm.rhythm_id,
                                     role,
@@ -229,22 +226,22 @@ class DrumPatternTests(unittest.TestCase):
                         )
                 self.assertEqual(actual, expected, (rhythm.rhythm_id, level_index))
 
-    def test_grouped_fills_preserve_events_and_only_add_generic_gates(self) -> None:
+    def test_fill_sequences_preserve_events_and_only_add_generic_gates(self) -> None:
         event_pattern = re.compile(
-            r"^H(?P<tick>\d+),(?P<period>\d+),(?P<tag>\d+),"
-            r"(?P<group>\d+)(?P<body>.+)Z$"
+            r"^HA(?P<sequence>\d+),(?P<tick>\d+),(?P<period>\d+)"
+            r"(?P<body>.+)Z$"
         )
         client = self.client()
         for rhythm in self.catalog.rhythms.values():
             for fill in rhythm.fills:
-                group = client._fill_group_tag(fill)
-                definition = compile_fill_group(
+                sequence_tag = client._fill_sequence_tag(fill)
+                definition = compile_fill_sequence(
                     rhythm_id=rhythm.rhythm_id,
                     fill=fill,
-                    group=group,
+                    sequence_tag=sequence_tag,
                     roles=client._drum_roles,
                     role_indexes=client._drum_role_index,
-                    drum_group_start=1001,
+                    drum_sequence_start=1256,
                     hit_body=client._drum_hit_body,
                 )
                 actual = []
@@ -255,36 +252,30 @@ class DrumPatternTests(unittest.TestCase):
                             (
                                 int(match.group("tick")),
                                 int(match.group("period")),
-                                int(match.group("tag")),
-                                int(match.group("group")),
+                                int(match.group("sequence")),
                                 match.group("body"),
                             )
                         )
 
                 length = fill.duration_ticks // 2
                 expected = []
-                tag = 0
                 for role in client._drum_roles:
                     if role in fill.continue_roles:
                         continue
-                    role_group = 1001 + client._drum_role_index[role]
+                    role_sequence = 1256 + client._drum_role_index[role]
                     gate = sequence_control_command(
-                        role_group,
+                        role_sequence,
                         SEQUENCE_CONTROL_GATE,
-                        length,
-                        0,
-                        role_group,
+                        duration=length,
                     )[:-1]
-                    expected.append((0, length, tag, group, gate))
-                    tag += 1
+                    expected.append((0, 0, sequence_tag, gate))
                 for event in fill.events:
                     tick = event.tick // 2
                     expected.append(
                         (
                             tick,
-                            length if tick == 0 else 0,
-                            tag,
-                            group,
+                            0,
+                            sequence_tag,
                             client._drum_hit_body(
                                 rhythm.rhythm_id,
                                 event.role,
@@ -293,11 +284,10 @@ class DrumPatternTests(unittest.TestCase):
                             ),
                         )
                     )
-                    tag += 1
 
                 self.assertEqual(actual, expected, fill.fill_id)
                 self.assertFalse(
-                    any(re.match(r"^zQ\d+,1,", body) for *_, body in actual),
+                    any(re.match(r"^HC\d+,1,", body) for *_, body in actual),
                     fill.fill_id,
                 )
 
@@ -384,59 +374,49 @@ class DrumPatternTests(unittest.TestCase):
         self.assertTrue(general_midi.startswith("n36"))
         self.assertNotIn("p258", general_midi)
 
-    def test_preloaded_library_fits_64_events_and_uses_all_fill_groups(self) -> None:
+    def test_preloaded_library_fits_64_events_and_uses_all_fill_sequences(self) -> None:
         client = self.client()
         commands: list[str] = []
         client._wire = commands.append  # type: ignore[method-assign]
         client._preload_drum_library()
-        publishes = [
-            command for command in commands if re.match(r"^zQ\d+,3,", command)
+        resets = [
+            command for command in commands if re.match(r"^HR\d+Z$", command)
         ]
-        self.assertEqual(len(publishes), 270)
-        self.assertIn("zQ1,3,48,0Z", publishes)
-        self.assertTrue(any(command.startswith("zQ270,3,") for command in publishes))
+        self.assertEqual(len(resets), 270)
+        self.assertIn("HR256Z", resets)
+        self.assertIn("HR525Z", resets)
 
-        current_count = 0
-        current_length = 0
-        maximum = 0
+        counts: dict[int, int] = {}
         for command in commands:
-            if command.startswith("H"):
-                match = re.match(r"^H(\d+),(\d+),\d+,\d+", command)
+            if command.startswith("HA"):
+                match = re.match(r"^HA(\d+),(\d+),(\d+)", command)
                 self.assertIsNotNone(match, command)
                 assert match is not None
-                tick, period = (int(value) for value in match.groups())
-                current_count += 1
-            elif (publish := re.match(r"^zQ\d+,3,(\d+),0Z$", command)):
-                current_length = int(publish.group(1))
-                group_events = commands[commands.index(command) - current_count : commands.index(command)]
-                for event_command in group_events:
-                    event_match = re.match(r"^H(\d+),(\d+),", event_command)
-                    assert event_match is not None
-                    tick, period = (int(value) for value in event_match.groups())
-                    self.assertEqual(period, current_length if tick == 0 else 0)
-                maximum = max(maximum, current_count)
-                self.assertLessEqual(current_count, 64)
-                current_count = 0
-        self.assertGreater(maximum, 0)
+                tag, _tick, period = (int(value) for value in match.groups())
+                self.assertEqual(period, 0)
+                counts[tag] = counts.get(tag, 0) + 1
+        self.assertEqual(set(counts), set(range(256, 526)))
+        self.assertLessEqual(max(counts.values()), 64)
 
     def test_fill_policy_is_encoded_as_generic_role_tag_mutes(self) -> None:
         client = self.client()
         commands: list[str] = []
         client._wire = commands.append  # type: ignore[method-assign]
         client._preload_drum_library()
-        first_commit = commands.index("zQ1,3,48,0Z")
-        first = commands[:first_commit]
+        first_start = commands.index("HR256Z")
+        first_end = commands.index("HR257Z")
+        first = commands[first_start:first_end]
         fill = self.catalog.rhythm("pop_8").fills[0]
         length = fill.duration_ticks // 2
         for role in client._drum_roles:
-            tag = 1001 + client._drum_role_index[role]
+            tag = 1256 + client._drum_role_index[role]
             mute_commands = [
-                command for command in first if f"zQ{tag},2,{length},0,{tag}" in command
+                command for command in first if f"HC{tag},2,{length},0" in command
             ]
             muted = bool(mute_commands)
             self.assertEqual(muted, role not in fill.continue_roles)
             for command in mute_commands:
-                self.assertRegex(command, rf"^H0,{length},\d+,1zQ{tag},2,")
+                self.assertRegex(command, rf"^HA256,0,0HC{tag},2,")
 
     def test_fill_order_and_allowed_starts_form_a_finite_supercycle(self) -> None:
         client = self.client()
@@ -457,7 +437,7 @@ class DrumPatternTests(unittest.TestCase):
             len(occurrences),
         )
         self.assertTrue(all(
-            f",{index}zQ" in command
+            f",{index}HC" in command
             for index, command in enumerate(
                 command for command in commands if command.startswith("H")
             )
@@ -474,15 +454,13 @@ class DrumPatternTests(unittest.TestCase):
 
         cold = client._drum_commands(quantize_live=False)
         live = client._drum_commands(quantize_live=True)
-        cold_triggers = [line for line in cold if re.match(r"^zQ\d+,1,0,", line)]
-        live_triggers = [line for line in live if re.match(r"^zQ\d+,1,0,", line)]
-        cold_roots = [line for line in cold if line.startswith("H") and "zQ" in line]
-        live_roots = [line for line in live if line.startswith("H") and "zQ" in line]
+        cold_triggers = [line for line in cold if re.match(r"^HC\d+,1,0Z$", line)]
+        live_triggers = [line for line in live if re.match(r"^HC\d+,1,192Z$", line)]
+        cold_roots = [line for line in cold if re.match(r"^H\d", line) and "HC" in line]
+        live_roots = [line for line in live if re.match(r"^H\d", line) and "HC" in line]
 
         self.assertTrue(cold_triggers)
         self.assertTrue(cold_roots)
-        self.assertTrue(all(line.split(",")[3] == "0" for line in cold_triggers))
-        self.assertTrue(all(line.split(",")[3] == "192" for line in live_triggers))
         self.assertEqual(cold_roots, live_roots)
 
     def test_every_fill_subset_fits_root_lane_and_whole_beat_schedule(self) -> None:
@@ -514,9 +492,9 @@ class DrumPatternTests(unittest.TestCase):
         self.assertEqual(maximum, 10)
 
     def test_lb_runtime_reserves_storage_but_not_hundreds_of_players(self) -> None:
-        self.assertEqual(self.config["amy_max_sequence_groups"], 1024)
-        self.assertEqual(self.config["amy_max_sequence_group_tags"], 64)
-        self.assertEqual(self.config["amy_max_sequence_group_executions"], 40)
+        self.assertEqual(self.config["amy_max_sequencer_tags"], 1280)
+        self.assertEqual(self.config["amy_max_sequence_events"], 64)
+        self.assertEqual(self.config["amy_max_sequence_executions"], 40)
 
 
 if __name__ == "__main__":
