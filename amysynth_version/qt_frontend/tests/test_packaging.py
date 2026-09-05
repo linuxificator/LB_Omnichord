@@ -443,6 +443,27 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("PIPE_REJECT_REMOTE_CLIENTS", service)
         self.assertIn("ReadFile", service)
         self.assertNotIn("AF_INET", service)
+        config = json.loads(
+            (FRONTEND / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
+        for member, config_key in (
+            ("max_buses", "amy_max_buses"),
+            ("max_oscs", "amy_max_oscs"),
+            ("max_sequencer_tags", "amy_max_sequencer_tags"),
+            ("max_sequence_events", "amy_max_sequence_events"),
+            ("max_sequence_executions", "amy_max_sequence_executions"),
+        ):
+            self.assertIn(
+                f"config.{member} = {config[config_key]};",
+                service,
+                f"Windows AMY service must match {config_key}",
+            )
+        for retired_member in (
+            "max_sequence_groups",
+            "max_sequence_group_tags",
+            "max_sequence_group_executions",
+        ):
+            self.assertNotIn(retired_member, service)
         self.assertNotIn("--tcp-port", launcher)
         self.assertNotIn("--amy-socket", launcher)
         self.assertIn("$CaptureScreenshotsDir", launcher)
