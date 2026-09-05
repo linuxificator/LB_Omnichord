@@ -75,6 +75,10 @@ def main() -> int:
         if args.kit == "general_midi":
             amy.send_wire("K258i0iy0Z")
         else:
+            # This mapping-isolation test deliberately uses ordinary note-off
+            # semantics so l0 below stops each sample before testing the next.
+            # Production one-shot drum synths are covered separately and set
+            # SYNTH_FLAGS_IGNORE_NOTE_OFFS.
             amy.send_wire("i0iv4in1Zv0w7i0Z")
         amy.send_wire("i0iV1Zy0V1Z")
         render_blocks(8)

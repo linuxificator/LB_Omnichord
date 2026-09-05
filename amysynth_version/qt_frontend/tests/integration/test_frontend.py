@@ -272,7 +272,7 @@ class FrontendIntegrationTests(unittest.TestCase):
 
             self.assertIn("zY0Z", startup)
             self.assertIn("S12288Z", startup)
-            self.assertTrue(any("i0iv4in1Z" in line for line in startup))
+            self.assertIn("i0iv4in1if2Z", startup)
             for synth in (1, 2, 3, 4):
                 self.assertTrue(
                     any(f"i{synth}" in line and "K" in line for line in startup),

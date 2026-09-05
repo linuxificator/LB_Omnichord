@@ -121,8 +121,8 @@ native-runner package validation, not a physical Windows audio/MIDI test.
 
 All hosted targets must give PCM preset numbers 0–18 the same meaning. The
 Windows service is built from pinned AMY release branch
-`releases/amy_omnichord_R20260905T104903` at commit
-`11f0c39fe8350e7a32b9a1c7b1114f4a7806d795`. Its CMake target defines
+`releases/amy_omnichord_R20260905T133309` at commit
+`f3d72dfcec453a274d726869d5bf32533c3cca3b`. Its CMake target defines
 `GAMMA9001`, generates and links `drums_bin.c`, and registers the linked data
 before both self-test and service `amy_start()` calls.
 

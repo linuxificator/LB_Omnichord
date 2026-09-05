@@ -10,6 +10,7 @@ from typing import Any, final
 from PySide6.QtCore import QObject, Property, QTimer, Signal, Slot
 
 import app_core
+from amy_transport import SYNTH_FLAGS_IGNORE_NOTE_OFFS
 from application_scheduler import MonotonicScheduler
 from amy_parameter_plan import compile_parameter_commands
 from control_limits import clamp_control_value
@@ -161,7 +162,10 @@ class MidiAmyEngine:
         if self._drum_configured:
             return
         synth = self.drum_synth
-        self._wire(f"i{synth}iv{self.drum_voices}in1iy{self.drum_bus}Z")
+        self._wire(
+            f"i{synth}iv{self.drum_voices}in1iy{self.drum_bus}"
+            f"if{SYNTH_FLAGS_IGNORE_NOTE_OFFS}Z"
+        )
         self._wire(f"v0w7i{synth}Z")
         self._route(synth, self.drum_bus)
         self._apply_master_bus(self.drum_bus)

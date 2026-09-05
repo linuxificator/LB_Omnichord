@@ -44,6 +44,7 @@ RESET_SEQUENCER = 4096
 RESET_ALL_OSCS = 8192
 RESET_TIMEBASE = 16384
 RESET_ALL_NOTES = 131072
+SYNTH_FLAGS_IGNORE_NOTE_OFFS = 2
 SYNTH_FLAGS_NO_NOTE_WARNINGS = 8
 DEBUG_LOG_QUEUE_CAPACITY = 2048
 DEBUG_LOG_MAX_BYTES = 4 * 1024 * 1024
@@ -775,7 +776,9 @@ class AmySerialClient:
         if self.drum_kit == "general_midi":
             self._wire(f"K258i{drums}iy{self._bus_for_synth(drums)}Z")
         else:
-            self._wire(f"i{drums}iv{drum_voices}in1Z")
+            self._wire(
+                f"i{drums}iv{drum_voices}in1if{SYNTH_FLAGS_IGNORE_NOTE_OFFS}Z"
+            )
             self._wire(f"v0w7i{drums}Z")
         self._route_synth_bus(drums)
         self._wire(f"i{drums}iV{self._f(self.volume['drums'])}Z")
