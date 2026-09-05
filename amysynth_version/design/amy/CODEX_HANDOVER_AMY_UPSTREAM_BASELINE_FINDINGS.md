@@ -93,6 +93,28 @@ safe multiplication/conversion which preserves the intended fixed-point bit
 pattern. It needs numerical equivalence tests across the full table range,
 particularly negative values and the extrema.
 
+### Godot's Windows build cannot use `M_PI` as currently written
+
+Severity: Windows Godot-addon build failure.
+
+The cross-platform Godot debug build reaches the common AMY sources and then
+fails under MSVC at `src/pcm.c:148` because `M_PI` is undeclared. The sequence
+patch does not change `src/pcm.c`, and `src/sequencer.c` compiled successfully
+before this independent failure stopped the job.
+
+The PCM window initialization should use an AMY-owned portable constant or a
+platform-independent standard expression rather than relying on the
+non-standard `M_PI` extension. This deserves a small Windows compile
+regression. A temporary CI-only baseline fix may be used to let the sequence
+binding continue through link validation, but it must not enter the sequence
+PR.
+
+The same MSVC build also reports pointer-truncation warnings in debug printing
+inside `src/instrument.c` and `src/midi_mappings.c`: pointers are cast to
+Windows' 32-bit `long`/`unsigned long` for `%lx`. These do not cause the
+current build failure, but portable diagnostics should use `%p` with `void *`
+instead.
+
 ### Optional ALSA shutdown state has a ThreadSanitizer race
 
 Severity: host MIDI shutdown race; previously observed, not re-measured in the
@@ -164,8 +186,9 @@ Handle these as independent changes in this order:
 3. fix filter allocation ownership and repeated oscillator-reset tests;
 4. remove the fixed-point signed-shift undefined behavior with numerical
    equivalence coverage;
-5. reproduce and fix the optional ALSA lifecycle race;
-6. update CI action versions independently of source changes.
+5. restore the Windows Godot build and correct its pointer diagnostics;
+6. reproduce and fix the optional ALSA lifecycle race;
+7. update CI action versions independently of source changes.
 
 Keeping these outside the reusable-sequence PR makes review causality clear
 and prevents unrelated baseline cleanup from expanding that patch.
