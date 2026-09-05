@@ -111,7 +111,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
             raise ValueError(f"unsupported non-ROM program {program.kind!r}")
 
         self._route_synth_bus(synth)
-        level = self.volume[role] * self._instrument_level(role)
+        level = self._output_level(role)
         self._wire(f"i{synth}iV{self._f(level)}Z")
         self._apply_reverb_bus(bus)
 
@@ -136,8 +136,7 @@ class ProgramAmySerialClient(base.AmySerialClient):
             maximum = max(1.0, float(raw.get("high_note_gain", 1.0)))
             amount = max(0.0, min(1.0, (float(note) - start) / (full - start)))
             level = (
-                self.volume["strum"]
-                * self._instrument_level("strum")
+                self._output_level("strum")
                 * (1.0 + amount * (maximum - 1.0))
             )
             self._wire(f"i{self.synth_id['strum']}iV{self._f(level)}Z")

@@ -13,6 +13,7 @@ from drum_gamma9001 import GAMMA9001_DIRECT_PCM
 PPQ = 96
 AMY_PPQ = 48
 KIT_FAMILIES = ("tiny", "gamma9001", "general_midi")
+FILL_DENSITY_BARS = (8, 7, 6, 5, 4, 3, 2, 1)
 
 
 @dataclass(frozen=True)

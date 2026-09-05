@@ -716,6 +716,9 @@ regression proves that hold promotion stops only future starts and emits no imme
   tempo, all three activities, chord-arpeggio controls and bass voicing. A
   compatible playing riff is preserved by stable ID and the selector follows
   its new position; otherwise the destination preset/default selector is used.
+- Reverb level, liveness, damping and percussion inclusion are live controls
+  while the rhythm runs: changing a preset must not change the perceived room.
+  With the rhythm stopped, all four values are recalled from the preset.
 - The octave of the active chord row is also preserved. Every non-active row
   loads its octave from the destination preset.
 - The destination rhythm pattern may change, but transport and sequencer

@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from PySide6.QtCore import (
     QObject,
@@ -37,6 +37,7 @@ from control_limits import bounded_control_range, clamp_control_value
 from config_loader import ResolvedAmyConfig
 from drum_patterns import (
     DrumRhythm,
+    FILL_DENSITY_BARS,
     load_drum_pattern_catalog,
 )
 from musical_state import (
@@ -269,7 +270,13 @@ class RhythmRuntime:
     fill_density_index_by_rhythm: list[int]
 
 
-FILL_DENSITY_BARS = (32, 16, 8, 6, 4, 3, 2, 1)
+@dataclass(frozen=True)
+class RunningPresetState:
+    """Live controls that a preset must not replace during playback."""
+
+    attributes: dict[str, Any]
+    rhythm_controls: tuple[int, int, int, list[int], int]
+    active_row_octave: tuple[int, int] | None
 
 
 def display_label(suffix: str) -> str:
@@ -781,6 +788,18 @@ def load_rhythm_catalog(
 
 
 class InstrumentBackend(QObject):
+    # This is the single policy list for scalar state that stays live while a
+    # preset changes during an active beat. Subclasses extend it instead of
+    # adding per-control rhythm-running branches to their preset loaders.
+    RUNNING_PRESET_PRESERVED_ATTRIBUTES: ClassVar[tuple[str, ...]] = (
+        "_rhythm_running",
+        "_running_tempo",
+        "_reverb_level",
+        "_reverb_liveness",
+        "_reverb_damping",
+        "_reverb_drums",
+    )
+
     stateChanged = Signal()
 
     chordVolumeChanged = Signal()
@@ -1268,6 +1287,10 @@ class InstrumentBackend(QObject):
     @Property(int, notify=rhythmControlsChanged)
     def rhythmFillDensityBars(self) -> int:
         return FILL_DENSITY_BARS[self.rhythmFillDensityIndex]
+
+    @Property("QVariantList", constant=True)  # type: ignore[arg-type]
+    def rhythmFillDensityLabels(self) -> list[str]:
+        return [f"/{bars}" for bars in FILL_DENSITY_BARS]
 
     def _effective_chord_activity(self) -> int:
         if self._chord_activity_hold_override:
@@ -2102,28 +2125,66 @@ class InstrumentBackend(QObject):
         self._stop_tempo_nudge()
         self._strum_ladder_mode = False
 
-    def _apply_preset_data(
-        self,
-        data: dict[str, Any],
-    ) -> None:
-        rhythm_was_running = self._rhythm_running
-        live_tempo = self.rhythmTempo if rhythm_was_running else None
-        live_rhythm_controls: tuple[int, int, int, list[int], int] | None = None
-        live_active_row_octave: tuple[int, int] | None = None
-        if rhythm_was_running:
-            rhythm_index = self._rhythm.selected_index
-            live_rhythm_controls = (
+    def _capture_running_preset_state(self) -> RunningPresetState | None:
+        """Snapshot the centrally declared live controls for preset recall."""
+        if not self._rhythm_running:
+            return None
+
+        rhythm_index = self._rhythm.selected_index
+        active_row_octave = (
+            (self._active_row, self._row_octave_indexes[self._active_row])
+            if 0 <= self._active_row < ROW_COUNT
+            else None
+        )
+        return RunningPresetState(
+            attributes={
+                name: copy.deepcopy(getattr(self, name))
+                for name in self.RUNNING_PRESET_PRESERVED_ATTRIBUTES
+            },
+            rhythm_controls=(
                 self._rhythm.busyness_by_rhythm[rhythm_index],
                 self._rhythm.chord_activity_by_rhythm[rhythm_index],
                 self._rhythm.bass_activity_by_rhythm[rhythm_index],
                 list(self._rhythm.fill_order_by_rhythm[rhythm_index]),
                 self._rhythm.fill_density_index_by_rhythm[rhythm_index],
-            )
-            if 0 <= self._active_row < ROW_COUNT:
-                live_active_row_octave = (
-                    self._active_row,
-                    self._row_octave_indexes[self._active_row],
-                )
+            ),
+            active_row_octave=active_row_octave,
+        )
+
+    def _restore_running_preset_state(
+        self,
+        state: RunningPresetState | None,
+    ) -> None:
+        if state is None:
+            return
+
+        for name, value in state.attributes.items():
+            setattr(self, name, value)
+
+        rhythm_index = self._rhythm.selected_index
+        (
+            self._rhythm.busyness_by_rhythm[rhythm_index],
+            self._rhythm.chord_activity_by_rhythm[rhythm_index],
+            self._rhythm.bass_activity_by_rhythm[rhythm_index],
+            self._rhythm.fill_order_by_rhythm[rhythm_index],
+            self._rhythm.fill_density_index_by_rhythm[rhythm_index],
+        ) = state.rhythm_controls
+        if state.active_row_octave is not None:
+            row_index, octave_index = state.active_row_octave
+            self._row_octave_indexes[row_index] = octave_index
+
+    def _apply_runtime_preset_data(self, data: dict[str, Any]) -> None:
+        """Apply a user-selected preset under the live-performance policy."""
+        live_state = self._capture_running_preset_state()
+        try:
+            self._apply_preset_data(data)
+        finally:
+            self._restore_running_preset_state(live_state)
+
+    def _apply_preset_data(
+        self,
+        data: dict[str, Any],
+    ) -> None:
         self._reset_presettable_state_to_defaults()
         plan = compile_omni_preset_plan(
             data,
@@ -2208,25 +2269,6 @@ class InstrumentBackend(QObject):
         self._pitch_bend_offset_hz = 0.0
         self._stop_tempo_nudge()
 
-        # Presets may provide rhythm configuration, but never transport state.
-        # While running, live performance controls continue to drive the UI
-        # and AMY sequencer. Apply them to the destination rhythm selected by
-        # the preset, and preserve only the octave of the active chord row.
-        if live_rhythm_controls is not None:
-            rhythm_index = self._rhythm.selected_index
-            (
-                self._rhythm.busyness_by_rhythm[rhythm_index],
-                self._rhythm.chord_activity_by_rhythm[rhythm_index],
-                self._rhythm.bass_activity_by_rhythm[rhythm_index],
-                self._rhythm.fill_order_by_rhythm[rhythm_index],
-                self._rhythm.fill_density_index_by_rhythm[rhythm_index],
-            ) = live_rhythm_controls
-        if live_active_row_octave is not None:
-            row_index, octave_index = live_active_row_octave
-            self._row_octave_indexes[row_index] = octave_index
-        self._rhythm_running = rhythm_was_running
-        self._running_tempo = live_tempo
-
         # The active chord and its touch lifecycle are live performance state,
         # not preset data.  Preserve their row/root identity so the destination
         # preset can change the sounding chord type without silencing it, and
@@ -2276,7 +2318,7 @@ class InstrumentBackend(QObject):
 
         try:
             data = self._read_preset(preset_number)
-            self._apply_preset_data(data)
+            self._apply_runtime_preset_data(data)
         except (
             OSError,
             ValueError,

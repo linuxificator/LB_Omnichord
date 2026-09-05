@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
-from typing import Any
+from typing import Any, ClassVar
 
 from PySide6.QtCore import Property, Signal, Slot
 
@@ -37,6 +37,19 @@ class InstrumentBackend(app_core.InstrumentBackend):
     chordGateChanged = Signal()
     bassVoicingChanged = Signal()
     chordArpeggioChanged = Signal()
+
+    RUNNING_PRESET_PRESERVED_ATTRIBUTES: ClassVar[tuple[str, ...]] = (
+        *app_core.InstrumentBackend.RUNNING_PRESET_PRESERVED_ATTRIBUTES,
+        # These are adjusted as part of a performance, not recalled while the
+        # beat runs. Chord-gate is listed explicitly even though presets do
+        # not currently store it, preventing a future loader from changing
+        # that established contract accidentally.
+        "_bass_voicing_shift",
+        "_chord_arpeggio_enabled",
+        "_chord_arpeggio_rate",
+        "_chord_arpeggio_descending",
+        "_chord_gate_state",
+    )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._chord_gate_state = CHORD_GATE_OFF
@@ -131,7 +144,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Property(str, notify=chordArpeggioChanged)
     def chordArpeggioDirectionLabel(self) -> str:
-        return "D" if self._chord_arpeggio_descending else "U"
+        return "↓" if self._chord_arpeggio_descending else "↑"
 
     @Property(int, notify=bassVoicingChanged)
     def bassVoicingShift(self) -> int:
@@ -537,68 +550,44 @@ class InstrumentBackend(app_core.InstrumentBackend):
         self._chord_arpeggio_descending = (
             str(rhythm.get("chord_arpeggio_direction", "up")).lower() == "down"
         )
-        effects = self._defaults.get("effects", {})
-        self._reverb_level = max(
-            0.0,
-            min(REVERB_LEVEL_MAX, float(effects.get("reverb_level", 0.0))),
-        )
 
     def _apply_preset_data(self, data: dict[str, Any]) -> None:
-        rhythm_was_running = bool(getattr(self, "_rhythm_running", False))
-        live_chord_arpeggio = (
-            (
-                self._chord_arpeggio_enabled,
-                self._chord_arpeggio_rate,
-                self._chord_arpeggio_descending,
-            )
-            if rhythm_was_running
-            else None
+        live_bass_riff_id = (
+            self._active_bass_riff_id if self._bass_riff_is_playing() else None
         )
-        live_bass_voicing = self._bass_voicing_shift if rhythm_was_running else None
-        live_bass_riff_id = self._active_bass_riff_id if self._bass_riff_is_playing() else None
         super()._apply_preset_data(data)
-        self._rhythm_running = rhythm_was_running
         rhythm = data.get("rhythm", {})
         if not isinstance(rhythm, dict):
             rhythm = {}
-        if live_chord_arpeggio is not None:
-            (
+        self._chord_arpeggio_enabled = bool(
+            rhythm.get(
+                "chord_arpeggio_enabled",
                 self._chord_arpeggio_enabled,
-                self._chord_arpeggio_rate,
-                self._chord_arpeggio_descending,
-            ) = live_chord_arpeggio
-        else:
-            self._chord_arpeggio_enabled = bool(
-                rhythm.get(
-                    "chord_arpeggio_enabled",
-                    self._chord_arpeggio_enabled,
-                )
             )
-            self._chord_arpeggio_rate = max(
-                CHORD_ARPEGGIO_RATE_MIN,
-                min(
-                    CHORD_ARPEGGIO_RATE_MAX,
-                    int(
-                        rhythm.get(
-                            "chord_arpeggio_rate",
-                            self._chord_arpeggio_rate,
-                        )
-                    ),
-                ),
-            )
-            self._chord_arpeggio_descending = (
-                str(
+        )
+        self._chord_arpeggio_rate = max(
+            CHORD_ARPEGGIO_RATE_MIN,
+            min(
+                CHORD_ARPEGGIO_RATE_MAX,
+                int(
                     rhythm.get(
-                        "chord_arpeggio_direction",
-                        ("down" if self._chord_arpeggio_descending else "up"),
+                        "chord_arpeggio_rate",
+                        self._chord_arpeggio_rate,
                     )
-                ).lower()
-                == "down"
-            )
+                ),
+            ),
+        )
+        self._chord_arpeggio_descending = (
+            str(
+                rhythm.get(
+                    "chord_arpeggio_direction",
+                    ("down" if self._chord_arpeggio_descending else "up"),
+                )
+            ).lower()
+            == "down"
+        )
         self._bass_voicing_shift = clamp_bass_voicing_shift(
-            live_bass_voicing
-            if live_bass_voicing is not None
-            else rhythm.get("bass_voicing_shift", self._bass_voicing_shift),
+            rhythm.get("bass_voicing_shift", self._bass_voicing_shift),
             limit=BASS_VOICING_LIMIT,
         )
         stored_riff_selector = self._preset_bass_riff_selector(data)
@@ -607,24 +596,6 @@ class InstrumentBackend(app_core.InstrumentBackend):
             preserve_riff_id=live_bass_riff_id,
             force=True,
         )
-        effects = data.get("effects", {})
-        if not isinstance(effects, dict):
-            effects = {}
-        default_effects = self._defaults.get("effects", {})
-        legacy_main = effects.get(
-            "main_reverb",
-            default_effects.get("reverb_level", 0.0),
-        )
-        self._reverb_level = max(
-            0.0,
-            min(
-                REVERB_LEVEL_MAX,
-                float(effects.get("reverb_level", legacy_main)),
-            ),
-        )
-        # Chord-gate state is live performance state. Keeping it lets an
-        # active row/root converge to the destination preset's chord voicing
-        # instead of muting the accompaniment on every preset selection.
 
     def _preset_snapshot(self) -> dict[str, Any]:
         snapshot = super()._preset_snapshot()

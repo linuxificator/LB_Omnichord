@@ -17,6 +17,7 @@ from config_loader import DebugConfig, ResolvedAmyConfig, resolve_amy_config_dat
 from drum_patterns import (
     DrumFill,
     DrumPatternCatalog,
+    FILL_DENSITY_BARS,
     load_drum_pattern_catalog,
 )
 from rhythm_command_plan import (
@@ -738,7 +739,7 @@ class AmySerialClient:
             self.writer.delay(max(0.0, guard_ms) / 1000.0)
         self._apply_patch_compatibility(patch, synth)
         self._route_synth_bus(synth)
-        level = self.volume[role] * self._instrument_level(role)
+        level = self._output_level(role)
         self._wire(f"i{synth}iV{self._f(level)}Z")
         # A patch may carry its own reverb setting for this bus. The Omnichord
         # reverb controls are the application-level authority, so restore only
@@ -781,7 +782,7 @@ class AmySerialClient:
             )
             self._wire(f"v0w7i{drums}Z")
         self._route_synth_bus(drums)
-        self._wire(f"i{drums}iV{self._f(self.volume['drums'])}Z")
+        self._wire(f"i{drums}iV{self._f(self._output_level('drums'))}Z")
         self._configured_synths.add(drums)
 
         self._configure_synth("bass")
@@ -962,9 +963,17 @@ class AmySerialClient:
     def _set_volume(self, role: str, value: Any) -> None:
         level = max(0.0, min(1.0, float(value)))
         self.volume[role] = level
-        output_level = level * self._instrument_level(role)
+        output_level = self._output_level(role)
         for synth in self._role_synth_ids(role):
             self._wire(f"i{synth}iV{self._f(output_level)}Z")
+
+    def _output_level(self, role: str) -> float:
+        """Resolve UI, musical-role and patch normalization in one place."""
+        return (
+            self.volume[role]
+            * self.resolved_config.role_level(role)
+            * self._instrument_level(role)
+        )
 
     def _instrument_level(self, role: str) -> float:
         key = self.selected_synth.get(role, "")
@@ -1057,10 +1066,15 @@ class AmySerialClient:
 
         # Chord and bass are independent tagged sequencer lanes. Updating
         # tuning/chord pitch replaces only those ranges; percussion and
-        # sequencer transport remain untouched.
-        if self.bass_running:
+        # sequencer transport remain untouched. While transport is stopped,
+        # retain only the host state: AMY schedules external controls for a
+        # future sequencer tick, so authoring lanes against a frozen clock
+        # would accumulate start-pending executions. _start_rhythm() compiles
+        # every lane from this latest state after resetting the timebase.
+        if self.rhythm_running and self.bass_running:
             self._replace_lane("bass")
-        self._replace_lane("chords")
+        if self.rhythm_running:
+            self._replace_lane("chords")
 
     # ------------------------------------------------------------------
     # AMY tagged sequencer lanes
@@ -1173,7 +1187,7 @@ class AmySerialClient:
         plan = compile_fill_schedule(
             fills=rhythm.fills,
             order=order,
-            density_bars=int(config.get("fill_density_bars", 32)),
+            density_bars=int(config.get("fill_density_bars", FILL_DENSITY_BARS[0])),
             bar_ticks=self._drum_quantum(),
             lane_start=lane.start,
             lane_count=lane.count,
@@ -1379,6 +1393,12 @@ class AmySerialClient:
         self._scheduled_rhythm_id = new_id
         self._wire(f"j{self._f(float(new_config.get('tempo', 108.0)))}Z")
 
+        # Configuration remains editable while stopped, but no sequence
+        # execution may be authored against AMY's frozen sequencer clock.
+        # Starting transport below rebuilds all lanes from the latest state.
+        if not self.rhythm_running:
+            return
+
         if tempo_only_changed:
             return
         if bass_only_changed:
@@ -1566,14 +1586,16 @@ class AmySerialClient:
             self.bass_running = enabled
             if not enabled:
                 self._wire(f"l0i{self.synth_id['bass']}Z")
-            self._replace_lane("bass")
+            if self.rhythm_running:
+                self._replace_lane("bass")
         elif address == a["rhythm_config"]:
             self._set_rhythm_config(str(value))
         elif address == a["rhythm_chord_enabled"]:
             enabled = bool(int(value))
             if not self._set_rhythm_chord_enabled(enabled):
                 return
-            self._replace_lane("chords")
+            if self.rhythm_running:
+                self._replace_lane("chords")
         elif address == a["rhythm_running"]:
             new_state = bool(int(value))
             if new_state:

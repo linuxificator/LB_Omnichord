@@ -128,6 +128,176 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_strum_migraine_tracks_mouse_without_owning_input_and_fades(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 180
+    height: 390
+    visible: true
+    property int startCount: 0
+    property int moveCount: 0
+    property int endCount: 0
+
+    QtObject {
+        id: fakeController
+        function strumStart(value) { window.startCount += 1 }
+        function strumMove(value) { window.moveCount += 1 }
+        function strumEnd() { window.endCount += 1 }
+    }
+
+    StrumPad {
+        objectName: "testStrumPad"
+        x: 20
+        y: 10
+        width: 120
+        height: 360
+        controller: fakeController
+    }
+}
+""",
+        )
+        migraine = window.findChild(QObject, "migraine")
+        self.assertIsNotNone(migraine)
+        assert migraine is not None
+
+        first = QPoint(65, 75)
+        QTest.mousePress(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            first,
+        )
+        QTest.qWait(110)
+        self.assertEqual(int(window.property("startCount")), 1)
+        self.assertTrue(bool(migraine.property("active")))
+        self.assertAlmostEqual(float(migraine.property("targetCenterX")), 45.0)
+        self.assertAlmostEqual(float(migraine.property("targetCenterY")), 65.0)
+        self.assertGreater(float(migraine.property("opacity")), 0.5)
+
+        moved = QPoint(95, 185)
+        QTest.mouseMove(window, moved, 30)
+        QCoreApplication.processEvents()
+        self.assertGreaterEqual(int(window.property("moveCount")), 1)
+        self.assertAlmostEqual(float(migraine.property("targetCenterX")), 75.0)
+        self.assertAlmostEqual(float(migraine.property("targetCenterY")), 175.0)
+
+        QTest.mouseRelease(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            moved,
+        )
+        QCoreApplication.processEvents()
+        self.assertEqual(int(window.property("endCount")), 1)
+        self.assertFalse(bool(migraine.property("active")))
+        release_opacity = float(migraine.property("opacity"))
+        self.assertGreater(release_opacity, 0.25)
+
+        QTest.qWait(180)
+        fading_opacity = float(migraine.property("opacity"))
+        self.assertGreater(fading_opacity, 0.0)
+        self.assertLess(fading_opacity, release_opacity)
+
+        second = QPoint(120, 315)
+        QTest.mousePress(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            second,
+        )
+        QTest.qWait(110)
+        self.assertEqual(int(window.property("startCount")), 2)
+        self.assertTrue(bool(migraine.property("active")))
+        self.assertGreater(float(migraine.property("opacity")), fading_opacity)
+        self.assertAlmostEqual(float(migraine.property("targetCenterX")), 100.0)
+        self.assertAlmostEqual(float(migraine.property("targetCenterY")), 305.0)
+
+        QTest.mouseRelease(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            second,
+        )
+        QTest.qWait(550)
+        self.assertEqual(int(window.property("endCount")), 2)
+        self.assertAlmostEqual(float(migraine.property("opacity")), 0.0)
+        self.assertFalse(bool(migraine.property("visible")))
+
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
+    def test_strum_migraine_renders_beyond_the_strum_edge(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Window
+import "."
+
+Window {
+    width: 180
+    height: 180
+    visible: true
+    color: "#000000"
+
+    QtObject {
+        id: fakeController
+        function strumStart(value) {}
+        function strumMove(value) {}
+        function strumEnd() {}
+    }
+
+    StrumPad {
+        x: 50
+        y: 40
+        width: 80
+        height: 100
+        controller: fakeController
+    }
+}
+""",
+        )
+        point = QPoint(52, 90)
+        QTest.mousePress(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            point,
+        )
+        QTest.qWait(140)
+
+        screen = window.screen()
+        self.assertIsNotNone(screen)
+        assert screen is not None
+        image = screen.grabWindow(window.winId()).toImage()
+        chromatic_pixel_outside_strum = any(
+            max(color.red(), color.green(), color.blue()) > 35
+            and (
+                max(color.red(), color.green(), color.blue())
+                - min(color.red(), color.green(), color.blue())
+            ) > 18
+            for x in range(5, 50)
+            for y in range(42, 138)
+            if (color := image.pixelColor(x, y))
+        )
+        self.assertTrue(chromatic_pixel_outside_strum)
+
+        QTest.mouseRelease(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            point,
+        )
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
     def test_flat_f01_osc_controls_keep_mechanical_value_feedback(self) -> None:
         engine, component, window = self.create_window(
             b"""

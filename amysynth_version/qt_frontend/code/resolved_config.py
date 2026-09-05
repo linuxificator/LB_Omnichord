@@ -172,6 +172,7 @@ class ResolvedAmyConfig:
     performance: PerformanceTimingConfig
     synth_patches: tuple[tuple[str, int], ...]
     instrument_levels: tuple[tuple[str, float], ...]
+    role_levels: tuple[tuple[str, float], ...]
     provenance: ConfigProvenance
     _compatibility_json: str = field(repr=False, compare=False)
     _synth_programs_json: str = field(repr=False, compare=False)
@@ -202,6 +203,12 @@ class ResolvedAmyConfig:
     def instrument_level(self, key: str) -> float:
         return next(
             (level for name, level in self.instrument_levels if name == key),
+            1.0,
+        )
+
+    def role_level(self, role: str) -> float:
+        return next(
+            (level for name, level in self.role_levels if name == role),
             1.0,
         )
 
@@ -573,6 +580,7 @@ def _to_resolved(
     performance = cast(dict[str, Any], data["performance"])
     sample_map = cast(dict[str, Any], drums["sample_map"])
     instrument_levels = cast(dict[str, Any], data["instrument_levels"])
+    role_levels = cast(dict[str, Any], data["role_levels"])
     synth_programs = cast(dict[str, Any], data["synth_programs"])
     patch_compatibility = cast(dict[str, Any], data["patch_compatibility"])
 
@@ -697,6 +705,10 @@ def _to_resolved(
         instrument_levels=tuple(
             (str(name), float(level))
             for name, level in sorted(instrument_levels.items())
+        ),
+        role_levels=tuple(
+            (str(name), float(level))
+            for name, level in sorted(role_levels.items())
         ),
         provenance=provenance,
         _compatibility_json=json.dumps(

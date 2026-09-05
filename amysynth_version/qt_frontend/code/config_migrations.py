@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 8
+CURRENT_CONFIG_REVISION = 9
 JsonObject = dict[str, Any]
 
 
@@ -63,6 +63,18 @@ REVISION_SIX_OSC_INPUT = {
     "enabled": True,
     "listen_address": "0.0.0.0",
     "listen_port": 8000,
+}
+
+# One bass note needs to balance the energy of a typical three-note chord and
+# the ear is less sensitive in the bass register. Native AMY measurements over
+# representative Juno and DX7 patches put the median A-weighted difference at
+# about 10.9 dB. Use a conservative +10.1 dB role correction while leaving
+# patch-specific envelope/timbre differences to instrument_levels.
+REVISION_NINE_ROLE_LEVELS = {
+    "drums": 1.0,
+    "bass": 3.2,
+    "strum": 1.0,
+    "chord": 1.0,
 }
 
 
@@ -404,6 +416,18 @@ def _revision_seven_to_eight(data: JsonObject) -> tuple[str, ...]:
     )
 
 
+def _revision_eight_to_nine(data: JsonObject) -> tuple[str, ...]:
+    """Add explicit role-level normalization without patch-specific policy."""
+
+    changed: list[str] = []
+    if "role_levels" not in data:
+        data["role_levels"] = copy.deepcopy(REVISION_NINE_ROLE_LEVELS)
+        changed.append("$.role_levels")
+    data["config_revision"] = 9
+    changed.append("$.config_revision")
+    return tuple(changed)
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
@@ -416,6 +440,7 @@ MIGRATIONS: dict[int, Migration] = {
     5: _revision_five_to_six,
     6: _revision_six_to_seven,
     7: _revision_seven_to_eight,
+    8: _revision_eight_to_nine,
 }
 
 

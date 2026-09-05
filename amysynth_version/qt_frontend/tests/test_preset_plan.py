@@ -16,7 +16,11 @@ from preset_plan import (  # noqa: E402
 )
 
 
-def compile_plan(data: dict[str, object]):
+def compile_plan(
+    data: dict[str, object],
+    *,
+    fill_density_bars: tuple[int, ...] = (0, 4, 8),
+):
     return compile_omni_preset_plan(
         data,
         chord_suffixes=("", "m7"),
@@ -35,7 +39,7 @@ def compile_plan(data: dict[str, object]):
             RhythmSettingPreset(100.0, 2, 2, 2, (0,), 0),
             RhythmSettingPreset(120.0, 3, 3, 3, (1,), 1),
         ),
-        fill_density_bars=(0, 4, 8),
+        fill_density_bars=fill_density_bars,
         tuning_modes=("EQ", "HARM"),
         default_tuning_mode_index=0,
         default_tuning_reference_hz=440,
@@ -93,6 +97,24 @@ class PresetPlanTests(unittest.TestCase):
         self.assertEqual(jazz.fill_order, (4, 2))
         self.assertEqual(jazz.fill_density_index, 2)
         self.assertEqual((plan.tuning_mode_index, plan.tuning_reference_hz), (1, 466.0))
+
+    def test_legacy_long_fill_density_maps_to_new_longest_interval(self) -> None:
+        plan = compile_plan(
+            {
+                "rhythm": {
+                    "settings": {
+                        "rock": {"fill_density_bars": 32},
+                        "jazz": {"fill_density_bars": 16},
+                    }
+                }
+            },
+            fill_density_bars=(8, 7, 6, 5, 4, 3, 2, 1),
+        )
+
+        self.assertEqual(
+            tuple(setting.fill_density_index for setting in plan.rhythm_settings),
+            (0, 0),
+        )
 
 
 if __name__ == "__main__":

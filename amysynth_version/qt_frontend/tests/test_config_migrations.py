@@ -14,6 +14,7 @@ from config_migrations import (  # noqa: E402
     CURRENT_CONFIG_REVISION,
     REVISION_FIVE_GAMMA9001_MAP,
     REVISION_FOUR_SHIPPED_TINY_MAP,
+    REVISION_NINE_ROLE_LEVELS,
     ConfigMigrationError,
     migrate_config_document,
 )
@@ -27,6 +28,7 @@ class ConfigMigrationTests(unittest.TestCase):
         cls.shipped = json.loads(cls.shipped_path.read_text(encoding="utf-8"))
         cls.revision_seven = copy.deepcopy(cls.shipped)
         cls.revision_seven["config_revision"] = 7
+        cls.revision_seven.pop("role_levels")
         cls.revision_seven["rhythm"]["max_sequencer_tags"] = 256
         cls.revision_seven["rhythm"]["group_ranges"] = {
             name: {"start": item["start"] - 255, "count": item["count"]}
@@ -356,6 +358,21 @@ class ConfigMigrationTests(unittest.TestCase):
             "amy_max_sequence_group_executions",
         ):
             self.assertNotIn(retired, migrated.data)
+
+    def test_revision_nine_adds_explicit_perceptual_role_levels(self) -> None:
+        revision_eight = copy.deepcopy(self.shipped)
+        revision_eight["config_revision"] = 8
+        revision_eight.pop("role_levels")
+
+        migrated = migrate_config_document(revision_eight)
+
+        self.assertEqual(migrated.data["role_levels"], REVISION_NINE_ROLE_LEVELS)
+        self.assertEqual(migrated.data["config_revision"], 9)
+        self.assertTrue(
+            {"$.role_levels", "$.config_revision"}.issubset(
+                migrated.changed_paths
+            )
+        )
 
     def test_revision_five_rejects_a_custom_tiny_mapping(self) -> None:
         custom = copy.deepcopy(self.revision_six)

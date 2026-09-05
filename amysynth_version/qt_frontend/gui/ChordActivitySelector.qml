@@ -11,7 +11,7 @@ Item {
     property int arpeggioRate: 1
     property bool arpeggioDescending: false
     property string directionLabel:
-        arpeggioDescending ? "D" : "U"
+        arpeggioDescending ? "↓" : "↑"
 
     property color textColor: "#4c3b08"
     property color groupColor: "#f8e9a1"
@@ -90,7 +90,10 @@ Item {
                             - (topRepeater.count - 1) * topRow.spacing
                         ) / topRepeater.count
                     height: topRow.height
-                    text: index < 4 ? String(index + 1) : "A"
+                    text:
+                        index < 4
+                        ? String(index + 1)
+                        : (root.arpeggioEnabled ? "▂▄▆" : "•••")
 
                     property bool selectedState:
                         index < 4

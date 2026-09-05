@@ -560,8 +560,12 @@ class StaticContractTests(unittest.TestCase):
         )
         self.assertIn('label: "bass activity"', qml)
         self.assertIn('label: "fill density"', qml)
-        for label in ('"/32"', '"/16"', '"/8"', '"/1"'):
-            self.assertIn(label, qml)
+        self.assertIn(
+            "valueLabels: root.controller.rhythmFillDensityLabels",
+            qml,
+        )
+        self.assertNotIn('"/16"', qml)
+        self.assertNotIn('"/32"', qml)
         self.assertNotIn("levels: [0, 1, 2, 3, 4]", qml)
         activity_selector = (ROOT / "gui" / "ActivitySelector.qml").read_text(encoding="utf-8")
         self.assertIn("property var levels: [1, 2, 3, 4]", activity_selector)
@@ -604,7 +608,8 @@ class StaticContractTests(unittest.TestCase):
 
         chord = (ROOT / "gui" / "ChordActivitySelector.qml").read_text(encoding="utf-8")
         self.assertIn('text: "chord activity"', chord)
-        self.assertIn('text: index < 4 ? String(index + 1) : "A"', chord)
+        self.assertIn('(root.arpeggioEnabled ? "▂▄▆" : "•••")', chord)
+        self.assertIn('arpeggioDescending ? "↓" : "↑"', chord)
         self.assertIn('? "/" + String(index + 1)', chord)
         self.assertIn(": root.directionLabel", chord)
         self.assertIn("model: 5", chord)
@@ -874,6 +879,47 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("PointerNormalization.verticalUnit", strum)
         self.assertIn("PointerNormalization.verticalUnit", midi_strum)
         self.assertNotIn("controller", section)
+
+    def test_migraine_is_a_visual_only_strum_particle_layer(self) -> None:
+        strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
+        migraine = (ROOT / "gui" / "Migraine.qml").read_text(encoding="utf-8")
+
+        self.assertIn("import QtQuick.Particles", migraine)
+        self.assertIn("import QtQuick.Shapes", migraine)
+        self.assertIn('objectName: "migraine"', migraine)
+        self.assertIn('source: "assets/migraine_particle.png"', migraine)
+        self.assertIn("property int fadeDuration: 500", migraine)
+        self.assertIn('groups: ["red"]', migraine)
+        self.assertIn('groups: ["green"]', migraine)
+        self.assertIn('groups: ["blue"]', migraine)
+        self.assertIn("registration * 3.4", migraine)
+        self.assertIn("Math.cos(registrationAngle)", migraine)
+        self.assertIn("Math.sin(registrationAngle)", migraine)
+        self.assertIn("model: 3", migraine)
+        self.assertIn("model: 56", migraine)
+        self.assertIn('objectName: "migraineSharpChromaEdge"', migraine)
+        self.assertIn("PathSvg {", migraine)
+        self.assertIn("joinStyle: ShapePath.MiterJoin", migraine)
+        self.assertIn("readonly property var pointAngles", migraine)
+        self.assertNotIn('groups: ["core"]', migraine)
+        self.assertNotIn('group: "core"', migraine)
+        for input_handler in (
+            "MouseArea {",
+            "MultiPointTouchArea {",
+            "TapHandler {",
+            "DragHandler {",
+            "HoverHandler {",
+        ):
+            self.assertNotIn(input_handler, migraine)
+
+        self.assertEqual(strum.count("MultiPointTouchArea {"), 1)
+        migraine_layer = strum[
+            strum.index("Migraine {") - 120:strum.index("Migraine {")
+        ]
+        self.assertNotIn("clip: true", migraine_layer)
+        self.assertIn("migraine.beginAt(points[0].x, points[0].y)", strum)
+        self.assertIn("migraine.moveTo(points[0].x, points[0].y)", strum)
+        self.assertEqual(strum.count("migraine.release()"), 2)
 
     def test_parameter_slider_live_edits_do_not_reset_repeater_models(self) -> None:
         app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")

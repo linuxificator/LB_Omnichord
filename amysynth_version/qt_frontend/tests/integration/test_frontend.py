@@ -416,11 +416,15 @@ class FrontendIntegrationTests(unittest.TestCase):
     def test_chord_arpeggio_controls_are_independent_and_clamped(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
+            self.assertEqual(
+                list(app.query("rhythmFillDensityLabels")),
+                ["/8", "/7", "/6", "/5", "/4", "/3", "/2", "/1"],
+            )
             self.assertFalse(bool(app.query("chordArpeggioEnabled")))
             self.assertEqual(int(app.query("chordArpeggioRate")), 1)
             self.assertFalse(bool(app.query("chordArpeggioDescending")))
             self.assertEqual(
-                str(app.query("chordArpeggioDirectionLabel")), "U"
+                str(app.query("chordArpeggioDirectionLabel")), "↑"
             )
 
             app.action("setChordArpeggioRate", 9.0)
@@ -430,7 +434,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("toggleChordArpeggioDirection")
             self.assertTrue(bool(app.query("chordArpeggioDescending")))
             self.assertEqual(
-                str(app.query("chordArpeggioDirectionLabel")), "D"
+                str(app.query("chordArpeggioDirectionLabel")), "↓"
             )
             self.assertFalse(bool(app.query("chordArpeggioEnabled")))
 

@@ -2,8 +2,8 @@
   "schema_revision": 1,
   "public_qobject_surface": {
     "InstrumentBackend": {
-      "property_count": 57,
-      "property_sha256": "9136f289fdbb3f81d12c2b940a5b7fa3feffa94cdbe556fe9fcf2ae0583d5398",
+      "property_count": 58,
+      "property_sha256": "67b7421687d53a3e42429f206b7c0d0e5a8c8f9d961bcbef17bfcc41574ed76f",
       "method_count": 134,
       "method_sha256": "c2223a07d27d17a2d3734a8c1fd98985cac6051035eaed3ca80850e098a9eea1"
     },
