@@ -53,6 +53,7 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertEqual(resolved.role_level("bass"), 3.2)
         self.assertEqual(resolved.role_level("chord"), 1.0)
         self.assertEqual(resolved.role_level("unknown"), 1.0)
+        self.assertFalse(resolved.debug.log_amy_commands)
         self.assertEqual(resolved.layout.midi_row_buses, (4, 5, 6, 7, 8, 9))
         self.assertEqual(
             resolved.layout.sequencer_tag_ranges,

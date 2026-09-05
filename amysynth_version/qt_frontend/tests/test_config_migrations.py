@@ -382,7 +382,7 @@ class ConfigMigrationTests(unittest.TestCase):
         for key in REVISION_TEN_OSC_DISCOVERY:
             revision_nine["osc_input"].pop(key)
 
-        migrated = migrate_config_document(revision_nine)
+        migrated = migrate_config_document(revision_nine, target_revision=10)
 
         self.assertEqual(
             {
@@ -405,9 +405,35 @@ class ConfigMigrationTests(unittest.TestCase):
         revision_nine["config_revision"] = 9
         revision_nine.pop("osc_input")
 
-        migrated = migrate_config_document(revision_nine)
+        migrated = migrate_config_document(revision_nine, target_revision=10)
 
         self.assertNotIn("osc_input", migrated.data)
+
+    def test_revision_eleven_disables_the_former_default_command_log(self) -> None:
+        revision_ten = copy.deepcopy(self.shipped)
+        revision_ten["config_revision"] = 10
+        revision_ten["debug"]["log_amy_commands"] = True
+
+        migrated = migrate_config_document(revision_ten)
+
+        self.assertFalse(migrated.data["debug"]["log_amy_commands"])
+        self.assertEqual(migrated.data["config_revision"], 11)
+        self.assertTrue(
+            {
+                "$.debug.log_amy_commands",
+                "$.config_revision",
+            }.issubset(migrated.changed_paths)
+        )
+
+    def test_revision_eleven_preserves_an_already_disabled_command_log(self) -> None:
+        revision_ten = copy.deepcopy(self.shipped)
+        revision_ten["config_revision"] = 10
+
+        migrated = migrate_config_document(revision_ten)
+
+        self.assertFalse(migrated.data["debug"]["log_amy_commands"])
+        self.assertNotIn("$.debug.log_amy_commands", migrated.changed_paths)
+        self.assertEqual(migrated.changed_paths, ("$.config_revision",))
 
     def test_revision_five_rejects_a_custom_tiny_mapping(self) -> None:
         custom = copy.deepcopy(self.revision_six)

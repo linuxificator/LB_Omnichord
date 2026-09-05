@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 10
+CURRENT_CONFIG_REVISION = 11
 JsonObject = dict[str, Any]
 
 
@@ -447,6 +447,24 @@ def _revision_nine_to_ten(data: JsonObject) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def _revision_ten_to_eleven(data: JsonObject) -> tuple[str, ...]:
+    """Disable the formerly shipped always-on AMY command log."""
+
+    debug = data.get("debug")
+    if not isinstance(debug, dict):
+        raise ConfigMigrationError(
+            "$.debug",
+            "must be an object before revision 10 can migrate",
+        )
+    changed: list[str] = []
+    if debug.get("log_amy_commands") is not False:
+        debug["log_amy_commands"] = False
+        changed.append("$.debug.log_amy_commands")
+    data["config_revision"] = 11
+    changed.append("$.config_revision")
+    return tuple(changed)
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
@@ -461,6 +479,7 @@ MIGRATIONS: dict[int, Migration] = {
     7: _revision_seven_to_eight,
     8: _revision_eight_to_nine,
     9: _revision_nine_to_ten,
+    10: _revision_ten_to_eleven,
 }
 
 

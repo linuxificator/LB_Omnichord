@@ -222,6 +222,23 @@ class TransportCharacterizationTests(unittest.TestCase):
         probe.write("TEST", "two")
         self.assertEqual(probe.dropped_records, 1)
 
+    def test_disabled_debug_log_never_creates_its_configured_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "amy.log"
+            log = _DebugLog(
+                DebugConfig(
+                    log_amy_commands=False,
+                    amy_command_log=str(path),
+                    log_logical_events=True,
+                )
+            )
+
+            log.write("TEST", "not persisted")
+            log.close()
+
+            self.assertFalse(path.exists())
+            self.assertIsNone(log.path)
+
 
 if __name__ == "__main__":
     unittest.main()
