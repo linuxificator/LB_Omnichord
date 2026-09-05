@@ -1,0 +1,687 @@
+name: Regenerate Gamma9001-aligned drum fills
+
+on:
+  push:
+    branches:
+      - feature/gamma9001-drum-pattern-refresh
+    paths:
+      - '.github/workflows/regenerate-gamma9001-fills.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: feature/gamma9001-drum-pattern-refresh
+          fetch-depth: 1
+
+      - name: Install runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            amysynth_version/qt_frontend/requirements.txt
+            amysynth_version/qt_frontend/requirements-portable.txt
+            amysynth_version/qt_frontend/requirements-test.txt
+            amysynth_version/qt_frontend/packaging/constraints/desktop-current.txt
+
+      - name: Generate fills from current groove catalogue
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          from copy import deepcopy
+          from pathlib import Path
+
+          ROOT = Path('amysynth_version')
+          DRUMS = ROOT / 'qt_frontend/music/drums'
+          ACTIVITY_PATH = DRUMS / 'drum_activity_timing.json'
+          FILLS_PATH = DRUMS / 'drum_fills_timing.json'
+          CONT_PATH = DRUMS / 'drum_fill_continuation_roles.json'
+          MANIFEST_PATH = ROOT / 'design/rhythm_rework/new_patterns/canonical_drum_data_manifest.json'
+          PROVENANCE_PATH = ROOT / 'qt_frontend/music/catalogue_provenance.json'
+          PPQ = 96
+          MAX_FILL_EVENTS = 40
+
+          activity = json.loads(ACTIVITY_PATH.read_text(encoding='utf-8'))
+          old_fills = json.loads(FILLS_PATH.read_text(encoding='utf-8'))
+          manifest = json.loads(MANIFEST_PATH.read_text(encoding='utf-8'))
+          provenance = json.loads(PROVENANCE_PATH.read_text(encoding='utf-8'))
+
+          rhythms = activity['rhythms']
+          if len(rhythms) != 54:
+              raise SystemExit(f'expected 54 rhythms, got {len(rhythms)}')
+          if len(old_fills['fills']) != 270:
+              raise SystemExit('expected existing 270-fill index shell')
+
+          old_by_index = {int(item['index']): item for item in old_fills['fills']}
+          old_index = {str(k): [int(v) for v in values] for k, values in old_fills['rhythm_fill_index'].items()}
+          if set(old_index) != {str(item['id']) for item in rhythms}:
+              raise SystemExit('fill/rhythm coverage does not match activity catalogue')
+
+          style_groups = {
+              'pop': {
+                  'pop_8', 'pop_16', 'slow_ballad', 'rock', 'punk', 'metal',
+                  'straight_blues', 'rnb', 'soul',
+              },
+              'swing': {
+                  'shuffle', 'twelve_eight_blues', 'jazz_shuffle',
+                  'soul_shuffle', 'six_eight_ballad', 'gospel_6_8',
+              },
+              'jazz': {'jazz_swing', 'jazz_waltz'},
+              'funk': {'funk', 'jazz_funk', 'seven_four_funk'},
+              'country': {'country_train', 'country_waltz', 'waltz'},
+              'march': {'polka', 'march'},
+              'electronic': {'disco', 'house', 'techno', 'trance'},
+              'breaks': {
+                  'garage_2step', 'breakbeat', 'drum_and_bass', 'dubstep',
+                  'hip_hop', 'boom_bap', 'trap',
+              },
+              'latin': {
+                  'bossa', 'samba', 'salsa', 'cha_cha', 'mambo', 'merengue',
+                  'cumbia', 'bolero', 'tango', 'son_clave_3_2',
+                  'rumba_clave_3_2', 'afro_cuban_6_8', 'calypso_soca',
+              },
+              'reggae': {'reggae'},
+              'odd': {'five_four', 'seven_eight', 'nine_eight', 'eleven_eight'},
+          }
+          style_for = {}
+          for style, ids in style_groups.items():
+              for rhythm_id in ids:
+                  if rhythm_id in style_for:
+                      raise SystemExit(f'duplicate style assignment for {rhythm_id}')
+                  style_for[rhythm_id] = style
+          missing_styles = {str(item['id']) for item in rhythms} - set(style_for)
+          if missing_styles:
+              raise SystemExit(f'unclassified rhythms: {sorted(missing_styles)}')
+
+          groupings = {
+              'five_four': (3, 2),
+              'seven_eight': (2, 2, 3),
+              'seven_four_funk': (4, 3),
+              'nine_eight': (2, 2, 2, 3),
+              'eleven_eight': (3, 3, 3, 2),
+          }
+
+          role_cycles = {
+              'pop': (
+                  ('backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low', 'low_secondary'),
+                  ('backbeat_primary', 'ghost_detail', 'tonal_high', 'tonal_mid', 'tonal_low', 'low_secondary'),
+                  ('backbeat_primary', 'low_secondary', 'tonal_high', 'low_secondary', 'tonal_mid', 'low_secondary'),
+                  ('backbeat_primary', 'ghost_detail', 'tonal_high', 'tonal_mid', 'tonal_low', 'low_secondary'),
+              ),
+              'swing': (
+                  ('backbeat_soft', 'tonal_high', 'tonal_mid'),
+                  ('backbeat_soft', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_soft', 'ghost_detail', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_primary', 'tonal_high', 'low_secondary', 'tonal_mid', 'low_secondary', 'tonal_low'),
+                  ('backbeat_soft', 'ghost_detail', 'tonal_high', 'tonal_mid', 'tonal_low', 'low_secondary'),
+              ),
+              'jazz': (
+                  ('backbeat_soft', 'tonal_high', 'tonal_mid'),
+                  ('backbeat_soft', 'ghost_detail', 'tonal_high', 'tonal_mid'),
+                  ('backbeat_soft', 'ghost_detail', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_primary', 'tonal_high', 'tonal_mid', 'low_secondary', 'tonal_low', 'low_secondary'),
+                  ('backbeat_soft', 'ghost_detail', 'tonal_high', 'tonal_mid', 'tonal_low', 'low_secondary'),
+              ),
+              'funk': (
+                  ('ghost_detail', 'backbeat_primary', 'low_secondary', 'ghost_detail'),
+                  ('ghost_detail', 'low_secondary', 'backbeat_primary', 'tonal_high', 'ghost_detail'),
+                  ('low_secondary', 'ghost_detail', 'backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('ghost_detail', 'low_secondary', 'backbeat_primary', 'low_secondary', 'ghost_detail', 'tonal_high'),
+                  ('low_secondary', 'ghost_detail', 'backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low', 'ghost_detail'),
+              ),
+              'country': (
+                  ('backbeat_soft', 'tonal_high', 'tonal_mid'),
+                  ('backbeat_soft', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_soft', 'backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_primary', 'tonal_high', 'low_secondary', 'tonal_mid', 'low_secondary', 'tonal_low'),
+                  ('backbeat_soft', 'backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low', 'low_secondary'),
+              ),
+              'march': (
+                  ('backbeat_primary', 'ghost_detail', 'backbeat_primary', 'ghost_detail'),
+                  ('backbeat_primary', 'ghost_detail', 'tonal_high', 'ghost_detail', 'tonal_mid'),
+                  ('backbeat_primary', 'ghost_detail', 'backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_primary', 'ghost_detail', 'backbeat_primary', 'ghost_detail', 'tonal_high', 'tonal_mid'),
+                  ('backbeat_primary', 'ghost_detail', 'tonal_high', 'tonal_mid', 'tonal_low', 'low_secondary'),
+              ),
+              'electronic': (
+                  ('backbeat_primary', 'electronic_detail', 'backbeat_primary', 'electronic_detail'),
+                  ('backbeat_primary', 'electronic_detail', 'tonal_high', 'electronic_detail', 'tonal_mid'),
+                  ('backbeat_primary', 'electronic_detail', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('electronic_detail', 'backbeat_primary', 'electronic_detail', 'backbeat_primary'),
+                  ('backbeat_primary', 'electronic_detail', 'tonal_high', 'tonal_mid', 'tonal_low', 'timekeeper_open'),
+              ),
+              'breaks': (
+                  ('backbeat_primary', 'ghost_detail', 'low_secondary', 'ghost_detail'),
+                  ('low_secondary', 'ghost_detail', 'backbeat_primary', 'electronic_detail', 'ghost_detail'),
+                  ('low_secondary', 'backbeat_primary', 'ghost_detail', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('electronic_detail', 'ghost_detail', 'backbeat_primary', 'low_secondary'),
+                  ('low_secondary', 'ghost_detail', 'backbeat_primary', 'electronic_detail', 'tonal_high', 'tonal_mid', 'tonal_low'),
+              ),
+              'latin': (
+                  ('hand_high', 'hand_low', 'tonal_high', 'hand_accent'),
+                  ('hand_high', 'hand_low', 'tonal_high', 'tonal_mid', 'hand_accent'),
+                  ('hand_low', 'hand_high', 'tonal_high', 'tonal_mid', 'tonal_low', 'hand_accent'),
+                  ('tonal_high', 'hand_high', 'tonal_mid', 'hand_low', 'tonal_low', 'hand_accent'),
+                  ('hand_low', 'hand_high', 'tonal_high', 'tonal_mid', 'tonal_low', 'hand_accent'),
+              ),
+              'reggae': (
+                  ('dry_click', 'backbeat_soft', 'tonal_high'),
+                  ('dry_click', 'tonal_high', 'tonal_mid', 'backbeat_soft'),
+                  ('dry_click', 'backbeat_soft', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_soft', 'low_secondary', 'tonal_high', 'tonal_mid'),
+                  ('dry_click', 'backbeat_soft', 'tonal_high', 'tonal_mid', 'tonal_low', 'low_secondary'),
+              ),
+              'odd': (
+                  ('backbeat_primary', 'tonal_high', 'tonal_mid'),
+                  ('backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('low_secondary', 'backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('backbeat_primary', 'low_secondary', 'tonal_high', 'tonal_mid', 'tonal_low'),
+                  ('low_secondary', 'backbeat_primary', 'tonal_high', 'tonal_mid', 'tonal_low', 'ghost_detail'),
+              ),
+          }
+
+          anchor_roles = {
+              'pop': {'low_primary', 'backbeat_primary'},
+              'swing': {'low_primary', 'backbeat_primary', 'backbeat_soft'},
+              'jazz': {'backbeat_soft', 'low_secondary'},
+              'funk': {'low_primary', 'backbeat_primary', 'ghost_detail'},
+              'country': {'low_primary', 'backbeat_soft', 'backbeat_primary'},
+              'march': {'low_primary', 'backbeat_primary', 'ghost_detail'},
+              'electronic': {'backbeat_primary', 'timekeeper_open'},
+              'breaks': {'low_primary', 'low_secondary', 'backbeat_primary', 'ghost_detail'},
+              'latin': {'hand_high', 'hand_low', 'hand_accent', 'tonal_high', 'tonal_mid', 'tonal_low'},
+              'reggae': {'backbeat_soft', 'dry_click', 'low_primary'},
+              'odd': {'low_primary', 'backbeat_primary'},
+          }
+
+          def meter_parts(rhythm: dict) -> tuple[int, int, int]:
+              numerator, denominator = (int(value) for value in str(rhythm['meter']).split('/', 1))
+              beat_ticks = PPQ * 4 // denominator
+              return numerator, denominator, beat_ticks
+
+          def durations(rhythm_id: str, numerator: int, denominator: int) -> tuple[int, ...]:
+              grouping = groupings.get(rhythm_id)
+              if denominator == 8:
+                  if grouping:
+                      tail = grouping[-1]
+                      medium = min(numerator, sum(grouping[-2:])) if len(grouping) > 1 else tail
+                  else:
+                      tail = 3 if numerator >= 6 else max(1, numerator // 2)
+                      medium = min(numerator, tail * 2)
+                  return (tail, medium, numerator, tail, numerator)
+              tail = 1
+              medium = min(2, numerator)
+              if grouping:
+                  medium = min(numerator, grouping[-1])
+              return (tail, medium, numerator, medium, numerator)
+
+          def continuation(style: str, rhythm_id: str, variant: int, active_roles: set[str]) -> list[str]:
+              candidates: set[str]
+              if style == 'electronic':
+                  candidates = {'low_primary', 'timekeeper_primary'} if variant <= 2 else {'low_primary'}
+              elif style == 'latin':
+                  candidates = {'timeline_primary', 'texture_shaker'}
+                  if rhythm_id in {'bossa', 'samba', 'cumbia', 'calypso_soca'}:
+                      candidates.add('low_primary')
+                  if variant >= 4:
+                      candidates.discard('texture_shaker')
+              elif style == 'jazz':
+                  candidates = {'sustain_primary', 'timekeeper_foot'} if variant <= 2 else {'timekeeper_foot'}
+              elif style == 'swing':
+                  candidates = {'timekeeper_primary'} if variant == 1 else set()
+              elif style == 'country':
+                  candidates = {'timekeeper_primary', 'dry_click'} if rhythm_id == 'country_train' and variant == 1 else ({'timekeeper_primary'} if variant == 1 else set())
+              elif style == 'reggae':
+                  candidates = {'timekeeper_primary'} if variant <= 2 else set()
+              elif style in {'pop', 'march', 'odd'}:
+                  candidates = {'timekeeper_primary'} if variant == 1 else set()
+              else:
+                  candidates = set()
+              return sorted(candidates & active_roles)
+
+          def subdivisions(style: str, denominator: int, variant: int) -> int:
+              if style in {'swing', 'jazz'}:
+                  return 3 if denominator == 4 else 2
+              if style == 'breaks' and variant == 4:
+                  return 8 if denominator == 4 else 4
+              if style == 'electronic' and variant == 4:
+                  return 8 if denominator == 4 else 4
+              return 4 if denominator == 4 else 2
+
+          role_base_velocity = {
+              'low_primary': 106,
+              'low_secondary': 98,
+              'backbeat_primary': 108,
+              'backbeat_soft': 82,
+              'ghost_detail': 62,
+              'timekeeper_primary': 78,
+              'timekeeper_open': 92,
+              'timekeeper_foot': 72,
+              'sustain_primary': 88,
+              'sustain_bell': 96,
+              'section_accent': 112,
+              'tonal_high': 96,
+              'tonal_mid': 98,
+              'tonal_low': 102,
+              'timeline_primary': 90,
+              'texture_shaker': 72,
+              'hand_high': 92,
+              'hand_low': 98,
+              'hand_accent': 104,
+              'dry_click': 82,
+              'electronic_detail': 78,
+          }
+
+          def add_event(merged: dict[tuple[int, str], dict], tick: int, role: str, velocity: int) -> None:
+              if tick < 0:
+                  return
+              velocity = max(1, min(127, int(velocity)))
+              key = (int(tick), str(role))
+              prior = merged.get(key)
+              event = {'tick': int(tick), 'role': str(role), 'velocity': velocity}
+              if prior is None or velocity > int(prior['velocity']):
+                  merged[key] = event
+
+          generated_fills = []
+          generated_continuation = []
+          generated_index = {}
+
+          for rhythm in rhythms:
+              rhythm_id = str(rhythm['id'])
+              style = style_for[rhythm_id]
+              numerator, denominator, beat_ticks = meter_parts(rhythm)
+              bar_ticks = numerator * beat_ticks
+              if int(rhythm['period_ticks']) < bar_ticks:
+                  raise SystemExit(f'{rhythm_id}: period shorter than one bar')
+              core_level = rhythm['levels'][2]['events']
+              active_roles = {
+                  str(event['role'])
+                  for level in rhythm['levels']
+                  for event in level['events']
+              }
+              duration_values = durations(rhythm_id, numerator, denominator)
+              indexes = old_index[rhythm_id]
+              if len(indexes) != 5:
+                  raise SystemExit(f'{rhythm_id}: expected five legacy fill indexes')
+              generated_index[rhythm_id] = indexes
+
+              bar_start = int(rhythm['period_ticks']) - bar_ticks
+              for variant, (index, duration_beats) in enumerate(zip(indexes, duration_values), start=1):
+                  old = deepcopy(old_by_index[index])
+                  fill_id = str(old['fill_id'])
+                  duration_ticks = duration_beats * beat_ticks
+                  start_beat = numerator - duration_beats + 1
+                  window_start = bar_start + (start_beat - 1) * beat_ticks
+                  continue_roles = continuation(style, rhythm_id, variant, active_roles)
+                  continue_set = set(continue_roles)
+                  merged: dict[tuple[int, str], dict] = {}
+
+                  # Carry the current core groove's essential non-continuing anchors
+                  # into the fill window so the fill starts from the exact refreshed
+                  # rhythm rather than from a generic unrelated break.
+                  for event in core_level:
+                      tick = int(event['tick'])
+                      role = str(event['role'])
+                      if window_start <= tick < window_start + duration_ticks:
+                          if role in anchor_roles[style] and role not in continue_set:
+                              add_event(
+                                  merged,
+                                  tick - window_start,
+                                  role,
+                                  round(int(event['velocity']) * 0.88),
+                              )
+
+                  subdiv = subdivisions(style, denominator, variant)
+                  step = beat_ticks // subdiv
+                  if step <= 0 or step % 2:
+                      raise SystemExit(f'{rhythm_id} f{variant}: subdivision is not AMY-exact')
+                  raw_count = duration_beats * subdiv
+                  if style in {'swing', 'jazz'} and variant in {1, 2, 4}:
+                      raw_count = duration_beats * subdiv
+                  count = min(MAX_FILL_EVENTS - 4, max(3, raw_count))
+                  cycle = role_cycles[style][variant - 1]
+
+                  # Variant 1/2 stay compact; 3/5 are phrase-shaped full-bar fills;
+                  # 4 is the intentionally more syncopated/rapid colour fill.
+                  for i in range(count):
+                      tick = i * step
+                      if tick >= duration_ticks:
+                          break
+                      role = cycle[i % len(cycle)]
+                      base = role_base_velocity[role]
+                      ramp = 0 if count <= 1 else round(12 * i / (count - 1))
+                      accent = 7 if i == 0 or (i * step) % beat_ticks == 0 else 0
+                      if variant == 1:
+                          ramp //= 2
+                      velocity = base + ramp + accent
+                      if role == 'ghost_detail':
+                          velocity = min(76, velocity)
+                      add_event(merged, tick, role, velocity)
+
+                  # Strong but pre-downbeat resolution. Do not put a crash on the
+                  # next bar's downbeat; the base groove owns that downbeat.
+                  final_step = max(2, step)
+                  final_tick = duration_ticks - final_step
+                  if variant in {3, 5}:
+                      closing_role = (
+                          'hand_accent' if style == 'latin'
+                          else 'backbeat_soft' if style in {'jazz', 'reggae'}
+                          else 'backbeat_primary'
+                      )
+                      add_event(merged, final_tick, closing_role, 116 if style != 'jazz' else 94)
+                  if variant == 5 and style not in {'jazz', 'latin', 'reggae'}:
+                      add_event(merged, max(0, final_tick - final_step), 'tonal_low', 112)
+
+                  events = sorted(merged.values(), key=lambda event: (int(event['tick']), str(event['role'])))
+                  if not events:
+                      raise SystemExit(f'{fill_id}: generated no events')
+                  if len(events) > MAX_FILL_EVENTS:
+                      raise SystemExit(f'{fill_id}: {len(events)} events exceeds authored fill budget')
+                  if any(int(event['tick']) % 2 or int(event['tick']) >= duration_ticks for event in events):
+                      raise SystemExit(f'{fill_id}: invalid tick in generated fill')
+
+                  old['rhythm_id'] = rhythm_id
+                  old['meter'] = str(rhythm['meter'])
+                  old['allowed_start_beats'] = [start_beat]
+                  old['generation'] = {
+                      'activity_source_level': 3,
+                      'activity_window': 'final matching window of the current groove period',
+                      'style_family': style,
+                      'variant': variant,
+                      'gamma9001_quality_reference': True,
+                      'tiny_policy': 'compatibility degradation only',
+                  }
+                  timing = deepcopy(old.get('timing', {}))
+                  timing['ppq'] = PPQ
+                  timing['duration_beats'] = duration_beats
+                  timing['duration_ticks'] = duration_ticks
+                  timing['leading_rest_ticks'] = 0
+                  timing['event_count'] = len(events)
+                  timing['events'] = events
+                  old['timing'] = timing
+                  generated_fills.append(old)
+                  generated_continuation.append({
+                      'fill_id': fill_id,
+                      'continue_roles': continue_roles,
+                  })
+
+          if len(generated_fills) != 270 or len({item['fill_id'] for item in generated_fills}) != 270:
+              raise SystemExit('generated fill coverage is not exactly 270 unique fills')
+          if len({int(item['index']) for item in generated_fills}) != 270:
+              raise SystemExit('generated fill indexes are not unique')
+
+          fill_doc = deepcopy(old_fills)
+          fill_doc['title'] = 'LB Omnichord Gamma9001-first kit-independent drum fills matched to refreshed activity grooves'
+          fill_doc['repository_contract'] = {
+              'repository': 'linuxificator/LB_Omnichord',
+              'branch': 'feature/gamma9001-drum-pattern-refresh',
+              'design_status': 'canonical runtime fill catalogue matched to the 2026-09-05 Gamma9001-first activity refresh',
+          }
+          fill_doc.setdefault('design_contract', {})
+          fill_doc['design_contract'].update({
+              'ppq': PPQ,
+              'fills_per_rhythm': 5,
+              'instrument_data_forbidden_here': True,
+              'kit_independence': 'Events contain only tick, logical role and velocity; kit choice never changes timing.',
+              'activity_coupling': 'Every fill starts from the final matching window of the current level-3 refreshed groove, then overlays genre-specific transition vocabulary.',
+              'bar_resolution_rule': 'Every allowed fill start is chosen so the complete fill ends exactly at the next written bar boundary.',
+              'gamma9001_policy': 'Gamma9001 is the musical quality reference. Fill roles deliberately exploit its tom, ride/bell, side-stick, electronic and patch-390 Latin percussion vocabulary.',
+              'tiny_policy': 'Tiny must resolve every logical role for tests/compatibility, but its reduced sounds are an accepted degradation and never constrain authored fill vocabulary.',
+              'continuation_policy': 'Continuation roles are style-specific and intersected with roles actually present in the refreshed activity catalogue.',
+              'amy_48ppq_rule': 'All ticks are even at 96 PPQ and exactly convertible to AMY 48 PPQ.',
+              'fill_event_budget': MAX_FILL_EVENTS,
+          })
+          fill_doc['coverage_summary'] = {
+              'rhythm_count': 54,
+              'fill_count': 270,
+              'fills_per_rhythm_min': 5,
+              'fills_per_rhythm_max': 5,
+              'rhythms_not_having_exactly_5': [],
+          }
+          fill_doc['fills'] = generated_fills
+          fill_doc['rhythm_fill_index'] = generated_index
+
+          continuation_doc = {
+              'schema_version': 1,
+              'title': 'LB Omnichord fill continuation policy matched to Gamma9001-first refreshed grooves',
+              'design_contract': {
+                  'activity_aware': True,
+                  'gamma9001_quality_reference': True,
+                  'tiny_degradation_only': True,
+                  'rule': 'Only the listed refreshed base-groove roles continue during each fill; all other active logical roles are gated for the fill duration without resetting phase.',
+              },
+              'fills': generated_continuation,
+          }
+
+          FILLS_PATH.write_text(json.dumps(fill_doc, indent=2) + '\n', encoding='utf-8')
+          CONT_PATH.write_text(json.dumps(continuation_doc, indent=2) + '\n', encoding='utf-8')
+
+          # Fills must use exactly the same style/kit profile as their base groove.
+          # Gamma9001 therefore remains authoritative; Tiny and GM merely realize
+          # the same logical roles with their own available sounds.
+          changed_kit_paths = []
+          for family in ('gamma9001', 'tiny', 'general_midi'):
+              activity_kit_path = DRUMS / f'drum_activity_instruments_{family}.json'
+              fill_kit_path = DRUMS / f'drum_fills_instruments_{family}.json'
+              activity_kit = json.loads(activity_kit_path.read_text(encoding='utf-8'))
+              fill_kit = json.loads(fill_kit_path.read_text(encoding='utf-8'))
+              assignment = deepcopy(activity_kit['rhythm_profile'])
+              missing = {profile for profile in assignment.values() if profile not in fill_kit['profiles']}
+              if missing:
+                  raise SystemExit(f'{family}: fill mapping lacks activity profiles {sorted(missing)}')
+              fill_kit['rhythm_profile'] = assignment
+              fill_kit.setdefault('separation_contract', {})['quality_reference'] = (
+                  'Gamma9001 determines authored musical colour; Tiny is compatibility degradation only.'
+              )
+              fill_kit_path.write_text(json.dumps(fill_kit, indent=2) + '\n', encoding='utf-8')
+              changed_kit_paths.append(fill_kit_path)
+
+          # Update canonical manifest hashes without changing manifest format revision.
+          if int(manifest.get('manifest_revision', 0)) != 1:
+              raise SystemExit('unexpected canonical drum manifest format revision')
+          by_name = {entry['name']: entry for entry in manifest['files']}
+          changed_paths = [FILLS_PATH, CONT_PATH, *changed_kit_paths]
+          for path in changed_paths:
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              by_name[path.name]['sha256'] = digest
+          MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+          process_by_path = {
+              'music/drums/drum_fills_timing.json': (
+                  'LB-authored 2026-09-05 fill refresh derived from each current level-3 activity groove; '
+                  'genre-specific transition overlays; Gamma9001 musical reference; every allowed start '
+                  'resolves exactly at a bar boundary; Tiny is compatibility degradation only'
+              ),
+              'music/drums/drum_fill_continuation_roles.json': (
+                  'LB-authored 2026-09-05 activity-aware continuation policy; electronic kick, jazz '
+                  'timekeeping and Latin timeline/shaker continuities are retained where stylistically appropriate'
+              ),
+              'music/drums/drum_fills_instruments_gamma9001.json': (
+                  'Gamma9001 fill realization synchronized to the corresponding refreshed activity profile per rhythm'
+              ),
+              'music/drums/drum_fills_instruments_tiny.json': (
+                  'Tiny compatibility/degradation realization synchronized to the corresponding activity profile; not an authoring constraint'
+              ),
+              'music/drums/drum_fills_instruments_general_midi.json': (
+                  'General-MIDI compatibility realization synchronized to the corresponding activity profile'
+              ),
+          }
+          provenance['recorded'] = '2026-09-05'
+          prov_by_path = {entry['path']: entry for entry in provenance['catalogues']}
+          for path in changed_paths:
+              rel = path.relative_to(ROOT / 'qt_frontend').as_posix()
+              entry = prov_by_path[rel]
+              entry['sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+              entry['process'] = process_by_path[rel]
+          PROVENANCE_PATH.write_text(json.dumps(provenance, indent=2) + '\n', encoding='utf-8')
+
+          print('generated fills:', len(generated_fills))
+          print('max authored events:', max(len(item['timing']['events']) for item in generated_fills))
+          print('fill sha256:', hashlib.sha256(FILLS_PATH.read_bytes()).hexdigest())
+          print('continuation sha256:', hashlib.sha256(CONT_PATH.read_bytes()).hexdigest())
+          for family in ('gamma9001', 'tiny', 'general_midi'):
+              p = DRUMS / f'drum_fills_instruments_{family}.json'
+              print(f'{family} fill mapping sha256:', hashlib.sha256(p.read_bytes()).hexdigest())
+          PY
+
+      - name: Add permanent fill-fit regression
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('amysynth_version/qt_frontend/tests/test_drum_patterns.py')
+          text = p.read_text(encoding='utf-8')
+          marker = '    def test_fill_sequences_preserve_events_and_only_add_generic_gates(self) -> None:\n'
+          method = '''    def test_fills_end_on_bar_boundary_and_use_base_groove_profiles(self) -> None:\n        for rhythm in self.catalog.rhythms.values():\n            numerator = int(rhythm.meter.split("/", 1)[0])\n            bar_ticks = numerator * rhythm.fills[0].beat_unit_ticks\n            for fill in rhythm.fills:\n                for start in fill.allowed_start_beats:\n                    self.assertEqual(\n                        (start - 1) * fill.beat_unit_ticks + fill.duration_ticks,\n                        bar_ticks,\n                        fill.fill_id,\n                    )\n        for kit_name in KIT_FAMILIES:\n            kit = self.catalog.kits[kit_name]\n            self.assertEqual(\n                dict(kit.fill_rhythm_profile),\n                dict(kit.activity_rhythm_profile),\n                kit_name,\n            )\n\n'''
+          if 'def test_fills_end_on_bar_boundary_and_use_base_groove_profiles' not in text:
+              if marker not in text:
+                  raise SystemExit('fill regression insertion marker not found')
+              p.write_text(text.replace(marker, method + marker, 1), encoding='utf-8')
+          PY
+
+      - name: Install exact frontend test dependencies
+        working-directory: amysynth_version/qt_frontend
+        run: python -m pip install -c packaging/constraints/desktop-current.txt -r requirements-test.txt
+
+      - name: Run focused fill and provenance tests
+        working-directory: amysynth_version/qt_frontend
+        run: |
+          python tests/test_drum_patterns.py
+          python tests/test_catalogue_provenance.py
+          python tests/test_sequencer_tags.py
+
+      - name: Run maintained unit suite
+        working-directory: amysynth_version/qt_frontend
+        env:
+          ALSA_CONFIG_PATH: ${{ github.workspace }}/amysynth_version/qt_frontend/tests/alsa-null.conf
+          OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
+        run: python tests/run_tests.py --suite unit --coverage
+
+      - name: Write Codex handover
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          root = Path('amysynth_version')
+          drums = root / 'qt_frontend/music/drums'
+          out = root / 'design/rhythm_rework/new_patterns/CODEX_HANDOVER_GAMMA9001_FILL_REFRESH.md'
+          hashes = {
+              name: hashlib.sha256((drums / name).read_bytes()).hexdigest()
+              for name in (
+                  'drum_fills_timing.json',
+                  'drum_fill_continuation_roles.json',
+                  'drum_fills_instruments_gamma9001.json',
+                  'drum_fills_instruments_tiny.json',
+                  'drum_fills_instruments_general_midi.json',
+              )
+          }
+          content = f'''# Codex handover — Gamma9001-first drum fill refresh
+
+Status: **canonical fill data regenerated against the refreshed drum grooves and validated**
+
+Repository: `linuxificator/LB_Omnichord`  
+Branch: `feature/gamma9001-drum-pattern-refresh`  
+Active implementation: `amysynth_version` only. Sonic Pi remains frozen.
+
+## Intent
+
+The previous 270 fills were authored against the older drum activity catalogue and no longer sat naturally inside the richer Gamma9001-first grooves. This change replaces fill timing/continuation policy while preserving the existing five-F-button behavior, wire-only frontend architecture and nested AMY sequencer implementation.
+
+## Hard architecture rules
+
+- `drum_activity_timing.json` remains the authority for repeating groove timing.
+- `drum_fills_timing.json` contains only kit-independent tick/role/velocity fill data.
+- Concrete sounds remain in the three fill instrument realization files.
+- Gamma9001 is the musical quality reference.
+- Tiny exists for compatibility/tests only; its missing colour is accepted degradation and must never reduce the authored Gamma9001 vocabulary.
+- Fill realization uses the same per-rhythm profile assignment as the corresponding base groove for every kit family.
+- Do not move musical fill policy into AMY. AMY owns generic nested-sequencer mechanics only.
+
+## Musical construction
+
+All 54 rhythms still have exactly five fills (270 total). Each fill starts from the final matching window of the current **level-3 refreshed groove**, retaining essential non-continuing groove anchors, then overlays genre-specific transition vocabulary.
+
+Examples of deliberate continuation policy:
+
+- house/disco/techno/trance: four-on-the-floor kick continues; short fills can also retain the main timekeeper;
+- jazz: ride/foot timekeeping can continue under short fills;
+- Latin: clave/timeline and shaker continue where appropriate, with bossa/samba/cumbia/soca also able to retain the low pulse;
+- ordinary pop/rock/funk fills generally replace more of the groove, with only short fills optionally retaining timekeeping.
+
+Every allowed start is chosen so `start + duration` ends exactly at the written bar boundary. The next bar's normal groove owns the resolving downbeat; fills do not fake a crash beyond their duration.
+
+## Gamma9001 use
+
+The existing Gamma9001 profiles already expose TR-808, TR-909, Linn 9000, Tokyo Synthetics, 80s Power Kit and patch-390 percussion. The refreshed fills actively use logical tom, open-hat, electronic-detail, side-stick, hand-percussion, cowbell/accent and timbale/conga roles where stylistically appropriate. Latin profiles therefore retain the full patch-390 colour. Tiny resolves the same logical roles through surrogates only.
+
+## Validation
+
+The regeneration passed:
+
+- `python tests/test_drum_patterns.py`;
+- `python tests/test_catalogue_provenance.py`;
+- `python tests/test_sequencer_tags.py`;
+- `python tests/run_tests.py --suite unit --coverage` in the same pinned Python/Qt dependency environment used by project CI.
+
+A permanent regression now asserts that every allowed fill start resolves exactly at a bar boundary and that fill/profile selection equals base-groove/profile selection for all three kit families.
+
+## Canonical hashes
+
+- `drum_fills_timing.json`: `{hashes['drum_fills_timing.json']}`
+- `drum_fill_continuation_roles.json`: `{hashes['drum_fill_continuation_roles.json']}`
+- `drum_fills_instruments_gamma9001.json`: `{hashes['drum_fills_instruments_gamma9001.json']}`
+- `drum_fills_instruments_tiny.json`: `{hashes['drum_fills_instruments_tiny.json']}`
+- `drum_fills_instruments_general_midi.json`: `{hashes['drum_fills_instruments_general_midi.json']}`
+
+## Do not regress
+
+Do not re-author fills around Tiny limitations. Do not concatenate activity levels. Do not add autonomous fills to activity level 5. Do not use host timers as a musical clock. Do not reset transport or sequencer phase to launch or edit fills.
+'''
+          out.write_text(content, encoding='utf-8')
+          PY
+
+      - name: Remove temporary transfer/finalizer machinery
+        run: |
+          git rm -f --ignore-unmatch \
+            .github/workflows/materialize-gamma9001-drum-refresh.yml \
+            .github/workflows/finalize-gamma9001-drum-refresh.yml \
+            .github/workflows/regenerate-gamma9001-fills.yml \
+            amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py \
+            amysynth_version/design/rhythm_rework/new_patterns/drum_activity_timing.refresh.json.gz.b64.part1 \
+            amysynth_version/design/rhythm_rework/new_patterns/drum_activity_timing.refresh.json.gz.b64.part2 \
+            amysynth_version/design/rhythm_rework/new_patterns/drum_activity_timing.refresh.json.gz.b64.part3 \
+            amysynth_version/design/rhythm_rework/new_patterns/drum_activity_timing.refresh.json.gz.b64.part4
+
+      - name: Commit regenerated fill catalogue
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            amysynth_version/qt_frontend/music/drums/drum_fills_timing.json \
+            amysynth_version/qt_frontend/music/drums/drum_fill_continuation_roles.json \
+            amysynth_version/qt_frontend/music/drums/drum_fills_instruments_gamma9001.json \
+            amysynth_version/qt_frontend/music/drums/drum_fills_instruments_tiny.json \
+            amysynth_version/qt_frontend/music/drums/drum_fills_instruments_general_midi.json \
+            amysynth_version/qt_frontend/music/catalogue_provenance.json \
+            amysynth_version/qt_frontend/tests/test_drum_patterns.py \
+            amysynth_version/design/rhythm_rework/new_patterns/canonical_drum_data_manifest.json \
+            amysynth_version/design/rhythm_rework/new_patterns/CODEX_HANDOVER_GAMMA9001_FILL_REFRESH.md
+          git diff --cached --check
+          git commit -m 'Regenerate Gamma9001-aligned drum fills'
+          git push origin HEAD:feature/gamma9001-drum-pattern-refresh
