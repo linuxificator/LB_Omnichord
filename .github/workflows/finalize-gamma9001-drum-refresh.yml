@@ -151,6 +151,8 @@ jobs:
           activity_path.write_bytes(encoded)
 
           manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+          if int(manifest.get('manifest_revision', 0)) != 1:
+              raise SystemExit('canonical drum manifest format revision changed unexpectedly')
           for entry in manifest['files']:
               if entry['name'] == 'drum_activity_timing.json':
                   entry['sha256'] = canonical_sha
@@ -230,7 +232,7 @@ jobs:
                  'Final canonical runtime JSON SHA-256:\n\n`' + sha + '`')
           text = text.replace(old, new, 1)
           marker = '\n## 13. Definition of done\n'
-          evidence = f'''\n## 12a. Integration validation evidence\n\nThe staged payload was SHA-verified and materialized. Nine repetitive/electronic/odd-meter rhythms intentionally use a musically complete one-bar period rather than duplicating the same onset definitions into an older two-bar storage period; this permits richer level-4/5 grooves while remaining within the 56-event sequencer limit. Samba's unchanged 384-tick groove is represented as the equivalent one 4/4 bar so the existing 4/4 fill scheduler retains legal beat positions. No fill timing, kit mapping, transport code or AMY architecture was changed.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload SHA and structural validator: passed;\n- all 54 meter/period relationships checked at 96 PPQ;\n- all five levels remain cumulative and <=56 events;\n- every level-1 foundation has >=5 events and >=2 logical roles;\n- no timing event contains concrete kit data;\n- `tests/test_drum_patterns.py`: passed;\n- `tests/test_catalogue_provenance.py`: passed;\n- official-CI-equivalent unit environment (`libegl1`, pinned desktop constraints): `python tests/run_tests.py --suite unit --coverage` passed.\n\nThe temporary transfer payload, materializer and one-shot workflows are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
+          evidence = f'''\n## 12a. Integration validation evidence\n\nThe staged payload was SHA-verified and materialized. Nine repetitive/electronic/odd-meter rhythms intentionally use a musically complete one-bar period rather than duplicating the same onset definitions into an older two-bar storage period; this permits richer level-4/5 grooves while remaining within the 56-event sequencer limit. Samba's unchanged 384-tick groove is represented as the equivalent one 4/4 bar so the existing 4/4 fill scheduler retains legal beat positions. No fill timing, kit mapping, transport code or AMY architecture was changed. The canonical drum manifest remains format revision 1 because only catalogue content/hash metadata changed.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload SHA and structural validator: passed;\n- all 54 meter/period relationships checked at 96 PPQ;\n- all five levels remain cumulative and <=56 events;\n- every level-1 foundation has >=5 events and >=2 logical roles;\n- no timing event contains concrete kit data;\n- `tests/test_drum_patterns.py`: passed;\n- `tests/test_catalogue_provenance.py`: passed;\n- official-CI-equivalent unit environment (`libegl1`, pinned desktop constraints): `python tests/run_tests.py --suite unit --coverage` passed.\n\nThe temporary transfer payload, materializer and one-shot workflows are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
           if '## 12a. Integration validation evidence' not in text:
               text = text.replace(marker, evidence + marker, 1)
           p.write_text(text, encoding='utf-8')
@@ -249,3 +251,5 @@ jobs:
           git diff --cached --check
           git commit -m 'Materialize richer Gamma9001 drum activity catalogue'
           git push origin HEAD:feature/gamma9001-drum-pattern-refresh
+
+# retry after keeping manifest format revision stable
