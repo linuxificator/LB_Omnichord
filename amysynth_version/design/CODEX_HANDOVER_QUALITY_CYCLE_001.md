@@ -33,11 +33,11 @@ Executed evidence before the final verification pass:
 - all 47 automatically discovered unit scripts passed at the branch base;
 - architecture, composition, static-contract and quality-guardrail tests
   passed independently;
-- a requested local coverage run could not start because the existing local
-  virtual environment does not contain the declared `coverage==7.15.4` test
-  dependency. The dependency is correctly declared and release CI installs
-  the test requirements. Nothing was installed during this cycle because the
-  user required work that needs no additional authorization.
+- the initial local coverage attempt could not start because the existing
+  virtual environment did not contain the correctly declared
+  `coverage==7.15.4` test dependency. After the user returned and explicitly
+  requested coverage support, that exact pin was installed in the existing
+  Omnichord virtual environment and the coverage run was repeated successfully.
 
 ## Architecture assessment
 
@@ -209,6 +209,7 @@ The final branch state passed:
 ```bash
 /home/jeroen/omnichord/omnichord-env/bin/python tests/run_quality.py
 /home/jeroen/omnichord/omnichord-env/bin/python tests/run_tests.py --suite all
+/home/jeroen/omnichord/omnichord-env/bin/python tests/run_tests.py --suite unit --coverage
 /home/jeroen/omnichord/omnichord-env/bin/python ../esp32p4/tests/test_firmware_contract.py
 git diff --check
 ```
@@ -216,5 +217,15 @@ git diff --check
 The complete local suite includes quality, every discovered unit module,
 portable separated input processes, Linux platform input, frontend, serial,
 presets, native controls and native rhythm. No sandbox exception was needed.
-Coverage remains the separately recorded local-environment limitation above;
-it was not presented as passing.
+
+The subprocess-aware unit coverage run combined 36 data files and wrote
+`test-artifacts/coverage-unit/coverage.json`. It reports 5,005 of 8,663 lines
+covered (57.8% statement coverage) and 1,069 of 2,606 branches covered (41.0%).
+These are navigation measurements, not a global pass threshold. The pure and
+extracted modules are generally much stronger than the three large facades;
+the lowest unit-only branch coverage remains in `app_core.py`,
+`midi_player.py`, `midi_integration.py`, `performance_backend.py` and
+`program_amy.py`. Those modules also receive integration/native coverage that
+is deliberately not distorted into this unit report. Coverage warnings from
+static/package tests with no executed production Python are expected; their
+architectural assertions still passed.
