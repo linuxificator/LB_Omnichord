@@ -59,7 +59,7 @@ from preset_plan import (
     compile_omni_preset_plan,
 )
 from runtime_paths import production_frontend_asset_root
-from screenshot_state import populate_screenshot_input_controls
+from screenshot_state import populate_screenshot_input_controls, save_png_screenshot
 from synth_state import SynthState
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
@@ -3878,7 +3878,7 @@ def run_application(
         def capture_screen(name: str) -> bool:
             image = window.grabWindow()
             path = capture_dir / f"{name}.png"
-            if image.isNull() or not image.save(str(path), b"PNG"):
+            if not save_png_screenshot(image, path):
                 print(
                     f"Could not capture Qt screen to {path}",
                     file=sys.stderr,

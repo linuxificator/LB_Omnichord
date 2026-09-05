@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+
+from PySide6.QtGui import QColor, QImage
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
-from screenshot_state import populate_screenshot_input_controls  # noqa: E402
+from screenshot_state import (  # noqa: E402
+    populate_screenshot_input_controls,
+    save_png_screenshot,
+)
 
 
 class RecordingInjector:
@@ -34,6 +40,15 @@ class RecordingInjector:
 
 
 class ScreenshotStateTests(unittest.TestCase):
+    def test_png_capture_uses_qt_supported_suffix_inference(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="omnichord-capture-") as raw:
+            path = Path(raw) / "screen.png"
+            image = QImage(8, 8, QImage.Format.Format_RGBA8888)
+            image.fill(QColor("#123456"))
+
+            self.assertTrue(save_png_screenshot(image, path))
+            self.assertFalse(QImage(str(path)).isNull())
+
     def test_fixture_stages_rotaries_and_released_buttons_for_both_protocols(
         self,
     ) -> None:

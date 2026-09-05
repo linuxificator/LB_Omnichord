@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Protocol
 
 
@@ -9,6 +10,7 @@ class ScreenshotMidiInputInjector(Protocol):
     def process_midi_control(self, channel: int, controller: int, value: int) -> None: ...
 
     def process_midi_button(self, channel: int, note: int, velocity: int) -> None: ...
+
 
 class ScreenshotOscInputInjector(Protocol):
     """Internal OSC processing surface used by deterministic screenshots."""
@@ -20,6 +22,20 @@ class ScreenshotOscInputInjector(Protocol):
         value: float,
         value_type: str,
     ) -> None: ...
+
+
+class ScreenshotImage(Protocol):
+    """Small image surface needed by the deterministic capture path."""
+
+    def isNull(self) -> bool: ...
+
+    def save(self, file_name: str) -> bool: ...
+
+
+def save_png_screenshot(image: ScreenshotImage, path: Path) -> bool:
+    """Save a non-null image, letting Qt infer PNG from the file suffix."""
+
+    return not image.isNull() and image.save(str(path))
 
 
 def populate_screenshot_input_controls(
