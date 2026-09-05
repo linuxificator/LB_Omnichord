@@ -35,8 +35,8 @@ Physical ESP32-P4 timing proof is still open.
 AMY feature head is `f03875f2`. Python exposes the complete operation as
 `action='start'`, `'stop'`, or `'gate'`; strict wire integers `1`/`0`/`2`
 represent those actions and `vel` is reserved for note velocity. The exact
-Omnichord AMY release is `releases/amy_omnichord_R20260904T215233` at
-`8a896e9319957ed8eea49f26fe16378fcc2a27c5`. LB uses one stable root tag per
+Omnichord AMY release is `releases/amy_omnichord_R20260905T104903` at
+`11f0c39fe8350e7a32b9a1c7b1114f4a7806d795`. LB uses one stable root tag per
 fill-launch, bass and automatic-chord lane and keeps no AMY clock, execution,
 note-release or authoring high-water state.
 
