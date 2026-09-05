@@ -41,6 +41,9 @@ Read these documents in order for current reusable-sequence work:
 10. `CODEX_HANDOVER_DUAL_ESP32P4_RELEASE.md` — migration of the complete
     Gamma9001 firmware to reusable sequences and the two-profile release ZIP
     and flashing contract.
+11. `CODEX_HANDOVER_IGNORED_NOTEOFF_BOOKKEEPING.md` — standalone reproduction
+    and repair of the one-shot drum forgotten-pool overflow, its separation
+    from the sequence PR and the exact downstream release integration.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful

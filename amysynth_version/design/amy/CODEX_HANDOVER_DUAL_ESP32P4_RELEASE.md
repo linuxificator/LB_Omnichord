@@ -5,8 +5,8 @@ Date: 2026-09-05
 ## Context
 
 The Omnichord `rework/sequencer` branch pins AMY fork release
-`releases/amy_omnichord_R20260905T104903` at immutable commit
-`11f0c39fe8350e7a32b9a1c7b1114f4a7806d795`. That release combines the
+`releases/amy_omnichord_R20260905T133309` at immutable commit
+`f3d72dfcec453a274d726869d5bf32533c3cca3b`. That release combines the
 Shorepine-facing reusable-sequence implementation with the fork integrations
 needed by the application: runtime bus sizing, Gamma9001, socket/Android
 services, configurable embedded audio geometry and larger sequence capacities.

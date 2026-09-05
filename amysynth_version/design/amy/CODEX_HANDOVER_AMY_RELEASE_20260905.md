@@ -5,10 +5,10 @@ the next release gate
 Recorded: 2026-09-05
 AMY PR branch: `rework/sequencer`
 AMY PR source: `3872b4be16af4f486c8f3259d44478ee7174864f`
-AMY release branch: `releases/amy_omnichord_R20260905T104903`
-AMY release commit: `11f0c39fe8350e7a32b9a1c7b1114f4a7806d795`
+AMY release branch: `releases/amy_omnichord_R20260905T133309`
+AMY release commit: `f3d72dfcec453a274d726869d5bf32533c3cca3b`
 LB branch: `rework/sequencer`
-LB pin commit: `1327f4c`
+LB pin/integration commit: `084fd48`
 
 ## Purpose and construction
 
@@ -65,7 +65,7 @@ handover references to `8a896e93` remain historical and must not be treated as
 the current build input.
 
 The detached checkout at `/home/jeroen/omnichord/amyfork/amy` was moved to
-`11f0c39f`. `qt_frontend/prepare_local_amy.sh` rebuilt and force-installed
+`f3d72dfc`. `qt_frontend/prepare_local_amy.sh` rebuilt and force-installed
 `c_amy` into `/home/jeroen/omnichord/omnichord-env` from that exact checkout
 with Gamma9001. Consequently `run_local.sh` now loads this release; it does not
 silently rebuild AMY when the application starts.
@@ -97,7 +97,7 @@ SHA:
 - all unit suites;
 - separate-process portable input and Linux physical-input contracts;
 - frontend, serial, presets, native-control and native-rhythm integrations;
-- explicit release-input verification reporting AMY `11f0c39f`.
+- explicit release-input verification reporting AMY `f3d72dfc`.
 
 The standalone ASan/UBSan Unix-socket executable could compile but the managed
 sandbox refused creation of its pathname socket. This is an execution-
