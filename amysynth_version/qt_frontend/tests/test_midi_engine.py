@@ -127,6 +127,7 @@ class MidiAmyEngineTests(unittest.TestCase):
             },
         )()
         backend.channels = [99, 99, 99, 99, 99, 99]
+        backend._chord_input_channel = 7
         backend.process_midi_note(1, 60, 100, True)
         backend.process_midi_note(1, 60, 0, False)
 

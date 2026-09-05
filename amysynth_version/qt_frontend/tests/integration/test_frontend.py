@@ -548,6 +548,152 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(list(app.action("midiExtraControls", 0)), [])
             self.assertEqual(list(app.action("midiCommonControls", 0)), [])
 
+    def test_external_midi_chord_channel_is_monophonic_and_last_held_wins(
+        self,
+    ) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertEqual(int(app.action("midiChordInputChannel")), 7)
+
+            start = app.bridge.count()
+            app.action("injectMidiNote", 7, 60, 100, True)
+            app.bridge.wait_for_lines(
+                ["l0i3Z", "n60l1i3Z"],
+                start=start,
+            )
+            self.assertTrue(bool(app.query("externalChordActive")))
+            self.assertEqual(int(app.query("activeRowIndex")), 3)
+            self.assertEqual(int(app.query("activeRootSemitone")), 0)
+            self.assertEqual(int(app.action("octaveIndexForRow", 3)), 3)
+
+            waiting_start = app.bridge.count()
+            app.action("injectMidiNote", 7, 62, 100, True)
+            app.action("injectMidiNote", 7, 64, 100, True)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertFalse(
+                any("i3" in line for line in app.bridge.lines_since(waiting_start))
+            )
+
+            takeover_start = app.bridge.count()
+            app.action("injectMidiNote", 7, 60, 0, False)
+            app.bridge.wait_for_lines(
+                ["l0i3Z", "n64l1i3Z"],
+                start=takeover_start,
+            )
+            self.assertEqual(int(app.query("activeRootSemitone")), 4)
+            self.assertEqual(int(app.action("octaveIndexForRow", 3)), 3)
+
+            app.action("injectMidiNote", 7, 62, 0, False)
+            stop_start = app.bridge.count()
+            app.action("injectMidiNote", 7, 64, 0, False)
+            app.bridge.wait_for_lines(["l0i3Z"], start=stop_start)
+            self.assertFalse(bool(app.query("externalChordActive")))
+
+            outside_start = app.bridge.count()
+            app.action("injectMidiNote", 7, 12, 100, True)
+            app.bridge.wait_for_lines(["n12l1i3Z"], start=outside_start)
+            self.assertEqual(int(app.action("octaveIndexForRow", 3)), -1)
+            app.action("injectMidiNote", 7, 12, 0, False)
+
+    def test_external_midi_chord_respects_screen_priority_and_octave_lock(
+        self,
+    ) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+
+            app.action("pressChord", 0, 0)
+            app.action("injectMidiNote", 7, 64, 100, True)
+            self.assertFalse(bool(app.query("externalChordActive")))
+            self.assertEqual(int(app.query("activeRowIndex")), 0)
+            self.assertEqual(int(app.query("activeRootSemitone")), 0)
+            app.action("injectMidiNote", 7, 64, 0, False)
+            app.action("releaseChord", 0, 0)
+
+            app.action("injectMidiNote", 7, 60, 100, True)
+            self.assertTrue(bool(app.query("externalChordActive")))
+            self.assertEqual(int(app.action("octaveIndexForRow", 3)), 3)
+
+            app.action("pressChord", 1, 9)
+            self.assertEqual(int(app.query("activeRowIndex")), 3)
+            self.assertEqual(int(app.query("activeRootSemitone")), 0)
+            app.action("setRowOctave", 3, 1)
+            self.assertEqual(int(app.action("octaveIndexForRow", 3)), 3)
+
+            app.action("setRowOctave", 2, 5)
+            self.assertEqual(int(app.action("octaveIndexForRow", 2)), 5)
+            old_chord = int(app.action("chordIndexForRow", 3))
+            app.action("setRowChordType", 3, 0 if old_chord else 1)
+            self.assertNotEqual(int(app.action("chordIndexForRow", 3)), old_chord)
+            old_inversion = str(app.action("inversionLabelForRow", 3))
+            app.action("cycleRowInversion", 3)
+            self.assertNotEqual(
+                str(app.action("inversionLabelForRow", 3)),
+                old_inversion,
+            )
+
+            app.action("injectMidiNote", 7, 60, 0, False)
+            app.action("pressChord", 1, 9)
+            self.assertEqual(int(app.query("activeRowIndex")), 1)
+            self.assertEqual(int(app.query("activeRootSemitone")), 9)
+            app.action("releaseChord", 1, 9)
+            app.action("setRowOctave", 3, 1)
+            self.assertEqual(int(app.action("octaveIndexForRow", 3)), 1)
+
+    def test_external_chord_input_duplicates_note_to_matching_midi_row(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertEqual(int(app.action("midiChannel", 4)), 5)
+            app.action("cycleMidiChannel", 4)
+            app.action("cycleMidiChannel", 4)
+            self.assertEqual(int(app.action("midiChannel", 4)), 7)
+
+            start = app.bridge.count()
+            app.action("injectMidiNote", 7, 60, 100, True)
+            app.bridge.wait_for_lines(["n60l1i3Z"], start=start)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertTrue(
+                any(
+                    line.startswith("n60l") and line.endswith("i9Z")
+                    for line in app.bridge.lines_since(start)
+                ),
+                "matching MIDI row did not receive the duplicated note-on",
+            )
+
+            stop_start = app.bridge.count()
+            app.action("injectMidiNote", 7, 60, 0, False)
+            app.bridge.wait_for_lines(
+                ["l0i3Z", "n60l0i9Z"],
+                start=stop_start,
+            )
+
+    def test_chord_input_channel_cycles_through_omni_and_resets_ownership(
+        self,
+    ) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            app.action("injectMidiNote", 7, 60, 100, True)
+            self.assertTrue(bool(app.query("externalChordActive")))
+
+            reset_start = app.bridge.count()
+            app.action("cycleMidiChordInputChannel")
+            app.bridge.wait_for_lines(["l0i3Z"], start=reset_start)
+            self.assertEqual(int(app.action("midiChordInputChannel")), 8)
+            self.assertFalse(bool(app.query("externalChordActive")))
+
+            app.action("injectMidiNote", 7, 60, 0, False)
+            self.assertFalse(bool(app.query("externalChordActive")))
+            app.action("injectMidiNote", 8, 62, 100, True)
+            self.assertTrue(bool(app.query("externalChordActive")))
+            app.action("injectMidiNote", 8, 62, 0, False)
+
+            for _ in range(8):
+                app.action("cycleMidiChordInputChannel")
+            self.assertEqual(int(app.action("midiChordInputChannel")), 16)
+            app.action("cycleMidiChordInputChannel")
+            self.assertEqual(int(app.action("midiChordInputChannel")), 0)
+            app.action("cycleMidiChordInputChannel")
+            self.assertEqual(int(app.action("midiChordInputChannel")), 1)
+
     def test_midi_control_learn_routes_hidden_midi_and_omni_instruments(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
