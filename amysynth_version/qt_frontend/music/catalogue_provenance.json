@@ -33,23 +33,23 @@
     },
     {
       "path": "music/drums/drum_fills_timing.json",
-      "sha256": "c9cef2ab4afda67042a03d630408e2d58d5e6fcab81ccc47caea79663092b527",
+      "sha256": "6efeb1ba54401a02355674c5990ea06c312e13e4eadaeff288330bdc54870c45",
       "count_path": [
         "fills"
       ],
       "expected_count": 270,
       "schema": "music/schema/drum_fills_v2.schema.json",
-      "process": "curated original fill timing catalogue; source bibliography and design contract are embedded"
+      "process": "LB-authored 2026-09-05 fill refresh derived from each current level-3 activity groove; genre-specific transition overlays; Gamma9001 musical reference; rotating start positions are aligned to ordinary beat, half-bar, compound-meter or odd-meter grouping boundaries; Tiny is compatibility degradation only"
     },
     {
       "path": "music/drums/drum_fill_continuation_roles.json",
-      "sha256": "4faf22e95ce42ee564158fcfd25588117278513baee0944d2c2e069b229059b3",
+      "sha256": "b235ab5091c1a8c31a6aed7794cb017c220ebfd512ec759fa1a2c9238515735e",
       "count_path": [
         "fills"
       ],
       "expected_count": 270,
       "schema": "music/schema/drum_continuation_v1.schema.json",
-      "process": "LB-specific continuation policy derived manually from the fill catalogue"
+      "process": "LB-authored 2026-09-05 activity-aware continuation policy; electronic kick, jazz timekeeping and Latin timeline/shaker continuities are retained where appropriate"
     },
     {
       "path": "music/drums/drum_activity_instruments_tiny.json",
@@ -83,33 +83,33 @@
     },
     {
       "path": "music/drums/drum_fills_instruments_tiny.json",
-      "sha256": "089856e64ab7a3cd5244f9ac0da000b31a52f82fafc38a5294a10fceb39488be",
+      "sha256": "7550bbc7f52bb4e4ee5c31c087247e9a280460c1cb7722d16f467ad2b93aba00",
       "count_path": [
         "rhythm_profile"
       ],
       "expected_count": 54,
       "schema": "music/schema/drum_kit_v1.schema.json",
-      "process": "manual role mapping against AMY tiny PCM inventory"
+      "process": "Tiny compatibility/degradation realization synchronized to the corresponding activity profile; not an authoring constraint"
     },
     {
       "path": "music/drums/drum_fills_instruments_gamma9001.json",
-      "sha256": "64d10e616efd1f37a3f9841f6e4a0fc34d9893a6c42fc1de797211ddadf4a191",
+      "sha256": "53110d29d6535f7218bd3386ef26d1d248e7085075a563a42f8efbfed1844047",
       "count_path": [
         "rhythm_profile"
       ],
       "expected_count": 54,
       "schema": "music/schema/drum_kit_v1.schema.json",
-      "process": "manual role mapping against AMY Gamma9001 kit patches 384-390"
+      "process": "Gamma9001 fill realization synchronized to the corresponding refreshed activity profile per rhythm"
     },
     {
       "path": "music/drums/drum_fills_instruments_general_midi.json",
-      "sha256": "67df87f7ed540f0359363e471e5130725a89d48e30e5898049874848ae3e5438",
+      "sha256": "c940f8bce950fa62115df3d0486d21c8da0de8d3e2540f6e23b439063611e768",
       "count_path": [
         "rhythm_profile"
       ],
       "expected_count": 54,
       "schema": "music/schema/drum_kit_v1.schema.json",
-      "process": "manual role mapping against General MIDI percussion notes"
+      "process": "General-MIDI compatibility realization synchronized to the corresponding activity profile"
     }
   ]
 }

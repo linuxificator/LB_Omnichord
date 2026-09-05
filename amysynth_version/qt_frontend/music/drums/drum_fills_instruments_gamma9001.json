@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "title": "LB Omnichord drum fills instrument realization — gamma9001",
+  "title": "LB Omnichord drum fills instrument realization \u2014 gamma9001",
   "timing_catalogue": "drum_fills_timing.json",
   "kit_family": "gamma9001",
   "separation_contract": {
@@ -8,7 +8,8 @@
     "this_file_may_not_change_ticks": true,
     "this_file_may_not_add_or_remove_timing_events": true,
     "role_resolution_only": true,
-    "rule": "Resolve each event logical_role using the profile selected for that rhythm. Velocity comes from the timing catalogue and may be scaled but not used to move events."
+    "rule": "Resolve each event logical_role using the profile selected for that rhythm. Velocity comes from the timing catalogue and may be scaled but not used to move events.",
+    "quality_reference": "Gamma9001 determines authored musical colour; Tiny is compatibility degradation only."
   },
   "source_info": {
     "implementation": "AMY Gamma9001 GM-mapped kit patches",

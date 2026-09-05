@@ -239,6 +239,31 @@ class DrumPatternTests(unittest.TestCase):
                         )
                 self.assertEqual(actual, expected, (rhythm.rhythm_id, level_index))
 
+    def test_fill_start_rotation_and_base_groove_profiles(self) -> None:
+        maximum = 0
+        for rhythm in self.catalog.rhythms.values():
+            beats_per_bar = int(rhythm.meter.split("/", 1)[0])
+            occurrences = AmySerialClient._fill_occurrences(
+                list(range(len(rhythm.fills))),
+                rhythm.fills,
+            )
+            maximum = max(maximum, len(occurrences))
+            for fill, start in occurrences:
+                self.assertIn(start, fill.allowed_start_beats)
+                self.assertLessEqual(
+                    (start - 1) * fill.beat_unit_ticks + fill.duration_ticks,
+                    beats_per_bar * fill.beat_unit_ticks,
+                    fill.fill_id,
+                )
+        self.assertEqual(maximum, 10)
+        for kit_name in KIT_FAMILIES:
+            kit = self.catalog.kits[kit_name]
+            self.assertEqual(
+                dict(kit.fill_rhythm_profile),
+                dict(kit.activity_rhythm_profile),
+                kit_name,
+            )
+
     def test_fill_sequences_preserve_events_and_only_add_generic_gates(self) -> None:
         event_pattern = re.compile(
             r"^H(?P<tick>\d+),(?P<period>\d+),(?P<sequence>\d+)"
