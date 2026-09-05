@@ -43,6 +43,8 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertTrue(resolved.osc_input.enabled)
         self.assertEqual(resolved.osc_input.listen_address, "0.0.0.0")
         self.assertEqual(resolved.osc_input.listen_port, 8000)
+        self.assertTrue(resolved.osc_input.advertise)
+        self.assertEqual(resolved.osc_input.service_name, "LB Omnichord")
         self.assertTrue(resolved.osc_input.configured)
         self.assertEqual(resolved.capacities.voices.manual_chord, 7)
         self.assertEqual(resolved.capacities.max_sequencer_tags, 1280)
@@ -51,6 +53,7 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertEqual(resolved.role_level("bass"), 3.2)
         self.assertEqual(resolved.role_level("chord"), 1.0)
         self.assertEqual(resolved.role_level("unknown"), 1.0)
+        self.assertFalse(resolved.debug.log_amy_commands)
         self.assertEqual(resolved.layout.midi_row_buses, (4, 5, 6, 7, 8, 9))
         self.assertEqual(
             resolved.layout.sequencer_tag_ranges,
@@ -186,7 +189,11 @@ class ResolvedConfigTests(unittest.TestCase):
 
     def test_absent_osc_endpoint_is_an_explicit_unconfigured_capability(self) -> None:
         unconfigured = copy.deepcopy(self.shipped)
-        unconfigured["osc_input"] = {"enabled": True}
+        unconfigured["osc_input"] = {
+            "enabled": True,
+            "advertise": False,
+            "service_name": "LB Omnichord",
+        }
 
         with tempfile.TemporaryDirectory() as directory:
             resolved = load_resolved_amy_config(
@@ -197,6 +204,33 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertFalse(resolved.osc_input.configured)
         self.assertIsNone(resolved.osc_input.listen_address)
         self.assertIsNone(resolved.osc_input.listen_port)
+
+    def test_dns_sd_service_name_reports_dns_label_errors(self) -> None:
+        invalid = copy.deepcopy(self.shipped)
+        invalid["osc_input"]["service_name"] = f" {'é' * 32} "
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ConfigValidationError) as caught:
+                load_resolved_amy_config(
+                    self.write_config(Path(directory), invalid)
+                )
+
+        self.assertEqual(
+            [issue.path for issue in caught.exception.issues],
+            ["$.osc_input.service_name", "$.osc_input.service_name"],
+        )
+
+        invalid = copy.deepcopy(self.shipped)
+        invalid["osc_input"]["service_name"] = "Studio\nOmnichord"
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(ConfigValidationError) as caught:
+                load_resolved_amy_config(
+                    self.write_config(Path(directory), invalid)
+                )
+        self.assertEqual(
+            caught.exception.issues[0].message,
+            "must not contain control characters",
+        )
 
     def test_bad_config_fails_before_transport_is_opened(self) -> None:
         invalid = copy.deepcopy(self.shipped)

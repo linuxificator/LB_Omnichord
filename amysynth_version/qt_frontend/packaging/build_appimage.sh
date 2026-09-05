@@ -52,7 +52,12 @@ python -m PyInstaller \
     --additional-hooks-dir "$frontend_dir/packaging/pyinstaller_hooks" \
     --hidden-import c_amy \
     --collect-all amy \
+    --collect-all zeroconf \
+    --hidden-import ifaddr \
+    --copy-metadata zeroconf \
+    --copy-metadata ifaddr \
     --add-data "$frontend_dir/licence.txt:." \
+    --add-data "$frontend_dir/THIRD_PARTY_NOTICES.md:." \
     --add-data "$frontend_dir/config:config" \
     --add-data "$frontend_dir/gui:gui" \
     --add-data "$frontend_dir/instruments:instruments" \

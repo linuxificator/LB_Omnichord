@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from argparse import Namespace
 from collections.abc import Sequence
+from functools import partial
 from pathlib import Path
 from typing import Any, cast
 
@@ -21,6 +22,7 @@ from config_loader import (
 from midi_integration import InstrumentBackend
 from midi_platform_adapters import production_midi_input_port
 from osc_input import production_osc_input_port
+from osc_discovery_platform_adapters import production_osc_service_advertiser
 from program_amy import (
     ProgramAmyLocalClient,
     ProgramAmySerialClient,
@@ -82,7 +84,10 @@ def production_dependencies(
         socket_client=cast(ClientFactory, ProgramAmySocketClient),
         local_client=cast(ClientFactory, ProgramAmyLocalClient),
         midi_input_port=production_midi_input_port,
-        osc_input_port=production_osc_input_port,
+        osc_input_port=partial(
+            production_osc_input_port,
+            advertiser_factory=production_osc_service_advertiser,
+        ),
         private_files_dir=qt_private_files_dir,
         resolve_package_runtime=resolve_package_runtime,
         display_diagnostics=display_diagnostic_lines,

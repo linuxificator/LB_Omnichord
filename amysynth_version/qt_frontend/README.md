@@ -141,6 +141,14 @@ is green while listening, flashes green on input and is red when its
 listener/network is unavailable. Removing the OSC endpoint from the user config
 removes that technology item entirely.
 
+On Linux, Raspberry Pi, macOS and Windows the listening endpoint also announces
+itself as the standard `_osc._udp` DNS-SD service named `LB Omnichord`.
+Compatible controller apps can therefore find it automatically. Set
+`osc_input.advertise` to `false` or change `osc_input.service_name` in the user
+configuration if desired; there is intentionally no UI preference. Android
+continues to accept configured OSC UDP input but does not advertise it because
+reliable mDNS there requires a native Android lifecycle bridge.
+
 The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
 
 ## Regression tests

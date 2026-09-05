@@ -431,6 +431,20 @@ class HeadlessApp:
         artifact_root.mkdir(parents=True, exist_ok=True)
         self.artifact_dir = artifact_root
         self.frontend_log = self.home / ".omnichord" / "amy_debug.log"
+        # Production defaults command logging to off. This integration probe
+        # deliberately opts in because one test verifies scheduler ordering
+        # from the independently written transport log.
+        test_config = json.loads(
+            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
+        test_config["debug"]["log_amy_commands"] = True
+        test_config_dir = self.home / ".omnichord" / "config"
+        test_config_dir.mkdir(parents=True, exist_ok=True)
+        self.test_amy_config = test_config_dir / "amy_config.json"
+        self.test_amy_config.write_text(
+            json.dumps(test_config, indent=2) + "\n",
+            encoding="utf-8",
+        )
         self.api_port = free_tcp_port()
         self.bridge = SerialAmyBridge(
             self.artifact_dir,
@@ -446,6 +460,8 @@ class HeadlessApp:
             [
                 sys.executable,
                 str(TEST_APP),
+                "--amy-config",
+                str(self.test_amy_config),
                 "--serial-port",
                 self.bridge.serial_port,
                 "--serial-baud",

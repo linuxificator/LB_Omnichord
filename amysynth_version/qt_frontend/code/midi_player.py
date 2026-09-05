@@ -40,6 +40,7 @@ from user_data import MIDI_PRESET_DIR
 
 MIDI_ROW_COUNT = 6
 MIDI_PRESET_COUNT = 18
+DEFAULT_CHORD_INPUT_CHANNEL = 7
 MIDI_DRUM_KEY = "drum_kit_0"
 MIDI_FACTORY_DIR = app_core.INSTRUMENT_DIR / "midi_default_presets"
 MIDI_LAST_PRESET_FILE = "last_preset.json"
@@ -430,6 +431,7 @@ class MidiPlayerBackend(QObject):
         self.definitions = tuple(synths) + (drum,)
         self.rows = [SynthState(self.definitions, 0) for _ in range(MIDI_ROW_COUNT)]
         self.channels = [1, 2, 3, 4, 5, 6]
+        self._chord_input_channel = DEFAULT_CHORD_INPUT_CHANNEL
         self.volumes = [0.5] * MIDI_ROW_COUNT
         self._state_version = 0
         self._selected_preset = 1
@@ -520,6 +522,7 @@ class MidiPlayerBackend(QObject):
         self._osc_input_closed = True
         self._pending_midi_input_events.clear()
         self._pending_osc_input_events.clear()
+        self.owner.resetExternalChordInput()
         self._osc_input_port.close()
         self._midi_input_port.close()
         self.engine.close()
@@ -527,6 +530,10 @@ class MidiPlayerBackend(QObject):
     @Property(int, notify=stateChanged)
     def stateVersion(self) -> int:
         return self._state_version
+
+    @Property(int, notify=stateChanged)
+    def chordInputChannel(self) -> int:
+        return self._chord_input_channel
 
     @Property(int, notify=bindingStateChanged)
     def bindingVersion(self) -> int:
@@ -1768,6 +1775,15 @@ class MidiPlayerBackend(QObject):
         self.channels[row] = 1 if current == 0 else (0 if current == 16 else current + 1)
         self._emit_state()
 
+    @Slot()
+    def cycleChordInputChannel(self) -> None:
+        self.owner.resetExternalChordInput()
+        current = self._chord_input_channel
+        self._chord_input_channel = (
+            1 if current == 0 else (0 if current == 16 else current + 1)
+        )
+        self._emit_state()
+
     def _preset_path(self, number: int) -> Path:
         return MIDI_PRESET_DIR / f"m{number}.json"
 
@@ -2125,6 +2141,13 @@ class MidiPlayerBackend(QObject):
         velocity: int,
         is_on: bool,
     ) -> None:
+        if self._chord_input_channel in (0, int(channel)):
+            self.owner.processExternalChordInput(
+                int(channel),
+                int(note),
+                bool(is_on),
+            )
+
         root: int | None = None
         for row in range(MIDI_ROW_COUNT):
             configured = self.channels[row]

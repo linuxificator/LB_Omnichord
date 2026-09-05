@@ -35,6 +35,7 @@ class ReleaseInputs:
     amy: AmyInput
     desktop_python: str
     direct_runtime: dict[str, str]
+    desktop_runtime: dict[str, str]
     direct_build: dict[str, str]
     constraints: dict[str, str]
     component_evidence: tuple[dict[str, Any], ...]
@@ -99,6 +100,12 @@ def load_release_inputs(path: Path = DEFAULT_INPUTS) -> ReleaseInputs:
             str(key): str(value)
             for key, value in _object(
                 python.get("direct_runtime"), "python.direct_runtime"
+            ).items()
+        },
+        desktop_runtime={
+            str(key): str(value)
+            for key, value in _object(
+                python.get("desktop_runtime"), "python.desktop_runtime"
             ).items()
         },
         direct_build={
@@ -198,6 +205,7 @@ def create_release_manifest(
         "python": {
             "desktop": inputs.desktop_python,
             "direct_runtime": inputs.direct_runtime,
+            "desktop_runtime": inputs.desktop_runtime,
             "direct_build": inputs.direct_build,
             "constraints": inputs.constraints,
             "component_evidence": list(inputs.component_evidence),

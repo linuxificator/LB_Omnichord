@@ -120,6 +120,7 @@ class ProgramArchitectureTests(unittest.TestCase):
 
         runner = (ROOT / "tests" / "run_tests.py").read_text(encoding="utf-8")
         self.assertIn('"portable-input-processes"', runner)
+        self.assertIn('"desktop-network-discovery"', runner)
         self.assertIn('"platform-input-linux"', runner)
 
     def test_shipped_json_is_the_authoritative_config(self) -> None:

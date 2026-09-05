@@ -46,6 +46,12 @@ class BackendControlSurface:
             is_on,
         )
 
+    def midiChordInputChannel(self) -> int:
+        return int(self._backend.midiPlayer.chordInputChannel)
+
+    def cycleMidiChordInputChannel(self) -> None:
+        self._backend.midiPlayer.cycleChordInputChannel()
+
     def injectOscControl(
         self,
         address: str,

@@ -1072,6 +1072,8 @@ ApplicationWindow {
                                             .noteButtonWidth
                                     height:
                                         window.rowHeight
+                                    enabled:
+                                        !backend.externalChordActive
 
                                     property bool touchActive:
                                         false
@@ -1271,6 +1273,9 @@ ApplicationWindow {
                                     height:
                                         window.rowHeight
                                     text: modelData
+                                    enabled:
+                                        rowItem.rowIndex !== 3
+                                        || !backend.externalChordActive
 
                                     property bool selected: {
                                         backend.stateVersion

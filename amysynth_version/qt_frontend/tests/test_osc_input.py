@@ -24,6 +24,27 @@ from midi_player import MidiPlayerBackend  # noqa: E402
 from resolved_config import OscInputConfig  # noqa: E402
 
 
+class RecordingAdvertiser:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.starts: list[dict[str, object]] = []
+        self.close_count = 0
+
+    def start(self, *, service_name: str, listen_address: str, port: int) -> None:
+        self.starts.append(
+            {
+                "service_name": service_name,
+                "listen_address": listen_address,
+                "port": port,
+            }
+        )
+        if self.fail:
+            raise OSError("multicast unavailable")
+
+    def close(self) -> None:
+        self.close_count += 1
+
+
 def message(address: str, *values: object) -> bytes:
     builder = OscMessageBuilder(address=address)
     for value in values:
@@ -72,6 +93,73 @@ class OscPacketTests(unittest.TestCase):
 
 
 class OscUdpInputPortTests(unittest.TestCase):
+    def test_advertises_only_after_bind_and_unregisters_on_close(self) -> None:
+        advertiser = RecordingAdvertiser()
+        port_number = unused_udp_port()
+        port = PythonOscUdpInputPort(
+            lambda _event: None,
+            OscInputConfig(
+                True,
+                "127.0.0.1",
+                port_number,
+                advertise=True,
+                service_name="Studio Omnichord",
+            ),
+            advertiser=advertiser,
+        )
+
+        port.start()
+        self.assertEqual(port.lifecycle, "ready")
+        self.assertEqual(
+            advertiser.starts,
+            [
+                {
+                    "service_name": "Studio Omnichord",
+                    "listen_address": "127.0.0.1",
+                    "port": port_number,
+                }
+            ],
+        )
+        port.close()
+        port.close()
+        self.assertEqual(advertiser.close_count, 1)
+
+    def test_discovery_failure_never_disables_osc_input(self) -> None:
+        advertiser = RecordingAdvertiser(fail=True)
+        port = PythonOscUdpInputPort(
+            lambda _event: None,
+            OscInputConfig(
+                True,
+                "127.0.0.1",
+                unused_udp_port(),
+                advertise=True,
+                service_name="LB Omnichord",
+            ),
+            advertiser=advertiser,
+        )
+
+        port.start()
+        self.assertEqual(port.lifecycle, "ready")
+        port.close()
+
+    def test_disabled_advertisement_does_not_publish(self) -> None:
+        advertiser = RecordingAdvertiser()
+        port = PythonOscUdpInputPort(
+            lambda _event: None,
+            OscInputConfig(
+                True,
+                "127.0.0.1",
+                unused_udp_port(),
+                advertise=False,
+                service_name="LB Omnichord",
+            ),
+            advertiser=advertiser,
+        )
+
+        port.start()
+        port.close()
+        self.assertEqual(advertiser.starts, [])
+
     def test_receives_real_udp_after_bad_packet_and_closes_idempotently(self) -> None:
         received: list[OscInputEvent] = []
         arrived = threading.Event()
@@ -140,12 +228,21 @@ class OscUdpInputPortTests(unittest.TestCase):
         occupied.bind(("127.0.0.1", 0))
         try:
             port_number = int(occupied.getsockname()[1])
+            advertiser = RecordingAdvertiser()
             failed = PythonOscUdpInputPort(
                 lambda _event: None,
-                OscInputConfig(True, "127.0.0.1", port_number),
+                OscInputConfig(
+                    True,
+                    "127.0.0.1",
+                    port_number,
+                    advertise=True,
+                    service_name="LB Omnichord",
+                ),
+                advertiser=advertiser,
             )
             failed.start()
             self.assertEqual(failed.lifecycle, "failed")
+            self.assertEqual(advertiser.starts, [])
             self.assertTrue(failed.failure_reason)
             failed_status = failed.status_snapshot(0.0, True)
             self.assertIsNotNone(failed_status)

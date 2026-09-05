@@ -65,6 +65,8 @@ class OscInputConfig:
     enabled: bool
     listen_address: str | None
     listen_port: int | None
+    advertise: bool = False
+    service_name: str = ""
     configured: bool = True
 
 
@@ -331,6 +333,33 @@ def _domain_issues(data: JsonObject) -> list[ConfigIssue]:
                 ConfigIssue(
                     "$.osc_input.listen_address",
                     "must be a numeric IPv4 address",
+                )
+            )
+    if isinstance(osc_input, dict) and "service_name" in osc_input:
+        service_name = str(osc_input["service_name"])
+        encoded_name = service_name.encode("utf-8")
+        if service_name != service_name.strip():
+            issues.append(
+                ConfigIssue(
+                    "$.osc_input.service_name",
+                    "must not start or end with whitespace",
+                )
+            )
+        if len(encoded_name) > 63:
+            issues.append(
+                ConfigIssue(
+                    "$.osc_input.service_name",
+                    "must be at most 63 UTF-8 bytes for DNS-SD",
+                )
+            )
+        if any(
+            ord(character) < 32 or ord(character) == 127
+            for character in service_name
+        ):
+            issues.append(
+                ConfigIssue(
+                    "$.osc_input.service_name",
+                    "must not contain control characters",
                 )
             )
     synth_ids = cast(dict[str, Any], data["synth_ids"])
@@ -615,6 +644,8 @@ def _to_resolved(
                 if osc_input and "listen_port" in osc_input
                 else None
             ),
+            advertise=bool(osc_input["advertise"]) if osc_input else False,
+            service_name=str(osc_input["service_name"]) if osc_input else "",
             configured=bool(
                 osc_input
                 and "listen_address" in osc_input

@@ -199,52 +199,27 @@ Item {
         }
     }
 
-    Button {
+    MidiChannelButton {
         id: channelButton
 
         x: root.contentX + root.wheelWidth + 7
         y: (parent.height - height) / 2
-        width: 62
-        height: 62
-        property var midiTarget: ({
+        midiTarget: ({
             "screen": "midi",
             "kind": "button",
             "action": "cycle_channel",
             "row": root.rowIndex
         })
-        text: {
+        channel: {
             root.controller.stateVersion
-            const channel = root.controller.channel(root.rowIndex)
-            return channel === 0 ? "A" : String(channel)
+            return root.controller.channel(root.rowIndex)
         }
-        font.pixelSize: 20
-        font.bold: true
-
-        contentItem: Text {
-            text: channelButton.text
-            color: root.textColor
-            font: channelButton.font
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-        }
-
-        background: Rectangle {
-            radius: width / 2
-            color:
-                channelButton.pressed
-                ? Qt.darker(root.panelColor, 1.12)
-                : Qt.lighter(root.panelColor, 1.05)
-            border.color: root.accentColor
-            border.width: 2
-        }
-
-        MidiButtonLed {
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: 7
-            z: 2
-            midiControlRouter: root.controller
-            midiTarget: channelButton.midiTarget
-        }
+        panelColor: Qt.lighter(root.panelColor, 1.05)
+        pressedPanelColor: Qt.darker(root.panelColor, 1.12)
+        borderColor: root.accentColor
+        textColor: root.textColor
+        showMidiLed: true
+        midiControlRouter: root.controller
 
         onClicked: {
             if (!root.midiButtonHandled(channelButton.midiTarget)) {

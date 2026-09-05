@@ -69,6 +69,13 @@ same regression, x86_64 emulator and arm64 packaging gates on the selected
 branch without publishing a release; this is the validation route for changes
 to the package policy.
 
+OSC UDP input remains supported on Android, but OSC DNS-SD/mDNS advertisement
+is intentionally not packaged. Reliable Android multicast discovery requires a
+native `WifiManager.MulticastLock` or `NsdManager` lifecycle bridge. The shared
+platform resolver therefore selects a no-op advertiser before importing the
+desktop-only Zeroconf dependency; no Android-specific discovery code is hidden
+inside the portable OSC or UI layers.
+
 PySide6 6.11.2 internally collects detected Android modules through Python
 sets, but python-for-Android writes the resulting list directly into Qt's JNI
 startup array. The build therefore makes a second deploy initialization pass

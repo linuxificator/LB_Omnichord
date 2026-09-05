@@ -222,6 +222,7 @@ class AndroidPackagingTests(unittest.TestCase):
             self.assertIn("pyserial==3.5", app["requirements"])
             self.assertIn("fastjsonschema==2.22.2", app["requirements"])
             self.assertIn("python-osc==1.10.2", app["requirements"])
+            self.assertNotIn("zeroconf", app["requirements"])
             self.assertEqual(app["android.permissions"], "INTERNET")
             self.assertEqual(app["android.add_aars"], str(aar.resolve()))
             self.assertEqual(

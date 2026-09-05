@@ -3,17 +3,17 @@
 Status: authoritative startup configuration contract
 Owner: configuration loading, migration and composition
 Applies to: shipped and per-user AMY frontend configuration on all platforms
-Last verified: 2026-09-03
+Last verified: 2026-09-05
 
 ## Authority and revision
 
 `qt_frontend/config/amy_config.json` is the shipped configuration authority.
-It declares `config_revision`; current revision 7 is structurally defined by
-`config/schema/amy_config_v7.schema.json`. Historical revisions 1–6 remain
+It declares `config_revision`; current revision 11 is structurally defined by
+`config/schema/amy_config_v11.schema.json`. Historical revisions 1–10 remain
 packaged so their contracts are inspectable. The retired pattern capacities
-are optional in revisions 1–3 and required in revisions 4–6; revision 7
-replaces them with the required sequencer-group capacities. The later MIDI
-discovery fields and drum-kit identity follow their own versioned schemas.
+are optional in revisions 1–3 and required in revisions 4–6; revisions 7 and 8
+record the sequencer vocabulary transition. The later role-level and OSC
+service-discovery fields follow their own versioned schemas.
 Unknown keys inside stable objects, missing required values and wrong types are
 startup errors. Required operational values must not reappear as consumer
 fallbacks.
@@ -31,6 +31,7 @@ before serial, MIDI, socket or AMY resources are created.
 - serial transport;
 - MIDI input and whether its platform profile is derived or overridden;
 - portable OSC UDP input;
+- desktop OSC DNS-SD advertisement policy and instance name;
 - voice and AMY runtime capacities;
 - synth, bus and sequencer-tag layout;
 - contiguous fill/chord/drum-base sequencer-group ownership;
@@ -112,6 +113,27 @@ Because revision-1 full documents cannot distinguish that old default from an
 intentional diagnostic selection, a user who deliberately forced `linux` must
 reapply it after migration. Future and malformed revisions fail at
 `$.config_revision` rather than being guessed.
+
+Revision 8 to 9 adds explicit perceptual role levels. The shipped bass role
+gain balances one bass note against the expected energy of a three-note chord;
+instrument-specific envelope and timbre remain separate policy.
+
+Revision 9 to 10 adds `osc_input.advertise: true` and
+`osc_input.service_name: "LB Omnichord"` to every existing OSC section. It does
+not recreate an OSC section a user deliberately omitted. Both values remain
+editable only in JSON. The service name must contain at most 63 UTF-8 bytes and
+may not start or end with whitespace. These defaults live in the shipped file
+and explicit migration only; the OSC listener and discovery adapter contain no
+fallback copy.
+
+Revision 10 to 11 disables continuous AMY wire-command logging. Earlier
+releases enabled `debug.log_amy_commands` by default, which could leave a large
+`~/.omnichord/amy_debug.log` after normal use. The migration changes only that
+switch: it preserves the configured path and logical-event setting so logging
+can still be enabled explicitly for diagnosis. Because a revision-10 document
+cannot distinguish its shipped `true` value from a deliberate user opt-in,
+users who intentionally enabled command logging must re-enable it once after
+the migration.
 
 `JsonStore` writes a flushed same-directory temporary file, replaces the
 current document and retains one `.previous` version after successful updates.

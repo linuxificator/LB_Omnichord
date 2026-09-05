@@ -8,7 +8,8 @@
     "this_file_may_not_change_ticks": true,
     "this_file_may_not_add_or_remove_timing_events": true,
     "role_resolution_only": true,
-    "rule": "Resolve each event logical_role using the profile selected for that rhythm. Velocity comes from the timing catalogue and may be scaled but not used to move events."
+    "rule": "Resolve each event logical_role using fill_profile[fill_id] when present, otherwise the rhythm_profile fallback. Velocity comes from the timing catalogue and may be scaled but not used to move events.",
+    "quality_reference": "Gamma9001 determines authored musical colour; Tiny is compatibility degradation only."
   },
   "source_info": {
     "implementation": "AMY Gamma9001 GM-mapped kit patches",
@@ -1365,6 +1366,751 @@
         "midi_note": 40,
         "gm_role": "Electric Snare"
       }
+    },
+    "gamma_latin_808": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 65,
+        "gm_role": "High Timbale"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 66,
+        "gm_role": "Low Timbale"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 384,
+        "kit": "TR-808",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_latin_909": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 65,
+        "gm_role": "High Timbale"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 66,
+        "gm_role": "Low Timbale"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 385,
+        "kit": "TR-909",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_latin_linn": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 65,
+        "gm_role": "High Timbale"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 66,
+        "gm_role": "Low Timbale"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 386,
+        "kit": "Linn 9000",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_latin_tokyo": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 65,
+        "gm_role": "High Timbale"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 66,
+        "gm_role": "Low Timbale"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 388,
+        "kit": "Tokyo Synthetics",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
+    },
+    "gamma_latin_power": {
+      "low_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 36,
+        "gm_role": "Bass Drum 1"
+      },
+      "low_secondary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 35,
+        "gm_role": "Acoustic Bass Drum"
+      },
+      "backbeat_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "backbeat_soft": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 37,
+        "gm_role": "Side Stick"
+      },
+      "ghost_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 38,
+        "gm_role": "Acoustic Snare"
+      },
+      "timekeeper_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 42,
+        "gm_role": "Closed Hi-Hat"
+      },
+      "timekeeper_open": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 46,
+        "gm_role": "Open Hi-Hat"
+      },
+      "timekeeper_foot": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 44,
+        "gm_role": "Pedal Hi-Hat"
+      },
+      "sustain_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 51,
+        "gm_role": "Ride Cymbal 1"
+      },
+      "sustain_bell": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 53,
+        "gm_role": "Ride Bell"
+      },
+      "section_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 49,
+        "gm_role": "Crash Cymbal 1"
+      },
+      "tonal_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 65,
+        "gm_role": "High Timbale"
+      },
+      "tonal_mid": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 66,
+        "gm_role": "Low Timbale"
+      },
+      "tonal_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "timeline_primary": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "texture_shaker": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 70,
+        "gm_role": "Maracas"
+      },
+      "hand_high": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 63,
+        "gm_role": "Open Hi Conga"
+      },
+      "hand_low": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 64,
+        "gm_role": "Low Conga"
+      },
+      "hand_accent": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 56,
+        "gm_role": "Cowbell"
+      },
+      "dry_click": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 390,
+        "kit": "Percussion",
+        "midi_note": 75,
+        "gm_role": "Claves"
+      },
+      "electronic_detail": {
+        "engine": "amy_gamma9001_gm_patch",
+        "patch": 389,
+        "kit": "80s Power Kit",
+        "midi_note": 40,
+        "gm_role": "Electric Snare"
+      }
     }
   },
   "rhythm_profile": {
@@ -1428,5 +2174,284 @@
     "dual_kit_allowed": true,
     "latin_rule": "Profiles may use main-kit drum roles and patch 390 for Latin/hand-percussion roles. Do not collapse these to one patch if that changes the intended orchestration.",
     "esp32_p4_note": "This is design data only. Gamma9001 storage/build integration on the P4 must be verified separately before selecting this realization at runtime."
+  },
+  "fill_profile": {
+    "drum_fill_0001_pop_8": "gamma_power",
+    "drum_fill_0002_pop_8": "gamma_808",
+    "drum_fill_0003_pop_8": "gamma_909",
+    "drum_fill_0004_pop_8": "gamma_linn",
+    "drum_fill_0005_pop_8": "gamma_tokyo",
+    "drum_fill_0006_pop_16": "gamma_linn",
+    "drum_fill_0007_pop_16": "gamma_808",
+    "drum_fill_0008_pop_16": "gamma_909",
+    "drum_fill_0009_pop_16": "gamma_tokyo",
+    "drum_fill_0010_pop_16": "gamma_power",
+    "drum_fill_0011_slow_ballad": "gamma_linn",
+    "drum_fill_0012_slow_ballad": "gamma_808",
+    "drum_fill_0013_slow_ballad": "gamma_909",
+    "drum_fill_0014_slow_ballad": "gamma_tokyo",
+    "drum_fill_0015_slow_ballad": "gamma_power",
+    "drum_fill_0016_six_eight_ballad": "gamma_jazz_linn",
+    "drum_fill_0017_six_eight_ballad": "gamma_linn",
+    "drum_fill_0018_six_eight_ballad": "gamma_power",
+    "drum_fill_0019_six_eight_ballad": "gamma_909",
+    "drum_fill_0020_six_eight_ballad": "gamma_808",
+    "drum_fill_0021_rock": "gamma_power",
+    "drum_fill_0022_rock": "gamma_808",
+    "drum_fill_0023_rock": "gamma_909",
+    "drum_fill_0024_rock": "gamma_linn",
+    "drum_fill_0025_rock": "gamma_tokyo",
+    "drum_fill_0026_shuffle": "gamma_jazz_linn",
+    "drum_fill_0027_shuffle": "gamma_linn",
+    "drum_fill_0028_shuffle": "gamma_power",
+    "drum_fill_0029_shuffle": "gamma_909",
+    "drum_fill_0030_shuffle": "gamma_808",
+    "drum_fill_0031_punk": "gamma_power",
+    "drum_fill_0032_punk": "gamma_808",
+    "drum_fill_0033_punk": "gamma_909",
+    "drum_fill_0034_punk": "gamma_linn",
+    "drum_fill_0035_punk": "gamma_tokyo",
+    "drum_fill_0036_metal": "gamma_power",
+    "drum_fill_0037_metal": "gamma_808",
+    "drum_fill_0038_metal": "gamma_909",
+    "drum_fill_0039_metal": "gamma_linn",
+    "drum_fill_0040_metal": "gamma_tokyo",
+    "drum_fill_0041_country_train": "gamma_linn",
+    "drum_fill_0042_country_train": "gamma_808",
+    "drum_fill_0043_country_train": "gamma_909",
+    "drum_fill_0044_country_train": "gamma_tokyo",
+    "drum_fill_0045_country_train": "gamma_power",
+    "drum_fill_0046_country_waltz": "gamma_linn",
+    "drum_fill_0047_country_waltz": "gamma_808",
+    "drum_fill_0048_country_waltz": "gamma_909",
+    "drum_fill_0049_country_waltz": "gamma_tokyo",
+    "drum_fill_0050_country_waltz": "gamma_power",
+    "drum_fill_0051_waltz": "gamma_linn",
+    "drum_fill_0052_waltz": "gamma_808",
+    "drum_fill_0053_waltz": "gamma_909",
+    "drum_fill_0054_waltz": "gamma_tokyo",
+    "drum_fill_0055_waltz": "gamma_power",
+    "drum_fill_0056_polka": "gamma_linn",
+    "drum_fill_0057_polka": "gamma_808",
+    "drum_fill_0058_polka": "gamma_909",
+    "drum_fill_0059_polka": "gamma_tokyo",
+    "drum_fill_0060_polka": "gamma_power",
+    "drum_fill_0061_march": "gamma_power",
+    "drum_fill_0062_march": "gamma_808",
+    "drum_fill_0063_march": "gamma_909",
+    "drum_fill_0064_march": "gamma_linn",
+    "drum_fill_0065_march": "gamma_tokyo",
+    "drum_fill_0066_straight_blues": "gamma_power",
+    "drum_fill_0067_straight_blues": "gamma_808",
+    "drum_fill_0068_straight_blues": "gamma_909",
+    "drum_fill_0069_straight_blues": "gamma_linn",
+    "drum_fill_0070_straight_blues": "gamma_tokyo",
+    "drum_fill_0071_twelve_eight_blues": "gamma_jazz_linn",
+    "drum_fill_0072_twelve_eight_blues": "gamma_linn",
+    "drum_fill_0073_twelve_eight_blues": "gamma_power",
+    "drum_fill_0074_twelve_eight_blues": "gamma_909",
+    "drum_fill_0075_twelve_eight_blues": "gamma_808",
+    "drum_fill_0076_jazz_swing": "gamma_jazz_linn",
+    "drum_fill_0077_jazz_swing": "gamma_linn",
+    "drum_fill_0078_jazz_swing": "gamma_power",
+    "drum_fill_0079_jazz_swing": "gamma_909",
+    "drum_fill_0080_jazz_swing": "gamma_808",
+    "drum_fill_0081_jazz_waltz": "gamma_jazz_linn",
+    "drum_fill_0082_jazz_waltz": "gamma_linn",
+    "drum_fill_0083_jazz_waltz": "gamma_power",
+    "drum_fill_0084_jazz_waltz": "gamma_909",
+    "drum_fill_0085_jazz_waltz": "gamma_808",
+    "drum_fill_0086_jazz_shuffle": "gamma_jazz_linn",
+    "drum_fill_0087_jazz_shuffle": "gamma_linn",
+    "drum_fill_0088_jazz_shuffle": "gamma_power",
+    "drum_fill_0089_jazz_shuffle": "gamma_909",
+    "drum_fill_0090_jazz_shuffle": "gamma_808",
+    "drum_fill_0091_funk": "gamma_linn",
+    "drum_fill_0092_funk": "gamma_808",
+    "drum_fill_0093_funk": "gamma_power",
+    "drum_fill_0094_funk": "gamma_tokyo",
+    "drum_fill_0095_funk": "gamma_909",
+    "drum_fill_0096_jazz_funk": "gamma_linn",
+    "drum_fill_0097_jazz_funk": "gamma_808",
+    "drum_fill_0098_jazz_funk": "gamma_power",
+    "drum_fill_0099_jazz_funk": "gamma_tokyo",
+    "drum_fill_0100_jazz_funk": "gamma_909",
+    "drum_fill_0101_soul": "gamma_linn",
+    "drum_fill_0102_soul": "gamma_808",
+    "drum_fill_0103_soul": "gamma_909",
+    "drum_fill_0104_soul": "gamma_tokyo",
+    "drum_fill_0105_soul": "gamma_power",
+    "drum_fill_0106_soul_shuffle": "gamma_jazz_linn",
+    "drum_fill_0107_soul_shuffle": "gamma_linn",
+    "drum_fill_0108_soul_shuffle": "gamma_power",
+    "drum_fill_0109_soul_shuffle": "gamma_909",
+    "drum_fill_0110_soul_shuffle": "gamma_808",
+    "drum_fill_0111_gospel_6_8": "gamma_jazz_linn",
+    "drum_fill_0112_gospel_6_8": "gamma_linn",
+    "drum_fill_0113_gospel_6_8": "gamma_power",
+    "drum_fill_0114_gospel_6_8": "gamma_909",
+    "drum_fill_0115_gospel_6_8": "gamma_808",
+    "drum_fill_0116_rnb": "gamma_linn",
+    "drum_fill_0117_rnb": "gamma_808",
+    "drum_fill_0118_rnb": "gamma_909",
+    "drum_fill_0119_rnb": "gamma_tokyo",
+    "drum_fill_0120_rnb": "gamma_power",
+    "drum_fill_0121_disco": "gamma_909",
+    "drum_fill_0122_disco": "gamma_808",
+    "drum_fill_0123_disco": "gamma_tokyo",
+    "drum_fill_0124_disco": "gamma_linn",
+    "drum_fill_0125_disco": "gamma_power",
+    "drum_fill_0126_house": "gamma_909",
+    "drum_fill_0127_house": "gamma_808",
+    "drum_fill_0128_house": "gamma_tokyo",
+    "drum_fill_0129_house": "gamma_linn",
+    "drum_fill_0130_house": "gamma_power",
+    "drum_fill_0131_techno": "gamma_909",
+    "drum_fill_0132_techno": "gamma_808",
+    "drum_fill_0133_techno": "gamma_tokyo",
+    "drum_fill_0134_techno": "gamma_linn",
+    "drum_fill_0135_techno": "gamma_power",
+    "drum_fill_0136_trance": "gamma_909",
+    "drum_fill_0137_trance": "gamma_808",
+    "drum_fill_0138_trance": "gamma_tokyo",
+    "drum_fill_0139_trance": "gamma_linn",
+    "drum_fill_0140_trance": "gamma_power",
+    "drum_fill_0141_garage_2step": "gamma_tokyo",
+    "drum_fill_0142_garage_2step": "gamma_808",
+    "drum_fill_0143_garage_2step": "gamma_linn",
+    "drum_fill_0144_garage_2step": "gamma_909",
+    "drum_fill_0145_garage_2step": "gamma_power",
+    "drum_fill_0146_breakbeat": "gamma_tokyo",
+    "drum_fill_0147_breakbeat": "gamma_808",
+    "drum_fill_0148_breakbeat": "gamma_linn",
+    "drum_fill_0149_breakbeat": "gamma_909",
+    "drum_fill_0150_breakbeat": "gamma_power",
+    "drum_fill_0151_drum_and_bass": "gamma_tokyo",
+    "drum_fill_0152_drum_and_bass": "gamma_808",
+    "drum_fill_0153_drum_and_bass": "gamma_linn",
+    "drum_fill_0154_drum_and_bass": "gamma_909",
+    "drum_fill_0155_drum_and_bass": "gamma_power",
+    "drum_fill_0156_dubstep": "gamma_tokyo",
+    "drum_fill_0157_dubstep": "gamma_808",
+    "drum_fill_0158_dubstep": "gamma_linn",
+    "drum_fill_0159_dubstep": "gamma_909",
+    "drum_fill_0160_dubstep": "gamma_power",
+    "drum_fill_0161_hip_hop": "gamma_tokyo",
+    "drum_fill_0162_hip_hop": "gamma_808",
+    "drum_fill_0163_hip_hop": "gamma_linn",
+    "drum_fill_0164_hip_hop": "gamma_909",
+    "drum_fill_0165_hip_hop": "gamma_power",
+    "drum_fill_0166_boom_bap": "gamma_tokyo",
+    "drum_fill_0167_boom_bap": "gamma_808",
+    "drum_fill_0168_boom_bap": "gamma_linn",
+    "drum_fill_0169_boom_bap": "gamma_909",
+    "drum_fill_0170_boom_bap": "gamma_power",
+    "drum_fill_0171_trap": "gamma_tokyo",
+    "drum_fill_0172_trap": "gamma_808",
+    "drum_fill_0173_trap": "gamma_linn",
+    "drum_fill_0174_trap": "gamma_909",
+    "drum_fill_0175_trap": "gamma_power",
+    "drum_fill_0176_bossa": "gamma_latin_808",
+    "drum_fill_0177_bossa": "gamma_latin_909",
+    "drum_fill_0178_bossa": "gamma_latin_linn",
+    "drum_fill_0179_bossa": "gamma_latin_tokyo",
+    "drum_fill_0180_bossa": "gamma_latin_power",
+    "drum_fill_0181_samba": "gamma_latin_808",
+    "drum_fill_0182_samba": "gamma_latin_909",
+    "drum_fill_0183_samba": "gamma_latin_linn",
+    "drum_fill_0184_samba": "gamma_latin_tokyo",
+    "drum_fill_0185_samba": "gamma_latin_power",
+    "drum_fill_0186_salsa": "gamma_latin_808",
+    "drum_fill_0187_salsa": "gamma_latin_909",
+    "drum_fill_0188_salsa": "gamma_latin_linn",
+    "drum_fill_0189_salsa": "gamma_latin_tokyo",
+    "drum_fill_0190_salsa": "gamma_latin_power",
+    "drum_fill_0191_cha_cha": "gamma_latin_808",
+    "drum_fill_0192_cha_cha": "gamma_latin_909",
+    "drum_fill_0193_cha_cha": "gamma_latin_linn",
+    "drum_fill_0194_cha_cha": "gamma_latin_tokyo",
+    "drum_fill_0195_cha_cha": "gamma_latin_power",
+    "drum_fill_0196_mambo": "gamma_latin_808",
+    "drum_fill_0197_mambo": "gamma_latin_909",
+    "drum_fill_0198_mambo": "gamma_latin_linn",
+    "drum_fill_0199_mambo": "gamma_latin_tokyo",
+    "drum_fill_0200_mambo": "gamma_latin_power",
+    "drum_fill_0201_merengue": "gamma_latin_808",
+    "drum_fill_0202_merengue": "gamma_latin_909",
+    "drum_fill_0203_merengue": "gamma_latin_linn",
+    "drum_fill_0204_merengue": "gamma_latin_tokyo",
+    "drum_fill_0205_merengue": "gamma_latin_power",
+    "drum_fill_0206_cumbia": "gamma_latin_808",
+    "drum_fill_0207_cumbia": "gamma_latin_909",
+    "drum_fill_0208_cumbia": "gamma_latin_linn",
+    "drum_fill_0209_cumbia": "gamma_latin_tokyo",
+    "drum_fill_0210_cumbia": "gamma_latin_power",
+    "drum_fill_0211_bolero": "gamma_latin_808",
+    "drum_fill_0212_bolero": "gamma_latin_909",
+    "drum_fill_0213_bolero": "gamma_latin_linn",
+    "drum_fill_0214_bolero": "gamma_latin_tokyo",
+    "drum_fill_0215_bolero": "gamma_latin_power",
+    "drum_fill_0216_tango": "gamma_latin_808",
+    "drum_fill_0217_tango": "gamma_latin_909",
+    "drum_fill_0218_tango": "gamma_latin_linn",
+    "drum_fill_0219_tango": "gamma_latin_tokyo",
+    "drum_fill_0220_tango": "gamma_latin_power",
+    "drum_fill_0221_son_clave_3_2": "gamma_latin_808",
+    "drum_fill_0222_son_clave_3_2": "gamma_latin_909",
+    "drum_fill_0223_son_clave_3_2": "gamma_latin_linn",
+    "drum_fill_0224_son_clave_3_2": "gamma_latin_tokyo",
+    "drum_fill_0225_son_clave_3_2": "gamma_latin_power",
+    "drum_fill_0226_rumba_clave_3_2": "gamma_latin_808",
+    "drum_fill_0227_rumba_clave_3_2": "gamma_latin_909",
+    "drum_fill_0228_rumba_clave_3_2": "gamma_latin_linn",
+    "drum_fill_0229_rumba_clave_3_2": "gamma_latin_tokyo",
+    "drum_fill_0230_rumba_clave_3_2": "gamma_latin_power",
+    "drum_fill_0231_afro_cuban_6_8": "gamma_latin_808",
+    "drum_fill_0232_afro_cuban_6_8": "gamma_latin_909",
+    "drum_fill_0233_afro_cuban_6_8": "gamma_latin_linn",
+    "drum_fill_0234_afro_cuban_6_8": "gamma_latin_tokyo",
+    "drum_fill_0235_afro_cuban_6_8": "gamma_latin_power",
+    "drum_fill_0236_reggae": "gamma_reggae_808",
+    "drum_fill_0237_reggae": "gamma_808",
+    "drum_fill_0238_reggae": "gamma_linn",
+    "drum_fill_0239_reggae": "gamma_tokyo",
+    "drum_fill_0240_reggae": "gamma_909",
+    "drum_fill_0241_calypso_soca": "gamma_latin_808",
+    "drum_fill_0242_calypso_soca": "gamma_latin_909",
+    "drum_fill_0243_calypso_soca": "gamma_latin_linn",
+    "drum_fill_0244_calypso_soca": "gamma_latin_tokyo",
+    "drum_fill_0245_calypso_soca": "gamma_latin_power",
+    "drum_fill_0246_five_four": "gamma_power",
+    "drum_fill_0247_five_four": "gamma_808",
+    "drum_fill_0248_five_four": "gamma_909",
+    "drum_fill_0249_five_four": "gamma_linn",
+    "drum_fill_0250_five_four": "gamma_tokyo",
+    "drum_fill_0251_seven_eight": "gamma_power",
+    "drum_fill_0252_seven_eight": "gamma_808",
+    "drum_fill_0253_seven_eight": "gamma_909",
+    "drum_fill_0254_seven_eight": "gamma_linn",
+    "drum_fill_0255_seven_eight": "gamma_tokyo",
+    "drum_fill_0256_seven_four_funk": "gamma_linn",
+    "drum_fill_0257_seven_four_funk": "gamma_808",
+    "drum_fill_0258_seven_four_funk": "gamma_power",
+    "drum_fill_0259_seven_four_funk": "gamma_tokyo",
+    "drum_fill_0260_seven_four_funk": "gamma_909",
+    "drum_fill_0261_nine_eight": "gamma_power",
+    "drum_fill_0262_nine_eight": "gamma_808",
+    "drum_fill_0263_nine_eight": "gamma_909",
+    "drum_fill_0264_nine_eight": "gamma_linn",
+    "drum_fill_0265_nine_eight": "gamma_tokyo",
+    "drum_fill_0266_eleven_eight": "gamma_power",
+    "drum_fill_0267_eleven_eight": "gamma_808",
+    "drum_fill_0268_eleven_eight": "gamma_909",
+    "drum_fill_0269_eleven_eight": "gamma_linn",
+    "drum_fill_0270_eleven_eight": "gamma_tokyo"
+  },
+  "gamma_fill_selection_policy": {
+    "fill_specific_profiles": true,
+    "profiles_per_rhythm": 5,
+    "quality_reference": "Gamma9001",
+    "tiny_policy": "Tiny does not mirror this colour layer; it is a compatibility/test degradation path.",
+    "rule": "F1-F5 must not collapse to one kit profile. Profile changes are deliberate orchestration, not randomness."
   }
 }

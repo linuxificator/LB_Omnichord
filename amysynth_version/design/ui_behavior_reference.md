@@ -3,7 +3,7 @@
 Status: authoritative UI interaction contract
 Owner: Qt/QML interaction behavior
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-01
+Last verified: 2026-09-05
 
 ## Purpose
 
@@ -56,6 +56,9 @@ Rules:
 - selecting an instrument must fully initialize the selected patch.
 - MIDI master volume and mute control only MIDI buses and remain independent
   of the OMNI master.
+- the white channel selector at the top-right defaults to 7 and maps one MIDI
+  key at a time to the bottom OMNI chord row; matching MIDI synth rows still
+  receive the same note independently;
 
 ## Tuning behavior
 
@@ -88,6 +91,14 @@ A chord tap immediately starts the selected notes on the manual chord synth and
 releases them on finger-up. It also selects that chord as the active chord for
 strum and accompaniment. The accompaniment pitches may update, but the tap does
 not temporarily suppress or stop the automatic-chord lane.
+
+An accepted external chord-channel key has temporary priority over screen
+chord keys and the bottom row's octave buttons until Note Off. It must not
+disable chord type, inversion or the other rows' octave controls. Conversely,
+an external Note On that arrives while a screen chord is physically held is
+ignored through its matching Note Off. Brief external-key overlaps use
+last-still-held takeover after the currently sounding key is released; they do
+not create polyphonic manual chords.
 
 ### Press and hold
 

@@ -3,6 +3,8 @@ PySide6==6.10.3
 PySide6_Addons==6.10.3
 PySide6_Essentials==6.10.3
 shiboken6==6.10.3
+zeroconf==0.151.3
+ifaddr==0.2.0
 altgraph==0.17.5
 packaging==26.3
 pyinstaller-hooks-contrib==2026.6

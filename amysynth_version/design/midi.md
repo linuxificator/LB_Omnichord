@@ -3,7 +3,7 @@
 Status: authoritative MIDI input and routing contract
 Owner: MIDI input/player subsystem
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-01
+Last verified: 2026-09-05
 
 ## Routing
 
@@ -56,6 +56,45 @@ Ordinary Note On/Off events remain musical input and do not create button-learn
 indicators; a controller that sends pads as notes needs an explicit whitelist or
 translation layer before those notes may be treated as buttons.
 Channel 0 in a row means omni/all incoming channels.
+
+## OMNI chord input channel
+
+The white round selector at the top-right of the MIDI screen reserves one
+incoming MIDI channel for monophonic OMNI chord selection. It starts at channel
+7 and cycles through `1..16,A` with the same channel convention as a MIDI synth
+row; `A` means every incoming channel. The selector is live performance state,
+not part of an OMNI or MIDI preset.
+
+A Note On on this channel uses its exact MIDI note as the root of the bottom
+OMNI chord row and starts that row's current chord on the normal manual-chord
+voice. Its matching Note Off releases that voice. Notes in the visible O1--O6
+range also select the matching bottom-row octave button. A note outside that
+range remains an exact, playable root but leaves every visible octave button
+unselected; it is never folded into the displayed range.
+
+The input is deliberately monophonic. The first accepted held key sounds.
+Further Note Ons are retained without sounding, and releasing the active key
+starts the most recently pressed key that is still held. A queued key released
+before the active key is discarded. Duplicate Note Ons do not retrigger.
+Changing the chord-input channel stops its active manual chord and clears this
+held-key state, preventing a stale Note Off on the old channel from owning the
+voice.
+
+Pointer/touch and external-key ownership do not interrupt one another:
+
+- a Note On arriving while any screen chord key is held is ignored together
+  with its corresponding Note Off;
+- while an accepted external key is held, all screen chord keys and the six
+  octave buttons belonging to the bottom chord row ignore input;
+- chord type, inversion and octave controls on the other rows remain live and
+  follow their ordinary behavior;
+- once the external key is released, screen chord and bottom-row octave input
+  is enabled immediately.
+
+This chord route does not consume the MIDI event. Every enabled MIDI synth row
+whose channel also matches receives the original Note On/Off independently.
+The result is an intentional duplicate: the MIDI synth plays its note while the
+OMNI manual-chord path plays the selected chord.
 
 Native readers never call the MIDI QObject or musical engine. Every reader
 normalizes input to one frozen `MidiInputEvent` value. A lock-protected sequence

@@ -147,6 +147,16 @@ class DrumPatternTests(unittest.TestCase):
                 "tiny", "pop_8", "low_primary"
             )
 
+    def test_foundation_levels_are_musically_usable(self) -> None:
+        for rhythm in self.catalog.rhythms.values():
+            foundation = rhythm.levels[0]
+            self.assertGreaterEqual(len(foundation), 5, rhythm.rhythm_id)
+            self.assertGreaterEqual(
+                len({event.role for event in foundation}),
+                2,
+                rhythm.rhythm_id,
+            )
+
     def test_activity_levels_are_selected_complete_not_concatenated(self) -> None:
         pop = self.catalog.rhythm("pop_8")
         level_one = {(event.tick, event.role) for event in pop.levels[0]}
@@ -229,6 +239,39 @@ class DrumPatternTests(unittest.TestCase):
                         )
                 self.assertEqual(actual, expected, (rhythm.rhythm_id, level_index))
 
+    def test_phrase_ending_fill_starts_and_gamma_profile_diversity(self) -> None:
+        maximum = 0
+        for rhythm in self.catalog.rhythms.values():
+            beats_per_bar = int(rhythm.meter.split("/", 1)[0])
+            occurrences = AmySerialClient._fill_occurrences(
+                list(range(len(rhythm.fills))),
+                rhythm.fills,
+            )
+            maximum = max(maximum, len(occurrences))
+            for fill, start in occurrences:
+                self.assertIn(start, fill.allowed_start_beats)
+                self.assertLessEqual(
+                    (start - 1) * fill.beat_unit_ticks + fill.duration_ticks,
+                    beats_per_bar * fill.beat_unit_ticks,
+                    fill.fill_id,
+                )
+        self.assertEqual(maximum, 5)
+
+        gamma = self.catalog.kits["gamma9001"]
+        self.assertEqual(len(gamma.fill_id_profile), 270)
+        for rhythm in self.catalog.rhythms.values():
+            profiles = {gamma.fill_id_profile[fill.fill_id] for fill in rhythm.fills}
+            self.assertEqual(len(profiles), 5, rhythm.rhythm_id)
+
+        for kit_name in ("tiny", "general_midi"):
+            kit = self.catalog.kits[kit_name]
+            self.assertFalse(kit.fill_id_profile, kit_name)
+            self.assertEqual(
+                dict(kit.fill_rhythm_profile),
+                dict(kit.activity_rhythm_profile),
+                kit_name,
+            )
+
     def test_fill_sequences_preserve_events_and_only_add_generic_gates(self) -> None:
         event_pattern = re.compile(
             r"^H(?P<tick>\d+),(?P<period>\d+),(?P<sequence>\d+)"
@@ -284,6 +327,7 @@ class DrumPatternTests(unittest.TestCase):
                                 event.role,
                                 event.velocity,
                                 fill=True,
+                                fill_id=fill.fill_id,
                             ),
                         )
                     )
@@ -350,6 +394,7 @@ class DrumPatternTests(unittest.TestCase):
                         rhythm.rhythm_id,
                         event.role,
                         fill=True,
+                        fill_id=fill.fill_id,
                     )
                     self.assertIsNotNone(sound.preset)
                     resolved.add((int(sound.preset), sound.note))
@@ -441,6 +486,29 @@ class DrumPatternTests(unittest.TestCase):
             re.match(r"^H\d+,\d+,0HC\d+,1,1Z$", command)
             for command in authored
         ))
+        self.assertIn("HC0,0,192Z", commands)
+        self.assertIn("HC0,1,192Z", commands)
+        self.assertNotIn("HC0,0,1536Z", commands)
+
+    def test_fill_schedule_replacement_never_waits_beyond_one_bar(self) -> None:
+        client = self.client()
+        for rhythm in self.catalog.rhythms.values():
+            client.rhythm_config = {
+                "id": rhythm.rhythm_id,
+                "fill_order": list(range(len(rhythm.fills))),
+                "fill_density_bars": 8,
+            }
+            bar_ticks = client._drum_quantum()
+            controls = [
+                command
+                for command in client._fill_schedule_commands()
+                if re.match(r"^HC0,[01],", command)
+            ]
+            self.assertEqual(
+                controls,
+                [f"HC0,0,{bar_ticks}Z", f"HC0,1,{bar_ticks}Z"],
+                rhythm.rhythm_id,
+            )
 
     def test_cold_start_is_immediate_but_live_drum_edits_are_quantized(self) -> None:
         client = self.client()
@@ -489,7 +557,7 @@ class DrumPatternTests(unittest.TestCase):
                             + fill.duration_ticks,
                             beats_per_bar * fill.beat_unit_ticks,
                         )
-        self.assertEqual(maximum, 10)
+        self.assertEqual(maximum, 5)
 
     def test_lb_runtime_reserves_storage_but_not_hundreds_of_players(self) -> None:
         self.assertEqual(self.config["amy_max_sequencer_tags"], 1280)

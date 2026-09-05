@@ -283,10 +283,10 @@ class PureCommandPlanTests(unittest.TestCase):
         self.assertEqual(
             schedule.commands,
             (
-                "HC40,0,768Z",
+                "HC40,0,192Z",
                 "HR40Z",
                 "H96,768,40HC30,1,1Z",
-                "HC40,1,768Z",
+                "HC40,1,192Z",
             ),
         )
 

@@ -11,6 +11,29 @@ REPOSITORY = FRONTEND.parents[1]
 
 
 class PackagingContracts(unittest.TestCase):
+    def test_desktop_packages_include_discovery_code_metadata_and_notices(self) -> None:
+        scripts = (
+            FRONTEND / "packaging" / "build_appimage.sh",
+            FRONTEND / "packaging" / "build_macos_dmg.sh",
+            FRONTEND / "packaging" / "build_windows.ps1",
+        )
+        for script in scripts:
+            content = script.read_text(encoding="utf-8")
+            with self.subTest(script=script.name):
+                self.assertIn("--collect-all zeroconf", content)
+                self.assertIn("--hidden-import ifaddr", content)
+                self.assertIn("--copy-metadata zeroconf", content)
+                self.assertIn("--copy-metadata ifaddr", content)
+                self.assertIn("THIRD_PARTY_NOTICES.md", content)
+
+        workflow = (
+            REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(
+            workflow.count("Run OSC service-discovery process contract"),
+            3,
+        )
+
     def test_catalogue_schemas_and_provenance_ship_on_every_platform(self) -> None:
         appimage = (
             FRONTEND / "packaging" / "build_appimage.sh"
@@ -44,6 +67,8 @@ class PackagingContracts(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("NSLocalNetworkUsageDescription", macos)
+        self.assertIn("NSBonjourServices", macos)
+        self.assertIn("_osc._udp", macos)
         self.assertLess(
             macos.index("NSLocalNetworkUsageDescription"),
             macos.index("codesign --force"),
@@ -227,6 +252,7 @@ class PackagingContracts(unittest.TestCase):
         for suite in (
             "unit",
             "portable-input-processes",
+            "desktop-network-discovery",
             "platform-input-linux",
             "frontend",
             "serial",

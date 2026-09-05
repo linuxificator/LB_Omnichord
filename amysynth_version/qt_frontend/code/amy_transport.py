@@ -492,12 +492,14 @@ class AmySerialClient:
         velocity: int,
         *,
         fill: bool,
+        fill_id: str | None = None,
     ) -> str:
         sound = self.drum_catalog.resolve(
             self.drum_kit,
             rhythm_id,
             role,
             fill=fill,
+            fill_id=fill_id,
         )
         gain = max(0.0, self.resolved_config.drums.velocity_gain)
         level = max(0.0, min(1.0, float(velocity) / 127.0)) * gain

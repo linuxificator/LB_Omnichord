@@ -69,6 +69,7 @@ class DrumHitBody(Protocol):
         velocity: int,
         *,
         fill: bool,
+        fill_id: str | None = None,
     ) -> str: ...
 
 
@@ -195,6 +196,7 @@ def compile_tagged_lane(
     start: int,
     count: int,
     events: list[ScheduledEvent],
+    replacement_alignment: int | None = None,
 ) -> TaggedLanePlan:
     """Replace one running AMY sequence without host-side clock state."""
 
@@ -205,7 +207,11 @@ def compile_tagged_lane(
         for tick, period, body in events
     ]
     periods = [period for _, period, _ in normalized_events]
-    alignment = math.lcm(*periods) if periods else 0
+    alignment = (
+        math.lcm(*periods)
+        if replacement_alignment is None and periods
+        else max(0, int(replacement_alignment or 0))
+    )
     commands = [
         sequence_control_command(start, SEQUENCE_CONTROL_STOP, alignment=alignment),
         *compile_sequence_definition(
@@ -523,15 +529,21 @@ def compile_fill_sequence(
                 ),
             )
         )
+    fill_id = getattr(fill, "fill_id", None)
     for event in fill.events:
         event_tick = event.tick // 2
-        events.append(
-            (
-                event_tick,
-                0,
-                hit_body(rhythm_id, event.role, event.velocity, fill=True),
+        body = (
+            hit_body(rhythm_id, event.role, event.velocity, fill=True)
+            if fill_id is None
+            else hit_body(
+                rhythm_id,
+                event.role,
+                event.velocity,
+                fill=True,
+                fill_id=fill_id,
             )
         )
+        events.append((event_tick, 0, body))
     return compile_sequence_definition(sequence_tag=sequence_tag, events=events)
 
 
@@ -603,5 +615,6 @@ def compile_fill_schedule(
         start=lane_start,
         count=lane_count,
         events=events,
+        replacement_alignment=bar_ticks,
     )
     return FillSchedulePlan(lane.commands)

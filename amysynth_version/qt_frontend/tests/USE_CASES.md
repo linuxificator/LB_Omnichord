@@ -46,6 +46,7 @@ A static regression test rejects reintroduction of the former parallel `SynthRun
 | --- | --- | --- |
 | `unit` | all top-level `test_*.py`: catalogue/state, MIDI engine, socket framing, migration and structural invariants | none |
 | `portable-input-processes` | identical OSC UDP and MIDI parser scenarios with external sender and receiver PIDs | all package build runners; no hardware claim |
+| `desktop-network-discovery` | real `_osc._udp` advertisement and browser in separate processes | Linux regression plus Linux x64, Raspberry Pi, macOS and Windows package runners |
 | `platform-input-linux` | real raw-MIDI bytes and source-package OSC from external controller processes into a separately launched Omnichord | Linux PTY/socket + Qt offscreen |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
@@ -210,6 +211,27 @@ installation failed to show or release chord-key interaction correctly.
   cannot mutate one another.
 - Reconfiguring a synth or rebuilding after panic reapplies the owning master
   gain so a patch cannot bypass it.
+
+**MIDI-06 — channel 7 selects bottom-row OMNI chords monophonically**
+
+- The white top-right selector defaults to 7 and cycles through `1..16,A`
+  using the same display and channel semantics as the MIDI-row selectors.
+- A matching Note On plays the bottom chord row from the exact incoming MIDI
+  root; Note Off releases it. MIDI notes 24--95 select the matching O1--O6
+  button, while roots outside that range remain exact and select no octave
+  button.
+- Only one external chord sounds. Overlapping keys are queued, the most recent
+  still-held key takes over after the active key's Note Off, and a queued key
+  released early never sounds.
+- If any screen chord is already held, the incoming Note On and its matching
+  Note Off are ignored. While an external chord is active, screen chord presses
+  and bottom-row octave presses are ignored; chord type, inversion and the
+  other rows' octaves remain live. UI and backend tests both enforce ownership.
+- A MIDI synth row on the same channel receives an independent duplicate of
+  the original Note On/Off. Chord routing may not consume or rewrite that row's
+  event.
+- Changing the selector, panic and shutdown stop the active external manual
+  voice and discard queued/ignored keys.
 
 **MIDI-CC-01 — only genuine CC movement creates activity**
 
@@ -398,6 +420,20 @@ actual bar.
   index, reaches the Qt thread once and preserves packet order.
 - Malformed packets and unsupported argument types create no indicators and do
   not stop the listener. Bind failure is reported as failed rather than ready.
+
+**OSC-CTRL-01A — zero-configuration desktop discovery**
+
+- A successfully bound wildcard OSC listener advertises `_osc._udp` under the
+  configured `service_name`; the shipped name is `LB Omnichord` and
+  advertisement is enabled by default.
+- A separate desktop browser process discovers the service, configured UDP
+  port and a usable non-loopback IPv4 address. Shutdown withdraws the record.
+- `advertise: false`, a loopback-only listener, bind failure or an absent OSC
+  section publishes nothing. Discovery failure never changes OSC reception or
+  the OSC technology LED.
+- Linux x86_64, Raspberry Pi aarch64, macOS arm64 and Windows x86_64 use the
+  same Zeroconf adapter. Android selects a tested no-op and retains direct OSC
+  UDP input without an mDNS advertisement.
 
 **OSC-CTRL-02 — common learn and ownership state**
 

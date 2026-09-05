@@ -2,16 +2,16 @@
   "schema_revision": 1,
   "public_qobject_surface": {
     "InstrumentBackend": {
-      "property_count": 58,
-      "property_sha256": "67b7421687d53a3e42429f206b7c0d0e5a8c8f9d961bcbef17bfcc41574ed76f",
-      "method_count": 134,
-      "method_sha256": "c2223a07d27d17a2d3734a8c1fd98985cac6051035eaed3ca80850e098a9eea1"
+      "property_count": 59,
+      "property_sha256": "19cbc3039d760a8ce9a0fe1ee83e09c01d048467c36a31fa8df00190717a5c2e",
+      "method_count": 136,
+      "method_sha256": "2b9dcabcf76951940a3d6b255ed7b7f8c1e4cbb923808d837b78ad5fd77cf016"
     },
     "MidiPlayerBackend": {
-      "property_count": 18,
-      "property_sha256": "5de684b1c5bef029d60655ab5ddc806e45e91cc0673b5850db464c2635ca9aea",
-      "method_count": 49,
-      "method_sha256": "7aca75bcb11a2ca5e024f958a383836d3994fb73c23366ee0e39cd04de4b8d82"
+      "property_count": 19,
+      "property_sha256": "134618410eb73a953ae49cd9f63eeebed79ad71af6a1f8b712081bef0dcec151",
+      "method_count": 50,
+      "method_sha256": "475c97b3304ba7bd185592b4f7f05ea8f62a8b0a524538337979c86a31f1710f"
     }
   },
   "supported_config_entrypoints": [

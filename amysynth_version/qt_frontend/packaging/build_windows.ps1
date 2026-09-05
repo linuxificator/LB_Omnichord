@@ -32,7 +32,10 @@ python -m PyInstaller --noconfirm --clean --windowed --onedir `
     --name LB_Omnichord --distpath $pyDist --workpath (Join-Path $buildRoot "pyinstaller-work") `
     --specpath $buildRoot --paths (Join-Path $frontend "code") `
     --additional-hooks-dir (Join-Path $frontend "packaging\pyinstaller_hooks") `
+    --collect-all zeroconf --hidden-import ifaddr `
+    --copy-metadata zeroconf --copy-metadata ifaddr `
     --add-data "$(Join-Path $frontend 'licence.txt');." `
+    --add-data "$(Join-Path $frontend 'THIRD_PARTY_NOTICES.md');." `
     --add-data "$(Join-Path $frontend 'config');config" `
     --add-data "$(Join-Path $frontend 'gui');gui" `
     --add-data "$(Join-Path $frontend 'instruments');instruments" `

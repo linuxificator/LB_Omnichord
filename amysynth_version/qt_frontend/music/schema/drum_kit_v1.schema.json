@@ -1,11 +1,33 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["schema_version", "kit_family", "profiles", "rhythm_profile"],
+  "required": [
+    "schema_version",
+    "kit_family",
+    "profiles",
+    "rhythm_profile"
+  ],
   "properties": {
-    "schema_version": {"const": 1},
-    "kit_family": {"enum": ["tiny", "gamma9001", "general_midi"]},
-    "profiles": {"type": "object", "minProperties": 1},
-    "rhythm_profile": {"type": "object", "minProperties": 1}
+    "schema_version": {
+      "const": 1
+    },
+    "kit_family": {
+      "enum": [
+        "tiny",
+        "gamma9001",
+        "general_midi"
+      ]
+    },
+    "profiles": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "rhythm_profile": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "fill_profile": {
+      "type": "object"
+    }
   }
 }

@@ -27,6 +27,7 @@ on:
           - quality
           - unit
           - portable-input-processes
+          - desktop-network-discovery
           - platform-input-linux
           - frontend
           - serial
@@ -59,6 +60,7 @@ jobs:
           - quality
           - unit
           - portable-input-processes
+          - desktop-network-discovery
           - platform-input-linux
           - frontend
           - serial

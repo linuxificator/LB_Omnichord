@@ -41,6 +41,7 @@ from drum_patterns import (
     FILL_DENSITY_BARS,
     load_drum_pattern_catalog,
 )
+from external_chord_input import ExternalChordAction, ExternalChordInputState
 from musical_state import (
     ChordSnapshot,
     OmniPerformanceSnapshot,
@@ -165,6 +166,8 @@ OCTAVE_NAMES = ("O1", "O2", "O3", "O4", "O5", "O6")
 OCTAVE_BASES = (24, 36, 48, 60, 72, 84)
 
 ROW_COUNT = 4
+EXTERNAL_CHORD_ROW = ROW_COUNT - 1
+EXTERNAL_CHORD_VOICE_ID = "external-midi-chord"
 
 TUNING_MODE_NAMES = ("HARM", "EQ", "JV")
 DEFAULT_TUNING_MODE_INDEX = 1
@@ -972,6 +975,7 @@ class InstrumentBackend(QObject):
 
         self._active_row = -1
         self._active_root_semitone = -1
+        self._active_root_midi_override: int | None = None
         self._state_version = 0
 
         volumes = defaults["volumes"]
@@ -1056,6 +1060,7 @@ class InstrumentBackend(QObject):
         self._pressed_chord_order: list[tuple[int, int]] = []
         self._promoted_chords: set[tuple[int, int]] = set()
         self._chord_activity_hold_override = False
+        self._external_chord_input = ExternalChordInputState()
 
         self._initialized = False
 
@@ -1103,9 +1108,12 @@ class InstrumentBackend(QObject):
     def _debug_chord_state(
         self,
     ) -> dict[str, Any]:
+        external_key = self._external_chord_input.active
         return {
             "pressed": [list(key) for key in sorted(self._pressed_chords)],
             "promoted": [list(key) for key in sorted(self._promoted_chords)],
+            "external": list(external_key) if external_key is not None else None,
+            "root_midi_override": self._active_root_midi_override,
             "override": (self._chord_activity_hold_override),
             "effective_activity": (self._effective_chord_activity()),
             "stored_activity": (self._rhythm.chord_activity_by_rhythm[self._rhythm.selected_index]),
@@ -1160,6 +1168,10 @@ class InstrumentBackend(QObject):
     @Property(int, notify=stateChanged)
     def activeRootSemitone(self) -> int:
         return self._active_root_semitone
+
+    @Property(bool, notify=stateChanged)
+    def externalChordActive(self) -> bool:
+        return self._external_chord_input.active is not None
 
     @Property(bool, notify=stateChanged)
     def isOff(self) -> bool:
@@ -2461,9 +2473,11 @@ class InstrumentBackend(QObject):
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
         self._chord_activity_hold_override = False
+        self._external_chord_input.reset()
 
         self._active_row = -1
         self._active_root_semitone = -1
+        self._active_root_midi_override = None
         self._strum_last_index = None
 
         # Dedicated panic packet silences AMY and forces the serial backend
@@ -2686,6 +2700,14 @@ class InstrumentBackend(QObject):
     @Slot(int, result=int)
     def octaveIndexForRow(self, row_index: int) -> int:
         if 0 <= row_index < ROW_COUNT:
+            if (
+                row_index == self._active_row
+                and self._active_root_midi_override is not None
+            ):
+                root_midi = self._active_root_midi_override
+                if OCTAVE_BASES[0] <= root_midi < OCTAVE_BASES[-1] + 12:
+                    return (root_midi - OCTAVE_BASES[0]) // 12
+                return -1
             return self._row_octave_indexes[row_index]
         return 0
 
@@ -2727,6 +2749,16 @@ class InstrumentBackend(QObject):
                 ),
             )
 
+        if (
+            row_index == EXTERNAL_CHORD_ROW
+            and self._external_chord_input.active is not None
+        ):
+            self._send_manual_chord(
+                "update",
+                voice_id=EXTERNAL_CHORD_VOICE_ID,
+                notes=self._current_notes(),
+            )
+
         # Update future rhythm events and retune the current rhythm chord,
         # but only if this row is the active chord row.
         if row_index == self._active_row:
@@ -2762,7 +2794,21 @@ class InstrumentBackend(QObject):
             return
         if not 0 <= octave_index < len(OCTAVE_BASES):
             return
-        if octave_index == self._row_octave_indexes[row_index]:
+        if (
+            row_index == EXTERNAL_CHORD_ROW
+            and self._external_chord_input.active is not None
+        ):
+            return
+        cleared_override = (
+            row_index == self._active_row
+            and self._active_root_midi_override is not None
+        )
+        if cleared_override:
+            self._active_root_midi_override = None
+        if (
+            octave_index == self._row_octave_indexes[row_index]
+            and not cleared_override
+        ):
             return
 
         self._row_octave_indexes[row_index] = octave_index
@@ -2797,9 +2843,12 @@ class InstrumentBackend(QObject):
         self,
         row_index: int,
         root_semitone: int,
+        *,
+        root_midi_override: int | None = None,
     ) -> None:
         self._active_row = row_index
         self._active_root_semitone = root_semitone
+        self._active_root_midi_override = root_midi_override
         self._strum_last_index = None
         self._emit_state_changed()
 
@@ -2829,12 +2878,16 @@ class InstrumentBackend(QObject):
         action: str,
         key: tuple[int, int] | None = None,
         notes: list[int] | None = None,
+        *,
+        voice_id: str | None = None,
     ) -> None:
         payload: dict[str, Any] = {
             "action": action,
         }
 
-        if key is not None:
+        if voice_id is not None:
+            payload["id"] = voice_id
+        elif key is not None:
             payload["id"] = self._manual_voice_id(key)
 
         if notes is not None:
@@ -2957,12 +3010,78 @@ class InstrumentBackend(QObject):
         self._promoted_chords.clear()
         self._update_hold_override()
 
+    def _apply_external_chord_action(
+        self,
+        action: ExternalChordAction,
+    ) -> None:
+        if action.kind == "stop":
+            self._send_manual_chord(
+                "stop",
+                voice_id=EXTERNAL_CHORD_VOICE_ID,
+            )
+            return
+
+        _channel, note = action.key
+        if OCTAVE_BASES[0] <= note < OCTAVE_BASES[-1] + 12:
+            self._row_octave_indexes[EXTERNAL_CHORD_ROW] = (
+                note - OCTAVE_BASES[0]
+            ) // 12
+        self._set_active_chord(
+            EXTERNAL_CHORD_ROW,
+            note % 12,
+            root_midi_override=note,
+        )
+        self._send_chord_state(play_now=False)
+        self._send_manual_chord(
+            "start",
+            notes=self._current_notes(),
+            voice_id=EXTERNAL_CHORD_VOICE_ID,
+        )
+
+    @Slot(int, int, bool)
+    def processExternalChordInput(
+        self,
+        channel: int,
+        note: int,
+        is_on: bool,
+    ) -> None:
+        if not 1 <= int(channel) <= 16 or not 0 <= int(note) <= 127:
+            return
+        was_active = self._external_chord_input.active is not None
+        if is_on:
+            actions = self._external_chord_input.note_on(
+                channel,
+                note,
+                screen_chord_held=bool(self._pressed_chords),
+            )
+        else:
+            actions = self._external_chord_input.note_off(channel, note)
+
+        for action in actions:
+            self._apply_external_chord_action(action)
+        if (
+            actions
+            and was_active
+            and self._external_chord_input.active is None
+        ):
+            self._emit_state_changed()
+
+    @Slot()
+    def resetExternalChordInput(self) -> None:
+        was_active = self._external_chord_input.active is not None
+        for action in self._external_chord_input.reset():
+            self._apply_external_chord_action(action)
+        if was_active:
+            self._emit_state_changed()
+
     @Slot(int, int)
     def pressChord(
         self,
         row_index: int,
         root_semitone: int,
     ) -> None:
+        if self._external_chord_input.active is not None:
+            return
         if not self._valid_chord_selection(
             row_index,
             root_semitone,
@@ -3084,9 +3203,11 @@ class InstrumentBackend(QObject):
 
     @Slot()
     def turnOff(self) -> None:
+        self._external_chord_input.reset()
         self._release_all_pressed_chords()
         self._active_row = -1
         self._active_root_semitone = -1
+        self._active_root_midi_override = None
         self._strum_last_index = None
         self._emit_state_changed()
         self._send_chord_state(play_now=False)
@@ -3095,6 +3216,8 @@ class InstrumentBackend(QObject):
         self,
         row_index: int,
         root_semitone: int,
+        *,
+        root_midi_override: int | None = None,
     ) -> list[int]:
         if not self._valid_chord_selection(
             row_index,
@@ -3104,8 +3227,11 @@ class InstrumentBackend(QObject):
 
         chord = self._chords[self._row_chord_indexes[row_index]]
         inversion_index = self._row_inversion_indexes[row_index]
-        octave_base = OCTAVE_BASES[self._row_octave_indexes[row_index]]
-        root_midi = octave_base + root_semitone
+        if root_midi_override is None:
+            octave_base = OCTAVE_BASES[self._row_octave_indexes[row_index]]
+            root_midi = octave_base + root_semitone
+        else:
+            root_midi = int(root_midi_override)
 
         return [root_midi + interval for interval in chord.inversions[inversion_index]]
 
@@ -3116,6 +3242,7 @@ class InstrumentBackend(QObject):
         return self._notes_for_chord(
             self._active_row,
             self._active_root_semitone,
+            root_midi_override=self._active_root_midi_override,
         )
 
     def _current_bass_notes(self) -> list[int]:
@@ -3428,6 +3555,12 @@ class InstrumentBackend(QObject):
                     key=active_key,
                     notes=self._current_notes(),
                 )
+            elif self._external_chord_input.active is not None:
+                self._send_manual_chord(
+                    "update",
+                    notes=self._current_notes(),
+                    voice_id=EXTERNAL_CHORD_VOICE_ID,
+                )
 
     def send_initial_state(self) -> None:
         self._debug(
@@ -3450,11 +3583,13 @@ class InstrumentBackend(QObject):
 
         self._active_row = -1
         self._active_root_semitone = -1
+        self._active_root_midi_override = None
         self._strum_last_index = None
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
         self._chord_activity_hold_override = False
+        self._external_chord_input.reset()
         self._send_chord_state(play_now=False)
 
         self._client.send_message(

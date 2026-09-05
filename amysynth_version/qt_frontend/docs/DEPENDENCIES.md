@@ -3,17 +3,17 @@
 Status: authoritative dependency-source contract
 Owner: frontend runtime and release packaging
 Applies to: Python source, tests, tools and all five release targets
-Last verified: 2026-09-03
+Last verified: 2026-09-05
 
 ## Python requirement groups
 
 | Group | Source | Current direct intent | Consumers |
 | --- | --- | --- | --- |
 | Portable pure Python | `requirements-portable.txt` | `pyserial==3.5`, `fastjsonschema==2.22.2`, `python-osc==1.10.2` | every frontend target |
-| Desktop runtime intent | `requirements.txt` | portable group plus `PySide6>=6.6,<6.11` | Linux x86_64, Raspberry Pi aarch64, macOS arm64 and Windows x86_64 |
+| Desktop runtime intent | `requirements.txt` | portable group plus `PySide6>=6.6,<6.11` and `zeroconf==0.151.3` | Linux x86_64, Raspberry Pi aarch64, macOS arm64 and Windows x86_64 |
 | Desktop build | `requirements-build.txt` | runtime group plus `PyInstaller==6.22.2` | Linux/Raspberry Pi AppImage, macOS DMG and Windows zip jobs |
 | Test and quality | `requirements-test.txt` | runtime group, NumPy 2.5.2, Ruff 0.16.5, mypy 2.3.1, coverage.py 7.15.4 and pyserial stubs | local and reusable regression/quality jobs |
-| Android host | `requirements-android-host.txt` | runtime group, `PySide6==6.11.2`, `Cython==0.29.36` | the Linux host that runs `pyside6-android-deploy` |
+| Android host | `requirements-android-host.txt` | portable group, `PySide6==6.11.2`, `Cython==0.29.36` | the Linux host that runs `pyside6-android-deploy` |
 
 An included `-r requirements.txt` means the runtime file remains the single
 authority for shared direct dependencies. A workflow must install a named
@@ -44,6 +44,7 @@ The machine-readable inventory is
 | `serial` | `pyserial` | runtime | UART transport is an enabled portable application capability |
 | `fastjsonschema` | `fastjsonschema` | runtime | versioned JSON Schema validation before opening runtime resources; pure-Python universal package |
 | `pythonosc` | `python-osc` | runtime | OSC 1.0 packet and bundle parsing inside the portable UDP input adapter; pure-Python universal package |
+| `zeroconf` | `zeroconf` | runtime | standard `_osc._udp` DNS-SD advertisement behind the desktop-only discovery adapter |
 | `numpy` | `numpy` | test and quality | `instrument_balance.py` directly renders and measures native AMY output; declaring it removes reliance on AMY's transitive unpinned requirement |
 | `amy`, `c_amy` | pinned LB AMY component exception | AMY release contract | native service and native integration tests require the fork build, not an unqualified PyPI dependency |
 
@@ -54,6 +55,14 @@ owning groups for the same reproducibility reason. `types-pyserial` supplies
 static metadata only.
 
 No application or launcher installs Python packages at runtime.
+
+The desktop Zeroconf resolution also pins its transitive `ifaddr==0.2.0`
+dependency in both desktop constraint sets. Android neither installs nor
+imports these packages: its platform resolver returns an explicit no-op because
+reliable mDNS requires a native multicast/NSD lifecycle bridge. Desktop bundles
+copy both distributions' metadata/license files and ship
+`THIRD_PARTY_NOTICES.md`; release SBOM relationships exclude them from the
+Android package.
 
 NumPy is test-only from LB Omnichord's perspective. The pinned AMY source also
 declares NumPy (and SoundFile) as its own component dependencies; their resolved

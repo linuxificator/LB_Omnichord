@@ -16,27 +16,27 @@
     },
     {
       "name": "drum_activity_timing.json",
-      "sha256": "91b01030832ee7cd4d470bb5671fe04a2875966efa99f1cfb92a673e4158196c"
+      "sha256": "efd49780caee62bf41ecfab4095166d5765af6490f51d43c0e162a07ce3205ae"
     },
     {
       "name": "drum_fill_continuation_roles.json",
-      "sha256": "4faf22e95ce42ee564158fcfd25588117278513baee0944d2c2e069b229059b3"
+      "sha256": "b235ab5091c1a8c31a6aed7794cb017c220ebfd512ec759fa1a2c9238515735e"
     },
     {
       "name": "drum_fills_instruments_gamma9001.json",
-      "sha256": "64d10e616efd1f37a3f9841f6e4a0fc34d9893a6c42fc1de797211ddadf4a191"
+      "sha256": "437345d1cad411f53174020c04b90cb313494d8973491ab674e4c18f6a094917"
     },
     {
       "name": "drum_fills_instruments_general_midi.json",
-      "sha256": "67df87f7ed540f0359363e471e5130725a89d48e30e5898049874848ae3e5438"
+      "sha256": "c940f8bce950fa62115df3d0486d21c8da0de8d3e2540f6e23b439063611e768"
     },
     {
       "name": "drum_fills_instruments_tiny.json",
-      "sha256": "089856e64ab7a3cd5244f9ac0da000b31a52f82fafc38a5294a10fceb39488be"
+      "sha256": "7550bbc7f52bb4e4ee5c31c087247e9a280460c1cb7722d16f467ad2b93aba00"
     },
     {
       "name": "drum_fills_timing.json",
-      "sha256": "c9cef2ab4afda67042a03d630408e2d58d5e6fcab81ccc47caea79663092b527"
+      "sha256": "68bf2c4ec68f82f87f43b4f6a5aa76f4830473d4e000e23efc10e2b267389f2c"
     }
   ]
 }

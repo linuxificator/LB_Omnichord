@@ -1,5 +1,5 @@
 {
-  "config_revision": 9,
+  "config_revision": 11,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,
@@ -35,7 +35,9 @@
   "osc_input": {
     "enabled": true,
     "listen_address": "0.0.0.0",
-    "listen_port": 8000
+    "listen_port": 8000,
+    "advertise": true,
+    "service_name": "LB Omnichord"
   },
   "default_synths": {
     "chord": "juno_004",
@@ -112,7 +114,7 @@
   "amy_max_sequence_executions": 40,
   "amy_max_buses": 11,
   "debug": {
-    "log_amy_commands": true,
+    "log_amy_commands": false,
     "amy_command_log": "~/.omnichord/amy_debug.log",
     "log_logical_events": true
   },
