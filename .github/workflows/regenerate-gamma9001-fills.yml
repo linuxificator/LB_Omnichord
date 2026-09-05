@@ -38,6 +38,9 @@ jobs:
       - name: Generate canonical fills
         run: python amysynth_version/design/rhythm_rework/new_patterns/regenerate_gamma9001_fills.py --generate
 
+      - name: Restore musical start-position rotation
+        run: python amysynth_version/design/rhythm_rework/new_patterns/adjust_gamma9001_fill_starts.py --adjust
+
       - name: Install exact frontend test dependencies
         working-directory: amysynth_version/qt_frontend
         run: python -m pip install -c packaging/constraints/desktop-current.txt -r requirements-test.txt
@@ -56,8 +59,8 @@ jobs:
           OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
         run: python tests/run_tests.py --suite unit --coverage
 
-      - name: Finalize Codex handover
-        run: python amysynth_version/design/rhythm_rework/new_patterns/regenerate_gamma9001_fills.py --finalize-handover
+      - name: Write validated Codex handover
+        run: python amysynth_version/design/rhythm_rework/new_patterns/adjust_gamma9001_fill_starts.py --handover
 
       - name: Remove temporary regeneration machinery
         run: |
@@ -67,6 +70,7 @@ jobs:
             .github/workflows/regenerate-gamma9001-fills.yml \
             amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py \
             amysynth_version/design/rhythm_rework/new_patterns/regenerate_gamma9001_fills.py \
+            amysynth_version/design/rhythm_rework/new_patterns/adjust_gamma9001_fill_starts.py \
             amysynth_version/design/rhythm_rework/new_patterns/drum_activity_timing.refresh.json.gz.b64.part1 \
             amysynth_version/design/rhythm_rework/new_patterns/drum_activity_timing.refresh.json.gz.b64.part2 \
             amysynth_version/design/rhythm_rework/new_patterns/drum_activity_timing.refresh.json.gz.b64.part3 \
