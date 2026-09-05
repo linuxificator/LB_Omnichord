@@ -560,8 +560,12 @@ class StaticContractTests(unittest.TestCase):
         )
         self.assertIn('label: "bass activity"', qml)
         self.assertIn('label: "fill density"', qml)
-        for label in ('"/32"', '"/16"', '"/8"', '"/1"'):
-            self.assertIn(label, qml)
+        self.assertIn(
+            "valueLabels: root.controller.rhythmFillDensityLabels",
+            qml,
+        )
+        self.assertNotIn('"/16"', qml)
+        self.assertNotIn('"/32"', qml)
         self.assertNotIn("levels: [0, 1, 2, 3, 4]", qml)
         activity_selector = (ROOT / "gui" / "ActivitySelector.qml").read_text(encoding="utf-8")
         self.assertIn("property var levels: [1, 2, 3, 4]", activity_selector)
@@ -604,7 +608,8 @@ class StaticContractTests(unittest.TestCase):
 
         chord = (ROOT / "gui" / "ChordActivitySelector.qml").read_text(encoding="utf-8")
         self.assertIn('text: "chord activity"', chord)
-        self.assertIn('text: index < 4 ? String(index + 1) : "A"', chord)
+        self.assertIn('(root.arpeggioEnabled ? "▂▄▆" : "•••")', chord)
+        self.assertIn('arpeggioDescending ? "↓" : "↑"', chord)
         self.assertIn('? "/" + String(index + 1)', chord)
         self.assertIn(": root.directionLabel", chord)
         self.assertIn("model: 5", chord)

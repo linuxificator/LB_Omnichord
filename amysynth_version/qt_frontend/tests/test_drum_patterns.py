@@ -21,6 +21,7 @@ from amy_transport import (  # noqa: E402
     _resolve_drum_catalog_directory,
 )
 from drum_patterns import (  # noqa: E402
+    FILL_DENSITY_BARS,
     KIT_FAMILIES,
     load_drum_pattern_catalog,
 )
@@ -41,6 +42,9 @@ class _WriterProbe:
 
 
 class DrumPatternTests(unittest.TestCase):
+    def test_fill_density_contract_covers_one_through_eight_bars(self) -> None:
+        self.assertEqual(FILL_DENSITY_BARS, (8, 7, 6, 5, 4, 3, 2, 1))
+
     @classmethod
     def setUpClass(cls) -> None:
         cls.catalog = load_drum_pattern_catalog(FRONTEND / "music" / "drums")

@@ -17,6 +17,7 @@ from config_loader import DebugConfig, ResolvedAmyConfig, resolve_amy_config_dat
 from drum_patterns import (
     DrumFill,
     DrumPatternCatalog,
+    FILL_DENSITY_BARS,
     load_drum_pattern_catalog,
 )
 from rhythm_command_plan import (
@@ -1186,7 +1187,7 @@ class AmySerialClient:
         plan = compile_fill_schedule(
             fills=rhythm.fills,
             order=order,
-            density_bars=int(config.get("fill_density_bars", 32)),
+            density_bars=int(config.get("fill_density_bars", FILL_DENSITY_BARS[0])),
             bar_ticks=self._drum_quantum(),
             lane_start=lane.start,
             lane_count=lane.count,

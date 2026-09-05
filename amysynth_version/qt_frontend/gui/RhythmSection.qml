@@ -202,7 +202,7 @@ Item {
             toValue: 7
             stepValue: 1
             decimals: 0
-            valueLabels: ["/32", "/16", "/8", "/6", "/4", "/3", "/2", "/1"]
+            valueLabels: root.controller.rhythmFillDensityLabels
             midiControlRouter: root.controller.midiPlayer
             midiTarget: ({
                 "screen": "omni",

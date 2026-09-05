@@ -76,7 +76,7 @@ lower `F1`..`F5` row is independent and multi-select:
   running;
 - selected fills rotate in order and through their allowed start beats.
 
-Fill density has the exact choices `/32`, `/16`, `/8`, `/6`, `/4`, `/3`,
+Fill density has the exact choices `/8`, `/7`, `/6`, `/5`, `/4`, `/3`,
 `/2`, `/1` bars. LB expands the selected fills and allowed starts into the
 smallest finite supercycle and cumulates those child-start events behind root
 tag 0. The root is replaced at its global alignment. There is no host timer,

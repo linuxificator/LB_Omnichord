@@ -143,11 +143,16 @@ def compile_omni_preset_plan(
                 fill_density_bars[rhythm_fallback.fill_density_index],
             )
         )
-        density_index = (
-            fill_density_bars.index(raw_density)
-            if raw_density in fill_density_bars
-            else rhythm_fallback.fill_density_index
-        )
+        if raw_density in fill_density_bars:
+            density_index = fill_density_bars.index(raw_density)
+        elif raw_density > max(fill_density_bars):
+            # Presets written before the useful fill range was narrowed could
+            # contain /16 or /32. Preserve their intent as the longest now
+            # supported interval rather than falling back to an unrelated
+            # per-rhythm value.
+            density_index = fill_density_bars.index(max(fill_density_bars))
+        else:
+            density_index = rhythm_fallback.fill_density_index
         rhythm_plans.append(
             RhythmSettingPreset(
                 tempo=_clamp(stored.get("tempo", rhythm_fallback.tempo), 40.0, 200.0),

@@ -733,6 +733,12 @@ class PresetIntegrationTests(unittest.TestCase):
                 "chord_activity": 1,
                 "bass_activity": 1,
             })
+            preset_two["effects"] = {
+                "reverb_level": 0.15,
+                "reverb_liveness": 0.2,
+                "reverb_damping": 0.85,
+                "reverb_drums": False,
+            }
             preset_two["rhythm"]["bass_voicing_shift"] = 5
             preset_two["rhythm"]["chord_arpeggio_enabled"] = False
             preset_two["rhythm"]["chord_arpeggio_rate"] = 1
@@ -762,6 +768,11 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setChordArpeggioRate", 3.0)
             app.action("toggleChordArpeggioDirection")
             app.action("toggleChordArpeggio")
+            app.action("setReverbLevel", 1.25)
+            app.action("setReverbLiveness", 0.78)
+            app.action("setReverbDamping", 0.31)
+            if not bool(app.query("reverbDrumsIncluded")):
+                app.action("toggleReverbDrums")
             app.action("toggleRhythm")
             app.action("setRhythmTempo", 107.0)
             app.bridge.wait_idle(timeout=8.0)
@@ -795,6 +806,10 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("chordArpeggioRate")), 3)
             self.assertTrue(bool(app.query("chordArpeggioDescending")))
             self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 1.25)
+            self.assertAlmostEqual(float(app.query("reverbLiveness")), 0.78)
+            self.assertAlmostEqual(float(app.query("reverbDamping")), 0.31)
+            self.assertTrue(bool(app.query("reverbDrumsIncluded")))
             self.assertEqual(int(app.query("activeRowIndex")), 0)
             self.assertEqual(int(app.query("activeRootSemitone")), 0)
             self.assertEqual(int(app.action("octaveIndexForRow", 0)), 2)
@@ -842,6 +857,15 @@ class PresetIntegrationTests(unittest.TestCase):
                 str(stored["rhythm"]["chord_arpeggio_direction"]), "down"
             )
             self.assertEqual(
+                stored["effects"],
+                {
+                    "reverb_level": 1.25,
+                    "reverb_liveness": 0.78,
+                    "reverb_damping": 0.31,
+                    "reverb_drums": True,
+                },
+            )
+            self.assertEqual(
                 tuple(row["octave"] for row in stored["chord_rows"]),
                 ("O3", "O1", "O2", "O6"),
             )
@@ -862,6 +886,12 @@ class PresetIntegrationTests(unittest.TestCase):
             preset_two["rhythm"]["chord_arpeggio_enabled"] = True
             preset_two["rhythm"]["chord_arpeggio_rate"] = 4
             preset_two["rhythm"]["chord_arpeggio_direction"] = "down"
+            preset_two["effects"] = {
+                "reverb_level": 0.25,
+                "reverb_liveness": 0.35,
+                "reverb_damping": 0.45,
+                "reverb_drums": True,
+            }
             target_octaves = ("O1", "O2", "O5", "O6")
             for row, octave in zip(preset_two["chord_rows"], target_octaves):
                 row["octave"] = octave
@@ -889,6 +919,10 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertTrue(bool(app.query("chordArpeggioEnabled")))
             self.assertEqual(int(app.query("chordArpeggioRate")), 4)
             self.assertTrue(bool(app.query("chordArpeggioDescending")))
+            self.assertAlmostEqual(float(app.query("reverbLevel")), 0.25)
+            self.assertAlmostEqual(float(app.query("reverbLiveness")), 0.35)
+            self.assertAlmostEqual(float(app.query("reverbDamping")), 0.45)
+            self.assertTrue(bool(app.query("reverbDrumsIncluded")))
             self.assertEqual(
                 tuple(app.action("octaveIndexForRow", row) for row in range(4)),
                 (0, 1, 4, 5),
