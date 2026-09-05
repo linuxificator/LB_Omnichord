@@ -18,6 +18,11 @@ dropped independently from every sequence change.
 No Codex-specific explanation is added to the Shorepine-facing AMY tree. This
 handover is the diagnostic record for the LB Omnichord side.
 
+A public, project-facing explanation now lives in AMY as
+`docs/windows-m-pi-portability.md`. It was added on `rework/sequencer` in
+commit `3872b4be` and is linked from AMY's README, Godot guide and reusable-
+sequence status page. It contains no Codex or downstream-application material.
+
 ## Why the current source needs it
 
 ISO C does not require `<math.h>` to expose `M_PI`. Unix toolchains commonly
