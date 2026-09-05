@@ -486,6 +486,29 @@ class DrumPatternTests(unittest.TestCase):
             re.match(r"^H\d+,\d+,0HC\d+,1,1Z$", command)
             for command in authored
         ))
+        self.assertIn("HC0,0,192Z", commands)
+        self.assertIn("HC0,1,192Z", commands)
+        self.assertNotIn("HC0,0,1536Z", commands)
+
+    def test_fill_schedule_replacement_never_waits_beyond_one_bar(self) -> None:
+        client = self.client()
+        for rhythm in self.catalog.rhythms.values():
+            client.rhythm_config = {
+                "id": rhythm.rhythm_id,
+                "fill_order": list(range(len(rhythm.fills))),
+                "fill_density_bars": 8,
+            }
+            bar_ticks = client._drum_quantum()
+            controls = [
+                command
+                for command in client._fill_schedule_commands()
+                if re.match(r"^HC0,[01],", command)
+            ]
+            self.assertEqual(
+                controls,
+                [f"HC0,0,{bar_ticks}Z", f"HC0,1,{bar_ticks}Z"],
+                rhythm.rhythm_id,
+            )
 
     def test_cold_start_is_immediate_but_live_drum_edits_are_quantized(self) -> None:
         client = self.client()

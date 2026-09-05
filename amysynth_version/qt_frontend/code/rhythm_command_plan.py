@@ -196,6 +196,7 @@ def compile_tagged_lane(
     start: int,
     count: int,
     events: list[ScheduledEvent],
+    replacement_alignment: int | None = None,
 ) -> TaggedLanePlan:
     """Replace one running AMY sequence without host-side clock state."""
 
@@ -206,7 +207,11 @@ def compile_tagged_lane(
         for tick, period, body in events
     ]
     periods = [period for _, period, _ in normalized_events]
-    alignment = math.lcm(*periods) if periods else 0
+    alignment = (
+        math.lcm(*periods)
+        if replacement_alignment is None and periods
+        else max(0, int(replacement_alignment or 0))
+    )
     commands = [
         sequence_control_command(start, SEQUENCE_CONTROL_STOP, alignment=alignment),
         *compile_sequence_definition(
@@ -610,5 +615,6 @@ def compile_fill_schedule(
         start=lane_start,
         count=lane_count,
         events=events,
+        replacement_alignment=bar_ticks,
     )
     return FillSchedulePlan(lane.commands)
