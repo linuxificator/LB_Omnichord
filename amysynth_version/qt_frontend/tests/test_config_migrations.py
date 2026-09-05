@@ -15,6 +15,7 @@ from config_migrations import (  # noqa: E402
     REVISION_FIVE_GAMMA9001_MAP,
     REVISION_FOUR_SHIPPED_TINY_MAP,
     REVISION_NINE_ROLE_LEVELS,
+    REVISION_TEN_OSC_DISCOVERY,
     ConfigMigrationError,
     migrate_config_document,
 )
@@ -308,6 +309,7 @@ class ConfigMigrationTests(unittest.TestCase):
                 "enabled": True,
                 "listen_address": "0.0.0.0",
                 "listen_port": 8000,
+                **REVISION_TEN_OSC_DISCOVERY,
             },
         )
         self.assertTrue(
@@ -364,7 +366,7 @@ class ConfigMigrationTests(unittest.TestCase):
         revision_eight["config_revision"] = 8
         revision_eight.pop("role_levels")
 
-        migrated = migrate_config_document(revision_eight)
+        migrated = migrate_config_document(revision_eight, target_revision=9)
 
         self.assertEqual(migrated.data["role_levels"], REVISION_NINE_ROLE_LEVELS)
         self.assertEqual(migrated.data["config_revision"], 9)
@@ -373,6 +375,39 @@ class ConfigMigrationTests(unittest.TestCase):
                 migrated.changed_paths
             )
         )
+
+    def test_revision_ten_enables_discovery_for_configured_legacy_osc(self) -> None:
+        revision_nine = copy.deepcopy(self.shipped)
+        revision_nine["config_revision"] = 9
+        for key in REVISION_TEN_OSC_DISCOVERY:
+            revision_nine["osc_input"].pop(key)
+
+        migrated = migrate_config_document(revision_nine)
+
+        self.assertEqual(
+            {
+                key: migrated.data["osc_input"][key]
+                for key in REVISION_TEN_OSC_DISCOVERY
+            },
+            REVISION_TEN_OSC_DISCOVERY,
+        )
+        self.assertEqual(migrated.data["config_revision"], 10)
+        self.assertTrue(
+            {
+                "$.osc_input.advertise",
+                "$.osc_input.service_name",
+                "$.config_revision",
+            }.issubset(migrated.changed_paths)
+        )
+
+    def test_revision_ten_does_not_recreate_an_absent_osc_capability(self) -> None:
+        revision_nine = copy.deepcopy(self.shipped)
+        revision_nine["config_revision"] = 9
+        revision_nine.pop("osc_input")
+
+        migrated = migrate_config_document(revision_nine)
+
+        self.assertNotIn("osc_input", migrated.data)
 
     def test_revision_five_rejects_a_custom_tiny_mapping(self) -> None:
         custom = copy.deepcopy(self.revision_six)

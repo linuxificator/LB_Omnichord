@@ -118,6 +118,19 @@ def create_spdx_sbom(manifest: dict[str, Any]) -> dict[str, Any]:
     packages: list[dict[str, Any]] = []
     relationships: list[dict[str, str]] = []
     dependency_keys: set[tuple[str, str]] = set()
+    python = _object(manifest.get("python"), "python")
+    portable_runtime = {
+        str(name): str(version)
+        for name, version in _object(
+            python.get("direct_runtime"), "direct_runtime"
+        ).items()
+    }
+    desktop_runtime = {
+        str(name): str(version)
+        for name, version in _object(
+            python.get("desktop_runtime"), "desktop_runtime"
+        ).items()
+    }
 
     for raw in raw_packages:
         package = _object(raw, "release package")
@@ -150,15 +163,16 @@ def create_spdx_sbom(manifest: dict[str, Any]) -> dict[str, Any]:
                 "relatedSpdxElement": app_id,
             }
         )
-        runtime_dependencies = (
+        runtime_dependencies = [
             ("AMY", str(_object(manifest["amy"], "amy")["commit"])),
             ("PySide6", PLATFORM_PYSIDE[platform]),
             ("PySide6_Addons", PLATFORM_PYSIDE[platform]),
             ("PySide6_Essentials", PLATFORM_PYSIDE[platform]),
             ("shiboken6", PLATFORM_PYSIDE[platform]),
-            ("pyserial", "3.5"),
-            ("fastjsonschema", "2.22.2"),
-        )
+            *portable_runtime.items(),
+        ]
+        if platform in DESKTOP_PLATFORMS:
+            runtime_dependencies.extend(desktop_runtime.items())
         for dependency in runtime_dependencies:
             dependency_keys.add(dependency)
             relationships.append(

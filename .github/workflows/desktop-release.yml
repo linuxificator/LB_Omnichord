@@ -102,6 +102,10 @@ jobs:
         working-directory: amysynth_version/qt_frontend
         run: python tests/contracts/test_external_input_processes.py
 
+      - name: Run OSC service-discovery process contract
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/contracts/test_osc_discovery_processes.py
+
       - name: Download verified AppImage tools
         env:
           APPIMAGE_ARCH: ${{ matrix.arch }}
@@ -231,6 +235,10 @@ jobs:
         working-directory: amysynth_version/qt_frontend
         run: python tests/contracts/test_external_input_processes.py
 
+      - name: Run OSC service-discovery process contract
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/contracts/test_osc_discovery_processes.py
+
       - name: Build and validate DMG
         working-directory: amysynth_version/qt_frontend
         env:
@@ -346,6 +354,11 @@ jobs:
         shell: pwsh
         working-directory: amysynth_version/qt_frontend
         run: python tests\contracts\test_external_input_processes.py
+
+      - name: Run OSC service-discovery process contract
+        shell: pwsh
+        working-directory: amysynth_version/qt_frontend
+        run: python tests\contracts\test_osc_discovery_processes.py
 
       - name: Checkout pinned AMY fork
         shell: pwsh

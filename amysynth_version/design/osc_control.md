@@ -3,7 +3,7 @@
 Status: authoritative OSC input and control-binding contract
 Owner: OSC input adapter and shared external-control binding subsystem
 Applies to: active `amysynth_version` implementation on all platforms
-Last verified: 2026-09-03
+Last verified: 2026-09-05
 
 ## Purpose and boundary
 
@@ -28,7 +28,9 @@ binding state or QML.
 "osc_input": {
   "enabled": true,
   "listen_address": "0.0.0.0",
-  "listen_port": 8000
+  "listen_port": 8000,
+  "advertise": true,
+  "service_name": "LB Omnichord"
 }
 ```
 
@@ -55,6 +57,34 @@ local-network UDP access. When the target moves to API 37 or later, packaging
 must add and the application must request `ACCESS_LOCAL_NETWORK`; adding it to
 the current target pre-emptively is explicitly not permitted by the Android
 platform contract.
+
+## Automatic service discovery
+
+On Linux x86_64, Raspberry Pi aarch64, macOS arm64 and Windows x86_64, a live
+OSC listener advertises itself as `_osc._udp` through standard DNS-SD/mDNS.
+The shipped instance name is `LB Omnichord`. Controllers which support Bonjour,
+Avahi or Zeroconf can therefore offer the application without requiring the
+user to type its address or port. Name conflicts are resolved by DNS-SD without
+changing the configured base name.
+
+`advertise` enables or disables only this discovery convenience;
+`service_name` sets the advertised instance name. Neither setting changes UDP
+listening or the OSC address namespace. Advertisement begins only after the
+configured socket binds successfully. It runs outside the Qt and audio threads,
+withdraws on shutdown and retries when no usable interface exists at startup.
+A discovery failure never disables OSC input or changes the OSC technology LED:
+that LED continues to report the actual listening socket and network state.
+
+A listener restricted to `127.0.0.1` is intentionally not advertised because
+remote controllers could not use the published loopback address. Advertising a
+wildcard listener publishes its active, non-loopback IPv4 addresses.
+
+Android keeps normal OSC UDP input but does not advertise it. Reliable mDNS on
+Android requires native multicast-lock or `NsdManager` lifecycle integration;
+adding that platform-specific bridge for a convenience feature was rejected.
+The Android resolver selects an explicit no-op before importing the desktop
+Zeroconf dependency. No UI setting or error is shown for this deliberate
+platform capability difference.
 
 ## Accepted OSC messages
 
@@ -149,15 +179,20 @@ invalidate unrelated legacy MIDI bindings.
 
 The portable input port has constructed, starting, ready, failed, closing and
 closed states. One worker owns the UDP socket. Closing is idempotent, unblocks
-the worker and prevents callbacks after close. Malformed datagrams are rejected
-without terminating the port. The Qt object thread alone mutates presentation,
-binding and musical/application state.
+the worker, withdraws any desktop DNS-SD record and prevents callbacks after
+close. Malformed datagrams are rejected without terminating the port. The Qt
+object thread alone mutates presentation, binding and musical/application
+state.
 
 ## Verification
 
 Tests must prove:
 
 - exact config migration/default/validation and no consumer fallback;
+- bind-before-advertise, configured name, opt-out, conflict-safe registration,
+  network retry and error isolation;
+- discovery of a real listening endpoint by a separate desktop mDNS process;
+- an explicit Android no-op selected before any Zeroconf import;
 - omission/disablement, listening-green/activity-green/network-red technology
   presentation and live network recovery;
 - real loopback UDP reception, message/bundle decoding, ordering, malformed

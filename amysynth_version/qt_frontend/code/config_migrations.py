@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 9
+CURRENT_CONFIG_REVISION = 10
 JsonObject = dict[str, Any]
 
 
@@ -75,6 +75,10 @@ REVISION_NINE_ROLE_LEVELS = {
     "bass": 3.2,
     "strum": 1.0,
     "chord": 1.0,
+}
+REVISION_TEN_OSC_DISCOVERY = {
+    "advertise": True,
+    "service_name": "LB Omnichord",
 }
 
 
@@ -428,6 +432,21 @@ def _revision_eight_to_nine(data: JsonObject) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def _revision_nine_to_ten(data: JsonObject) -> tuple[str, ...]:
+    """Add opt-out DNS-SD discovery to an existing configured OSC endpoint."""
+
+    changed: list[str] = []
+    osc_input = data.get("osc_input")
+    if isinstance(osc_input, dict):
+        for key, value in REVISION_TEN_OSC_DISCOVERY.items():
+            if key not in osc_input:
+                osc_input[key] = copy.deepcopy(value)
+                changed.append(f"$.osc_input.{key}")
+    data["config_revision"] = 10
+    changed.append("$.config_revision")
+    return tuple(changed)
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
@@ -441,6 +460,7 @@ MIGRATIONS: dict[int, Migration] = {
     6: _revision_six_to_seven,
     7: _revision_seven_to_eight,
     8: _revision_eight_to_nine,
+    9: _revision_nine_to_ten,
 }
 
 

@@ -28,6 +28,9 @@ SUITES: dict[str, tuple[Path, ...]] = {
     "portable-input-processes": (
         TESTS / "contracts" / "test_external_input_processes.py",
     ),
+    "desktop-network-discovery": (
+        TESTS / "contracts" / "test_osc_discovery_processes.py",
+    ),
     "platform-input-linux": (
         TESTS / "platform" / "linux" / "test_midi_input.py",
     ),
@@ -52,6 +55,7 @@ ALL_ORDER = (
     "quality",
     "unit",
     "portable-input-processes",
+    "desktop-network-discovery",
     "platform-input-linux",
     "frontend",
     "serial",

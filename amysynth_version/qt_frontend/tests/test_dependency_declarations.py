@@ -71,7 +71,7 @@ class DependencyDeclarationTests(unittest.TestCase):
         )
         self.assertEqual(
             resolved["runtime"],
-            {"pyside6", "pyserial", "fastjsonschema", "python-osc"},
+            {"pyside6", "pyserial", "fastjsonschema", "python-osc", "zeroconf"},
         )
         self.assertEqual(
             resolved["build"],
@@ -80,6 +80,7 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "pyserial",
                 "fastjsonschema",
                 "python-osc",
+                "zeroconf",
                 "pyinstaller",
             },
         )
@@ -90,6 +91,7 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "pyserial",
                 "fastjsonschema",
                 "python-osc",
+                "zeroconf",
                 "numpy",
                 "ruff",
                 "mypy",

@@ -34,6 +34,11 @@
       "owner": "runtime",
       "used_by": ["portable OSC 1.0 input parsing"]
     },
+    "zeroconf": {
+      "distribution": "zeroconf",
+      "owner": "runtime",
+      "used_by": ["desktop OSC DNS-SD service advertisement"]
+    },
     "numpy": {
       "distribution": "numpy",
       "owner": "test_quality",

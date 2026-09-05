@@ -14,6 +14,10 @@
       "fastjsonschema": "2.22.2",
       "python-osc": "1.10.2"
     },
+    "desktop_runtime": {
+      "zeroconf": "0.151.3",
+      "ifaddr": "0.2.0"
+    },
     "direct_build": {
       "PyInstaller": "6.22.2"
     },
@@ -30,6 +34,8 @@
       {"name": "pyserial", "versions": ["3.5"], "license": "BSD-3-Clause", "source": "https://github.com/pyserial/pyserial"},
       {"name": "fastjsonschema", "versions": ["2.22.2"], "license": "BSD-3-Clause", "source": "https://github.com/horejsek/python-fastjsonschema"},
       {"name": "python-osc", "versions": ["1.10.2"], "license": "Unlicense", "source": "https://github.com/attwad/python-osc"},
+      {"name": "zeroconf", "versions": ["0.151.3"], "license": "LGPL-2.1-or-later", "source": "https://github.com/python-zeroconf/python-zeroconf"},
+      {"name": "ifaddr", "versions": ["0.2.0"], "license": "MIT", "source": "https://github.com/pydron/ifaddr"},
       {"name": "PyInstaller", "versions": ["6.22.2"], "license": "GPL-2.0-or-later WITH Bootloader-exception", "source": "https://github.com/pyinstaller/pyinstaller"},
       {"name": "altgraph", "versions": ["0.17.5"], "license": "MIT", "source": "https://github.com/ronaldoussoren/altgraph"},
       {"name": "packaging", "versions": ["26.3"], "license": "Apache-2.0 OR BSD-2-Clause", "source": "https://github.com/pypa/packaging"},
@@ -42,10 +48,10 @@
   },
   "declared_input_hashes": {
     "requirements-portable.txt": "2f1a18c1262acf966f18356fc6507d8e7a129e04c9a21c39b9d5692abe027313",
-    "requirements.txt": "e402ad6424600a24c816dc1c2303a2f92635e6adaddb6d3152ce09c82cd8a1da",
+    "requirements.txt": "5a8b3bc8fd6e70f3459cc449e1d9365fb89f6c4cda7ad259c2721a414af686d5",
     "requirements-build.txt": "816c7f59d6b8eac729c12540d8ddc12c47595be0e4601d4c5757134c450336b8",
-    "packaging/constraints/desktop-current.txt": "31b259bea5a578654276fd92d771f664f3883775d5f436a62e10c043f5b808be",
-    "packaging/constraints/raspberrypi-aarch64.txt": "dd6ff070e8b053d55ecba118341944f82ef3710e2075e40719247e33170c2c6f"
+    "packaging/constraints/desktop-current.txt": "be523673e8800747abb36586418156178714d6e7158b06b9381a4695cf90f340",
+    "packaging/constraints/raspberrypi-aarch64.txt": "b611ee2189471306e24ab254901f5d10aee807e487befa33699fddac531c4731"
   },
   "release_packages": [
     {"platform": "linux-x86_64", "suffix": "Linux-x86_64.AppImage"},

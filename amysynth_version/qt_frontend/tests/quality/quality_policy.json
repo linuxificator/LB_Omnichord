@@ -31,6 +31,7 @@
     ]
   },
   "direct_platform_access_allowlist": [
-    "midi_platform_profile.py"
+    "midi_platform_profile.py",
+    "osc_discovery_platform_adapters.py"
   ]
 }

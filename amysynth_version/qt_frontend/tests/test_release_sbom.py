@@ -64,6 +64,31 @@ class ReleaseSbomTests(unittest.TestCase):
         self.assertTrue(
             any(item["relationshipType"] == "BUILD_DEPENDENCY_OF" for item in relationships)
         )
+        for platform in (
+            "linux-x86_64",
+            "raspberrypi-aarch64",
+            "macos-arm64",
+            "windows-x86_64",
+            "android-arm64",
+        ):
+            app_id = next(
+                package["SPDXID"]
+                for package in app_packages
+                if package["name"] == f"LB Omnichord ({platform})"
+            )
+            dependencies = {
+                item["relatedSpdxElement"]
+                for item in relationships
+                if item["spdxElementId"] == app_id
+                and item["relationshipType"] == "DEPENDS_ON"
+            }
+            self.assertIn("SPDXRef-Package-python-osc-1.10.2", dependencies)
+            if platform == "android-arm64":
+                self.assertNotIn("SPDXRef-Package-zeroconf-0.151.3", dependencies)
+                self.assertNotIn("SPDXRef-Package-ifaddr-0.2.0", dependencies)
+            else:
+                self.assertIn("SPDXRef-Package-zeroconf-0.151.3", dependencies)
+                self.assertIn("SPDXRef-Package-ifaddr-0.2.0", dependencies)
 
     def test_sbom_is_deterministic_and_rejects_an_incomplete_release(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

@@ -39,7 +39,12 @@ python -m PyInstaller \
     --additional-hooks-dir "$frontend_dir/packaging/pyinstaller_hooks" \
     --hidden-import c_amy \
     --collect-all amy \
+    --collect-all zeroconf \
+    --hidden-import ifaddr \
+    --copy-metadata zeroconf \
+    --copy-metadata ifaddr \
     --add-data "$frontend_dir/licence.txt:." \
+    --add-data "$frontend_dir/THIRD_PARTY_NOTICES.md:." \
     --add-data "$frontend_dir/config:config" \
     --add-data "$frontend_dir/gui:gui" \
     --add-data "$frontend_dir/instruments:instruments" \
@@ -48,6 +53,8 @@ python -m PyInstaller \
 
 plutil -insert NSLocalNetworkUsageDescription \
     -string "LB Omnichord receives OSC control messages from devices and apps on your local network." \
+    "$app_bundle/Contents/Info.plist"
+plutil -insert NSBonjourServices -json '["_osc._udp"]' \
     "$app_bundle/Contents/Info.plist"
 plutil -lint "$app_bundle/Contents/Info.plist"
 codesign --force --deep --sign - "$app_bundle"

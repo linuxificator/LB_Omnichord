@@ -11,6 +11,10 @@ from typing import Literal, Protocol
 from pythonosc.osc_packet import OscPacket, ParseError
 
 from input_technology import InputTechnologyState, InputTechnologyStatus
+from osc_discovery import (
+    OscServiceAdvertiser,
+    null_osc_service_advertiser,
+)
 from resolved_config import OscInputConfig
 
 
@@ -132,8 +136,15 @@ def decode_osc_packet(packet: bytes) -> tuple[tuple[str, int, float, OscValueTyp
 class PythonOscUdpInputPort:
     """Portable single-worker UDP adapter around python-osc packet parsing."""
 
-    def __init__(self, event_sink: OscInputEventSink, config: OscInputConfig) -> None:
+    def __init__(
+        self,
+        event_sink: OscInputEventSink,
+        config: OscInputConfig,
+        *,
+        advertiser: OscServiceAdvertiser | None = None,
+    ) -> None:
         self._config = config
+        self._advertiser = advertiser or null_osc_service_advertiser()
         self._emitter = OrderedOscInputEmitter(event_sink)
         self._state_lock = threading.Lock()
         self._lifecycle: OscInputLifecycle = "constructed"
@@ -193,6 +204,16 @@ class PythonOscUdpInputPort:
         )
         self._thread.start()
         self._set_state("ready")
+        if self._config.advertise:
+            try:
+                self._advertiser.start(
+                    service_name=self._config.service_name,
+                    listen_address=listen_address,
+                    port=int(udp_socket.getsockname()[1]),
+                )
+            except (OSError, RuntimeError, ValueError):
+                # Service discovery is best-effort; OSC input is already live.
+                pass
 
     def status_snapshot(
         self,
@@ -260,13 +281,22 @@ class PythonOscUdpInputPort:
         self._thread = None
         if thread is not None and thread is not threading.current_thread():
             thread.join(timeout=1.0)
+        self._advertiser.close()
         self._set_state("closed")
 
 
 def production_osc_input_port(
     event_sink: OscInputEventSink,
     config: object,
+    *,
+    advertiser_factory: Callable[
+        [], OscServiceAdvertiser
+    ] = null_osc_service_advertiser,
 ) -> OscInputPort:
     if not isinstance(config, OscInputConfig):
         raise TypeError("OSC input port requires resolved OscInputConfig")
-    return PythonOscUdpInputPort(event_sink, config)
+    return PythonOscUdpInputPort(
+        event_sink,
+        config,
+        advertiser=advertiser_factory(),
+    )
