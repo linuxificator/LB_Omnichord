@@ -142,6 +142,43 @@ class DrumMusicalContractTests(unittest.TestCase):
             expected = {offset + 192 for offset in range(0, period, 384)}
             self.assertEqual(self._ticks(events, "backbeat_primary"), expected)
 
+    def test_funk_country_and_break_families_keep_required_anchors(self) -> None:
+        for rhythm_id in AUDIT_FAMILIES["funk"]:
+            events = self._events(self.rhythms[rhythm_id])
+            roles = {event["role"] for event in events}
+            self.assertTrue(
+                {"low_primary", "backbeat_primary", "timekeeper_primary"} <= roles,
+                rhythm_id,
+            )
+            if rhythm_id != "seven_four_funk":
+                self.assertTrue(
+                    any(tick % 96 for tick in self._ticks(events, "low_primary")),
+                    rhythm_id,
+                )
+
+        for rhythm_id in AUDIT_FAMILIES["country_waltz"]:
+            events = self._events(self.rhythms[rhythm_id])
+            roles = {event["role"] for event in events}
+            self.assertIn("low_primary", roles, rhythm_id)
+            self.assertIn("timekeeper_primary", roles, rhythm_id)
+            self.assertTrue(
+                {"backbeat_primary", "backbeat_soft"} & roles,
+                rhythm_id,
+            )
+
+        for rhythm_id in AUDIT_FAMILIES["breaks"]:
+            events = self._events(self.rhythms[rhythm_id])
+            roles = {event["role"] for event in events}
+            self.assertTrue(
+                {"low_primary", "backbeat_primary", "timekeeper_primary"} <= roles,
+                rhythm_id,
+            )
+            if rhythm_id not in {"dubstep", "trap"}:
+                self.assertTrue(
+                    any(tick % 96 for tick in self._ticks(events, "low_primary")),
+                    rhythm_id,
+                )
+
     def test_latin_timeline_reggae_and_odd_meter_identities(self) -> None:
         son = self._events(self.rhythms["son_clave_3_2"])
         rumba = self._events(self.rhythms["rumba_clave_3_2"])
@@ -235,6 +272,12 @@ class DrumMusicalContractTests(unittest.TestCase):
             self.assertIn("src_berklee_drum_performance", refs, fill["fill_id"])
             if fill.get("generation", {}).get("style_family") == "latin":
                 self.assertIn("src_berklee_afro_latin", refs, fill["fill_id"])
+
+    def test_activity_catalogue_records_authoritative_review_sources(self) -> None:
+        references = self.activity["musical_basis"]["references"]
+        self.assertGreaterEqual(len(references), 5)
+        self.assertTrue(all(ref["url"].startswith("https://") for ref in references))
+        self.assertTrue({ref["publisher"] for ref in references} >= {"Yamaha", "Berklee Online", "Berklee PULSE", "Ableton"})
 
 
 if __name__ == "__main__":
