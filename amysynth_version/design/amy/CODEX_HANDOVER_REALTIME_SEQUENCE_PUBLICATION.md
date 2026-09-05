@@ -5,6 +5,10 @@ Date: 2026-09-04
 Affected AMY branch: `rework/sequencer_simplification`
 Primary target of concern: ESP32-P4 at 48 kHz, 128-sample AMY blocks
 
+Release note: the integration release recorded below is historical. The
+current immutable release, built from the final merged PR head, is recorded in
+`CODEX_HANDOVER_AMY_RELEASE_20260905.md`.
+
 Implementation commits on the clean AMY branch:
 
 - `2669c3ae` — exercise append-while-active COW and three overlapping

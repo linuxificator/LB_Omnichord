@@ -4,6 +4,10 @@ Status: implemented and tested on `rework/sequencer_simplification`
 Date: 2026-09-04
 Repositories: `linuxificator/amy` and `linuxificator/LB_Omnichord`
 
+Release note: the integration release recorded below is historical. The
+current immutable release, built from the final merged PR head, is recorded in
+`CODEX_HANDOVER_AMY_RELEASE_20260905.md`.
+
 ## Why this supersedes the previous design
 
 The original `rework/sequencer` experiment introduced sequencer groups as a

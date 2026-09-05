@@ -6,6 +6,10 @@ AMY feature branch: `rework/sequencer_simplification`
 AMY feature head: `f03875f239d85f44d7d3d4115e0b51bf6482318d`
 LB branch: `rework/sequencer_simplification`
 
+Release note: the integration release recorded below is historical. The
+current immutable release, built from the final merged PR head, is recorded in
+`CODEX_HANDOVER_AMY_RELEASE_20260905.md`.
+
 ## Review input and resulting API
 
 Dan Ellis' review comment on Shorepine AMY PR 1151 values a broad feature set
