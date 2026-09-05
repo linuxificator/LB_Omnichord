@@ -81,6 +81,8 @@ Completed successfully on the AMY release source:
 - complete `make ctest -j2`, including reusable sequences, concurrency, OOM,
   clock rollover, bus behavior and configurable build geometry;
 - `tests/test_sequence_api.py`;
+- the complete 133-test AMY audio/regression suite with the CI threshold
+  `AMY_TEST_THRESHOLD_DB=-70.0`;
 - `make check-c-api`, covering generated C, Python, JavaScript and PCM data;
 - Android service contract: Gamma9001, separate private service, 336
   oscillators, 11 buses and 1,280 sequence tags;
