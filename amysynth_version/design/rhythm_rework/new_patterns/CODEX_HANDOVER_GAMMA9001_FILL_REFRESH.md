@@ -54,3 +54,21 @@ Permanent regression coverage retains the established maximum 10-event fill-root
 ## Do not regress
 
 Do not author around Tiny limitations. Do not remove fill-start rotation merely to make fills end at a bar. Do not add autonomous fills to activity level 5. Do not use host timers as a musical clock. Do not reset transport or sequencer phase to launch or edit fills.
+
+## Instrumentation diversity correction — 2026-09-05
+
+Listening review found that the first fill refresh changed timing vocabulary but still selected only one Gamma9001 profile per rhythm. That made F1-F5 timbrally repetitive.
+
+The corrected contract is:
+
+- fill timing remains kit-independent;
+- F1-F5 use distinct logical orchestrations at the existing event ticks;
+- Gamma9001 may select a profile by `fill_id`, with the old per-rhythm profile retained only as fallback;
+- all five fills of every rhythm use five distinct Gamma9001 profiles;
+- Latin fills combine changing main-kit anchors with patch-390 timbale/conga/claves/maracas/cowbell colour;
+- Tiny and General MIDI do not need to mirror this colour layer. Tiny remains test/compatibility degradation and must not constrain Gamma9001 authoring.
+
+Canonical hashes after this correction:
+
+- `drum_fills_timing.json`: `fd78abf33adcbfcff36ed31e0ef99bbdab5f8b852efeacb3a8e008b319562078`
+- `drum_fills_instruments_gamma9001.json`: `437345d1cad411f53174020c04b90cb313494d8973491ab674e4c18f6a094917`

@@ -33,13 +33,13 @@
     },
     {
       "path": "music/drums/drum_fills_timing.json",
-      "sha256": "6efeb1ba54401a02355674c5990ea06c312e13e4eadaeff288330bdc54870c45",
+      "sha256": "fd78abf33adcbfcff36ed31e0ef99bbdab5f8b852efeacb3a8e008b319562078",
       "count_path": [
         "fills"
       ],
       "expected_count": 270,
       "schema": "music/schema/drum_fills_v2.schema.json",
-      "process": "LB-authored 2026-09-05 fill refresh derived from each current level-3 activity groove; genre-specific transition overlays; Gamma9001 musical reference; rotating start positions are aligned to ordinary beat, half-bar, compound-meter or odd-meter grouping boundaries; Tiny is compatibility degradation only"
+      "process": "LB-authored 2026-09-05 Gamma9001-first fill refresh; timing remains kit-independent, while F1-F5 use deliberately different logical orchestrations at unchanged event ticks"
     },
     {
       "path": "music/drums/drum_fill_continuation_roles.json",
@@ -93,13 +93,13 @@
     },
     {
       "path": "music/drums/drum_fills_instruments_gamma9001.json",
-      "sha256": "53110d29d6535f7218bd3386ef26d1d248e7085075a563a42f8efbfed1844047",
+      "sha256": "437345d1cad411f53174020c04b90cb313494d8973491ab674e4c18f6a094917",
       "count_path": [
         "rhythm_profile"
       ],
       "expected_count": 54,
       "schema": "music/schema/drum_kit_v1.schema.json",
-      "process": "Gamma9001 fill realization synchronized to the corresponding refreshed activity profile per rhythm"
+      "process": "Gamma9001-first fill realization with deterministic fill_id-specific profiles; each rhythm's five fills use five distinct compatible profiles, including patch-390 Latin hybrid colour"
     },
     {
       "path": "music/drums/drum_fills_instruments_general_midi.json",

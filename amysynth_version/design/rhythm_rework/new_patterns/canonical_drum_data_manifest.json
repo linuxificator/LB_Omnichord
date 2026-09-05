@@ -24,7 +24,7 @@
     },
     {
       "name": "drum_fills_instruments_gamma9001.json",
-      "sha256": "53110d29d6535f7218bd3386ef26d1d248e7085075a563a42f8efbfed1844047"
+      "sha256": "437345d1cad411f53174020c04b90cb313494d8973491ab674e4c18f6a094917"
     },
     {
       "name": "drum_fills_instruments_general_midi.json",
@@ -36,7 +36,7 @@
     },
     {
       "name": "drum_fills_timing.json",
-      "sha256": "6efeb1ba54401a02355674c5990ea06c312e13e4eadaeff288330bdc54870c45"
+      "sha256": "fd78abf33adcbfcff36ed31e0ef99bbdab5f8b852efeacb3a8e008b319562078"
     }
   ]
 }

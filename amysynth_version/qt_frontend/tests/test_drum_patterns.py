@@ -239,7 +239,7 @@ class DrumPatternTests(unittest.TestCase):
                         )
                 self.assertEqual(actual, expected, (rhythm.rhythm_id, level_index))
 
-    def test_fill_start_rotation_and_base_groove_profiles(self) -> None:
+    def test_fill_start_rotation_and_gamma_profile_diversity(self) -> None:
         maximum = 0
         for rhythm in self.catalog.rhythms.values():
             beats_per_bar = int(rhythm.meter.split("/", 1)[0])
@@ -256,8 +256,16 @@ class DrumPatternTests(unittest.TestCase):
                     fill.fill_id,
                 )
         self.assertEqual(maximum, 10)
-        for kit_name in KIT_FAMILIES:
+
+        gamma = self.catalog.kits["gamma9001"]
+        self.assertEqual(len(gamma.fill_id_profile), 270)
+        for rhythm in self.catalog.rhythms.values():
+            profiles = {gamma.fill_id_profile[fill.fill_id] for fill in rhythm.fills}
+            self.assertEqual(len(profiles), 5, rhythm.rhythm_id)
+
+        for kit_name in ("tiny", "general_midi"):
             kit = self.catalog.kits[kit_name]
+            self.assertFalse(kit.fill_id_profile, kit_name)
             self.assertEqual(
                 dict(kit.fill_rhythm_profile),
                 dict(kit.activity_rhythm_profile),
@@ -319,6 +327,7 @@ class DrumPatternTests(unittest.TestCase):
                                 event.role,
                                 event.velocity,
                                 fill=True,
+                                fill_id=fill.fill_id,
                             ),
                         )
                     )
@@ -385,6 +394,7 @@ class DrumPatternTests(unittest.TestCase):
                         rhythm.rhythm_id,
                         event.role,
                         fill=True,
+                        fill_id=fill.fill_id,
                     )
                     self.assertIsNotNone(sound.preset)
                     resolved.add((int(sound.preset), sound.note))

@@ -69,6 +69,7 @@ class DrumHitBody(Protocol):
         velocity: int,
         *,
         fill: bool,
+        fill_id: str | None = None,
     ) -> str: ...
 
 
@@ -523,15 +524,21 @@ def compile_fill_sequence(
                 ),
             )
         )
+    fill_id = getattr(fill, "fill_id", None)
     for event in fill.events:
         event_tick = event.tick // 2
-        events.append(
-            (
-                event_tick,
-                0,
-                hit_body(rhythm_id, event.role, event.velocity, fill=True),
+        body = (
+            hit_body(rhythm_id, event.role, event.velocity, fill=True)
+            if fill_id is None
+            else hit_body(
+                rhythm_id,
+                event.role,
+                event.velocity,
+                fill=True,
+                fill_id=fill_id,
             )
         )
+        events.append((event_tick, 0, body))
     return compile_sequence_definition(sequence_tag=sequence_tag, events=events)
 
 

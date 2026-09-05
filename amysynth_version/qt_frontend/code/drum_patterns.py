@@ -57,6 +57,7 @@ class _KitMap:
     activity_rhythm_profile: Mapping[str, str]
     fill_profiles: Mapping[str, Mapping[str, DrumSound]]
     fill_rhythm_profile: Mapping[str, str]
+    fill_id_profile: Mapping[str, str]
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ class DrumPatternCatalog:
         role: str,
         *,
         fill: bool = False,
+        fill_id: str | None = None,
     ) -> DrumSound:
         kit_name = str(kit_family)
         try:
@@ -91,7 +93,13 @@ class DrumPatternCatalog:
             kit.fill_rhythm_profile if fill else kit.activity_rhythm_profile
         )
         try:
-            profile_name = assignments[str(rhythm_id)]
+            profile_name = (
+                kit.fill_id_profile.get(str(fill_id))
+                if fill and fill_id is not None
+                else None
+            )
+            if profile_name is None:
+                profile_name = assignments[str(rhythm_id)]
             return profiles[profile_name][str(role)]
         except KeyError as exc:
             kind = "fill" if fill else "activity"
@@ -164,14 +172,23 @@ def _sound(raw: Any, *, kit_family: str) -> DrumSound:
 def _load_kit(
     path: Path,
     kit_family: str,
-) -> tuple[Mapping[str, Mapping[str, DrumSound]], Mapping[str, str]]:
+) -> tuple[
+    Mapping[str, Mapping[str, DrumSound]],
+    Mapping[str, str],
+    Mapping[str, str],
+]:
     raw = _read(path, "drum_kit_v1.schema.json")
     if str(raw.get("kit_family")) != kit_family:
         raise ValueError(f"{path} does not describe kit {kit_family!r}")
     raw_profiles = raw.get("profiles")
     assignments = raw.get("rhythm_profile")
-    if not isinstance(raw_profiles, dict) or not isinstance(assignments, dict):
-        raise ValueError(f"{path} lacks profiles or rhythm_profile")
+    fill_assignments = raw.get("fill_profile", {})
+    if (
+        not isinstance(raw_profiles, dict)
+        or not isinstance(assignments, dict)
+        or not isinstance(fill_assignments, dict)
+    ):
+        raise ValueError(f"{path} lacks valid profiles/rhythm_profile/fill_profile")
     profiles: dict[str, dict[str, DrumSound]] = {}
     for profile_name, profile in raw_profiles.items():
         if not isinstance(profile, dict):
@@ -186,8 +203,10 @@ def _load_kit(
             for key, value in profiles.items()
         }
     )
-    return immutable_profiles, MappingProxyType(
-        {str(key): str(value) for key, value in assignments.items()}
+    return (
+        immutable_profiles,
+        MappingProxyType({str(key): str(value) for key, value in assignments.items()}),
+        MappingProxyType({str(key): str(value) for key, value in fill_assignments.items()}),
     )
 
 
@@ -200,12 +219,18 @@ def _validate_drum_cross_references(catalog: DrumPatternCatalog) -> None:
     }
     for rhythm in catalog.rhythms.values():
         active_roles = {event.role for level in rhythm.levels for event in level}
-        fill_roles = {event.role for fill in rhythm.fills for event in fill.events}
         for kit_family in KIT_FAMILIES:
             for role in active_roles:
                 catalog.resolve(kit_family, rhythm.rhythm_id, role)
-            for role in fill_roles:
-                catalog.resolve(kit_family, rhythm.rhythm_id, role, fill=True)
+            for fill in rhythm.fills:
+                for event in fill.events:
+                    catalog.resolve(
+                        kit_family,
+                        rhythm.rhythm_id,
+                        event.role,
+                        fill=True,
+                        fill_id=fill.fill_id,
+                    )
         for fill in rhythm.fills:
             # A continuation role absent at the selected level is an
             # intentional no-op; its whitelist is activity-independent.
@@ -338,11 +363,11 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
 
     kits: dict[str, _KitMap] = {}
     for kit_family in KIT_FAMILIES:
-        activity_profiles, activity_assignments = _load_kit(
+        activity_profiles, activity_assignments, _ = _load_kit(
             directory / f"drum_activity_instruments_{kit_family}.json",
             kit_family,
         )
-        fill_profiles, fill_assignments = _load_kit(
+        fill_profiles, fill_assignments, fill_id_assignments = _load_kit(
             directory / f"drum_fills_instruments_{kit_family}.json",
             kit_family,
         )
@@ -351,6 +376,7 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
             activity_rhythm_profile=activity_assignments,
             fill_profiles=fill_profiles,
             fill_rhythm_profile=fill_assignments,
+            fill_id_profile=fill_id_assignments,
         )
 
     catalog = DrumPatternCatalog(
