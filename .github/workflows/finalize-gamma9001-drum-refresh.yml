@@ -78,19 +78,12 @@ jobs:
           if set(differences) != expected:
               raise SystemExit(f'unexpected cycle metadata changes: {sorted(differences)}')
 
-          # The authored Samba phrase is exactly 384 ticks. Represent it as the
-          # equivalent one 4/4 bar so the existing 4/4 fill starts remain legal.
           samba = current_by_id['samba']
           if (samba['meter'], int(samba['period_bars']), int(samba['period_ticks'])) != ('2/4', 2, 384):
               raise SystemExit('unexpected staged Samba metadata')
           samba['meter'] = '4/4'
           samba['period_bars'] = 1
 
-          # AMY has 40 simultaneous sequence-execution slots. The pre-refresh
-          # worst-case characterization is 34, leaving six slots of headroom.
-          # Merengue's richer staged timing used eleven distinct logical roles,
-          # which would raise that worst case to 39. Preserve the richer timing
-          # while realizing it through six genre-appropriate Latin functions.
           merengue = current_by_id['merengue']
           merengue_roles = {
               'low_primary',
@@ -288,7 +281,7 @@ jobs:
           text = p.read_text(encoding='utf-8')
           text = text.replace(
               'Status: **data authored and validated; materialization into the canonical runtime JSON is the next bounded step**  ',
-              'Status: **canonical runtime data materialized; targeted drum/provenance tests and maintained unit suite passed**  ',
+              'Status: **canonical runtime data materialized; targeted drum/provenance tests and maintained unit suite passed**',
               1,
           )
           old = 'Decoded canonical JSON SHA-256:\n\n`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`'
