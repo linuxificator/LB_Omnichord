@@ -109,15 +109,36 @@ and Android/macOS/Windows/Raspberry Pi packaging remain hosted CI gates.
 assembled here. PyInstaller/package construction and all five target packages
 must be exercised by the normal GitHub workflow before publishing a release.
 
+## Hosted integration findings
+
+Non-publishing five-platform run `33956845291` compiled the newly pinned AMY
+release. Its shared test jobs and Linux, Raspberry Pi and macOS package jobs
+passed. The first Windows attempt found that `packaging/windows/amy_service.c`
+still initialized the three retired group-capacity members of `amy_config_t`.
+This was a caller integration defect, not a defect in AMY's reusable-sequence
+implementation.
+
+LB commit `e2a8bc5` changes the service to `max_sequencer_tags`,
+`max_sequence_events` and `max_sequence_executions`, using the same
+`1280/64/40` profile as the authoritative JSON and Android service. Its
+packaging contract now derives the expected literals from that JSON and
+forbids the retired member names.
+
+The same audit found pre-group `max_pattern*` members in the separately built
+ESP32-P4 application. LB commit `67e49b3` migrates those to the current fields
+and extends the immutable-release static contract. This is a source/build
+compatibility correction only; physical ESP32-P4 real-time validation remains
+open. A focused Windows smoke build was started from that commit before the
+next complete package run, preserving the project's partial-rerun workflow.
+
 ## Continuation
 
-1. Push the LB pin and this handover after the local tree is clean.
-2. Run the hosted release/build workflow against the LB branch or after its
-   normal merge decision.
-3. Require the standalone Unix-socket sanitizer job and all platform package
+1. Require the focused Windows smoke build to pass, then perform one final
+   complete non-publishing platform run from the repaired LB commit.
+2. Require the standalone Unix-socket sanitizer job and all platform package
    jobs to pass.
-4. Perform the separate physical ESP32-P4 timing, DMA and memory validation;
+3. Perform the separate physical ESP32-P4 timing, DMA and memory validation;
    hosted success does not prove that hardware deadline.
-5. If any AMY release fix is needed, commit it separately on the release
+4. If any AMY release fix is needed, commit it separately on the release
    branch, update the single manifest SHA, reinstall AMY and rerun the affected
    tests followed by the full suite.
