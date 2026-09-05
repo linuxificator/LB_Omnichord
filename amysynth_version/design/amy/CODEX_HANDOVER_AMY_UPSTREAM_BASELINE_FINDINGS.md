@@ -13,9 +13,12 @@ must not be presented as regressions caused by the sequence patch. They were
 discovered while extending pre-merge validation beyond AMY's normal test
 matrix.
 
-No corresponding changes have been added to the Shorepine-facing sequence
-branch. Each source defect should be handled as a focused upstream issue or
-patch with its own baseline regression test.
+Except for the separately documented `M_PI` Windows portability correction,
+no corresponding changes have been added to the Shorepine-facing sequence
+branch. Each other source defect should be handled as a focused upstream issue
+or patch with its own baseline regression test. See
+`CODEX_HANDOVER_AMY_M_PI_WINDOWS_PORTABILITY.md` for why that one build fix is
+carried as an independent commit.
 
 ## Confirmed source findings
 
@@ -102,12 +105,12 @@ fails under MSVC at `src/pcm.c:148` because `M_PI` is undeclared. The sequence
 patch does not change `src/pcm.c`, and `src/sequencer.c` compiled successfully
 before this independent failure stopped the job.
 
-The PCM window initialization should use an AMY-owned portable constant or a
-platform-independent standard expression rather than relying on the
-non-standard `M_PI` extension. This deserves a small Windows compile
-regression. A temporary CI-only baseline fix may be used to let the sequence
-binding continue through link validation, but it must not enter the sequence
-PR.
+The PCM window initialization should use a portable fallback rather than
+relying unconditionally on the non-standard `M_PI` extension. This deserves a
+small Windows compile regression. Because current Shorepine main has failed
+every Godot Windows build since this sampler source entered the tested branch,
+the guarded fallback is carried as its own reviewable commit with the sequence
+merge; it remains causally separate from the sequence implementation.
 
 The same MSVC build also reports pointer-truncation warnings in debug printing
 inside `src/instrument.c` and `src/midi_mappings.c`: pointers are cast to

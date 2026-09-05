@@ -32,6 +32,9 @@ Read these documents in order for current reusable-sequence work:
 7. `CODEX_HANDOVER_AMY_UPSTREAM_BASELINE_FINDINGS.md` — memory-safety,
    lifecycle, sanitizer and CI observations confirmed outside the sequence
    patch and kept separate for future upstream fixes.
+8. `CODEX_HANDOVER_AMY_M_PI_WINDOWS_PORTABILITY.md` — why current Shorepine
+   main stopped building the Godot addon on MSVC, why the guarded portability
+   correction is carried as an independent commit, and its validation proof.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful
