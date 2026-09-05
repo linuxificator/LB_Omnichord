@@ -38,6 +38,9 @@ Read these documents in order for current reusable-sequence work:
 9. `CODEX_HANDOVER_AMY_RELEASE_20260905.md` — reconstruction of the current
    immutable Omnichord release from the PR head, downstream-only layers, exact
    consumer pin and host validation evidence.
+10. `CODEX_HANDOVER_DUAL_ESP32P4_RELEASE.md` — migration of the complete
+    Gamma9001 firmware to reusable sequences and the two-profile release ZIP
+    and flashing contract.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful
