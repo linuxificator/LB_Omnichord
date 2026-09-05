@@ -199,7 +199,6 @@ class SynthState:
         application catalogue defaults. This is the exact reset semantics used
         by the per-section UI reset buttons.
         """
-        definition = self.selected_definition
         values_by_synth = self._default_values()
         self._overlay_parameters(values_by_synth, data)
         new_values = values_by_synth[self._selected_index]

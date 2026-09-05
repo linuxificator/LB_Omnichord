@@ -266,7 +266,6 @@ def compile_chord_sequence_plan(
     if not bool(arpeggio.get("enabled", False)):
         rhythm_notes = chord_notes[: max(1, max_chord_notes)]
         gate = max(1, round(chord_gate_beats * ppq))
-        length = gate + 1
         for velocity_index, velocity in enumerate(velocities):
             sequence_tag = sequence_start + velocity_index
             sequence_events = [
@@ -307,7 +306,6 @@ def compile_chord_sequence_plan(
     rate = max(1, min(4, int(arpeggio.get("notes_per_beat", 1))))
     step = max(1, round(ppq / rate))
     gate = max(1, round(chord_gate_beats * step))
-    length = (max(0, note_count - 1) * step) + gate + 1
     note_indexes = list(range(note_count))
     if str(arpeggio.get("direction", "up")).lower() == "down":
         note_indexes.reverse()

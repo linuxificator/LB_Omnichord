@@ -15,7 +15,6 @@ CODE = FRONTEND / "code"
 sys.path.insert(0, str(CODE))
 
 from amy_transport import (  # noqa: E402
-    AMY_PPQ,
     AmySerialClient,
     _TaggedSequencerLane,
     _resolve_drum_catalog_directory,
@@ -460,6 +459,7 @@ class DrumPatternTests(unittest.TestCase):
         live_roots = [line for line in live if re.match(r"^H\d", line) and "HC" in line]
 
         self.assertTrue(cold_triggers)
+        self.assertTrue(live_triggers)
         self.assertTrue(cold_roots)
         self.assertEqual(cold_roots, live_roots)
 

@@ -5,7 +5,6 @@ import math
 import queue
 import sys
 import threading
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +31,7 @@ from rhythm_command_plan import (
     fill_occurrences,
 )
 from transport_scheduler import (
+    ByteSink,
     CommandScheduler,
     TransportFailed,
     TransportHealth,
@@ -148,7 +148,7 @@ class _ScheduledWriter:
 
     def __init__(
         self,
-        sink: Any,
+        sink: ByteSink,
         *,
         thread_name: str,
         debug_log: _DebugLog | None,

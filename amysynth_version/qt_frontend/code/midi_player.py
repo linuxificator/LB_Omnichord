@@ -13,11 +13,9 @@ import app_core
 from amy_transport import SYNTH_FLAGS_IGNORE_NOTE_OFFS
 from application_scheduler import MonotonicScheduler
 from amy_parameter_plan import compile_parameter_commands
-from control_limits import clamp_control_value
 from json_store import JsonStore
 from midi_control import (
     NOTE_BUTTON_OFFSET,
-    PITCH_BEND_CONTROLLER,
     MidiControlState,
 )
 from midi_binding_service import MidiBindingService
@@ -539,7 +537,7 @@ class MidiPlayerBackend(QObject):
         with self._midi_control_lock:
             return self._midi_control_state.omni_led_state()
 
-    @Property("QVariantList", constant=True)
+    @Property(list, constant=True)
     def synthNames(self) -> list[str]:
         return [definition.label for definition in self.definitions]
 
@@ -587,7 +585,7 @@ class MidiPlayerBackend(QObject):
     def masterMuted(self) -> bool:
         return self._master_muted
 
-    @Property("QVariantList", notify=midiInputTechsChanged)
+    @Property(list, notify=midiInputTechsChanged)
     def midiInputTechs(self) -> list[dict[str, Any]]:
         """Return the shared input-tech row under its compatibility name."""
 

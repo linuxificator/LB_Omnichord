@@ -26,7 +26,6 @@ from midi_input import (  # noqa: E402
 )
 from midi_linux import LinuxMidiInputPort, linux_technologies  # noqa: E402
 from midi_platform_adapters import (  # noqa: E402
-    UnavailableMidiInputPort,
     create_midi_input_port,
     midi_input_technologies,
 )

@@ -101,7 +101,7 @@ def csv_after(command: str | None, key: str, stop_letters: str) -> list[float | 
     if not command:
         return []
     match = re.search(
-        re.escape(key) + f"([^" + re.escape(stop_letters) + r"]*)",
+        re.escape(key) + "([^" + re.escape(stop_letters) + r"]*)",
         command,
     )
     if not match:

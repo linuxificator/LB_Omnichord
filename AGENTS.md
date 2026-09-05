@@ -93,12 +93,12 @@ Relevant hardware characteristics:
 The proven low-latency baseline is:
 
 - Sample rate: **48 kHz**.
-- AMY render block: **64 samples**.
-- I2S DMA configuration proven clean at this setting: **2 × 32 frames**.
+- AMY render block: **128 samples**.
+- I2S DMA configuration proven clean at this setting: **2 × 64 frames**.
 - Removing `vTaskDelay()` from the render loop was essential; reintroducing scheduler delays into the audio render path can cause periodic distortion.
 - Measured GPIO-to-audio latency with the working 64-sample setup is below approximately 2 ms.
 
-Do not casually increase the block size or add blocking/delay behavior to the audio loop. If a heavier patch requires a different DMA configuration, measure the consequences rather than assuming it is harmless.
+Do not casually change the block size or add blocking/delay behavior to the audio loop. If a heavier patch requires a different DMA configuration, measure the consequences rather than assuming it is harmless.
 
 ### External PCM5102A DAC
 

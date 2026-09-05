@@ -49,7 +49,7 @@ def build_plan() -> list[dict[str, object]]:
         else:
             patch = None
         setup = (
-            [f"i2iv2in1iy2Z", "v0w6b0.985i2Z", "i2iy2Z"]
+            ["i2iv2in1iy2Z", "v0w6b0.985i2Z", "i2iy2Z"]
             if patch is None
             else [f"K{patch}i2iv2iy2Z"]
         )
