@@ -49,12 +49,11 @@ jobs:
               '',
               1,
           )
-          text = text.replace(
-              '                    fill_id=fill.fill_id,\n',
-              '                    fill_id=getattr(fill, "fill_id", None),\n',
-              1,
-          )
-          path.write_text(text, encoding='utf-8')
+          old = '''    for event in fill.events:\n        event_tick = event.tick // 2\n        events.append(\n            (\n                event_tick,\n                0,\n                hit_body(\n                    rhythm_id,\n                    event.role,\n                    event.velocity,\n                    fill=True,\n                    fill_id=fill.fill_id,\n                ),\n            )\n        )\n'''
+          new = '''    fill_id = getattr(fill, "fill_id", None)\n    for event in fill.events:\n        event_tick = event.tick // 2\n        body = (\n            hit_body(rhythm_id, event.role, event.velocity, fill=True)\n            if fill_id is None\n            else hit_body(\n                rhythm_id,\n                event.role,\n                event.velocity,\n                fill=True,\n                fill_id=fill_id,\n            )\n        )\n        events.append((event_tick, 0, body))\n'''
+          if old not in text:
+              raise SystemExit('fill body compatibility marker not found')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
           PY
 
       - name: Install exact frontend test dependencies
