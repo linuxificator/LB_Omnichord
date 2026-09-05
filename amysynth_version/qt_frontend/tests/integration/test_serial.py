@@ -1022,7 +1022,16 @@ class SerialIntegrationTests(unittest.TestCase):
             if int(app.query("chordGateState")) != 1:
                 app.action("toggleChordGate")
             if not bool(app.query("rhythmRunning")):
+                rhythm_start = app.bridge.count()
                 app.action("toggleRhythm")
+                # The action returns after enqueueing, not after the writer
+                # reaches the PTY. Synchronize on the actual wire boundary so
+                # a busy runner cannot move zY1 into the tap-only delta below.
+                app.bridge.wait_for_lines(
+                    ["zY1Z"],
+                    start=rhythm_start,
+                    timeout=8.0,
+                )
             app.bridge.wait_idle(timeout=8.0)
 
             start = app.bridge.count()
