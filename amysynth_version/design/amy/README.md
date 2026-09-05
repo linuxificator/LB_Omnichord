@@ -2,7 +2,7 @@
 
 Status: index for AMY fork analysis and continuation work
 Owner: LB Omnichord integration
-Last updated: 2026-09-04
+Last updated: 2026-09-05
 
 This directory is the home for AMY implementation audits, diagnostic trails
 and continuation notes that are useful to LB Omnichord development but must not
@@ -29,6 +29,9 @@ Read these documents in order for current reusable-sequence work:
 6. `CODEX_HANDOVER_SEQUENCE_FINAL_QUALITY_REAUDIT.md` — completed repairs,
    additional compatibility/rollover findings, final host validation and the
    remaining target-only checks.
+7. `CODEX_HANDOVER_AMY_UPSTREAM_BASELINE_FINDINGS.md` — memory-safety,
+   lifecycle, sanitizer and CI observations confirmed outside the sequence
+   patch and kept separate for future upstream fixes.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful
