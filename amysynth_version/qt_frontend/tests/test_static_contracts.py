@@ -18,6 +18,12 @@ class StaticContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         prepare = (ROOT.parent / "esp32p4" / "prepare_amy.sh").read_text(encoding="utf-8")
+        esp32_main = (ROOT.parent / "esp32p4" / "main" / "main.c").read_text(
+            encoding="utf-8"
+        )
+        runtime_config = json.loads(
+            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
         release_inputs = json.loads(
             (ROOT / "packaging" / "release_inputs.json").read_text(encoding="utf-8")
         )
@@ -29,6 +35,22 @@ class StaticContractTests(unittest.TestCase):
             self.assertNotIn(release_inputs["amy"]["commit"], contract)
         self.assertNotIn("AMY_REF:-main", prepare)
         self.assertIn("release branch and immutable commit do not match", prepare)
+        for member, config_key in (
+            ("max_sequencer_tags", "amy_max_sequencer_tags"),
+            ("max_sequence_events", "amy_max_sequence_events"),
+            ("max_sequence_executions", "amy_max_sequence_executions"),
+        ):
+            self.assertIn(
+                f"config.{member} = {runtime_config[config_key]};",
+                esp32_main,
+                f"ESP32-P4 AMY service must match {config_key}",
+            )
+        for retired_member in (
+            "max_patterns",
+            "max_pattern_tags",
+            "max_pattern_instances",
+        ):
+            self.assertNotIn(retired_member, esp32_main)
 
     def test_frontend_code_has_no_amy_library_imports(self) -> None:
         """Only the separately managed local service may load AMY."""
