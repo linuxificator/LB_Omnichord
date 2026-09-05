@@ -469,6 +469,61 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_chord_input_channel_button_matches_channel_control_contract(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 90
+    height: 90
+    visible: true
+    property int selectedChannel: 7
+
+    MidiChannelButton {
+        objectName: "chordInputChannelButton"
+        x: 14
+        y: 14
+        channel: window.selectedChannel
+        onClicked: {
+            window.selectedChannel = channel === 16 ? 0 : channel + 1
+        }
+    }
+}
+""",
+        )
+        button = window.findChild(QObject, "chordInputChannelButton")
+        face = window.findChild(QObject, "midiChannelButtonFace")
+        self.assertIsNotNone(button)
+        self.assertIsNotNone(face)
+        assert button is not None
+        assert face is not None
+
+        self.assertEqual(float(button.property("width")), 62.0)
+        self.assertEqual(float(button.property("height")), 62.0)
+        self.assertEqual(str(button.property("text")), "7")
+        self.assertEqual(face.property("color").name(), "#ffffff")
+        self.assertEqual(button.property("borderColor").name(), "#000000")
+        self.assertEqual(float(button.property("borderWidth")), 2.0)
+
+        QTest.mouseClick(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            QPoint(45, 45),
+        )
+        QCoreApplication.processEvents()
+        self.assertEqual(int(window.property("selectedChannel")), 8)
+        self.assertEqual(str(button.property("text")), "8")
+
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
     def test_midi_bound_slider_press_without_movement_stays_bound(self) -> None:
         engine, component, window = self.create_window(
             b"""

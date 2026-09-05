@@ -3,7 +3,7 @@
 Status: authoritative GUI structure contract
 Owner: Qt/QML user interface
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-03
+Last verified: 2026-09-05
 
 ## Screens
 
@@ -56,6 +56,13 @@ The MIDI view contains:
 - MIDI preview strum.
 - Independent MIDI reverb controls for level, liveness, damping and drum send.
 - Independent MIDI master volume and mute.
+
+The top-right corner contains a white round OMNI chord-input channel selector.
+It has the same 62-pixel diameter, typography and two-pixel circular border as
+the six MIDI-row channel selectors, but uses black text and border. It displays
+`7` at startup and cycles through `1..16,A` on a click or tap. The corresponding
+note ownership and bottom-row chord/octave feedback contract is defined in
+`midi.md`.
 
 No watermark is shown on the MIDI screen.
 
@@ -145,6 +152,14 @@ button grab through release. Pointer-down starts and selects the chord.
 Pointer-up immediately releases the directly played manual voice,
 independently of rhythm timing, and the selected chord keeps its blue active
 border after a quick tap.
+
+An accepted external chord-channel Note On owns the manual chord interaction
+until its matching Note Off. During that interval the chord keys and only the
+bottom chord row's octave buttons ignore pointer/touch input. Their backend
+slots enforce the same rule, so a second UI path cannot bypass it. Chord type,
+inversion and octave buttons on the other rows remain usable. If a chord key is
+already physically held, a newly arriving external note pair is ignored
+instead of stealing that pointer's manual voice.
 
 Ordinary buttons use Qt Quick Controls button signals. Held increment/decrement
 controls use `AbstractButton.autoRepeat`; sliders use `Slider.onMoved`; MIDI

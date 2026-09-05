@@ -502,4 +502,27 @@ Item {
         tuningCoupled: root.tuningCoupled
         padColor: root.activeStrumColor
     }
+
+    MidiChannelButton {
+        id: chordInputChannelButton
+        objectName: "chordInputChannelButton"
+        x:
+            root.hostWindow.strumX
+            + (root.hostWindow.strumWidth - width) / 2
+        y: 8
+        z: 2000
+        channel: {
+            backend.midiPlayer.stateVersion
+            return backend.midiPlayer.chordInputChannel
+        }
+        panelColor: "#ffffff"
+        pressedPanelColor: "#dddddd"
+        borderColor: "#000000"
+        textColor: "#000000"
+        ToolTip.visible: hovered
+        ToolTip.text: "OMNI chord input channel"
+
+        onClicked:
+            backend.midiPlayer.cycleChordInputChannel()
+    }
 }
