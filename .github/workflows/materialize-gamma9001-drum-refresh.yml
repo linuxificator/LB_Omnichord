@@ -29,13 +29,14 @@ jobs:
           python amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py --check
           python amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py
 
-      - name: Reconcile rhythm metadata with current main contract
+      - name: Preserve current rhythm metadata and two-bar cycles
         run: |
           git fetch origin main --depth=1
           python - <<'PY'
           import hashlib
           import json
           import subprocess
+          from copy import deepcopy
           from pathlib import Path
 
           rel = 'amysynth_version/qt_frontend/music/drums/drum_activity_timing.json'
@@ -60,20 +61,72 @@ jobs:
               for rhythm_id in current
           }
           differences = {key: value for key, value in differences.items() if value}
+          expected = {
+              'disco', 'eleven_eight', 'five_four', 'house', 'nine_eight',
+              'samba', 'seven_eight', 'seven_four_funk', 'techno', 'trance',
+          }
           print('RHYTHM_METADATA_DIFFERENCES', json.dumps(differences, sort_keys=True))
-          if set(differences) - {'samba'}:
-              raise SystemExit(f'unexpected rhythm metadata changes: {sorted(set(differences) - {"samba"})}')
-          if 'samba' not in differences:
-              raise SystemExit('expected staged Samba metadata mismatch was not found')
+          if set(differences) != expected:
+              raise SystemExit(
+                  f'unexpected metadata-difference set: got {sorted(differences)}, '
+                  f'expected {sorted(expected)}'
+              )
 
-          samba = current['samba']
-          base_samba = baseline['samba']
-          print('STAGED_SAMBA', samba['meter'], samba['period_bars'], samba['period_ticks'])
-          print('MAIN_SAMBA', base_samba['meter'], base_samba['period_bars'], base_samba['period_ticks'])
-          for field in fields:
-              samba[field] = base_samba[field]
-          if any(int(event['tick']) >= int(samba['period_ticks']) for level in samba['levels'] for event in level['events']):
-              raise SystemExit('a refreshed Samba event falls outside the restored main period')
+          for rhythm_id, rhythm in current.items():
+              base_rhythm = baseline[rhythm_id]
+              old_period = int(rhythm['period_ticks'])
+              new_period = int(base_rhythm['period_ticks'])
+              if rhythm_id in differences:
+                  if new_period != old_period * 2:
+                      raise SystemExit(
+                          f'{rhythm_id}: cannot safely expand period {old_period} -> {new_period}'
+                      )
+                  for level in rhythm['levels']:
+                      original_events = deepcopy(level['events'])
+                      repeated = [
+                          {**event, 'tick': int(event['tick']) + old_period}
+                          for event in original_events
+                      ]
+                      level['events'] = original_events + repeated
+                      level['events'].sort(key=lambda event: (int(event['tick']), str(event['role'])))
+                      level['event_count'] = len(level['events'])
+                      if level['event_count'] > 56:
+                          raise SystemExit(
+                              f'{rhythm_id} level {level["level"]}: '
+                              f'{level["event_count"]} events after cycle preservation exceeds 56'
+                          )
+              for field in fields:
+                  rhythm[field] = base_rhythm[field]
+              if any(
+                  int(event['tick']) >= int(rhythm['period_ticks'])
+                  for level in rhythm['levels']
+                  for event in level['events']
+              ):
+                  raise SystemExit(f'{rhythm_id}: event outside restored period')
+
+          level_locations = [
+              (rhythm['id'], int(level['level']), len(level['events']))
+              for rhythm in activity['rhythms']
+              for level in rhythm['levels']
+          ]
+          maximum = max(count for _, _, count in level_locations)
+          activity['coverage_summary'] = {
+              'rhythm_count': len(activity['rhythms']),
+              'levels_per_rhythm': 5,
+              'max_event_count': maximum,
+              'max_event_locations': [
+                  {'rhythm_id': rhythm_id, 'level': level, 'event_count': count}
+                  for rhythm_id, level, count in level_locations
+                  if count == maximum
+              ],
+          }
+          activity['repository_contract']['branch'] = 'feature/gamma9001-drum-pattern-refresh'
+          activity['repository_contract']['commit_read'] = subprocess.check_output(
+              ['git', 'rev-parse', 'origin/main'], text=True
+          ).strip()
+          activity['repository_contract']['design_status'] = (
+              'canonical runtime activity catalogue; Gamma9001 quality refresh 2026-09-05'
+          )
 
           encoded = (json.dumps(activity, indent=2) + '\n').encode('utf-8')
           canonical_sha = hashlib.sha256(encoded).hexdigest()
@@ -95,14 +148,17 @@ jobs:
                   entry['sha256'] = canonical_sha
                   entry['process'] = (
                       'LB-authored 2026-09-05 genre-convention refresh; Gamma9001 is the musical '
-                      'reference while timing remains kit-independent; existing rhythm meter/period '
-                      'metadata retained from the pre-refresh runtime contract'
+                      'reference while timing remains kit-independent; pre-refresh rhythm meter and '
+                      'cycle-length metadata retained exactly, with authored one-cycle grooves repeated '
+                      'across the existing two-cycle period where required'
                   )
                   break
           else:
               raise SystemExit('provenance lacks drum activity entry')
           provenance_path.write_text(json.dumps(provenance, indent=2) + '\n', encoding='utf-8')
           print('CANONICAL_DRUM_ACTIVITY_SHA256', canonical_sha)
+          print('MAX_EVENT_COUNT', maximum)
+          print('EXPANDED', ','.join(sorted(differences)))
           PY
 
       - name: Add foundation richness regression
@@ -153,7 +209,7 @@ jobs:
                  'Final canonical runtime JSON SHA-256:\n\n`' + sha + '`')
           text = text.replace(old, new, 1)
           marker = '\n## 13. Definition of done\n'
-          evidence = f'''\n## 12a. Integration validation evidence\n\nThe one-shot branch job SHA-verified and materialized the complete staged payload, then compared `meter`, `period_bars` and `period_ticks` for all 54 rhythms against `main`. Only Samba differed; its runtime metadata was restored exactly from `main` before validation, preserving the established fill scheduling contract without weakening fills or tests.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload structural validator: passed;\n- all 54 rhythm metadata contracts compared against `main`; passed after the intentional Samba reconciliation;\n- `tests/test_drum_patterns.py`: passed, including the new foundation-richness assertion;\n- `tests/test_catalogue_provenance.py`: passed;\n- `python tests/run_tests.py --suite unit`: passed.\n\nThe temporary payload, materializer and one-shot workflow are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
+          evidence = f'''\n## 12a. Integration validation evidence\n\nThe one-shot branch job SHA-verified and materialized the staged payload, then compared `meter`, `period_bars` and `period_ticks` for all 54 rhythms against `main`. Ten authored entries had intentionally simpler/shorter metadata, but changing rhythm cycle length was not part of the user request. Their pre-refresh runtime metadata was therefore retained exactly. When the authored period was half the established period, the complete authored groove was repeated into the second half rather than leaving silence. No fill timing or transport behavior was changed.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload structural validator: passed;\n- all 54 rhythm meter/period contracts compared against `main`; passed after cycle preservation;\n- every complete level remains <=56 events;\n- `tests/test_drum_patterns.py`: passed, including the new foundation-richness assertion;\n- `tests/test_catalogue_provenance.py`: passed;\n- `python tests/run_tests.py --suite unit`: passed.\n\nThe temporary payload, materializer and one-shot workflow are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
           if '## 12a. Integration validation evidence' not in text:
               text = text.replace(marker, evidence + marker, 1)
           p.write_text(text, encoding='utf-8')
