@@ -1,10 +1,17 @@
 # Codex handover — Gamma9001 drum activity refresh
 
-Status: **canonical runtime data materialized; targeted drum/provenance tests and maintained unit suite passed**
+Status: **canonical runtime data integrated and retained after complete source-backed review**
 Repository: `linuxificator/LB_Omnichord`  
-Branch: `feature/gamma9001-drum-pattern-refresh`  
+Current integration branch: `feature/midi_osc_improvement`
 Target subsystem: active `amysynth_version` only  
 Date: 2026-09-05
+
+> Final audit note: the complete 54-rhythm/270-fill review, current fill
+> dynamics, start positions, diversity measurements and executable musical
+> contracts are recorded in
+> `CODEX_HANDOVER_DRUM_CATALOGUE_MUSICAL_AUDIT.md`. That document supersedes
+> any fill-specific figures or acceptance criteria in this historical activity
+> materialization handover.
 
 ## 1. User intent
 

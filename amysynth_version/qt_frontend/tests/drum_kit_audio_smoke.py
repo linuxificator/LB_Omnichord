@@ -32,6 +32,7 @@ def sounds_for_kit(kit: str) -> list[DrumSound]:
                         rhythm.rhythm_id,
                         event.role,
                         fill=True,
+                        fill_id=fill.fill_id,
                     )
                 )
     return sorted(
@@ -63,6 +64,7 @@ def main() -> int:
     sounds = sounds_for_kit(args.kit)
 
     c_amy.live(
+        audio=False,
         default_synths=0,
         max_buses=11,
         max_oscs=336,

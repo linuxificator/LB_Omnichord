@@ -33,13 +33,13 @@
     },
     {
       "path": "music/drums/drum_fills_timing.json",
-      "sha256": "fd78abf33adcbfcff36ed31e0ef99bbdab5f8b852efeacb3a8e008b319562078",
+      "sha256": "68bf2c4ec68f82f87f43b4f6a5aa76f4830473d4e000e23efc10e2b267389f2c",
       "count_path": [
         "fills"
       ],
       "expected_count": 270,
       "schema": "music/schema/drum_fills_v2.schema.json",
-      "process": "LB-authored 2026-09-05 Gamma9001-first fill refresh; timing remains kit-independent, while F1-F5 use deliberately different logical orchestrations at unchanged event ticks"
+      "process": "LB-authored 2026-09-05 Gamma9001-first fill refresh; all 270 fills were checked against cited Yamaha/Berklee/Ableton and specialist educational references; phrase-ending starts, proportional velocity balance and five distinct within-rhythm onset/orchestration contours are enforced while timing remains kit-independent"
     },
     {
       "path": "music/drums/drum_fill_continuation_roles.json",

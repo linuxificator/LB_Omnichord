@@ -239,7 +239,7 @@ class DrumPatternTests(unittest.TestCase):
                         )
                 self.assertEqual(actual, expected, (rhythm.rhythm_id, level_index))
 
-    def test_fill_start_rotation_and_gamma_profile_diversity(self) -> None:
+    def test_phrase_ending_fill_starts_and_gamma_profile_diversity(self) -> None:
         maximum = 0
         for rhythm in self.catalog.rhythms.values():
             beats_per_bar = int(rhythm.meter.split("/", 1)[0])
@@ -255,7 +255,7 @@ class DrumPatternTests(unittest.TestCase):
                     beats_per_bar * fill.beat_unit_ticks,
                     fill.fill_id,
                 )
-        self.assertEqual(maximum, 10)
+        self.assertEqual(maximum, 5)
 
         gamma = self.catalog.kits["gamma9001"]
         self.assertEqual(len(gamma.fill_id_profile), 270)
@@ -557,7 +557,7 @@ class DrumPatternTests(unittest.TestCase):
                             + fill.duration_ticks,
                             beats_per_bar * fill.beat_unit_ticks,
                         )
-        self.assertEqual(maximum, 10)
+        self.assertEqual(maximum, 5)
 
     def test_lb_runtime_reserves_storage_but_not_hundreds_of_players(self) -> None:
         self.assertEqual(self.config["amy_max_sequencer_tags"], 1280)
