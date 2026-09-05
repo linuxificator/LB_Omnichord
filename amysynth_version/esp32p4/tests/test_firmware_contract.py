@@ -180,7 +180,7 @@ class FirmwareContractTests(unittest.TestCase):
                     path.write_bytes(profile_name.encode("ascii"))
 
             archive = assemble(
-                release_stamp="R20260905123456",
+                release_name="R20260905T123456",
                 v1=profiles["v1"],
                 v3=profiles["v3"],
                 output_dir=root / "out",
@@ -189,7 +189,7 @@ class FirmwareContractTests(unittest.TestCase):
                 names = set(bundle.namelist())
             checksum_exists = archive.with_suffix(".zip.sha256").is_file()
 
-        release_root = "LB_Omnichord.R20260905123456.ESP32P4"
+        release_root = "LB_Omnichord.R20260905T123456.ESP32P4"
         self.assertIn(f"{release_root}/flash_esptool_v4.py", names)
         self.assertIn(f"{release_root}/flash_esptool_v5.py", names)
         self.assertIn(f"{release_root}/v1/amy_p4_test.bin", names)

@@ -732,12 +732,12 @@ jobs:
 
       - name: Assemble ESP32-P4 release asset
         env:
-          RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
         run: |
           set -euo pipefail
-          firmware_zip="LB_Omnichord.${RELEASE_STAMP}.ESP32P4.zip"
+          firmware_zip="LB_Omnichord.${RELEASE_TAG}.ESP32P4.zip"
           python3 amysynth_version/esp32p4/assemble_release.py \
-            --release-stamp "$RELEASE_STAMP" \
+            --release-name "$RELEASE_TAG" \
             --v1 esp32p4-firmware/v1 \
             --v3 esp32p4-firmware/v3 \
             --output-dir firmware-dist
@@ -790,13 +790,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
         run: |
           cp '${{ steps.provenance.outputs.bundle-path }}' \
             "LB_Omnichord.${RELEASE_STAMP}.provenance.sigstore.json"
           cp '${{ steps.sbom.outputs.bundle-path }}' \
             "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
           cp '${{ steps.firmware-provenance.outputs.bundle-path }}' \
-            "LB_Omnichord.${RELEASE_STAMP}.ESP32P4.provenance.sigstore.json"
+            "LB_Omnichord.${RELEASE_TAG}.ESP32P4.provenance.sigstore.json"
           while read -r package; do
             gh attestation verify "dist/$package" \
               --repo "$GITHUB_REPOSITORY"
@@ -804,7 +805,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --predicate-type https://spdx.dev/Document/v2.3
           done < <(jq -r '.packages[].file' release-manifest.json)
-          firmware_zip="LB_Omnichord.${RELEASE_STAMP}.ESP32P4.zip"
+          firmware_zip="LB_Omnichord.${RELEASE_TAG}.ESP32P4.zip"
           gh attestation verify "firmware-dist/$firmware_zip" \
             --repo "$GITHUB_REPOSITORY"
 
@@ -822,14 +823,14 @@ jobs:
             "LB_Omnichord.${RELEASE_STAMP}.spdx.json"
             "LB_Omnichord.${RELEASE_STAMP}.provenance.sigstore.json"
             "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
-            "LB_Omnichord.${RELEASE_STAMP}.ESP32P4.provenance.sigstore.json"
+            "LB_Omnichord.${RELEASE_TAG}.ESP32P4.provenance.sigstore.json"
           )
           linux_file="LB_Omnichord.${RELEASE_STAMP}.Linux-x86_64.AppImage"
           pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
           mac_file="LB_Omnichord.${RELEASE_STAMP}.macOS-arm64.dmg"
           windows_file="LB_Omnichord.${RELEASE_STAMP}.Windows-x86_64.zip"
           android_file="LB_Omnichord.${RELEASE_STAMP}.Android-arm64.apk"
-          esp32p4_file="LB_Omnichord.${RELEASE_STAMP}.ESP32P4.zip"
+          esp32p4_file="LB_Omnichord.${RELEASE_TAG}.ESP32P4.zip"
           {
             echo '## Linux x64'
             echo

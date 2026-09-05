@@ -51,7 +51,7 @@ constants in application code.
 
 The normal Omnichord release calls the reusable P4 workflow with profile
 `all`. It publishes one asset named
-`LB_Omnichord.R<date><time>.ESP32P4.zip`. Extracting the ZIP yields exactly one
+`LB_Omnichord.R<date>T<time>.ESP32P4.zip`. Extracting the ZIP yields exactly one
 directory with the matching release name. That directory contains:
 
 - `v1/` and `v3/`, each with its own bootloader, partition table, application,

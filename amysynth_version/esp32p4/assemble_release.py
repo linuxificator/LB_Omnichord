@@ -25,9 +25,9 @@ REQUIRED_PROFILE_FILES = (
 )
 
 
-def assemble(*, release_stamp: str, v1: Path, v3: Path, output_dir: Path) -> Path:
-    if re.fullmatch(r"R[0-9]{14}", release_stamp) is None:
-        raise ValueError(f"invalid release stamp: {release_stamp}")
+def assemble(*, release_name: str, v1: Path, v3: Path, output_dir: Path) -> Path:
+    if re.fullmatch(r"R[0-9]{8}T[0-9]{6}", release_name) is None:
+        raise ValueError(f"invalid release name: {release_name}")
 
     source_root = Path(__file__).resolve().parent
     profiles = {"v1": v1.resolve(), "v3": v3.resolve()}
@@ -40,7 +40,7 @@ def assemble(*, release_stamp: str, v1: Path, v3: Path, output_dir: Path) -> Pat
             raise FileNotFoundError(f"release helper is missing: {helper}")
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    release_root = f"LB_Omnichord.{release_stamp}.ESP32P4"
+    release_root = f"LB_Omnichord.{release_name}.ESP32P4"
     archive = output_dir / f"{release_root}.zip"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for helper in HELPERS:
@@ -62,14 +62,14 @@ def assemble(*, release_stamp: str, v1: Path, v3: Path, output_dir: Path) -> Pat
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--release-stamp", required=True)
+    parser.add_argument("--release-name", required=True)
     parser.add_argument("--v1", required=True, type=Path)
     parser.add_argument("--v3", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args()
     print(
         assemble(
-            release_stamp=args.release_stamp,
+            release_name=args.release_name,
             v1=args.v1,
             v3=args.v3,
             output_dir=args.output_dir,
