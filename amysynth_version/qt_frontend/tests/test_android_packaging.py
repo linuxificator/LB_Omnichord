@@ -45,6 +45,10 @@ class AndroidPackagingTests(unittest.TestCase):
             tuple(manifest["android_load_order"]),
         )
         self.assertNotIn("Test", QT_MODULE_LOAD_ORDER)
+        self.assertLess(
+            QT_MODULE_LOAD_ORDER.index("Quick"),
+            QT_MODULE_LOAD_ORDER.index("QuickParticles"),
+        )
 
     def test_android_qt_load_order_rejects_duplicate_modules(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

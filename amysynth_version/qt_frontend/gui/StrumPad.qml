@@ -59,6 +59,18 @@ Item {
         }
     }
 
+    Item {
+        anchors.fill: parent
+        z: 900
+
+        Migraine {
+            id: migraine
+
+            width: 96
+            height: 96
+        }
+    }
+
     /*
      * One unified input path for both real touch and desktop mouse.
      *
@@ -91,6 +103,7 @@ Item {
                 root.normalizedY(points[0].y)
                 + (root.ladderMode ? 2.0 : 0.0)
             )
+            migraine.beginAt(points[0].x, points[0].y)
         }
 
         onUpdated: (points) => {
@@ -105,6 +118,7 @@ Item {
                 root.normalizedY(points[0].y)
                 + (root.ladderMode ? 2.0 : 0.0)
             )
+            migraine.moveTo(points[0].x, points[0].y)
         }
 
         onReleased: (points) => {
@@ -113,6 +127,7 @@ Item {
 
             root.gestureActive = false
             root.controller.strumEnd()
+            migraine.release()
         }
 
         onCanceled: (points) => {
@@ -121,6 +136,7 @@ Item {
 
             root.gestureActive = false
             root.controller.strumEnd()
+            migraine.release()
         }
 
         // If the outer Flickable is interactive in windowed mode, retain
