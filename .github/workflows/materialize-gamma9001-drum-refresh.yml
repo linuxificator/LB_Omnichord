@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: feature/gamma9001-drum-pattern-refresh
+          fetch-depth: 1
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
@@ -28,37 +29,51 @@ jobs:
           python amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py --check
           python amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py
 
-      - name: Reconcile Samba activity meter with canonical fill contract
+      - name: Reconcile rhythm metadata with current main contract
         run: |
+          git fetch origin main --depth=1
           python - <<'PY'
           import hashlib
           import json
+          import subprocess
           from pathlib import Path
 
-          root = Path('amysynth_version')
-          activity_path = root / 'qt_frontend/music/drums/drum_activity_timing.json'
-          fills_path = root / 'qt_frontend/music/drums/drum_fills_timing.json'
-          manifest_path = root / 'design/rhythm_rework/new_patterns/canonical_drum_data_manifest.json'
-          provenance_path = root / 'qt_frontend/music/catalogue_provenance.json'
+          rel = 'amysynth_version/qt_frontend/music/drums/drum_activity_timing.json'
+          activity_path = Path(rel)
+          manifest_path = Path('amysynth_version/design/rhythm_rework/new_patterns/canonical_drum_data_manifest.json')
+          provenance_path = Path('amysynth_version/qt_frontend/music/catalogue_provenance.json')
 
           activity = json.loads(activity_path.read_text(encoding='utf-8'))
-          fills = json.loads(fills_path.read_text(encoding='utf-8'))
-          samba = next(item for item in activity['rhythms'] if item['id'] == 'samba')
-          fill_by_index = {int(item['index']): item for item in fills['fills']}
-          samba_fill_indexes = [int(value) for value in fills['rhythm_fill_index']['samba']]
-          samba_fill_meters = {fill_by_index[index]['meter'] for index in samba_fill_indexes}
-          if samba_fill_meters != {'4/4'}:
-              raise SystemExit(f'unexpected Samba fill meters: {sorted(samba_fill_meters)}')
-          if samba['meter'] != '2/4':
-              raise SystemExit(f'unexpected staged Samba activity meter: {samba["meter"]}')
+          base = json.loads(subprocess.check_output(['git', 'show', f'origin/main:{rel}'], text=True))
+          current = {item['id']: item for item in activity['rhythms']}
+          baseline = {item['id']: item for item in base['rhythms']}
+          if set(current) != set(baseline):
+              raise SystemExit('refresh rhythm IDs differ from main')
 
-          samba['meter'] = '4/4'
-          expected_period = int(samba['period_bars']) * 4 * 96
-          if int(samba['period_ticks']) != expected_period:
-              raise SystemExit(
-                  f'Samba period {samba["period_ticks"]} is incompatible with '
-                  f'{samba["period_bars"]} bars of 4/4 at 96 PPQ (expected {expected_period})'
-              )
+          fields = ('meter', 'period_bars', 'period_ticks')
+          differences = {
+              rhythm_id: {
+                  field: (current[rhythm_id][field], baseline[rhythm_id][field])
+                  for field in fields
+                  if current[rhythm_id][field] != baseline[rhythm_id][field]
+              }
+              for rhythm_id in current
+          }
+          differences = {key: value for key, value in differences.items() if value}
+          print('RHYTHM_METADATA_DIFFERENCES', json.dumps(differences, sort_keys=True))
+          if set(differences) - {'samba'}:
+              raise SystemExit(f'unexpected rhythm metadata changes: {sorted(set(differences) - {"samba"})}')
+          if 'samba' not in differences:
+              raise SystemExit('expected staged Samba metadata mismatch was not found')
+
+          samba = current['samba']
+          base_samba = baseline['samba']
+          print('STAGED_SAMBA', samba['meter'], samba['period_bars'], samba['period_ticks'])
+          print('MAIN_SAMBA', base_samba['meter'], base_samba['period_bars'], base_samba['period_ticks'])
+          for field in fields:
+              samba[field] = base_samba[field]
+          if any(int(event['tick']) >= int(samba['period_ticks']) for level in samba['levels'] for event in level['events']):
+              raise SystemExit('a refreshed Samba event falls outside the restored main period')
 
           encoded = (json.dumps(activity, indent=2) + '\n').encode('utf-8')
           canonical_sha = hashlib.sha256(encoded).hexdigest()
@@ -74,22 +89,20 @@ jobs:
           manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
 
           provenance = json.loads(provenance_path.read_text(encoding='utf-8'))
+          provenance['recorded'] = '2026-09-05'
           for entry in provenance['catalogues']:
               if entry['path'] == 'music/drums/drum_activity_timing.json':
                   entry['sha256'] = canonical_sha
                   entry['process'] = (
                       'LB-authored 2026-09-05 genre-convention refresh; Gamma9001 is the musical '
-                      'reference while timing remains kit-independent; Samba activity meter '
-                      'reconciled to the existing 4/4 fill/runtime contract during integration validation'
+                      'reference while timing remains kit-independent; existing rhythm meter/period '
+                      'metadata retained from the pre-refresh runtime contract'
                   )
                   break
           else:
               raise SystemExit('provenance lacks drum activity entry')
-          provenance['recorded'] = '2026-09-05'
           provenance_path.write_text(json.dumps(provenance, indent=2) + '\n', encoding='utf-8')
-
           print('CANONICAL_DRUM_ACTIVITY_SHA256', canonical_sha)
-          print('SAMBA', samba['meter'], samba['period_bars'], samba['period_ticks'])
           PY
 
       - name: Add foundation richness regression
@@ -103,8 +116,7 @@ jobs:
           if 'def test_foundation_levels_are_musically_usable' not in text:
               if marker not in text:
                   raise SystemExit('test insertion marker not found')
-              text = text.replace(marker, method + marker, 1)
-              p.write_text(text, encoding='utf-8')
+              p.write_text(text.replace(marker, method + marker, 1), encoding='utf-8')
           PY
 
       - name: Install frontend test dependencies
@@ -135,13 +147,13 @@ jobs:
               'Status: **canonical runtime data materialized; targeted drum/provenance tests and maintained unit suite passed**  ',
               1,
           )
-          text = text.replace(
-              'Decoded canonical JSON SHA-256:\n\n`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`',
-              'Staged payload JSON SHA-256 (before the Samba meter integration correction):\n\n`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`\n\nFinal canonical runtime JSON SHA-256:\n\n`' + sha + '`',
-              1,
-          )
+          old = 'Decoded canonical JSON SHA-256:\n\n`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`'
+          new = ('Staged payload JSON SHA-256 (before integration metadata reconciliation):\n\n'
+                 '`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`\n\n'
+                 'Final canonical runtime JSON SHA-256:\n\n`' + sha + '`')
+          text = text.replace(old, new, 1)
           marker = '\n## 13. Definition of done\n'
-          evidence = f'''\n## 12a. Integration validation evidence\n\nThe one-shot branch job SHA-verified and materialized the complete staged payload. The first integration run exposed one real contract mismatch: the refreshed `samba` activity metadata said `2/4`, while the existing canonical Samba fills use the established 4/4 scheduling contract and legal starts on beats 3/4. The final canonical activity entry was therefore reconciled to `4/4`; no fill timing or test expectation was weakened.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload structural validator: passed;\n- `tests/test_drum_patterns.py`: passed, including the new foundation-richness assertion;\n- `tests/test_catalogue_provenance.py`: passed;\n- `python tests/run_tests.py --suite unit`: passed.\n\nThe temporary payload, materializer and one-shot workflow are removed in the immediate cleanup commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
+          evidence = f'''\n## 12a. Integration validation evidence\n\nThe one-shot branch job SHA-verified and materialized the complete staged payload, then compared `meter`, `period_bars` and `period_ticks` for all 54 rhythms against `main`. Only Samba differed; its runtime metadata was restored exactly from `main` before validation, preserving the established fill scheduling contract without weakening fills or tests.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload structural validator: passed;\n- all 54 rhythm metadata contracts compared against `main`; passed after the intentional Samba reconciliation;\n- `tests/test_drum_patterns.py`: passed, including the new foundation-richness assertion;\n- `tests/test_catalogue_provenance.py`: passed;\n- `python tests/run_tests.py --suite unit`: passed.\n\nThe temporary payload, materializer and one-shot workflow are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
           if '## 12a. Integration validation evidence' not in text:
               text = text.replace(marker, evidence + marker, 1)
           p.write_text(text, encoding='utf-8')
