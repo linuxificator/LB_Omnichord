@@ -80,6 +80,13 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_pcm_drum_synth_ignores_note_offs_without_tracking_them(self) -> None:
+        client = _Client()
+        MidiAmyEngine(client)
+
+        commands = [value for kind, value in client.events if kind == "wire"]
+        self.assertIn("i11iv8in1iy10if2Z", commands)
+
     def test_shipped_midi_profile_is_auto_and_resolves_per_package(self) -> None:
         config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
         configured = config["midi_input"]["tech_profile"]

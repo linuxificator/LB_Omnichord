@@ -14,8 +14,8 @@ private :amy service process -> AMY C engine -> Oboe -> AAudio
 ```
 
 The application embeds the `amy-service` AAR from fork release branch
-`releases/amy_omnichord_R20260903T202802`, pinned to commit
-`890ec66de2677db5bdf9a5dda9f53f01628d2b58`. Its native build generates,
+`releases/amy_omnichord_R20260905T133309`, pinned to commit
+`f3d72dfcec453a274d726869d5bf32533c3cca3b`. Its native build generates,
 links and registers Gamma9001 PCM data before AMY starts. The AAR's unexported lifecycle
 provider starts AMY in a separate `:amy` process under the same package UID.
 Qt discovers the application's real private files directory with
@@ -23,11 +23,6 @@ Qt discovers the application's real private files directory with
 hard-coded. The Python frontend opens the socket and sends wire messages only.
 It does not import or link AMY and it does not call the AAR's JNI
 implementation.
-
-The socket receiver keeps its realtime handoff queue bounded and stops reading
-when that queue is full. Normal kernel socket backpressure therefore preserves
-large startup transactions such as the preloaded rhythm-group library instead
-of acknowledging and discarding excess wire packets.
 
 This is the Android equivalent of the desktop wrappers. Linux and macOS use a
 supervisor around a separate service and Unix socket; Windows uses

@@ -152,7 +152,11 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("needs: [tests, release-metadata]", release)
         self.assertIn("android-packages:", release)
         self.assertIn("android-emulator:", release)
-        self.assertIn("android-packages, android-emulator]", release)
+        self.assertIn("esp32p4-firmware:", release)
+        self.assertIn(
+            "android-packages, android-emulator, esp32p4-firmware]",
+            release,
+        )
         self.assertIn("hdiutil attach", release)
         self.assertIn(
             "bash amysynth_version/qt_frontend/packaging/android/"
@@ -339,6 +343,9 @@ class PackagingContracts(unittest.TestCase):
         release = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
         ).read_text(encoding="utf-8")
+        firmware_assembler = (
+            FRONTEND.parent / "esp32p4" / "assemble_release.py"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("date -u +%Y%m%dT%H%M%S", release)
         self.assertIn('echo "tag=R${instant}"', release)
@@ -348,7 +355,8 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("release_sbom.py", release)
         self.assertIn("https://spdx.dev/Document/v2.3", release)
         self.assertIn("actions/attest@", release)
-        self.assertEqual(release.count("actions/attest@"), 2)
+        self.assertEqual(release.count("actions/attest@"), 3)
+        self.assertIn("Attest ESP32-P4 firmware provenance", release)
         self.assertIn("gh attestation verify", release)
         self.assertIn("provenance.sigstore.json", release)
         self.assertIn("sbom.sigstore.json", release)
@@ -366,6 +374,16 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("macOS-arm64.dmg", release)
         self.assertIn("Windows-x86_64.zip", release)
         self.assertIn("Android-arm64.apk", release)
+        self.assertIn("ESP32P4.zip", release)
+        self.assertIn("profile: all", release)
+        self.assertIn("esp32p4-firmware/v1", release)
+        self.assertIn("esp32p4-firmware/v3", release)
+        self.assertIn("assemble_release.py", release)
+        self.assertIn('"flash_esptool_v4.py"', firmware_assembler)
+        self.assertIn('"flash_esptool_v5.py"', firmware_assembler)
+        self.assertIn('release_root = f"LB_Omnichord.{release_name}.ESP32P4"', firmware_assembler)
+        self.assertIn("## ESP32-P4 firmware", release)
+        self.assertIn("128-sample / 2 x 64-frame", release)
         self.assertIn("## Android arm64", release)
         self.assertIn("CI debug-signed", release)
         self.assertIn("## Windows native", release)
@@ -443,6 +461,27 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("PIPE_REJECT_REMOTE_CLIENTS", service)
         self.assertIn("ReadFile", service)
         self.assertNotIn("AF_INET", service)
+        config = json.loads(
+            (FRONTEND / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
+        for member, config_key in (
+            ("max_buses", "amy_max_buses"),
+            ("max_oscs", "amy_max_oscs"),
+            ("max_sequencer_tags", "amy_max_sequencer_tags"),
+            ("max_sequence_events", "amy_max_sequence_events"),
+            ("max_sequence_executions", "amy_max_sequence_executions"),
+        ):
+            self.assertIn(
+                f"config.{member} = {config[config_key]};",
+                service,
+                f"Windows AMY service must match {config_key}",
+            )
+        for retired_member in (
+            "max_sequence_groups",
+            "max_sequence_group_tags",
+            "max_sequence_group_executions",
+        ):
+            self.assertNotIn(retired_member, service)
         self.assertNotIn("--tcp-port", launcher)
         self.assertNotIn("--amy-socket", launcher)
         self.assertIn("$CaptureScreenshotsDir", launcher)

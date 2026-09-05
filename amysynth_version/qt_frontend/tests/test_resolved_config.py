@@ -45,15 +45,17 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertEqual(resolved.osc_input.listen_port, 8000)
         self.assertTrue(resolved.osc_input.configured)
         self.assertEqual(resolved.capacities.voices.manual_chord, 7)
-        self.assertEqual(resolved.capacities.max_sequence_groups, 1024)
+        self.assertEqual(resolved.capacities.max_sequencer_tags, 1280)
+        self.assertEqual(resolved.capacities.max_sequence_events, 64)
+        self.assertEqual(resolved.capacities.max_sequence_executions, 40)
         self.assertEqual(resolved.layout.midi_row_buses, (4, 5, 6, 7, 8, 9))
         self.assertEqual(
             resolved.layout.sequencer_tag_ranges,
             (("drums", 0, 56), ("bass", 56, 56), ("chords", 112, 140)),
         )
         self.assertEqual(
-            resolved.layout.sequencer_group_ranges,
-            (("fills", 1, 936), ("chords", 937, 64), ("drum_bases", 1001, 24)),
+            resolved.layout.sequencer_sequence_ranges,
+            (("fills", 256, 936), ("chords", 1192, 64), ("drum_bases", 1256, 24)),
         )
         self.assertEqual(resolved.provenance.source_kind, "shipped")
         self.assertEqual(
@@ -131,11 +133,11 @@ class ResolvedConfigTests(unittest.TestCase):
         invalid["amy_max_buses"] = 10
         invalid["rhythm"]["tag_ranges"]["bass"]["start"] = 50
         invalid["rhythm"]["tag_ranges"]["chords"] = {
-            "start": 240,
+            "start": 1270,
             "count": 20,
         }
-        invalid["amy_max_sequence_group_tags"] = 63
-        invalid["amy_max_sequence_group_executions"] = 33
+        invalid["amy_max_sequence_events"] = 63
+        invalid["amy_max_sequence_executions"] = 33
         invalid["default_synths"]["chord"] = "does_not_exist"
 
         with tempfile.TemporaryDirectory() as directory:
@@ -155,17 +157,17 @@ class ResolvedConfigTests(unittest.TestCase):
                 "$.amy_max_buses",
                 "$.rhythm.tag_ranges.bass",
                 "$.rhythm.tag_ranges.chords",
-                "$.amy_max_sequence_group_tags",
-                "$.amy_max_sequence_group_executions",
+                "$.amy_max_sequence_events",
+                "$.amy_max_sequence_executions",
                 "$.default_synths.chord",
             }.issubset(paths),
             paths,
         )
 
-    def test_group_ranges_must_be_contiguous_and_end_at_capacity(self) -> None:
+    def test_sequence_ranges_must_be_disjoint_contiguous_and_end_at_capacity(self) -> None:
         invalid = copy.deepcopy(self.shipped)
-        invalid["rhythm"]["group_ranges"]["chords"]["start"] = 936
-        invalid["amy_max_sequence_groups"] = 1025
+        invalid["rhythm"]["sequence_ranges"]["chords"]["start"] = 1191
+        invalid["amy_max_sequencer_tags"] = 1281
 
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(ConfigValidationError) as caught:
@@ -174,9 +176,10 @@ class ResolvedConfigTests(unittest.TestCase):
                 )
 
         paths = {issue.path for issue in caught.exception.issues}
-        self.assertIn("$.rhythm.group_ranges.chords.start", paths)
-        self.assertIn("$.rhythm.group_ranges.drum_bases.start", paths)
-        self.assertIn("$.amy_max_sequence_groups", paths)
+        self.assertIn("$.rhythm.sequence_ranges.chords.start", paths)
+        self.assertIn("$.rhythm.sequence_ranges.chords", paths)
+        self.assertIn("$.rhythm.sequence_ranges.drum_bases.start", paths)
+        self.assertIn("$.amy_max_sequencer_tags", paths)
 
     def test_absent_osc_endpoint_is_an_explicit_unconfigured_capability(self) -> None:
         unconfigured = copy.deepcopy(self.shipped)

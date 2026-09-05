@@ -14,8 +14,8 @@ from harness import HeadlessApp, SerialAmyBridge
 
 
 _NOTE = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)"
-CHORD_GROUP_START = 937
-DRUM_BASE_GROUP_START = 1001
+CHORD_SEQUENCE_START = 1192
+DRUM_BASE_SEQUENCE_START = 1256
 
 
 def wire_float(value: float) -> str:
@@ -24,14 +24,14 @@ def wire_float(value: float) -> str:
 
 def scheduled_note_ons(lines: list[str], synth: int) -> list[float]:
     direct_pattern = re.compile(
-        rf"^H\d+,\d+,\d+n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
+        rf"^H\d+,\d+n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
     )
     definition_pattern = re.compile(
-        rf"^H\d+,\d+,\d+,(?P<group>\d+)"
+        rf"^H\d+,\d+,(?P<sequence>\d+)"
         rf"n(?P<note>{_NOTE})l(?P<vel>{_NOTE})i{int(synth)}Z$"
     )
     trigger_pattern = re.compile(
-        r"^H\d+,\d+,\d+zQ(?P<group>\d+),1,1,0Z$"
+        r"^H\d+,\d+,\d+HC(?P<sequence>\d+),1,1Z$"
     )
     definitions: dict[int, list[float]] = {}
     notes: list[float] = []
@@ -42,29 +42,34 @@ def scheduled_note_ons(lines: list[str], synth: int) -> list[float]:
             continue
         match = definition_pattern.match(line)
         if match and float(match.group("vel")) > 0.0:
-            definitions.setdefault(int(match.group("group")), []).append(
-                float(match.group("note"))
-            )
+            sequence = int(match.group("sequence"))
+            note = float(match.group("note"))
+            definitions.setdefault(sequence, []).append(note)
+            # Bass notes live directly in the reusable root sequence. Chord
+            # notes live in finite child sequences and are counted when their
+            # root trigger is encountered below.
+            if int(synth) == 1 and 56 <= sequence < 112:
+                notes.append(note)
         match = trigger_pattern.match(line)
         if match:
-            notes.extend(definitions.get(int(match.group("group")), []))
+            notes.extend(definitions.get(int(match.group("sequence")), []))
     return notes
 
 
 def chord_trigger(line: str) -> tuple[int, int] | None:
     match = re.match(
-        r"^H\d+,\d+,(?P<tag>\d+)zQ(?P<group>\d+),1,1,0Z$",
+        r"^H\d+,\d+,(?P<tag>\d+)HC(?P<sequence>\d+),1,1Z$",
         line,
     )
     if match is None:
         return None
     tag = int(match.group("tag"))
-    group = int(match.group("group"))
+    sequence_tag = int(match.group("sequence"))
     if not 112 <= tag < 252:
         return None
-    if not CHORD_GROUP_START <= group < DRUM_BASE_GROUP_START:
+    if not CHORD_SEQUENCE_START <= sequence_tag < DRUM_BASE_SEQUENCE_START:
         return None
-    return tag, group
+    return tag, sequence_tag
 
 
 def immediate_note_ons(lines: list[str], synth: int) -> list[float]:
@@ -145,15 +150,15 @@ class SerialIntegrationTests(unittest.TestCase):
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=12.0)
             startup = app.bridge.lines_since(0)
-            self.assertIn("zQ1,3,48,0Z", startup)
+            self.assertIn("HR256Z", startup)
             self.assertTrue(
-                any(line.startswith("zQ270,3,") for line in startup),
+                "HR525Z" in startup,
                 "last fill definition was not preloaded",
             )
             self.assertEqual(
                 sum(
-                    (match := re.match(r"^zQ(\d+),3,", line)) is not None
-                    and int(match.group(1)) < 1001
+                    (match := re.match(r"^HR(\d+)Z$", line)) is not None
+                    and 256 <= int(match.group(1)) < 1192
                     for line in startup
                 ),
                 270,
@@ -162,7 +167,7 @@ class SerialIntegrationTests(unittest.TestCase):
             fill_start = app.bridge.count()
             app.action("toggleRhythmFill", 0)
             app.bridge.wait_for_line_match(
-                lambda line: line.startswith("H") and "zQ" in line,
+                lambda line: re.match(r"^H\d", line) is not None and "HC" in line,
                 "updated fill root schedule",
                 start=fill_start,
                 timeout=8.0,
@@ -170,11 +175,12 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=8.0)
             fill_lines = app.bridge.lines_since(fill_start)
             self.assertTrue(
-                any(line.startswith("H") and "zQ" in line for line in fill_lines)
+                any(re.match(r"^H\d", line) and "HC" in line for line in fill_lines)
             )
             self.assertFalse(
                 any(
-                    re.match(r"^H\d+,\d+,\d+,[1-9]\d*", line)
+                    (match := re.match(r"^H\d+,\d+,(\d+)", line)) is not None
+                    and 256 <= int(match.group(1)) < 1192
                     for line in fill_lines
                 ),
                 "fill selection resent its stored event block",
@@ -183,23 +189,27 @@ class SerialIntegrationTests(unittest.TestCase):
             activity_start = app.bridge.count()
             app.action("setRhythmBusyness", 5.0)
             app.bridge.wait_for_line_match(
-                lambda line: line.startswith("zQ100") and ",3," in line,
-                "replacement base-drum group definition",
+                lambda line: line.startswith("HR125"),
+                "replacement base-drum sequence definition",
                 start=activity_start,
                 timeout=8.0,
             )
             app.bridge.wait_idle(timeout=8.0)
             activity_lines = app.bridge.lines_since(activity_start)
             self.assertTrue(
-                any(line.startswith("zQ100") and ",3," in line for line in activity_lines)
+                any(line.startswith("HR125") for line in activity_lines)
             )
             self.assertTrue(
-                any(re.match(r"^H\d+,\d+,\d+,100\d", line) for line in activity_lines)
+                any(
+                    (match := re.match(r"^H\d+,\d+,(\d+)", line)) is not None
+                    and 1256 <= int(match.group(1)) < 1280
+                    for line in activity_lines
+                )
             )
             self.assertFalse(
                 any(
-                    (match := re.match(r"^zQ(\d+),3,", line)) is not None
-                    and int(match.group(1)) < 937
+                    (match := re.match(r"^HR(\d+)Z$", line)) is not None
+                    and 256 <= int(match.group(1)) < 1192
                     for line in activity_lines
                 ),
                 "activity change rebuilt a preloaded fill",
@@ -462,13 +472,8 @@ class SerialIntegrationTests(unittest.TestCase):
                 [event[3] for event in c_events],
                 [36.0, 43.0, 48.0, 43.0, 36.0, 31.0, 36.0, 43.0],
             )
-            tagged = [line for line in c_lines if line.startswith("H")]
-            self.assertTrue(tagged)
-            for line in tagged:
-                match = re.match(r"^H\d+,\d+,(\d+)", line)
-                self.assertIsNotNone(match)
-                assert match is not None
-                tag = int(match.group(1))
+            self.assertTrue(c_events)
+            for _tick, _period, tag, _note, _velocity in c_events:
                 self.assertGreaterEqual(tag, 56)
                 self.assertLess(tag, 112)
             self.assertNotIn("zY0Z", c_lines)
@@ -807,15 +812,13 @@ class SerialIntegrationTests(unittest.TestCase):
             app.action("promoteChordHold", 0, 0)
             # The localhost API returns before the asynchronous UART writer has
             # necessarily emitted anything. Wait for the actual manual press,
-            # then for the targeted chord-tag clears; an idle-age heuristic can
+            # then for the targeted chord-sequence reset; an idle-age heuristic can
             # otherwise return while the output delta is still empty.
             app.bridge.wait_for_lines(["l0i3Z"], start=start, timeout=8.0)
             deadline = time.monotonic() + 8.0
             while time.monotonic() < deadline:
                 delta = app.bridge.lines_since(start)
-                cancellations = [
-                    line for line in delta if line.startswith("H0,0,")
-                ]
+                cancellations = [line for line in delta if line == "HR112Z"]
                 if cancellations:
                     break
                 time.sleep(0.01)
@@ -846,9 +849,9 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertNotIn("zY1Z", delta)
             self.assertNotIn("l0i0Z", delta)
             self.assertNotIn("l0i1Z", delta)
-            cancellations = [line for line in delta if line.startswith("H0,0,")]
+            cancellations = [line for line in delta if line == "HR112Z"]
             self.assertTrue(cancellations, delta)
-            cancel_tags = {int(line.split(",", 2)[2][:-1]) for line in cancellations}
+            cancel_tags = {int(line[2:-1]) for line in cancellations}
             self.assertTrue(all(112 <= tag < 252 for tag in cancel_tags), cancel_tags)
             self.assertTrue(
                 chord_trigger_tags <= cancel_tags,
@@ -856,8 +859,8 @@ class SerialIntegrationTests(unittest.TestCase):
             )
             self.assertFalse(
                 any(
-                    line.startswith("H0,0,")
-                    and int(line.split(",", 2)[2][:-1]) < 56
+                    (match := re.match(r"^HR(\d+)Z$", line)) is not None
+                    and int(match.group(1)) < 56
                     for line in delta
                 ),
                 delta,
@@ -891,12 +894,10 @@ class SerialIntegrationTests(unittest.TestCase):
     def test_arpeggio_rate_switch_keeps_running_note_gate_owned_by_old_rate(
         self,
     ) -> None:
-        """Rate changes atomically publish a new revision of the same group."""
-        publish_group = re.compile(
-            r"^zQ(?P<group>\d+),3,(?P<length>\d+),0Z$"
-        )
+        """Rate changes replace future data without truncating old releases."""
+        reset_sequence = re.compile(r"^HR(?P<sequence>\d+)Z$")
         off_pattern = re.compile(
-            rf"^H(?P<tick>\d+),0,\d+,(?P<group>\d+)"
+            rf"^H(?P<tick>\d+),0,(?P<sequence>\d+)"
             rf"n(?P<note>{_NOTE})l0i4Z$"
         )
 
@@ -926,14 +927,14 @@ class SerialIntegrationTests(unittest.TestCase):
             )
             app.bridge.wait_idle(timeout=10.0)
             rate2_lines = app.bridge.lines_since(rate2_start)
-            rate2_groups = {
-                int(match.group("group"))
+            rate2_sequences = {
+                int(match.group("sequence"))
                 for line in rate2_lines
-                if (match := publish_group.match(line)) is not None
-                and int(match.group("length")) == 162
+                if (match := reset_sequence.match(line)) is not None
+                and CHORD_SEQUENCE_START <= int(match.group("sequence")) < DRUM_BASE_SEQUENCE_START
             }
             rate2_offs = {
-                (int(match.group("group")), int(match.group("tick"))): float(
+                (int(match.group("sequence")), int(match.group("tick"))): float(
                     match.group("note")
                 )
                 for line in rate2_lines
@@ -944,11 +945,11 @@ class SerialIntegrationTests(unittest.TestCase):
                 for line in rate2_lines
                 if (trigger := chord_trigger(line)) is not None
             }
-            self.assertEqual(rate2_groups, rate2_triggers)
+            self.assertEqual(rate2_sequences, rate2_triggers)
             self.assertTrue(
-                all(group in rate2_groups for group, _tick in rate2_offs)
+                all(tag in rate2_sequences for tag, _tick in rate2_offs)
             )
-            self.assertIn((937, 161), rate2_offs)
+            self.assertIn((1192, 161), rate2_offs)
             self.assertGreaterEqual(len(set(rate2_offs.values())), 7)
 
             rate4_start = app.bridge.count()
@@ -961,14 +962,14 @@ class SerialIntegrationTests(unittest.TestCase):
             )
             app.bridge.wait_idle(timeout=10.0)
             rate4_lines = app.bridge.lines_since(rate4_start)
-            rate4_groups = {
-                int(match.group("group"))
+            rate4_sequences = {
+                int(match.group("sequence"))
                 for line in rate4_lines
-                if (match := publish_group.match(line)) is not None
-                and int(match.group("length")) == 82
+                if (match := reset_sequence.match(line)) is not None
+                and CHORD_SEQUENCE_START <= int(match.group("sequence")) < DRUM_BASE_SEQUENCE_START
             }
             rate4_offs = {
-                (int(match.group("group")), int(match.group("tick"))): float(
+                (int(match.group("sequence")), int(match.group("tick"))): float(
                     match.group("note")
                 )
                 for line in rate4_lines
@@ -979,14 +980,14 @@ class SerialIntegrationTests(unittest.TestCase):
                 for line in rate4_lines
                 if (trigger := chord_trigger(line)) is not None
             }
-            self.assertEqual(rate4_groups, rate4_triggers)
+            self.assertEqual(rate4_sequences, rate4_triggers)
             self.assertTrue(
-                all(group in rate4_groups for group, _tick in rate4_offs)
+                all(tag in rate4_sequences for tag, _tick in rate4_offs)
             )
-            self.assertIn((937, 81), rate4_offs)
-            # Group identity is stable. AMY's immutable revisions, covered by
+            self.assertIn((1192, 81), rate4_offs)
+            # Sequence identity is stable. AMY's immutable definitions, covered by
             # its native tests, let already-running /2 notes retain releases.
-            self.assertEqual(rate2_groups, rate4_groups)
+            self.assertEqual(rate2_sequences, rate4_sequences)
             self.assertNotIn("l0i4Z", rate4_lines)
             self.assertNotIn("zY0Z", rate4_lines)
             self.assertNotIn("zY1Z", rate4_lines)
@@ -1013,13 +1014,11 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertTrue(immediate_note_ons(delta, 3), delta)
             self.assertGreaterEqual(delta.count("l0i3Z"), 2, delta)
             self.assertTrue(any(line.startswith("H") for line in delta), delta)
-            cancelled_chord_tags = [
-                int(line.split(",", 2)[2][:-1])
-                for line in delta
-                if line.startswith("H0,0,")
-                and 112 <= int(line.split(",", 2)[2][:-1]) < 252
-            ]
-            self.assertEqual(cancelled_chord_tags, [], delta)
+            self.assertIn("HR112Z", delta)
+            self.assertTrue(
+                any(re.match(r"^HC112,1,\d+Z$", line) for line in delta),
+                delta,
+            )
             self.assertNotIn("zY0Z", delta)
             self.assertNotIn("zY1Z", delta)
             self.assertEqual(int(app.query("activeRowIndex")), 1)
@@ -1101,17 +1100,10 @@ class SerialIntegrationTests(unittest.TestCase):
                 start = app.bridge.count()
                 app.action("toggleBassRunning")
                 deadline = time.monotonic() + 8.0
-                tags: set[int] = set()
                 lines: list[str] = []
                 while time.monotonic() < deadline:
                     lines = app.bridge.lines_since(start)
-                    tags = {
-                        int(line.split(",", 2)[2][:-1])
-                        for line in lines
-                        if line.startswith("H0,0,")
-                        and 56 <= int(line.split(",", 2)[2][:-1]) < 112
-                    }
-                    if tags:
+                    if "HC56,0,0Z" in lines and "HR56Z" in lines:
                         break
                     time.sleep(0.01)
                 else:
@@ -1121,7 +1113,14 @@ class SerialIntegrationTests(unittest.TestCase):
                     )
                 app.bridge.wait_idle(timeout=8.0)
                 lines = app.bridge.lines_since(start)
-                self.assertTrue(all(56 <= tag < 112 for tag in tags), tags)
+                self.assertFalse(
+                    any(
+                        (match := re.match(r"^HR(\d+)Z$", line)) is not None
+                        and not 56 <= int(match.group(1)) < 112
+                        for line in lines
+                    ),
+                    lines,
+                )
                 self.assertNotIn("zY0Z", lines)
                 self.assertNotIn("S4096Z", lines)
 

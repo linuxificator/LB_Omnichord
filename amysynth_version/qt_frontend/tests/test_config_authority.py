@@ -30,9 +30,9 @@ REQUIRED_SECTIONS = {
     "midi_player",
     "midi_input",
     "amy_max_oscs",
-    "amy_max_sequence_groups",
-    "amy_max_sequence_group_tags",
-    "amy_max_sequence_group_executions",
+    "amy_max_sequencer_tags",
+    "amy_max_sequence_events",
+    "amy_max_sequence_executions",
     "amy_max_buses",
 }
 
@@ -85,16 +85,16 @@ class ConfigAuthorityTests(unittest.TestCase):
                     offenders.append(f"{name}:{node.lineno}:{node.args[0].value}")
         self.assertEqual(offenders, [])
 
-    def test_group_layout_has_one_runtime_owner_and_independent_oracle(self) -> None:
+    def test_sequence_layout_has_one_runtime_owner_and_independent_oracle(self) -> None:
         config = json.loads(
             (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
         )
         self.assertEqual(
-            config["rhythm"]["group_ranges"],
+            config["rhythm"]["sequence_ranges"],
             {
-                "fills": {"start": 1, "count": 936},
-                "chords": {"start": 937, "count": 64},
-                "drum_bases": {"start": 1001, "count": 24},
+                "fills": {"start": 256, "count": 936},
+                "chords": {"start": 1192, "count": 64},
+                "drum_bases": {"start": 1256, "count": 24},
             },
         )
         transport = (CODE / "amy_transport.py").read_text(encoding="utf-8")

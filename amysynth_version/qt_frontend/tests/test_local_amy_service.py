@@ -123,8 +123,9 @@ class LocalAmyServiceTests(unittest.TestCase):
         )
         self.assertEqual(sent, ["K215i5Z", "n60l1i5Z"])
         self.assertEqual(server.close_count, 1)
-        self.assertEqual(live_calls[0]["max_sequence_groups"], 1024)
-        self.assertEqual(live_calls[0]["max_sequence_group_executions"], 40)
+        self.assertEqual(live_calls[0]["max_sequencer_tags"], 1280)
+        self.assertEqual(live_calls[0]["max_sequence_events"], 64)
+        self.assertEqual(live_calls[0]["max_sequence_executions"], 40)
 
     def test_packet_service_preserves_one_valid_request_per_packet(self) -> None:
         sent, _server, _live_calls = self.run_service(

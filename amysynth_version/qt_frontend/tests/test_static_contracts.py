@@ -18,6 +18,15 @@ class StaticContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         prepare = (ROOT.parent / "esp32p4" / "prepare_amy.sh").read_text(encoding="utf-8")
+        esp32_main = (ROOT.parent / "esp32p4" / "main" / "main.c").read_text(
+            encoding="utf-8"
+        )
+        esp32_kconfig = (
+            ROOT.parent / "esp32p4" / "main" / "Kconfig.projbuild"
+        ).read_text(encoding="utf-8")
+        runtime_config = json.loads(
+            (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+        )
         release_inputs = json.loads(
             (ROOT / "packaging" / "release_inputs.json").read_text(encoding="utf-8")
         )
@@ -29,6 +38,62 @@ class StaticContractTests(unittest.TestCase):
             self.assertNotIn(release_inputs["amy"]["commit"], contract)
         self.assertNotIn("AMY_REF:-main", prepare)
         self.assertIn("release branch and immutable commit do not match", prepare)
+        for definition in (
+            "AMY_BLOCK_SIZE=128",
+            "AMY_SAMPLE_RATE=48000",
+            "AMY_ESP_I2S_PHILIPS_FORMAT=1",
+            "AMY_ESP_I2S_DMA_DESC_NUM=2",
+            "AMY_ESP_I2S_DMA_FRAME_NUM=64",
+        ):
+            self.assertIn(definition, prepare)
+        for retired_source_patch in (
+            'replace_once(amy_h, "#define AMY_BLOCK_SIZE',
+            'replace_once(amy_h, "#define BLOCK_SIZE_BITS',
+            'replace_once(amy_h, "#define AMY_SAMPLE_RATE',
+            'text.replace(\n    "I2S_STD_MSB_SLOT_DEFAULT_CONFIG"',
+            'chan_cfg.dma_desc_num = 2;',
+            'chan_cfg.dma_frame_num = AMY_BLOCK_SIZE / 2;',
+        ):
+            self.assertNotIn(retired_source_patch, prepare)
+        self.assertIn("target_compile_definitions(${COMPONENT_LIB} PUBLIC", prepare)
+        for member, config_key, kconfig_key in (
+            (
+                "max_sequencer_tags",
+                "amy_max_sequencer_tags",
+                "OMNICHORD_P4_MAX_SEQUENCER_TAGS",
+            ),
+            (
+                "max_sequence_events",
+                "amy_max_sequence_events",
+                "OMNICHORD_P4_MAX_SEQUENCE_EVENTS",
+            ),
+            (
+                "max_sequence_executions",
+                "amy_max_sequence_executions",
+                "OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS",
+            ),
+        ):
+            self.assertIn(
+                f"config.{member} =\n        CONFIG_{kconfig_key};",
+                esp32_main,
+                f"ESP32-P4 AMY service must match {config_key}",
+            )
+            match = re.search(
+                rf"config {kconfig_key}\n(?:    .*\n)*?    default ([0-9]+)",
+                esp32_kconfig,
+            )
+            self.assertIsNotNone(match, kconfig_key)
+            self.assertEqual(int(match.group(1)), runtime_config[config_key])
+        for retired_member in (
+            "max_patterns",
+            "max_pattern_tags",
+            "max_pattern_instances",
+            "max_sequence_groups",
+            "max_sequence_group_tags",
+            "max_sequence_group_executions",
+        ):
+            self.assertNotIn(retired_member, esp32_main)
+            self.assertNotIn(retired_member.upper(), esp32_kconfig)
 
     def test_frontend_code_has_no_amy_library_imports(self) -> None:
         """Only the separately managed local service may load AMY."""
@@ -398,16 +463,14 @@ class StaticContractTests(unittest.TestCase):
             "if not self._set_rhythm_chord_enabled(enabled):",
             transport_py,
         )
-        self.assertIn("def _chord_group_plan(", transport_py)
-        self.assertIn("compile_chord_group_plan(", transport_py)
-        self.assertIn(
-            "sequence_control_command(group, SEQUENCE_CONTROL_START, 1)",
-            rhythm_plan_py,
-        )
+        self.assertIn("def _chord_sequence_plan(", transport_py)
+        self.assertIn("compile_chord_sequence_plan(", transport_py)
+        self.assertIn('return f"HC{tag_value},{action_value}', rhythm_plan_py)
+        self.assertNotIn("zQ", rhythm_plan_py)
         for retired_wire_family in ("zQB", "zQE", "zQC", "zQT", "zQM", "zQA"):
             self.assertNotIn(retired_wire_family, rhythm_plan_py)
 
-        # Rhythm is now independent tagged lanes. Reintroducing the previous
+        # Rhythm uses independent root-tag lanes. Reintroducing the previous
         # whole-sequencer rebuild helpers would again make lane-local edits able
         # to interrupt drums/bass/chords together.
         self.assertIn("class _TaggedSequencerLane:", transport_py)

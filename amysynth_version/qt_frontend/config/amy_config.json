@@ -1,5 +1,5 @@
 {
-  "config_revision": 7,
+  "config_revision": 8,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,
@@ -83,16 +83,15 @@
     "bass_gate_beats": 0.3,
     "max_rhythm_chord_notes": 4,
     "sequencer_reset_guard_ms": 10.0,
-    "max_sequencer_tags": 256,
     "tag_ranges": {
       "drums": {"start": 0, "count": 56},
       "bass": {"start": 56, "count": 56},
       "chords": {"start": 112, "count": 140}
     },
-    "group_ranges": {
-      "fills": {"start": 1, "count": 936},
-      "chords": {"start": 937, "count": 64},
-      "drum_bases": {"start": 1001, "count": 24}
+    "sequence_ranges": {
+      "fills": {"start": 256, "count": 936},
+      "chords": {"start": 1192, "count": 64},
+      "drum_bases": {"start": 1256, "count": 24}
     }
   },
   "performance": {
@@ -102,9 +101,9 @@
     "synth_alloc_guard_ms": 10.0
   },
   "amy_max_oscs": 336,
-  "amy_max_sequence_groups": 1024,
-  "amy_max_sequence_group_tags": 64,
-  "amy_max_sequence_group_executions": 40,
+  "amy_max_sequencer_tags": 1280,
+  "amy_max_sequence_events": 64,
+  "amy_max_sequence_executions": 40,
   "amy_max_buses": 11,
   "debug": {
     "log_amy_commands": true,

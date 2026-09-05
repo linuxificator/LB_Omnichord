@@ -682,9 +682,18 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  esp32p4-firmware:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/main'
+    needs: [tests, release-metadata]
+    uses: ./.github/workflows/esp32p4-build.yml
+    with:
+      profile: all
+
   publish-release:
     if: github.ref == 'refs/heads/main'
-    needs: [release-metadata, linux-appimages, macos-dmg, windows-native, android-packages, android-emulator]
+    needs: [release-metadata, linux-appimages, macos-dmg, windows-native, android-packages, android-emulator, esp32p4-firmware]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -708,6 +717,33 @@ jobs:
           pattern: package-*
           path: dist
           merge-multiple: true
+
+      - name: Download validated ESP32-P4 v1 firmware
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: esp32p4-firmware-v1
+          path: esp32p4-firmware/v1
+
+      - name: Download validated ESP32-P4 v3 firmware
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: esp32p4-firmware-v3
+          path: esp32p4-firmware/v3
+
+      - name: Assemble ESP32-P4 release asset
+        env:
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
+        run: |
+          set -euo pipefail
+          firmware_zip="LB_Omnichord.${RELEASE_TAG}.ESP32P4.zip"
+          python3 amysynth_version/esp32p4/assemble_release.py \
+            --release-name "$RELEASE_TAG" \
+            --v1 esp32p4-firmware/v1 \
+            --v3 esp32p4-firmware/v3 \
+            --output-dir firmware-dist
+          (cd firmware-dist && sha256sum --check "$firmware_zip.sha256")
+          printf '%s\n' "$(cat firmware-dist/$firmware_zip.sha256)" \
+            > firmware-subject.sha256
 
       - name: Verify exact five-platform asset set
         env:
@@ -744,15 +780,24 @@ jobs:
           subject-checksums: release-subjects.sha256
           sbom-path: LB_Omnichord.${{ needs.release-metadata.outputs.stamp }}.spdx.json
 
+      - name: Attest ESP32-P4 firmware provenance
+        id: firmware-provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: firmware-subject.sha256
+
       - name: Preserve and independently verify signed attestations
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+          RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
         run: |
           cp '${{ steps.provenance.outputs.bundle-path }}' \
             "LB_Omnichord.${RELEASE_STAMP}.provenance.sigstore.json"
           cp '${{ steps.sbom.outputs.bundle-path }}' \
             "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
+          cp '${{ steps.firmware-provenance.outputs.bundle-path }}' \
+            "LB_Omnichord.${RELEASE_TAG}.ESP32P4.provenance.sigstore.json"
           while read -r package; do
             gh attestation verify "dist/$package" \
               --repo "$GITHUB_REPOSITORY"
@@ -760,8 +805,11 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --predicate-type https://spdx.dev/Document/v2.3
           done < <(jq -r '.packages[].file' release-manifest.json)
+          firmware_zip="LB_Omnichord.${RELEASE_TAG}.ESP32P4.zip"
+          gh attestation verify "firmware-dist/$firmware_zip" \
+            --repo "$GITHUB_REPOSITORY"
 
-      - name: Create tag and five-platform GitHub Release
+      - name: Create tag and platform release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
@@ -775,12 +823,14 @@ jobs:
             "LB_Omnichord.${RELEASE_STAMP}.spdx.json"
             "LB_Omnichord.${RELEASE_STAMP}.provenance.sigstore.json"
             "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
+            "LB_Omnichord.${RELEASE_TAG}.ESP32P4.provenance.sigstore.json"
           )
           linux_file="LB_Omnichord.${RELEASE_STAMP}.Linux-x86_64.AppImage"
           pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
           mac_file="LB_Omnichord.${RELEASE_STAMP}.macOS-arm64.dmg"
           windows_file="LB_Omnichord.${RELEASE_STAMP}.Windows-x86_64.zip"
           android_file="LB_Omnichord.${RELEASE_STAMP}.Android-arm64.apk"
+          esp32p4_file="LB_Omnichord.${RELEASE_TAG}.ESP32P4.zip"
           {
             echo '## Linux x64'
             echo
@@ -819,15 +869,25 @@ jobs:
             echo
             echo 'This package is CI debug-signed so it can be installed and emulator-tested without a repository signing secret. It is not a Play Store bundle or a stable update channel, and physical touchscreen, speaker, route-change and latency validation is still required.'
             echo
+            echo '## ESP32-P4 firmware (v1.x and v3.x silicon)'
+            echo
+            echo "Download \`$esp32p4_file\` and its SHA-256 file. It expands to a versioned directory containing separate \`v1/\` and \`v3/\` image directories, flashing instructions, and Python flashers for both legacy and current esptool syntax. Use \`v1\` for revision 1.x silicon, including the physically tested v1.3 board; use \`v3\` only for revision 3.x silicon."
+            echo
+            echo 'Both firmware profiles receive native AMY wire commands through the LP UART at 1,000,000 baud, include Gamma9001, 11 buses, capacity for 1280 reusable-sequence tags, and the physically selected 48 kHz / 128-sample / 2 x 64-frame audio geometry. CI proves compilation and image structure; v3 I2S audio and LP-UART operation still require physical-board validation.'
+            echo
             echo '## Build provenance'
             echo
             echo "AMY fork release: \`$AMY_RELEASE_BRANCH\` at immutable build commit \`$AMY_COMMIT\`."
             echo
-            echo 'Each package has signed GitHub build-provenance and SPDX 2.3 SBOM attestations. Download the package and verify it with `gh attestation verify PACKAGE --repo linuxificator/LB_Omnichord`; add `--predicate-type https://spdx.dev/Document/v2.3` to verify and inspect the SBOM attestation.'
+            echo 'Each application package has signed GitHub build-provenance and SPDX 2.3 SBOM attestations. The ESP32-P4 firmware has a separate signed build-provenance attestation. Download an asset and verify it with `gh attestation verify ASSET --repo linuxificator/LB_Omnichord`; add `--predicate-type https://spdx.dev/Document/v2.3` for an application package to verify and inspect its SBOM attestation.'
           } > release-notes.md
           for index in "${!release_assets[@]}"; do
             release_assets[$index]="dist/${release_assets[$index]}"
           done
+          release_assets+=(
+            "firmware-dist/$esp32p4_file"
+            "firmware-dist/$esp32p4_file.sha256"
+          )
           gh release create "$RELEASE_TAG" \
             "${release_assets[@]}" "${evidence_assets[@]}" \
             --repo "$GITHUB_REPOSITORY" \
@@ -836,6 +896,7 @@ jobs:
             --notes-file release-notes.md
           {
             jq -r '.packages[] | .file, .checksum_file' release-manifest.json
+            printf '%s\n' "$esp32p4_file" "$esp32p4_file.sha256"
             printf '%s\n' "${evidence_assets[@]}"
           } | sort > expected-assets.txt
           gh release view "$RELEASE_TAG" \

@@ -1,0 +1,65 @@
+menu "LB Omnichord ESP32-P4 firmware"
+
+config OMNICHORD_P4_BOARD_PROFILE
+    string "Board build profile label"
+    default "waveshare-pico-m-v1"
+    help
+        Descriptive build metadata. Silicon compatibility is selected by the
+        separate ESP32-P4 revision profile passed to build_firmware.sh.
+
+config OMNICHORD_P4_I2S_LRCK_GPIO
+    int "I2S LRCK/WS GPIO"
+    range 0 54
+    default 16
+
+config OMNICHORD_P4_I2S_DOUT_GPIO
+    int "I2S data-out GPIO"
+    range 0 54
+    default 17
+
+config OMNICHORD_P4_I2S_BCLK_GPIO
+    int "I2S bit-clock GPIO"
+    range 0 54
+    default 18
+
+config OMNICHORD_P4_UART_RX_GPIO
+    int "LP UART receive GPIO"
+    range 0 54
+    default 15
+
+config OMNICHORD_P4_UART_BAUD
+    int "LP UART baud rate"
+    range 1200 3000000
+    default 1000000
+
+config OMNICHORD_P4_MAX_OSCS
+    int "AMY oscillator capacity"
+    range 1 65535
+    default 336
+
+config OMNICHORD_P4_MAX_BUSES
+    int "AMY bus capacity"
+    range 1 65535
+    default 11
+
+config OMNICHORD_P4_MAX_SEQUENCER_TAGS
+    int "AMY reusable sequence tag capacity"
+    range 1 100000
+    default 1280
+
+config OMNICHORD_P4_MAX_SEQUENCE_EVENTS
+    int "Events per AMY reusable sequence"
+    range 1 100000
+    default 64
+
+config OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS
+    int "Concurrent AMY reusable sequence executions"
+    range 1 100000
+    default 40
+
+config OMNICHORD_P4_MIN_PSRAM_BYTES
+    int "Minimum required PSRAM in bytes"
+    range 1048576 134217728
+    default 8388608
+
+endmenu

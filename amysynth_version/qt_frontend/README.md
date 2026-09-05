@@ -145,7 +145,7 @@ component suites in parallel.
 Without `--suite`, the runner executes `unit`. The serial suite exercises the
 production `pyserial` writer through a Linux PTY. Native suites feed that same
 wire stream into the pinned LB Omnichord AMY release, started with 11 buses,
-336 oscillators and the sequencer-group capacities in `INSTALL.md`, and verify
+336 oscillators and the reusable-sequence capacities in `INSTALL.md`, and verify
 resulting AMY synth state. A passing
 native test is therefore stronger than merely finding an expected command in
 the host log. See `../design/testing.md` for the complete local/CI inventory.
@@ -153,16 +153,20 @@ the host log. See `../design/testing.md` for the complete local/CI inventory.
 ## Platform releases
 
 Every successful complete test run after an update to `main` publishes one
-five-platform GitHub Release. Tags use `RYYYYMMDDTHHMMSS`; asset timestamps
-omit the `T`. The release page has separate sections and downloads for:
+release with five application-platform packages and ESP32-P4 firmware. Tags use
+`RYYYYMMDDTHHMMSS`; application asset timestamps omit the `T`. The release page
+has separate sections and downloads for:
 
 - Linux x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Linux-x86_64.AppImage`
 - Raspberry Pi 4/5: `LB_Omnichord.RYYYYMMDDHHMMSS.RaspberryPi-aarch64.AppImage`
 - macOS Apple Silicon: `LB_Omnichord.RYYYYMMDDHHMMSS.macOS-arm64.dmg`
 - Windows x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Windows-x86_64.zip`
 - Android arm64: `LB_Omnichord.RYYYYMMDDHHMMSS.Android-arm64.apk`
+- ESP32-P4 v1/v3: `LB_Omnichord.RYYYYMMDDTHHMMSS.ESP32P4.zip`
 
-Each package has a matching `.sha256` asset. All timestamps are UTC.
+Each package has a matching `.sha256` asset. All timestamps are UTC. The P4
+ZIP retains the exact release tag, including `T`, as both its filename and its
+single extracted root directory.
 
 Every package contains the Qt frontend and supported AMY fork with the
 Gamma9001 PCM drum bank. At runtime they remain separate processes connected by the
@@ -187,6 +191,12 @@ application-private files directory and sends ordinary AMY packets through
 sideloadable artifact, not a Play Store/update-channel build. See
 [the shared AMY release contract](packaging/AMY_RELEASE.md) and
 [the Android package contract](packaging/android/README.md).
+
+The ESP32-P4 ZIP contains separate `v1/` and `v3/` firmware directories plus
+Python flashers for esptool v4 and v5 syntax. It uses the same pinned AMY
+release with Gamma9001, 11 buses and reusable sequences. See
+[`../esp32p4/README.md`](../esp32p4/README.md) for the build and hardware
+verification boundary.
 
 To install the macOS build, open the DMG, drag `LB_Omnichord.app` to
 `Applications`, eject the DMG and try to open the app once. After macOS blocks

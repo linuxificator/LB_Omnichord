@@ -11,13 +11,13 @@ from harness import HeadlessApp
 
 def chord_child_note(line: str, expected_note: float) -> bool:
     match = re.match(
-        r"^H\d+,\d+,\d+,(?P<group>\d+)"
+        r"^H\d+,\d+,(?P<sequence>\d+)"
         r"n(?P<note>[-+]?\d+(?:\.\d+)?)l(?P<velocity>[-+]?\d+(?:\.\d+)?)i4Z$",
         line,
     )
     return bool(
         match
-        and 937 <= int(match.group("group")) < 1001
+        and 1192 <= int(match.group("sequence")) < 1256
         and float(match.group("velocity")) > 0.0
         and abs(float(match.group("note")) - expected_note) < 1e-6
     )
@@ -683,7 +683,7 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertNotIn(
                 "S20480Z",
                 switched,
-                "live style switch reset nested sequencer instances",
+                "live style switch reset reusable sequence executions",
             )
             for synth in (0, 1, 4):
                 self.assertNotIn(
@@ -694,15 +694,15 @@ class PresetIntegrationTests(unittest.TestCase):
 
             self.assertTrue(
                 any(
-                    line.startswith("H")
-                    and re.match(r"^H\d+,\d+,\d+,1\d{3}", line)
+                    (match := re.match(r"^H\d+,\d+,(\d+)", line)) is not None
+                    and 1256 <= int(match.group(1)) < 1280
                     and "i0Z" in line
                     for line in switched
                 ),
-                "live style switch did not author nested drum events",
+                "live style switch did not author reusable drum-sequence events",
             )
             self.assertTrue(
-                any(re.match(r"^zQ1\d{3},1,0,", line) for line in switched),
+                any(re.match(r"^HC12(?:5[6-9]|[6-7]\d),1,", line) for line in switched),
                 "live style switch did not quantize new drum role loops",
             )
 
@@ -812,7 +812,7 @@ class PresetIntegrationTests(unittest.TestCase):
             )
             self.assertTrue(
                 any(
-                    line.startswith("H") and re.search(r"zQ\d+,1,1,0Z$", line)
+                    re.match(r"^H\d", line) and re.search(r"HC\d+,1,1Z$", line)
                     for line in switched
                 ),
                 "running preset switch installed no chord child triggers",

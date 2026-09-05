@@ -1,0 +1,4 @@
+# Separate ABI profile for newer ESP32-P4 silicon. It is compile-tested but
+# must not be claimed hardware-verified until the newer board is tested.
+# CONFIG_ESP32P4_SELECTS_REV_LESS_V3 is not set
+CONFIG_ESP32P4_REV_MIN_301=y

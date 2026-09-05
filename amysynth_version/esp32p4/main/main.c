@@ -6,6 +6,9 @@
 #include "freertos/task.h"
 
 #include "esp_err.h"
+#include "esp_chip_info.h"
+#include "esp_heap_caps.h"
+#include "esp_psram.h"
 
 #include "ulp_lp_core.h"
 #include "lp_core_uart.h"
@@ -19,6 +22,10 @@
 #include "lp_core_main.h"
 
 #include "lp_core/amy_uart_shared.h"
+
+#ifdef GAMMA9001
+extern const int16_t gamma9001_pcm_data[];
+#endif
 
 
 /*
@@ -235,7 +242,7 @@ static void init_lp_uart(void)
      */
     cfg.uart_pin_cfg.tx_io_num = -1;
     cfg.uart_pin_cfg.rx_io_num =
-        GPIO_NUM_15;
+        AMY_UART_RX_GPIO;
 
 
     cfg.uart_proto_cfg.baud_rate =
@@ -261,7 +268,8 @@ static void init_lp_uart(void)
 
 
     printf(
-        "LP UART: RX GPIO15, %d baud, 8N1\n",
+        "LP UART: RX GPIO%d, %d baud, 8N1\n",
+        AMY_UART_RX_GPIO,
         AMY_UART_BAUD
     );
 }
@@ -323,6 +331,9 @@ static void start_lp_core(void)
 
 void app_main(void)
 {
+    esp_chip_info_t chip_info;
+    esp_chip_info(&chip_info);
+
     printf("\n");
     printf(
         "========================================\n"
@@ -343,6 +354,32 @@ void app_main(void)
         "AMY block size  : %d samples\n",
         AMY_BLOCK_SIZE
     );
+
+    printf(
+        "Board profile   : %s\n",
+        CONFIG_OMNICHORD_P4_BOARD_PROFILE
+    );
+
+    printf(
+        "ESP32-P4 rev    : %d.%d\n",
+        chip_info.revision / 100,
+        chip_info.revision % 100
+    );
+
+    if (!esp_psram_is_initialized()) {
+        printf("ERROR: PSRAM is required but was not initialized\n");
+        abort();
+    }
+
+    const size_t psram_size = esp_psram_get_size();
+    printf("PSRAM           : %u bytes\n", (unsigned)psram_size);
+    if (psram_size < CONFIG_OMNICHORD_P4_MIN_PSRAM_BYTES) {
+        printf(
+            "ERROR: firmware requires at least %d bytes of PSRAM\n",
+            CONFIG_OMNICHORD_P4_MIN_PSRAM_BYTES
+        );
+        abort();
+    }
 
 
     /*
@@ -369,6 +406,10 @@ void app_main(void)
     config.features.audio_in = 0;
     config.features.startup_bleep = 0;
 
+#ifdef GAMMA9001
+    amy_set_gamma9001_pcm(gamma9001_pcm_data);
+#endif
+
     /*
      * Physical Strings uses AMY's Karplus-Strong oscillator.  Upstream AMY
      * defaults to a single KS delay buffer; reserve enough for all melodic
@@ -376,9 +417,29 @@ void app_main(void)
      * with two spare buffers for future voice-layout changes.
      */
     config.ks_oscs = 16;
-    config.max_patterns = 1024;
-    config.max_pattern_tags = 64;
-    config.max_pattern_instances = 32;
+    config.max_oscs = CONFIG_OMNICHORD_P4_MAX_OSCS;
+    config.max_buses = CONFIG_OMNICHORD_P4_MAX_BUSES;
+    config.max_sequencer_tags =
+        CONFIG_OMNICHORD_P4_MAX_SEQUENCER_TAGS;
+    config.max_sequence_events =
+        CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EVENTS;
+    config.max_sequence_executions =
+        CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS;
+
+    /* Large persistent pools live in external RAM. DMA/render scratch and
+     * FreeRTOS stacks remain internal. */
+    const uint32_t external_ram =
+        MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT;
+    const uint32_t internal_ram =
+        MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+    config.ram_caps_events = external_ram;
+    config.ram_caps_oscs = external_ram;
+    config.ram_caps_synth = external_ram;
+    config.ram_caps_delay = external_ram;
+    config.ram_caps_sample = external_ram;
+    config.ram_caps_sysex = external_ram;
+    config.ram_caps_block = internal_ram;
+    config.ram_caps_fbl = internal_ram;
 
 
     /*
@@ -388,9 +449,9 @@ void app_main(void)
      * GPIO17 -> DIN
      * GPIO18 -> BCK
      */
-    config.i2s_lrc  = 16;
-    config.i2s_dout = 17;
-    config.i2s_bclk = 18;
+    config.i2s_lrc  = CONFIG_OMNICHORD_P4_I2S_LRCK_GPIO;
+    config.i2s_dout = CONFIG_OMNICHORD_P4_I2S_DOUT_GPIO;
+    config.i2s_bclk = CONFIG_OMNICHORD_P4_I2S_BCLK_GPIO;
 
     config.i2s_din  = -1;
     config.i2s_mclk = -1;
@@ -471,7 +532,8 @@ void app_main(void)
 
     printf("\n");
     printf(
-        "Ready for AMY commands on GPIO15\n"
+        "Ready for AMY commands on GPIO%d\n",
+        AMY_UART_RX_GPIO
     );
     printf(
         "Format: native AMY command + LF\n"

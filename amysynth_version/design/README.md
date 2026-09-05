@@ -23,8 +23,8 @@ Core rules:
 - OMNI and MIDI remain separate subsystems.
 - Shared state is explicit; tuning is shared only when coupling is enabled.
 - `rhythm_bahavior.md` is the authoritative rhythm transport/tempo contract.
-- `sequencer_groups.md` defines the ownership boundary between LB musical
-  policy and AMY's persistent groups and active executions.
+- `sequencer_sequences.md` defines the ownership boundary between LB musical
+  policy and AMY's reusable definitions and active executions.
 - `testing.md` defines the maintained local suites and CI responsibilities;
   it also defines five-platform release packaging and validation.
   Detailed executable scenarios live in `../qt_frontend/tests/USE_CASES.md`.
@@ -45,6 +45,14 @@ Core rules:
 - `CODEX_HANDOVER_FRITS_SLIDER_FIX.md` records the macOS mouse-visible slider
   regression, its shared mouse/touch cause and the package-level proof added to
   prevent recurrence without platform-specific UI code.
+- `amy/README.md` indexes Codex-only AMY audit and implementation handovers
+  which are deliberately kept out of Shorepine-facing AMY branches.
+- `amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` records the cumulative-tag AMY
+  contract, exact fork/release commits, the simplified LB planner and the
+  diagnostic/test trail that supersedes the sequencer-group experiment.
+- `amy/CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` records the latest
+  Shorepine API feedback, finalized named-action syntax, compatibility
+  audit, host verification and immutable integration release.
 - `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md` indexes the 2026-08-31
   repository-wide code-quality audit. Those files are analysis and proposed
   refactoring guidance, not authority to change product behavior.
@@ -120,7 +128,7 @@ Then add every row that matches the task:
 | OSC input or external-control learn | `osc_control.md`, `midi_control.md`, `presets.md`, `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Presets, user state or migration | `presets.md`, `sound_balance.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Startup configuration, schema or config migration | `configuration.md`, `CODEX_HANDOVER_CONFIGURATION_AND_DRY.md`, `../qt_frontend/docs/DEPENDENCIES.md` |
-| Rhythm, tempo or sequencer behavior | `rhythm_bahavior.md`, `sequencer_groups.md`, `../qt_frontend/docs/SEQUENCER_TAGS.md`, `../qt_frontend/tests/USE_CASES.md` |
+| Rhythm, tempo or sequencer behavior | `rhythm_bahavior.md`, `sequencer_sequences.md`, `../qt_frontend/docs/SEQUENCER_TAGS.md`, `../qt_frontend/tests/USE_CASES.md` |
 | Tuning, pitch or note conversion | `tuning.md`, `use_cases.md`, `../qt_frontend/tests/USE_CASES.md` |
 | AMY commands, sockets, serial or buses | `amy_interface.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |
 | Instrument catalogue, defaults or balance | `sound_balance.md`, `presets.md`, `../qt_frontend/instruments/README_defaults.md` |
@@ -129,6 +137,7 @@ Then add every row that matches the task:
 | ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |
 | Architecture, code quality or refactoring | `CODEX_HANDOVER_CODE_QUALITY_BASELINE.md`, the relevant dedicated audit handover, `CODEX_HANDOVER_CODE_QUALITY_ROADMAP.md`, plus every owning subsystem contract touched by the proposed change |
+| AMY fork sequencer implementation or upstream review | `amy/README.md`, `amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md`, `amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION_AUDIT.md`, `amy/CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`, plus the rhythm, AMY-interface and ESP32-P4 rows when applicable |
 | Test harnesses, package smoke or cross-platform acceptance | `test_process_architecture.md`, `testing.md`, `CODEX_HANDOVER_TEST_ARCHITECTURE.md`, `CODEX_HANDOVER_TEST_PROCESS_ARCHITECTURE_AUDIT.md`, plus the platform contracts selected above |
 | Selecting or executing the next code-quality task | `CODEX_HANDOVER_ORDERED_CODE_QUALITY_TASKS.md`, `CODEX_HANDOVER_POST_T25_REMAINING_WORK.md`, its cited detailed handovers and every owning subsystem contract listed for that task |
 | Platform-dependent application code or adapter extraction | `CODEX_HANDOVER_PLATFORM_ADAPTER_BOUNDARY.md`, `CODEX_HANDOVER_ARCHITECTURE_BOUNDARIES.md`, `CODEX_HANDOVER_PORTABILITY_RELEASE_AND_SECURITY.md`, plus the platform/package contracts selected above |

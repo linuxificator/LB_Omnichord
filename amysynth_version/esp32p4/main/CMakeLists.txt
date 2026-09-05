@@ -7,6 +7,7 @@ idf_component_register(
 
     REQUIRES
         amy
+        esp_psram
         ulp
 )
 
@@ -35,3 +36,5 @@ ulp_embed_binary(
     "${ulp_lp_core_sources}"
     "${ulp_exp_dep_srcs}"
 )
+
+target_compile_definitions(${COMPONENT_LIB} PRIVATE GAMMA9001=1)

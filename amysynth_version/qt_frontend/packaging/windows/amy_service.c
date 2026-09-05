@@ -142,9 +142,9 @@ static int run_service(
     config.features.default_synths = 0;
     config.max_buses = 11;
     config.max_oscs = 336;
-    config.max_sequence_groups = 1024;
-    config.max_sequence_group_tags = 64;
-    config.max_sequence_group_executions = 40;
+    config.max_sequencer_tags = 1280;
+    config.max_sequence_events = 64;
+    config.max_sequence_executions = 40;
     g_offline_render = no_audio;
     g_wire_records = 0;
     g_nonzero_samples = 0;

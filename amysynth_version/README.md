@@ -18,7 +18,9 @@ Platform packages are published under the repository's
 the complete AMY regression matrix passes. Each release contains Linux x86_64
 and Raspberry Pi 4/5 aarch64 AppImages, a macOS Apple Silicon DMG and an
 experimental native Windows x86_64 zip, plus an experimental Android arm64
-APK. Every package contains the Qt frontend and compatible AMY runtime while
+APK. Releases also contain one dual-profile ESP32-P4 firmware ZIP with v1 and
+v3 images and old/new esptool flashers. Every application package contains the
+Qt frontend and compatible AMY runtime while
 preserving their separate-process wire-protocol boundary. Windows uses a
 private named pipe; Android embeds the lifecycle AAR and uses its app-private
 `amy.sock`; neither target runs the Linux AppImage through a compatibility
