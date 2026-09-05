@@ -9,10 +9,10 @@ import os
 import re
 import sys
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Sequence
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, cast
 
 from PySide6.QtCore import (
     QObject,
@@ -24,6 +24,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
 from application_composition import (
     ApplicationDependencies,
@@ -32,7 +33,7 @@ from application_composition import (
     compose_application_graph,
     load_application_resources,
 )
-from bass_riffs import BassRiffCatalog, load_bass_riff_catalog
+from bass_riffs import BassRiffCatalog
 from control_limits import bounded_control_range, clamp_control_value
 from config_loader import ResolvedAmyConfig
 from drum_patterns import (
@@ -464,7 +465,7 @@ def spell_strum_note_names(
     degree_offsets: tuple[int, ...],
 ) -> list[str]:
     """Spell root-relative pitch classes using their musical note function."""
-    root_label = NOTE_NAMES_BY_SEMITONE[int(root_semitone) % 12]
+    root_label = str(NOTE_NAMES_BY_SEMITONE[int(root_semitone) % 12])
     root_letter_index = NATURAL_NOTE_LETTERS.index(root_label[0])
     fallback_names = (
         FLAT_NOTE_NAMES if _fallback_prefers_flats(root_label, chord_suffix) else SHARP_NOTE_NAMES
@@ -641,9 +642,10 @@ def load_intonation_table(
 def load_title_config(
     path: Path,
 ) -> dict[str, object]:
-    default = {
+    default_height = 74
+    default: dict[str, object] = {
         "text": "Luciel's Birthday Omnichord",
-        "height": 74,
+        "height": default_height,
         "font": "URW Chancery L",
     }
 
@@ -659,9 +661,9 @@ def load_title_config(
     font = str(raw.get("font", default["font"])).strip()
 
     try:
-        height = int(raw.get("height", default["height"]))
+        height = int(raw.get("height", default_height))
     except (TypeError, ValueError):
-        height = int(default["height"])
+        height = default_height
 
     # Keep pathological JSON values from destroying the layout.
     height = max(0, min(240, height))
@@ -1031,7 +1033,9 @@ class InstrumentBackend(QObject):
         self._tempo_nudge_timer.setInterval(100)
         self._tempo_nudge_timer.timeout.connect(self._tempo_nudge_tick)
         self._tempo_nudge_direction = 0
-        self._tempo_nudge_origin = self.rhythmTempo
+        self._tempo_nudge_origin = self._rhythm.tempo_by_rhythm[
+            self._rhythm.selected_index
+        ]
         self._tempo_nudge_pressed = False
 
         # Pitch bend is deliberately transient. _tuning_reference remains the
@@ -1209,7 +1213,7 @@ class InstrumentBackend(QObject):
     def strumLadderMode(self) -> bool:
         return self._strum_ladder_mode
 
-    @Property("QVariantList", notify=strumNoteNamesChanged)
+    @Property(list, notify=strumNoteNamesChanged)
     def strumNoteNames(self) -> list[str]:
         return self._strum_note_names()
 
@@ -1225,27 +1229,27 @@ class InstrumentBackend(QObject):
     def selectedBassSynthIndex(self) -> int:
         return self._bass_synth.selected_index
 
-    @Property("QVariantList", notify=chordSynthControlsChanged)
+    @Property(list, notify=chordSynthControlsChanged)
     def chordCommonControls(self) -> list[dict[str, Any]]:
         return self._control_model("chord", "common")
 
-    @Property("QVariantList", notify=chordSynthControlsChanged)
+    @Property(list, notify=chordSynthControlsChanged)
     def chordExtraControls(self) -> list[dict[str, Any]]:
         return self._control_model("chord", "extra")
 
-    @Property("QVariantList", notify=strumSynthControlsChanged)
+    @Property(list, notify=strumSynthControlsChanged)
     def strumCommonControls(self) -> list[dict[str, Any]]:
         return self._control_model("strum", "common")
 
-    @Property("QVariantList", notify=strumSynthControlsChanged)
+    @Property(list, notify=strumSynthControlsChanged)
     def strumExtraControls(self) -> list[dict[str, Any]]:
         return self._control_model("strum", "extra")
 
-    @Property("QVariantList", notify=bassSynthControlsChanged)
+    @Property(list, notify=bassSynthControlsChanged)
     def bassCommonControls(self) -> list[dict[str, Any]]:
         return self._control_model("bass", "common")
 
-    @Property("QVariantList", notify=bassSynthControlsChanged)
+    @Property(list, notify=bassSynthControlsChanged)
     def bassExtraControls(self) -> list[dict[str, Any]]:
         return self._control_model("bass", "extra")
 
@@ -1259,6 +1263,9 @@ class InstrumentBackend(QObject):
 
     @Property(float, notify=rhythmControlsChanged)
     def rhythmTempo(self) -> float:
+        return self._rhythm_tempo_value()
+
+    def _rhythm_tempo_value(self) -> float:
         if self._rhythm_running and self._running_tempo is not None:
             return self._running_tempo
         return self._rhythm.tempo_by_rhythm[self._rhythm.selected_index]
@@ -1275,20 +1282,23 @@ class InstrumentBackend(QObject):
     def rhythmBusyness(self) -> int:
         return self._rhythm.busyness_by_rhythm[self._rhythm.selected_index]
 
-    @Property("QVariantList", notify=rhythmControlsChanged)
+    @Property(list, notify=rhythmControlsChanged)
     def rhythmFillEnabled(self) -> list[bool]:
         enabled = set(self._rhythm.fill_order_by_rhythm[self._rhythm.selected_index])
         return [index in enabled for index in range(5)]
 
     @Property(int, notify=rhythmControlsChanged)
     def rhythmFillDensityIndex(self) -> int:
+        return self._rhythm_fill_density_index_value()
+
+    def _rhythm_fill_density_index_value(self) -> int:
         return self._rhythm.fill_density_index_by_rhythm[self._rhythm.selected_index]
 
     @Property(int, notify=rhythmControlsChanged)
     def rhythmFillDensityBars(self) -> int:
-        return FILL_DENSITY_BARS[self.rhythmFillDensityIndex]
+        return FILL_DENSITY_BARS[self._rhythm_fill_density_index_value()]
 
-    @Property("QVariantList", constant=True)  # type: ignore[arg-type]
+    @Property(list, constant=True)
     def rhythmFillDensityLabels(self) -> list[str]:
         return [f"/{bars}" for bars in FILL_DENSITY_BARS]
 
@@ -1686,7 +1696,7 @@ class InstrumentBackend(QObject):
 
     def _tuned_notes(
         self,
-        notes: list[int | float],
+        notes: Sequence[int | float],
         root_semitone: int | None = None,
     ) -> list[float]:
         return [
@@ -2504,7 +2514,7 @@ class InstrumentBackend(QObject):
             return False
         clamped = max(40.0, min(200.0, float(value)))
         index = self._rhythm.selected_index
-        if abs(clamped - self.rhythmTempo) < 0.0001:
+        if abs(clamped - self._rhythm_tempo_value()) < 0.0001:
             return False
         self._rhythm.tempo_by_rhythm[index] = clamped
         if self._rhythm_running:
@@ -2519,9 +2529,9 @@ class InstrumentBackend(QObject):
         self._tempo_nudge_pressed = False
 
     def _tempo_nudge_tick(self) -> None:
-        current = self.rhythmTempo
+        current = self._rhythm_tempo_value()
         changed = self._set_rhythm_tempo_value(current + float(self._tempo_nudge_direction))
-        moved = abs(self.rhythmTempo - self._tempo_nudge_origin)
+        moved = abs(self._rhythm_tempo_value() - self._tempo_nudge_origin)
         if (not changed) or (not self._tempo_nudge_pressed and moved >= 20.0 - 1e-9):
             self._stop_tempo_nudge()
 
@@ -2531,7 +2541,7 @@ class InstrumentBackend(QObject):
         if self._midi_control_blocks({"screen": "omni", "kind": "rhythm_tempo"}):
             return
         self._tempo_nudge_direction = 1 if int(direction) > 0 else -1
-        self._tempo_nudge_origin = self.rhythmTempo
+        self._tempo_nudge_origin = self._rhythm_tempo_value()
         self._tempo_nudge_pressed = True
         self._tempo_nudge_timer.start()
 
@@ -2540,7 +2550,7 @@ class InstrumentBackend(QObject):
         if self._tempo_nudge_direction == 0:
             return
         self._tempo_nudge_pressed = False
-        if abs(self.rhythmTempo - self._tempo_nudge_origin) >= 20.0 - 1e-9:
+        if abs(self._rhythm_tempo_value() - self._tempo_nudge_origin) >= 20.0 - 1e-9:
             self._stop_tempo_nudge()
 
     @Slot(float)
@@ -3280,7 +3290,6 @@ class InstrumentBackend(QObject):
     @Slot(float)
     def strumMove(self, normalized_y: float) -> None:
         normalized_y = self._decode_strum_position(normalized_y)
-        notes = self._strum_notes()
         new_index = self._strum_index(normalized_y)
 
         if new_index is None:
@@ -3856,7 +3865,7 @@ def run_application(
     if args.capture_screenshots_dir is not None:
         capture_dir = args.capture_screenshots_dir.expanduser().resolve()
         capture_dir.mkdir(parents=True, exist_ok=True)
-        window = engine.rootObjects()[0]
+        window = cast(QQuickWindow, engine.rootObjects()[0])
 
         # Stage representative controls through the normal input-processing
         # paths. The resulting bar contains MIDI and OSC rotaries and buttons.
@@ -3869,7 +3878,7 @@ def run_application(
         def capture_screen(name: str) -> bool:
             image = window.grabWindow()
             path = capture_dir / f"{name}.png"
-            if image.isNull() or not image.save(str(path), "PNG"):
+            if image.isNull() or not image.save(str(path), b"PNG"):
                 print(
                     f"Could not capture Qt screen to {path}",
                     file=sys.stderr,
@@ -3911,8 +3920,5 @@ def run_application(
     # QML can no longer generate performance messages, so stop AMY and close
     # the UART before releasing the backend object that owns the client.
     amy_client.close()
-
-    # The backend can safely be released after QML no longer references it.
-    del backend
 
     return exit_code

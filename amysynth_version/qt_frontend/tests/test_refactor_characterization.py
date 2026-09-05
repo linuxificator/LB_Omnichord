@@ -95,6 +95,33 @@ class RefactorCharacterizationTests(unittest.TestCase):
                     actual["methods"],
                 )
 
+    def test_qml_list_properties_keep_qvariantlist_metatype(self) -> None:
+        expected = {
+            InstrumentBackend: (
+                "strumNoteNames",
+                "chordCommonControls",
+                "chordExtraControls",
+                "strumCommonControls",
+                "strumExtraControls",
+                "bassCommonControls",
+                "bassExtraControls",
+                "rhythmFillEnabled",
+                "rhythmFillDensityLabels",
+                "midiSynthNames",
+            ),
+            MidiPlayerBackend: ("synthNames", "midiInputTechs"),
+        }
+        for qobject_class, property_names in expected.items():
+            meta = qobject_class.staticMetaObject
+            for property_name in property_names:
+                with self.subTest(
+                    qobject=qobject_class.__name__,
+                    property=property_name,
+                ):
+                    index = meta.indexOfProperty(property_name)
+                    self.assertGreaterEqual(index, 0)
+                    self.assertEqual(meta.property(index).typeName(), "QVariantList")
+
     def test_supported_python_entrypoints_share_one_loader_object(self) -> None:
         canonical = config_loader.load_amy_config
         self.assertIs(amy_serial.load_amy_config, canonical)

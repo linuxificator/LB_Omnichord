@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, final
+from typing import Any, cast, final
 
 from PySide6.QtCore import QObject, Property, Slot
 
+from app_core import SynthRole
 from midi_player import MIDI_PRESET_COUNT, MidiPlayerBackend
 from performance_backend import InstrumentBackend as OmniInstrumentBackend
 
@@ -85,25 +86,32 @@ class InstrumentBackend(OmniInstrumentBackend):
         if player is not None:
             player.restore_control_values(protected)
 
-    def _reset_synth_role_to_preset(self, role: str) -> None:
+    def _reset_synth_role_to_preset(
+        self,
+        role: SynthRole,
+        *,
+        preserved_controls: dict[tuple[str, str], float] | None = None,
+        preserved_volume: float | None = None,
+    ) -> None:
         player = getattr(self, "_midi_player", None)
         protected = (
             player.capture_bound_control_values("omni", role=role)
             if player is not None
             else []
         )
-        controls = {
+        controls = dict(preserved_controls or {})
+        controls.update({
             (str(target["instrument"]), str(target["control"])): value
             for target, value in protected
             if str(target["kind"]) == "synth_control"
-        }
+        })
         volume = next(
             (
                 value
                 for target, value in protected
                 if str(target["kind"]) == "volume"
             ),
-            None,
+            preserved_volume,
         )
         super()._reset_synth_role_to_preset(
             role,
@@ -125,9 +133,9 @@ class InstrumentBackend(OmniInstrumentBackend):
     def midiPlayer(self) -> QObject:
         return self._midi_player
 
-    @Property("QVariantList", constant=True)
+    @Property(list, constant=True)
     def midiSynthNames(self) -> list[str]:
-        return self._midi_player.synthNames
+        return cast(list[str], self._midi_player.synthNames)
 
     @Property(int, constant=True)
     def midiPresetCount(self) -> int:
@@ -138,7 +146,7 @@ class InstrumentBackend(OmniInstrumentBackend):
     # signal belongs to the same Qt meta-object.
     @Property(int)
     def selectedMidiPreset(self) -> int:
-        return self._midi_player.selectedPreset
+        return cast(int, self._midi_player.selectedPreset)
 
     @Slot(int, result=int)
     def midiSynthIndex(self, row: int) -> int:
@@ -154,15 +162,15 @@ class InstrumentBackend(OmniInstrumentBackend):
 
     @Slot(result=int)
     def midiTuningReference(self) -> int:
-        return self._midi_player.tuningReference
+        return cast(int, self._midi_player.tuningReference)
 
     @Slot(result=float)
     def midiMasterVolume(self) -> float:
-        return self._midi_player.masterVolume
+        return cast(float, self._midi_player.masterVolume)
 
     @Slot(result=bool)
     def midiMasterMuted(self) -> bool:
-        return self._midi_player.masterMuted
+        return cast(bool, self._midi_player.masterMuted)
 
     @Slot("QVariantMap", result=str)
     def midiControlTargetVisualState(self, target: dict[str, Any]) -> str:
@@ -242,7 +250,7 @@ class InstrumentBackend(OmniInstrumentBackend):
             self._syncing_tuning = False
 
     def _sync_omni_tuning_when_coupled(self) -> None:
-        if not self._midi_player.tuningCoupled or self._syncing_tuning:
+        if not cast(bool, self._midi_player.tuningCoupled) or self._syncing_tuning:
             return
         self._syncing_tuning = True
         try:
@@ -251,8 +259,8 @@ class InstrumentBackend(OmniInstrumentBackend):
             self._syncing_tuning = False
 
     def _copy_midi_tuning_to_omni(self) -> None:
-        self.setTuningModeIndex(self._midi_player.tuningModeIndex)
-        self.setTuningReference(self._midi_player.tuningReference)
+        self.setTuningModeIndex(cast(int, self._midi_player.tuningModeIndex))
+        self.setTuningReference(cast(int, self._midi_player.tuningReference))
 
     @Slot()
     def syncMidiTuningFromOmni(self) -> None:

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "tool": "mypy",
   "tool_version": "2.3.1",
-  "recorded": "2026-09-01",
-  "total_errors": 42,
+  "recorded": "2026-09-05",
+  "total_errors": 0,
   "known_production_modules": [
     "code/amy_serial.py",
     "code/amy_transport.py",
@@ -27,21 +27,5 @@
     "code/unix_wire_socket.py",
     "code/user_data.py"
   ],
-  "errors": [
-    {"file": "code/amy_transport.py", "code": "assignment", "count": 1},
-    {"file": "code/amy_transport.py", "code": "var-annotated", "count": 2},
-    {"file": "code/app_core.py", "code": "arg-type", "count": 12},
-    {"file": "code/app_core.py", "code": "assignment", "count": 1},
-    {"file": "code/app_core.py", "code": "attr-defined", "count": 1},
-    {"file": "code/app_core.py", "code": "call-overload", "count": 2},
-    {"file": "code/app_core.py", "code": "index", "count": 1},
-    {"file": "code/app_core.py", "code": "operator", "count": 4},
-    {"file": "code/midi_integration.py", "code": "arg-type", "count": 4},
-    {"file": "code/midi_integration.py", "code": "override", "count": 2},
-    {"file": "code/midi_integration.py", "code": "return-value", "count": 5},
-    {"file": "code/midi_player.py", "code": "arg-type", "count": 2},
-    {"file": "code/midi_player.py", "code": "assignment", "count": 2},
-    {"file": "code/midi_player.py", "code": "union-attr", "count": 1},
-    {"file": "code/performance_backend.py", "code": "arg-type", "count": 2}
-  ]
+  "errors": []
 }

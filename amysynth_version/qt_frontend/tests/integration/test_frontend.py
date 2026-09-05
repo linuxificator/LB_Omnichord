@@ -716,7 +716,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("activeRowIndex")), -1)
             start = app.bridge.count()
             app.action("midiPreviewStart", 0, 0.5, True)
-            synth_lines = app.bridge.wait_for_line_match(
+            app.bridge.wait_for_line_match(
                 lambda line: "i5" in line and "n" in line and "l" in line,
                 "MIDI synth-5 preview note",
                 start=start,
