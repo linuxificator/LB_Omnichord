@@ -99,6 +99,9 @@ small, behavior-preserving phase:
 - `CODEX_HANDOVER_PACKAGE_SIZE_AND_BUILD_SLIMMING.md` — measured five-platform
   package bloat, the Qt/QML runtime allowlist, Android build-cost findings,
   size/audit gates and the deliberately deferred production-signing boundary.
+- `CODEX_HANDOVER_QUALITY_CYCLE_001.md` — post-sequencer/external-control
+  architecture re-audit, necessary low-risk corrections, zero-error type and
+  Pyflakes ratchets, verification evidence and the remaining optional queue.
 - `code_quality_tasks/README.md` — actual T01-T25 result handovers, verification
   evidence and newly discovered follow-up work.
 - `code_quality_tasks/POST_T25_MAIN_RELEASE_20260901.md` — merge-to-main
