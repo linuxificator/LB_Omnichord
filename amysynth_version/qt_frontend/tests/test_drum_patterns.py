@@ -147,6 +147,16 @@ class DrumPatternTests(unittest.TestCase):
                 "tiny", "pop_8", "low_primary"
             )
 
+    def test_foundation_levels_are_musically_usable(self) -> None:
+        for rhythm in self.catalog.rhythms.values():
+            foundation = rhythm.levels[0]
+            self.assertGreaterEqual(len(foundation), 5, rhythm.rhythm_id)
+            self.assertGreaterEqual(
+                len({event.role for event in foundation}),
+                2,
+                rhythm.rhythm_id,
+            )
+
     def test_activity_levels_are_selected_complete_not_concatenated(self) -> None:
         pop = self.catalog.rhythm("pop_8")
         level_one = {(event.tick, event.role) for event in pop.levels[0]}
@@ -229,6 +239,39 @@ class DrumPatternTests(unittest.TestCase):
                         )
                 self.assertEqual(actual, expected, (rhythm.rhythm_id, level_index))
 
+    def test_fill_start_rotation_and_gamma_profile_diversity(self) -> None:
+        maximum = 0
+        for rhythm in self.catalog.rhythms.values():
+            beats_per_bar = int(rhythm.meter.split("/", 1)[0])
+            occurrences = AmySerialClient._fill_occurrences(
+                list(range(len(rhythm.fills))),
+                rhythm.fills,
+            )
+            maximum = max(maximum, len(occurrences))
+            for fill, start in occurrences:
+                self.assertIn(start, fill.allowed_start_beats)
+                self.assertLessEqual(
+                    (start - 1) * fill.beat_unit_ticks + fill.duration_ticks,
+                    beats_per_bar * fill.beat_unit_ticks,
+                    fill.fill_id,
+                )
+        self.assertEqual(maximum, 10)
+
+        gamma = self.catalog.kits["gamma9001"]
+        self.assertEqual(len(gamma.fill_id_profile), 270)
+        for rhythm in self.catalog.rhythms.values():
+            profiles = {gamma.fill_id_profile[fill.fill_id] for fill in rhythm.fills}
+            self.assertEqual(len(profiles), 5, rhythm.rhythm_id)
+
+        for kit_name in ("tiny", "general_midi"):
+            kit = self.catalog.kits[kit_name]
+            self.assertFalse(kit.fill_id_profile, kit_name)
+            self.assertEqual(
+                dict(kit.fill_rhythm_profile),
+                dict(kit.activity_rhythm_profile),
+                kit_name,
+            )
+
     def test_fill_sequences_preserve_events_and_only_add_generic_gates(self) -> None:
         event_pattern = re.compile(
             r"^H(?P<tick>\d+),(?P<period>\d+),(?P<sequence>\d+)"
@@ -284,6 +327,7 @@ class DrumPatternTests(unittest.TestCase):
                                 event.role,
                                 event.velocity,
                                 fill=True,
+                                fill_id=fill.fill_id,
                             ),
                         )
                     )
@@ -350,6 +394,7 @@ class DrumPatternTests(unittest.TestCase):
                         rhythm.rhythm_id,
                         event.role,
                         fill=True,
+                        fill_id=fill.fill_id,
                     )
                     self.assertIsNotNone(sound.preset)
                     resolved.add((int(sound.preset), sound.note))
