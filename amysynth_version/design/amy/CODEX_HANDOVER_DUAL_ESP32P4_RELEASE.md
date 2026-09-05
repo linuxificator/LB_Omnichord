@@ -74,6 +74,8 @@ selected package and prints the exact command without opening a serial port.
 - `d76a889` — migrate packaged capacity metadata and tests;
 - `d6fdf65` — package both profiles with portable old/new esptool flashers;
 - `01159d5` — document the release and physical-validation boundary.
+- `8219afe` — use the exact `RYYYYMMDDTHHMMSS` tag in the ZIP and root name;
+- `c059f88` — expose the firmware asset in active release documentation.
 
 ## Verification
 
@@ -85,3 +87,13 @@ physical I2S/LP-UART validation remains outside CI.
 
 Hosted workflow run `33958471411` completed successfully for both `v1` and
 `v3` at Omnichord commit `01159d5e688f3673bc42e205dbe7f15e1a14aa90`.
+Both real artifacts from that run were then assembled and extracted locally;
+both flashers passed dry-run validation against their generated metadata.
+
+Full non-publishing release workflow run `33958666254` completed successfully
+at commit `f7008a93ab09b803c4543ec104f890afb2f3ba20`. It covered all shared tests,
+Linux x86_64, Raspberry Pi, macOS, Windows, Android arm64/x86_64 plus emulator,
+and both ESP32-P4 profiles through the reusable workflow-call path. Later
+commits only corrected the P4 asset/root to the exact tag spelling and expanded
+documentation; their packaging, firmware-contract and quality tests passed
+locally.
