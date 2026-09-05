@@ -776,6 +776,20 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("x: root.hostWindow.omniTitleX", midi)
         self.assertIn("width: root.hostWindow.omniTitleWidth", midi)
 
+    def test_midi_chord_channel_uses_the_free_upper_utility_space(self) -> None:
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        button_start = midi.index("id: chordInputChannelButton")
+        button = midi[button_start:]
+        self.assertIn("root.hostWindow.volumeX", button)
+        self.assertIn("+ root.hostWindow.volumeWidth", button)
+        self.assertIn("- width", button)
+        self.assertIn("root.hostWindow.utilityY", button)
+        self.assertIn(
+            "+ (root.hostWindow.sectionHeight - height) / 2",
+            button,
+        )
+        self.assertNotIn("root.hostWindow.strumX", button)
+
     def test_qt_owns_chord_gesture_recognition(self) -> None:
         backend = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")

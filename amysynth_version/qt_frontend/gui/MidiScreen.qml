@@ -507,9 +507,12 @@ Item {
         id: chordInputChannelButton
         objectName: "chordInputChannelButton"
         x:
-            root.hostWindow.strumX
-            + (root.hostWindow.strumWidth - width) / 2
-        y: 8
+            root.hostWindow.volumeX
+            + root.hostWindow.volumeWidth
+            - width
+        y:
+            root.hostWindow.utilityY
+            + (root.hostWindow.sectionHeight - height) / 2
         z: 2000
         channel: {
             backend.midiPlayer.stateVersion

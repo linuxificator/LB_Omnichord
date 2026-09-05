@@ -57,12 +57,14 @@ The MIDI view contains:
 - Independent MIDI reverb controls for level, liveness, damping and drum send.
 - Independent MIDI master volume and mute.
 
-The top-right corner contains a white round OMNI chord-input channel selector.
-It has the same 62-pixel diameter, typography and two-pixel circular border as
-the six MIDI-row channel selectors, but uses black text and border. It displays
-`7` at startup and cycles through `1..16,A` on a click or tap. The corresponding
-note ownership and bottom-row chord/octave feedback contract is defined in
-`midi.md`.
+The otherwise free right side of the upper utility row contains a white round
+OMNI chord-input channel selector. Its right edge aligns with the right edge of
+the purple preset panel below it, and its vertical center aligns with `PNC!`
+and `FSC`. It has the same 62-pixel diameter, typography and two-pixel circular
+border as the six MIDI-row channel selectors, but uses black text and border.
+It displays `7` at startup and cycles through `1..16,A` on a click or tap. The
+corresponding note ownership and bottom-row chord/octave feedback contract is
+defined in `midi.md`.
 
 No watermark is shown on the MIDI screen.
 
