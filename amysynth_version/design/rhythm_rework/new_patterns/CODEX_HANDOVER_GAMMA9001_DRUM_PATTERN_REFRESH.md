@@ -1,6 +1,6 @@
 # Codex handover — Gamma9001 drum activity refresh
 
-Status: **data authored and validated; materialization into the canonical runtime JSON is the next bounded step**  
+Status: **canonical runtime data materialized; targeted drum/provenance tests and maintained unit suite passed**
 Repository: `linuxificator/LB_Omnichord`  
 Branch: `feature/gamma9001-drum-pattern-refresh`  
 Target subsystem: active `amysynth_version` only  
@@ -55,9 +55,13 @@ Temporary transport files are placed next to this handover under:
 
 The payload is a lossless gzip+base64 transport encoding of the complete replacement JSON.
 
-Decoded canonical JSON SHA-256:
+Staged payload JSON SHA-256 (before bounded runtime normalization):
 
 `e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`
+
+Final canonical runtime JSON SHA-256:
+
+`595c177f804655bfb5c147d9e3fceebec838a33e87e161f6784946cd3a8de842`
 
 Staging text SHA-256:
 
@@ -296,6 +300,25 @@ Specifically reject:
 - trap/DnB density that exceeds the accompaniment role and masks strum/chords.
 
 Listening refinements may change velocity or remove/reposition events, but must retain all hard structural constraints.
+
+## 12a. Integration validation evidence
+
+The staged payload was SHA-verified and materialized. Nine repetitive/electronic/odd-meter rhythms intentionally use a musically complete one-bar period instead of duplicating identical onset definitions into an older two-bar storage period; this permits richer level-4/5 grooves while staying within 56 events. Samba's unchanged 384-tick phrase is represented as one 4/4 bar so existing 4/4 fill starts remain legal. Merengue's richer event timing is retained but its concrete logical-function diversity is bounded to six Latin roles (kick, timeline, shaker, high/low hand percussion and accent), with colliding same-tick roles merged at the stronger velocity. This preserves the established sequencer worst case of 34 simultaneous executions out of AMY's 40 rather than accepting the staged 39/40 result. No fill timing, kit mapping, transport code or AMY architecture was changed. The canonical drum manifest remains format revision 1 because only catalogue content/hash metadata changed.
+
+Final canonical `drum_activity_timing.json` SHA-256: `595c177f804655bfb5c147d9e3fceebec838a33e87e161f6784946cd3a8de842`.
+
+Validation executed before commit:
+
+- staged payload SHA and structural validator: passed;
+- all 54 meter/period relationships checked at 96 PPQ;
+- all five levels remain cumulative and <=56 events;
+- every level-1 foundation has >=5 events and >=2 logical roles;
+- no timing event contains concrete kit data;
+- `tests/test_drum_patterns.py`: passed;
+- `tests/test_catalogue_provenance.py`: passed;
+- official-CI-equivalent unit environment (`libegl1`, pinned desktop constraints): `python tests/run_tests.py --suite unit --coverage` passed, including the unchanged 34-of-40 sequencer-execution characterization.
+
+The temporary transfer payload, materializer and one-shot workflows are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.
 
 ## 13. Definition of done
 

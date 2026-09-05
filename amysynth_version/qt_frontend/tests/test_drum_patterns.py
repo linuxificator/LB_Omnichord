@@ -147,6 +147,16 @@ class DrumPatternTests(unittest.TestCase):
                 "tiny", "pop_8", "low_primary"
             )
 
+    def test_foundation_levels_are_musically_usable(self) -> None:
+        for rhythm in self.catalog.rhythms.values():
+            foundation = rhythm.levels[0]
+            self.assertGreaterEqual(len(foundation), 5, rhythm.rhythm_id)
+            self.assertGreaterEqual(
+                len({event.role for event in foundation}),
+                2,
+                rhythm.rhythm_id,
+            )
+
     def test_activity_levels_are_selected_complete_not_concatenated(self) -> None:
         pop = self.catalog.rhythm("pop_8")
         level_one = {(event.tick, event.role) for event in pop.levels[0]}
