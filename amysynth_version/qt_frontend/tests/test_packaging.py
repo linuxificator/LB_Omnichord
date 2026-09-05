@@ -343,6 +343,9 @@ class PackagingContracts(unittest.TestCase):
         release = (
             REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
         ).read_text(encoding="utf-8")
+        firmware_assembler = (
+            FRONTEND.parent / "esp32p4" / "assemble_release.py"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("date -u +%Y%m%dT%H%M%S", release)
         self.assertIn('echo "tag=R${instant}"', release)
@@ -371,7 +374,14 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("macOS-arm64.dmg", release)
         self.assertIn("Windows-x86_64.zip", release)
         self.assertIn("Android-arm64.apk", release)
-        self.assertIn("ESP32P4-v1.zip", release)
+        self.assertIn("ESP32P4.zip", release)
+        self.assertIn("profile: all", release)
+        self.assertIn("esp32p4-firmware/v1", release)
+        self.assertIn("esp32p4-firmware/v3", release)
+        self.assertIn("assemble_release.py", release)
+        self.assertIn('"flash_esptool_v4.py"', firmware_assembler)
+        self.assertIn('"flash_esptool_v5.py"', firmware_assembler)
+        self.assertIn('release_root = f"LB_Omnichord.{release_stamp}.ESP32P4"', firmware_assembler)
         self.assertIn("## ESP32-P4 firmware", release)
         self.assertIn("128-sample / 2 x 64-frame", release)
         self.assertIn("## Android arm64", release)

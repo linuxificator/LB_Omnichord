@@ -59,7 +59,7 @@ echo "Downloading artifact '$ARTIFACT' from workflow run $run_id ..."
 gh run download "$run_id" \
     --repo "$REPO" \
     --name "$ARTIFACT" \
-    --dir "$tmpdir"
+    --dir "$tmpdir/$PROFILE"
 
 build_info="$(find "$tmpdir" -type f -name BUILD_INFO -print -quit)"
 if [[ -z "$build_info" ]]; then
@@ -98,12 +98,14 @@ echo "Local:    ${idf_version:-unknown ESP-IDF version}"
 echo "Artifact: $(tr '\n' ' ' < "$build_info")"
 echo "Port:     $PORT"
 
-esptool_args=(--chip esp32p4 --port "$PORT")
+flash_args=("$PROFILE" "$PORT" --package-root "$tmpdir")
 if [[ -n "$BAUD" ]]; then
-    esptool_args+=(--baud "$BAUD")
+    flash_args+=(--baud "$BAUD")
 fi
-
-cd "$package_dir"
-python -m esptool "${esptool_args[@]}" write-flash @flash_project_args
+if python -m esptool write-flash --help >/dev/null 2>&1; then
+    python "$project_dir/flash_esptool_v5.py" "${flash_args[@]}"
+else
+    python "$project_dir/flash_esptool_v4.py" "${flash_args[@]}"
+fi
 
 echo "Flashed CI firmware for commit $head_sha"

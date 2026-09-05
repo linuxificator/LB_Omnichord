@@ -689,7 +689,7 @@ jobs:
     needs: [tests, release-metadata]
     uses: ./.github/workflows/esp32p4-build.yml
     with:
-      profile: v1
+      profile: all
 
   publish-release:
     if: github.ref == 'refs/heads/main'
@@ -718,21 +718,29 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Download validated ESP32-P4 firmware
+      - name: Download validated ESP32-P4 v1 firmware
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: esp32p4-firmware-v1
-          path: esp32p4-firmware
+          path: esp32p4-firmware/v1
+
+      - name: Download validated ESP32-P4 v3 firmware
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: esp32p4-firmware-v3
+          path: esp32p4-firmware/v3
 
       - name: Assemble ESP32-P4 release asset
         env:
           RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
         run: |
           set -euo pipefail
-          firmware_zip="LB_Omnichord.${RELEASE_STAMP}.ESP32P4-v1.zip"
-          mkdir -p firmware-dist
-          (cd esp32p4-firmware && zip -r "$GITHUB_WORKSPACE/firmware-dist/$firmware_zip" .)
-          (cd firmware-dist && sha256sum "$firmware_zip" > "$firmware_zip.sha256")
+          firmware_zip="LB_Omnichord.${RELEASE_STAMP}.ESP32P4.zip"
+          python3 amysynth_version/esp32p4/assemble_release.py \
+            --release-stamp "$RELEASE_STAMP" \
+            --v1 esp32p4-firmware/v1 \
+            --v3 esp32p4-firmware/v3 \
+            --output-dir firmware-dist
           (cd firmware-dist && sha256sum --check "$firmware_zip.sha256")
           printf '%s\n' "$(cat firmware-dist/$firmware_zip.sha256)" \
             > firmware-subject.sha256
@@ -788,7 +796,7 @@ jobs:
           cp '${{ steps.sbom.outputs.bundle-path }}' \
             "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
           cp '${{ steps.firmware-provenance.outputs.bundle-path }}' \
-            "LB_Omnichord.${RELEASE_STAMP}.ESP32P4-v1.provenance.sigstore.json"
+            "LB_Omnichord.${RELEASE_STAMP}.ESP32P4.provenance.sigstore.json"
           while read -r package; do
             gh attestation verify "dist/$package" \
               --repo "$GITHUB_REPOSITORY"
@@ -796,7 +804,7 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --predicate-type https://spdx.dev/Document/v2.3
           done < <(jq -r '.packages[].file' release-manifest.json)
-          firmware_zip="LB_Omnichord.${RELEASE_STAMP}.ESP32P4-v1.zip"
+          firmware_zip="LB_Omnichord.${RELEASE_STAMP}.ESP32P4.zip"
           gh attestation verify "firmware-dist/$firmware_zip" \
             --repo "$GITHUB_REPOSITORY"
 
@@ -814,14 +822,14 @@ jobs:
             "LB_Omnichord.${RELEASE_STAMP}.spdx.json"
             "LB_Omnichord.${RELEASE_STAMP}.provenance.sigstore.json"
             "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
-            "LB_Omnichord.${RELEASE_STAMP}.ESP32P4-v1.provenance.sigstore.json"
+            "LB_Omnichord.${RELEASE_STAMP}.ESP32P4.provenance.sigstore.json"
           )
           linux_file="LB_Omnichord.${RELEASE_STAMP}.Linux-x86_64.AppImage"
           pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
           mac_file="LB_Omnichord.${RELEASE_STAMP}.macOS-arm64.dmg"
           windows_file="LB_Omnichord.${RELEASE_STAMP}.Windows-x86_64.zip"
           android_file="LB_Omnichord.${RELEASE_STAMP}.Android-arm64.apk"
-          esp32p4_file="LB_Omnichord.${RELEASE_STAMP}.ESP32P4-v1.zip"
+          esp32p4_file="LB_Omnichord.${RELEASE_STAMP}.ESP32P4.zip"
           {
             echo '## Linux x64'
             echo
@@ -860,11 +868,11 @@ jobs:
             echo
             echo 'This package is CI debug-signed so it can be installed and emulator-tested without a repository signing secret. It is not a Play Store bundle or a stable update channel, and physical touchscreen, speaker, route-change and latency validation is still required.'
             echo
-            echo '## ESP32-P4 firmware (v1.x silicon)'
+            echo '## ESP32-P4 firmware (v1.x and v3.x silicon)'
             echo
-            echo "Download \`$esp32p4_file\` and its SHA-256 file. It contains a directly flashable merged image plus the bootloader, partition table, application image and portable esptool argument files. This image supports ESP32-P4 revision 1.0 through 1.99 and targets the physically observed revision 1.3 board. Do not flash it on revision 3.x silicon; build the separate v3 profile instead."
+            echo "Download \`$esp32p4_file\` and its SHA-256 file. It expands to a versioned directory containing separate \`v1/\` and \`v3/\` image directories, flashing instructions, and Python flashers for both legacy and current esptool syntax. Use \`v1\` for revision 1.x silicon, including the physically tested v1.3 board; use \`v3\` only for revision 3.x silicon."
             echo
-            echo 'The firmware receives native AMY wire commands through the LP UART at 1,000,000 baud, includes Gamma9001, 11 buses, storage for 1024 sequence groups and the physically selected 48 kHz / 128-sample / 2 x 64-frame audio geometry. CI proves compilation and image structure; I2S audio and LP-UART operation still require the physical-board test.'
+            echo 'Both firmware profiles receive native AMY wire commands through the LP UART at 1,000,000 baud, include Gamma9001, 11 buses, capacity for 1280 reusable-sequence tags, and the physically selected 48 kHz / 128-sample / 2 x 64-frame audio geometry. CI proves compilation and image structure; v3 I2S audio and LP-UART operation still require physical-board validation.'
             echo
             echo '## Build provenance'
             echo

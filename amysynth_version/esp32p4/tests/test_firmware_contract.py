@@ -5,12 +5,19 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
+import tempfile
 import unittest
+import zipfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = ROOT.parents[1]
 FRONTEND = ROOT.parent / "qt_frontend"
+sys.path.insert(0, str(ROOT))
+
+from assemble_release import assemble
+from release_flash_common import build_command
 
 
 class FirmwareContractTests(unittest.TestCase):
@@ -106,6 +113,89 @@ class FirmwareContractTests(unittest.TestCase):
         self.assertIn("workflow_dispatch:", workflow)
         self.assertIn('"v1","v3"', workflow)
         self.assertIn("package_firmware.sh", workflow)
+
+    def test_release_flashers_cover_old_and_new_esptool_syntax(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            package_root = Path(temporary)
+            profile = package_root / "v1"
+            (profile / "bootloader").mkdir(parents=True)
+            (profile / "bootloader/bootloader.bin").write_bytes(b"boot")
+            (profile / "app.bin").write_bytes(b"app")
+            (profile / "flasher_args.json").write_text(
+                json.dumps(
+                    {
+                        "flash_files": {
+                            "0x2000": "bootloader/bootloader.bin",
+                            "0x10000": "app.bin",
+                        },
+                        "flash_settings": {
+                            "flash_mode": "dio",
+                            "flash_freq": "80m",
+                            "flash_size": "32MB",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            legacy, legacy_cwd = build_command(
+                package_root=package_root,
+                profile="v1",
+                port="/dev/test",
+                baud=921600,
+                modern=False,
+            )
+            modern, modern_cwd = build_command(
+                package_root=package_root,
+                profile="v1",
+                port="/dev/test",
+                baud=921600,
+                modern=True,
+            )
+
+        self.assertEqual(legacy_cwd, profile.resolve())
+        self.assertEqual(modern_cwd, profile.resolve())
+        self.assertIn("write_flash", legacy)
+        self.assertIn("--flash_mode", legacy)
+        self.assertIn("write-flash", modern)
+        self.assertIn("--flash-mode", modern)
+        self.assertLess(legacy.index("0x2000"), legacy.index("0x10000"))
+
+    def test_release_zip_has_versioned_root_and_both_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            profiles = {}
+            for profile_name in ("v1", "v3"):
+                profile = root / profile_name
+                profiles[profile_name] = profile
+                for relative in (
+                    "BUILD_INFO",
+                    "flasher_args.json",
+                    "amy_p4_test.bin",
+                    "bootloader/bootloader.bin",
+                    "partition_table/partition-table.bin",
+                ):
+                    path = profile / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(profile_name.encode("ascii"))
+
+            archive = assemble(
+                release_stamp="R20260905123456",
+                v1=profiles["v1"],
+                v3=profiles["v3"],
+                output_dir=root / "out",
+            )
+            with zipfile.ZipFile(archive) as bundle:
+                names = set(bundle.namelist())
+            checksum_exists = archive.with_suffix(".zip.sha256").is_file()
+
+        release_root = "LB_Omnichord.R20260905123456.ESP32P4"
+        self.assertIn(f"{release_root}/flash_esptool_v4.py", names)
+        self.assertIn(f"{release_root}/flash_esptool_v5.py", names)
+        self.assertIn(f"{release_root}/v1/amy_p4_test.bin", names)
+        self.assertIn(f"{release_root}/v3/amy_p4_test.bin", names)
+        self.assertTrue(all(name.startswith(f"{release_root}/") for name in names))
+        self.assertTrue(checksum_exists)
 
 
 if __name__ == "__main__":
