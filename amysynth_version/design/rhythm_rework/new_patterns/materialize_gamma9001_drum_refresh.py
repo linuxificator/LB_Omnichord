@@ -85,7 +85,10 @@ def validate(data: bytes) -> dict:
 
 def update_hash_metadata() -> None:
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    manifest["manifest_revision"] = max(2, int(manifest.get("manifest_revision", 1)) + 1)
+    # manifest_revision versions the manifest format, not the catalogue content.
+    # This refresh changes only one recorded file hash, so keep revision 1.
+    if int(manifest.get("manifest_revision", 0)) != 1:
+        raise SystemExit("unexpected canonical drum manifest format revision")
     found = False
     for entry in manifest["files"]:
         if entry["name"] == "drum_activity_timing.json":
