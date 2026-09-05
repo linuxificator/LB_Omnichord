@@ -73,10 +73,13 @@ PySide6 6.11.2 internally collects detected Android modules through Python
 sets, but python-for-Android writes the resulting list directly into Qt's JNI
 startup array. The build therefore makes a second deploy initialization pass
 with the explicit dependency order `Core`, `Gui`, `Network`, `OpenGL`, `Qml`,
-`Quick`, `QuickParticles`, `QuickControls2`. It then checks that same order in
-the compiled APK resource table. In particular, `Quick` must load before
-`QuickParticles` and `QuickControls2`; otherwise either can pull in `Quick` as
-an ordinary native dependency before its Android JNI initialization is ready.
+`Quick`, `QuickControls2`. It then checks that same order in the compiled APK
+resource table. In particular, `Quick` must load before `QuickControls2`, which
+can otherwise pull in `Quick` as an ordinary native dependency before its
+Android JNI initialization is ready. `QtQuick.Particles` is a QML-only module,
+not a PySide binding module with a `QtQuickParticles.abi3.so`; its QML plugin
+and recursive native dependencies are retained through `qt_runtime_manifest.json`
+and loaded by QML rather than added to the PySide JNI preload list.
 
 QtTest and QtWidgets are test dependencies only. Package acceptance drives the
 final artifact from a separate process, so neither binding nor its native Qt

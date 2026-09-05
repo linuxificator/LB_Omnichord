@@ -357,7 +357,7 @@ def build(args: argparse.Namespace) -> Path:
         "--sdk-path",
         str(args.sdk.resolve()),
         "--extra-modules",
-        "QtQuick,QtQuickParticles,QtQuickControls2",
+        "QtQuick,QtQuickControls2",
     ]
     run(deploy_command, cwd=staging)
     pyside_spec = staging / "pysidedeploy.spec"

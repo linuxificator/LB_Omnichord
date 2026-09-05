@@ -25,7 +25,6 @@
     "OpenGL",
     "Qml",
     "Quick",
-    "QuickParticles",
     "QuickControls2"
   ],
   "source_qml_imports": [
