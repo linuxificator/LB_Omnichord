@@ -640,13 +640,13 @@ jobs:
           github-env --output "$GITHUB_ENV"
 
       - name: Download x86_64 Android package
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: android-emulator-x86_64
           path: android-package
 
       - name: Download x86_64 Android package evidence
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: evidence-android-emulator-x86_64
           path: android-package-evidence
@@ -712,20 +712,20 @@ jobs:
           github-env --output "$GITHUB_ENV"
 
       - name: Download all validated packages
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: package-*
           path: dist
           merge-multiple: true
 
       - name: Download validated ESP32-P4 v1 firmware
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: esp32p4-firmware-v1
           path: esp32p4-firmware/v1
 
       - name: Download validated ESP32-P4 v3 firmware
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: esp32p4-firmware-v3
           path: esp32p4-firmware/v3
