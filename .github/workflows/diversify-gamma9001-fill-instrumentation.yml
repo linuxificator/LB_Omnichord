@@ -74,6 +74,14 @@ jobs:
           OMNICHORD_TEST_ARTIFACT_DIR: test-artifacts
         run: python tests/run_tests.py --suite unit --coverage
 
+      - name: Normalize handover EOF
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('amysynth_version/design/rhythm_rework/new_patterns/CODEX_HANDOVER_GAMMA9001_FILL_REFRESH.md')
+          path.write_text(path.read_text(encoding='utf-8').rstrip() + '\n', encoding='utf-8')
+          PY
+
       - name: Remove temporary instrumentation machinery
         run: |
           rm amysynth_version/design/rhythm_rework/new_patterns/diversify_gamma9001_fill_instrumentation.py
