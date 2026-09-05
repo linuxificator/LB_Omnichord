@@ -1,6 +1,6 @@
 # Codex session handoff — AMY/LB Omnichord state and code-quality audit
 
-Updated: 2026-09-03.
+Updated: 2026-09-04.
 
 This file is intentionally written for future Codex sessions. It records the
 working state, decisions, lessons learned and branch/release discipline from
@@ -9,7 +9,40 @@ automation work. It supplements `AGENTS.md` and the authoritative design
 contracts under `amysynth_version/design/`; it does not override either of
 them or the current user's request.
 
-## 2026-09-03 sequencer-group rework supersedes the old pattern design
+## 2026-09-04 cumulative sequence simplification supersedes group rework
+
+The active work is now `rework/sequencer_simplification` in both repositories.
+Read
+`amysynth_version/design/amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` first.
+Repeated ordinary AMY tagged `H` events now cumulate behind one reusable
+sequence tag; `HR` resets future contents and `HC` controls execution. The
+separate `HA` append and `zQ`/group abstractions are retired.
+
+The differential review, Shorepine/Tulip compatibility evidence and open test
+findings now live in
+`amysynth_version/design/amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION_AUDIT.md`.
+Its ESP32 real-time follow-up is
+`amysynth_version/design/amy/CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md`.
+The final API-review implementation, verification and compatibility trail is
+`amysynth_version/design/amy/CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md`.
+That direction is now implemented as immutable dynamically retained
+generations, checked short pointer publication, execution-held references and
+an intrusive retire list reclaimed at the non-rendering public wire boundary.
+A two-buffer ping-pong is not sufficient for overlapping long-lived
+executions; a tracing collector is unnecessary because ownership is explicit.
+Physical ESP32-P4 timing proof is still open.
+
+AMY feature head is `f03875f2`. Python exposes the complete operation as
+`action='start'`, `'stop'`, or `'gate'`; strict wire integers `1`/`0`/`2`
+represent those actions and `vel` is reserved for note velocity. The exact
+Omnichord AMY release is `releases/amy_omnichord_R20260904T215233` at
+`8a896e9319957ed8eea49f26fe16378fcc2a27c5`. LB uses one stable root tag per
+fill-launch, bass and automatic-chord lane and keeps no AMY clock, execution,
+note-release or authoring high-water state.
+
+The 2026-09-03 sequencer-group section below is now historical rationale only.
+
+## 2026-09-03 sequencer-group rework superseded the old pattern design
 
 The active implementation no longer uses the nested-pattern wire API described
 later in this historical handoff. Treat the old `zQB`/`zQE`/`zQC`/`zQT`/
@@ -37,7 +70,7 @@ groups, runs each base drum role as a stable loop execution, and publishes each
 complete chord/arpeggio phrase as one immutable group revision. Musical role
 ownership and fill continuation policy remain in LB; AMY receives only generic
 group operations. The current authoritative contracts are
-`amysynth_version/design/sequencer_groups.md`,
+`amysynth_version/design/sequencer_sequences.md`,
 `amysynth_version/qt_frontend/docs/SEQUENCER_TAGS.md` and
 `amysynth_version/qt_frontend/docs/RHYTHM_PATTERNS.md`.
 
@@ -176,9 +209,10 @@ relying on this note.
   tag means "kick", "hi-hat", "fill", "bass riff" or "Omnichord chord lane".
 - Minimize AMY changes. If LB behavior can be expressed through generic AMY
   primitives and wire messages, do not extend AMY for LB-specific convenience.
-- Existing AMY sequencer behavior, both C/Python API and wire `H` commands,
-  must remain compatible. New nested-pattern behavior lives under the existing
-  `zQ` extended-control family.
+- Untagged AMY sequencer behavior remains compatible. Repeated three-field
+  tagged `H` events intentionally changed from active replacement to stopped,
+  cumulative reusable definitions; migration and first-party impact must be
+  stated explicitly rather than described as backwards compatible.
 - Do not resurrect the bus-mixer experiment. It was abandoned for upstream and
   is not required by the current LB rhythm/fill design.
 - Qt remains a wire-only client. It must not import `amy` or `c_amy`, link AMY

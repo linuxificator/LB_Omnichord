@@ -82,9 +82,9 @@ class VoiceCapacities:
 @dataclass(frozen=True, slots=True)
 class RuntimeCapacities:
     max_oscs: int
-    max_sequence_groups: int
-    max_sequence_group_tags: int
-    max_sequence_group_executions: int
+    max_sequencer_tags: int
+    max_sequence_events: int
+    max_sequence_executions: int
     max_buses: int
     voices: VoiceCapacities
 
@@ -98,7 +98,7 @@ class SynthBusLayout:
     midi_row_buses: tuple[int, ...]
     midi_drum_bus: int
     sequencer_tag_ranges: tuple[tuple[str, int, int], ...]
-    sequencer_group_ranges: tuple[tuple[str, int, int], ...]
+    sequencer_sequence_ranges: tuple[tuple[str, int, int], ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,7 +137,6 @@ class RhythmRuntimeConfig:
     bass_gate_beats: float
     max_rhythm_chord_notes: int
     sequencer_reset_guard_ms: float
-    max_sequencer_tags: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -384,7 +383,7 @@ def _domain_issues(data: JsonObject) -> list[ConfigIssue]:
         )
 
     rhythm = cast(dict[str, Any], data["rhythm"])
-    max_tags = int(rhythm["max_sequencer_tags"])
+    max_tags = int(data["amy_max_sequencer_tags"])
     ranges = cast(dict[str, Any], rhythm["tag_ranges"])
     occupied: set[int] = set()
     for name in ("drums", "bass", "chords"):
@@ -408,39 +407,56 @@ def _domain_issues(data: JsonObject) -> list[ConfigIssue]:
             )
         occupied.update(current)
 
-    group_ranges = cast(dict[str, Any], rhythm["group_ranges"])
-    expected_start = 1
+    sequence_ranges = cast(dict[str, Any], rhythm["sequence_ranges"])
+    expected_start: int | None = None
     for name in ("fills", "chords", "drum_bases"):
-        item = cast(dict[str, Any], group_ranges[name])
+        item = cast(dict[str, Any], sequence_ranges[name])
         start = int(item["start"])
         count = int(item["count"])
-        if start != expected_start:
+        if expected_start is not None and start != expected_start:
             issues.append(
                 ConfigIssue(
-                    f"$.rhythm.group_ranges.{name}.start",
-                    f"must be {expected_start} so group ranges are contiguous",
+                    f"$.rhythm.sequence_ranges.{name}.start",
+                    f"must be {expected_start} so sequence ranges are contiguous",
                 )
             )
+        current = set(range(start, start + count))
+        if start + count > max_tags:
+            issues.append(
+                ConfigIssue(
+                    f"$.rhythm.sequence_ranges.{name}",
+                    f"range ends at {start + count}, beyond amy_max_sequencer_tags {max_tags}",
+                )
+            )
+        overlap = current.intersection(occupied)
+        if overlap:
+            issues.append(
+                ConfigIssue(
+                    f"$.rhythm.sequence_ranges.{name}",
+                    f"shares sequencer tag {min(overlap)} with another range",
+                )
+            )
+        occupied.update(current)
         expected_start = start + count
-    if expected_start != int(data["amy_max_sequence_groups"]) + 1:
+    if expected_start != max_tags:
         issues.append(
             ConfigIssue(
-                "$.amy_max_sequence_groups",
-                "must equal the number of addressable rhythm groups",
+                "$.amy_max_sequencer_tags",
+                "must equal the end of the addressable rhythm sequence ranges",
             )
         )
 
-    if int(data["amy_max_sequence_group_tags"]) < 64:
+    if int(data["amy_max_sequence_events"]) < 64:
         issues.append(
             ConfigIssue(
-                "$.amy_max_sequence_group_tags",
-                "must be at least 64 for the largest authored sequence group",
+                "$.amy_max_sequence_events",
+                "must be at least 64 for the largest authored sequence",
             )
         )
-    if int(data["amy_max_sequence_group_executions"]) < 34:
+    if int(data["amy_max_sequence_executions"]) < 34:
         issues.append(
             ConfigIssue(
-                "$.amy_max_sequence_group_executions",
+                "$.amy_max_sequence_executions",
                 "must be at least 34 for the characterized worst-case rhythm",
             )
         )
@@ -550,7 +566,7 @@ def _to_resolved(
     buses = cast(dict[str, Any], data["buses"])
     rhythm = cast(dict[str, Any], data["rhythm"])
     tag_ranges = cast(dict[str, Any], rhythm["tag_ranges"])
-    group_ranges = cast(dict[str, Any], rhythm["group_ranges"])
+    sequence_ranges = cast(dict[str, Any], rhythm["sequence_ranges"])
     debug = cast(dict[str, Any], data["debug"])
     defaults = cast(dict[str, Any], data["default_synths"])
     drums = cast(dict[str, Any], data["drums"])
@@ -599,11 +615,9 @@ def _to_resolved(
         ),
         capacities=RuntimeCapacities(
             max_oscs=int(data["amy_max_oscs"]),
-            max_sequence_groups=int(data["amy_max_sequence_groups"]),
-            max_sequence_group_tags=int(data["amy_max_sequence_group_tags"]),
-            max_sequence_group_executions=int(
-                data["amy_max_sequence_group_executions"]
-            ),
+            max_sequencer_tags=int(data["amy_max_sequencer_tags"]),
+            max_sequence_events=int(data["amy_max_sequence_events"]),
+            max_sequence_executions=int(data["amy_max_sequence_executions"]),
             max_buses=int(data["amy_max_buses"]),
             voices=VoiceCapacities(
                 drums=int(voices["drums"]),
@@ -632,11 +646,11 @@ def _to_resolved(
                 )
                 for name in ("drums", "bass", "chords")
             ),
-            sequencer_group_ranges=tuple(
+            sequencer_sequence_ranges=tuple(
                 (
                     name,
-                    int(cast(dict[str, Any], group_ranges[name])["start"]),
-                    int(cast(dict[str, Any], group_ranges[name])["count"]),
+                    int(cast(dict[str, Any], sequence_ranges[name])["start"]),
+                    int(cast(dict[str, Any], sequence_ranges[name])["count"]),
                 )
                 for name in ("fills", "chords", "drum_bases")
             ),
@@ -670,7 +684,6 @@ def _to_resolved(
             bass_gate_beats=float(rhythm["bass_gate_beats"]),
             max_rhythm_chord_notes=int(rhythm["max_rhythm_chord_notes"]),
             sequencer_reset_guard_ms=float(rhythm["sequencer_reset_guard_ms"]),
-            max_sequencer_tags=int(rhythm["max_sequencer_tags"]),
         ),
         performance=PerformanceTimingConfig(
             strum_gate_ms=float(performance["strum_gate_ms"]),

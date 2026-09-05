@@ -25,7 +25,25 @@ class ConfigMigrationTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.shipped_path = ROOT / "config" / "amy_config.json"
         cls.shipped = json.loads(cls.shipped_path.read_text(encoding="utf-8"))
-        cls.revision_six = copy.deepcopy(cls.shipped)
+        cls.revision_seven = copy.deepcopy(cls.shipped)
+        cls.revision_seven["config_revision"] = 7
+        cls.revision_seven["rhythm"]["max_sequencer_tags"] = 256
+        cls.revision_seven["rhythm"]["group_ranges"] = {
+            name: {"start": item["start"] - 255, "count": item["count"]}
+            for name, item in cls.revision_seven["rhythm"].pop(
+                "sequence_ranges"
+            ).items()
+        }
+        cls.revision_seven["amy_max_sequence_groups"] = (
+            cls.revision_seven.pop("amy_max_sequencer_tags") - 256
+        )
+        cls.revision_seven["amy_max_sequence_group_tags"] = (
+            cls.revision_seven.pop("amy_max_sequence_events")
+        )
+        cls.revision_seven["amy_max_sequence_group_executions"] = (
+            cls.revision_seven.pop("amy_max_sequence_executions")
+        )
+        cls.revision_six = copy.deepcopy(cls.revision_seven)
         cls.revision_six["config_revision"] = 6
         cls.revision_six["rhythm"]["pattern_ranges"] = {
             name: {"start": item["start"] - 1, "count": item["count"]}
@@ -134,11 +152,9 @@ class ConfigMigrationTests(unittest.TestCase):
         self.assertEqual(
             migrated.data["config_revision"], CURRENT_CONFIG_REVISION
         )
-        self.assertEqual(migrated.data["amy_max_sequence_groups"], 1024)
-        self.assertEqual(migrated.data["amy_max_sequence_group_tags"], 64)
-        self.assertEqual(
-            migrated.data["amy_max_sequence_group_executions"], 40
-        )
+        self.assertEqual(migrated.data["amy_max_sequencer_tags"], 1280)
+        self.assertEqual(migrated.data["amy_max_sequence_events"], 64)
+        self.assertEqual(migrated.data["amy_max_sequence_executions"], 40)
         self.assertTrue(
             {
                 "$.amy_max_patterns",
@@ -155,11 +171,9 @@ class ConfigMigrationTests(unittest.TestCase):
             source_path=self.shipped_path,
             source_kind="user",
         )
-        self.assertEqual(resolved.capacities.max_sequence_groups, 1024)
-        self.assertEqual(resolved.capacities.max_sequence_group_tags, 64)
-        self.assertEqual(
-            resolved.capacities.max_sequence_group_executions, 40
-        )
+        self.assertEqual(resolved.capacities.max_sequencer_tags, 1280)
+        self.assertEqual(resolved.capacities.max_sequence_events, 64)
+        self.assertEqual(resolved.capacities.max_sequence_executions, 40)
 
     def test_historical_schemas_make_revision_four_capacities_optional(self) -> None:
         capacity_keys = {
@@ -301,7 +315,7 @@ class ConfigMigrationTests(unittest.TestCase):
         )
 
     def test_revision_seven_renames_pattern_capacity_and_identity_domains(self) -> None:
-        migrated = migrate_config_document(self.revision_six)
+        migrated = migrate_config_document(self.revision_six, target_revision=7)
 
         self.assertNotIn("pattern_ranges", migrated.data["rhythm"])
         self.assertEqual(
@@ -319,6 +333,29 @@ class ConfigMigrationTests(unittest.TestCase):
         ):
             self.assertNotIn(old_name, migrated.data)
         self.assertEqual(migrated.data["amy_max_sequence_groups"], 1024)
+
+    def test_revision_eight_uses_one_shared_sequencer_tag_domain(self) -> None:
+        migrated = migrate_config_document(self.revision_seven)
+
+        self.assertNotIn("max_sequencer_tags", migrated.data["rhythm"])
+        self.assertNotIn("group_ranges", migrated.data["rhythm"])
+        self.assertEqual(
+            migrated.data["rhythm"]["sequence_ranges"],
+            {
+                "fills": {"start": 256, "count": 936},
+                "chords": {"start": 1192, "count": 64},
+                "drum_bases": {"start": 1256, "count": 24},
+            },
+        )
+        self.assertEqual(migrated.data["amy_max_sequencer_tags"], 1280)
+        self.assertEqual(migrated.data["amy_max_sequence_events"], 64)
+        self.assertEqual(migrated.data["amy_max_sequence_executions"], 40)
+        for retired in (
+            "amy_max_sequence_groups",
+            "amy_max_sequence_group_tags",
+            "amy_max_sequence_group_executions",
+        ):
+            self.assertNotIn(retired, migrated.data)
 
     def test_revision_five_rejects_a_custom_tiny_mapping(self) -> None:
         custom = copy.deepcopy(self.revision_six)

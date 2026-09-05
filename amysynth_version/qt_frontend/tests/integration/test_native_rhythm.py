@@ -8,21 +8,21 @@ from catalog import control_default, patch_for_index, synth_index
 from harness import HeadlessApp
 
 
-CHORD_GROUP_START = 937
-DRUM_BASE_GROUP_START = 1001
+CHORD_SEQUENCE_START = 1192
+DRUM_BASE_SEQUENCE_START = 1256
 
 
 def is_chord_trigger(line: str) -> bool:
     match = re.match(
-        r"^H\d+,\d+,(?P<tag>\d+)zQ(?P<group>\d+),1,1,0Z$",
+        r"^H\d+,\d+,(?P<tag>\d+)HC(?P<sequence>\d+),1,1Z$",
         line,
     )
     return bool(
         match
         and 112 <= int(match.group("tag")) < 252
-        and CHORD_GROUP_START
-        <= int(match.group("group"))
-        < DRUM_BASE_GROUP_START
+        and CHORD_SEQUENCE_START
+        <= int(match.group("sequence"))
+        < DRUM_BASE_SEQUENCE_START
     )
 
 
@@ -66,11 +66,11 @@ class NativeRhythmTests(unittest.TestCase):
             triggers = [
                 line
                 for line in lines
-                if re.match(r"^zQ\d+,1,0,\d+,\d+Z$", line)
+                if re.match(r"^HC\d+,1,0Z$", line)
             ]
             self.assertTrue(triggers, "cold Start authored no drum loop trigger")
             self.assertTrue(
-                all(line.split(",")[3] == "0" for line in triggers),
+                all(line.endswith(",0Z") for line in triggers),
                 "cold Start delayed the visible percussion level by a bar",
             )
             self.assertTrue(

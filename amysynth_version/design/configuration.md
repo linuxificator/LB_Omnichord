@@ -101,6 +101,13 @@ keys to `amy_max_sequence_groups`, `amy_max_sequence_group_tags` and
 from the former shipped 32 to 40, matching the exhaustive 34-execution rhythm
 overlap proof while retaining headroom. These are explicit migration rules,
 not consumer aliases; revision-7 runtime code knows only the group names.
+Revision 7 to 8 then migrates that never-released intermediate vocabulary to
+the simplified reusable-sequence API. It moves stored definitions into AMY's
+single public tag namespace, renames `rhythm.group_ranges` to
+`rhythm.sequence_ranges`, and replaces the three group capacity keys with
+`amy_max_sequencer_tags`, `amy_max_sequence_events` and
+`amy_max_sequence_executions`. The shipped 1280-tag profile covers root lanes,
+the large fill reserve, chord children and base percussion without aliases.
 Because revision-1 full documents cannot distinguish that old default from an
 intentional diagnostic selection, a user who deliberately forced `linux` must
 reapply it after migration. Future and malformed revisions fail at

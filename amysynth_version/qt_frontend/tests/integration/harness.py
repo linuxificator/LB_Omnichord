@@ -113,14 +113,14 @@ class SerialAmyBridge:
                     default_synths=0,
                     max_buses=11,
                     max_oscs=336,
-                    max_sequence_groups=1024,
-                    max_sequence_group_tags=64,
-                    max_sequence_group_executions=40,
+                    max_sequencer_tags=1280,
+                    max_sequence_events=64,
+                    max_sequence_executions=40,
                 )
             except (AttributeError, TypeError) as exc:
                 raise RuntimeError(
-                    "installed AMY lacks the pinned configurable nested "
-                    "sequencer/offline-render API"
+                    "installed AMY lacks the pinned reusable-sequence and "
+                    "offline-render API"
                 ) from exc
             self._block_seconds = float(amy.AMY_BLOCK_SIZE) / float(
                 amy.AMY_SAMPLE_RATE
@@ -132,7 +132,9 @@ class SerialAmyBridge:
                     "sample_rate": int(amy.AMY_SAMPLE_RATE),
                     "max_buses": 11,
                     "max_oscs": 336,
-                    "max_sequence_groups": 1024,
+                    "max_sequencer_tags": 1280,
+                    "max_sequence_events": 64,
+                    "max_sequence_executions": 40,
                 },
             )
 

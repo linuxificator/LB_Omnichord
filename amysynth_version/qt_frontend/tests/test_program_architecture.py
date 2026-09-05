@@ -163,14 +163,14 @@ class ProgramArchitectureTests(unittest.TestCase):
         self.assertEqual(preload_owners, ["__init__"])
 
         # Beat-accurate phrases are pure wire plans. Host scheduling remains
-        # valid for manual strum/tail ownership, but not for rhythm groups.
+        # valid for manual strum/tail ownership, but not for rhythm sequences.
         self.assertFalse(any(
             isinstance(node, (ast.Import, ast.ImportFrom))
             and any(alias.name in {"time", "threading"} for alias in node.names)
             for node in planner_tree.body
         ))
         rhythm_methods = (
-            "_chord_group_plan",
+            "_chord_sequence_plan",
             "_drum_activity_commands",
             "_fill_schedule_commands",
             "_drum_commands",
@@ -191,17 +191,23 @@ class ProgramArchitectureTests(unittest.TestCase):
                     for node in ast.walk(method)
                 ))
 
-        # LB keeps definition-authoring high-water marks, never AMY execution
-        # phase, definition revisions or generation ownership.
+        # AMY owns sequence definitions, execution phase, revisions and note
+        # lifetime. LB emits reset/definition/control transactions and keeps
+        # none of that runtime state (including no authoring high-water mark).
         for forbidden in (
+            "high_water",
             "current_amy_tick",
             "amy_sequencer_tick",
-            "group_execution_generation",
-            "active_group_revision",
-            "group_end_tick",
+            "sequence_execution_generation",
+            "active_sequence_revision",
+            "sequence_end_tick",
         ):
             self.assertNotIn(forbidden, transport_source)
             self.assertNotIn(forbidden, planner_source)
+
+        # Repeating ordinary H tags is AMY's cumulative definition syntax.
+        # Keeping this guard prevents the retired HA adapter from returning.
+        self.assertNotIn('f"HA', planner_source)
 
     def test_frontend_sequencer_path_is_wire_only(self) -> None:
         for filename in (

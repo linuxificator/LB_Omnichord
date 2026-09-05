@@ -21,7 +21,7 @@ controls shape the accompaniment that is already in progress and therefore
 remain live while transport runs.
 
 The five percussion levels are complete pattern alternatives, not cumulative
-layers. Drum fills are compact AMY one-shot sequence groups, preloaded once at
+layers. Drum fills are compact AMY one-shot sequences, preloaded once at
 startup and launched by the AMY root sequencer. The frontend never follows
 AMY's musical clock with a host timer.
 
@@ -77,7 +77,7 @@ active) is retained by stable riff ID when that ID occurs in the new set. The
 selector follows its possibly different one-based position. If it is not
 present, or no riff is playing, the selector uses the loaded preset's
 `bass_riff_selector`, clamped to the set, with the application default as the
-legacy fallback. Selector and mode changes replace only the bass tag range.
+legacy fallback. Selector and mode changes replace only the bass root sequence.
 
 ### 1.5 Chord activity and independent arpeggio mode
 
@@ -107,15 +107,15 @@ lane with the same timing and newly calculated pitches.
 Arpeggio enabled state, rate and direction are preset configuration. A stopped
 preset switch loads them. A running preset switch preserves their current live
 values. Toggling `A` or changing an effective arpeggio control replaces only
-the automatic-chord tag range and never stops or resets transport.
+the automatic-chord root sequence and never stops or resets transport.
 
-The root range schedules one-shot group starts. A whole-chord group revision
-owns all of its onsets and its all-off. An arpeggio group revision owns the
-complete ordered phrase, including every note-on and matching note-off. Each
-distinct source velocity uses one stable group tag; `/1` through `/4`, chord,
-pitch and direction changes atomically publish new revisions under those same
-tags and replace future root starts. An execution which has already begun
-retains its immutable old revision and completes its original gates. Thus
+The root sequence schedules finite child starts. A whole-chord child owns all
+of its onsets and its all-off. An arpeggio child owns the complete ordered
+phrase, including every note-on and matching note-off. Each distinct source
+velocity uses one stable sequence tag. `/1` through `/4`, chord, pitch and
+direction changes reset and cumulatively rebuild the future definition behind
+that tag. An execution which has already begun retains its immutable old
+snapshot and completes its original gates. Thus
 `/2 -> /4` may not cut a sounding `/2` note short, nor may it defer that note's
 off until `/4` next reaches the same pitch.
 
@@ -359,13 +359,13 @@ The intended behavior is conceptually:
 
 ```text
 old rhythm events  -------------------->
-                       replace affected root/group events
+                       replace affected sequence definitions
 new rhythm events                       -------------------->
 sequencer clock      --------------------------------------->
 ```
 
-The clock remains continuous. Only the root events and group definitions
-associated with the rhythm are replaced.
+The clock remains continuous. Only the affected reusable definitions are
+replaced.
 
 A live pattern change must therefore use AMY's running sequencer/event replacement mechanism rather than transport stop/reset/start behavior.
 
@@ -581,7 +581,7 @@ The already-visible percussion activity is part of that configuration: its
 first tick must become audible immediately after Start, without reselecting an
 activity button and without an artificial one-bar wait. Because AMY applies a
 sequencer reset at an audio-block boundary, wrapper transports must not submit
-new group executions until that reset has crossed the boundary.
+new sequence executions until that reset has crossed the boundary.
 
 ### RHYTHM-016 — manual chord takeover preserves the sequenced gate
 
@@ -597,8 +597,8 @@ the contact with another timer. That promotion performs the established
 accompaniment takeover:
 while automatic rhythm chords are enabled it temporarily closes the effective
 automatic-chord lane without changing the independent `CHORD ON/OFF` state. It
-must remove the repeating future root `H...zQ<group>,1,...` triggers. Root tags
-contain no synth-4 release: every already-running immutable group execution
+must stop the repeating parent sequence that launches future chord children.
+The parent contains no synth-4 release: every already-running immutable child
 owns its own whole-chord or note-specific off and reaches that original gate
 without an immediate all-off.
 Manual synth-3 note-ons begin at
@@ -618,7 +618,7 @@ non-active chord rows load from the destination preset. When
 
 ### RHYTHM-018 — CHORD ON/OFF owns only automatic sequencer chords
 
-`CHORD OFF` removes future synth-4 group starts; already-running executions
+`CHORD OFF` removes future synth-4 child starts; already-running executions
 retain their immutable sequenced note-offs. `CHORD ON` reinstalls the automatic synth-4 lane from the remembered
 chord identity. Neither action may start, retrigger, release or otherwise
 control a manual synth-3 chord. A physically held chord remains owned by its
@@ -646,10 +646,10 @@ on release. Legacy presets containing chord activity 0 load as level 1.
 Riff selection reads only the independent bass-riff catalogue and filters by
 current rhythm ID and exact chord suffix. Its PPQ timing, durations and
 velocities remain unchanged under transposition. Root/tuning changes replace
-only the bass pitches; selector changes replace only bass tags. Neither path
-may stop/reset transport or edit percussion/automatic-chord tags. Every current
-rhythm/chord combination has at least three candidates and every selected riff
-fits the reserved bass tag range.
+only the bass pitches; selector changes reset and rebuild only the bass root
+sequence. Neither path may stop/reset transport or edit percussion or chord
+sequences. Every current rhythm/chord combination has at least three candidates
+and every selected riff fits one AMY definition.
 
 ### RHYTHM-021 — chord arpeggios use the chord lane and circular beat timing
 
@@ -660,12 +660,12 @@ or high-to-low order. Each note gate is the configured chord-gate fraction of
 one arpeggio subdivision. Ticks wrap modulo the repeating rhythm period; no
 sequence is truncated at its end. Overlapping starts remain valid.
 
-Exact repeated tick/body sets may be represented by one AMY tag with a shorter
-period, but expanding those tags over the rhythm cycle must reproduce exactly
-the generated circular trigger set. Arpeggio changes replace only tags 112..251.
-Every catalogue rhythm, every activity selection, `/1..4` and every supported
-2–7-note chord must fit that existing range. Disabling automatic chords or
-promoting a manual hold clears future triggers while active executions retain
+The automatic-chord parent cumulates every onset behind stable tag 112. Exact
+repeated tick/body sets may use a shorter period, but expansion over the rhythm
+cycle must reproduce exactly the generated circular trigger set. Every
+catalogue rhythm, activity selection, `/1..4` rate and supported 2–7-note
+chord must fit one definition. Disabling automatic chords or promoting a
+manual hold stops future child starts while active executions retain
 their whole-chord or note-specific offs. The exhaustive catalogue proof also
 counts overlapping chord executions together with the maximum active drum
 roles and one fill; the current worst case is 34 of 40 configured executions.
@@ -682,7 +682,7 @@ Enabling another fill while a cycle exists puts it first in the next schedule.
 Disabling one removes future launches, but a fill which is already playing is
 immutable and always finishes.
 
-Each base percussion role is an independent tagged AMY group execution. The LB
+Each base percussion role is an independent tagged AMY sequence execution. The LB
 data for a fill lists the musical roles which continue. During the fill, every
 other active role suppresses event dispatch for the complete, whole-beat fill
 duration;

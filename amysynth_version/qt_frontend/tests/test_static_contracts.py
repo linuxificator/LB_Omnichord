@@ -398,16 +398,14 @@ class StaticContractTests(unittest.TestCase):
             "if not self._set_rhythm_chord_enabled(enabled):",
             transport_py,
         )
-        self.assertIn("def _chord_group_plan(", transport_py)
-        self.assertIn("compile_chord_group_plan(", transport_py)
-        self.assertIn(
-            "sequence_control_command(group, SEQUENCE_CONTROL_START, 1)",
-            rhythm_plan_py,
-        )
+        self.assertIn("def _chord_sequence_plan(", transport_py)
+        self.assertIn("compile_chord_sequence_plan(", transport_py)
+        self.assertIn('return f"HC{tag_value},{action_value}', rhythm_plan_py)
+        self.assertNotIn("zQ", rhythm_plan_py)
         for retired_wire_family in ("zQB", "zQE", "zQC", "zQT", "zQM", "zQA"):
             self.assertNotIn(retired_wire_family, rhythm_plan_py)
 
-        # Rhythm is now independent tagged lanes. Reintroducing the previous
+        # Rhythm uses independent root-tag lanes. Reintroducing the previous
         # whole-sequencer rebuild helpers would again make lane-local edits able
         # to interrupt drums/bass/chords together.
         self.assertIn("class _TaggedSequencerLane:", transport_py)

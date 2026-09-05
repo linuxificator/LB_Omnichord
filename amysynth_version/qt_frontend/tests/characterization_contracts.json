@@ -26,7 +26,7 @@
     "test_instrument_defaults.py::InstrumentDefaultTests.test_repeater_sustain_command_does_not_touch_filter",
     "test_instrument_defaults.py::InstrumentDefaultTests.test_chord_patch_and_restore_commands_are_adjacent_per_synth",
     "test_midi_engine.py::MidiAmyEngineTests.test_rom_patch_waits_before_parameters_and_routing",
-    "test_drum_patterns.py::DrumPatternTests.test_preloaded_library_fits_64_events_and_uses_all_fill_groups",
+    "test_drum_patterns.py::DrumPatternTests.test_preloaded_library_fits_64_events_and_uses_all_fill_sequences",
     "test_drum_patterns.py::DrumPatternTests.test_fill_policy_is_encoded_as_generic_role_tag_mutes",
     "test_sequencer_tags.py::SequencerTagTests.test_one_tag_tracks_one_event_and_clear_is_targeted",
     "test_sequencer_tags.py::SequencerTagTests.test_arpeggio_uses_all_notes_wraps_and_reverses"
