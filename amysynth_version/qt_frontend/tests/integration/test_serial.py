@@ -164,6 +164,10 @@ class SerialIntegrationTests(unittest.TestCase):
                 270,
             )
 
+            app.action("toggleRhythm")
+            app.bridge.wait_for_lines(["zY1Z"], timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+
             fill_start = app.bridge.count()
             app.action("toggleRhythmFill", 0)
             app.bridge.wait_for_line_match(
@@ -528,6 +532,10 @@ class SerialIntegrationTests(unittest.TestCase):
             app.action("setRhythmChordActivity", 1.0)
             if int(app.query("chordGateState")) != 1:
                 app.action("toggleChordGate")
+            app.bridge.wait_idle(timeout=8.0)
+
+            app.action("toggleRhythm")
+            app.bridge.wait_for_lines(["zY1Z"], timeout=8.0)
             app.bridge.wait_idle(timeout=8.0)
 
             arpeggio_start = app.bridge.count()
@@ -1025,6 +1033,48 @@ class SerialIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("activeRootSemitone")), 9)
             self.assertGreater(int(app.query("rhythmChordActivity")), 0)
             self.assertTrue(bool(app.query("rhythmRunning")))
+
+    def test_stopped_transport_does_not_accumulate_sequence_executions(self) -> None:
+        """More than one pool's worth of idle chord use must remain harmless."""
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            self.assertFalse(bool(app.query("rhythmRunning")))
+
+            start = app.bridge.count()
+            if int(app.query("chordGateState")) != 1:
+                app.action("toggleChordGate")
+            app.action("setRhythmChordActivity", 4.0)
+            # The shipped AMY configuration has 40 execution slots. Previously
+            # each chord-state/gate update created another start-pending root
+            # execution while the stopped sequencer clock could retire none.
+            for index in range(45):
+                row = index % 5
+                root = index % 12
+                app.action("pressChord", row, root)
+                app.action("promoteChordHold", row, root)
+                app.action("releaseChord", row, root)
+            app.bridge.wait_idle(timeout=10.0)
+            stopped_lines = app.bridge.lines_since(start)
+
+            self.assertTrue(immediate_note_ons(stopped_lines, 3), stopped_lines)
+            self.assertFalse(
+                any(line.startswith(("H", "HC", "HR")) for line in stopped_lines),
+                "stopped chord use authored AMY sequence executions:\n"
+                + "\n".join(stopped_lines),
+            )
+
+            # Start compiles exactly the latest deferred UI state after its
+            # timebase reset; deferring stopped edits must not lose the chord.
+            rhythm_start = app.bridge.count()
+            app.action("toggleRhythm")
+            app.bridge.wait_for_lines(["zY1Z"], start=rhythm_start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            running_lines = app.bridge.lines_since(rhythm_start)
+            self.assertIn("HR112Z", running_lines)
+            self.assertTrue(
+                any(re.match(r"^HC112,1,\d+Z$", line) for line in running_lines),
+                running_lines,
+            )
 
     def test_stopping_rhythm_releases_sounding_accompaniment(self) -> None:
         """Stopping mid-pattern must not strand a synth-4 chord or bass note."""

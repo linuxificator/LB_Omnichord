@@ -1057,10 +1057,15 @@ class AmySerialClient:
 
         # Chord and bass are independent tagged sequencer lanes. Updating
         # tuning/chord pitch replaces only those ranges; percussion and
-        # sequencer transport remain untouched.
-        if self.bass_running:
+        # sequencer transport remain untouched. While transport is stopped,
+        # retain only the host state: AMY schedules external controls for a
+        # future sequencer tick, so authoring lanes against a frozen clock
+        # would accumulate start-pending executions. _start_rhythm() compiles
+        # every lane from this latest state after resetting the timebase.
+        if self.rhythm_running and self.bass_running:
             self._replace_lane("bass")
-        self._replace_lane("chords")
+        if self.rhythm_running:
+            self._replace_lane("chords")
 
     # ------------------------------------------------------------------
     # AMY tagged sequencer lanes
@@ -1379,6 +1384,12 @@ class AmySerialClient:
         self._scheduled_rhythm_id = new_id
         self._wire(f"j{self._f(float(new_config.get('tempo', 108.0)))}Z")
 
+        # Configuration remains editable while stopped, but no sequence
+        # execution may be authored against AMY's frozen sequencer clock.
+        # Starting transport below rebuilds all lanes from the latest state.
+        if not self.rhythm_running:
+            return
+
         if tempo_only_changed:
             return
         if bass_only_changed:
@@ -1566,14 +1577,16 @@ class AmySerialClient:
             self.bass_running = enabled
             if not enabled:
                 self._wire(f"l0i{self.synth_id['bass']}Z")
-            self._replace_lane("bass")
+            if self.rhythm_running:
+                self._replace_lane("bass")
         elif address == a["rhythm_config"]:
             self._set_rhythm_config(str(value))
         elif address == a["rhythm_chord_enabled"]:
             enabled = bool(int(value))
             if not self._set_rhythm_chord_enabled(enabled):
                 return
-            self._replace_lane("chords")
+            if self.rhythm_running:
+                self._replace_lane("chords")
         elif address == a["rhythm_running"]:
             new_state = bool(int(value))
             if new_state:
