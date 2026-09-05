@@ -1,5 +1,5 @@
 {
-  "config_revision": 8,
+  "config_revision": 9,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,
@@ -57,6 +57,12 @@
   "instrument_levels": {
     "juno_074": 0.2,
     "juno_089": 0.4
+  },
+  "role_levels": {
+    "drums": 1.0,
+    "bass": 3.2,
+    "strum": 1.0,
+    "chord": 1.0
   },
   "drums": {
     "kit": "gamma9001",

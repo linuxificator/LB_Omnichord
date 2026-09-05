@@ -48,6 +48,9 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertEqual(resolved.capacities.max_sequencer_tags, 1280)
         self.assertEqual(resolved.capacities.max_sequence_events, 64)
         self.assertEqual(resolved.capacities.max_sequence_executions, 40)
+        self.assertEqual(resolved.role_level("bass"), 3.2)
+        self.assertEqual(resolved.role_level("chord"), 1.0)
+        self.assertEqual(resolved.role_level("unknown"), 1.0)
         self.assertEqual(resolved.layout.midi_row_buses, (4, 5, 6, 7, 8, 9))
         self.assertEqual(
             resolved.layout.sequencer_tag_ranges,

@@ -94,6 +94,25 @@ Frequency controls display real frequencies in Hz and use logarithmic slider tra
 
 Time controls display milliseconds, resonance displays Q, and modulation depths retain their documented physical/domain units. If a MIDI-note-valued control is exposed, the UI formats it as a note name and octave such as `C4` or `F♯3`, not as a raw MIDI integer.
 
+## Audio level model
+
+The four OMNI volume sliders retain a uniform 0–1 UI range, while the AMY
+output level is the product of that UI value, a musical-role level and an
+optional instrument level. `role_levels` in `config/amy_config.json` balances
+the expected function of bass, chord, strum and drums. `instrument_levels`
+remains reserved for demonstrated patch-output anomalies and is independent
+of role.
+
+The bass role defaults to 3.2 (+10.1 dB). A bass event normally contains one
+low note while a chord contains about three simultaneous notes, and human
+hearing is less sensitive in the bass register. Native-AMY comparisons across
+representative Juno and DX7 patches found a median A-weighted difference of
+about 10.9 dB; the slightly lower correction leaves useful headroom. It does
+not compensate a particular patch's envelope, timbre or unsuitable attack,
+and it cannot correct the low-frequency limits of speakers or headphones.
+Revision-8 user configurations are migrated once to this explicit revision-9
+value, after which the user's configured role levels remain authoritative.
+
 ## Runtime AMY allocation
 
 OMNI uses five independent AMY synth instances: drums 0, bass 1, strum 2,

@@ -738,7 +738,7 @@ class AmySerialClient:
             self.writer.delay(max(0.0, guard_ms) / 1000.0)
         self._apply_patch_compatibility(patch, synth)
         self._route_synth_bus(synth)
-        level = self.volume[role] * self._instrument_level(role)
+        level = self._output_level(role)
         self._wire(f"i{synth}iV{self._f(level)}Z")
         # A patch may carry its own reverb setting for this bus. The Omnichord
         # reverb controls are the application-level authority, so restore only
@@ -781,7 +781,7 @@ class AmySerialClient:
             )
             self._wire(f"v0w7i{drums}Z")
         self._route_synth_bus(drums)
-        self._wire(f"i{drums}iV{self._f(self.volume['drums'])}Z")
+        self._wire(f"i{drums}iV{self._f(self._output_level('drums'))}Z")
         self._configured_synths.add(drums)
 
         self._configure_synth("bass")
@@ -962,9 +962,17 @@ class AmySerialClient:
     def _set_volume(self, role: str, value: Any) -> None:
         level = max(0.0, min(1.0, float(value)))
         self.volume[role] = level
-        output_level = level * self._instrument_level(role)
+        output_level = self._output_level(role)
         for synth in self._role_synth_ids(role):
             self._wire(f"i{synth}iV{self._f(output_level)}Z")
+
+    def _output_level(self, role: str) -> float:
+        """Resolve UI, musical-role and patch normalization in one place."""
+        return (
+            self.volume[role]
+            * self.resolved_config.role_level(role)
+            * self._instrument_level(role)
+        )
 
     def _instrument_level(self, role: str) -> float:
         key = self.selected_synth.get(role, "")

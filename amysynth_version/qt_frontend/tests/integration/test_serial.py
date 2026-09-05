@@ -146,6 +146,20 @@ class SerialHarnessTests(unittest.TestCase):
 
 
 class SerialIntegrationTests(unittest.TestCase):
+    def test_equal_slider_positions_apply_perceptual_bass_role_gain(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            self.assertIn("i1iV1.6Z", app.bridge.lines_since(0))
+            start = app.bridge.count()
+
+            app.action("setBassVolume", 0.25)
+            app.action("setChordVolume", 0.25)
+            app.bridge.wait_for_lines(
+                ["i1iV0.8Z", "i3iV0.25Z", "i4iV0.25Z"],
+                start=start,
+                timeout=8.0,
+            )
+
     def test_drum_library_is_preloaded_once_and_controls_send_only_deltas(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=12.0)
