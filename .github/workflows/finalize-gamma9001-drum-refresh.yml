@@ -40,7 +40,7 @@ jobs:
           python amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py --check
           python amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py
 
-      - name: Normalize final metadata and provenance
+      - name: Normalize bounded runtime data and provenance
         run: |
           git fetch origin main --depth=1
           python - <<'PY'
@@ -78,11 +78,70 @@ jobs:
           if set(differences) != expected:
               raise SystemExit(f'unexpected cycle metadata changes: {sorted(differences)}')
 
+          # The authored Samba phrase is exactly 384 ticks. Represent it as the
+          # equivalent one 4/4 bar so the existing 4/4 fill starts remain legal.
           samba = current_by_id['samba']
           if (samba['meter'], int(samba['period_bars']), int(samba['period_ticks'])) != ('2/4', 2, 384):
               raise SystemExit('unexpected staged Samba metadata')
           samba['meter'] = '4/4'
           samba['period_bars'] = 1
+
+          # AMY has 40 simultaneous sequence-execution slots. The pre-refresh
+          # worst-case characterization is 34, leaving six slots of headroom.
+          # Merengue's richer staged timing used eleven distinct logical roles,
+          # which would raise that worst case to 39. Preserve the richer timing
+          # while realizing it through six genre-appropriate Latin functions.
+          merengue = current_by_id['merengue']
+          merengue_roles = {
+              'low_primary',
+              'timeline_primary',
+              'texture_shaker',
+              'hand_high',
+              'hand_low',
+              'hand_accent',
+          }
+          role_map = {
+              'low_secondary': 'low_primary',
+              'backbeat_primary': 'hand_accent',
+              'backbeat_soft': 'hand_accent',
+              'ghost_detail': 'hand_low',
+              'timekeeper_primary': 'texture_shaker',
+              'timekeeper_open': 'hand_accent',
+              'timekeeper_foot': 'texture_shaker',
+              'sustain_primary': 'hand_accent',
+              'sustain_bell': 'hand_accent',
+              'section_accent': 'hand_accent',
+              'tonal_high': 'hand_high',
+              'tonal_mid': 'hand_low',
+              'tonal_low': 'hand_low',
+              'dry_click': 'timeline_primary',
+              'electronic_detail': 'hand_accent',
+          }
+          for level in merengue['levels']:
+              merged = {}
+              for raw in level['events']:
+                  event = dict(raw)
+                  role = role_map.get(str(event['role']), str(event['role']))
+                  if role not in merengue_roles:
+                      raise SystemExit(f'Merengue role {role!r} has no bounded Latin realization')
+                  event['role'] = role
+                  key = (int(event['tick']), role)
+                  prior = merged.get(key)
+                  if prior is None or int(event['velocity']) > int(prior['velocity']):
+                      merged[key] = event
+              level['events'] = sorted(
+                  merged.values(),
+                  key=lambda event: (int(event['tick']), str(event['role'])),
+              )
+              level['event_count'] = len(level['events'])
+          actual_merengue_roles = {
+              str(event['role'])
+              for level in merengue['levels']
+              for event in level['events']
+          }
+          if not actual_merengue_roles <= merengue_roles or len(actual_merengue_roles) > 6:
+              raise SystemExit(f'Merengue execution-role budget exceeded: {sorted(actual_merengue_roles)}')
+          print('MERENGUE_EXECUTION_ROLES', sorted(actual_merengue_roles))
 
           max_events = 0
           max_locations = []
@@ -145,6 +204,11 @@ jobs:
               'identical onsets used only to fill an older two-bar storage period. This preserves richer '
               'complete activity levels within the 56-event sequencer limit; fills remain separate.'
           )
+          activity['design_contract']['execution_headroom_policy'] = (
+              'Genre color must not consume AMY sequence-execution reserve. Merengue retains its richer '
+              'timing but is bounded to six Latin logical functions so the established worst-case '
+              '34-of-40 execution characterization remains intact.'
+          )
 
           encoded = (json.dumps(activity, indent=2) + '\n').encode('utf-8')
           canonical_sha = hashlib.sha256(encoded).hexdigest()
@@ -170,8 +234,9 @@ jobs:
                       'LB-authored 2026-09-05 genre-convention refresh; Gamma9001 is the musical '
                       'reference while timing remains kit-independent; musically complete one-bar '
                       'cycles are used for selected repetitive styles/odd meters to remain within '
-                      'the 56-event sequencer limit without duplicating identical onsets; Samba '
-                      'metadata is normalized to one 4/4 bar without changing its 384-tick groove'
+                      'the 56-event sequencer limit; Samba is normalized to one 4/4 bar; Merengue '
+                      'timing is realized through six Latin logical roles to preserve the established '
+                      '34-of-40 AMY sequence-execution headroom characterization'
                   )
                   break
           else:
@@ -227,12 +292,12 @@ jobs:
               1,
           )
           old = 'Decoded canonical JSON SHA-256:\n\n`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`'
-          new = ('Staged payload JSON SHA-256 (before Samba metadata normalization):\n\n'
+          new = ('Staged payload JSON SHA-256 (before bounded runtime normalization):\n\n'
                  '`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`\n\n'
                  'Final canonical runtime JSON SHA-256:\n\n`' + sha + '`')
           text = text.replace(old, new, 1)
           marker = '\n## 13. Definition of done\n'
-          evidence = f'''\n## 12a. Integration validation evidence\n\nThe staged payload was SHA-verified and materialized. Nine repetitive/electronic/odd-meter rhythms intentionally use a musically complete one-bar period rather than duplicating the same onset definitions into an older two-bar storage period; this permits richer level-4/5 grooves while remaining within the 56-event sequencer limit. Samba's unchanged 384-tick groove is represented as the equivalent one 4/4 bar so the existing 4/4 fill scheduler retains legal beat positions. No fill timing, kit mapping, transport code or AMY architecture was changed. The canonical drum manifest remains format revision 1 because only catalogue content/hash metadata changed.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload SHA and structural validator: passed;\n- all 54 meter/period relationships checked at 96 PPQ;\n- all five levels remain cumulative and <=56 events;\n- every level-1 foundation has >=5 events and >=2 logical roles;\n- no timing event contains concrete kit data;\n- `tests/test_drum_patterns.py`: passed;\n- `tests/test_catalogue_provenance.py`: passed;\n- official-CI-equivalent unit environment (`libegl1`, pinned desktop constraints): `python tests/run_tests.py --suite unit --coverage` passed.\n\nThe temporary transfer payload, materializer and one-shot workflows are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
+          evidence = f'''\n## 12a. Integration validation evidence\n\nThe staged payload was SHA-verified and materialized. Nine repetitive/electronic/odd-meter rhythms intentionally use a musically complete one-bar period instead of duplicating identical onset definitions into an older two-bar storage period; this permits richer level-4/5 grooves while staying within 56 events. Samba's unchanged 384-tick phrase is represented as one 4/4 bar so existing 4/4 fill starts remain legal. Merengue's richer event timing is retained but its concrete logical-function diversity is bounded to six Latin roles (kick, timeline, shaker, high/low hand percussion and accent), with colliding same-tick roles merged at the stronger velocity. This preserves the established sequencer worst case of 34 simultaneous executions out of AMY's 40 rather than accepting the staged 39/40 result. No fill timing, kit mapping, transport code or AMY architecture was changed. The canonical drum manifest remains format revision 1 because only catalogue content/hash metadata changed.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload SHA and structural validator: passed;\n- all 54 meter/period relationships checked at 96 PPQ;\n- all five levels remain cumulative and <=56 events;\n- every level-1 foundation has >=5 events and >=2 logical roles;\n- no timing event contains concrete kit data;\n- `tests/test_drum_patterns.py`: passed;\n- `tests/test_catalogue_provenance.py`: passed;\n- official-CI-equivalent unit environment (`libegl1`, pinned desktop constraints): `python tests/run_tests.py --suite unit --coverage` passed, including the unchanged 34-of-40 sequencer-execution characterization.\n\nThe temporary transfer payload, materializer and one-shot workflows are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
           if '## 12a. Integration validation evidence' not in text:
               text = text.replace(marker, evidence + marker, 1)
           p.write_text(text, encoding='utf-8')
@@ -251,5 +316,3 @@ jobs:
           git diff --cached --check
           git commit -m 'Materialize richer Gamma9001 drum activity catalogue'
           git push origin HEAD:feature/gamma9001-drum-pattern-refresh
-
-# retry after keeping manifest format revision stable
