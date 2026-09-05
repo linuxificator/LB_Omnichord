@@ -67,7 +67,7 @@ idf_component_register(
     REQUIRES esp_driver_i2s esp_driver_uart esp_timer
 )
 
-target_compile_definitions(${COMPONENT_LIB} PRIVATE
+target_compile_definitions(${COMPONENT_LIB} PUBLIC
     AMY_BLOCK_SIZE=128
     AMY_SAMPLE_RATE=48000
     AMY_ESP_I2S_PHILIPS_FORMAT=1

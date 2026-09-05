@@ -21,6 +21,9 @@ class StaticContractTests(unittest.TestCase):
         esp32_main = (ROOT.parent / "esp32p4" / "main" / "main.c").read_text(
             encoding="utf-8"
         )
+        esp32_kconfig = (
+            ROOT.parent / "esp32p4" / "main" / "Kconfig.projbuild"
+        ).read_text(encoding="utf-8")
         runtime_config = json.loads(
             (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
         )
@@ -53,22 +56,44 @@ class StaticContractTests(unittest.TestCase):
         ):
             self.assertNotIn(retired_source_patch, prepare)
         self.assertIn("target_compile_definitions(${COMPONENT_LIB} PUBLIC", prepare)
-        for member, config_key in (
-            ("max_sequencer_tags", "amy_max_sequencer_tags"),
-            ("max_sequence_events", "amy_max_sequence_events"),
-            ("max_sequence_executions", "amy_max_sequence_executions"),
+        for member, config_key, kconfig_key in (
+            (
+                "max_sequencer_tags",
+                "amy_max_sequencer_tags",
+                "OMNICHORD_P4_MAX_SEQUENCER_TAGS",
+            ),
+            (
+                "max_sequence_events",
+                "amy_max_sequence_events",
+                "OMNICHORD_P4_MAX_SEQUENCE_EVENTS",
+            ),
+            (
+                "max_sequence_executions",
+                "amy_max_sequence_executions",
+                "OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS",
+            ),
         ):
             self.assertIn(
-                f"config.{member} = {runtime_config[config_key]};",
+                f"config.{member} =\n        CONFIG_{kconfig_key};",
                 esp32_main,
                 f"ESP32-P4 AMY service must match {config_key}",
             )
+            match = re.search(
+                rf"config {kconfig_key}\n(?:    .*\n)*?    default ([0-9]+)",
+                esp32_kconfig,
+            )
+            self.assertIsNotNone(match, kconfig_key)
+            self.assertEqual(int(match.group(1)), runtime_config[config_key])
         for retired_member in (
             "max_patterns",
             "max_pattern_tags",
             "max_pattern_instances",
+            "max_sequence_groups",
+            "max_sequence_group_tags",
+            "max_sequence_group_executions",
         ):
             self.assertNotIn(retired_member, esp32_main)
+            self.assertNotIn(retired_member.upper(), esp32_kconfig)
 
     def test_frontend_code_has_no_amy_library_imports(self) -> None:
         """Only the separately managed local service may load AMY."""

@@ -419,12 +419,12 @@ void app_main(void)
     config.ks_oscs = 16;
     config.max_oscs = CONFIG_OMNICHORD_P4_MAX_OSCS;
     config.max_buses = CONFIG_OMNICHORD_P4_MAX_BUSES;
-    config.max_sequence_groups =
-        CONFIG_OMNICHORD_P4_MAX_SEQUENCE_GROUPS;
-    config.max_sequence_group_tags =
-        CONFIG_OMNICHORD_P4_MAX_SEQUENCE_GROUP_TAGS;
-    config.max_sequence_group_executions =
-        CONFIG_OMNICHORD_P4_MAX_SEQUENCE_GROUP_EXECUTIONS;
+    config.max_sequencer_tags =
+        CONFIG_OMNICHORD_P4_MAX_SEQUENCER_TAGS;
+    config.max_sequence_events =
+        CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EVENTS;
+    config.max_sequence_executions =
+        CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS;
 
     /* Large persistent pools live in external RAM. DMA/render scratch and
      * FreeRTOS stacks remain internal. */
