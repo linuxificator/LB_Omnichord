@@ -30,22 +30,23 @@ class FirmwareContractTests(unittest.TestCase):
         expected = {
             "OMNICHORD_P4_MAX_OSCS": frontend["amy_max_oscs"],
             "OMNICHORD_P4_MAX_BUSES": frontend["amy_max_buses"],
-            "OMNICHORD_P4_MAX_SEQUENCE_GROUPS": frontend[
-                "amy_max_sequence_groups"
+            "OMNICHORD_P4_MAX_SEQUENCER_TAGS": frontend[
+                "amy_max_sequencer_tags"
             ],
-            "OMNICHORD_P4_MAX_SEQUENCE_GROUP_TAGS": frontend[
-                "amy_max_sequence_group_tags"
+            "OMNICHORD_P4_MAX_SEQUENCE_EVENTS": frontend[
+                "amy_max_sequence_events"
             ],
-            "OMNICHORD_P4_MAX_SEQUENCE_GROUP_EXECUTIONS": frontend[
-                "amy_max_sequence_group_executions"
+            "OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS": frontend[
+                "amy_max_sequence_executions"
             ],
         }
         for symbol, value in expected.items():
             self.assertIn(f"config {symbol}", kconfig)
             self.assertIn(f"default {value}", kconfig)
 
-    def test_old_nested_pattern_config_names_are_gone(self) -> None:
+    def test_retired_sequence_config_names_are_gone(self) -> None:
         source = (ROOT / "main/main.c").read_text()
+        kconfig = (ROOT / "main/Kconfig.projbuild").read_text()
         for obsolete in (
             "max_patterns",
             "max_pattern_tags",
@@ -53,7 +54,14 @@ class FirmwareContractTests(unittest.TestCase):
             "nested_sequencer",
         ):
             self.assertNotIn(obsolete, source)
-        self.assertIn("config.max_sequence_groups", source)
+        self.assertIn("config.max_sequencer_tags", source)
+        for retired in (
+            "max_sequence_groups",
+            "max_sequence_group_tags",
+            "max_sequence_group_executions",
+        ):
+            self.assertNotIn(retired, source)
+            self.assertNotIn(retired.upper(), kconfig)
 
     def test_gamma_and_external_ram_are_explicit(self) -> None:
         prepare = (ROOT / "prepare_amy.sh").read_text()

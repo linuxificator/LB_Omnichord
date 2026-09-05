@@ -39,9 +39,9 @@ grep -q '^CONFIG_ESPTOOLPY_FLASHSIZE="32MB"$' "$build_dir/sdkconfig"
 grep -q '^CONFIG_SPIRAM=y$' "$build_dir/sdkconfig"
 grep -q '^CONFIG_OMNICHORD_P4_MAX_OSCS=336$' "$build_dir/sdkconfig"
 grep -q '^CONFIG_OMNICHORD_P4_MAX_BUSES=11$' "$build_dir/sdkconfig"
-grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_GROUPS=1024$' "$build_dir/sdkconfig"
-grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_GROUP_TAGS=64$' "$build_dir/sdkconfig"
-grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_GROUP_EXECUTIONS=40$' "$build_dir/sdkconfig"
+grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCER_TAGS=1280$' "$build_dir/sdkconfig"
+grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EVENTS=64$' "$build_dir/sdkconfig"
+grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS=40$' "$build_dir/sdkconfig"
 grep -q 'gamma9001_pcm_data' "$build_dir/amy_p4_test.map"
 grep -q 'amy_set_gamma9001_pcm' "$build_dir/amy_p4_test.map"
 grep -q "AMY_SAMPLE_RATE=$audio_sample_rate" "$amy_component_cmake"
@@ -100,7 +100,9 @@ printf '%s\n' \
     "i2s_dma_frames=$i2s_dma_frames" \
     "max_oscs=336" \
     "max_buses=11" \
-    "max_sequence_groups=1024" \
+    "max_sequencer_tags=1280" \
+    "max_sequence_events=64" \
+    "max_sequence_executions=40" \
     > "$package_dir/BUILD_INFO"
 
 (
