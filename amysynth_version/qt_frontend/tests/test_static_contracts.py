@@ -35,6 +35,24 @@ class StaticContractTests(unittest.TestCase):
             self.assertNotIn(release_inputs["amy"]["commit"], contract)
         self.assertNotIn("AMY_REF:-main", prepare)
         self.assertIn("release branch and immutable commit do not match", prepare)
+        for definition in (
+            "AMY_BLOCK_SIZE=128",
+            "AMY_SAMPLE_RATE=48000",
+            "AMY_ESP_I2S_PHILIPS_FORMAT=1",
+            "AMY_ESP_I2S_DMA_DESC_NUM=2",
+            "AMY_ESP_I2S_DMA_FRAME_NUM=64",
+        ):
+            self.assertIn(definition, prepare)
+        for retired_source_patch in (
+            'replace_once(amy_h, "#define AMY_BLOCK_SIZE',
+            'replace_once(amy_h, "#define BLOCK_SIZE_BITS',
+            'replace_once(amy_h, "#define AMY_SAMPLE_RATE',
+            'text.replace(\n    "I2S_STD_MSB_SLOT_DEFAULT_CONFIG"',
+            'chan_cfg.dma_desc_num = 2;',
+            'chan_cfg.dma_frame_num = AMY_BLOCK_SIZE / 2;',
+        ):
+            self.assertNotIn(retired_source_patch, prepare)
+        self.assertIn("target_compile_definitions(${COMPONENT_LIB} PUBLIC", prepare)
         for member, config_key in (
             ("max_sequencer_tags", "amy_max_sequencer_tags"),
             ("max_sequence_events", "amy_max_sequence_events"),

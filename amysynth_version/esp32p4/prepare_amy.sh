@@ -38,16 +38,6 @@ import sys
 root = Path(sys.argv[1])
 
 
-def replace_once(path: Path, old: str, new: str) -> None:
-    text = path.read_text(encoding="utf-8")
-    count = text.count(old)
-    if count != 1:
-        raise SystemExit(
-            f"expected exactly one occurrence in {path}: {old!r}; found {count}"
-        )
-    path.write_text(text.replace(old, new, 1), encoding="utf-8")
-
-
 def replace_text_once(text: str, old: str, new: str, label: str) -> str:
     count = text.count(old)
     if count != 1:
@@ -57,30 +47,30 @@ def replace_text_once(text: str, old: str, new: str, label: str) -> str:
     return text.replace(old, new, 1)
 
 
-# The P4 target is intentionally 48 kHz with a 128-sample render block.
+# The release must provide the target-neutral compile-time audio configuration
+# hooks. The ESP-IDF component below supplies the proven P4 values without
+# rewriting AMY source files.
 amy_h = root / "src" / "amy.h"
-replace_once(amy_h, "#define AMY_BLOCK_SIZE 256", "#define AMY_BLOCK_SIZE 128")
-replace_once(amy_h, "#define BLOCK_SIZE_BITS 8 // log2 of BLOCK_SIZE", "#define BLOCK_SIZE_BITS 7 // log2 of BLOCK_SIZE")
-replace_once(amy_h, "#define AMY_SAMPLE_RATE 44100 ", "#define AMY_SAMPLE_RATE 48000 ")
+amy_h_text = amy_h.read_text(encoding="utf-8")
+for hook in (
+    "#ifndef AMY_BLOCK_SIZE",
+    "#ifndef AMY_SAMPLE_RATE",
+    "#if AMY_BLOCK_SIZE == 128",
+):
+    if hook not in amy_h_text:
+        raise SystemExit(f"selected AMY revision lacks audio geometry hook: {hook}")
 
-# PCM5102A uses Philips I2S timing. Keep the DMA queue deliberately short;
-# 2 x 64 frames matches the 128-sample AMY block used by this firmware.
+# PCM5102A and DMA configuration must likewise be supported without a private
+# rewrite of AMY's ESP I2S implementation.
 i2s = root / "src" / "i2s.c"
 text = i2s.read_text(encoding="utf-8")
-text = text.replace(
-    "I2S_STD_MSB_SLOT_DEFAULT_CONFIG",
-    "I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG",
-)
-needle = "    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);\n"
-if text.count(needle) != 1:
-    raise SystemExit(f"generic ESP I2S channel anchor changed; found {text.count(needle)}")
-text = text.replace(
-    needle,
-    needle
-    + "    chan_cfg.dma_desc_num = 2;\n"
-    + "    chan_cfg.dma_frame_num = AMY_BLOCK_SIZE / 2;\n",
-    1,
-)
+for hook in (
+    "AMY_ESP_I2S_DMA_DESC_NUM",
+    "AMY_ESP_I2S_DMA_FRAME_NUM",
+    "AMY_ESP_I2S_PHILIPS_FORMAT",
+):
+    if hook not in text:
+        raise SystemExit(f"selected AMY revision lacks ESP I2S hook: {hook}")
 
 # AMY PR #1119 is now upstream and is required for the short 2x64 DMA ring.
 # Do not restore the old target-side vTaskDelay removal; fail loudly if an
@@ -92,25 +82,12 @@ if yield_fix not in text:
         "from shorepine/amy#1119"
     )
 
-replace_old = "void esp_fill_audio_buffer_task() {"
-if replace_old in text:
-    text = text.replace(
-        replace_old,
-        "void esp_fill_audio_buffer_task(void *pvParameters) {\n    (void)pvParameters;",
-        1,
-    )
-i2s.write_text(text, encoding="utf-8")
+if "void esp_fill_audio_buffer_task(void *pvParameters)" not in text:
+    raise SystemExit("selected AMY revision lacks the ESP-IDF task signature fix")
 
-midi = root / "src" / "amy_midi.c"
-text = midi.read_text(encoding="utf-8")
-replace_old = "void run_midi_task() {"
-if replace_old in text:
-    text = text.replace(
-        replace_old,
-        "void run_midi_task(void *pvParameters) {\n    (void)pvParameters;",
-        1,
-    )
-midi.write_text(text, encoding="utf-8")
+midi_text = (root / "src" / "amy_midi.c").read_text(encoding="utf-8")
+if "void run_midi_task(void *pvParameters)" not in midi_text:
+    raise SystemExit("selected AMY revision lacks the MIDI task signature fix")
 
 # The Omnichord keeps four AMY buses for role isolation, but room reverb is a
 # single shared aux effect. Existing yNh... wire commands retain their format:
@@ -382,7 +359,12 @@ idf_component_register(
         esp_timer
 )
 
-target_compile_definitions(${COMPONENT_LIB} PRIVATE
+target_compile_definitions(${COMPONENT_LIB} PUBLIC
+    AMY_BLOCK_SIZE=128
+    AMY_SAMPLE_RATE=48000
+    AMY_ESP_I2S_PHILIPS_FORMAT=1
+    AMY_ESP_I2S_DMA_DESC_NUM=2
+    AMY_ESP_I2S_DMA_FRAME_NUM=64
     AMY_SHARED_REVERB=1
 )
 
