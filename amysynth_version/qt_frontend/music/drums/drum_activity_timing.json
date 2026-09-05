@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "title": "LB Omnichord kit-independent drum activity timing catalogue \u2014 Gamma9001 musical refresh",
+  "title": "LB Omnichord kit-independent drum activity timing catalogue — Gamma9001 musical refresh",
   "repository_contract": {
     "repository": "linuxificator/LB_Omnichord",
-    "branch": "feature/gamma9001-drum-pattern-refresh",
+    "branch": "feature/midi_osc_improvement",
     "source_rhythm_file": "amysynth_version/qt_frontend/music/rhythms.json",
     "runtime_authority": "amysynth_version/qt_frontend/music/drums/drum_activity_timing.json",
-    "design_status": "canonical runtime activity catalogue; Gamma9001 quality refresh 2026-09-05",
+    "design_status": "canonical Gamma9001-first activity catalogue; complete source-backed identity audit 2026-09-05",
     "refresh_intent": "Rewrite all 54 activity grooves so level 1 is already musically usable and levels 4-5 exploit the existing logical-role palette more fully. Gamma9001 is the musical quality reference; Tiny and General MIDI remain compatible realizations through the existing role resolver.",
     "commit_read": "c7cd16cf7a43594150ce1cf0d48a0aa82a7f76c4"
   },
@@ -94,7 +94,39 @@
       "Reggae level 1 is a one-drop-oriented complete groove; higher levels add restrained steppers/rockers color without replacing the basic identity.",
       "Odd meters are grouped explicitly: 5/4 as 3+2 quarter-note groups, 7/8 as 2+2+3 eighth-note groups, 9/8 as 2+2+2+3, 11/8 as 3+3+3+2, and 7/4 funk as 4+3."
     ],
-    "non_goal": "Activity level 5 is not a fill. Structural fills remain exclusively in drum_fills_timing.json."
+    "non_goal": "Activity level 5 is not a fill. Structural fills remain exclusively in drum_fills_timing.json.",
+    "references": [
+      {
+        "title": "Music Theory for Producers, Part 1",
+        "publisher": "Yamaha",
+        "url": "https://hub.yamaha.com/proaudio/recording/music-theory-for-producers-part-1/",
+        "use": "Kick/backbeat roles, four-on-the-floor, syncopation, swing and compound meter."
+      },
+      {
+        "title": "Drumming techniques",
+        "publisher": "Yamaha",
+        "url": "https://www.yamaha.com/en/musical_instrument_guide/drums/play/play003.html",
+        "use": "8-beat, 16-beat, shuffle, samba, bossa nova and rimshot references."
+      },
+      {
+        "title": "Drum Set Performance 101",
+        "publisher": "Berklee Online",
+        "url": "https://online.berklee.edu/courses/drum-set-performance-101",
+        "use": "Style, touch, dynamics, compound meter and odd-meter review basis."
+      },
+      {
+        "title": "Create Your Own Afro-Latin Groove",
+        "publisher": "Berklee PULSE",
+        "url": "https://pulse.berklee.edu/?id=4&lesson=15",
+        "use": "Interlocking clave, cascara, shaker and bass-drum roles."
+      },
+      {
+        "title": "Programming Beats 2: Linear Drumming",
+        "publisher": "Ableton",
+        "url": "https://makingmusic.ableton.com/programming-beats-2-linear-drumming",
+        "use": "Standard drum functions, linear orchestration, rock and house foundations."
+      }
+    ]
   },
   "coverage_summary": {
     "rhythm_count": 54,
@@ -3684,13 +3716,13 @@
             },
             {
               "tick": 192,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 192,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 216,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 288,
@@ -3724,13 +3756,13 @@
             },
             {
               "tick": 576,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 576,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 600,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 672,
@@ -3786,13 +3818,13 @@
             },
             {
               "tick": 192,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 192,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 216,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 240,
@@ -3856,13 +3888,13 @@
             },
             {
               "tick": 576,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 576,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 600,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 624,
@@ -3938,13 +3970,13 @@
             },
             {
               "tick": 192,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 192,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 216,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 240,
@@ -4018,13 +4050,13 @@
             },
             {
               "tick": 576,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 576,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 600,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 624,
@@ -4115,13 +4147,13 @@
             },
             {
               "tick": 192,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 192,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 216,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 240,
@@ -4215,13 +4247,13 @@
             },
             {
               "tick": 576,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 576,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 600,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 624,
@@ -4327,11 +4359,6 @@
             },
             {
               "tick": 192,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 192,
               "role": "sustain_bell",
               "velocity": 40
             },
@@ -4339,6 +4366,11 @@
               "tick": 192,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 216,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 240,
@@ -4442,11 +4474,6 @@
             },
             {
               "tick": 576,
-              "role": "low_primary",
-              "velocity": 96
-            },
-            {
-              "tick": 576,
               "role": "sustain_bell",
               "velocity": 40
             },
@@ -4454,6 +4481,11 @@
               "tick": 576,
               "role": "timekeeper_primary",
               "velocity": 50
+            },
+            {
+              "tick": 600,
+              "role": "low_primary",
+              "velocity": 96
             },
             {
               "tick": 624,
@@ -15055,7 +15087,7 @@
             {
               "tick": 0,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 0,
@@ -15085,7 +15117,7 @@
             {
               "tick": 192,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 192,
@@ -15115,7 +15147,7 @@
             {
               "tick": 384,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 384,
@@ -15145,7 +15177,7 @@
             {
               "tick": 576,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 576,
@@ -15182,7 +15214,7 @@
             {
               "tick": 0,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 0,
@@ -15197,7 +15229,7 @@
             {
               "tick": 96,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 96,
@@ -15222,7 +15254,7 @@
             {
               "tick": 192,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 192,
@@ -15237,7 +15269,7 @@
             {
               "tick": 288,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 288,
@@ -15262,7 +15294,7 @@
             {
               "tick": 384,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 384,
@@ -15277,7 +15309,7 @@
             {
               "tick": 480,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 480,
@@ -15302,7 +15334,7 @@
             {
               "tick": 576,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 576,
@@ -15317,7 +15349,7 @@
             {
               "tick": 672,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 672,
@@ -15349,7 +15381,7 @@
             {
               "tick": 0,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 0,
@@ -15369,7 +15401,7 @@
             {
               "tick": 96,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 96,
@@ -15399,7 +15431,7 @@
             {
               "tick": 192,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 192,
@@ -15424,7 +15456,7 @@
             {
               "tick": 288,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 288,
@@ -15454,7 +15486,7 @@
             {
               "tick": 384,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 384,
@@ -15474,7 +15506,7 @@
             {
               "tick": 480,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 480,
@@ -15504,7 +15536,7 @@
             {
               "tick": 576,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 576,
@@ -15529,7 +15561,7 @@
             {
               "tick": 672,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 672,
@@ -15566,7 +15598,7 @@
             {
               "tick": 0,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 0,
@@ -15591,7 +15623,7 @@
             {
               "tick": 96,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 96,
@@ -15621,7 +15653,7 @@
             {
               "tick": 192,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 192,
@@ -15646,7 +15678,7 @@
             {
               "tick": 288,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 288,
@@ -15681,7 +15713,7 @@
             {
               "tick": 384,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 384,
@@ -15706,7 +15738,7 @@
             {
               "tick": 480,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 480,
@@ -15736,7 +15768,7 @@
             {
               "tick": 576,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 576,
@@ -15761,7 +15793,7 @@
             {
               "tick": 672,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 672,
@@ -15803,7 +15835,7 @@
             {
               "tick": 0,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 0,
@@ -15828,7 +15860,7 @@
             {
               "tick": 96,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 96,
@@ -15863,7 +15895,7 @@
             {
               "tick": 192,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 192,
@@ -15888,7 +15920,7 @@
             {
               "tick": 288,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 288,
@@ -15928,7 +15960,7 @@
             {
               "tick": 384,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 384,
@@ -15953,7 +15985,7 @@
             {
               "tick": 480,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 480,
@@ -15988,7 +16020,7 @@
             {
               "tick": 576,
               "role": "low_primary",
-              "velocity": 62
+              "velocity": 70
             },
             {
               "tick": 576,
@@ -16013,7 +16045,7 @@
             {
               "tick": 672,
               "role": "backbeat_soft",
-              "velocity": 36
+              "velocity": 46
             },
             {
               "tick": 672,
@@ -20874,13 +20906,13 @@
             },
             {
               "tick": 192,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 216,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 192,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 288,
@@ -20914,13 +20946,13 @@
             },
             {
               "tick": 576,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 600,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 576,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 672,
@@ -20976,13 +21008,13 @@
             },
             {
               "tick": 192,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 216,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 192,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 240,
@@ -21046,13 +21078,13 @@
             },
             {
               "tick": 576,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 600,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 576,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 624,
@@ -21128,13 +21160,13 @@
             },
             {
               "tick": 192,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 216,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 192,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 240,
@@ -21208,13 +21240,13 @@
             },
             {
               "tick": 576,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 600,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 576,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 624,
@@ -21300,13 +21332,13 @@
             },
             {
               "tick": 192,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 216,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 192,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 240,
@@ -21395,13 +21427,13 @@
             },
             {
               "tick": 576,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 600,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 576,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 624,
@@ -21507,13 +21539,13 @@
             },
             {
               "tick": 192,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 216,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 192,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 240,
@@ -21617,13 +21649,13 @@
             },
             {
               "tick": 576,
-              "role": "timekeeper_primary",
-              "velocity": 44
-            },
-            {
-              "tick": 600,
               "role": "low_primary",
               "velocity": 96
+            },
+            {
+              "tick": 576,
+              "role": "timekeeper_primary",
+              "velocity": 44
             },
             {
               "tick": 624,

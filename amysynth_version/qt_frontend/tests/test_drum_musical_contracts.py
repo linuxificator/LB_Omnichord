@@ -78,6 +78,21 @@ class DrumMusicalContractTests(unittest.TestCase):
                 self.assertLessEqual(len(events), 56, (rhythm["id"], level["level"]))
                 prior = current
 
+    def test_no_two_complete_activity_catalogues_are_identical(self) -> None:
+        signatures: dict[tuple[object, ...], str] = {}
+        for rhythm in self.rhythms.values():
+            signature = tuple(
+                (
+                    int(event["tick"]),
+                    str(event["role"]),
+                    int(event["velocity"]),
+                )
+                for level in rhythm["levels"]
+                for event in level["events"]
+            )
+            prior = signatures.setdefault(signature, rhythm["id"])
+            self.assertEqual(prior, rhythm["id"], (prior, rhythm["id"]))
+
     def test_conventional_backbeat_and_four_on_floor_foundations(self) -> None:
         for rhythm_id in AUDIT_FAMILIES["pop"] | {"march"}:
             rhythm = self.rhythms[rhythm_id]

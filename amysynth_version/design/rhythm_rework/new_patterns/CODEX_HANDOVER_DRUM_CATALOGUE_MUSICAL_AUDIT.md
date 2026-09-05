@@ -28,6 +28,16 @@ The automated contracts are in `qt_frontend/tests/test_drum_musical_contracts.py
 
 ## Catalogue-wide decisions
 
+### Activity identity
+
+The complete five-level activity signatures were compared across all 54 IDs. Three pairs were identical across every level: `pop_8`/`rock`, `jazz_swing`/`jazz_shuffle` and `rnb`/`hip_hop`. They are now separated with small, source-consistent differences instead of decorative random hits:
+
+- rock anticipates beat three with a driving kick while pop 8 remains straight;
+- jazz shuffle retains the triplet ride grid but gives its low and soft-backbeat anchors more weight than jazz swing;
+- R&B uses a straighter beat-three low anchor while hip-hop retains its late-sixteenth displacement.
+
+Other styles may legitimately share a foundation at low activity—for example the four-on-the-floor family—but their complete five-level catalogues are distinct. A regression now rejects any two IDs whose entire activity catalogues become identical.
+
 ### Fill placement
 
 Every fill now ends at the next written bar boundary. This makes all start positions musically transitional and removes starts on beat 1 or 2 that merely interrupted the middle of a bar. The runtime-authoritative formula is:

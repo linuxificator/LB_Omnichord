@@ -23,13 +23,13 @@
     },
     {
       "path": "music/drums/drum_activity_timing.json",
-      "sha256": "595c177f804655bfb5c147d9e3fceebec838a33e87e161f6784946cd3a8de842",
+      "sha256": "efd49780caee62bf41ecfab4095166d5765af6490f51d43c0e162a07ce3205ae",
       "count_path": [
         "rhythms"
       ],
       "expected_count": 54,
       "schema": "music/schema/drum_activity_v1.schema.json",
-      "process": "LB-authored 2026-09-05 genre-convention refresh; Gamma9001 is the musical reference while timing remains kit-independent; musically complete one-bar cycles are used for selected repetitive styles/odd meters to remain within the 56-event sequencer limit; Samba is normalized to one 4/4 bar; Merengue timing is realized through six Latin logical roles to preserve the established 34-of-40 AMY sequence-execution headroom characterization"
+      "process": "LB-authored 2026-09-05 Gamma9001-first genre-convention refresh; all 54 rhythms and five complete cumulative activity levels are source-audited; full-catalogue identity checks prevent duplicate five-level rhythms while preserving 56-event and 34-of-40 execution limits"
     },
     {
       "path": "music/drums/drum_fills_timing.json",

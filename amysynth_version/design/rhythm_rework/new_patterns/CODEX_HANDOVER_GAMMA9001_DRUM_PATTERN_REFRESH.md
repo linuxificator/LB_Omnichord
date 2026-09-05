@@ -312,7 +312,9 @@ Listening refinements may change velocity or remove/reposition events, but must 
 
 The staged payload was SHA-verified and materialized. Nine repetitive/electronic/odd-meter rhythms intentionally use a musically complete one-bar period instead of duplicating identical onset definitions into an older two-bar storage period; this permits richer level-4/5 grooves while staying within 56 events. Samba's unchanged 384-tick phrase is represented as one 4/4 bar so existing 4/4 fill starts remain legal. Merengue's richer event timing is retained but its concrete logical-function diversity is bounded to six Latin roles (kick, timeline, shaker, high/low hand percussion and accent), with colliding same-tick roles merged at the stronger velocity. This preserves the established sequencer worst case of 34 simultaneous executions out of AMY's 40 rather than accepting the staged 39/40 result. No fill timing, kit mapping, transport code or AMY architecture was changed. The canonical drum manifest remains format revision 1 because only catalogue content/hash metadata changed.
 
-Final canonical `drum_activity_timing.json` SHA-256: `595c177f804655bfb5c147d9e3fceebec838a33e87e161f6784946cd3a8de842`.
+Historical materialization SHA-256: `595c177f804655bfb5c147d9e3fceebec838a33e87e161f6784946cd3a8de842`.
+
+Current canonical `drum_activity_timing.json` SHA-256 after the complete identity audit: `efd49780caee62bf41ecfab4095166d5765af6490f51d43c0e162a07ce3205ae`.
 
 Validation executed before commit:
 
