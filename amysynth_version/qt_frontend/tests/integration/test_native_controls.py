@@ -123,8 +123,22 @@ class NativeControlTests(unittest.TestCase):
 
         with HeadlessApp(native_amy=True) as app:
             app.bridge.wait_idle(timeout=10.0)
+            start = app.bridge.count()
             app.action("setChordSynthIndex", meow)
             app.action("setStrumSynthIndex", sustainer)
+            # HTTP actions enqueue writer transactions.  Wait for evidence
+            # that both transactions reached the independent serial peer
+            # before using wait_idle() to settle their remaining commands.
+            # Without this boundary, wait_idle() can observe the *previous*
+            # idle interval before the writer has emitted its first byte.
+            app.bridge.wait_for_lines(
+                [
+                    f"K{patch_for_index(meow)}i3Z",
+                    f"K{patch_for_index(sustainer)}i2Z",
+                ],
+                start=start,
+                timeout=8.0,
+            )
             app.bridge.wait_idle(timeout=8.0)
 
             before3 = app.bridge.synth_commands(3)
