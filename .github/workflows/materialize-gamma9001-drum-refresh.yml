@@ -29,7 +29,7 @@ jobs:
           python amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py --check
           python amysynth_version/design/rhythm_rework/new_patterns/materialize_gamma9001_drum_refresh.py
 
-      - name: Preserve current rhythm metadata and two-bar cycles
+      - name: Preserve current metadata and bounded two-bar contours
         run: |
           git fetch origin main --depth=1
           python - <<'PY'
@@ -37,6 +37,7 @@ jobs:
           import json
           import subprocess
           from copy import deepcopy
+          from itertools import product
           from pathlib import Path
 
           rel = 'amysynth_version/qt_frontend/music/drums/drum_activity_timing.json'
@@ -65,13 +66,14 @@ jobs:
               'disco', 'eleven_eight', 'five_four', 'house', 'nine_eight',
               'samba', 'seven_eight', 'seven_four_funk', 'techno', 'trance',
           }
-          print('RHYTHM_METADATA_DIFFERENCES', json.dumps(differences, sort_keys=True))
           if set(differences) != expected:
               raise SystemExit(
                   f'unexpected metadata-difference set: got {sorted(differences)}, '
                   f'expected {sorted(expected)}'
               )
+          print('RHYTHM_METADATA_DIFFERENCES', json.dumps(differences, sort_keys=True))
 
+          contour_choices = {}
           for rhythm_id, rhythm in current.items():
               base_rhythm = baseline[rhythm_id]
               old_period = int(rhythm['period_ticks'])
@@ -81,20 +83,33 @@ jobs:
                       raise SystemExit(
                           f'{rhythm_id}: cannot safely expand period {old_period} -> {new_period}'
                       )
-                  for level in rhythm['levels']:
-                      original_events = deepcopy(level['events'])
-                      repeated = [
+                  source_levels = [deepcopy(level['events']) for level in rhythm['levels']]
+                  counts = [len(events) for events in source_levels]
+                  candidates = []
+                  for choices in product(*(range(index + 1) for index in range(5))):
+                      if choices[0] != 0:
+                          continue
+                      if any(choices[index] > choices[index + 1] for index in range(4)):
+                          continue
+                      if any(counts[index] + counts[choices[index]] > 56 for index in range(5)):
+                          continue
+                      candidates.append(choices)
+                  if not candidates:
+                      raise SystemExit(
+                          f'{rhythm_id}: no cumulative second-half contour fits the 56-event limit; '
+                          f'counts={counts}'
+                      )
+                  choices = max(candidates, key=lambda value: (sum(value), value))
+                  contour_choices[rhythm_id] = tuple(choice + 1 for choice in choices)
+                  for index, level in enumerate(rhythm['levels']):
+                      first_half = source_levels[index]
+                      second_half = [
                           {**event, 'tick': int(event['tick']) + old_period}
-                          for event in original_events
+                          for event in source_levels[choices[index]]
                       ]
-                      level['events'] = original_events + repeated
+                      level['events'] = first_half + second_half
                       level['events'].sort(key=lambda event: (int(event['tick']), str(event['role'])))
                       level['event_count'] = len(level['events'])
-                      if level['event_count'] > 56:
-                          raise SystemExit(
-                              f'{rhythm_id} level {level["level"]}: '
-                              f'{level["event_count"]} events after cycle preservation exceeds 56'
-                          )
               for field in fields:
                   rhythm[field] = base_rhythm[field]
               if any(
@@ -103,6 +118,14 @@ jobs:
                   for event in level['events']
               ):
                   raise SystemExit(f'{rhythm_id}: event outside restored period')
+              previous = set()
+              for level in rhythm['levels']:
+                  events = {(int(event['tick']), str(event['role'])) for event in level['events']}
+                  if not previous <= events:
+                      raise SystemExit(f'{rhythm_id} level {level["level"]}: cumulative event contract broken')
+                  previous = events
+                  if len(level['events']) > 56:
+                      raise SystemExit(f'{rhythm_id} level {level["level"]}: exceeds 56 events')
 
           level_locations = [
               (rhythm['id'], int(level['level']), len(level['events']))
@@ -127,6 +150,11 @@ jobs:
           activity['repository_contract']['design_status'] = (
               'canonical runtime activity catalogue; Gamma9001 quality refresh 2026-09-05'
           )
+          activity['design_contract']['preserved_cycle_policy'] = (
+              'When an authored groove used half the established runtime period, the first half uses '
+              'the selected activity level and the second half uses the richest lower-or-equal complete '
+              'activity variant that preserves cumulative levels and the <=56 event limit.'
+          )
 
           encoded = (json.dumps(activity, indent=2) + '\n').encode('utf-8')
           canonical_sha = hashlib.sha256(encoded).hexdigest()
@@ -149,16 +177,17 @@ jobs:
                   entry['process'] = (
                       'LB-authored 2026-09-05 genre-convention refresh; Gamma9001 is the musical '
                       'reference while timing remains kit-independent; pre-refresh rhythm meter and '
-                      'cycle-length metadata retained exactly, with authored one-cycle grooves repeated '
-                      'across the existing two-cycle period where required'
+                      'cycle-length metadata retained exactly; half-period authored grooves use a '
+                      'capacity-bounded second-half contour selected only from complete lower-or-equal '
+                      'activity variants of the same rhythm'
                   )
                   break
           else:
               raise SystemExit('provenance lacks drum activity entry')
           provenance_path.write_text(json.dumps(provenance, indent=2) + '\n', encoding='utf-8')
+          print('SECOND_HALF_ACTIVITY_LEVELS', json.dumps(contour_choices, sort_keys=True))
           print('CANONICAL_DRUM_ACTIVITY_SHA256', canonical_sha)
           print('MAX_EVENT_COUNT', maximum)
-          print('EXPANDED', ','.join(sorted(differences)))
           PY
 
       - name: Add foundation richness regression
@@ -204,12 +233,12 @@ jobs:
               1,
           )
           old = 'Decoded canonical JSON SHA-256:\n\n`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`'
-          new = ('Staged payload JSON SHA-256 (before integration metadata reconciliation):\n\n'
+          new = ('Staged payload JSON SHA-256 (before integration metadata/cycle reconciliation):\n\n'
                  '`e7d3e14374d90a290fc19fa6f202c0776cccc299ce301b68fdc96af40877f0fc`\n\n'
                  'Final canonical runtime JSON SHA-256:\n\n`' + sha + '`')
           text = text.replace(old, new, 1)
           marker = '\n## 13. Definition of done\n'
-          evidence = f'''\n## 12a. Integration validation evidence\n\nThe one-shot branch job SHA-verified and materialized the staged payload, then compared `meter`, `period_bars` and `period_ticks` for all 54 rhythms against `main`. Ten authored entries had intentionally simpler/shorter metadata, but changing rhythm cycle length was not part of the user request. Their pre-refresh runtime metadata was therefore retained exactly. When the authored period was half the established period, the complete authored groove was repeated into the second half rather than leaving silence. No fill timing or transport behavior was changed.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload structural validator: passed;\n- all 54 rhythm meter/period contracts compared against `main`; passed after cycle preservation;\n- every complete level remains <=56 events;\n- `tests/test_drum_patterns.py`: passed, including the new foundation-richness assertion;\n- `tests/test_catalogue_provenance.py`: passed;\n- `python tests/run_tests.py --suite unit`: passed.\n\nThe temporary payload, materializer and one-shot workflow are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
+          evidence = f'''\n## 12a. Integration validation evidence\n\nThe one-shot branch job SHA-verified and materialized the staged payload, then compared `meter`, `period_bars` and `period_ticks` for all 54 rhythms against `main`. Ten authored entries used a shorter period, although changing runtime cycle length was outside the request. Their existing runtime metadata was retained exactly. For those entries, the first half uses the selected new activity level; the second half uses the richest lower-or-equal complete activity variant of the same rhythm that keeps the five levels cumulative and the complete sequence at or below 56 events. This avoids both silent second bars and arbitrary event deletion. No fill timing or transport behavior was changed.\n\nFinal canonical `drum_activity_timing.json` SHA-256: `{sha}`.\n\nValidation executed before commit:\n\n- staged payload structural validator: passed;\n- all 54 rhythm meter/period contracts compared against `main`;\n- all five final levels remain cumulative and <=56 events;\n- `tests/test_drum_patterns.py`: passed, including the new foundation-richness assertion;\n- `tests/test_catalogue_provenance.py`: passed;\n- `python tests/run_tests.py --suite unit`: passed.\n\nThe temporary payload, materializer and one-shot workflow are removed immediately after this validated commit, leaving `qt_frontend/music/drums/drum_activity_timing.json` as the single runtime authority.\n'''
           if '## 12a. Integration validation evidence' not in text:
               text = text.replace(marker, evidence + marker, 1)
           p.write_text(text, encoding='utf-8')
