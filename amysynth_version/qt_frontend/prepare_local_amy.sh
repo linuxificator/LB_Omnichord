@@ -7,14 +7,12 @@ release_inputs="$frontend_dir/packaging/release_inputs.py"
 amy_pcm_bank="$(python3 "$release_inputs" amy-values --field pcm_bank)"
 amy_release_branch="$(python3 "$release_inputs" amy-values --field release_branch)"
 amy_commit="$(python3 "$release_inputs" amy-values --field commit)"
-amy_root="${OMNICHORD_AMY_ROOT:-$repo_dir/../amyfork/amy}"
+amy_root="${OMNICHORD_AMY_ROOT:-$repo_dir/.amy/$amy_commit}"
 
 if [[ -n "${OMNICHORD_VENV:-}" ]]; then
     venv_dir="$OMNICHORD_VENV"
-elif [[ -f "$frontend_dir/.venv/bin/activate" ]]; then
-    venv_dir="$frontend_dir/.venv"
 else
-    venv_dir="$repo_dir/../omnichord-env"
+    venv_dir="$repo_dir/.venv"
 fi
 
 checkout_missing=false
@@ -27,8 +25,9 @@ case "${1:-}" in
         ;;
 esac
 
-if [[ ! -f "$venv_dir/bin/activate" ]]; then
+if [[ ! -x "$venv_dir/bin/python" ]]; then
     echo "Python virtualenv not found: $venv_dir" >&2
+    echo "Run ./run_local.sh once to create and provision it automatically." >&2
     exit 1
 fi
 if [[ ! -f "$amy_root/setup.py" && "$checkout_missing" == true ]]; then
@@ -54,20 +53,37 @@ if [[ "$actual_commit" != "$amy_commit" ]]; then
     exit 1
 fi
 
-. "$venv_dir/bin/activate"
-AMY_PCM_BANK="$amy_pcm_bank" python -m pip install \
+venv_python="$venv_dir/bin/python"
+AMY_PCM_BANK="$amy_pcm_bank" "$venv_python" -m pip install \
     --no-deps \
     --force-reinstall \
     --no-cache-dir \
     "$amy_root"
 
-amy_so="$(python -c 'import c_amy; print(c_amy.__file__)')"
-nm -D "$amy_so" | grep 'amy_set_gamma9001_pcm' >/dev/null || {
-    echo "AMY verification failed: Gamma9001 registration is absent" >&2
-    exit 1
-}
-nm -D "$amy_so" | grep 'gamma9001_pcm_data' >/dev/null || {
-    echo "AMY verification failed: Gamma9001 PCM data is absent" >&2
-    exit 1
-}
+amy_so="$("$venv_python" -c 'import c_amy; print(c_amy.__file__)')"
+"$venv_python" - "$amy_so" <<'PY'
+import ctypes
+import sys
+
+library = ctypes.CDLL(sys.argv[1])
+for symbol in ("amy_set_gamma9001_pcm", "gamma9001_pcm_data"):
+    try:
+        getattr(library, symbol)
+    except AttributeError as exc:
+        raise SystemExit(f"AMY verification failed: {symbol} is absent") from exc
+PY
+"$venv_python" - "$amy_so" "$venv_dir/.lb-omnichord-amy" \
+    "$amy_commit:$amy_pcm_bank" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+extension = Path(sys.argv[1])
+stamp = Path(sys.argv[2])
+contract = sys.argv[3]
+digest = hashlib.sha256(extension.read_bytes()).hexdigest()
+temporary = stamp.with_name(f".{stamp.name}.tmp")
+temporary.write_text(f"{contract}\n{digest}\n", encoding="utf-8")
+temporary.replace(stamp)
+PY
 echo "AMY installed from $amy_release_branch at $amy_commit with $amy_pcm_bank: $amy_so"

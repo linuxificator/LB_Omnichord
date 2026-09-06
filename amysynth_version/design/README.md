@@ -48,6 +48,10 @@ Core rules:
 - `CODEX_HANDOVER_RASPBERRY_PI_APPIMAGE_GRAPHICS.md` records the physical Pi 4
   Wayland/EGL and PySide 6.7 meta-object failures, their independent fixes and
   the evidence still required from the rebuilt AppImage.
+- `CODEX_HANDOVER_STRUM_RENDER_PERFORMANCE.md` records the Pi 4/120 Hz visual
+  load diagnosis, shared cached rendering budget and cross-platform tests.
+- `CODEX_HANDOVER_SOURCE_CHECKOUT_BOOTSTRAP.md` records the clone-local venv
+  and pinned-AMY bootstrap boundary used only by source checkouts.
 - `amy/README.md` indexes Codex-only AMY audit and implementation handovers
   which are deliberately kept out of Shorepine-facing AMY branches.
 - `amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` records the cumulative-tag AMY

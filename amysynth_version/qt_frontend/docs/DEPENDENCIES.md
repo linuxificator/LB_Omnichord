@@ -54,7 +54,17 @@ rather than imports in portable application code, but are declared in their
 owning groups for the same reproducibility reason. `types-pyserial` supplies
 static metadata only.
 
-No application or launcher installs Python packages at runtime.
+Released application packages never install Python packages at runtime. The
+source-only `run_local.sh` developer launcher is the explicit exception: on a
+fresh Git clone it creates the ignored repository-root `.venv`, installs the
+reviewed `requirements.txt`, and provisions the exact pinned AMY component in
+the ignored `.amy/<commit>/` checkout before starting. On later launches it
+first uses pip's offline `--dry-run --no-index` resolution check plus `pip
+check`; it consults the package index only when the declared environment is
+missing or incompatible. A commit/bank stamp and extension digest prevent a
+different `c_amy` build from being accepted merely because it exports similarly
+named symbols. This bootstrap is not shipped or invoked by AppImage, DMG,
+Windows or Android launchers.
 
 The desktop Zeroconf resolution also pins its transitive `ifaddr==0.2.0`
 dependency in both desktop constraint sets. Android neither installs nor

@@ -78,12 +78,11 @@ The project uses **1,000,000 baud, 8 data bits, no parity, one stop bit, no hard
 From the repository root:
 
 ```bash
-cd amysynth_version/qt_frontend
 sudo apt update
 sudo apt install python3-venv python3-pip
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r amysynth_version/qt_frontend/requirements.txt
 ```
 
 Re-run the requirements command after updating an existing environment.
@@ -93,7 +92,7 @@ Re-run the requirements command after updating an existing environment.
 Windowed:
 
 ```bash
-.venv/bin/python code/main.py \
+.venv/bin/python amysynth_version/qt_frontend/code/main.py \
   --serial-port /dev/serial0 \
   --serial-baud 1000000 \
   --windowed
@@ -102,7 +101,7 @@ Windowed:
 Fullscreen:
 
 ```bash
-.venv/bin/python code/main.py \
+.venv/bin/python amysynth_version/qt_frontend/code/main.py \
   --serial-port /dev/serial0 \
   --serial-baud 1000000 \
   --fullscreen
@@ -149,24 +148,19 @@ Start both processes with:
 ./run_local.sh --windowed
 ```
 
-Install the pinned reusable-sequence/Gamma9001 AMY release into the environment
-used by the service. The Qt process remains independent of AMY.
-`OMNICHORD_VENV` can override the launcher's
-default `../omnichord-env`; `OMNICHORD_AMY_SOCKET` can override
-`~/.omnichord/amy.sock`; and `OMNICHORD_AMY_ROOT` can override the expected AMY
-checkout at `../amyfork/amy`.
+On a fresh source checkout, this command creates `.venv` in the Git-clone root,
+installs the declared frontend requirements, checks out the exact AMY release
+below `.amy/<commit>/`, builds it with Gamma9001 and records the verified binary
+digest. Both directories are ignored by Git. A later start first verifies the
+complete requirements contract without network access and checks AMY's exact
+commit/bank stamp, digest and Gamma9001 symbols. It installs or rebuilds only
+when those checks fail.
 
-Prepare the local AMY fork with the hosted Gamma9001 bank before first use (and
-after rebuilding AMY):
-
-```bash
-./prepare_local_amy.sh
-```
-
-This reads the exact branch, commit and bank from `packaging/release_inputs.json`,
-invokes `AMY_PCM_BANK=gamma9001`, and verifies that the installed extension
-contains both Gamma9001 registration and PCM-data symbols. A bank/map mismatch
-can accept every wire command while producing unrelated drum timbres.
+The Qt process remains independent of AMY. `OMNICHORD_VENV` and
+`OMNICHORD_AMY_ROOT` override the two clone-local directories;
+`OMNICHORD_AMY_SOCKET` overrides `~/.omnichord/amy.sock`. A bank/map mismatch
+can accept every wire command while producing unrelated drum timbres, which is
+why symbol presence alone is not treated as sufficient proof.
 
 ## Linux
 
@@ -177,25 +171,11 @@ sudo apt update
 sudo apt install git python3-venv python3-pip python3-dev build-essential
 ```
 
-Create the frontend environment:
+Clone and run:
 
 ```bash
 git clone https://github.com/linuxificator/LB_Omnichord.git
 cd LB_Omnichord/amysynth_version/qt_frontend
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip setuptools
-.venv/bin/python -m pip install -r requirements.txt
-```
-
-Place the project AMY fork at `../amyfork/amy` relative to the LB_Omnichord
-repository, or set `OMNICHORD_AMY_ROOT`. Then run
-`./prepare_local_amy.sh`; a generic or differently pinned AMY build is not
-compatible with the supported release contract.
-
-Run the frontend:
-
-```bash
-cd ../LB_Omnichord/amysynth_version/qt_frontend
 ./run_local.sh --windowed
 ```
 
@@ -214,19 +194,6 @@ Install Python 3 and Git using your normal macOS package source, then:
 ```bash
 git clone https://github.com/linuxificator/LB_Omnichord.git
 cd LB_Omnichord/amysynth_version/qt_frontend
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip setuptools
-.venv/bin/python -m pip install -r requirements.txt
-```
-
-Use the same project AMY fork and `prepare_local_amy.sh` process described for
-Linux. The fork must support the bus count and the exact Gamma9001 profile
-declared by `release_inputs.json`.
-
-Then run:
-
-```bash
-cd ../LB_Omnichord/amysynth_version/qt_frontend
 ./run_local.sh --windowed
 ```
 
@@ -358,8 +325,8 @@ The command without `--suite` runs all automatically discovered unit tests.
 `all` additionally needs Linux PTY/local-socket support, PySide6, pyserial and
 the pinned LB Omnichord AMY release. Native suites start AMY with 11 buses, 336
 oscillators, 1280 reusable sequence tags, 64 events per definition and 40
-active or alignment-pending executions. Run `./prepare_local_amy.sh` first when
-that release is not installed. The full suite and CI layout is documented in
+active or alignment-pending executions. `run_local.sh` provisions that release;
+`prepare_local_amy.sh` remains available for an explicit rebuild. The full suite and CI layout is documented in
 `../design/testing.md`.
 
 ## Install a released Linux x86_64 AppImage
@@ -442,27 +409,25 @@ latency and sustained-load validation.
 
 ## No local AMY module (Unix convenience service)
 
-If local mode reports that `amy` or `c_amy` cannot be imported, install the
-exact release and Gamma9001 bank declared by this repository:
+If local mode reports that `amy` or `c_amy` cannot be imported, rerun the
+source launcher. It automatically repairs a missing or mismatched clone-local
+environment:
 
 ```bash
 cd amysynth_version/qt_frontend
-./prepare_local_amy.sh --checkout
+./run_local.sh --windowed
 ```
 
-Then verify the package with the Python interpreter selected for the frontend.
-For the frontend-local environment shown in the installation steps above:
+To inspect it explicitly, use the interpreter in the Git-clone root:
 
 ```bash
-.venv/bin/python -c 'import amy, c_amy; print(amy.__file__)'
+../../.venv/bin/python -c 'import amy, c_amy; print(amy.__file__)'
 ```
 
-Installations using the repository-neighbour development convention can use
-`../../../omnichord-env/bin/python` instead. An explicit `OMNICHORD_VENV`
-overrides both locations.
-
-The checkout option is explicit because it uses the network. `run_local.sh`
-itself never downloads, compiles or installs AMY while starting the app.
+An explicit `OMNICHORD_VENV` or `OMNICHORD_AMY_ROOT` uses that managed location
+instead. Only the source launcher has this bootstrap behavior. Released
+AppImages, DMGs, Windows packages and Android APKs never install or download
+runtime dependencies.
 
 ## No Raspberry Pi serial output
 

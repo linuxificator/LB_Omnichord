@@ -100,13 +100,14 @@ is a dependency of that service process rather than of the Qt frontend. A bare
 `ModuleNotFoundError` previously obscured this distinction on a fresh Pi
 checkout.
 
-`prepare_local_amy.sh --checkout` now uses the existing release-input checkout
-tool to fetch the exact immutable AMY commit when its conventional sibling
-checkout is absent, then installs the declared Gamma9001 bank into the selected
-frontend virtual environment. The network operation remains explicit;
-`run_local.sh` still never downloads or installs anything. Both scripts select
-an explicit `OMNICHORD_VENV`, a frontend-local `.venv`, or the established
-repository-neighbour `omnichord-env`, in that order.
+The initial repair added `prepare_local_amy.sh --checkout` as an explicit
+release-input checkout and install step. Follow-up source-bootstrap work on the
+same branch supersedes that launch contract: `run_local.sh` now creates and
+validates an ignored clone-root `.venv` and provisions the pinned Gamma9001 AMY
+under `.amy/<commit>/` when necessary. Subsequent starts are offline when the
+declared requirements and stamped AMY extension digest still match. Explicit
+`OMNICHORD_VENV` and `OMNICHORD_AMY_ROOT` overrides remain supported. Released
+packages do not execute this source-only bootstrap.
 
 ## Validation completed
 

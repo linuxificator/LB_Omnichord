@@ -62,11 +62,10 @@ The serial defaults are in `config/amy_config.json`. Command-line options overri
 From the repository root:
 
 ```bash
-cd amysynth_version/qt_frontend
 sudo apt update
 sudo apt install python3-venv python3-pip
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -r amysynth_version/qt_frontend/requirements.txt
 ```
 
 ## Run
@@ -74,13 +73,13 @@ python3 -m venv .venv
 Windowed test:
 
 ```bash
-.venv/bin/python code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --windowed
+.venv/bin/python amysynth_version/qt_frontend/code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --windowed
 ```
 
 Fullscreen:
 
 ```bash
-.venv/bin/python code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --fullscreen
+.venv/bin/python amysynth_version/qt_frontend/code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --fullscreen
 ```
 
 The program may also use `/dev/ttyAMA0` or a USB UART such as `/dev/ttyUSB0` when supplied with `--serial-port`.
@@ -88,29 +87,25 @@ The program may also use `/dev/ttyAMA0` or a USB UART such as `/dev/ttyUSB0` whe
 ## Run AMY locally on the Raspberry Pi
 
 To render AMY audio on the Pi from a source checkout instead of sending wire
-commands to an ESP32-P4, provision the exact AMY release declared by this
-repository once:
+commands to an ESP32-P4, start it directly:
 
 ```bash
 cd amysynth_version/qt_frontend
-./prepare_local_amy.sh --checkout
-```
-
-The explicit `--checkout` option creates the conventional sibling
-`amyfork/amy` checkout when it is absent, verifies its immutable commit and
-installs its Gamma9001 `c_amy` service into the frontend virtual environment.
-It requires network access only while provisioning. Subsequent launches do
-not fetch or build anything:
-
-```bash
 ./run_local.sh --windowed
 ```
 
+On the first run, the source launcher creates `.venv` in the Git-clone root,
+installs `requirements.txt`, checks out the exact AMY release below
+`.amy/<commit>/`, and builds its Gamma9001 `c_amy` service. Both directories
+are ignored by Git. This first preparation needs network access and the normal
+Python/C build prerequisites. Later launches perform offline dependency,
+commit/bank, symbol and binary-digest checks and start without downloading.
+
 `run_local.sh` starts the standalone AMY service and the Qt frontend as two
-processes connected by the local wire-protocol socket. It uses
-`OMNICHORD_VENV` when set, otherwise a frontend `.venv` when present, and
-finally the repository-neighbour `omnichord-env` development convention. Set
-`OMNICHORD_AMY_ROOT` only when the AMY checkout intentionally lives elsewhere.
+processes connected by the local wire-protocol socket. `OMNICHORD_VENV` and
+`OMNICHORD_AMY_ROOT` remain explicit overrides for intentionally managed
+locations. Released AppImages remain self-contained and never execute this
+source-only bootstrap.
 
 ## USB MIDI input
 

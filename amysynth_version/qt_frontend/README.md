@@ -37,15 +37,23 @@ For local Linux development with a separate AMY process, use:
 ./run_local.sh --windowed
 ```
 
-The Qt process does not import AMY or own its lifetime; the launcher is only a
-shell-level convenience wrapper for the two independent processes.
+On its first source-checkout run this creates `.venv` and `.amy/<commit>` in
+the Git-clone root, installs the declared frontend requirements and builds the
+exact pinned Gamma9001 AMY service. Both directories are ignored by Git.
+Subsequent starts validate the requirements and AMY binary digest without
+network access unless the declared inputs changed or the environment was
+damaged. The Qt process still does not import AMY or own its lifetime; the
+launcher remains a shell-level convenience wrapper for two independent
+processes. Released packages contain their complete runtime and never use this
+source bootstrap or download dependencies at startup.
 
 ## Running
 
-From this directory after creating the virtual environment described in `README_rpi.md`:
+From this directory after creating the clone-root virtual environment described
+in `README_rpi.md`:
 
 ```bash
-.venv/bin/python code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --windowed
+../../.venv/bin/python code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --windowed
 ```
 
 `main.py` addresses the canonical `gui/`, `config/`, `instruments/` and `music/` directories directly. There are no compatibility symlinks or duplicate runtime data files in `code/`.

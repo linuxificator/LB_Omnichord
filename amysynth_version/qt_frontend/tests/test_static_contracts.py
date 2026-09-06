@@ -331,14 +331,21 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("control.family !== 1", rotary)
         self.assertIn("control.family !== 1", button)
 
-    def test_local_launcher_validates_but_never_builds_amy(self) -> None:
+    def test_local_launcher_bootstraps_and_revalidates_clone_local_runtime(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
         self.assertIn("import c_amy", launcher)
         self.assertIn("amy_set_gamma9001_pcm", launcher)
         self.assertIn("gamma9001_pcm_data", launcher)
-        self.assertIn("prepare_local_amy.sh --checkout", launcher)
-        self.assertNotIn('"$frontend_dir/prepare_local_amy.sh"', launcher)
-        self.assertNotIn("pip install", launcher)
+        self.assertIn('venv_dir="$repo_dir/.venv"', launcher)
+        self.assertIn('amy_root="${OMNICHORD_AMY_ROOT:-$repo_dir/.amy/$amy_commit}"', launcher)
+        self.assertIn('python3 -m venv "$venv_dir"', launcher)
+        self.assertIn("--dry-run", launcher)
+        self.assertIn("--no-index", launcher)
+        self.assertIn('-r "$frontend_dir/requirements.txt"', launcher)
+        self.assertIn('"$venv_python" -m pip check', launcher)
+        self.assertIn('"$frontend_dir/prepare_local_amy.sh" --checkout', launcher)
+        self.assertIn('amy_contract_is_current()', launcher)
+        self.assertIn('hashlib.sha256(Path(sys.argv[1]).read_bytes())', launcher)
         self.assertLess(
             launcher.index("amy_set_gamma9001_pcm"),
             launcher.index("code/local_amy_service.py"),
@@ -351,7 +358,13 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('--destination "$amy_root"', setup)
         self.assertIn('actual_commit="$(git -C "$amy_root" rev-parse HEAD)"', setup)
         self.assertIn('if [[ "$actual_commit" != "$amy_commit" ]]', setup)
-        self.assertIn('AMY_PCM_BANK="$amy_pcm_bank" python -m pip install', setup)
+        self.assertIn('AMY_PCM_BANK="$amy_pcm_bank" "$venv_python" -m pip install', setup)
+        self.assertIn('amy_root="${OMNICHORD_AMY_ROOT:-$repo_dir/.amy/$amy_commit}"', setup)
+        self.assertIn('"$venv_dir/.lb-omnichord-amy"', setup)
+
+        ignore = (ROOT.parents[1] / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("/.venv/", ignore)
+        self.assertIn("/.amy/", ignore)
 
     def test_midi_cc_bar_clears_omni_button_and_aligns_to_sections(self) -> None:
         qml = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
@@ -963,29 +976,31 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("PointerNormalization.verticalUnit", midi_strum)
         self.assertNotIn("controller", section)
 
-    def test_migraine_is_a_visual_only_strum_particle_layer(self) -> None:
+    def test_migraine_is_a_visual_only_bounded_cached_layer(self) -> None:
         strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
         migraine = (ROOT / "gui" / "Migraine.qml").read_text(encoding="utf-8")
 
-        self.assertIn("import QtQuick.Particles", migraine)
         self.assertIn("import QtQuick.Shapes", migraine)
+        self.assertNotIn("import QtQuick.Particles", migraine)
         self.assertIn('objectName: "migraine"', migraine)
-        self.assertIn('source: "assets/migraine_particle.png"', migraine)
         self.assertIn("property int fadeDuration: 500", migraine)
-        self.assertIn('groups: ["red"]', migraine)
-        self.assertIn('groups: ["green"]', migraine)
-        self.assertIn('groups: ["blue"]', migraine)
+        self.assertIn("property int morphInterval: 34", migraine)
+        self.assertIn('objectName: "migraineCachedEdge"', migraine)
+        self.assertIn("layer.enabled: true", migraine)
+        self.assertIn("root.pendingMorphDistance += distance", migraine)
+        self.assertIn("onTriggered: root.advanceMorph()", migraine)
         self.assertIn("registration * 3.4", migraine)
         self.assertIn("Math.cos(registrationAngle)", migraine)
         self.assertIn("Math.sin(registrationAngle)", migraine)
         self.assertIn("model: 3", migraine)
-        self.assertIn("model: 56", migraine)
         self.assertIn('objectName: "migraineSharpChromaEdge"', migraine)
         self.assertIn("PathSvg {", migraine)
         self.assertIn("joinStyle: ShapePath.MiterJoin", migraine)
         self.assertIn("readonly property var pointAngles", migraine)
-        self.assertNotIn('groups: ["core"]', migraine)
-        self.assertNotIn('group: "core"', migraine)
+        self.assertNotIn("ParticleSystem {", migraine)
+        self.assertNotIn("ImageParticle {", migraine)
+        self.assertNotIn("Emitter {", migraine)
+        self.assertNotIn("Wander {", migraine)
         for input_handler in (
             "MouseArea {",
             "MultiPointTouchArea {",
