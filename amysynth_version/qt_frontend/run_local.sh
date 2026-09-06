@@ -3,8 +3,15 @@ set -euo pipefail
 
 frontend_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd -- "$frontend_dir/../.." && pwd)"
-venv_dir="${OMNICHORD_VENV:-$repo_dir/../omnichord-env}"
 socket_path="${OMNICHORD_AMY_SOCKET:-$HOME/.omnichord/amy.sock}"
+
+if [[ -n "${OMNICHORD_VENV:-}" ]]; then
+    venv_dir="$OMNICHORD_VENV"
+elif [[ -f "$frontend_dir/.venv/bin/activate" ]]; then
+    venv_dir="$frontend_dir/.venv"
+else
+    venv_dir="$repo_dir/../omnichord-env"
+fi
 
 if [[ ! -f "$venv_dir/bin/activate" ]]; then
     echo "Python virtualenv not found: $venv_dir" >&2
@@ -16,7 +23,11 @@ fi
 # The AMY service is provisioned separately from the frontend runtime.  Only
 # validate its PCM-bank contract here; never build or install AMY while
 # launching the wire-protocol client and service processes.
-amy_extension="$(python -c 'import c_amy; print(c_amy.__file__)')"
+if ! amy_extension="$(python -c 'import c_amy; print(c_amy.__file__)')"; then
+    echo "AMY service is not installed in $venv_dir." >&2
+    echo "Provision it with ./prepare_local_amy.sh --checkout before launching." >&2
+    exit 1
+fi
 if ! nm -D "$amy_extension" | grep 'amy_set_gamma9001_pcm' >/dev/null \
     || ! nm -D "$amy_extension" | grep 'gamma9001_pcm_data' >/dev/null; then
     echo "AMY service does not contain the required Gamma9001 PCM bank: $amy_extension" >&2

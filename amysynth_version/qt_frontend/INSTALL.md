@@ -442,13 +442,27 @@ latency and sustained-load validation.
 
 ## No local AMY module (Unix convenience service)
 
-If local mode reports that `amy` or `c_amy` cannot be imported, verify the package in the frontend virtual environment:
+If local mode reports that `amy` or `c_amy` cannot be imported, install the
+exact release and Gamma9001 bank declared by this repository:
+
+```bash
+cd amysynth_version/qt_frontend
+./prepare_local_amy.sh --checkout
+```
+
+Then verify the package with the Python interpreter selected for the frontend.
+For the frontend-local environment shown in the installation steps above:
 
 ```bash
 .venv/bin/python -c 'import amy, c_amy; print(amy.__file__)'
 ```
 
-Then reinstall from the upstream AMY checkout using that exact Python interpreter.
+Installations using the repository-neighbour development convention can use
+`../../../omnichord-env/bin/python` instead. An explicit `OMNICHORD_VENV`
+overrides both locations.
+
+The checkout option is explicit because it uses the network. `run_local.sh`
+itself never downloads, compiles or installs AMY while starting the app.
 
 ## No Raspberry Pi serial output
 

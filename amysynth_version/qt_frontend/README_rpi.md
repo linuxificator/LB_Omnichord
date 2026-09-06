@@ -85,6 +85,33 @@ Fullscreen:
 
 The program may also use `/dev/ttyAMA0` or a USB UART such as `/dev/ttyUSB0` when supplied with `--serial-port`.
 
+## Run AMY locally on the Raspberry Pi
+
+To render AMY audio on the Pi from a source checkout instead of sending wire
+commands to an ESP32-P4, provision the exact AMY release declared by this
+repository once:
+
+```bash
+cd amysynth_version/qt_frontend
+./prepare_local_amy.sh --checkout
+```
+
+The explicit `--checkout` option creates the conventional sibling
+`amyfork/amy` checkout when it is absent, verifies its immutable commit and
+installs its Gamma9001 `c_amy` service into the frontend virtual environment.
+It requires network access only while provisioning. Subsequent launches do
+not fetch or build anything:
+
+```bash
+./run_local.sh --windowed
+```
+
+`run_local.sh` starts the standalone AMY service and the Qt frontend as two
+processes connected by the local wire-protocol socket. It uses
+`OMNICHORD_VENV` when set, otherwise a frontend `.venv` when present, and
+finally the repository-neighbour `omnichord-env` development convention. Set
+`OMNICHORD_AMY_ROOT` only when the AMY checkout intentionally lives elsewhere.
+
 ## USB MIDI input
 
 The current Linux input backend opens every ALSA raw-MIDI character device

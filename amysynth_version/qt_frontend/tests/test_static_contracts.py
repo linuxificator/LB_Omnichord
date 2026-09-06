@@ -318,12 +318,22 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("import c_amy", launcher)
         self.assertIn("amy_set_gamma9001_pcm", launcher)
         self.assertIn("gamma9001_pcm_data", launcher)
+        self.assertIn("prepare_local_amy.sh --checkout", launcher)
         self.assertNotIn('"$frontend_dir/prepare_local_amy.sh"', launcher)
         self.assertNotIn("pip install", launcher)
         self.assertLess(
             launcher.index("amy_set_gamma9001_pcm"),
             launcher.index("code/local_amy_service.py"),
         )
+
+    def test_local_amy_setup_can_checkout_the_exact_release(self) -> None:
+        setup = (ROOT / "prepare_local_amy.sh").read_text(encoding="utf-8")
+        self.assertIn("--checkout", setup)
+        self.assertIn('packaging/checkout_amy.py', setup)
+        self.assertIn('--destination "$amy_root"', setup)
+        self.assertIn('actual_commit="$(git -C "$amy_root" rev-parse HEAD)"', setup)
+        self.assertIn('if [[ "$actual_commit" != "$amy_commit" ]]', setup)
+        self.assertIn('AMY_PCM_BANK="$amy_pcm_bank" python -m pip install', setup)
 
     def test_midi_cc_bar_clears_omni_button_and_aligns_to_sections(self) -> None:
         qml = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
