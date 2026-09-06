@@ -16,6 +16,7 @@ from performance_qml_adapter import PerformanceQmlAdapter  # noqa: E402
 
 
 class FakeController(QObject):
+    performanceChanged = Signal()
     chordGateChanged = Signal()
     bassVoicingChanged = Signal()
     chordArpeggioChanged = Signal()
@@ -107,9 +108,7 @@ class PerformanceQmlAdapterTests(unittest.TestCase):
         self.adapter.chordArpeggioChanged.connect(
             lambda: counts.__setitem__("arp", counts["arp"] + 1)
         )
-        self.controller.chordGateChanged.emit()
-        self.controller.bassVoicingChanged.emit()
-        self.controller.chordArpeggioChanged.emit()
+        self.controller.performanceChanged.emit()
         self.assertEqual(counts, {"gate": 1, "bass": 1, "arp": 1})
 
     def test_actions_delegate_without_duplicating_domain_logic(self) -> None:

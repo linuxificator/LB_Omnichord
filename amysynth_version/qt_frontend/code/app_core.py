@@ -832,13 +832,10 @@ class InstrumentBackend(QObject):
     rhythmStateChanged = Signal()
     rhythmControlsChanged = Signal()
 
-    # PySide 6.7 on aarch64 cannot safely append signals after slots inherited
-    # by the performance and integration subclasses. The domain behavior stays
-    # in those layers; only their Qt signal declarations live in this stable
-    # base meta-object.
-    chordGateChanged = Signal()
-    bassVoicingChanged = Signal()
-    chordArpeggioChanged = Signal()
+    # PySide 6.7 on aarch64 cannot safely expose signals appended after slots
+    # inherited by the performance subclass. Its domain-specific signals stay
+    # in that layer; this one stable notification drives the direct QML adapter.
+    performanceChanged = Signal()
 
     tuningChanged = Signal()
     presetChanged = Signal()

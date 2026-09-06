@@ -153,7 +153,9 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
             self.assertNotIn("Required property", output)
             self.assertTrue(
                 any("h0.02" in packet for packet in wire_packets),
-                f"bound CC did not change AMY reverb: {wire_packets!r}",
+                "bound CC did not change AMY reverb: "
+                f"returncode={process.returncode!r}, "
+                f"packets={wire_packets!r}, output={output!r}",
             )
 
 

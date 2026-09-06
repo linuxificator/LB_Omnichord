@@ -273,8 +273,15 @@ class StaticContractTests(unittest.TestCase):
             "bassVoicingChanged = Signal()",
             "chordArpeggioChanged = Signal()",
         ):
-            self.assertIn(signal, app_core)
-            self.assertNotIn(signal, performance)
+            self.assertNotIn(signal, app_core)
+            self.assertIn(signal, performance)
+        self.assertIn("performanceChanged = Signal()", app_core)
+        self.assertIn(
+            "controller.performanceChanged.connect(self._notify_all)",
+            (ROOT / "code" / "performance_qml_adapter.py").read_text(
+                encoding="utf-8"
+            ),
+        )
 
     def test_midi_button_leds_are_not_visible_in_idle_state(self) -> None:
         led = (ROOT / "gui" / "MidiButtonLed.qml").read_text(encoding="utf-8")

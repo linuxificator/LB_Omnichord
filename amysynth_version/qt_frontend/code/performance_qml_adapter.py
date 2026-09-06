@@ -21,9 +21,13 @@ class PerformanceQmlAdapter(QObject):
     def __init__(self, controller: Any) -> None:
         super().__init__(controller)
         self._controller = controller
-        controller.chordGateChanged.connect(self.chordGateChanged.emit)
-        controller.bassVoicingChanged.connect(self.bassVoicingChanged.emit)
-        controller.chordArpeggioChanged.connect(self.chordArpeggioChanged.emit)
+        controller.performanceChanged.connect(self._notify_all)
+
+    @Slot()
+    def _notify_all(self) -> None:
+        self.chordGateChanged.emit()
+        self.bassVoicingChanged.emit()
+        self.chordArpeggioChanged.emit()
 
     @Property(int, notify=chordGateChanged)
     def chordGateState(self) -> int:
