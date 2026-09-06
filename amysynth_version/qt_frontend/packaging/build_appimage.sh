@@ -65,6 +65,21 @@ python -m PyInstaller \
     "$frontend_dir/packaging/appimage_entry.py"
 
 cp -a "$pyinstaller_dist/LB_Omnichord/." "$app_dir/usr/lib/LB_Omnichord/"
+
+# Raspberry Pi OS supplies the C++ runtime used by its Mesa/V3D graphics
+# drivers. Keeping the older Ubuntu-builder copy ahead of that runtime makes
+# Qt's Wayland EGL plugin load but prevents it from creating a graphics
+# context on current Pi OS. AppImages cannot bundle the kernel/compositor/GPU
+# stack, so this target deliberately resolves libstdc++ with the host stack.
+if [[ "$platform_name" == "RaspberryPi-aarch64" ]]; then
+    bundled_cxx_runtime="$app_dir/usr/lib/LB_Omnichord/_internal/libstdc++.so.6"
+    if [[ ! -e "$bundled_cxx_runtime" && ! -L "$bundled_cxx_runtime" ]]; then
+        echo "Expected PyInstaller C++ runtime is missing: $bundled_cxx_runtime" >&2
+        exit 2
+    fi
+    rm -f -- "$bundled_cxx_runtime"
+fi
+
 install -Dm755 /dev/stdin "$app_dir/AppRun" <<'EOF'
 #!/usr/bin/env bash
 set -e

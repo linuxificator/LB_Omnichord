@@ -9,6 +9,11 @@
     "Windows-x86_64": 145000000,
     "macOS-arm64": 145000000
   },
+  "platform_forbidden_runtime_basenames": {
+    "RaspberryPi-aarch64": [
+      "libstdc++.so.6"
+    ]
+  },
   "python_modules": [
     "PySide6.QtCore",
     "PySide6.QtGui",

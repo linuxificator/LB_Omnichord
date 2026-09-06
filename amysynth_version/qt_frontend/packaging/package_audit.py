@@ -90,10 +90,18 @@ def content_members(package: Path | None, tree: Path | None) -> list[Member]:
 
 
 def policy_violations(
-    members: Iterable[Member], forbidden_fragments: Iterable[str]
+    members: Iterable[Member],
+    forbidden_fragments: Iterable[str],
+    forbidden_basenames: Iterable[str] = (),
 ) -> list[dict[str, str]]:
     violations: list[dict[str, str]] = []
+    basenames = frozenset(forbidden_basenames)
     for member in members:
+        if Path(member.path).name in basenames:
+            violations.append(
+                {"fragment": Path(member.path).name, "path": member.path}
+            )
+            continue
         for fragment in forbidden_fragments:
             if fragment in member.path:
                 violations.append({"fragment": fragment, "path": member.path})
@@ -123,7 +131,9 @@ def audit(
     manifest = load_manifest(manifest_path)
     members = content_members(package, tree)
     violations = policy_violations(
-        members, manifest["forbidden_runtime_fragments"]
+        members,
+        manifest["forbidden_runtime_fragments"],
+        manifest.get("platform_forbidden_runtime_basenames", {}).get(platform, ()),
     )
     package_bytes = package.stat().st_size if package is not None else None
     configured_budget = manifest.get("package_size_budgets_bytes", {}).get(platform)
@@ -161,7 +171,7 @@ def audit(
         examples = ", ".join(
             f"{item['fragment']}:{item['path']}" for item in violations[:5]
         )
-        raise ValueError(f"forbidden Qt runtime content: {examples}")
+        raise ValueError(f"forbidden runtime content: {examples}")
     return report
 
 

@@ -120,7 +120,7 @@ class PackageSizePolicyTests(unittest.TestCase):
                     "lib/arm64-v8a/libQt6Quick3D_arm64-v8a.so", b"unused"
                 )
 
-            with self.assertRaisesRegex(ValueError, "forbidden Qt runtime content"):
+            with self.assertRaisesRegex(ValueError, "forbidden runtime content"):
                 audit(
                     platform="android-arm64",
                     output=report,
@@ -135,6 +135,47 @@ class PackageSizePolicyTests(unittest.TestCase):
             self.assertEqual(
                 evidence["forbidden_runtime_matches"][0]["fragment"],
                 "Qt6Quick3D",
+            )
+
+    def test_raspberry_pi_audit_rejects_a_bundled_cxx_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            app_dir = root / "AppDir"
+            bundled = (
+                app_dir
+                / "usr"
+                / "lib"
+                / "LB_Omnichord"
+                / "_internal"
+                / "libstdc++.so.6"
+            )
+            bundled.parent.mkdir(parents=True)
+            bundled.write_bytes(b"builder runtime")
+            package = root / "test.AppImage"
+            with zipfile.ZipFile(package, "w") as archive:
+                archive.writestr("placeholder", b"package")
+            report = root / "report.json"
+
+            with self.assertRaisesRegex(ValueError, "libstdc\\+\\+\\.so\\.6"):
+                audit(
+                    platform="RaspberryPi-aarch64",
+                    output=report,
+                    package=package,
+                    tree=app_dir,
+                    max_package_bytes=10_000,
+                )
+
+            evidence = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(
+                evidence["forbidden_runtime_matches"],
+                [
+                    {
+                        "fragment": "libstdc++.so.6",
+                        "path": (
+                            "usr/lib/LB_Omnichord/_internal/libstdc++.so.6"
+                        ),
+                    }
+                ],
             )
 
     def test_audit_enforces_compressed_size_budget(self) -> None:
