@@ -10,7 +10,7 @@ Item {
     property bool tuningCoupled: true
     property int activeMidiRow: 0
     property var midiControlModel: []
-    property var inputTechModel: backend.midiPlayer.midiInputTechs
+    property var inputTechModel: midiBackend.midiInputTechs
     readonly property bool tuningMidiLocked:
         root.hostWindow.midiTuningMidiBound
         || (
@@ -35,10 +35,10 @@ Item {
         repeat: true
         triggeredOnStart: true
         onTriggered: {
-            backend.midiPlayer.setControlIndicatorCapacity(
+            midiBackend.setControlIndicatorCapacity(
                 midiControlBar.indicatorCapacity
             )
-            root.midiControlModel = backend.midiPlayer
+            root.midiControlModel = midiBackend
                 .commonControls(-1)
                 .slice(0, midiControlBar.indicatorCapacity)
         }
@@ -101,7 +101,7 @@ Item {
         )
 
         function publishCapacity() {
-            backend.midiPlayer.setControlIndicatorCapacity(indicatorCapacity)
+            midiBackend.setControlIndicatorCapacity(indicatorCapacity)
         }
 
         onIndicatorCapacityChanged: {
@@ -155,8 +155,8 @@ Item {
         y: root.hostWindow.presetY
         width: root.hostWindow.reverbPanelWidth
         height: root.hostWindow.presetRowHeight
-        controller: backend.midiPlayer
-        midiControlRouter: backend.midiPlayer
+        controller: midiBackend
+        midiControlRouter: midiBackend
         controlScreen: "midi"
     }
 
@@ -172,7 +172,7 @@ Item {
             + root.hostWindow.sectionGap
             + root.hostWindow.presetRowHeight
 
-        controller: backend.midiPlayer
+        controller: midiBackend
         omniController: backend
         tuningModeModel: tuningModeNames
         fullScreen:
@@ -266,9 +266,9 @@ Item {
                 + root.hostWindow.volumeWidth
             height: root.hostWindow.sectionHeight
 
-            controller: backend.midiPlayer
+            controller: midiBackend
             rowIndex: index
-            synthModel: backend.midiPlayer.synthNames
+            synthModel: midiBackend.synthNames
             leftRailWidth: root.hostWindow.leftRailWidth
             contentX: root.hostWindow.contentX
             volumeX: root.hostWindow.volumeX
@@ -302,10 +302,10 @@ Item {
             + omniButton.extensionWidth
         height: root.hostWindow.rowHeight
         text: "OMNI"
-        midiControlRouter: backend.midiPlayer
+        midiControlRouter: midiBackend
         bindingLocationScreen: "omni"
         onClicked: {
-            backend.finishMidiPreview()
+            midiBackend.previewEnd()
             root.showOmniRequested()
         }
     }
@@ -438,7 +438,7 @@ Item {
                     }
 
                     onClicked: {
-                        backend.midiPlayer.clickControlIndicator(
+                        midiBackend.clickControlIndicator(
                             modelData.channel,
                             modelData.controller
                         )
@@ -515,8 +515,8 @@ Item {
             + (root.hostWindow.sectionHeight - height) / 2
         z: 2000
         channel: {
-            backend.midiPlayer.stateVersion
-            return backend.midiPlayer.chordInputChannel
+            midiBackend.stateVersion
+            return midiBackend.chordInputChannel
         }
         panelColor: "#ffffff"
         pressedPanelColor: "#dddddd"
@@ -526,6 +526,6 @@ Item {
         ToolTip.text: "OMNI chord input channel"
 
         onClicked:
-            backend.midiPlayer.cycleChordInputChannel()
+            midiBackend.cycleChordInputChannel()
     }
 }

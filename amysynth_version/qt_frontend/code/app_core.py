@@ -3925,11 +3925,17 @@ def run_application(
     )
     amy_client = graph.client
     backend = graph.backend
+    midi_backend = backend.midiPlayer
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
 
     context.setContextProperty("backend", backend)
+    # PySide 6.7 (the Raspberry Pi wheel baseline) does not reliably expose
+    # Qt properties or slots added by the Python subclass of InstrumentBackend.
+    # Publish the independently owned MIDI/OSC controller directly so QML does
+    # not depend on that version-sensitive inherited meta-object extension.
+    context.setContextProperty("midiBackend", midi_backend)
     context.setContextProperty(
         "sliderTrace",
         bool(args.slider_trace) or os.environ.get("OMNICHORD_SLIDER_TRACE") == "1",

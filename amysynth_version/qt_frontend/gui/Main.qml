@@ -120,15 +120,15 @@ ApplicationWindow {
     property bool tuningCoupled: true
     property bool strumLadderMode: backend.strumLadderMode
     readonly property bool omniTuningMidiBound: {
-        backend.midiPlayer.bindingVersion
-        return backend.midiPlayer.isControlTargetBound({
+        midiBackend.bindingVersion
+        return midiBackend.isControlTargetBound({
             "screen": "omni",
             "kind": "tuning_reference"
         })
     }
     readonly property bool midiTuningMidiBound: {
-        backend.midiPlayer.bindingVersion
-        return backend.midiPlayer.isControlTargetBound({
+        midiBackend.bindingVersion
+        return midiBackend.isControlTargetBound({
             "screen": "midi",
             "kind": "tuning_reference"
         })
@@ -137,18 +137,18 @@ ApplicationWindow {
         window.omniTuningMidiBound
         || (window.tuningCoupled && window.midiTuningMidiBound)
     readonly property bool rhythmTempoMidiBound: {
-        backend.midiPlayer.bindingVersion
-        return backend.midiPlayer.isControlTargetBound({
+        midiBackend.bindingVersion
+        return midiBackend.isControlTargetBound({
             "screen": "omni",
             "kind": "rhythm_tempo"
         })
     }
 
     function midiButtonHandled(target) {
-        const learned = backend.midiPlayer.activateControlTarget(target)
+        const learned = midiBackend.activateControlTarget(target)
         if (learned)
             return true
-        return backend.midiPlayer.midiButtonTargetBlocked(target)
+        return midiBackend.midiButtonTargetBlocked(target)
     }
 
     function setFullscreenMode(fullscreen) {
@@ -303,7 +303,7 @@ ApplicationWindow {
                 presetRowHeight: window.presetRowHeight
                 strumWidth: window.strumWidth
                 ladderMode: window.strumLadderMode
-                midiControlRouter: backend.midiPlayer
+                midiControlRouter: midiBackend
                 onStrumModeToggleRequested: {
                     const target = {
                         "screen": "omni",
@@ -323,7 +323,7 @@ ApplicationWindow {
                 width: window.reverbPanelWidth
                 height: window.presetRowHeight
                 controller: backend
-                midiControlRouter: backend.midiPlayer
+                midiControlRouter: midiBackend
                 controlScreen: "omni"
             }
 
@@ -675,7 +675,7 @@ ApplicationWindow {
                 panelBorderColor: "#aa8719"
                 fillColor: "#d69b10"
                 textColor: "#4c3505"
-                midiControlRouter: backend.midiPlayer
+                midiControlRouter: midiBackend
                 midiTarget: ({
                     "screen": "omni",
                     "kind": "volume",
@@ -700,7 +700,7 @@ ApplicationWindow {
                 panelBorderColor: "#6d6d68"
                 fillColor: "#686864"
                 textColor: "#242422"
-                midiControlRouter: backend.midiPlayer
+                midiControlRouter: midiBackend
                 midiTarget: ({
                     "screen": "omni",
                     "kind": "volume",
@@ -723,7 +723,7 @@ ApplicationWindow {
                 panelBorderColor: "#4b95c4"
                 fillColor: "#18a8e0"
                 textColor: "#08243d"
-                midiControlRouter: backend.midiPlayer
+                midiControlRouter: midiBackend
                 midiTarget: ({
                     "screen": "omni",
                     "kind": "volume",
@@ -746,7 +746,7 @@ ApplicationWindow {
                 panelBorderColor: "#58855b"
                 fillColor: "#3d9348"
                 textColor: "#14321a"
-                midiControlRouter: backend.midiPlayer
+                midiControlRouter: midiBackend
                 midiTarget: ({
                     "screen": "omni",
                     "kind": "volume",
@@ -1528,10 +1528,10 @@ ApplicationWindow {
                 height: window.rowHeight
                 text: "OSC\nMIDI"
                 font.pixelSize: height * 0.31
-                midiControlRouter: backend.midiPlayer
+                midiControlRouter: midiBackend
                 bindingLocationScreen: "midi"
                 midiLearnActive:
-                    backend.midiPlayer.omniControlLedState === "learn"
+                    midiBackend.omniControlLedState === "learn"
                 onClicked:
                     window.midiScreen = true
             }
