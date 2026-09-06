@@ -532,7 +532,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake ccache cmake libffi-dev libltdl-dev \
-            libncurses5-dev libncursesw5-dev libssl-dev libtool \
+            libegl1 libncurses5-dev libncursesw5-dev libssl-dev libtool \
             pkg-config unzip zip zlib1g-dev
           yes | sdkmanager --licenses >/dev/null
           sdkmanager \

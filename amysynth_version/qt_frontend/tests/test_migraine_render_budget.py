@@ -137,9 +137,15 @@ Window {
         self.assertEqual(int(window.property("synchronousMorphUpdates")), 0)
         self.assertEqual(int(window.property("morphUpdates")), 0)
 
-        QTest.qWait(80)
-        self.assertGreaterEqual(int(window.property("morphUpdates")), 1)
-        self.assertLessEqual(int(window.property("morphUpdates")), 2)
+        # macOS' offscreen event dispatcher can defer a QML Timer past a
+        # single short qWait even though its declared interval is unchanged.
+        # Poll for delivery without weakening the actual contract: all 120
+        # inputs must still coalesce into exactly one geometry update.
+        for _attempt in range(50):
+            QTest.qWait(10)
+            if int(window.property("morphUpdates")) >= 1:
+                break
+        self.assertEqual(int(window.property("morphUpdates")), 1)
 
         migraine = window.findChild(QObject, "migraine")
         self.assertIsNotNone(migraine)

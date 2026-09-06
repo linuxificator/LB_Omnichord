@@ -177,6 +177,10 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("needs: [tests, release-metadata]", release)
         self.assertIn("android-packages:", release)
         self.assertIn("android-emulator:", release)
+        android_packages = release[
+            release.index("  android-packages:") : release.index("  android-emulator:")
+        ]
+        self.assertIn("libegl1", android_packages)
         self.assertIn("esp32p4-firmware:", release)
         self.assertIn(
             "android-packages, android-emulator, esp32p4-firmware]",

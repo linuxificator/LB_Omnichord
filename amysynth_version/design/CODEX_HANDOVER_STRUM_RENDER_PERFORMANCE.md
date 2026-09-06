@@ -83,7 +83,7 @@ ordinary gesture suite. It proves:
 1. an active footprint has no more than twelve Qt Quick children, exactly
    three shapes and no particle/emitter objects;
 2. a synchronous burst of 120 movement updates causes no synchronous geometry
-   rebuild, and only one or two morphology updates occur in the next 80 ms;
+   rebuild, and those inputs coalesce into exactly one morphology update;
 3. the rendered centre remains transparent while the edge contains substantial
    chromatic output.
 
@@ -98,6 +98,15 @@ PySide6 6.7 runtime. A source launch of the corrected component reached the
 physical 1920x1080/120 Hz Wayland session with V3D acceleration. This proves
 the shared component loads and satisfies the structural/cadence contract on
 the target; it does not replace the audible live-strumming check below.
+
+The cross-platform test waits up to 500 ms for that one timer delivery rather
+than assuming every headless event dispatcher services a 34 ms QML timer
+within one fixed 80 ms sleep. A macOS runner exposed that test-harness timing
+difference. The assertions still require zero synchronous rebuilds, exactly
+one coalesced update and the unchanged 34 ms component interval.
+The Android host jobs install `libegl1` before importing PySide6 for this test;
+that is a host-runner prerequisite and is unrelated to libraries bundled in
+the APK.
 
 ## Evidence boundary and next physical check
 
