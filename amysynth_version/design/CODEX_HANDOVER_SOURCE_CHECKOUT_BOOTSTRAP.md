@@ -1,7 +1,7 @@
 # Codex handover: source-checkout local runtime bootstrap
 
-Status: implemented; fresh Pi first-start validation completed, offline
-second-start validation pending
+Status: implemented; fresh Pi first-start and offline repeat-start validation
+completed
 Recorded: 2026-09-06
 Branch: `fix/raspberrypi-appimage-runtime`
 
@@ -74,6 +74,6 @@ A clean physical Pi clone with neither hidden directory present successfully
 created the environment, cloned and built the exact Gamma9001 AMY commit, and
 started both processes using the Broadcom V3D OpenGL renderer at a measured
 8.33 ms display cadence. The run exposed and led to the post-install dependency
-validation correction above. The remaining acceptance step is a second launch
-with package-index access disabled; it must validate and start without any
-installation or provisioning.
+validation correction above. After that correction, a second launch with
+`PIP_NO_INDEX=1` reported a consistent environment and started the same socket
+service and V3D frontend without an install, clone or AMY rebuild.

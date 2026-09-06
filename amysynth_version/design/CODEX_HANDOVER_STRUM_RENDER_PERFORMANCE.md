@@ -93,6 +93,12 @@ the unit suite and is also run explicitly by the Linux x86_64, Raspberry Pi
 aarch64, macOS arm64, Windows x86_64 and Android host package jobs. That guards
 one implementation and one budget instead of creating platform forks.
 
+The three render-budget tests also passed with the Pi's own Python 3.13 and
+PySide6 6.7 runtime. A source launch of the corrected component reached the
+physical 1920x1080/120 Hz Wayland session with V3D acceleration. This proves
+the shared component loads and satisfies the structural/cadence contract on
+the target; it does not replace the audible live-strumming check below.
+
 ## Evidence boundary and next physical check
 
 Hosted tests can deterministically prevent the exact object/cadence regression
