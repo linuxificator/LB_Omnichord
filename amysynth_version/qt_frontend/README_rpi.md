@@ -6,10 +6,19 @@ is frozen legacy material and is never modified as part of this AMY version.
 
 ## Raspberry Pi AppImage
 
-GitHub Releases also provide a self-contained `RaspberryPi-aarch64.AppImage`
-for 64-bit Raspberry Pi OS. It targets the Raspberry Pi 4 instruction-set
+GitHub Releases also provide a portable `RaspberryPi-aarch64.AppImage` for
+64-bit Raspberry Pi OS. It targets the Raspberry Pi 4 instruction-set
 baseline and runs on both Pi 4 and Pi 5; separate builds are unnecessary. Pi 3
 and older models are outside the supported release target.
+
+The package contains LB Omnichord, PySide6/Qt, AMY and their application
+resources. Like other Linux application packages, it does not and cannot
+contain the running kernel, Wayland compositor or hardware-specific Mesa/V3D
+driver stack. Current 64-bit Raspberry Pi OS must therefore provide its normal
+EGL, Wayland EGL and OpenGL libraries. The package deliberately uses the Pi
+system's `libstdc++.so.6` so that this host graphics stack and its C++ ABI stay
+matched; substituting an older builder runtime can make the Qt Wayland plugin
+load while EGL context creation still fails.
 
 The AppImage bundles the pinned native AMY service and uses the Pi's local
 audio output. It preserves the process boundary: its launcher starts AMY and

@@ -45,6 +45,9 @@ Core rules:
 - `CODEX_HANDOVER_FRITS_SLIDER_FIX.md` records the macOS mouse-visible slider
   regression, its shared mouse/touch cause and the package-level proof added to
   prevent recurrence without platform-specific UI code.
+- `CODEX_HANDOVER_RASPBERRY_PI_APPIMAGE_GRAPHICS.md` records the physical Pi 4
+  Wayland/EGL and PySide 6.7 meta-object failures, their independent fixes and
+  the evidence still required from the rebuilt AppImage.
 - `amy/README.md` indexes Codex-only AMY audit and implementation handovers
   which are deliberately kept out of Shorepine-facing AMY branches.
 - `amy/CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` records the cumulative-tag AMY
@@ -135,7 +138,7 @@ Then add every row that matches the task:
 | Tuning, pitch or note conversion | `tuning.md`, `use_cases.md`, `../qt_frontend/tests/USE_CASES.md` |
 | AMY commands, sockets, serial or buses | `amy_interface.md`, `../qt_frontend/docs/CONTROL_SAFETY.md` |
 | Instrument catalogue, defaults or balance | `sound_balance.md`, `presets.md`, `../qt_frontend/instruments/README_defaults.md` |
-| Platform packages, releases, Android or native Windows | `../qt_frontend/README.md`, `../qt_frontend/INSTALL.md`, `../qt_frontend/packaging/android/README.md`, `../qt_frontend/docs/WINDOWS_NATIVE.md`, `../../.github/workflows/desktop-release.yml` |
+| Platform packages, releases, Android or native Windows | `../qt_frontend/README.md`, `../qt_frontend/INSTALL.md`, `CODEX_HANDOVER_RASPBERRY_PI_APPIMAGE_GRAPHICS.md` for Raspberry Pi/AppImage graphics, `../qt_frontend/packaging/android/README.md`, `../qt_frontend/docs/WINDOWS_NATIVE.md`, `../../.github/workflows/desktop-release.yml` |
 | Optional historical WSL experiment | `../qt_frontend/docs/WSL_APPIMAGE_TESTING.md`, plus the desktop documents above |
 | ESP32-P4 firmware or packaging | `../esp32p4/README.md`, `../esp32p4/CI_FLASH.md` |
 | Known unresolved behavior | `unclear.md` plus the owning subsystem documents above |

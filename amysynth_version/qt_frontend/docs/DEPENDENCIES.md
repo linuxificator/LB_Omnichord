@@ -121,6 +121,11 @@ build and emulator gate are mandatory.
 - ESP32-P4 uses ESP-IDF 6.0.2.
 - AppImage tool/runtime downloads are architecture-specific and SHA-256
   verified in the release workflow.
+- The Raspberry Pi AppImage deliberately does not bundle PyInstaller's
+  `libstdc++.so.6`. Current Pi OS resolves that library together with its
+  Mesa/V3D graphics stack; an older Ubuntu-builder copy can load Qt's Wayland
+  EGL plugin yet prevent EGL context creation. The final package audit enforces
+  this platform-scoped exclusion. The x86_64 AppImage policy is unchanged.
 - Workflow actions are pinned to reviewed full commit SHAs and Dependabot may
   propose reviewed updates. Runner images and system packages remain named
   platform build inputs; byte-reproducibility is not claimed.

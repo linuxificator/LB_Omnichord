@@ -73,10 +73,6 @@ cp -a "$pyinstaller_dist/LB_Omnichord/." "$app_dir/usr/lib/LB_Omnichord/"
 # stack, so this target deliberately resolves libstdc++ with the host stack.
 if [[ "$platform_name" == "RaspberryPi-aarch64" ]]; then
     bundled_cxx_runtime="$app_dir/usr/lib/LB_Omnichord/_internal/libstdc++.so.6"
-    if [[ ! -e "$bundled_cxx_runtime" && ! -L "$bundled_cxx_runtime" ]]; then
-        echo "Expected PyInstaller C++ runtime is missing: $bundled_cxx_runtime" >&2
-        exit 2
-    fi
     rm -f -- "$bundled_cxx_runtime"
 fi
 
