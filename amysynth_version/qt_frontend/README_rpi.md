@@ -64,25 +64,32 @@ From the repository root:
 ```bash
 sudo apt update
 sudo apt install python3-venv python3-pip
-python3 -m venv .venv
-.venv/bin/pip install -r amysynth_version/qt_frontend/requirements.txt
 ```
+
+The source launcher creates and verifies the clone-local `.venv` itself.
 
 ## Run
 
 Windowed test:
 
 ```bash
-.venv/bin/python amysynth_version/qt_frontend/code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --windowed
+cd amysynth_version/qt_frontend
+./run_local.sh --serial --windowed
 ```
 
 Fullscreen:
 
 ```bash
-.venv/bin/python amysynth_version/qt_frontend/code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --fullscreen
+cd amysynth_version/qt_frontend
+./run_local.sh --serial --fullscreen
 ```
 
-The program may also use `/dev/ttyAMA0` or a USB UART such as `/dev/ttyUSB0` when supplied with `--serial-port`.
+`--serial` prevents the launcher from starting local AMY and leaves the
+frontend's socket options unset, so the normal serial transport is selected.
+The default `/dev/serial0` and 1,000,000 baud come from `amy_config.json`.
+The program may also use `/dev/ttyAMA0` or a USB UART such as `/dev/ttyUSB0`
+when supplied after `--serial`, for example `./run_local.sh --serial
+--serial-port /dev/ttyUSB0 --windowed`.
 
 ## Run AMY locally on the Raspberry Pi
 

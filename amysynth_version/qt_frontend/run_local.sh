@@ -8,6 +8,16 @@ release_inputs="$frontend_dir/packaging/release_inputs.py"
 amy_pcm_bank="$(python3 "$release_inputs" amy-values --field pcm_bank)"
 amy_commit="$(python3 "$release_inputs" amy-values --field commit)"
 
+transport_mode="socket"
+application_args=()
+for argument in "$@"; do
+    if [[ "$argument" == "--serial" ]]; then
+        transport_mode="serial"
+    else
+        application_args+=("$argument")
+    fi
+done
+
 if [[ -n "${OMNICHORD_VENV:-}" ]]; then
     venv_dir="$OMNICHORD_VENV"
 else
@@ -24,6 +34,10 @@ if [[ ! -x "$venv_dir/bin/python" ]]; then
 fi
 
 venv_python="$venv_dir/bin/python"
+requirements_file="$frontend_dir/requirements-source.txt"
+if [[ "$transport_mode" == "serial" ]]; then
+    requirements_file="$frontend_dir/requirements.txt"
+fi
 
 # This is a source-checkout convenience boundary, not a packaged application
 # startup path. Verify the frontend plus pinned AMY's declared Python
@@ -34,11 +48,17 @@ if ! "$venv_python" -m pip install \
     --dry-run \
     --no-deps \
     --no-index \
-    -r "$frontend_dir/requirements-source.txt" >/dev/null 2>&1; then
+    -r "$requirements_file" >/dev/null 2>&1; then
     echo "Installing source requirements into $venv_dir"
     "$venv_python" -m pip install \
         --disable-pip-version-check \
-        -r "$frontend_dir/requirements-source.txt"
+        -r "$requirements_file"
+fi
+
+if [[ "$transport_mode" == "serial" ]]; then
+    "$venv_python" -m pip check
+    exec "$venv_python" "$frontend_dir/code/main.py" \
+        "${application_args[@]}"
 fi
 
 amy_stamp="$venv_dir/.lb-omnichord-amy"
@@ -114,4 +134,4 @@ fi
 
 "$venv_python" "$frontend_dir/code/main.py" \
     --amy-socket "$socket_path" \
-    "$@"
+    "${application_args[@]}"

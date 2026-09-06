@@ -49,11 +49,11 @@ source bootstrap or download dependencies at startup.
 
 ## Running
 
-From this directory after creating the clone-root virtual environment described
-in `README_rpi.md`:
+From this directory, the source launcher creates or validates the clone-root
+virtual environment and selects the physical UART without starting local AMY:
 
 ```bash
-../../.venv/bin/python code/main.py --serial-port /dev/serial0 --serial-baud 1000000 --windowed
+./run_local.sh --serial --windowed
 ```
 
 `main.py` addresses the canonical `gui/`, `config/`, `instruments/` and `music/` directories directly. There are no compatibility symlinks or duplicate runtime data files in `code/`.

@@ -22,6 +22,12 @@ The source-only launcher now owns an idempotent developer bootstrap:
 - both locations are ignored by Git;
 - explicit `OMNICHORD_VENV` and `OMNICHORD_AMY_ROOT` still override them.
 
+`./run_local.sh --serial` uses the same clone-local frontend bootstrap but
+does not provision or start local AMY. It launches the portable frontend with
+no socket argument, allowing the existing composition root to select the
+serial endpoint from configuration. The default invocation retains the local
+Gamma9001 socket service behavior.
+
 On first run, `run_local.sh` creates the venv, installs the authoritative
 `requirements-source.txt`, checks out the exact AMY release commit, builds it with the
 declared Gamma9001 bank and starts the unchanged two-process socket runtime.
@@ -64,6 +70,7 @@ Static source contracts require:
 
 - clone-root ignored `.venv` and `.amy` defaults;
 - venv creation through the standard library;
+- an explicit source-launcher serial route that exits before AMY provisioning;
 - offline pip requirement verification and `pip check` before launch;
 - invocation of the exact existing AMY preparation helper when validation
   fails;

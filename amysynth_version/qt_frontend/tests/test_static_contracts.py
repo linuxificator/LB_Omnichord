@@ -338,22 +338,23 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("gamma9001_pcm_data", launcher)
         self.assertIn('venv_dir="$repo_dir/.venv"', launcher)
         self.assertIn('amy_root="${OMNICHORD_AMY_ROOT:-$repo_dir/.amy/$amy_commit}"', launcher)
+        self.assertIn('if [[ "$argument" == "--serial" ]]', launcher)
+        self.assertIn('transport_mode="serial"', launcher)
+        self.assertIn('requirements_file="$frontend_dir/requirements.txt"', launcher)
         self.assertIn('python3 -m venv "$venv_dir"', launcher)
         self.assertIn("--dry-run", launcher)
         self.assertIn("--no-index", launcher)
-        self.assertIn('-r "$frontend_dir/requirements-source.txt"', launcher)
+        self.assertIn('-r "$requirements_file"', launcher)
         self.assertIn('"$venv_python" -m pip check', launcher)
         self.assertIn('"$frontend_dir/prepare_local_amy.sh" --checkout', launcher)
         self.assertIn('amy_contract_is_current()', launcher)
         self.assertIn('hashlib.sha256(Path(sys.argv[1]).read_bytes())', launcher)
-        self.assertLess(
-            launcher.index("amy_set_gamma9001_pcm"),
-            launcher.index('"$venv_python" -m pip check'),
-        )
-        self.assertLess(
-            launcher.index('"$venv_python" -m pip check'),
-            launcher.index("code/local_amy_service.py"),
-        )
+        final_pip_check = launcher.rindex('"$venv_python" -m pip check')
+        self.assertLess(launcher.index("amy_set_gamma9001_pcm"), final_pip_check)
+        self.assertLess(final_pip_check, launcher.index("code/local_amy_service.py"))
+        serial_exit = launcher.index('if [[ "$transport_mode" == "serial" ]]', 1000)
+        self.assertLess(serial_exit, launcher.index("amy_contract_is_current()"))
+        self.assertIn('exec "$venv_python" "$frontend_dir/code/main.py"', launcher)
 
         source_requirements = (ROOT / "requirements-source.txt").read_text(
             encoding="utf-8"
