@@ -18,6 +18,18 @@ SERVICE_SESSION = re.compile(
     r"AMY service session completed: ([1-9][0-9]*) wire commands, "
     r"([1-9][0-9]*) nonzero PCM samples"
 )
+RUNTIME_FAILURE_MARKERS = (
+    "Traceback (most recent call last)",
+    "TypeError:",
+    "ReferenceError:",
+    "QQmlApplicationEngine failed",
+    "Cannot assign to non-existent property",
+    "is not a function",
+    "*** Sort Warning ***",
+    "EGL not available",
+    "Failed to create OpenGL context",
+    "Failed to create RHI",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +75,15 @@ def _runtime_markers(platform: str, application_log: str) -> tuple[bool, str]:
         ):
             if marker not in application_log:
                 missing.append(marker)
-    return not missing, "all runtime markers observed" if not missing else "missing: " + ", ".join(missing)
+    failures = [
+        marker for marker in RUNTIME_FAILURE_MARKERS if marker in application_log
+    ]
+    details: list[str] = []
+    if missing:
+        details.append("missing: " + ", ".join(missing))
+    if failures:
+        details.append("runtime failures: " + ", ".join(failures))
+    return not missing and not failures, "all runtime markers observed" if not details else "; ".join(details)
 
 
 def evaluate(args: argparse.Namespace) -> dict[str, Any]:
@@ -130,7 +150,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         ScenarioEvidence(
             "packaged-runtime",
             "package-integration",
-            runtime_ok and "Traceback (most recent call last)" not in application_log,
+            runtime_ok,
             runtime_detail,
             (str(args.application_log.resolve()),),
         ),

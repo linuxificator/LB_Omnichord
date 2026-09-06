@@ -134,6 +134,73 @@ class PackageEvidenceTests(unittest.TestCase):
         }
         self.assertEqual(failures, {"packaged-runtime"})
 
+    def test_qt_metaobject_warning_rejects_an_otherwise_complete_capture(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            artifact = root / "app"
+            artifact.write_bytes(b"x")
+            audit = root / "audit.json"
+            audit.write_text(
+                json.dumps(
+                    {
+                        "platform": "RaspberryPi-aarch64",
+                        "package_bytes": 1,
+                        "forbidden_runtime_matches": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            qml = root / "qml.json"
+            qml.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "source_imports": ["QtQuick"],
+                        "reviewed_qml_modules": ["QtQuick"],
+                        "scanner_result": [],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            app_log = root / "application.log"
+            app_log.write_text(
+                "QPA platform: offscreen\n"
+                "AMY service ready: socket\n"
+                "AMY backend: external socket\n"
+                "Captured omni.png\n"
+                "*** Sort Warning ***\n",
+                encoding="utf-8",
+            )
+            input_log = root / "input.log"
+            input_log.write_text("OK\n", encoding="utf-8")
+            pngs = []
+            for name in ("omni.png", "midi.png"):
+                path = root / name
+                path.write_bytes(PNG_SIGNATURE + bytes(2048))
+                pngs.append(path)
+
+            manifest = evaluate(
+                argparse.Namespace(
+                    platform="RaspberryPi-aarch64",
+                    artifact=artifact,
+                    package_audit=audit,
+                    qml_imports=qml,
+                    application_log=app_log,
+                    external_input_contract_log=input_log,
+                    screenshot=pngs,
+                    regression_result="success",
+                    audio_evidence=None,
+                )
+            )
+
+        runtime = next(
+            item
+            for item in manifest["scenarios"]
+            if item["identifier"] == "packaged-runtime"
+        )
+        self.assertFalse(runtime["passed"])
+        self.assertIn("*** Sort Warning ***", runtime["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()
