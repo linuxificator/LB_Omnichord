@@ -108,6 +108,14 @@ The Android host jobs install `libegl1` before importing PySide6 for this test;
 that is a host-runner prerequisite and is unrelated to libraries bundled in
 the APK.
 
+GitHub Actions run `34056233700` completed successfully at render/test commit
+`37e01accd9b7d82677ddcd1060eea6f5f6469717`. It built and validated Linux
+x86-64, Raspberry Pi/aarch64, macOS, Windows, Android x86-64 and Android arm64,
+plus both ESP32-P4 firmware variants. The packaged Android emulator acceptance
+also passed its externally injected `adb` strum swipe, audio evidence and
+rendered-frame checks. Because this was a manual feature-branch run, it did not
+publish a release.
+
 ## Evidence boundary and next physical check
 
 Hosted tests can deterministically prevent the exact object/cadence regression

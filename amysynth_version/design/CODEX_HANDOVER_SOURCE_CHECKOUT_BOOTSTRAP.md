@@ -84,3 +84,7 @@ started both processes using the Broadcom V3D OpenGL renderer at a measured
 validation correction above. After that correction, a second launch with
 `PIP_NO_INDEX=1` reported a consistent environment and started the same socket
 service and V3D frontend without an install, clone or AMY rebuild.
+
+The `--serial` route was then physically started on the same Pi at commit
+`0f6e3fd`: it reported `/dev/serial0 @ 1000000 baud`, did not start the local
+AMY socket service, and rendered through the same 120 Hz V3D path.
