@@ -1,0 +1,6 @@
+# Source-checkout runtime: portable frontend plus the pinned AMY Python
+# distribution's declared dependencies. Released packages use their own build
+# inputs and never install this file at application startup.
+-r requirements.txt
+numpy==2.5.2
+soundfile==0.13.1

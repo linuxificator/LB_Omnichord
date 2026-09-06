@@ -1,7 +1,7 @@
 # Codex handover: source-checkout local runtime bootstrap
 
-Status: implemented and covered by source contracts; fresh Pi checkout test
-pending
+Status: implemented; fresh Pi first-start validation completed, offline
+second-start validation pending
 Recorded: 2026-09-06
 Branch: `fix/raspberrypi-appimage-runtime`
 
@@ -23,13 +23,20 @@ The source-only launcher now owns an idempotent developer bootstrap:
 - explicit `OMNICHORD_VENV` and `OMNICHORD_AMY_ROOT` still override them.
 
 On first run, `run_local.sh` creates the venv, installs the authoritative
-`requirements.txt`, checks out the exact AMY release commit, builds it with the
+`requirements-source.txt`, checks out the exact AMY release commit, builds it with the
 declared Gamma9001 bank and starts the unchanged two-process socket runtime.
 
 On subsequent runs it first asks pip to resolve the requirements with
 `--dry-run --no-deps --no-index`. This verifies installed versions against the
 real requirement files without contacting a package index. It also runs `pip
 check`. Installation occurs only if that offline verification fails.
+
+The source requirement set includes the portable frontend dependencies plus
+pinned NumPy and SoundFile versions declared by AMY itself. The final `pip
+check` deliberately runs after AMY provisioning: a physical fresh-clone Pi
+test found that running it only before AMY installation could accept a first
+start yet reject the second because AMY's dependency metadata did not exist at
+the earlier check.
 
 AMY installation records `<commit>:<bank>` plus the SHA-256 digest of the
 compiled extension. Startup verifies the stamp, current binary digest and both
@@ -63,7 +70,10 @@ Static source contracts require:
 - pinned commit/bank and extension-digest verification before the service is
   started.
 
-The remaining acceptance step is a clean physical Pi clone with neither hidden
-directory present. Its first `./run_local.sh --windowed` must provision and
-start; a second launch with networking unavailable must validate and start
-without installation.
+A clean physical Pi clone with neither hidden directory present successfully
+created the environment, cloned and built the exact Gamma9001 AMY commit, and
+started both processes using the Broadcom V3D OpenGL renderer at a measured
+8.33 ms display cadence. The run exposed and led to the post-install dependency
+validation correction above. The remaining acceptance step is a second launch
+with package-index access disabled; it must validate and start without any
+installation or provisioning.

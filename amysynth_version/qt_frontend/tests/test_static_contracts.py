@@ -341,15 +341,26 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('python3 -m venv "$venv_dir"', launcher)
         self.assertIn("--dry-run", launcher)
         self.assertIn("--no-index", launcher)
-        self.assertIn('-r "$frontend_dir/requirements.txt"', launcher)
+        self.assertIn('-r "$frontend_dir/requirements-source.txt"', launcher)
         self.assertIn('"$venv_python" -m pip check', launcher)
         self.assertIn('"$frontend_dir/prepare_local_amy.sh" --checkout', launcher)
         self.assertIn('amy_contract_is_current()', launcher)
         self.assertIn('hashlib.sha256(Path(sys.argv[1]).read_bytes())', launcher)
         self.assertLess(
             launcher.index("amy_set_gamma9001_pcm"),
+            launcher.index('"$venv_python" -m pip check'),
+        )
+        self.assertLess(
+            launcher.index('"$venv_python" -m pip check'),
             launcher.index("code/local_amy_service.py"),
         )
+
+        source_requirements = (ROOT / "requirements-source.txt").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("-r requirements.txt", source_requirements)
+        self.assertIn("numpy==", source_requirements)
+        self.assertIn("soundfile==", source_requirements)
 
     def test_local_amy_setup_can_checkout_the_exact_release(self) -> None:
         setup = (ROOT / "prepare_local_amy.sh").read_text(encoding="utf-8")

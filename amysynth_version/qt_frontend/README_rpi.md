@@ -95,7 +95,7 @@ cd amysynth_version/qt_frontend
 ```
 
 On the first run, the source launcher creates `.venv` in the Git-clone root,
-installs `requirements.txt`, checks out the exact AMY release below
+installs `requirements-source.txt`, checks out the exact AMY release below
 `.amy/<commit>/`, and builds its Gamma9001 `c_amy` service. Both directories
 are ignored by Git. This first preparation needs network access and the normal
 Python/C build prerequisites. Later launches perform offline dependency,

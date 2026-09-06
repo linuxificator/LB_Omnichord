@@ -26,20 +26,20 @@ fi
 venv_python="$venv_dir/bin/python"
 
 # This is a source-checkout convenience boundary, not a packaged application
-# startup path.  Verify the declared requirements without consulting a package
-# index; only a missing or incompatible environment triggers installation.
+# startup path. Verify the frontend plus pinned AMY's declared Python
+# dependencies without consulting a package index; only a missing or
+# incompatible environment triggers installation.
 if ! "$venv_python" -m pip install \
     --disable-pip-version-check \
     --dry-run \
     --no-deps \
     --no-index \
-    -r "$frontend_dir/requirements.txt" >/dev/null 2>&1; then
+    -r "$frontend_dir/requirements-source.txt" >/dev/null 2>&1; then
     echo "Installing source requirements into $venv_dir"
     "$venv_python" -m pip install \
         --disable-pip-version-check \
-        -r "$frontend_dir/requirements.txt"
+        -r "$frontend_dir/requirements-source.txt"
 fi
-"$venv_python" -m pip check
 
 amy_stamp="$venv_dir/.lb-omnichord-amy"
 amy_contract="$amy_commit:$amy_pcm_bank"
@@ -81,6 +81,11 @@ if ! amy_contract_is_current; then
         exit 1
     }
 fi
+
+# Run this after AMY provisioning as well: the installed AMY distribution has
+# its own dependency metadata, which is absent on a completely fresh venv
+# during the earlier requirements check.
+"$venv_python" -m pip check
 
 "$venv_python" "$frontend_dir/code/local_amy_service.py" \
     --socket "$socket_path" \

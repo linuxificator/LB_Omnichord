@@ -57,8 +57,9 @@ static metadata only.
 Released application packages never install Python packages at runtime. The
 source-only `run_local.sh` developer launcher is the explicit exception: on a
 fresh Git clone it creates the ignored repository-root `.venv`, installs the
-reviewed `requirements.txt`, and provisions the exact pinned AMY component in
-the ignored `.amy/<commit>/` checkout before starting. On later launches it
+reviewed `requirements-source.txt` (the portable frontend plus pinned NumPy and
+SoundFile dependencies declared by AMY), and provisions the exact pinned AMY
+component in the ignored `.amy/<commit>/` checkout before starting. On later launches it
 first uses pip's offline `--dry-run --no-index` resolution check plus `pip
 check`; it consults the package index only when the declared environment is
 missing or incompatible. A commit/bank stamp and extension digest prevent a
@@ -74,10 +75,12 @@ copy both distributions' metadata/license files and ship
 `THIRD_PARTY_NOTICES.md`; release SBOM relationships exclude them from the
 Android package.
 
-NumPy is test-only from LB Omnichord's perspective. The pinned AMY source also
-declares NumPy (and SoundFile) as its own component dependencies; their resolved
-versions in a packaged AMY service remain part of the AMY component's build
-provenance, not portable frontend runtime intent.
+NumPy is test-only from the portable LB Omnichord frontend's perspective. The
+pinned AMY source also declares NumPy and SoundFile as component dependencies;
+the source-only requirements file pins both so a fresh clone is reproducible
+and `pip check` can validate the combined frontend/service environment. Their
+resolved versions in a packaged AMY service remain part of the AMY component's
+build provenance, not portable frontend runtime intent.
 
 ## LB AMY component exception
 

@@ -74,6 +74,18 @@ class DependencyDeclarationTests(unittest.TestCase):
             {"pyside6", "pyserial", "fastjsonschema", "python-osc", "zeroconf"},
         )
         self.assertEqual(
+            resolved["source_runtime"],
+            {
+                "pyside6",
+                "pyserial",
+                "fastjsonschema",
+                "python-osc",
+                "zeroconf",
+                "numpy",
+                "soundfile",
+            },
+        )
+        self.assertEqual(
             resolved["build"],
             {
                 "pyside6",
@@ -116,6 +128,11 @@ class DependencyDeclarationTests(unittest.TestCase):
             owner = record["owner"]
             distribution = record["distribution"].casefold().replace("_", "-")
             self.assertIn(distribution, resolved[owner], tool)
+
+        for dependency, record in self.manifest["transitive_dependencies"].items():
+            owner = record["owner"]
+            distribution = record["distribution"].casefold().replace("_", "-")
+            self.assertIn(distribution, resolved[owner], dependency)
 
     def test_workflows_consume_declared_groups_and_shared_amy_pin(self) -> None:
         regression = (

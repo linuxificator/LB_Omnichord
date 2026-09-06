@@ -582,6 +582,25 @@ class PackagingContracts(unittest.TestCase):
         self.assertNotIn("--hidden-import package_smoke", build)
         self.assertNotIn("--hidden-import PySide6.QtTest", build)
 
+    def test_release_launchers_do_not_use_source_bootstrap(self) -> None:
+        launchers = (
+            FRONTEND / "packaging" / "appimage_entry.py",
+            FRONTEND / "packaging" / "windows" / "run_windows.ps1",
+            FRONTEND / "code" / "main.py",
+        )
+        source_only_fragments = (
+            "run_local.sh",
+            "prepare_local_amy.sh",
+            "requirements-source.txt",
+            "pip install",
+            "/.venv",
+        )
+        for launcher in launchers:
+            content = launcher.read_text(encoding="utf-8")
+            with self.subTest(launcher=launcher.name):
+                for fragment in source_only_fragments:
+                    self.assertNotIn(fragment, content)
+
     def test_release_stamp_validation_matches_asset_format(self) -> None:
         build_script = (FRONTEND / "packaging" / "build_appimage.sh").read_text(
             encoding="utf-8"

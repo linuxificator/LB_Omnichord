@@ -4,6 +4,7 @@
   "requirement_groups": {
     "portable": "requirements-portable.txt",
     "runtime": "requirements.txt",
+    "source_runtime": "requirements-source.txt",
     "build": "requirements-build.txt",
     "test_quality": "requirements-test.txt",
     "android_host": "requirements-android-host.txt"
@@ -42,7 +43,7 @@
     "numpy": {
       "distribution": "numpy",
       "owner": "test_quality",
-      "used_by": ["native instrument-balance renderer"]
+      "used_by": ["pinned AMY source runtime", "native instrument-balance renderer"]
     },
     "amy": {
       "component_exception": "lb_amy",
@@ -51,6 +52,13 @@
     "c_amy": {
       "component_exception": "lb_amy",
       "used_by": ["local AMY service", "native tests"]
+    }
+  },
+  "transitive_dependencies": {
+    "soundfile": {
+      "distribution": "soundfile",
+      "owner": "source_runtime",
+      "required_by": "pinned AMY Python distribution"
     }
   },
   "invoked_python_tools": {
