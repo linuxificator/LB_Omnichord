@@ -83,9 +83,9 @@ with the explicit dependency order `Core`, `Gui`, `Network`, `OpenGL`, `Qml`,
 `Quick`, `QuickControls2`. It then checks that same order in the compiled APK
 resource table. In particular, `Quick` must load before `QuickControls2`, which
 can otherwise pull in `Quick` as an ordinary native dependency before its
-Android JNI initialization is ready. `QtQuick.Particles` is a QML-only module,
-not a PySide binding module with a `QtQuickParticles.abi3.so`; its QML plugin
-and recursive native dependencies are retained through `qt_runtime_manifest.json`
+Android JNI initialization is ready. QML-only modules have no corresponding
+PySide binding module; their plugins and recursive native dependencies are
+retained through `qt_runtime_manifest.json`
 and loaded by QML rather than added to the PySide JNI preload list.
 
 QtTest and QtWidgets are test dependencies only. Package acceptance drives the

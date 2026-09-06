@@ -35,7 +35,6 @@
   "source_qml_imports": [
     "QtQuick",
     "QtQuick.Controls",
-    "QtQuick.Particles",
     "QtQuick.Shapes",
     "QtQuick.Window"
   ],
@@ -48,7 +47,6 @@
     "QtQuick/Controls/Basic",
     "QtQuick/Controls/Basic/impl",
     "QtQuick/Controls/impl",
-    "QtQuick/Particles",
     "QtQuick/Shapes",
     "QtQuick/Templates",
     "QtQuick/Window"

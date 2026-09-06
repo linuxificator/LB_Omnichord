@@ -88,6 +88,10 @@ jobs:
             -c "amysynth_version/qt_frontend/packaging/constraints/${{ matrix.constraints }}" \
             -r amysynth_version/qt_frontend/requirements-build.txt
 
+      - name: Run shared 120 Hz strum visual-cost contract
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/test_migraine_render_budget.py
+
       - name: Install pinned AMY with Gamma9001 drum bank
         run: |
           python amysynth_version/qt_frontend/packaging/checkout_amy.py \
@@ -221,6 +225,10 @@ jobs:
             -c amysynth_version/qt_frontend/packaging/constraints/desktop-current.txt \
             -r amysynth_version/qt_frontend/requirements-build.txt
 
+      - name: Run shared 120 Hz strum visual-cost contract
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/test_migraine_render_budget.py
+
       - name: Install pinned AMY with Gamma9001 drum bank
         run: |
           python amysynth_version/qt_frontend/packaging/checkout_amy.py \
@@ -349,6 +357,11 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install -c amysynth_version/qt_frontend/packaging/constraints/desktop-current.txt -r amysynth_version/qt_frontend/requirements-build.txt
+
+      - name: Run shared 120 Hz strum visual-cost contract
+        shell: pwsh
+        working-directory: amysynth_version/qt_frontend
+        run: python tests\test_migraine_render_budget.py
 
       - name: Run portable external-input process contract
         shell: pwsh
@@ -550,6 +563,10 @@ jobs:
               check=True,
           )
           PY
+
+      - name: Run shared 120 Hz strum visual-cost contract
+        working-directory: amysynth_version/qt_frontend
+        run: python tests/test_migraine_render_budget.py
 
       - name: Run portable external-input process contract
         working-directory: amysynth_version/qt_frontend

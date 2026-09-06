@@ -66,6 +66,17 @@ percentage threshold. The reusable workflow applies this selectively to the
 pure/unit suite; native/package tests remain acceptance evidence rather than
 being distorted to raise a coverage number.
 
+The portable strum-visual cost contract loads the real `Migraine.qml`, asserts
+a small cached Qt Quick item surface with no particle/emitter fan-out, sends a
+120-event pointer burst, and proves shape updates are deferred to the bounded
+30 Hz visual cadence. It also renders a tolerant appearance check for a hollow
+chromatic outline. The unit suite runs it automatically, and every desktop,
+Raspberry Pi and Android-host package job runs the identical test under its
+native Python/Qt toolchain. Android target packaging and emulator input still
+exercise the same QML source; hosted CI cannot claim physical Pi/Android GPU or
+audio-deadline evidence. Sustained 120 Hz interaction without audible dropout
+on a real Pi remains a recorded physical acceptance test.
+
 Top-level unit tests are discovered automatically. Integration suites are
 listed explicitly because their process, PTY and native-engine requirements
 differ. `test-artifacts/<suite>/` is recreated for every suite invocation and

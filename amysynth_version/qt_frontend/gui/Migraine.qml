@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Particles
 import QtQuick.Shapes
 
 Item {
@@ -14,7 +13,10 @@ Item {
     property real targetCenterY: 0
     property real morphPhase: 0
     property int fadeDuration: 500
+    property int morphInterval: 34
     property bool animatePosition: true
+
+    property real pendingMorphDistance: 0
 
     readonly property var pointAngles: [
         -0.08, 0.79, 1.72, 2.58, 3.48, 4.39, 5.32
@@ -152,26 +154,6 @@ Item {
         return path + "Z"
     }
 
-    function haloRadius(angle) {
-        let nearestDistance = Math.PI
-        let nearestIndex = 0
-        for (let index = 0; index < root.pointAngles.length; ++index) {
-            let distance = Math.abs(angle - root.pointAngle(index))
-            distance = Math.min(distance, Math.PI * 2 - distance)
-            if (distance < nearestDistance) {
-                nearestDistance = distance
-                nearestIndex = index
-            }
-        }
-        const pointStrength = Math.pow(
-            Math.max(0, 1 - nearestDistance / 0.23),
-            2.2
-        )
-        return root.shoulderRadius(nearestIndex)
-            + pointStrength
-            * (root.pointLength(nearestIndex) - root.shoulderRadius(nearestIndex))
-    }
-
     function beginAt(x, y) {
         const wasVisible = root.visible
         root.animatePosition = wasVisible
@@ -180,12 +162,8 @@ Item {
         root.x = x - root.width / 2
         root.y = y - root.height / 2
         root.animatePosition = true
+        root.pendingMorphDistance = 0
         root.active = true
-        for (let index = 0; index < chromaRepeater.count; ++index) {
-            const layer = chromaRepeater.itemAt(index)
-            if (layer)
-                layer.burst()
-        }
     }
 
     function moveTo(x, y) {
@@ -193,16 +171,25 @@ Item {
             x - root.targetCenterX,
             y - root.targetCenterY
         )
-        root.morphPhase = (
-            root.morphPhase + Math.min(0.24, distance / 180)
-        ) % 1.0
+        root.pendingMorphDistance += distance
         root.targetCenterX = x
         root.targetCenterY = y
         root.x = x - root.width / 2
         root.y = y - root.height / 2
     }
 
+    function advanceMorph() {
+        if (root.pendingMorphDistance < 0.1)
+            return
+        root.morphPhase = (
+            root.morphPhase
+            + Math.min(0.24, root.pendingMorphDistance / 180)
+        ) % 1.0
+        root.pendingMorphDistance = 0
+    }
+
     function release() {
+        root.pendingMorphDistance = 0
         root.active = false
     }
 
@@ -222,86 +209,66 @@ Item {
         }
     }
 
-    ParticleSystem {
-        id: particleSystem
+    Timer {
+        interval: root.morphInterval
+        running: root.active && root.pendingMorphDistance >= 0.1
+        repeat: true
+        onTriggered: root.advanceMorph()
     }
 
-    ImageParticle {
-        objectName: "migraineRedParticles"
-        system: particleSystem
-        groups: ["red"]
-        source: "assets/migraine_particle.png"
-        color: "#ff2448"
-        colorVariation: 0.01
-        alpha: 0.15
-        alphaVariation: 0.03
-        rotationVariation: 180
-        entryEffect: ImageParticle.Fade
-    }
+    Item {
+        id: cachedEdge
 
-    ImageParticle {
-        objectName: "migraineGreenParticles"
-        system: particleSystem
-        groups: ["green"]
-        source: "assets/migraine_particle.png"
-        color: "#38ff70"
-        colorVariation: 0.01
-        alpha: 0.14
-        alphaVariation: 0.03
-        rotationVariation: 180
-        entryEffect: ImageParticle.Fade
-    }
+        objectName: "migraineCachedEdge"
+        anchors.fill: parent
 
-    ImageParticle {
-        objectName: "migraineBlueParticles"
-        system: particleSystem
-        groups: ["blue"]
-        source: "assets/migraine_particle.png"
-        color: "#3976ff"
-        colorVariation: 0.01
-        alpha: 0.15
-        alphaVariation: 0.03
-        rotationVariation: 180
-        entryEffect: ImageParticle.Fade
-    }
+        // The pointed RGB edge changes at no more than 30 Hz and is cached as
+        // one texture. Pointer tracking, fade and position smoothing then only
+        // transform that texture; they do not rebuild particle emitters or
+        // retessellate paths at the display's 120 Hz refresh rate.
+        layer.enabled: true
+        layer.smooth: true
 
-    Repeater {
-        id: chromaRepeater
-        model: 3
-
-        Item {
-            id: chromaLayer
-
-            required property int index
-
-            readonly property string groupName:
-                ["red", "green", "blue"][index]
-            readonly property color edgeColor:
-                ["#ff2448", "#38ff70", "#3976ff"][index]
-            readonly property real registration:
-                index - 1
-            readonly property real registrationAngle:
-                root.morphPhase * Math.PI * 2
-            readonly property real registrationX:
-                registration * 3.4 * Math.cos(registrationAngle)
-            readonly property real registrationY:
-                registration * 3.4 * Math.sin(registrationAngle)
-
-            function burst() {
-                for (let index = 0; index < haloRepeater.count; ++index) {
-                    const emitter = haloRepeater.itemAt(index)
-                    if (emitter)
-                        emitter.burst(1)
-                }
-            }
+        Repeater {
+            id: chromaRepeater
+            model: 3
 
             Shape {
+                id: chromaLayer
+
+                required property int index
+
+                readonly property color edgeColor:
+                    ["#ff2448", "#38ff70", "#3976ff"][index]
+                readonly property color haloColor:
+                    ["#4dff2448", "#4d38ff70", "#4d3976ff"][index]
+                readonly property real registration:
+                    index - 1
+                readonly property real registrationAngle:
+                    root.morphPhase * Math.PI * 2
+                readonly property real registrationX:
+                    registration * 3.4 * Math.cos(registrationAngle)
+                readonly property real registrationY:
+                    registration * 3.4 * Math.sin(registrationAngle)
+
                 objectName: "migraineSharpChromaEdge"
                 x: chromaLayer.registrationX
                 y: chromaLayer.registrationY
                 width: root.width
                 height: root.height
                 antialiasing: true
+
+                ShapePath {
+                    strokeColor: chromaLayer.haloColor
+                    strokeWidth: 6.0
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.MiterJoin
+
+                    PathSvg {
+                        path: root.outlinePathData
+                    }
+                }
 
                 ShapePath {
                     strokeColor: chromaLayer.edgeColor
@@ -315,58 +282,6 @@ Item {
                     }
                 }
             }
-
-            Repeater {
-                id: haloRepeater
-                model: 56
-
-                Emitter {
-                    id: haloEmitter
-
-                    required property int index
-
-                    readonly property real angle:
-                        index * Math.PI * 2 / haloRepeater.count
-                    readonly property real radius:
-                        root.haloRadius(angle)
-
-                    x:
-                        root.width / 2
-                        + Math.cos(angle) * radius
-                        + chromaLayer.registrationX
-                    y:
-                        root.height / 2
-                        + Math.sin(angle) * radius
-                        + chromaLayer.registrationY
-                    width: 1
-                    height: 1
-                    system: particleSystem
-                    group: chromaLayer.groupName
-                    enabled: root.active
-                    emitRate: 2
-                    lifeSpan: 280
-                    lifeSpanVariation: 40
-                    maximumEmitted: 4
-                    size: 9
-                    endSize: 6
-                    sizeVariation: 2
-
-                    velocity: AngleDirection {
-                        angle: haloEmitter.angle * 180 / Math.PI
-                        angleVariation: 10
-                        magnitude: 2
-                        magnitudeVariation: 1
-                    }
-                }
-            }
         }
-    }
-
-    Wander {
-        system: particleSystem
-        groups: ["red", "green", "blue"]
-        xVariance: 1.2
-        yVariance: 1.2
-        pace: 24
     }
 }

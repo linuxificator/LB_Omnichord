@@ -196,6 +196,20 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn("package_evidence.py", android_smoke)
         self.assertIn("--capture-screenshots-dir", release)
         self.assertIn("adb shell input swipe", android_smoke)
+        self.assertIn("strum_start_y=", android_smoke)
+        self.assertIn("strum_end_y=", android_smoke)
+        self.assertEqual(
+            release.count("Run shared 120 Hz strum visual-cost contract"),
+            4,
+        )
+        self.assertEqual(
+            release.count("python tests/test_migraine_render_budget.py"),
+            3,
+        )
+        self.assertIn(
+            r"python tests\test_migraine_render_budget.py",
+            release,
+        )
         self.assertIn("rendered_viewport=0", android_smoke)
         self.assertIn("stat -c %s", android_smoke)
         self.assertIn("did not produce a detailed rendered frame", android_smoke)

@@ -152,7 +152,11 @@ fi
 chord_x=$((display_width * 250 / 1920))
 chord_y=$((display_height * 735 / 1080))
 adb shell input swipe "$chord_x" "$chord_y" "$chord_x" "$chord_y" 700
-sleep 1
+strum_x=$((display_width * 1840 / 1920))
+strum_start_y=$((display_height * 850 / 1080))
+strum_end_y=$((display_height * 250 / 1080))
+adb shell input swipe \
+  "$strum_x" "$strum_start_y" "$strum_x" "$strum_end_y" 300
 adb exec-out screencap -p > "$evidence_dir/omni-after.png"
 capture_diagnostics
 kill -TERM "$external_sender_pid" 2>/dev/null || true
