@@ -1,7 +1,7 @@
 # Codex handover: Raspberry Pi AppImage graphics and QML backend
 
-Status: fix implemented on `fix/raspberrypi-appimage-runtime`; rebuilt-package
-and final physical AppImage validation pending
+Status: fix validated in source mode and as a rebuilt AppImage on the physical
+Pi; branch is not merged to `main`
 Recorded: 2026-09-06
 Affected release: `R20260905T204515`
 Hardware/OS: Raspberry Pi 4, 64-bit Debian 13 (Trixie) Raspberry Pi OS,
@@ -53,59 +53,111 @@ source already carried a partial compatibility measure: MIDI integration
 signals were declared in the base class because the older aarch64 binding did
 not reliably append subclass signals after inherited slots.
 
-The physical log proved that the same compatibility boundary also affected the
-subclass `midiPlayer` property and `finishMidiPreview` slot. Base-class
-properties remained available, but QML saw the added subclass surface as
-undefined. CI accepted partial screenshots because its package capture checked
-that non-trivial PNG files existed, not that every expected QObject member was
-resolvable.
+The physical log proved that the same compatibility boundary also affected
+subclass properties, slots and signals. Base-class properties remained
+available, but QML saw parts of the MIDI integration and live-performance
+surface as undefined. The missing surface included `midiPlayer`, MIDI preview,
+chord gate text/actions, arpeggio direction/actions, bass-riff selection and
+tuning coupling. CI accepted partial screenshots because its package capture
+checked that non-trivial PNG files existed, not that every expected QObject
+member was resolvable.
 
 The application composition root now publishes the already-independent
 `MidiPlayerBackend` QObject directly as the `midiBackend` QML context property.
-`Main.qml` and `MidiScreen.qml` use that direct object. Switching from the MIDI
-screen ends its preview through `midiBackend.previewEnd()`, the owning object's
-existing slot. No MIDI, OSC, musical or AMY behavior changed, and no platform
-branch entered portable UI code.
+It also publishes a narrow direct-`QObject` `PerformanceQmlAdapter`. That
+adapter exposes only existing performance and integration behavior; all calls
+delegate to the existing backend and no musical state is duplicated. QML
+therefore no longer depends on properties or slots appended by either Python
+subclass.
 
-This is smaller and clearer than moving the complete MIDI facade into the core
-performance class merely to work around an old binding generator. The Python
-integration facade remains available to source-level callers, but the QML
-contract no longer depends on subclass meta-object extension.
+The first rebuilt PySide6 6.7.3 artifact rendered complete screens, but its log
+reported a Qt meta-object sort warning when the adapter connected to the three
+signals declared by the performance subclass. Moving those signals into the
+base and reusing them as subclass property notifiers looked smaller, but the
+full process test correctly exposed a silent `SIGSEGV` (`-11`). That rejected
+approach is not retained.
+
+The final design adds one generic `performanceChanged` signal to the stable
+base meta-object. The performance layer emits it beside its existing specific
+signals whenever adapter-visible state changes. The direct adapter listens
+only to this safe signal and fans it out to its own property notifiers. The
+specific signals, state and behavior remain owned by the performance layer.
+The process-separated Linux MIDI regression reproduces the earlier crash and
+now passes, protecting this boundary in addition to the adapter meta-object
+surface test.
+
+This is smaller and clearer than moving the complete MIDI facade or
+performance implementation into the application core merely to work around an
+old binding generator. The Python integration facade remains available to
+source-level callers, but the QML contract no longer depends on subclass
+meta-object extension. No MIDI, OSC, musical or AMY behavior changed, and no
+platform branch entered portable UI code.
+
+## Source-mode AMY provisioning
+
+`run_local.sh` intentionally starts a separate Python AMY service, so `c_amy`
+is a dependency of that service process rather than of the Qt frontend. A bare
+`ModuleNotFoundError` previously obscured this distinction on a fresh Pi
+checkout.
+
+`prepare_local_amy.sh --checkout` now uses the existing release-input checkout
+tool to fetch the exact immutable AMY commit when its conventional sibling
+checkout is absent, then installs the declared Gamma9001 bank into the selected
+frontend virtual environment. The network operation remains explicit;
+`run_local.sh` still never downloads or installs anything. Both scripts select
+an explicit `OMNICHORD_VENV`, a frontend-local `.venv`, or the established
+repository-neighbour `omnichord-env`, in that order.
 
 ## Validation completed
 
 - The original AppImage with only the system C++ runtime preloaded created a
   Broadcom V3D/OpenGL context, isolating the first failure.
-- The corrected frontend was then run on the same physical Pi against the AMY
-  service from the released AppImage. AMY and Qt remained separate processes
-  connected only through the Unix socket/wire protocol.
+- The exact pinned AMY commit was compiled on the physical Pi with Gamma9001
+  and installed through the documented `prepare_local_amy.sh --checkout`
+  route.
+- `run_local.sh` then started that AMY service and the corrected frontend as
+  separate processes connected only through the Unix socket/wire protocol.
 - The corrected frontend created a Broadcom V3D OpenGL 3.1 context through the
   real Wayland display.
-- It captured complete OMNI and MIDI screens of 406,159 and 366,465 bytes.
-- Its filtered log contained no `TypeError`, `ReferenceError`, undefined QML
-  backend access, missing method, EGL failure or context-creation failure.
-- Targeted static-contract, application-composition and package-audit unit
-  tests passed locally. The frontend integration test could not bind its test
-  TCP control port inside the local filesystem/network sandbox; this is an
-  environment restriction rather than a product result.
+- It captured complete OMNI and MIDI screens without `TypeError`,
+  `ReferenceError`, undefined QML backend access, missing method, EGL failure
+  or context-creation failure.
+- The complete local suite passed outside the socket-restricted sandbox,
+  including quality, QML gestures, process-separated MIDI, frontend, serial,
+  native-control and native-rhythm tests.
 
-The source validation used the Pi's existing PySide6 6.10.3 environment for
-the corrected frontend and the packaged Gamma9001 AMY service for synthesis.
-It therefore proves the architecture and physical graphics path, but it is not
-a substitute for rebuilding the final PySide6 6.7.3 AppImage.
+The source validation used the Pi's existing PySide6 6.10.3 environment and
+its newly compiled pinned Gamma9001 AMY service. It proves source-mode setup,
+the process boundary and the physical graphics path, but it is not a substitute
+for rebuilding the final PySide6 6.7.3 AppImage.
 
-## Remaining release proof
+## Rebuilt package evidence
 
-Before merging this fix to `main`:
+- GitHub Actions run: `34052065218`
+- Built source commit: `f49f66aea5f6c7cc08a37559efc61075ef897fef`
+- Package artifact: `9994908939` (`package-RaspberryPi-aarch64`)
+- Evidence artifact: `9994909123` (`evidence-RaspberryPi-aarch64`)
+- File: `LB_Omnichord.R20260906183334.RaspberryPi-aarch64.AppImage`
+- Size: 88,799,752 bytes
+- SHA-256: `5711725c128f48777c887a310e7784d78d6d58cd8aa5900a61f543708005e9aa`
 
-1. Run the feature branch's complete GitHub package workflow, including the
-   native aarch64 builder constrained to PySide6 6.7.3.
-2. Confirm the Pi package audit contains no `libstdc++.so.6`.
-3. Download that exact AppImage to the physical Pi and start it normally,
-   without `LD_PRELOAD`, software rendering or a repository checkout.
-4. Verify both OMNI and MIDI screens, mouse/touch interaction and audio.
-5. Preserve the physical log and exact artifact SHA as release evidence.
+The CI package audit reported no forbidden runtime matches. Its acceptance log
+passed the strengthened runtime-failure policy and contained no Qt sort
+warning, QML property/method failure, traceback or EGL/context failure.
 
-Do not declare the rebuilt AppImage physically validated until those steps are
-observed. A CI offscreen/software screenshot does not prove Wayland, EGL, V3D,
-input devices, physical audio or absence of drop-outs.
+That exact checksum was verified again after transfer to the physical Pi. It
+was started normally from `/tmp`, without `LD_PRELOAD`, software rendering,
+an OpenGL override or assistance from the source checkout. The package started
+its own AMY service, connected over its private Unix socket and created a
+Broadcom V3D OpenGL 3.1 context through Wayland. It captured complete OMNI and
+MIDI screens of 404,869 and 364,368 bytes. The physical runtime log contained
+no meta-object warning or QML/EGL error.
+
+## Validation boundary
+
+The observed tests prove source provisioning, package startup, process/socket
+separation, Gamma9001 service initialization and complete hardware-accelerated
+rendering on the target Pi. Automated capture does not prove prolonged audible
+playback, physical mouse/touch behavior, MIDI hardware, latency or absence of
+audio drop-outs; those remain physical interaction checks rather than claims
+made by this repair.
