@@ -340,6 +340,8 @@ ApplicationWindow {
                     + window.presetRowHeight
 
                 controller: backend
+                performanceController: performanceBackend
+                midiControlRouter: midiBackend
                 tuningModeModel: tuningModeNames
                 fullScreen:
                     window.visibility
@@ -564,6 +566,8 @@ ApplicationWindow {
                     window.sectionHeight
 
                 controller: backend
+                performanceController: performanceBackend
+                midiControlRouter: midiBackend
                 rhythmModel: rhythmNames
             }
 
@@ -578,6 +582,7 @@ ApplicationWindow {
                     window.sectionHeight
 
                 controller: backend
+                midiControlRouter: midiBackend
                 synthModel: synthNames
                 role: "bass"
 
@@ -610,6 +615,7 @@ ApplicationWindow {
                     window.sectionHeight
 
                 controller: backend
+                midiControlRouter: midiBackend
                 synthModel: synthNames
                 role: "strum"
 
@@ -642,6 +648,7 @@ ApplicationWindow {
                     window.sectionHeight
 
                 controller: backend
+                midiControlRouter: midiBackend
                 synthModel: synthNames
                 role: "chord"
 
@@ -823,7 +830,7 @@ ApplicationWindow {
                                 panelColor: "#e5d9b2"
                                 borderColor: "#9f9165"
                                 textColor: "#4a4022"
-                                onClicked: backend.rollChordRows(-1)
+                                onClicked: performanceBackend.rollChordRows(-1)
                             }
 
                             PresetResetButton {
@@ -833,7 +840,7 @@ ApplicationWindow {
                                 panelColor: "#e5d9b2"
                                 borderColor: "#9f9165"
                                 textColor: "#4a4022"
-                                onClicked: backend.rollChordRows(1)
+                                onClicked: performanceBackend.rollChordRows(1)
                             }
                         }
 
@@ -1472,10 +1479,10 @@ ApplicationWindow {
                     + 2 * window.rowIndent
                     - window.controlSpacing
                 height: window.rowHeight
-                text: backend.chordGateButtonText
+                text: performanceBackend.chordGateButtonText
 
                 readonly property bool selectedState:
-                    backend.chordGateState === 1
+                    performanceBackend.chordGateState === 1
 
                 font.pixelSize: 14
                 font.bold: true
@@ -1507,7 +1514,7 @@ ApplicationWindow {
                 }
 
                 onClicked:
-                    backend.toggleChordGate()
+                    performanceBackend.toggleChordGate()
             }
 
             RainbowModeButton {

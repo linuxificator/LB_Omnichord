@@ -6,7 +6,7 @@ Item {
     id: root
 
     required property var controller
-    required property var omniController
+    required property var integrationController
     required property var tuningModeModel
     required property bool fullScreen
     property int leftExtension: 0
@@ -84,7 +84,7 @@ Item {
                 root.controller.setTuningCoupled(false)
                 root.toggleTuningCouplingRequested()
             } else {
-                if (root.omniController.coupleTuningFromMidi())
+                if (root.integrationController.coupleTuningFromMidi())
                     root.toggleTuningCouplingRequested()
             }
         }
@@ -272,7 +272,7 @@ Item {
 
         onClicked: {
             if (!root.midiButtonHandled(panicButton.midiTarget)) {
-                root.omniController.panic()
+                root.integrationController.panic()
             }
         }
     }

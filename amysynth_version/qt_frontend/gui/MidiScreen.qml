@@ -173,7 +173,7 @@ Item {
             + root.hostWindow.presetRowHeight
 
         controller: midiBackend
-        omniController: backend
+        integrationController: performanceBackend
         tuningModeModel: tuningModeNames
         fullScreen:
             root.hostWindow.visibility
@@ -213,10 +213,10 @@ Item {
         onPressedChanged: {
             if (pressed) {
                 if (root.tuningCoupled) backend.beginPitchBend(1)
-                else backend.beginMidiPitchBend(1)
+                else midiBackend.beginPitchBend(1)
             } else {
                 if (root.tuningCoupled) backend.endPitchBend()
-                else backend.endMidiPitchBend()
+                else midiBackend.endPitchBend()
             }
         }
     }
@@ -238,10 +238,10 @@ Item {
         onPressedChanged: {
             if (pressed) {
                 if (root.tuningCoupled) backend.beginPitchBend(-1)
-                else backend.beginMidiPitchBend(-1)
+                else midiBackend.beginPitchBend(-1)
             } else {
                 if (root.tuningCoupled) backend.endPitchBend()
-                else backend.endMidiPitchBend()
+                else midiBackend.endPitchBend()
             }
         }
     }
@@ -497,7 +497,7 @@ Item {
         y: 0
         width: root.hostWindow.strumWidth
         height: root.hostWindow.totalControlHeight
-        controller: backend
+        controller: performanceBackend
         rowIndex: root.activeMidiRow
         tuningCoupled: root.tuningCoupled
         padColor: root.activeStrumColor

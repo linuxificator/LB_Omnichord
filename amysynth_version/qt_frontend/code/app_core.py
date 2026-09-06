@@ -59,6 +59,7 @@ from preset_plan import (
     RhythmSettingPreset,
     compile_omni_preset_plan,
 )
+from performance_qml_adapter import PerformanceQmlAdapter
 from runtime_paths import production_frontend_asset_root
 from screenshot_state import populate_screenshot_input_controls, save_png_screenshot
 from synth_state import SynthState
@@ -3926,16 +3927,19 @@ def run_application(
     amy_client = graph.client
     backend = graph.backend
     midi_backend = backend.midiPlayer
+    performance_backend = PerformanceQmlAdapter(backend)
 
     engine = QQmlApplicationEngine()
     context = engine.rootContext()
 
     context.setContextProperty("backend", backend)
     # PySide 6.7 (the Raspberry Pi wheel baseline) does not reliably expose
-    # Qt properties or slots added by the Python subclass of InstrumentBackend.
-    # Publish the independently owned MIDI/OSC controller directly so QML does
-    # not depend on that version-sensitive inherited meta-object extension.
+    # Qt properties or slots added by Python subclasses of InstrumentBackend.
+    # Publish the independently owned MIDI/OSC controller and the narrow
+    # performance adapter directly so QML never depends on that inherited
+    # meta-object extension.
     context.setContextProperty("midiBackend", midi_backend)
+    context.setContextProperty("performanceBackend", performance_backend)
     context.setContextProperty(
         "sliderTrace",
         bool(args.slider_trace) or os.environ.get("OMNICHORD_SLIDER_TRACE") == "1",

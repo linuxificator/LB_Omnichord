@@ -17,6 +17,9 @@ Item {
     property color borderColor: "#8a6810"
     property var midiControlRouter: null
     property var midiTarget: ({})
+    readonly property bool midiControlRouterAvailable:
+        typeof root.midiControlRouter !== "undefined"
+        && root.midiControlRouter !== null
     property string accessibleName: ""
     property string traceKind: "numeric"
     property string traceLabel: ""
@@ -30,13 +33,13 @@ Item {
     readonly property real visualPosition: slider.visualPosition
     readonly property bool pressed: slider.pressed
     readonly property bool midiBound: {
-        if (root.midiControlRouter === null)
+        if (!root.midiControlRouterAvailable)
             return false
         root.midiControlRouter.bindingVersion
         return root.midiControlRouter.isControlTargetBound(root.midiTarget)
     }
     readonly property string midiVisualState: {
-        if (root.midiControlRouter === null)
+        if (!root.midiControlRouterAvailable)
             return "idle"
         root.midiControlRouter.bindingVersion
         return root.midiControlRouter.controlTargetVisualState(root.midiTarget)
@@ -49,14 +52,14 @@ Item {
     signal activated()
 
     function beginMidiInteraction() {
-        if (root.midiControlRouter === null)
+        if (!root.midiControlRouterAvailable)
             return false
         const learned = root.midiControlRouter.activateControlTarget(root.midiTarget)
         return learned || root.midiPresetFeedback
     }
 
     function releaseMidiBindingForManualEdit() {
-        if (root.midiControlRouter !== null) {
+        if (root.midiControlRouterAvailable) {
             root.midiControlRouter.releaseControlTargetForManualEdit(root.midiTarget)
         }
     }

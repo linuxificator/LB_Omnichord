@@ -5,6 +5,7 @@ Item {
     id: root
 
     required property var controller
+    required property var midiControlRouter
     required property var synthModel
 
     property string role: "chord"
@@ -326,7 +327,7 @@ Item {
                         borderColor:
                             root.extraBorderColor
                         midiControlRouter:
-                            root.controller.midiPlayer
+                            root.midiControlRouter
                         midiTarget: ({
                             "screen": "omni",
                             "kind": "synth_control",
@@ -379,7 +380,7 @@ Item {
                         borderColor:
                             root.commonBorderColor
                         midiControlRouter:
-                            root.controller.midiPlayer
+                            root.midiControlRouter
                         midiTarget: ({
                             "screen": "omni",
                             "kind": "synth_control",

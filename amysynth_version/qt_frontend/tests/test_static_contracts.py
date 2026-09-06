@@ -221,14 +221,49 @@ class StaticContractTests(unittest.TestCase):
         utility = (ROOT / "gui" / "MidiUtilitySection.qml").read_text(encoding="utf-8")
         app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        qml_sources = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in sorted((ROOT / "gui").glob("*.qml"))
+        )
         self.assertIn('context.setContextProperty("midiBackend", midi_backend)', app_core)
         self.assertIn("controller: midiBackend", screen)
         self.assertNotIn("backend.midiPlayer", screen)
         self.assertNotIn("backend.midiPlayer", main)
         self.assertNotIn("backend.finishMidiPreview", screen)
+        self.assertNotIn(".midiPlayer", qml_sources)
         self.assertIn("root.controller.stateVersion", synth)
         self.assertIn("root.controller.tuningModeIndex", utility)
         self.assertNotIn("root.controller.midiStateVersion", synth)
+
+    def test_subclass_only_qml_surface_uses_direct_metaobjects(self) -> None:
+        app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        rhythm = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
+        midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
+        midi_utility = (ROOT / "gui" / "MidiUtilitySection.qml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            'context.setContextProperty("performanceBackend", performance_backend)',
+            app_core,
+        )
+        self.assertIn("performanceController: performanceBackend", main)
+        for member in (
+            "chordArpeggioEnabled",
+            "chordArpeggioRate",
+            "chordArpeggioDescending",
+            "chordArpeggioDirectionLabel",
+            "bassRiffMode",
+            "bassRiffSelector",
+            "bassRiffSelectorMaximum",
+            "bassVoicingShift",
+        ):
+            self.assertNotIn(f"root.controller.{member}", rhythm, member)
+        self.assertNotIn("backend.beginMidiPitchBend", midi)
+        self.assertNotIn("backend.endMidiPitchBend", midi)
+        self.assertIn("controller: performanceBackend", midi)
+        self.assertNotIn("omniController", midi_utility)
+        self.assertIn("root.integrationController.coupleTuningFromMidi()", midi_utility)
 
     def test_midi_button_leds_are_not_visible_in_idle_state(self) -> None:
         led = (ROOT / "gui" / "MidiButtonLed.qml").read_text(encoding="utf-8")
@@ -510,14 +545,14 @@ class StaticContractTests(unittest.TestCase):
 
     def test_chord_gate_and_grouped_row_roll_controls_are_present(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
-        self.assertIn("text: backend.chordGateButtonText", qml)
+        self.assertIn("text: performanceBackend.chordGateButtonText", qml)
         self.assertNotIn("enabled: backend.chordGateState !== 0", qml)
-        self.assertIn("backend.toggleChordGate()", qml)
+        self.assertIn("performanceBackend.toggleChordGate()", qml)
         gate_start = qml.index("id: chordGateButton")
         gate_end = qml.index("RainbowModeButton {", gate_start)
         gate = qml[gate_start:gate_end]
         activity_selector = (ROOT / "gui" / "ActivitySelector.qml").read_text(encoding="utf-8")
-        self.assertIn("backend.chordGateState === 1", gate)
+        self.assertIn("performanceBackend.chordGateState === 1", gate)
         for color in (
             '"#fff9dd"',
             '"#4c3b08"',
@@ -529,8 +564,8 @@ class StaticContractTests(unittest.TestCase):
             self.assertIn(color, gate)
             self.assertIn(color, activity_selector)
         self.assertIn("chordGateButton.selectedState ? 2 : 1", gate)
-        self.assertIn("backend.rollChordRows(-1)", qml)
-        self.assertIn("backend.rollChordRows(1)", qml)
+        self.assertIn("performanceBackend.rollChordRows(-1)", qml)
+        self.assertIn("performanceBackend.rollChordRows(1)", qml)
 
     def test_chord_left_controls_span_two_rows_with_equal_spacing(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
@@ -583,11 +618,11 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('"bass voicing"', qml)
         self.assertIn('"riff selector"', qml)
         self.assertIn("? 1 : -6", qml)
-        self.assertIn("root.controller.bassRiffSelectorMaximum", qml)
+        self.assertIn("root.performanceController.bassRiffSelectorMaximum", qml)
         self.assertIn(": 6", qml)
         self.assertIn("stepValue: 1", qml)
-        self.assertIn("root.controller.bassVoicingShift", qml)
-        self.assertIn("root.controller.bassRiffSelector", qml)
+        self.assertIn("root.performanceController.bassVoicingShift", qml)
+        self.assertIn("root.performanceController.bassRiffSelector", qml)
         self.assertIn(".setBassVoicingShift(value)", qml)
         self.assertIn(".setBassRiffSelector(value)", qml)
         guarded_rhythm_button_actions = {

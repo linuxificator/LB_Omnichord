@@ -4,6 +4,8 @@ import QtQuick.Controls
 Item {
     id: root
     required property var controller
+    required property var performanceController
+    required property var midiControlRouter
     required property var rhythmModel
     property color wheelColor: "#d9b743"
     property color wheelBorderColor: "#8e7012"
@@ -20,10 +22,10 @@ Item {
     }
 
     function midiButtonHandled(target) {
-        const learned = root.controller.midiPlayer.activateControlTarget(target)
+        const learned = root.midiControlRouter.activateControlTarget(target)
         if (learned)
             return true
-        return root.controller.midiPlayer.midiButtonTargetBlocked(target)
+        return root.midiControlRouter.midiButtonTargetBlocked(target)
     }
 
     Frame {
@@ -68,7 +70,7 @@ Item {
             }
             onCurrentIndexChanged: {
                 if (initialized && !syncingFromBackend && currentIndex >= 0)
-                    root.controller.setRhythmIndex(currentIndex)
+                    root.performanceController.setRhythmIndex(currentIndex)
             }
         }
         Rectangle {
@@ -130,7 +132,7 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             y: 8
             z: 2
-            midiControlRouter: root.controller.midiPlayer
+            midiControlRouter: root.midiControlRouter
             midiTarget: runButton.midiTarget
         }
         onClicked: {
@@ -180,7 +182,7 @@ Item {
             toValue: 200
             stepValue: 1
             decimals: 0
-            midiControlRouter: root.controller.midiPlayer
+            midiControlRouter: root.midiControlRouter
             midiTarget: ({
                 "screen": "omni",
                 "kind": "rhythm_tempo"
@@ -203,7 +205,7 @@ Item {
             stepValue: 1
             decimals: 0
             valueLabels: root.controller.rhythmFillDensityLabels
-            midiControlRouter: root.controller.midiPlayer
+            midiControlRouter: root.midiControlRouter
             midiTarget: ({
                 "screen": "omni",
                 "kind": "rhythm_fill_density"
@@ -233,7 +235,7 @@ Item {
                 groupColor: "#f5df78"
                 idleColor: "#f7e9a8"
                 selectedColor: "#bc8410"
-                midiControlRouter: root.controller.midiPlayer
+                midiControlRouter: root.midiControlRouter
                 activityMidiTargetForLevel: function(level) {
                     return {
                         "screen": "omni",
@@ -286,22 +288,22 @@ Item {
                     root.controller
                         .rhythmChordActivity
                 arpeggioEnabled:
-                    root.controller
+                    root.performanceController
                         .chordArpeggioEnabled
                 arpeggioRate:
-                    root.controller
+                    root.performanceController
                         .chordArpeggioRate
                 arpeggioDescending:
-                    root.controller
+                    root.performanceController
                         .chordArpeggioDescending
                 directionLabel:
-                    root.controller
+                    root.performanceController
                         .chordArpeggioDirectionLabel
 
                 groupColor: "#f8e9a1"
                 idleColor: "#faefbd"
                 selectedColor: "#cb981d"
-                midiControlRouter: root.controller.midiPlayer
+                midiControlRouter: root.midiControlRouter
                 activityMidiTargetForLevel: function(level) {
                     return {
                         "screen": "omni",
@@ -348,7 +350,7 @@ Item {
                         "kind": "button",
                         "action": "chord_arpeggio"
                     })) {
-                        root.controller
+                        root.performanceController
                             .toggleChordArpeggio()
                     }
                 }
@@ -359,7 +361,7 @@ Item {
                         "action": "chord_arpeggio_rate",
                         "rate": rate
                     })) {
-                        root.controller
+                        root.performanceController
                             .setChordArpeggioRate(rate)
                     }
                 }
@@ -369,7 +371,7 @@ Item {
                         "kind": "button",
                         "action": "chord_arpeggio_direction"
                     })) {
-                        root.controller
+                        root.performanceController
                             .toggleChordArpeggioDirection()
                     }
                 }
@@ -391,7 +393,7 @@ Item {
                 groupColor: "#faefbd"
                 idleColor: "#fff5d1"
                 selectedColor: "#d4aa3a"
-                midiControlRouter: root.controller.midiPlayer
+                midiControlRouter: root.midiControlRouter
                 midiTargetForLevel: function(level) {
                     return {
                         "screen": "omni",
@@ -408,7 +410,7 @@ Item {
                         "action": "rhythm_bass_activity",
                         "level": level
                     })) {
-                        root.controller
+                        root.performanceController
                             .setRhythmBassActivity(
                                 level
                             )
@@ -425,18 +427,18 @@ Item {
                 height: 48
 
                 label:
-                    root.controller.bassRiffMode
+                    root.performanceController.bassRiffMode
                     ? "riff selector"
                     : "bass voicing"
                 currentValue:
-                    root.controller.bassRiffMode
-                    ? root.controller.bassRiffSelector
-                    : root.controller.bassVoicingShift
+                    root.performanceController.bassRiffMode
+                    ? root.performanceController.bassRiffSelector
+                    : root.performanceController.bassVoicingShift
                 fromValue:
-                    root.controller.bassRiffMode ? 1 : -6
+                    root.performanceController.bassRiffMode ? 1 : -6
                 toValue:
-                    root.controller.bassRiffMode
-                    ? root.controller.bassRiffSelectorMaximum
+                    root.performanceController.bassRiffMode
+                    ? root.performanceController.bassRiffSelectorMaximum
                     : 6
                 stepValue: 1
                 decimals: 0
@@ -446,9 +448,9 @@ Item {
                 fillColor: "#c59518"
                 handleColor: "#fffbea"
                 borderColor: "#8a6810"
-                midiControlRouter: root.controller.midiPlayer
+                midiControlRouter: root.midiControlRouter
                 midiTarget:
-                    root.controller.bassRiffMode
+                    root.performanceController.bassRiffMode
                     ? ({
                         "screen": "omni",
                         "kind": "bass_riff_selector"
@@ -459,10 +461,10 @@ Item {
                     })
 
                 onEdited: (value) => {
-                    if (root.controller.bassRiffMode) {
-                        root.controller.setBassRiffSelector(value)
+                    if (root.performanceController.bassRiffMode) {
+                        root.performanceController.setBassRiffSelector(value)
                     } else {
-                        root.controller.setBassVoicingShift(value)
+                        root.performanceController.setBassVoicingShift(value)
                     }
                 }
             }

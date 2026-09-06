@@ -5,13 +5,16 @@ Rectangle {
 
     property var midiControlRouter: null
     property var midiTarget: ({})
+    readonly property bool midiControlRouterAvailable:
+        typeof root.midiControlRouter !== "undefined"
+        && root.midiControlRouter !== null
 
     width: 8
     height: 8
     radius: width / 2
 
     readonly property string midiVisualState: {
-        if (root.midiControlRouter === null)
+        if (!root.midiControlRouterAvailable)
             return "idle"
         root.midiControlRouter.bindingVersion
         return root.midiControlRouter.controlTargetVisualState(
@@ -19,7 +22,7 @@ Rectangle {
         )
     }
     readonly property bool midiBound: {
-        if (root.midiControlRouter === null)
+        if (!root.midiControlRouterAvailable)
             return false
         root.midiControlRouter.bindingVersion
         return root.midiControlRouter.isControlTargetBound(

@@ -3,7 +3,7 @@ import QtQuick
 Rectangle {
     id: root
 
-    required property var midiControlRouter
+    property var midiControlRouter: null
     required property string targetScreen
     property int targetPreset: 0
     property bool locationEnabled: true
@@ -21,7 +21,8 @@ Rectangle {
     }
 
     Connections {
-        target: root.midiControlRouter
+        target: root.midiControlRouter || null
+        ignoreUnknownSignals: true
 
         function onBindingLocationRequested(screen, presetNumber) {
             if (

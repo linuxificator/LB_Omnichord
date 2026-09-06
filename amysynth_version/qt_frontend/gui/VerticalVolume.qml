@@ -13,15 +13,18 @@ Frame {
     property var midiControlRouter: null
     property var midiTarget: ({})
     property bool midiBindingGesture: false
+    readonly property bool midiControlRouterAvailable:
+        typeof root.midiControlRouter !== "undefined"
+        && root.midiControlRouter !== null
 
     readonly property bool midiBound: {
-        if (root.midiControlRouter === null)
+        if (!root.midiControlRouterAvailable)
             return false
         root.midiControlRouter.bindingVersion
         return root.midiControlRouter.isControlTargetBound(root.midiTarget)
     }
     readonly property string midiVisualState: {
-        if (root.midiControlRouter === null)
+        if (!root.midiControlRouterAvailable)
             return "idle"
         root.midiControlRouter.bindingVersion
         return root.midiControlRouter.controlTargetVisualState(root.midiTarget)
@@ -52,7 +55,7 @@ Frame {
             return
         }
 
-        if (root.midiControlRouter !== null && root.midiBound) {
+        if (root.midiControlRouterAvailable && root.midiBound) {
             root.midiControlRouter.releaseControlTargetForManualEdit(
                 root.midiTarget
             )
@@ -67,7 +70,7 @@ Frame {
     }
 
     function beginMidiInteraction() {
-        if (root.midiControlRouter === null)
+        if (!root.midiControlRouterAvailable)
             return false
         const learned = root.midiControlRouter.activateControlTarget(
             root.midiTarget

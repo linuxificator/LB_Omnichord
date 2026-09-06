@@ -6,6 +6,8 @@ Item {
     id: root
 
     required property var controller
+    required property var performanceController
+    required property var midiControlRouter
     required property var tuningModeModel
     required property bool fullScreen
     property int leftExtension: 0
@@ -58,10 +60,10 @@ Item {
     }
 
     function midiButtonHandled(target) {
-        const learned = root.controller.midiPlayer.activateControlTarget(target)
+        const learned = root.midiControlRouter.activateControlTarget(target)
         if (learned)
             return true
-        return root.controller.midiPlayer.midiButtonTargetBlocked(target)
+        return root.midiControlRouter.midiButtonTargetBlocked(target)
     }
 
     // Orange area deliberately ends at the tuning tap-control.
@@ -83,10 +85,10 @@ Item {
         coupled: root.tuningCoupled
         onClicked: {
             if (root.tuningCoupled) {
-                root.controller.setMidiTuningCoupled(false)
+                root.performanceController.setMidiTuningCoupled(false)
                 root.toggleTuningCouplingRequested()
             } else {
-                if (root.controller.coupleTuningFromOmni())
+                if (root.performanceController.coupleTuningFromOmni())
                     root.toggleTuningCouplingRequested()
             }
         }
@@ -232,7 +234,7 @@ Item {
         panelBorderColor: "#a75d0a"
         fillColor: "#cc6f0c"
         textColor: "#492606"
-        midiControlRouter: root.controller.midiPlayer
+        midiControlRouter: root.midiControlRouter
         midiTarget: ({
             "screen": "omni",
             "kind": "tuning_reference"
@@ -267,7 +269,7 @@ Item {
         centerPanelTextColor:
             root.controller.masterMuted ? "#ffffff" : "#111111"
         centerPanelBorderColor: "#6d492c"
-        midiControlRouter: root.controller.midiPlayer
+        midiControlRouter: root.midiControlRouter
         midiTarget: ({
             "screen": "omni",
             "kind": "master_volume"
@@ -325,13 +327,13 @@ Item {
             anchors.horizontalCenter: parent.horizontalCenter
             y: 4
             z: 2
-            midiControlRouter: root.controller.midiPlayer
+            midiControlRouter: root.midiControlRouter
             midiTarget: panicButton.midiTarget
         }
 
         onClicked: {
             if (!root.midiButtonHandled(panicButton.midiTarget)) {
-                root.controller.panic()
+                root.performanceController.panic()
             }
         }
     }
@@ -429,7 +431,7 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: 4
                 z: 2
-                midiControlRouter: root.controller.midiPlayer
+                midiControlRouter: root.midiControlRouter
                 midiTarget: storeButton.midiTarget
             }
 
@@ -538,7 +540,7 @@ Item {
                         height: 7
                         radius: width / 2
                         z: 2
-                        midiControlRouter: root.controller.midiPlayer
+                        midiControlRouter: root.midiControlRouter
                         targetScreen: "omni"
                         targetPreset: presetButton.presetNumber
                         locationEnabled: !presetButton.selected
@@ -548,7 +550,7 @@ Item {
                         anchors.horizontalCenter: parent.horizontalCenter
                         y: 14
                         z: 2
-                        midiControlRouter: root.controller.midiPlayer
+                        midiControlRouter: root.midiControlRouter
                         midiTarget: presetButton.midiTarget
                     }
 
