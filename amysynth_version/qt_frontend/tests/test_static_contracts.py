@@ -265,6 +265,17 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn("omniController", midi_utility)
         self.assertIn("root.integrationController.coupleTuningFromMidi()", midi_utility)
 
+        performance = (ROOT / "code" / "performance_backend.py").read_text(
+            encoding="utf-8"
+        )
+        for signal in (
+            "chordGateChanged = Signal()",
+            "bassVoicingChanged = Signal()",
+            "chordArpeggioChanged = Signal()",
+        ):
+            self.assertIn(signal, app_core)
+            self.assertNotIn(signal, performance)
+
     def test_midi_button_leds_are_not_visible_in_idle_state(self) -> None:
         led = (ROOT / "gui" / "MidiButtonLed.qml").read_text(encoding="utf-8")
         preset = (ROOT / "gui" / "PresetResetButton.qml").read_text(encoding="utf-8")

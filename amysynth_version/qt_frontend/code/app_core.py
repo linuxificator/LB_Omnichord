@@ -832,13 +832,22 @@ class InstrumentBackend(QObject):
     rhythmStateChanged = Signal()
     rhythmControlsChanged = Signal()
 
+    # PySide 6.7 on aarch64 cannot safely append signals after slots inherited
+    # by the performance and integration subclasses. The domain behavior stays
+    # in those layers; only their Qt signal declarations live in this stable
+    # base meta-object.
+    chordGateChanged = Signal()
+    bassVoicingChanged = Signal()
+    chordArpeggioChanged = Signal()
+
     tuningChanged = Signal()
     presetChanged = Signal()
     presetStored = Signal(int)
 
-    # These integration signals live in the base meta-object so PySide 6.8 on
+    # These integration signals live in the base meta-object so PySide 6.7 on
     # aarch64 does not append subclass signals after inherited slots. Newer
-    # PySide versions silently reorder them, but 6.8 rejects that meta-object.
+    # PySide versions silently reorder them, but 6.7 warns and can omit the
+    # resulting subclass surface.
     midiStateChanged = Signal()
     midiTuningChanged = Signal()
     midiPresetChanged = Signal()

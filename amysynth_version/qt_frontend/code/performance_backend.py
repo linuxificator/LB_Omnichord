@@ -4,7 +4,7 @@ import json
 from dataclasses import replace
 from typing import Any, ClassVar
 
-from PySide6.QtCore import Property, Signal, Slot
+from PySide6.QtCore import Property, Slot
 
 import app_core
 from bass_riffs import BassRiffDefinition, transpose_riff_events
@@ -33,10 +33,6 @@ class InstrumentBackend(app_core.InstrumentBackend):
     that must survive independently of the sounding chord: remembered chord
     identity, chord gate state, bass inversion/voicing and grouped row rolls.
     """
-
-    chordGateChanged = Signal()
-    bassVoicingChanged = Signal()
-    chordArpeggioChanged = Signal()
 
     RUNNING_PRESET_PRESERVED_ATTRIBUTES: ClassVar[tuple[str, ...]] = (
         *app_core.InstrumentBackend.RUNNING_PRESET_PRESERVED_ATTRIBUTES,
@@ -116,60 +112,60 @@ class InstrumentBackend(app_core.InstrumentBackend):
             self._emit_state_changed()
         return True
 
-    @Property(int, notify=chordGateChanged)
+    @Property(int, notify=app_core.InstrumentBackend.chordGateChanged)
     def chordGateState(self) -> int:
         return self._chord_gate_state
 
-    @Property(str, notify=chordGateChanged)
+    @Property(str, notify=app_core.InstrumentBackend.chordGateChanged)
     def chordGateButtonText(self) -> str:
         if self._chord_gate_state == CHORD_GATE_ON:
             return "CHORD\nON"
         return "CHORD\nOFF"
 
-    @Property(bool, notify=chordGateChanged)
+    @Property(bool, notify=app_core.InstrumentBackend.chordGateChanged)
     def isOff(self) -> bool:
         return self._chord_gate_state != CHORD_GATE_ON
 
-    @Property(bool, notify=chordArpeggioChanged)
+    @Property(bool, notify=app_core.InstrumentBackend.chordArpeggioChanged)
     def chordArpeggioEnabled(self) -> bool:
         return self._chord_arpeggio_enabled
 
-    @Property(int, notify=chordArpeggioChanged)
+    @Property(int, notify=app_core.InstrumentBackend.chordArpeggioChanged)
     def chordArpeggioRate(self) -> int:
         return self._chord_arpeggio_rate
 
-    @Property(bool, notify=chordArpeggioChanged)
+    @Property(bool, notify=app_core.InstrumentBackend.chordArpeggioChanged)
     def chordArpeggioDescending(self) -> bool:
         return self._chord_arpeggio_descending
 
-    @Property(str, notify=chordArpeggioChanged)
+    @Property(str, notify=app_core.InstrumentBackend.chordArpeggioChanged)
     def chordArpeggioDirectionLabel(self) -> str:
         return "↓" if self._chord_arpeggio_descending else "↑"
 
-    @Property(int, notify=bassVoicingChanged)
+    @Property(int, notify=app_core.InstrumentBackend.bassVoicingChanged)
     def bassVoicingShift(self) -> int:
         return self._bass_voicing_shift
 
-    @Property(bool, notify=bassVoicingChanged)
+    @Property(bool, notify=app_core.InstrumentBackend.bassVoicingChanged)
     def bassRiffMode(self) -> bool:
         return self.rhythmBassActivity == BASS_RIFF_ACTIVITY
 
-    @Property(int, notify=bassVoicingChanged)
+    @Property(int, notify=app_core.InstrumentBackend.bassVoicingChanged)
     def bassRiffSelector(self) -> int:
         return self._bass_riff_selector
 
-    @Property(int, notify=bassVoicingChanged)
+    @Property(int, notify=app_core.InstrumentBackend.bassVoicingChanged)
     def bassRiffSelectorMaximum(self) -> int:
         candidates = self._available_bass_riffs()
         if candidates:
             return len(candidates)
         return max(1, self._bass_riff_selector)
 
-    @Property(str, notify=bassVoicingChanged)
+    @Property(str, notify=app_core.InstrumentBackend.bassVoicingChanged)
     def selectedBassRiffId(self) -> str:
         return self._active_bass_riff_id or ""
 
-    @Property(str, notify=bassVoicingChanged)
+    @Property(str, notify=app_core.InstrumentBackend.bassVoicingChanged)
     def selectedBassRiffName(self) -> str:
         riff = self._bass_riffs.by_id(self._active_bass_riff_id)
         return riff.name if riff is not None else ""
