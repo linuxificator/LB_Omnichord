@@ -2,7 +2,7 @@
 
 Status: index for AMY fork analysis and continuation work
 Owner: LB Omnichord integration
-Last updated: 2026-09-05
+Last updated: 2026-09-07
 
 This directory is the home for AMY implementation audits, diagnostic trails
 and continuation notes that are useful to LB Omnichord development but must not
@@ -44,6 +44,9 @@ Read these documents in order for current reusable-sequence work:
 11. `CODEX_HANDOVER_IGNORED_NOTEOFF_BOOKKEEPING.md` — standalone reproduction
     and repair of the one-shot drum forgotten-pool overflow, its separation
     from the sequence PR and the exact downstream release integration.
+12. `CODEX_HANDOVER_ESP32P4_REVERB_MEMORY_BASELINE.md` — physical four-synth
+    reverb timing comparison for PSRAM versus internal SRAM, exact wire
+    workload, capacity constraints and implications for the bus design.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful
