@@ -49,6 +49,9 @@ Read these documents in order for current reusable-sequence work:
     workload, capacity constraints and implications for the bus design.
 13. `CODEX_HANDOVER_ESP32P4_REVERB_LPF_PARALLELIZATION.md` — physical
     full-width Q8.23 LPF scheduling A/B; both grouped candidates were slower.
+14. `CODEX_HANDOVER_SHARED_REVERB_ROOMS_ESP32P4.md` — implemented generic
+    two-room send/return model, deterministic P4 SRAM-bank ownership,
+    deferred diagnostics and controlled physical PSRAM/SRAM measurements.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful
