@@ -1,9 +1,9 @@
 # Shared reverb rooms: ESP32-P4 implementation and physical proof
 
-Status: AMY implementation and synthetic target benchmark complete; LB routing integration pending
-Date: 2026-09-07
+Status: integrated and physically validated with the complete LB workload
+Date: 2026-09-08
 AMY branch: `rework/shared-reverb`
-AMY commit: `789af46b478ca0eeec9faadb13c51d6a3adacf03`
+AMY release commit: `b959b86ec23769976572b93f476ec18fe374a723`
 LB firmware branch: `rework/shared-reverb`
 LB firmware commit: `286734d270323be5d9df85b3b6a1063c3c01734d`
 Physical target: Waveshare ESP32-P4 revision 1.3, CPU 360 MHz, 32 MiB
@@ -141,10 +141,15 @@ Derived observations:
 ## Decision and remaining work
 
 The two-room, two-exclusive-bank design is practical on the physical v1.3
-target and is substantially safer than per-bus reverbs. Keep the production
-firmware on the dedicated-SRAM form; the PSRAM image was measurement-only.
+target and is substantially safer than per-bus reverbs. The production
+firmware uses the dedicated-SRAM form; the PSRAM image was measurement-only.
 
-Next steps, in order:
+The integration steps below have been completed. The later full-workload run
+did expose a separate 10 ms scheduler-yield problem. Its diagnosis, fix and
+long physical acceptance measurement are recorded in
+`CODEX_HANDOVER_ESP32P4_RENDER_JITTER_AND_DMA_DEBT.md`.
+
+Completed integration contract:
 
 1. Change LB Omnichord's two transport-facing reverb controllers to configure
    one shared processor each and send their buses to it.
