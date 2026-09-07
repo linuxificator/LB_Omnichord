@@ -47,6 +47,8 @@ Read these documents in order for current reusable-sequence work:
 12. `CODEX_HANDOVER_ESP32P4_REVERB_MEMORY_BASELINE.md` — physical four-synth
     reverb timing comparison for PSRAM versus internal SRAM, exact wire
     workload, capacity constraints and implications for the bus design.
+13. `CODEX_HANDOVER_ESP32P4_REVERB_LPF_PARALLELIZATION.md` — physical
+    full-width Q8.23 LPF scheduling A/B; both grouped candidates were slower.
 
 The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
 Gamma9001 and superseded nested/group-sequencer history. It is still useful
