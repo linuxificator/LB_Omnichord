@@ -3,4 +3,4 @@
 # inputs and never install this file at application startup.
 -r requirements.txt
 numpy==2.5.2
-soundfile==0.13.1
+soundfile==0.14.0
