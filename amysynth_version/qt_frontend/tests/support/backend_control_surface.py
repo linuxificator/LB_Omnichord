@@ -60,9 +60,15 @@ class BackendControlSurface:
         process. It deliberately exposes the two read-only P4 queries rather
         than a general raw-command escape hatch.
         """
-        commands = {"load": "?loadZ", "reverb": "?reverbZ"}
+        commands = {
+            "load": "?loadZ",
+            "reverb": "?reverbZ",
+            "sequence": "D1Z",
+        }
         if kind not in commands:
-            raise ValueError("AMY diagnostic kind must be load or reverb")
+            raise ValueError(
+                "AMY diagnostic kind must be load, reverb, or sequence"
+            )
         if self._amy_client is None:
             raise RuntimeError("AMY diagnostic transport is unavailable")
         self._amy_client.writer.high(commands[kind])
