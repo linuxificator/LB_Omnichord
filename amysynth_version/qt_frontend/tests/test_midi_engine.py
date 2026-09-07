@@ -482,6 +482,8 @@ class MidiAmyEngineTests(unittest.TestCase):
                 ("wire", "v0o7i5Z"),
                 ("wire", "i5iy4Z"),
                 ("wire", "i5iV0.28Z"),
+                ("wire", "y4h0Z"),
+                ("wire", "y4hS1,1Z"),
                 ("wire", "y4V1Z"),
             ],
         )
@@ -559,20 +561,39 @@ class MidiAmyEngineTests(unittest.TestCase):
 
         client.events.clear()
         engine.set_reverb(0.4, 0.6, 0.7, False)
+        self.assertIn(("wire", "hR1,0.4,0.6,0.7Z"), client.events)
         reverb_commands = [
             value for kind, value in client.events if kind == "wire" and str(value).startswith("y")
         ]
         self.assertEqual(
             reverb_commands,
             [
-                "y4h0.4,0.6,0.7Z",
-                "y5h0.4,0.6,0.7Z",
-                "y6h0.4,0.6,0.7Z",
-                "y7h0.4,0.6,0.7Z",
-                "y8h0.4,0.6,0.7Z",
-                "y9h0.4,0.6,0.7Z",
-                "y10h0,0.6,0.7Z",
+                "y4h0Z",
+                "y4hS1,1Z",
+                "y5h0Z",
+                "y5hS1,1Z",
+                "y6h0Z",
+                "y6hS1,1Z",
+                "y7h0Z",
+                "y7hS1,1Z",
+                "y8h0Z",
+                "y8hS1,1Z",
+                "y9h0Z",
+                "y9hS1,1Z",
+                "y10h0Z",
+                "y10hS1,0Z",
             ],
+        )
+
+        client.events.clear()
+        engine.set_reverb(0.5, 0.6, 0.7, False)
+        self.assertEqual(client.events, [("wire", "hR1,0.5,0.6,0.7Z")])
+
+        client.events.clear()
+        engine.set_reverb(0.5, 0.6, 0.7, True)
+        self.assertEqual(
+            client.events,
+            [("wire", "y10hS1,1Z")],
         )
 
     def test_native_defaults_are_not_resent_by_midi_state(self) -> None:

@@ -35,6 +35,12 @@ from osc_input import (
 from musical_state import TuningSnapshot, tune_note
 from synth_programs import resolve_program
 from synth_state import SynthState
+from shared_reverb import (
+    MIDI_REVERB_PROCESSOR,
+    bus_commands as shared_reverb_bus_commands,
+    processor_command as shared_reverb_processor_command,
+    send_command as shared_reverb_send_command,
+)
 from user_data import MIDI_PRESET_DIR
 
 
@@ -126,6 +132,13 @@ class MidiAmyEngine:
         }
         self._preview_tail_tokens = [0] * MIDI_ROW_COUNT
         self.master_volume = 1.0
+        self.reverb = {
+            "level": 0.0,
+            "liveness": 0.5,
+            "damping": 0.5,
+            "drums": False,
+        }
+        self._reverb_routing_initialized = False
         self.configure_drum_synth()
 
     def _wire(self, command: str) -> None:
@@ -167,6 +180,7 @@ class MidiAmyEngine:
         )
         self._wire(f"v0w7i{synth}Z")
         self._route(synth, self.drum_bus)
+        self._apply_reverb_bus(self.drum_bus)
         self._apply_master_bus(self.drum_bus)
         self._drum_configured = True
 
@@ -255,6 +269,7 @@ class MidiAmyEngine:
         self._configured_rows.add(row)
         self._route(synth, bus)
         self.set_row_volume(row, self.balanced_volume(key, volume))
+        self._apply_reverb_bus(bus)
         self._apply_master_bus(bus)
 
     def set_row_volume(self, row: int, volume: float) -> None:
@@ -271,12 +286,46 @@ class MidiAmyEngine:
         level = max(0.0, min(MIDI_REVERB_MAX, float(level)))
         liveness = max(0.0, min(1.0, float(liveness)))
         damping = max(0.0, min(1.0, float(damping)))
-        for bus in self.row_buses:
-            self._wire(f"y{bus}h{self._f(level)},{self._f(liveness)},{self._f(damping)}Z")
-        drum_level = level if drums else 0.0
-        self._wire(
-            f"y{self.drum_bus}h{self._f(drum_level)},{self._f(liveness)},{self._f(damping)}Z"
-        )
+        previous = self.reverb
+        self.reverb = {
+            "level": level,
+            "liveness": liveness,
+            "damping": damping,
+            "drums": bool(drums),
+        }
+        if not self._reverb_routing_initialized or any(
+            self.reverb[key] != previous[key]
+            for key in ("level", "liveness", "damping")
+        ):
+            self._wire(
+                shared_reverb_processor_command(
+                    MIDI_REVERB_PROCESSOR,
+                    level,
+                    liveness,
+                    damping,
+                )
+            )
+        if not self._reverb_routing_initialized:
+            for bus in (*self.row_buses, self.drum_bus):
+                self._apply_reverb_bus(bus)
+            self._reverb_routing_initialized = True
+        elif bool(drums) != bool(previous["drums"]):
+            self._wire(
+                shared_reverb_send_command(
+                    self.drum_bus,
+                    MIDI_REVERB_PROCESSOR,
+                    1.0 if drums else 0.0,
+                )
+            )
+
+    def _apply_reverb_bus(self, bus: int) -> None:
+        send = 0.0 if int(bus) == self.drum_bus and not self.reverb["drums"] else 1.0
+        for command in shared_reverb_bus_commands(
+            int(bus),
+            MIDI_REVERB_PROCESSOR,
+            send,
+        ):
+            self._wire(command)
 
     def note_on(
         self,

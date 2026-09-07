@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from config_loader import load_resolved_amy_config
+from shared_reverb import SHARED_REVERB_PROCESSOR_COUNT
 from unix_wire_socket import listen_unix_wire_socket
 from wire_frames import LfWireFrameParser, validate_wire_request
 
@@ -67,6 +68,7 @@ def main() -> int:
         default_synths=0,
         max_buses=max_buses,
         max_oscs=max_oscs,
+        max_reverb_rooms=SHARED_REVERB_PROCESSOR_COUNT,
         max_sequencer_tags=max_sequencer_tags,
         max_sequence_events=max_sequence_events,
         max_sequence_executions=max_sequence_executions,

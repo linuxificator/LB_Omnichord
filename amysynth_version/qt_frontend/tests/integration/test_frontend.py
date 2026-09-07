@@ -513,12 +513,8 @@ class FrontendIntegrationTests(unittest.TestCase):
 
             self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
             lines = app.bridge.lines_since(start)
-            for bus in (1, 2, 3):
-                self.assertIn(
-                    f"y{bus}h3,0.5,0.5Z",
-                    lines,
-                    f"reverb level 3.0 did not reach AMY bus {bus}",
-                )
+            self.assertIn("hR0,3,0.5,0.5Z", lines)
+            self.assertFalse(any("hR0,9" in line for line in lines))
 
             app.action("setReverbLevel", 9.0)
             self.assertAlmostEqual(float(app.query("reverbLevel")), 3.0)
@@ -785,7 +781,7 @@ class FrontendIntegrationTests(unittest.TestCase):
 
             checkpoint = app.bridge.count()
             app.action("injectMidiControl", 3, 76, 127)
-            expected = [f"y{bus}h3,0.5,0.5Z" for bus in (1, 2, 3)]
+            expected = ["hR0,3,0.5,0.5Z"]
             mapped_lines = app.bridge.wait_for_lines(
                 expected,
                 start=checkpoint,
@@ -821,7 +817,7 @@ class FrontendIntegrationTests(unittest.TestCase):
 
             checkpoint = app.bridge.count()
             app.action("injectMidiControl", 4, 77, 127)
-            expected = [f"y{bus}h3,0.58,0.52Z" for bus in range(4, 10)]
+            expected = ["hR1,3,0.58,0.52Z"]
             lines = app.bridge.wait_for_lines(
                 expected,
                 start=checkpoint,

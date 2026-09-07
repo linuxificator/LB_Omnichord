@@ -11,6 +11,12 @@ from typing import Any
 
 from control_limits import clamp_control_value
 from application_scheduler import MonotonicScheduler
+from shared_reverb import (
+    OMNI_REVERB_PROCESSOR,
+    bus_commands as shared_reverb_bus_commands,
+    processor_command as shared_reverb_processor_command,
+    send_command as shared_reverb_send_command,
+)
 from amy_parameter_plan import compile_parameter_commands
 from config_loader import DebugConfig, ResolvedAmyConfig, resolve_amy_config_data
 from drum_patterns import (
@@ -670,32 +676,43 @@ class AmySerialClient:
         self.master_volume = updated
         self._apply_master_buses()
 
-    def _reverb_command(self, bus: int, *, enabled: bool) -> str:
-        level = self.reverb["level"] if enabled else 0.0
-        return (
-            f"y{int(bus)}h{self._f(level)},"
-            f"{self._f(self.reverb['liveness'])},"
-            f"{self._f(self.reverb['damping'])}Z"
+    def _reverb_send_for_bus(self, bus: int) -> float:
+        if int(bus) == self.bus_id["drums"]:
+            return 1.0 if self.reverb["drums"] else 0.0
+        return 1.0
+
+    def _apply_reverb_processor(self) -> None:
+        self._wire(
+            shared_reverb_processor_command(
+                OMNI_REVERB_PROCESSOR,
+                self.reverb["level"],
+                self.reverb["liveness"],
+                self.reverb["damping"],
+            )
         )
 
-    def _reverb_enabled_for_bus(self, bus: int) -> bool:
-        if int(bus) == self.bus_id["drums"]:
-            return bool(self.reverb["drums"])
-        return True
-
     def _apply_reverb_bus(self, bus: int) -> None:
+        for command in shared_reverb_bus_commands(
+            int(bus),
+            OMNI_REVERB_PROCESSOR,
+            self._reverb_send_for_bus(int(bus)),
+        ):
+            self._wire(command)
+
+    def _apply_reverb_send(self, bus: int) -> None:
         self._wire(
-            self._reverb_command(
+            shared_reverb_send_command(
                 int(bus),
-                enabled=self._reverb_enabled_for_bus(int(bus)),
+                OMNI_REVERB_PROCESSOR,
+                self._reverb_send_for_bus(int(bus)),
             )
         )
 
     def _apply_reverb_buses(self) -> None:
-        # Every musical role owns its own bus so loading a Juno patch cannot
-        # leak the patch's bus-level EQ/chorus/reverb into another role.
-        # The user reverb is intentionally shared across the three melodic
-        # buses; drums receive the same room only when DRM is enabled.
+        # Patch-local reverbs are explicitly disabled by _apply_reverb_bus.
+        # All Omnichord roles then feed one processor, modelling one acoustic
+        # space. Drums can be excluded by setting their send to zero.
+        self._apply_reverb_processor()
         for bus in (
             self.bus_id["drums"],
             self.bus_id["bass"],
@@ -713,10 +730,17 @@ class AmySerialClient:
             "damping": max(0.0, min(1.0, float(value.get("damping", self.reverb["damping"])))),
             "drums": bool(value.get("drums", self.reverb["drums"])),
         }
-        if updated == self.reverb:
+        previous = self.reverb
+        if updated == previous:
             return
         self.reverb = updated
-        self._apply_reverb_buses()
+        if any(
+            updated[key] != previous[key]
+            for key in ("level", "liveness", "damping")
+        ):
+            self._apply_reverb_processor()
+        if updated["drums"] != previous["drums"]:
+            self._apply_reverb_send(self.bus_id["drums"])
 
     def _configure_one_synth(self, role: str, synth: int) -> None:
         self._bump_synth_generation(synth)

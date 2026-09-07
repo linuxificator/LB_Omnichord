@@ -716,12 +716,17 @@ class SerialIntegrationTests(unittest.TestCase):
             app.bridge.wait_idle(timeout=10.0)
             lines = app.bridge.lines_since(0)
 
-            # Four isolated buses: drums 0 are dry by default; bass/strum/chord
-            # buses also start at user reverb level zero. Liveness/damping are
-            # still defined at their neutral midpoint even while level is zero.
+            # Four isolated buses feed one shared processor. Patch-local bus
+            # reverbs are disabled; drums start with a zero send while the
+            # melodic buses feed processor 0 at unity.
+            self.assertIn("hR0,0,0.5,0.5Z", lines)
             for bus in range(4):
-                self.assertIn(f"y{bus}h0,0.5,0.5Z", lines)
-            self.assertFalse(any("h0.001" in line for line in lines))
+                self.assertIn(f"y{bus}h0Z", lines)
+                expected_send = 0 if bus == 0 else 1
+                self.assertIn(f"y{bus}hS0,{expected_send}Z", lines)
+            self.assertFalse(
+                any(line.startswith("y") and "h0." in line for line in lines)
+            )
 
             # The PTY may coalesce writes that were physically separated by a
             # scheduler delay when its reader thread is descheduled. Verify
@@ -758,12 +763,7 @@ class SerialIntegrationTests(unittest.TestCase):
             start = app.bridge.count()
             app.action("setReverbLevel", 0.4)
             app.bridge.wait_for_lines(
-                [
-                    "y0h0,0.5,0.5Z",
-                    "y1h0.4,0.5,0.5Z",
-                    "y2h0.4,0.5,0.5Z",
-                    "y3h0.4,0.5,0.5Z",
-                ],
+                ["hR0,0.4,0.5,0.5Z"],
                 start=start,
                 timeout=5.0,
             )
@@ -772,20 +772,16 @@ class SerialIntegrationTests(unittest.TestCase):
             start = app.bridge.count()
             app.action("toggleReverbDrums")
             app.bridge.wait_for_lines(
-                ["y0h0.4,0.5,0.5Z"], start=start, timeout=5.0
+                ["y0hS0,1Z"], start=start, timeout=5.0
             )
             self.assertTrue(bool(app.query("reverbDrumsIncluded")))
 
-            # Level zero is exact on every bus, including drums when DRM is on.
+            # Level zero disables the one processor exactly. Bus sends remain
+            # routing state and therefore need no redundant rewrite.
             start = app.bridge.count()
             app.action("setReverbLevel", 0.0)
             app.bridge.wait_for_lines(
-                [
-                    "y0h0,0.5,0.5Z",
-                    "y1h0,0.5,0.5Z",
-                    "y2h0,0.5,0.5Z",
-                    "y3h0,0.5,0.5Z",
-                ],
+                ["hR0,0,0.5,0.5Z"],
                 start=start,
                 timeout=5.0,
             )
