@@ -235,3 +235,26 @@ Release artifacts intentionally contain separate `v1/` and `v3/` images.
 - Future performance decisions should use maximum unrepaid debt together with
   average and maximum stage times. A raw count of blocks above 2.667 ms is not
   sufficient evidence of audible underrun when buffering is present.
+
+## Raspberry Pi packaged transport acceptance
+
+CI artifact
+`LB_Omnichord.R20260907224839.RaspberryPi-aarch64.AppImage` was copied to the
+physical 2 GiB Raspberry Pi 4 and its published SHA-256 checksum was verified.
+Both packaged modes ran through the hardware-accelerated Wayland/OpenGL path
+(`Broadcom V3D 4.2.14.0`, 120 Hz) and captured valid 1920 x 850 OMNI and MIDI
+screens:
+
+- default invocation started the bundled Gamma9001 AMY service as a separate
+  process, connected the frontend over its private Unix socket, exited cleanly
+  after capture and left no service process behind;
+- `--serial --serial-port /dev/serial0 --serial-baud 1000000` started no local
+  service and sent the normal startup/capture command stream through the Pi's
+  physical UART to the connected P4;
+- a subsequent `?loadZ` sent through that UART produced a valid P4 snapshot:
+  17,953 blocks, zero compute deadline misses, zero unpaced writes, zero debt
+  and zero overload yields. This proves the packaged frontend, UART framing,
+  LP-core receiver and running AMY firmware were connected end to end.
+
+The package remains self-contained in both modes. `--serial` selects external
+hardware rather than provisioning anything at runtime.
