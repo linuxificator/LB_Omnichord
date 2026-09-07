@@ -18,9 +18,11 @@ from typing import Any, Callable
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-
 ROOT = Path(__file__).resolve().parents[2]
 TEST_APP = Path(__file__).with_name("headless_app.py")
+sys.path.insert(0, str(ROOT / "code"))
+
+from shared_reverb import SHARED_REVERB_PROCESSOR_COUNT  # noqa: E402
 
 
 def free_tcp_port() -> int:
@@ -113,6 +115,7 @@ class SerialAmyBridge:
                     default_synths=0,
                     max_buses=11,
                     max_oscs=336,
+                    max_reverb_rooms=SHARED_REVERB_PROCESSOR_COUNT,
                     max_sequencer_tags=1280,
                     max_sequence_events=64,
                     max_sequence_executions=40,
@@ -132,6 +135,7 @@ class SerialAmyBridge:
                     "sample_rate": int(amy.AMY_SAMPLE_RATE),
                     "max_buses": 11,
                     "max_oscs": 336,
+                    "max_reverb_rooms": SHARED_REVERB_PROCESSOR_COUNT,
                     "max_sequencer_tags": 1280,
                     "max_sequence_events": 64,
                     "max_sequence_executions": 40,
