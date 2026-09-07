@@ -128,3 +128,16 @@ Omnichord AMY release and contains only compile-time guarded ESP load
 instrumentation. The memory-placement and stack-size accommodations above were
 made in `/tmp/lb-p4-baseline` and must not be copied into a production branch
 without broader stress and stack testing.
+
+## Physical reset path
+
+The Raspberry Pi GPIO18 output is wired to ESP32-P4 `EN`. A clean target reset
+can therefore be performed remotely on the Pi without cycling USB:
+
+```bash
+pinctrl set 18 op dl
+pinctrl set 18 op dh
+```
+
+Keep the low pulse brief and always restore the output high. This is useful
+when a measurement must start from a clean heap and effect state.
