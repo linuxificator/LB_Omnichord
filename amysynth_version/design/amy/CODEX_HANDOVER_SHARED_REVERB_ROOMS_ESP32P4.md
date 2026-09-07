@@ -3,7 +3,7 @@
 Status: integrated and physically validated with the complete LB workload
 Date: 2026-09-08
 AMY branch: `rework/shared-reverb`
-AMY release commit: `b959b86ec23769976572b93f476ec18fe374a723`
+AMY release commit: `e9a96c20da31b4130a243bf75b984408c1dff5e0`
 LB firmware branch: `rework/shared-reverb`
 LB firmware commit: `286734d270323be5d9df85b3b6a1063c3c01734d`
 Physical target: Waveshare ESP32-P4 revision 1.3, CPU 360 MHz, 32 MiB

@@ -3,8 +3,8 @@
   "recorded": "2026-09-08",
   "amy": {
     "repository": "https://github.com/linuxificator/amy.git",
-    "release_branch": "releases/amy_omnichord_R20260908T003826",
-    "commit": "b959b86ec23769976572b93f476ec18fe374a723",
+    "release_branch": "releases/amy_omnichord_R20260908T005616",
+    "commit": "e9a96c20da31b4130a243bf75b984408c1dff5e0",
     "pcm_bank": "gamma9001"
   },
   "python": {

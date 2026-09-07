@@ -3,8 +3,8 @@
 Status: physically validated and released on the AMY fork
 Date: 2026-09-08
 AMY development branch: `rework/shared-reverb`
-AMY release branch: `releases/amy_omnichord_R20260908T003826`
-AMY commit: `b959b86ec23769976572b93f476ec18fe374a723`
+AMY release branch: `releases/amy_omnichord_R20260908T005616`
+AMY commit: `e9a96c20da31b4130a243bf75b984408c1dff5e0`
 LB integration branch: `rework/shared-reverb`
 Physical target: Waveshare ESP32-P4 Pico M, chip revision 1.3, 360 MHz,
 32 MiB PSRAM at 200 MHz
@@ -216,7 +216,12 @@ Release artifacts intentionally contain separate `v1/` and `v3/` images.
 
 ## Verification and maintenance contract
 
-- `make ctest` passes at AMY commit `b959b86e`.
+- `make ctest` passes at AMY commit `e9a96c20`.
+- The first release build exposed a diagnostics-only portability error:
+  GCC's `__sync_synchronize()` was used by generic shared-reverb snapshots but
+  is not provided by MSVC. The final commit routes the same full memory fence
+  through `MemoryBarrier()` on Windows and the GCC intrinsic elsewhere. This
+  changes neither audio nor snapshot semantics.
 - The ESP-IDF 6.0.2 `v1` image compiles and links that exact commit with
   Gamma9001; application size is `0x4b2940`, leaving 41% of the 8 MiB app
   partition.
@@ -230,4 +235,3 @@ Release artifacts intentionally contain separate `v1/` and `v3/` images.
 - Future performance decisions should use maximum unrepaid debt together with
   average and maximum stage times. A raw count of blocks above 2.667 ms is not
   sufficient evidence of audible underrun when buffering is present.
-

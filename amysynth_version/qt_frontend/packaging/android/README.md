@@ -14,8 +14,8 @@ private :amy service process -> AMY C engine -> Oboe -> AAudio
 ```
 
 The application embeds the `amy-service` AAR from fork release branch
-`releases/amy_omnichord_R20260908T003826`, pinned to commit
-`b959b86ec23769976572b93f476ec18fe374a723`. Its native build generates,
+`releases/amy_omnichord_R20260908T005616`, pinned to commit
+`e9a96c20da31b4130a243bf75b984408c1dff5e0`. Its native build generates,
 links and registers Gamma9001 PCM data before AMY starts. The AAR's unexported lifecycle
 provider starts AMY in a separate `:amy` process under the same package UID.
 Qt discovers the application's real private files directory with
