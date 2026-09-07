@@ -115,10 +115,25 @@ def run_frontend(arguments: list[str]) -> int:
         socket.unlink(missing_ok=True)
 
 
+def run_serial_frontend(arguments: list[str]) -> int:
+    """Run the packaged frontend against a separately connected AMY target."""
+
+    if "--amy-socket" in arguments or "--amy-local-name" in arguments:
+        raise ValueError(
+            "--serial cannot be combined with an AMY socket or local endpoint"
+        )
+    main = import_frontend()
+    sys.argv = [sys.argv[0], *arguments]
+    return int(main.main(arguments, asset_root=APP_ROOT))
+
+
 def main_entry() -> int:
     arguments = sys.argv[1:]
     if arguments and arguments[0] == "--amy-service":
         return run_service(arguments[1:])
+    if "--serial" in arguments:
+        serial_arguments = [arg for arg in arguments if arg != "--serial"]
+        return run_serial_frontend(serial_arguments)
     return run_frontend(arguments)
 
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
+import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 FRONTEND = Path(__file__).resolve().parents[1]
@@ -11,6 +14,45 @@ REPOSITORY = FRONTEND.parents[1]
 
 
 class PackagingContracts(unittest.TestCase):
+    def test_appimage_serial_mode_skips_the_bundled_service(self) -> None:
+        entry_path = FRONTEND / "packaging" / "appimage_entry.py"
+        spec = importlib.util.spec_from_file_location(
+            "appimage_entry_contract", entry_path
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        fake_main = mock.Mock()
+        fake_main.main.return_value = 17
+        with mock.patch.object(module, "import_frontend", return_value=fake_main):
+            with mock.patch.object(
+                sys,
+                "argv",
+                ["LB_Omnichord", "--serial", "--serial-port", "/dev/serial0"],
+            ):
+                result = module.main_entry()
+
+        self.assertEqual(result, 17)
+        fake_main.main.assert_called_once_with(
+            ["--serial-port", "/dev/serial0"],
+            asset_root=module.APP_ROOT,
+        )
+
+    def test_appimage_serial_mode_rejects_a_second_transport(self) -> None:
+        entry_path = FRONTEND / "packaging" / "appimage_entry.py"
+        spec = importlib.util.spec_from_file_location(
+            "appimage_entry_conflict_contract", entry_path
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        with self.assertRaisesRegex(ValueError, "cannot be combined"):
+            module.run_serial_frontend(["--amy-socket", "/tmp/amy.sock"])
+
     def test_desktop_packages_include_discovery_code_metadata_and_notices(self) -> None:
         scripts = (
             FRONTEND / "packaging" / "build_appimage.sh",
@@ -574,6 +616,9 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('"--amy-service"', entry)
         self.assertIn('"--amy-socket"', entry)
         self.assertIn("local_amy_service.main()", entry)
+        self.assertIn('if "--serial" in arguments:', entry)
+        self.assertIn("return run_serial_frontend(serial_arguments)", entry)
+        self.assertIn("main.main(arguments, asset_root=APP_ROOT)", entry)
         self.assertIn(
             'frontend_arguments = ["--amy-socket", str(socket), *arguments]',
             entry,

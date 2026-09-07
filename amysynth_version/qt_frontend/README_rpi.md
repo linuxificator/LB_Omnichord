@@ -20,12 +20,12 @@ system's `libstdc++.so.6` so that this host graphics stack and its C++ ABI stay
 matched; substituting an older builder runtime can make the Qt Wayland plugin
 load while EGL context creation still fails.
 
-The AppImage bundles the pinned native AMY service and uses the Pi's local
-audio output. It preserves the process boundary: its launcher starts AMY and
-Qt as separate processes and they exchange AMY wire packets over a private
-Unix socket. Use this package when the Pi itself should synthesize audio. The
-source install and UART instructions below remain the path for driving an
-external ESP32-P4 instead.
+The AppImage bundles the pinned native AMY service and defaults to the Pi's
+local audio output. It preserves the process boundary: its launcher starts AMY
+and Qt as separate processes and they exchange AMY wire packets over a private
+Unix socket. The same self-contained AppImage can instead drive an external
+ESP32-P4 over UART by passing `--serial`; in that mode it does not start the
+local AMY process.
 
 Make the downloaded package executable and start it directly:
 
@@ -33,6 +33,24 @@ Make the downloaded package executable and start it directly:
 chmod +x LB_Omnichord.R*.RaspberryPi-aarch64.AppImage
 ./LB_Omnichord.R*.RaspberryPi-aarch64.AppImage
 ```
+
+To use the ESP32-P4 connected to the configured `/dev/serial0` at 1,000,000
+baud:
+
+```bash
+./LB_Omnichord.R*.RaspberryPi-aarch64.AppImage --serial
+```
+
+The normal frontend overrides remain available, for example:
+
+```bash
+./LB_Omnichord.R*.RaspberryPi-aarch64.AppImage \
+    --serial --serial-port /dev/ttyUSB0 --serial-baud 1000000
+```
+
+Released packages remain fully self-contained in either mode. Serial mode
+selects external hardware; it does not download, install or import AMY into the
+frontend process.
 
 ## Wiring
 
