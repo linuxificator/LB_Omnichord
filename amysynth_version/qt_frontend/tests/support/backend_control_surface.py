@@ -13,8 +13,9 @@ class BackendControlSurface:
     production QObject does not expose synthetic MIDI or OSC injection slots.
     """
 
-    def __init__(self, backend: Any) -> None:
+    def __init__(self, backend: Any, amy_client: Any | None = None) -> None:
         self._backend = backend
+        self._amy_client = amy_client
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._backend, name)
@@ -51,6 +52,20 @@ class BackendControlSurface:
 
     def cycleMidiChordInputChannel(self) -> None:
         self._backend.midiPlayer.cycleChordInputChannel()
+
+    def requestAmyDiagnostics(self, kind: str = "load") -> None:
+        """Queue one bounded firmware diagnostic request on the real sink.
+
+        This adapter exists only in the separately launched integration-test
+        process. It deliberately exposes the two read-only P4 queries rather
+        than a general raw-command escape hatch.
+        """
+        commands = {"load": "?loadZ", "reverb": "?reverbZ"}
+        if kind not in commands:
+            raise ValueError("AMY diagnostic kind must be load or reverb")
+        if self._amy_client is None:
+            raise RuntimeError("AMY diagnostic transport is unavailable")
+        self._amy_client.writer.high(commands[kind])
 
     def injectOscControl(
         self,

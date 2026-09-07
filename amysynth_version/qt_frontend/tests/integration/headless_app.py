@@ -42,7 +42,10 @@ def main() -> int:
     backend = graph.backend
 
     port = int(os.environ.get("OMNICHORD_TEST_API_PORT", "18765"))
-    test_server = TestControlServer(BackendControlSurface(backend), port)
+    test_server = TestControlServer(
+        BackendControlSurface(backend, amy_client),
+        port,
+    )
     print(
         f"TEST_API_PORT={test_server.port}",
         file=sys.stderr,
