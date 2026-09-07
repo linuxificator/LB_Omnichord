@@ -15,7 +15,9 @@ The image includes:
 - 11 independent AMY buses;
 - 1280 reusable-sequence identities, at most 64 events per definition and 40
   concurrent executions;
-- a 48 kHz, 128-sample AMY render block and 2 × 64-frame I2S DMA ring.
+- a 48 kHz, 128-sample AMY render block and 2 × 128-frame I2S DMA ring. The
+  second render-block of buffering adds 2.67 ms of fixed output latency and
+  absorbs an isolated expensive onset without changing sequencer timing.
 
 Large persistent AMY pools use PSRAM. Render/DMA scratch remains in internal
 RAM. Startup aborts clearly when less than 8 MB PSRAM is available.

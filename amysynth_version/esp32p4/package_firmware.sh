@@ -10,7 +10,7 @@ amy_component_cmake="$project_dir/components/amy/CMakeLists.txt"
 audio_sample_rate=48000
 audio_block_size=128
 i2s_dma_descriptors=2
-i2s_dma_frames=64
+i2s_dma_frames=128
 
 case "$profile" in
     v1|v3) ;;

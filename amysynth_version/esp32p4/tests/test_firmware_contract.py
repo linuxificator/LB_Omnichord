@@ -80,7 +80,7 @@ class FirmwareContractTests(unittest.TestCase):
         self.assertIn("esp_psram_is_initialized", source)
         package = (ROOT / "package_firmware.sh").read_text()
         self.assertIn('audio_block_size=128', package)
-        self.assertIn('i2s_dma_frames=64', package)
+        self.assertIn('i2s_dma_frames=128', package)
         self.assertIn('"audio_block_size=$audio_block_size"', package)
         self.assertIn('"i2s_dma_frames=$i2s_dma_frames"', package)
 
