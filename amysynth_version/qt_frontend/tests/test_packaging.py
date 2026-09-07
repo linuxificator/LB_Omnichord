@@ -469,7 +469,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertIn('"flash_esptool_v5.py"', firmware_assembler)
         self.assertIn('release_root = f"LB_Omnichord.{release_name}.ESP32P4"', firmware_assembler)
         self.assertIn("## ESP32-P4 firmware", release)
-        self.assertIn("128-sample / 2 x 64-frame", release)
+        self.assertIn("128-sample / 2 x 128-frame", release)
         self.assertIn("## Android arm64", release)
         self.assertIn("CI debug-signed", release)
         self.assertIn("## Windows native", release)

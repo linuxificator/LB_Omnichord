@@ -43,7 +43,7 @@ class StaticContractTests(unittest.TestCase):
             "AMY_SAMPLE_RATE=48000",
             "AMY_ESP_I2S_PHILIPS_FORMAT=1",
             "AMY_ESP_I2S_DMA_DESC_NUM=2",
-            "AMY_ESP_I2S_DMA_FRAME_NUM=64",
+            "AMY_ESP_I2S_DMA_FRAME_NUM=128",
         ):
             self.assertIn(definition, prepare)
         for retired_source_patch in (

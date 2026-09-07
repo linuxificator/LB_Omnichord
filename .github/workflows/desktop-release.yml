@@ -903,7 +903,7 @@ jobs:
             echo
             echo "Download \`$esp32p4_file\` and its SHA-256 file. It expands to a versioned directory containing separate \`v1/\` and \`v3/\` image directories, flashing instructions, and Python flashers for both legacy and current esptool syntax. Use \`v1\` for revision 1.x silicon, including the physically tested v1.3 board; use \`v3\` only for revision 3.x silicon."
             echo
-            echo 'Both firmware profiles receive native AMY wire commands through the LP UART at 1,000,000 baud, include Gamma9001, 11 buses, capacity for 1280 reusable-sequence tags, and the physically selected 48 kHz / 128-sample / 2 x 64-frame audio geometry. CI proves compilation and image structure; v3 I2S audio and LP-UART operation still require physical-board validation.'
+            echo 'Both firmware profiles receive native AMY wire commands through the LP UART at 1,000,000 baud, include Gamma9001, 11 buses, capacity for 1280 reusable-sequence tags, and the physically selected 48 kHz / 128-sample / 2 x 128-frame audio geometry. CI proves compilation and image structure; v3 I2S audio and LP-UART operation still require physical-board validation.'
             echo
             echo '## Build provenance'
             echo
