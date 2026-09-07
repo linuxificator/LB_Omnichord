@@ -42,8 +42,13 @@ grep -q '^CONFIG_OMNICHORD_P4_MAX_BUSES=11$' "$build_dir/sdkconfig"
 grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCER_TAGS=1280$' "$build_dir/sdkconfig"
 grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EVENTS=64$' "$build_dir/sdkconfig"
 grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS=40$' "$build_dir/sdkconfig"
+grep -q '^CONFIG_CACHE_L2_CACHE_SIZE=0x20000$' "$build_dir/sdkconfig"
 grep -q 'gamma9001_pcm_data' "$build_dir/amy_p4_test.map"
 grep -q 'amy_set_gamma9001_pcm' "$build_dir/amy_p4_test.map"
+riscv32-esp-elf-nm -a "$build_dir/amy_p4_test.elf" \
+    | grep -q 'reserved_region_amy_reverb_room_0'
+riscv32-esp-elf-nm -a "$build_dir/amy_p4_test.elf" \
+    | grep -q 'reserved_region_amy_reverb_room_1'
 grep -q "AMY_SAMPLE_RATE=$audio_sample_rate" "$amy_component_cmake"
 grep -q "AMY_BLOCK_SIZE=$audio_block_size" "$amy_component_cmake"
 grep -q "AMY_ESP_I2S_DMA_DESC_NUM=$i2s_dma_descriptors" "$amy_component_cmake"
@@ -98,6 +103,9 @@ printf '%s\n' \
     "audio_block_size=$audio_block_size" \
     "i2s_dma_descriptors=$i2s_dma_descriptors" \
     "i2s_dma_frames=$i2s_dma_frames" \
+    "shared_reverb_rooms=2" \
+    "shared_reverb_arena_bytes=131072" \
+    "shared_reverb_memory=internal_sram_exclusive_banks" \
     "max_oscs=336" \
     "max_buses=11" \
     "max_sequencer_tags=1280" \

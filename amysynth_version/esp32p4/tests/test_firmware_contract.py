@@ -107,6 +107,30 @@ class FirmwareContractTests(unittest.TestCase):
         self.assertIn("CONFIG_SPIRAM=y", defaults)
         self.assertIn("factory,  app,  factory, 0x10000, 8M", partitions)
 
+    def test_two_reverbs_own_complete_internal_sram_banks(self) -> None:
+        source = (ROOT / "main/main.c").read_text()
+        defaults = (ROOT / "sdkconfig.defaults").read_text()
+        package = (ROOT / "package_firmware.sh").read_text()
+
+        self.assertIn("AMY_REVERB_BANK_BYTES (128U * 1024U)", source)
+        self.assertIn("AMY_REVERB_BANK_COUNT 2U", source)
+        self.assertIn("AMY_REVERB_BANK_0_START 0x4ff60000U", source)
+        self.assertIn("AMY_REVERB_BANK_1_START 0x4ff80000U", source)
+        self.assertEqual(source.count("SOC_RESERVE_MEMORY_REGION("), 2)
+        self.assertNotIn("= heap_caps_aligned_alloc", source)
+        self.assertIn("config.reverb_room_memory = s_amy_reverb_banks", source)
+        self.assertIn("config.reverb_room_memory_bytes = AMY_REVERB_BANK_BYTES", source)
+        self.assertIn("CONFIG_CACHE_L2_CACHE_SIZE=0x20000", defaults)
+        self.assertIn("reserved_region_amy_reverb_room_0", package)
+        self.assertIn("reserved_region_amy_reverb_room_1", package)
+
+    def test_reverb_measurement_is_deferred_outside_audio_tasks(self) -> None:
+        source = (ROOT / "main/main.c").read_text()
+        self.assertIn("config.reverb_diagnostics = 1", source)
+        self.assertIn('strcmp(command, "?reverbZ")', source)
+        self.assertIn('strcmp(command, "?loadZ")', source)
+        self.assertIn("print_deferred_diagnostics();", source)
+
     def test_ci_supports_reuse_and_standalone_profiles(self) -> None:
         workflow = (REPO_ROOT / ".github/workflows/esp32p4-build.yml").read_text()
         self.assertIn("workflow_call:", workflow)

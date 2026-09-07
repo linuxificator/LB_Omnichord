@@ -8,6 +8,7 @@ idf_component_register(
     REQUIRES
         amy
         esp_psram
+        heap
         ulp
 )
 

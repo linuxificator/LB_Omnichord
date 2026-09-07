@@ -8,7 +8,9 @@
 #include "esp_err.h"
 #include "esp_chip_info.h"
 #include "esp_heap_caps.h"
+#include "esp_memory_utils.h"
 #include "esp_psram.h"
+#include "heap_memory_layout.h"
 
 #include "ulp_lp_core.h"
 #include "lp_core_uart.h"
@@ -41,6 +43,97 @@ extern const uint8_t lp_core_main_bin_end[]
 static lp_mailbox_t s_mailbox;
 
 static TaskHandle_t s_amy_command_task = NULL;
+
+#define AMY_REVERB_BANK_BYTES (128U * 1024U)
+#define AMY_REVERB_BANK_COUNT 2U
+#define AMY_REVERB_BANK_0_START 0x4ff60000U
+#define AMY_REVERB_BANK_1_START 0x4ff80000U
+
+/*
+ * ESP32-P4's internal SRAM is physically banked in 128 KiB units. Keep these
+ * two complete banks out of the capability heap from the earliest startup
+ * phase. A late heap_caps_aligned_alloc() is not deterministic: heap metadata
+ * and earlier allocations can make a whole aligned bank unavailable even
+ * though more than 256 KiB remains free in total.
+ *
+ * Both supported board revisions expose these addresses as internal SRAM with
+ * the configured 128 KiB L2 cache. The link-map checks in the release build
+ * guard this board/profile contract as well.
+ */
+SOC_RESERVE_MEMORY_REGION(
+    AMY_REVERB_BANK_0_START,
+    AMY_REVERB_BANK_0_START + AMY_REVERB_BANK_BYTES,
+    amy_reverb_room_0
+)
+SOC_RESERVE_MEMORY_REGION(
+    AMY_REVERB_BANK_1_START,
+    AMY_REVERB_BANK_1_START + AMY_REVERB_BANK_BYTES,
+    amy_reverb_room_1
+)
+
+_Static_assert(
+    (AMY_REVERB_BANK_0_START & (AMY_REVERB_BANK_BYTES - 1U)) == 0U,
+    "reverb room 0 must start on a 128 KiB SRAM-bank boundary"
+);
+_Static_assert(
+    (AMY_REVERB_BANK_1_START & (AMY_REVERB_BANK_BYTES - 1U)) == 0U,
+    "reverb room 1 must start on a 128 KiB SRAM-bank boundary"
+);
+_Static_assert(
+    AMY_REVERB_BANK_0_START + AMY_REVERB_BANK_BYTES <=
+        AMY_REVERB_BANK_1_START,
+    "reverb SRAM banks must not overlap"
+);
+
+static void *s_amy_reverb_banks[AMY_REVERB_BANK_COUNT] = {
+    (void *)AMY_REVERB_BANK_0_START,
+    (void *)AMY_REVERB_BANK_1_START,
+};
+
+static void reserve_reverb_banks(void)
+{
+    const uint32_t caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+
+    for (uint32_t room = 0; room < AMY_REVERB_BANK_COUNT; ++room) {
+        if (!esp_ptr_internal(s_amy_reverb_banks[room]) ||
+            ((uintptr_t)s_amy_reverb_banks[room] &
+             (AMY_REVERB_BANK_BYTES - 1U)) != 0U) {
+            printf("ERROR: invalid reserved SRAM bank for reverb %u\n",
+                   (unsigned)room);
+            abort();
+        }
+        memset(s_amy_reverb_banks[room], 0, AMY_REVERB_BANK_BYTES);
+    }
+
+    uintptr_t first = (uintptr_t)s_amy_reverb_banks[0];
+    uintptr_t second = (uintptr_t)s_amy_reverb_banks[1];
+    if ((first < second + AMY_REVERB_BANK_BYTES) &&
+        (second < first + AMY_REVERB_BANK_BYTES)) {
+        printf("ERROR: reserved reverb SRAM banks overlap\n");
+        abort();
+    }
+
+    printf("Reverb SRAM    : room0=%p room1=%p, %u bytes each (heap-excluded)\n",
+           s_amy_reverb_banks[0], s_amy_reverb_banks[1],
+           (unsigned)AMY_REVERB_BANK_BYTES);
+    printf("Internal SRAM  : free=%u largest=%u\n",
+           (unsigned)heap_caps_get_free_size(caps),
+           (unsigned)heap_caps_get_largest_free_block(caps));
+}
+
+static void print_deferred_diagnostics(void)
+{
+    amy_reverb_diagnostics_print();
+    amy_esp_load_diagnostics_print();
+    printf("AMY memory     : internal free=%u largest=%u, PSRAM free=%u\n",
+           (unsigned)heap_caps_get_free_size(
+               MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+           (unsigned)heap_caps_get_largest_free_block(
+               MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+           (unsigned)heap_caps_get_free_size(
+               MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    fflush(stdout);
+}
 
 
 /*
@@ -214,6 +307,14 @@ static void amy_command_task(void *arg)
                 continue;
             }
 
+            /* Diagnostics are read and printed from this lower-priority
+             * control task, never from either realtime audio task. */
+            if (strcmp(command, "?reverbZ") == 0 ||
+                strcmp(command, "?loadZ") == 0) {
+                print_deferred_diagnostics();
+                continue;
+            }
+
 
             /*
              * Native AMY wire command.
@@ -381,6 +482,12 @@ void app_main(void)
         abort();
     }
 
+    /* The linker/startup reservation keeps complete, naturally aligned SRAM
+     * banks away from every heap and application pool. AMY suballocates the
+     * room state, block and all delay lines inside each arena and performs no
+     * realtime allocation. */
+    reserve_reverb_banks();
+
 
     /*
      * ----------------------------------------------------
@@ -425,6 +532,10 @@ void app_main(void)
         CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EVENTS;
     config.max_sequence_executions =
         CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS;
+    config.max_reverb_rooms = AMY_REVERB_BANK_COUNT;
+    config.reverb_room_memory = s_amy_reverb_banks;
+    config.reverb_room_memory_bytes = AMY_REVERB_BANK_BYTES;
+    config.reverb_diagnostics = 1;
 
     /* Large persistent pools live in external RAM. DMA/render scratch and
      * FreeRTOS stacks remain internal. */
