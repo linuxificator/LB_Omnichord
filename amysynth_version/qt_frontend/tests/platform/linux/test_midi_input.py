@@ -131,7 +131,10 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
                 os.write(midi_master, bytes((0xB0, 74, 0, 0xB0, 74, 1)))
                 deadline = time.monotonic() + 5.0
                 while time.monotonic() < deadline:
-                    if any("h0.02" in packet for packet in wire_packets):
+                    if any(
+                        packet.startswith("hR0,0.02,")
+                        for packet in wire_packets
+                    ):
                         break
                     if process.poll() is not None:
                         break
@@ -152,7 +155,10 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
             self.assertNotIn("Cannot assign to non-existent property", output)
             self.assertNotIn("Required property", output)
             self.assertTrue(
-                any("h0.02" in packet for packet in wire_packets),
+                any(
+                    packet.startswith("hR0,0.02,")
+                    for packet in wire_packets
+                ),
                 "bound CC did not change AMY reverb: "
                 f"returncode={process.returncode!r}, "
                 f"packets={wire_packets!r}, output={output!r}",
