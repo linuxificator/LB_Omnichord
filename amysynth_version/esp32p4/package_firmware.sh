@@ -45,10 +45,13 @@ grep -q '^CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS=40$' "$build_dir/sdkconfig
 grep -q '^CONFIG_CACHE_L2_CACHE_SIZE=0x20000$' "$build_dir/sdkconfig"
 grep -q 'gamma9001_pcm_data' "$build_dir/amy_p4_test.map"
 grep -q 'amy_set_gamma9001_pcm' "$build_dir/amy_p4_test.map"
-riscv32-esp-elf-nm -a "$build_dir/amy_p4_test.elf" \
-    | grep -q 'reserved_region_amy_reverb_room_0'
-riscv32-esp-elf-nm -a "$build_dir/amy_p4_test.elf" \
-    | grep -q 'reserved_region_amy_reverb_room_1'
+# Packaging runs on the host after the containerized ESP-IDF build. The
+# cross-toolchain PATH therefore is intentionally not assumed here; the host
+# binutils reader understands the ELF target and verifies the same symbols.
+readelf -sW "$build_dir/amy_p4_test.elf" \
+    | grep -F 'reserved_region_amy_reverb_room_0' >/dev/null
+readelf -sW "$build_dir/amy_p4_test.elf" \
+    | grep -F 'reserved_region_amy_reverb_room_1' >/dev/null
 grep -q "AMY_SAMPLE_RATE=$audio_sample_rate" "$amy_component_cmake"
 grep -q "AMY_BLOCK_SIZE=$audio_block_size" "$amy_component_cmake"
 grep -q "AMY_ESP_I2S_DMA_DESC_NUM=$i2s_dma_descriptors" "$amy_component_cmake"
