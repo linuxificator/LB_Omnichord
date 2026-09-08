@@ -18,8 +18,18 @@ Last verified: 2026-09-08
 - Generated build directories and temporary worktrees are not source history.
 - Clean Shorepine-facing AMY branches never contain Codex/LB handovers.
 
-The branch cleanup performed on `rework/cleanup_and_details` retains the
-current release line, this work branch, open dependency-update branches and
-explicit diagnostic branches. Old merged feature/fix/rework branch labels are
-removed because their commits remain reachable from `main` and release tags.
+The branch cleanup performed on `rework/cleanup_and_details` retains:
 
+- `main` and `rework/cleanup_and_details`;
+- open dependency-update branches;
+- `diagnostics/esp32p4-rejected-prototypes`, with an explicit non-production
+  warning;
+- `testing/windows_smoke` and `integration/android_build`, because their exact
+  names are intentional partial-CI entrypoints in `desktop-release.yml`.
+
+Old feature/fix/rework labels are removed because their delivered commits
+remain reachable from `main` and release tags. Superseded unmerged branches and
+the old regression-note stash are removed only after current code, contracts
+and tests were checked as their replacement. A CI-entrypoint branch may point
+at an old commit while idle; create/update it from the source revision being
+diagnosed rather than treating its tip as an independent product line.
