@@ -18,6 +18,7 @@ from runtime_cpu_affinity import (  # noqa: E402
     frontend_uses_local_amy_service,
     local_amy_affinity_plan,
     read_device_model,
+    current_thread_ids,
 )
 
 
@@ -59,11 +60,12 @@ class RuntimeCpuAffinityTests(unittest.TestCase):
             model="Raspberry Pi 4 Model B",
             get_affinity=lambda _pid: {0, 1, 2, 3},
             set_affinity=lambda pid, cpus: calls.append((pid, cpus)),
+            thread_ids=lambda: (41, 42),
             diagnostics=diagnostics,
         )
 
         self.assertIsNotNone(plan)
-        self.assertEqual(calls, [(0, {3})])
+        self.assertEqual(calls, [(0, {3}), (41, {3}), (42, {3})])
         self.assertIn("service -> CPU(s) 3", diagnostics.getvalue())
 
     def test_affinity_failure_is_visible_and_nonfatal(self) -> None:
@@ -77,6 +79,7 @@ class RuntimeCpuAffinityTests(unittest.TestCase):
             model="Raspberry Pi 5 Model B",
             get_affinity=lambda _pid: {0, 1, 2, 3},
             set_affinity=reject,
+            thread_ids=lambda: (),
             diagnostics=diagnostics,
         )
 
@@ -88,6 +91,14 @@ class RuntimeCpuAffinityTests(unittest.TestCase):
             path = Path(directory) / "model"
             path.write_bytes(b"Raspberry Pi 4 Model B\0")
             self.assertEqual(read_device_model(path), "Raspberry Pi 4 Model B")
+
+    def test_thread_id_reader_ignores_non_numeric_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / "9").mkdir()
+            (path / "3").mkdir()
+            (path / "not-a-thread").mkdir()
+            self.assertEqual(current_thread_ids(path), (3, 9))
 
     def test_frontend_marker_is_explicit(self) -> None:
         self.assertTrue(

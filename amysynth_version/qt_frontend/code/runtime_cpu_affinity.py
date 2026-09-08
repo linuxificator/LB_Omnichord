@@ -42,12 +42,26 @@ def read_device_model(path: Path = RPI_MODEL_PATH) -> str:
         return ""
 
 
+def current_thread_ids(path: Path = Path("/proc/self/task")) -> tuple[int, ...]:
+    try:
+        return tuple(
+            sorted(
+                int(entry.name)
+                for entry in path.iterdir()
+                if entry.name.isdecimal()
+            )
+        )
+    except OSError:
+        return ()
+
+
 def apply_local_amy_affinity(
     role: AffinityRole,
     *,
     model: str | None = None,
     get_affinity: Callable[[int], set[int]] | None = None,
     set_affinity: Callable[[int, set[int]], None] | None = None,
+    thread_ids: Callable[[], Iterable[int]] | None = None,
     diagnostics: TextIO | None = None,
 ) -> LocalAmyAffinityPlan | None:
     """Apply the Pi local-service CPU partition, or safely keep OS defaults."""
@@ -58,6 +72,7 @@ def apply_local_amy_affinity(
         return None
 
     output = diagnostics or sys.stderr
+    thread_ids = thread_ids or current_thread_ids
     try:
         plan = local_amy_affinity_plan(
             read_device_model() if model is None else model,
@@ -67,6 +82,13 @@ def apply_local_amy_affinity(
             return None
         selected = plan.service_cpus if role == "service" else plan.frontend_cpus
         set_affinity(0, set(selected))
+        for thread_id in thread_ids():
+            try:
+                set_affinity(int(thread_id), set(selected))
+            except ProcessLookupError:
+                # A short-lived worker may disappear between /proc iteration
+                # and sched_setaffinity; it cannot retain stale affinity.
+                continue
     except OSError as exc:
         print(
             f"CPU affinity: keeping OS defaults ({exc})",
