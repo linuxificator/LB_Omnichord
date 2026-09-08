@@ -16,6 +16,9 @@ bus. Every bus has an independent weighted send; a zero send excludes it. LB
 routes Omnichord buses 0-3 to room 0 and MIDI buses 4-10 to room 1. That routing
 policy is outside AMY.
 
+The current per-room signal flow, including all delay taps, feedback lanes and
+LPFs, is shown in [`reverb_signal_flow.svg`](reverb_signal_flow.svg).
+
 On P4, each complete 111,888-byte reverb arena occupies its own exclusive,
 naturally aligned 128 KiB internal-SRAM bank. Room 0 executes with core 0 and
 room 1 with core 1 through the existing render/fill synchronization. No extra
@@ -91,4 +94,3 @@ from the conservative CPU envelope above.
 - Skipping silent rooms: useful diagnostic, not worst-case capacity.
 - Deferring sequencer events by one block: changes musical timing.
 - Returning to 64-frame descriptors: insufficient jitter capacity.
-
