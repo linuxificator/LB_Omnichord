@@ -13,16 +13,13 @@ process and connects over a private Unix socket. `--serial` suppresses that
 service and sends the identical wire stream to ESP32-P4; `--serial-port` and
 `--serial-baud` select the UART. No runtime download occurs in either mode.
 
-On a Raspberry Pi with at least four CPUs, local-service mode reserves the
-highest-numbered CPU from the Qt process and pins the complete AMY service to
-that CPU before AMY creates its audio threads. The frontend keeps the remaining
-CPUs. This process-level partition is deliberately implemented in the Linux/Pi
-runtime adapter rather than portable application or musical code. It is not a
-kernel `isolcpus` claim: operating-system work and interrupts may still run on
-the AMY CPU. If affinity is unavailable, restricted by an enclosing cpuset or
-cannot be changed, startup remains functional, prints a diagnostic and retains
-the operating system's policy. Serial mode does not reserve a CPU because AMY
-runs on the external ESP32-P4.
+The frontend and local AMY service retain the operating system's CPU scheduler
+policy. Physical tracing found that pinning AMY to one otherwise lightly loaded
+CPU made its normal and tail scheduler latency worse, while reserving two CPUs
+did not help a backend with one active render thread. No boot-time CPU
+isolation, realtime priority or Raspberry-Pi-specific musical/UI behavior is
+therefore imposed. The evidence and exact acceptance boundary are recorded in
+[`frontend_performance.md`](frontend_performance.md).
 
 `run_local.sh` is source-checkout tooling. It creates/checks a clone-local
 ignored virtual environment and prepares the pinned AMY dependency when

@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 
 from config_loader import load_resolved_amy_config
-from runtime_cpu_affinity import apply_local_amy_affinity
 from shared_reverb import SHARED_REVERB_PROCESSOR_COUNT
 from unix_wire_socket import listen_unix_wire_socket
 from wire_frames import LfWireFrameParser, validate_wire_request
@@ -37,7 +36,6 @@ def remove_stale_socket(path: Path) -> None:
 
 def main() -> int:
     args = parse_arguments()
-    apply_local_amy_affinity("service")
     config = load_resolved_amy_config(args.config.expanduser())
     max_buses = int(
         config.capacities.max_buses

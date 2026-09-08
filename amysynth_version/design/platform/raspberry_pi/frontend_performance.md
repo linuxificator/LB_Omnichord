@@ -40,20 +40,28 @@ loaded frames advance at no more than 30 Hz. No path is constructed or
 tessellated during interaction. The complete mostly-static control surface is
 cached independently, so moving the contact visual cannot invalidate it.
 
-## CPU partition decision
+## CPU partition experiment
 
 Measurements with the fixed frontend compared the default scheduler with one
 and two CPUs withheld from Qt. Reserving two CPUs did not improve AMY: the host
 backend has one active render thread, and removing a second CPU only reduces
-Qt/OS headroom. The selected policy therefore gives the highest-numbered CPU
-(CPU 3 on the tested Pi) to the local AMY process and CPUs 0-2 to Qt. CPU 3
-also had the lowest observed interrupt count on this test system.
+Qt/OS headroom. The one-CPU experiment assigned CPU 3 (the least interrupt-
+loaded CPU observed before the run) to AMY and CPUs 0-2 to Qt.
 
-This is process affinity, not realtime scheduling and not a boot-time isolated
-CPU. It reduces direct Qt/AMY competition without changing global kernel
-parameters, priorities, audio formats or application behavior. Failure to
-apply the hint is nonfatal and visible. An AppImage using `--serial` retains all
-CPUs because its AMY renderer is the ESP32-P4.
+Kernel `sched_wakeup`/`sched_switch` traces then alternated three 120 Hz runs per
+policy. All 12,647 observed complete AMY callbacks met the approximately
+5.33 ms audio period, but the fixed-core runs had consistently worse p99
+wake-to-completion latency (1.30-1.75 ms) than the unrestricted runs
+(1.15-1.18 ms). Tail maxima varied in both directions: 2.84-4.61 ms pinned and
+2.74-4.93 ms unrestricted. Pinning to a merely quiet core is therefore not the
+same as isolating it; kernel and PipeWire work can still contend there while
+AMY loses the scheduler's ability to migrate.
+
+The product consequently retains the operating system's affinity and normal
+scheduling policy. It does not add risky boot parameters, realtime priority or
+a platform-specific affinity watchdog. A future kernel-isolated-core profile
+would be a separate opt-in system-integration experiment and would need new
+physical latency evidence before becoming a product default.
 
 ## Regression boundary
 
@@ -65,8 +73,8 @@ runners. It does enforce the causes that can be checked deterministically:
 - 120 synchronous pointer updates cannot produce 120 shape/frame changes;
 - no runtime `QtQuick.Shapes` or particle-emitter fan-out is used;
 - mouse/touch gestures still traverse the shared production strum path;
-- the affinity planner is pure, respects enclosing cpusets, is Pi-only and
-  fails open with a diagnostic.
+- local-service and serial modes retain identical application and wire-command
+  behavior; no host scheduler policy leaks into portable code.
 
 Physical acceptance repeats the external 120 Hz `uinput` sweep while observing
 frontend/AMY CPU and listening for dropouts. It is evidence in addition to the
