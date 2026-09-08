@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 11
+CURRENT_CONFIG_REVISION = 12
 JsonObject = dict[str, Any]
 
 
@@ -80,6 +80,12 @@ REVISION_TEN_OSC_DISCOVERY = {
     "advertise": True,
     "service_name": "LB Omnichord",
 }
+
+# Revision 9 temporarily compensated for bass loss in the old output path by
+# raising the entire role 10.1 dB.  Shared bus mixing removed that loss.  Only
+# replace the exact shipped value: a user-selected role level remains policy.
+REVISION_TWELVE_LEGACY_BASS_LEVEL = 3.2
+REVISION_TWELVE_BASS_LEVEL = 1.0
 
 
 def _sample_pair(sample_map: object, name: str) -> tuple[int, int] | None:
@@ -465,6 +471,24 @@ def _revision_ten_to_eleven(data: JsonObject) -> tuple[str, ...]:
     return tuple(changed)
 
 
+def _revision_eleven_to_twelve(data: JsonObject) -> tuple[str, ...]:
+    """Remove obsolete bass compensation after shared-bus mixing."""
+
+    role_levels = data.get("role_levels")
+    if not isinstance(role_levels, dict):
+        raise ConfigMigrationError(
+            "$.role_levels",
+            "must be an object before revision 11 can migrate",
+        )
+    changed: list[str] = []
+    if role_levels.get("bass") == REVISION_TWELVE_LEGACY_BASS_LEVEL:
+        role_levels["bass"] = REVISION_TWELVE_BASS_LEVEL
+        changed.append("$.role_levels.bass")
+    data["config_revision"] = 12
+    changed.append("$.config_revision")
+    return tuple(changed)
+
+
 Migration = Callable[[JsonObject], tuple[str, ...]]
 
 
@@ -480,6 +504,7 @@ MIGRATIONS: dict[int, Migration] = {
     8: _revision_eight_to_nine,
     9: _revision_nine_to_ten,
     10: _revision_ten_to_eleven,
+    11: _revision_eleven_to_twelve,
 }
 
 
