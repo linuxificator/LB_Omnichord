@@ -165,7 +165,7 @@ that core for UART reception; I2S output is also a physical integration
 boundary. A physical v1.3 acceptance run must therefore confirm:
 
 1. PSRAM initialization and the printed board/chip profile;
-2. clean 48 kHz I2S output with the 128-sample / 2 × 64 profile;
+2. clean 48 kHz I2S output with the 128-sample / 2 × 128 profile;
 3. sustained 1 Mbaud LP-UART command reception without ring overflow;
 4. distinct Gamma9001 kick, snare, tom and cymbal presets;
 5. independent routing across all 11 buses;

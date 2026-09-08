@@ -200,4 +200,4 @@ names or `python tests/run_tests.py --suite all` for the complete matrix. The
 two native suites require the pinned LB AMY release and are principally
 intended for Linux development/CI; they are not required to run the Qt-only
 frontend on a Raspberry Pi connected to an ESP32-P4. See
-`../design/testing.md` for details.
+`../design/arch/testing.md` for details.

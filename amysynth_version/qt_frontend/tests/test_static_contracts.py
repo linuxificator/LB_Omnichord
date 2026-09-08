@@ -111,7 +111,7 @@ class StaticContractTests(unittest.TestCase):
         forbidden = [name for name in imported if name in {"amy", "c_amy"}]
         self.assertEqual(forbidden, [])
 
-    def test_codex_startup_reading_routes_existing_design_contracts(self) -> None:
+    def test_agent_startup_reading_routes_existing_design_contracts(self) -> None:
         repository = ROOT.parents[1]
         agents_path = repository / "AGENTS.md"
         design_root = ROOT.parent / "design"
@@ -119,31 +119,51 @@ class StaticContractTests(unittest.TestCase):
 
         agents = agents_path.read_text(encoding="utf-8")
         design_index = design_index_path.read_text(encoding="utf-8")
-        self.assertIn("## Required Codex startup reading", agents)
         self.assertIn("amysynth_version/README.md", agents)
         self.assertIn("amysynth_version/design/README.md", agents)
-        self.assertIn("task-routing table", agents)
 
         required_design_files = (
-            "principles.md",
-            "architecture.md",
-            "behavior.md",
-            "testing.md",
-            "gui.md",
-            "ui_behavior_reference.md",
-            "midi.md",
-            "midi_control.md",
-            "presets.md",
-            "sound_balance.md",
-            "rhythm_bahavior.md",
-            "tuning.md",
-            "use_cases.md",
-            "amy_interface.md",
-            "unclear.md",
+            "arch/principles.md",
+            "arch/architecture.md",
+            "arch/behavior.md",
+            "arch/testing.md",
+            "gui/contract.md",
+            "gui/behavior.md",
+            "controls/midi.md",
+            "controls/midi_control.md",
+            "controls/osc.md",
+            "music/presets.md",
+            "music/sound_balance.md",
+            "music/rhythm.md",
+            "music/sequences.md",
+            "music/tuning.md",
+            "music/use_cases.md",
+            "amy/interface.md",
+            "amy/sequencer.md",
+            "esp32/performance.md",
+            "platform/raspberry_pi/README.md",
         )
         for name in required_design_files:
             self.assertTrue((design_root / name).is_file(), name)
-            self.assertIn(name, design_index)
+
+        for category in (
+            "arch/",
+            "amy/",
+            "esp32/",
+            "gui/",
+            "controls/",
+            "music/",
+            "platform/",
+        ):
+            self.assertIn(category, design_index)
+
+        obsolete_roots = (
+            "code_quality_tasks",
+            "dependency_assessments",
+            "rhythm_rework",
+        )
+        for name in obsolete_roots:
+            self.assertFalse((design_root / name).exists(), name)
 
         required_frontend_contracts = (
             ROOT.parent / "README.md",
@@ -157,7 +177,10 @@ class StaticContractTests(unittest.TestCase):
         )
         for path in required_frontend_contracts:
             self.assertTrue(path.is_file(), str(path))
-        self.assertIn("WINDOWS_NATIVE.md", design_index)
+        windows_index = (
+            design_root / "platform" / "windows" / "README.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("WINDOWS_NATIVE.md", windows_index)
 
     def test_public_readme_uses_current_amy_and_qt_screenshots(self) -> None:
         repository = ROOT.parents[1]

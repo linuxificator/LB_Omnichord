@@ -1,0 +1,16 @@
+# Musical behavior
+
+Status: authoritative category index
+Owner: musical application policy
+Last verified: 2026-09-08
+
+- `presets.md`: preset ownership and persistence.
+- `rhythm.md`: transport, tempo, fills and activity behavior.
+- `sequences.md`: LB ownership versus AMY reusable definitions/executions.
+- `sound_balance.md`: instrument/reverb balance and measurement.
+- `tuning.md`: pitch and tuning behavior.
+- `use_cases.md`: executable musical expectations.
+
+Runtime catalogues under `../../qt_frontend/music/` and their schemas and
+provenance are the data authority. Design does not carry duplicate datasets.
+

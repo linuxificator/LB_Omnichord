@@ -32,10 +32,12 @@ gh auth login
 
 ## Pull and flash
 
-Check out the firmware branch and update it:
+Check out the source revision whose artifact you want to flash and update it.
+For the current production line this is normally `main`; diagnostic artifacts
+must be flashed from their exact diagnostic commit:
 
 ```bash
-git checkout rework/sequencer
+git checkout main
 git pull
 cd amysynth_version/esp32p4
 ```

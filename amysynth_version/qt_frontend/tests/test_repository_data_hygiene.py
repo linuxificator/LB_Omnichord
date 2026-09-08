@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import runpy
 import unittest
 from pathlib import Path
@@ -9,44 +8,34 @@ from pathlib import Path
 
 FRONTEND = Path(__file__).resolve().parents[1]
 REPOSITORY = FRONTEND.parents[1]
-DESIGN_DATA = (
-    REPOSITORY
-    / "amysynth_version"
-    / "design"
-    / "rhythm_rework"
-    / "new_patterns"
-)
-MANIFEST = DESIGN_DATA / "canonical_drum_data_manifest.json"
+DESIGN_ROOT = REPOSITORY / "amysynth_version" / "design"
+RUNTIME_DRUM_DATA = FRONTEND / "music" / "drums"
 
 
 class RepositoryDataHygieneTests(unittest.TestCase):
-    def test_canonical_drum_manifest_matches_runtime_files(self) -> None:
-        payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
-        self.assertEqual(payload["manifest_revision"], 1)
-        root = (DESIGN_DATA / payload["canonical_root"]).resolve()
-        self.assertEqual(root, (FRONTEND / "music" / "drums").resolve())
-
-        records = payload["files"]
-        self.assertEqual(len(records), 9)
+    def test_runtime_drum_directory_is_the_only_designated_data_source(self) -> None:
+        expected = {
+            "drum_activity_instruments_gamma9001.json",
+            "drum_activity_instruments_general_midi.json",
+            "drum_activity_instruments_tiny.json",
+            "drum_activity_timing.json",
+            "drum_fill_continuation_roles.json",
+            "drum_fills_instruments_gamma9001.json",
+            "drum_fills_instruments_general_midi.json",
+            "drum_fills_instruments_tiny.json",
+            "drum_fills_timing.json",
+        }
         self.assertEqual(
-            [record["name"] for record in records],
-            sorted(record["name"] for record in records),
+            {path.name for path in RUNTIME_DRUM_DATA.glob("*.json")}, expected
         )
-        for record in records:
-            path = root / record["name"]
-            self.assertTrue(path.is_file(), path)
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            self.assertEqual(digest, record["sha256"], path)
 
     def test_design_tree_does_not_duplicate_runtime_drum_json(self) -> None:
         runtime_hashes = {
             hashlib.sha256(path.read_bytes()).hexdigest(): path
-            for path in (FRONTEND / "music" / "drums").glob("*.json")
+            for path in RUNTIME_DRUM_DATA.glob("*.json")
         }
         duplicates = []
-        for path in DESIGN_DATA.glob("*.json"):
-            if path == MANIFEST:
-                continue
+        for path in DESIGN_ROOT.rglob("*.json"):
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             if digest in runtime_hashes:
                 duplicates.append((path, runtime_hashes[digest]))

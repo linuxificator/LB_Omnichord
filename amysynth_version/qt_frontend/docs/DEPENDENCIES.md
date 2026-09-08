@@ -99,8 +99,7 @@ input across all platforms.
 Python/native test and hosted desktop service builds select Gamma9001 with
 `AMY_PCM_BANK=gamma9001` where `setup.py` is used. Windows and Android generate,
 link and register the same Gamma data through native build definitions. ESP32
-uses the same source lineage but remains an explicitly declared Tiny-bank
-target until its storage profile changes. Exact options and verification are owned by
+uses the same source lineage and Gamma9001 bank. Exact options and verification are owned by
 [`AMY_RELEASE.md`](../packaging/AMY_RELEASE.md) and the
 platform documentation. ESP32-P4 additionally defines `AMY_SHARED_REVERB=1`.
 Never update only one consumer.
@@ -150,10 +149,8 @@ required controls are in [`SIGNING_DECISION.md`](../packaging/SIGNING_DECISION.m
 
 ## Change rule
 
-Before proposing another external package, copy the
-[assessment template](../../design/dependency_assessments/README.md), date it,
-and reach an explicit
+Before proposing another external package, apply the assessment criteria in
+[`dependencies.md`](../../design/arch/dependencies.md) and record an explicit
 adopt/use-existing/implement-locally/defer outcome. An adoption must declare
 the package in the correct group and pass every platform where its importing
-code runs. The full selection criteria remain in
-[`CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md`](../../design/CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md).
+code runs.

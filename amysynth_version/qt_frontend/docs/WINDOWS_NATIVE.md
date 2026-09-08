@@ -129,8 +129,8 @@ before both self-test and service `amy_start()` calls.
 This is equivalent to the explicit `AMY_PCM_BANK=gamma9001` used by Linux,
 Raspberry Pi and macOS Python-extension builds and to the pinned Android AAR.
 The environment variable belongs to AMY's `setup.py` path; Windows reaches the
-same bank through its native CMake target. ESP32-P4 remains a separately
-declared Tiny-bank target until a Gamma9001 flash/storage profile exists.
+same bank through its native CMake target. ESP32-P4 also ships Gamma9001 through
+its dedicated firmware build.
 
 The current Windows AMY service profile is not yet a low-latency baseline: the
 fork's host defaults are 44.1 kHz and 256 samples, its Windows backend tries

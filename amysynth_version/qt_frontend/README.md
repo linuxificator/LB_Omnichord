@@ -127,14 +127,14 @@ OMNI uses five independent AMY synth instances: drums 0, bass 1, strum 2,
 manually held chord 3 and rhythm-triggered chord 4. MIDI uses pitched synths
 5–10 and drum synth 11. Manual and rhythm chord voices share patch/settings but
 have independent voice pools and note lifetimes. The eleven-bus mapping is
-documented in `../design/architecture.md`.
+documented in `../design/arch/architecture.md`.
 
 Rhythm timing is compiled into AMY's 48-PPQ sequencer; Linux/Python is not used as the beat clock. A live tuning change updates the shared tuned chord state: held manual chords are retuned immediately, rhythm chord and bass sequencer events are rebuilt with the new pitches, and subsequent strum notes use the selected tuning. Bass retuning therefore appears in the AMY wire/debug stream mainly as rebuilt `H...n<note>...i1Z` sequencer events rather than standalone immediate bass note commands.
 
 Linux MIDI input opens ALSA raw-MIDI devices and an ALSA sequencer input port
 named `LB Omnichord / MIDI In`. Graph tools such as `qpwgraph` can connect VMPK,
 BLE MIDI bridges and MIDI Through directly to that port. See
-`../design/midi.md`.
+`../design/controls/midi.md`.
 
 OSC control input is portable across release platforms. By default it listens
 for OSC 1.0 UDP messages on every IPv4 interface at port 8000. Edit the
@@ -143,7 +143,7 @@ of `config/amy_config.json` to restrict or move it; use `127.0.0.1` for local-
 only control. Changing numeric or switch addresses appears in the same grey
 learn bar as MIDI, with flat F01 controls. OSC and MIDI share one-to-one target
 ownership and the same click/manual-takeover behavior. See
-`../design/osc_control.md` for message, security and persistence rules.
+`../design/controls/osc.md` for message, security and persistence rules.
 When configured, `OSC` also appears beside the MIDI input technologies: its LED
 is green while listening, flashes green on input and is red when its
 listener/network is unavailable. Removing the OSC endpoint from the user config
@@ -183,7 +183,7 @@ wire stream into the pinned LB Omnichord AMY release, started with 11 buses,
 336 oscillators and the reusable-sequence capacities in `INSTALL.md`, and verify
 resulting AMY synth state. A passing
 native test is therefore stronger than merely finding an expected command in
-the host log. See `../design/testing.md` for the complete local/CI inventory.
+the host log. See `../design/arch/testing.md` for the complete local/CI inventory.
 
 ## Platform releases
 

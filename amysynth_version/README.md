@@ -10,7 +10,7 @@ active design and test contracts, and must not be modified as part of AMY work.
 New behavior, fixes, documentation and tests belong under `amysynth_version`.
 
 Start with `design/README.md` for behavioral contracts,
-`design/testing.md` for the test/CI structure and `qt_frontend/INSTALL.md` for
+`design/arch/testing.md` for the test/CI structure and `qt_frontend/INSTALL.md` for
 installation and launch instructions.
 
 Platform packages are published under the repository's
@@ -26,11 +26,10 @@ private named pipe; Android embeds the lifecycle AAR and uses its app-private
 `amy.sock`; neither target runs the Linux AppImage through a compatibility
 layer.
 
-The first four-platform release is `R20260826T230234`: all frontend suites and
-all four native package jobs passed before publication. The Windows job proved
-offline AMY rendering and the packaged Qt/named-pipe/service boundary. The
-Linux x64 package has separate physical UI/audio validation; Raspberry Pi,
-macOS and Windows still need physical-device/audio validation, and native
-Windows MIDI input and low-latency tuning remain outstanding. Android's gate
-adds emulator QML/socket/audio validation but does not replace a physical
-touchscreen, route-change, speaker or latency test.
+The current validated baseline is `R20260907T231243`. Its complete matrix
+passed for Linux, Raspberry Pi, macOS, Windows, Android including emulator, and
+both ESP32-P4 firmware profiles. The published Raspberry Pi AppImage was also
+physically tested on a 2 GiB Pi 4 with hardware-accelerated Wayland/V3D, both
+with its bundled AMY service and through `/dev/serial0` to the published P4-v1
+firmware. macOS, Windows, Android and P4-v3 still retain the physical-device
+limitations stated by their platform contracts.

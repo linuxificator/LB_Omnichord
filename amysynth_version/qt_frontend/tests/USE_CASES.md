@@ -842,8 +842,8 @@ regression proves that hold promotion stops only future starts and emits no imme
   commands. This models the independently running production audio callback
   without making the regression depend on CI thread scheduling.
 - Native CI compiles the same Gamma9001 PCM bank as the hosted packages and
-  proves its registration and linked-data symbols. ESP32-P4 is a separately
-  declared Tiny-bank target.
+  proves its registration and linked-data symbols. The dedicated ESP32-P4
+  firmware build uses the same bank.
   AMY runs with `audio=False`, so only the bridge's explicit renderer advances
   engine time or consumes samples; no ALSA/miniaudio callback races the test.
 - The native regression requires non-silent rendered drum audio within one

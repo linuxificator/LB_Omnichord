@@ -1,68 +1,15 @@
-# Codex-only AMY handovers
+# AMY integration notes
 
-Status: index for AMY fork analysis and continuation work
-Owner: LB Omnichord integration
-Last updated: 2026-09-07
+Status: authoritative category index for LB-facing AMY work
+Owner: LB Omnichord AMY integration
+Last verified: 2026-09-08
 
-This directory is the home for AMY implementation audits, diagnostic trails
-and continuation notes that are useful to LB Omnichord development but must not
-be committed to a clean Shorepine-facing AMY branch. Authoritative LB behavior
-remains in the parent design directory; public AMY documentation belongs in
-AMY itself and must be written for AMY users rather than for this application.
+- `interface.md` owns the frontend/wire boundary.
+- `sequencer.md` consolidates the current reusable-sequence implementation,
+  compatibility and realtime publication model.
+- `maintenance.md` records independently discovered AMY defects and fixes.
+- `../esp32/` owns target-specific performance, reverb and firmware evidence.
 
-Read these documents in order for current reusable-sequence work:
-
-1. `CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION.md` — implemented public model,
-   branch and release map, LB integration and established constraints.
-2. `CODEX_HANDOVER_SEQUENCER_SIMPLIFICATION_AUDIT.md` — differential audit
-   against Shorepine main, compatibility impact, tests, defects and possible
-   simplifications.
-3. `CODEX_HANDOVER_REALTIME_SEQUENCE_PUBLICATION.md` — implemented
-   publication/reclamation design, its route from COW and the remaining
-   physical ESP32 timing proof.
-4. `CODEX_HANDOVER_SEQUENCE_API_REVIEW_COMPLETION.md` — latest PR API feedback,
-   final named-action syntax, compatibility evidence, completed host
-   verification, immutable LB release and remaining work.
-5. `CODEX_HANDOVER_SEQUENCE_FINAL_QUALITY_AUDIT.md` — final pre-merge
-   differential audit, reproduced concurrency/slot-order defects and the
-   ordered repair and re-audit plan.
-6. `CODEX_HANDOVER_SEQUENCE_FINAL_QUALITY_REAUDIT.md` — completed repairs,
-   additional compatibility/rollover findings, final host validation and the
-   remaining target-only checks.
-7. `CODEX_HANDOVER_AMY_UPSTREAM_BASELINE_FINDINGS.md` — memory-safety,
-   lifecycle, sanitizer and CI observations confirmed outside the sequence
-   patch and kept separate for future upstream fixes.
-8. `CODEX_HANDOVER_AMY_M_PI_WINDOWS_PORTABILITY.md` — why current Shorepine
-   main stopped building the Godot addon on MSVC, why the guarded portability
-   correction is carried as an independent commit, and its validation proof.
-9. `CODEX_HANDOVER_AMY_RELEASE_20260905.md` — reconstruction of the current
-   immutable Omnichord release from the PR head, downstream-only layers, exact
-   consumer pin and host validation evidence.
-10. `CODEX_HANDOVER_DUAL_ESP32P4_RELEASE.md` — migration of the complete
-    Gamma9001 firmware to reusable sequences and the two-profile release ZIP
-    and flashing contract.
-11. `CODEX_HANDOVER_IGNORED_NOTEOFF_BOOKKEEPING.md` — standalone reproduction
-    and repair of the one-shot drum forgotten-pool overflow, its separation
-    from the sequence PR and the exact downstream release integration.
-12. `CODEX_HANDOVER_ESP32P4_REVERB_MEMORY_BASELINE.md` — physical four-synth
-    reverb timing comparison for PSRAM versus internal SRAM, exact wire
-    workload, capacity constraints and implications for the bus design.
-13. `CODEX_HANDOVER_ESP32P4_REVERB_LPF_PARALLELIZATION.md` — physical
-    full-width Q8.23 LPF scheduling A/B; both grouped candidates were slower.
-14. `CODEX_HANDOVER_SHARED_REVERB_ROOMS_ESP32P4.md` — implemented generic
-    two-room send/return model, deterministic P4 SRAM-bank ownership,
-    deferred diagnostics and controlled physical PSRAM/SRAM measurements.
-
-The repository-root `CODEX_HANDOFF.md` contains older socket, Android, Windows,
-Gamma9001 and superseded nested/group-sequencer history. It is still useful
-background, but its historical sections do not override current contracts.
-
-Rules for future work:
-
-- never copy this directory into an AMY upstream-offer or release branch;
-- keep Omnichord musical policy out of AMY;
-- distinguish measured behavior from proposed behavior;
-- do not claim hard real-time safety from desktop tests alone;
-- update the audit baseline and exact SHAs whenever the AMY branch changes;
-- preserve a diagnostic Git trail with small commits when implementation work
-  is authorized.
+These documents belong only in LB Omnichord. Clean Shorepine-facing AMY
+branches contain public AMY documentation but never Codex/LB handovers or
+Omnichord-specific musical policy.

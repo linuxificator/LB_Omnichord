@@ -188,7 +188,7 @@ class PackagingContracts(unittest.TestCase):
             encoding="utf-8"
         )
         architecture = (
-            REPOSITORY / "amysynth_version" / "design" / "architecture.md"
+            REPOSITORY / "amysynth_version" / "design" / "arch" / "architecture.md"
         ).read_text(encoding="utf-8")
         runtime_adapter = (
             FRONTEND / "code" / "runtime_platform_adapters.py"
