@@ -50,8 +50,8 @@ A static regression test rejects reintroduction of the former parallel `SynthRun
 | `platform-input-linux` | real raw-MIDI bytes and source-package OSC from external controller processes into a separately launched Omnichord | Linux PTY/socket + Qt offscreen |
 | `frontend` | real headless `QCoreApplication` + real `InstrumentBackend`, driven through the localhost test API | pseudo serial |
 | `serial` | real `AmySerialClient` / `pyserial` framing, ordering and generated wire commands | Linux PTY |
-| `native-controls` | feed the real serial wire stream into native AMY with the production 11-bus/336-oscillator configuration and inspect actual synth state | Linux PTY + pinned Gamma9001 LB AMY fork |
-| `native-rhythm` | rhythm/sequencer scenarios against native AMY, including startup and live chord-instrument switching | Linux PTY + pinned Gamma9001 LB AMY fork in deterministic offline-render mode |
+| `native-controls` | feed the real serial wire stream into native AMY, inspect synth state, and render every instrument/register for audibility and clipping | Linux PTY + pinned Gamma9001 LB AMY fork |
+| `native-rhythm` | rhythm/sequencer scenarios plus the complete 270-fill loudness/peak render audit | Linux PTY + pinned Gamma9001 LB AMY fork in deterministic offline-render mode |
 | `presets` | per-instrument session state and sparse preset save/load semantics | none/headless backend |
 | `all` | all suites sequentially; intended for local/manual use. CI runs the component suites in parallel for a PR to `main`. | mixed |
 
@@ -328,6 +328,12 @@ installation failed to show or release chord-key interaction correctly.
 - Startup loading may initialize all stored values normally.
 - After reset or switching, genuine CC movement remains authoritative through
   the normal setter and AMY convergence path.
+- A MIDI-row RST restores its stored instrument, channel, volume and all
+  unbound controls. OMNI synth-section RST restores the equivalent role scope;
+  chord-row RST restores chord type, octave and inversion for all four rows.
+- Replacing the parameter model during reset must also move the visible native
+  QML slider handle and fill. MIDI M12 `STRINGS 8` Attack is the concrete
+  regression case.
 
 **MIDI-CC-10 — green binding has exclusive numeric authority**
 
@@ -595,6 +601,17 @@ emitted/backend value did not detect that visual regression.
 
 **Failure history:** Harpsichord and Orchestral Pad sounded harsh/horrible with the former 0 ms default attack; increasing attack manually fixed the sound.
 
+**CTRL-06 — an extra DX7 envelope may not mask the native patch**
+
+- DX7 operator envelopes remain AMY factory-patch authority.
+- The application-owned global output ADSR layered over them has an attack of
+  at most 40 ms for every DX7 catalogue entry.
+- The native balance sweep renders all 124 instruments at notes 40, 60 and 84
+  and rejects effectively silent or clipped captures.
+
+**Failure history:** MIDI M12 `STRINGS 8` added a second 350 ms attack over its
+native operator envelopes, so a short note ended before useful output emerged.
+
 ### STATE — per-instrument session memory
 
 **STATE-01 — controls belong to the instrument, not the role globally**
@@ -848,6 +865,17 @@ regression proves that hold promotion stops only future starts and emits no imme
   engine time or consumes samples; no ALSA/miniaudio callback races the test.
 - The native regression requires non-silent rendered drum audio within one
   second. A one-bar delay or a required activity reselection is a failure.
+
+**RHYTHM-13 — fills retain measured transient headroom**
+
+- Fill scheduling, instruments, internal velocities and continuation roles
+  remain canonical musical data.
+- A separate fill-output catalogue applies common headroom and sparse measured
+  exceptions only while fill hit bodies are compiled.
+- Native Gamma9001 CI renders all 270 fills against the equal-duration ending
+  of activity level 3. It enforces loudness/peak bounds and specifically guards
+  Funk F3 and the Breakbeat F1/F5 spread.
+- Normal percussion activity output is unchanged by fill gain.
 
 ### TUNING — all note-producing paths follow the selected tuning
 

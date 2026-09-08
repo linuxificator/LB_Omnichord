@@ -478,7 +478,7 @@ def _revision_eleven_to_twelve(data: JsonObject) -> tuple[str, ...]:
     if not isinstance(role_levels, dict):
         raise ConfigMigrationError(
             "$.role_levels",
-            "must be an object before revision 11 can migrate",
+            "must be an object before revision 12 can migrate",
         )
     changed: list[str] = []
     if role_levels.get("bass") == REVISION_TWELVE_LEGACY_BASS_LEVEL:

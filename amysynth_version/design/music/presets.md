@@ -85,6 +85,13 @@ parameter and volume values remain under MIDI authority. Hidden
 instrument-specific target values are protected without forcing that
 instrument to become selected.
 
+This contract applies uniformly to the bass, strum and chord-synth section
+buttons and to every MIDI row. A MIDI-row reset also restores its stored MIDI
+channel. The separate chord-row `RST` restores chord type, octave and inversion
+for all four rows. Backend integration tests and a QML model-replacement test
+prove both state restoration and visible slider movement; the concrete M12
+`STRINGS 8` attack case is retained as a regression test.
+
 ## Factory presets
 
 M1 is the most accessible/mellow preset. Higher numbers progressively introduce more unusual and experimental combinations.

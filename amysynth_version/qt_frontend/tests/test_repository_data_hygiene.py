@@ -20,6 +20,7 @@ class RepositoryDataHygieneTests(unittest.TestCase):
             "drum_activity_instruments_tiny.json",
             "drum_activity_timing.json",
             "drum_fill_continuation_roles.json",
+            "drum_fill_levels.json",
             "drum_fills_instruments_gamma9001.json",
             "drum_fills_instruments_general_midi.json",
             "drum_fills_instruments_tiny.json",

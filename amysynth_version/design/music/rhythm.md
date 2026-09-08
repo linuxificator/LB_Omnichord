@@ -682,6 +682,13 @@ Enabling another fill while a cycle exists puts it first in the next schedule.
 Disabling one removes future launches, but a fill which is already playing is
 immutable and always finishes.
 
+Fill loudness is data-owned and independent of density or scheduling. The
+canonical `drum_fill_levels.json` applies common transient headroom plus sparse
+measured exceptions only when fill wire bodies are compiled. It does not alter
+normal activity hits, the relative velocities inside a fill, its instruments
+or its timing. The native-render method and bounds are recorded in
+[`volume_balance_audit.md`](volume_balance_audit.md).
+
 Each base percussion role is an independent tagged AMY sequence execution. The LB
 data for a fill lists the musical roles which continue. During the fill, every
 other active role suppresses event dispatch for the complete, whole-beat fill

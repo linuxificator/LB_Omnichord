@@ -76,6 +76,24 @@ class SoundBalanceFeatureTests(unittest.TestCase):
         for preset, (value, wanted) in enumerate(zip(actual, expected), start=1):
             self.assertAlmostEqual(value, wanted, places=9, msg=f"P{preset}")
 
+    def test_balance_report_validator_rejects_silence_and_clipping(self) -> None:
+        report = {
+            f"synth_{index}": {
+                str(note): {
+                    "peak_dbfs": -20.0,
+                    "clipped_samples": 0,
+                }
+                for note in instrument_balance.NOTES
+            }
+            for index in range(124)
+        }
+        self.assertEqual(instrument_balance.validate_render_report(report), [])
+        report["synth_0"]["40"]["peak_dbfs"] = -90.0
+        report["synth_1"]["60"]["clipped_samples"] = 2
+        issues = instrument_balance.validate_render_report(report)
+        self.assertTrue(any("effectively silent" in issue for issue in issues))
+        self.assertTrue(any("clipped samples" in issue for issue in issues))
+
     def test_old_user_layout_migrates_without_overwriting(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -136,6 +136,42 @@ rather than output level. High Bells receives
 the same small compatibility excitation used by other silent resonant factory
 patches. These corrections apply identically to OMNI and MIDI roles.
 
+## Bass role and fill headroom
+
+All musical-role multipliers default to `1.0`. The factory OMNI presets remain
+the authority for their deliberately different bass, chord, strum and drum
+volumes. In particular, the obsolete `3.2` blanket bass compensation is not a
+new baseline: it addressed loss in an older output path, and the shared-bus
+mixer removed that cause. Configuration migration replaces only that exact
+historical value; custom user values survive.
+
+A bass part is assessed beside the complete three-note chord part, not against
+one isolated treble note. The audit uses actual rhythm events, note gates,
+velocities and preset levels. Its K-weighted metric already incorporates the
+reduced sensitivity of human hearing at low frequencies. It is evidence, not
+a target that forces every deliberately transient or spectrally narrow patch
+to the same number. A universal gain derived from a held-note sweep is invalid
+because accompaniment gates and patch envelopes dominate that comparison.
+
+Gamma9001 fills have a separate data-owned output gain in
+`music/drums/drum_fill_levels.json`. A common `0.72` factor provides transient
+headroom; sparse per-fill multipliers correct measured within-style outliers
+without rewriting event velocities, instrumentation or dynamics. The receiver
+applies that factor only while compiling fill hit bodies, so normal activity
+patterns and the canonical fill dataset retain their meaning. See
+[`volume_balance_audit.md`](volume_balance_audit.md) for measurements and
+acceptance bounds.
+
+## Envelope audibility
+
+Juno attack values are native patch data and may intentionally describe slow
+pads or swells. They are not globally shortened. DX7 sliders differ: their
+ADSR is an additional output envelope layered over the native six-operator
+envelopes. That extra attack is capped at 40 ms across the complete DX7
+catalogue, preventing short notes from ending before a patch becomes audible
+while retaining the instrument's native envelope character. MIDI M12
+`STRINGS 8` therefore resets to 40 ms rather than the former 350 ms.
+
 ## Balance measurement contract
 
 Every curated OMNI instrument must be rendered at low, middle and high notes

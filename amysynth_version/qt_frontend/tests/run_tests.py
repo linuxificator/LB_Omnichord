@@ -43,9 +43,11 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
     "native-controls": (
         TESTS / "integration" / "test_native_controls.py",
+        TESTS / "integration" / "test_native_instrument_balance.py",
     ),
     "native-rhythm": (
         TESTS / "integration" / "test_native_rhythm.py",
+        TESTS / "integration" / "test_native_drum_balance.py",
     ),
     "presets": (
         TESTS / "integration" / "test_presets.py",

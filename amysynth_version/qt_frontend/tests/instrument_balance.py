@@ -155,6 +155,43 @@ def wav_metrics(path: Path) -> dict[str, float | int]:
     }
 
 
+def validate_render_report(report: dict[str, object]) -> list[str]:
+    """Reject silent or clipped catalogue/register captures."""
+
+    issues: list[str] = []
+    capture_count = 0
+    for synth, raw_notes in report.items():
+        if not isinstance(raw_notes, dict):
+            issues.append(f"{synth}: expected per-note metrics")
+            continue
+        note_metrics = (
+            {"combined": raw_notes}
+            if "peak_dbfs" in raw_notes
+            else raw_notes
+        )
+        for note, raw_metrics in note_metrics.items():
+            if not isinstance(raw_metrics, dict):
+                issues.append(f"{synth} note {note}: expected metrics")
+                continue
+            capture_count += 1
+            metrics = raw_metrics
+            if float(metrics["peak_dbfs"]) < -80.0:
+                issues.append(f"{synth} note {note}: effectively silent")
+            if int(metrics["clipped_samples"]):
+                issues.append(
+                    f"{synth} note {note}: {metrics['clipped_samples']} clipped samples"
+                )
+    expected_count = 124 if all(
+        isinstance(metrics, dict) and "peak_dbfs" in metrics
+        for metrics in report.values()
+    ) else 124 * len(NOTES)
+    if capture_count != expected_count:
+        issues.append(
+            f"expected {expected_count} metric groups, received {capture_count}"
+        )
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--plan", type=Path, default=Path("instrument-balance-plan.json"))
@@ -167,7 +204,14 @@ def main() -> int:
         help="measure raw patch output without configured instrument_levels",
     )
     parser.add_argument("--report", type=Path, default=Path("instrument-balance-report.json"))
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail when any instrument/register capture is silent or clipped",
+    )
     args = parser.parse_args()
+    if args.check and not (args.render or args.wav_dir):
+        parser.error("--check requires --render or --wav-dir")
     plan = build_plan(use_instrument_levels=not args.unity_levels)
     args.plan.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
     if args.render:
@@ -185,6 +229,13 @@ def main() -> int:
             for item in plan
         }
         args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    else:
+        report = {}
+    if args.check:
+        issues = validate_render_report(report)
+        if issues:
+            print("\n".join(issues), file=sys.stderr)
+            return 1
     return 0
 
 

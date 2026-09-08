@@ -97,7 +97,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertTrue((FRONTEND / "music" / "catalogue_provenance.json").is_file())
         self.assertEqual(
             len(tuple((FRONTEND / "music" / "schema").glob("*.schema.json"))),
-            5,
+            6,
         )
 
     def test_network_permissions_match_current_release_targets(self) -> None:

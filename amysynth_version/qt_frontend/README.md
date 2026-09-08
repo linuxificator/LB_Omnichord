@@ -104,22 +104,22 @@ Time controls display milliseconds, resonance displays Q, and modulation depths 
 
 ## Audio level model
 
-The four OMNI volume sliders retain a uniform 0–1 UI range, while the AMY
-output level is the product of that UI value, a musical-role level and an
-optional instrument level. `role_levels` in `config/amy_config.json` balances
-the expected function of bass, chord, strum and drums. `instrument_levels`
-remains reserved for demonstrated patch-output anomalies and is independent
-of role.
+The four OMNI volume sliders retain a uniform 0–1 UI range. AMY output level
+is the product of that UI value, a musical-role level and an optional
+instrument level. All role levels now default to unity. The former blanket
+3.2 bass multiplier compensated an older signal path and became excessive
+after the shared-bus mixer fixed that underlying loss. Configuration revision
+12 removes only that exact historical value; a user-customized bass level
+remains authoritative. The original curated per-preset bass volumes are
+unchanged.
 
-The bass role defaults to 3.2 (+10.1 dB). A bass event normally contains one
-low note while a chord contains about three simultaneous notes, and human
-hearing is less sensitive in the bass register. Native-AMY comparisons across
-representative Juno and DX7 patches found a median A-weighted difference of
-about 10.9 dB; the slightly lower correction leaves useful headroom. It does
-not compensate a particular patch's envelope, timbre or unsuitable attack,
-and it cannot correct the low-frequency limits of speakers or headphones.
-Revision-8 user configurations are migrated once to this explicit revision-9
-value, after which the user's configured role levels remain authoritative.
+`instrument_levels` remains reserved for demonstrated patch-output anomalies
+and is independent of role. Offline audits use the actual accompaniment gates,
+velocities and factory volumes, plus ITU-R BS.1770 K-weighted loudness so low
+frequency sensitivity is considered in the measurement itself. Patch
+envelopes and spectra vary too much for a second universal bass correction;
+details and reproducible commands are in
+[`../design/music/volume_balance_audit.md`](../design/music/volume_balance_audit.md).
 
 ## Runtime AMY allocation
 
