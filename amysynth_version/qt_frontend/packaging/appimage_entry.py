@@ -76,6 +76,7 @@ def run_frontend(arguments: list[str]) -> int:
             str(CONFIG_PATH),
         ]
     )
+    os.environ["LB_OMNICHORD_LOCAL_AMY_SERVICE"] = "1"
 
     def stop_service() -> None:
         if service.poll() is None:

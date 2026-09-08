@@ -132,6 +132,7 @@ if [[ ! -S "$socket_path" ]]; then
     exit 1
 fi
 
+LB_OMNICHORD_LOCAL_AMY_SERVICE=1 \
 "$venv_python" "$frontend_dir/code/main.py" \
     --amy-socket "$socket_path" \
     "${application_args[@]}"

@@ -115,6 +115,12 @@ operating-system build logic remain outside portable Qt behavior. Asset-root
 discovery is based on packaged directory layout rather than an operating-system
 name. AST/source guards reject platform details returning to the portable core.
 
+The local Raspberry Pi process launcher additionally composes one named CPU-
+affinity adapter. It partitions only the two host processes: AMY and its audio
+threads inherit one CPU, while Qt excludes that CPU. The adapter is a no-op on
+other hardware and in serial mode; no CPU topology, model detection or
+scheduler policy enters `app_core.py`, QML, musical planning or wire transport.
+
 The native Windows service/package is now built by the Windows packaging
 script as an experimental zip: `amy_service.exe` is compiled against the
 checked-out AMY fork and the PySide6 frontend is a separate executable. Native

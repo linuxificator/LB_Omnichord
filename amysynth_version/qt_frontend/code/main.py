@@ -29,6 +29,10 @@ from program_amy import (
     ProgramAmySocketClient,
 )
 from runtime_diagnostics import display_diagnostic_lines
+from runtime_cpu_affinity import (
+    apply_local_amy_affinity,
+    frontend_uses_local_amy_service,
+)
 from runtime_paths import qt_private_files_dir
 from runtime_platform_adapters import resolve_package_runtime
 from windows_launcher import prepare_windowed_console_streams
@@ -100,6 +104,8 @@ def main(
     *,
     asset_root: Path | None = None,
 ) -> int:
+    if frontend_uses_local_amy_service():
+        apply_local_amy_affinity("frontend")
     dependencies = production_dependencies(asset_root=asset_root)
     args = app_core.parse_arguments(
         arguments,
