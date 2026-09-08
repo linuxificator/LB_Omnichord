@@ -499,6 +499,7 @@ class AmySerialClient:
         *,
         fill: bool,
         fill_id: str | None = None,
+        fill_gain: float = 1.0,
     ) -> str:
         sound = self.drum_catalog.resolve(
             self.drum_kit,
@@ -509,6 +510,8 @@ class AmySerialClient:
         )
         gain = max(0.0, self.resolved_config.drums.velocity_gain)
         level = max(0.0, min(1.0, float(velocity) / 127.0)) * gain
+        if fill:
+            level *= max(0.0, float(fill_gain))
         preset = "" if sound.preset is None else f"p{sound.preset}"
         return f"{preset}n{self._f(float(sound.note))}l{self._f(level)}i{self.synth_id['drums']}"
 

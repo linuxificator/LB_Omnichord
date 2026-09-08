@@ -328,6 +328,7 @@ class DrumPatternTests(unittest.TestCase):
                                 event.velocity,
                                 fill=True,
                                 fill_id=fill.fill_id,
+                                fill_gain=fill.output_gain,
                             ),
                         )
                     )
@@ -337,6 +338,20 @@ class DrumPatternTests(unittest.TestCase):
                     any(re.match(r"^HC\d+,1,", body) for *_, body in actual),
                     fill.fill_id,
                 )
+
+    def test_fill_output_balance_is_global_with_sparse_measured_exceptions(self) -> None:
+        fills = {
+            fill.fill_id: fill
+            for rhythm in self.catalog.rhythms.values()
+            for fill in rhythm.fills
+        }
+        self.assertEqual(len(fills), 270)
+        self.assertAlmostEqual(fills["drum_fill_0093_funk"].output_gain, 0.72)
+        self.assertAlmostEqual(
+            fills["drum_fill_0146_breakbeat"].output_gain,
+            0.72 * 1.529,
+        )
+        self.assertAlmostEqual(fills["drum_fill_0150_breakbeat"].output_gain, 0.72)
 
     def test_every_kit_resolves_without_changing_timing(self) -> None:
         for rhythm in self.catalog.rhythms.values():

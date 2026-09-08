@@ -32,6 +32,7 @@ class DrumFill:
     beat_unit_ticks: int
     events: tuple[DrumEvent, ...]
     continue_roles: frozenset[str]
+    output_gain: float
 
 
 @dataclass(frozen=True)
@@ -254,6 +255,15 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
         directory / "drum_fill_continuation_roles.json",
         "drum_continuation_v1.schema.json",
     )
+    fill_levels = _read(
+        directory / "drum_fill_levels.json",
+        "drum_fill_levels_v1.schema.json",
+    )
+    global_fill_gain = float(fill_levels["global_gain"])
+    raw_fill_gains = fill_levels["per_fill"]
+    if not isinstance(raw_fill_gains, dict):
+        raise ValueError("fill level catalogue per_fill must be an object")
+    fill_gains = {str(key): float(value) for key, value in raw_fill_gains.items()}
     if int(activity.get("design_contract", {}).get("ppq", 0)) != PPQ:
         raise ValueError("drum activity catalogue must use 96 PPQ")
 
@@ -308,6 +318,7 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
                 for raw in timing["events"]
             ),
             continue_roles=continue_by_id[fill_id],
+            output_gain=global_fill_gain * fill_gains.get(fill_id, 1.0),
         )
         if fill.index in fills_by_index:
             raise ValueError(f"duplicate fill index {fill.index}")
@@ -316,6 +327,14 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
         fill.fill_id for fill in fills_by_index.values()
     }:
         raise ValueError("fill timing and continuation coverage differ")
+    unknown_fill_gains = set(fill_gains) - {
+        fill.fill_id for fill in fills_by_index.values()
+    }
+    if unknown_fill_gains:
+        raise ValueError(
+            "fill level catalogue contains unknown ids: "
+            + ", ".join(sorted(unknown_fill_gains))
+        )
 
     index_raw = fills_raw.get("rhythm_fill_index")
     if not isinstance(index_raw, dict):
