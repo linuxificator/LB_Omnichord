@@ -1,5 +1,5 @@
 {
-  "config_revision": 11,
+  "config_revision": 12,
   "serial": {
     "port": "/dev/serial0",
     "baud": 1000000,
@@ -62,7 +62,7 @@
   },
   "role_levels": {
     "drums": 1.0,
-    "bass": 3.2,
+    "bass": 1.0,
     "strum": 1.0,
     "chord": 1.0
   },

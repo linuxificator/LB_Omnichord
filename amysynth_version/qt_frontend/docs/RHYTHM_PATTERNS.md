@@ -119,8 +119,8 @@ three mappings resolve every role without changing timing.
 
 `prepare_local_amy.sh` reads the bank, branch and immutable commit from
 `packaging/release_inputs.json`, builds with `AMY_PCM_BANK=gamma9001`, and
-requires both registration and linked PCM-data symbols. ESP32-P4 remains Tiny
-until its storage profile supports Gamma9001.
+requires both registration and linked PCM-data symbols. ESP32-P4 uses the same
+Gamma9001 bank in its dedicated firmware build.
 
 Repeatable native audio checks are:
 
@@ -148,11 +148,10 @@ note-offs no longer fire while transport is paused.
 
 ## Assets and regression gates
 
-Runtime assets below `music/drums/` are the canonical executable source.
-Historical design handovers remain under `design/rhythm_rework/new_patterns/`;
-their manifest links discussed assets to the runtime tree. Packagers copy the
-complete music tree and package tests require timing, continuation and direct
-mapping files.
+Runtime assets below `music/drums/` are the canonical executable source. Git
+history retains the superseded authoring handovers; no second design-tree copy
+or manifest competes with runtime data. Packagers copy the complete music tree
+and package tests require timing, continuation and direct mapping files.
 
 Loading is staged: schemas reject structural/version drift, typed loaders
 check musical constraints, catalogue assembly verifies references and AMY

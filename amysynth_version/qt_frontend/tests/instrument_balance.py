@@ -17,10 +17,12 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
+sys.path.insert(0, str(ROOT / "tests"))
+from audio_metrics import audio_metrics  # noqa: E402
 NOTES = (40, 60, 84)
 
 
-def build_plan() -> list[dict[str, object]]:
+def build_plan(*, use_instrument_levels: bool = True) -> list[dict[str, object]]:
     catalog = json.loads((ROOT / "instruments" / "synths.json").read_text())
     config = json.loads((ROOT / "config" / "amy_config.json").read_text())
     synths = list(catalog["synths"])
@@ -53,7 +55,11 @@ def build_plan() -> list[dict[str, object]]:
             if patch is None
             else [f"K{patch}i2iv2iy2Z"]
         )
-        multiplier = float(instrument_levels.get(key, 1.0))
+        multiplier = (
+            float(instrument_levels.get(key, 1.0))
+            if use_instrument_levels
+            else 1.0
+        )
         setup.append(f"i2iV{0.5 * multiplier:.9g}Z")
         if patch is not None:
             setup.extend(command_builder._patch_compatibility_commands(patch, 2))
@@ -92,7 +98,12 @@ def build_plan() -> list[dict[str, object]]:
     return plan
 
 
-def render_plan(plan: list[dict[str, object]], wav_dir: Path) -> dict[str, object]:
+def render_plan(
+    plan: list[dict[str, object]],
+    wav_dir: Path,
+    *,
+    gate_seconds: float,
+) -> dict[str, object]:
     import amy
     import numpy as np
 
@@ -109,19 +120,12 @@ def render_plan(plan: list[dict[str, object]], wav_dir: Path) -> dict[str, objec
         for note in item["notes"]:
             amy.send_wire(f"i2iV{note['level']:.9g}Z")
             amy.send_wire(str(note["on"]))
-            audio = amy.render(1.0)
+            audio = amy.render(gate_seconds)
             amy.send_wire(str(note["off"]))
             tail = amy.render(0.35)
             section = np.concatenate((audio, tail), axis=0)
             sections.append(section)
-            peak = float(np.max(np.abs(section)))
-            rms = float(np.sqrt(np.mean(section * section)))
-            metrics[str(note["note"])] = {
-                "rms_dbfs": round(20 * math.log10(max(rms, 1e-12)), 3),
-                "peak_dbfs": round(20 * math.log10(max(peak, 1e-12)), 3),
-                "crest_db": round(20 * math.log10(max(peak / max(rms, 1e-12), 1e-12)), 3),
-                "clipped_samples": int(np.count_nonzero(np.abs(section) >= 0.999969)),
-            }
+            metrics[str(note["note"])] = audio_metrics(section, 44100)
         combined = np.concatenate(sections, axis=0)
         pcm = np.asarray(np.clip(combined, -1.0, 0.999969) * 32768.0, dtype="<i2")
         path = wav_dir / str(item["wav"])
@@ -151,19 +155,73 @@ def wav_metrics(path: Path) -> dict[str, float | int]:
     }
 
 
+def validate_render_report(report: dict[str, object]) -> list[str]:
+    """Reject silent or clipped catalogue/register captures."""
+
+    issues: list[str] = []
+    capture_count = 0
+    for synth, raw_notes in report.items():
+        if not isinstance(raw_notes, dict):
+            issues.append(f"{synth}: expected per-note metrics")
+            continue
+        note_metrics = (
+            {"combined": raw_notes}
+            if "peak_dbfs" in raw_notes
+            else raw_notes
+        )
+        for note, raw_metrics in note_metrics.items():
+            if not isinstance(raw_metrics, dict):
+                issues.append(f"{synth} note {note}: expected metrics")
+                continue
+            capture_count += 1
+            metrics = raw_metrics
+            if float(metrics["peak_dbfs"]) < -80.0:
+                issues.append(f"{synth} note {note}: effectively silent")
+            if int(metrics["clipped_samples"]):
+                issues.append(
+                    f"{synth} note {note}: {metrics['clipped_samples']} clipped samples"
+                )
+    expected_count = 124 if all(
+        isinstance(metrics, dict) and "peak_dbfs" in metrics
+        for metrics in report.values()
+    ) else 124 * len(NOTES)
+    if capture_count != expected_count:
+        issues.append(
+            f"expected {expected_count} metric groups, received {capture_count}"
+        )
+    return issues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--plan", type=Path, default=Path("instrument-balance-plan.json"))
     parser.add_argument("--wav-dir", type=Path)
     parser.add_argument("--render", action="store_true")
+    parser.add_argument("--gate-seconds", type=float, default=1.0)
+    parser.add_argument(
+        "--unity-levels",
+        action="store_true",
+        help="measure raw patch output without configured instrument_levels",
+    )
     parser.add_argument("--report", type=Path, default=Path("instrument-balance-report.json"))
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="fail when any instrument/register capture is silent or clipped",
+    )
     args = parser.parse_args()
-    plan = build_plan()
+    if args.check and not (args.render or args.wav_dir):
+        parser.error("--check requires --render or --wav-dir")
+    plan = build_plan(use_instrument_levels=not args.unity_levels)
     args.plan.write_text(json.dumps(plan, indent=2) + "\n", encoding="utf-8")
     if args.render:
         if not args.wav_dir:
             parser.error("--render requires --wav-dir")
-        report = render_plan(plan, args.wav_dir)
+        report = render_plan(
+            plan,
+            args.wav_dir,
+            gate_seconds=max(0.01, args.gate_seconds),
+        )
         args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     elif args.wav_dir:
         report = {
@@ -171,6 +229,13 @@ def main() -> int:
             for item in plan
         }
         args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    else:
+        report = {}
+    if args.check:
+        issues = validate_render_report(report)
+        if issues:
+            print("\n".join(issues), file=sys.stderr)
+            return 1
     return 0
 
 

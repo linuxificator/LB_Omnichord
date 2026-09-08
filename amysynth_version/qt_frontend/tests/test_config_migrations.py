@@ -15,6 +15,8 @@ from config_migrations import (  # noqa: E402
     REVISION_FIVE_GAMMA9001_MAP,
     REVISION_FOUR_SHIPPED_TINY_MAP,
     REVISION_NINE_ROLE_LEVELS,
+    REVISION_TWELVE_BASS_LEVEL,
+    REVISION_TWELVE_LEGACY_BASS_LEVEL,
     REVISION_TEN_OSC_DISCOVERY,
     ConfigMigrationError,
     migrate_config_document,
@@ -414,7 +416,7 @@ class ConfigMigrationTests(unittest.TestCase):
         revision_ten["config_revision"] = 10
         revision_ten["debug"]["log_amy_commands"] = True
 
-        migrated = migrate_config_document(revision_ten)
+        migrated = migrate_config_document(revision_ten, target_revision=11)
 
         self.assertFalse(migrated.data["debug"]["log_amy_commands"])
         self.assertEqual(migrated.data["config_revision"], 11)
@@ -429,10 +431,37 @@ class ConfigMigrationTests(unittest.TestCase):
         revision_ten = copy.deepcopy(self.shipped)
         revision_ten["config_revision"] = 10
 
-        migrated = migrate_config_document(revision_ten)
+        migrated = migrate_config_document(revision_ten, target_revision=11)
 
         self.assertFalse(migrated.data["debug"]["log_amy_commands"])
         self.assertNotIn("$.debug.log_amy_commands", migrated.changed_paths)
+        self.assertEqual(migrated.changed_paths, ("$.config_revision",))
+
+    def test_revision_twelve_removes_only_the_shipped_bass_compensation(self) -> None:
+        revision_eleven = copy.deepcopy(self.shipped)
+        revision_eleven["config_revision"] = 11
+        revision_eleven["role_levels"]["bass"] = REVISION_TWELVE_LEGACY_BASS_LEVEL
+
+        migrated = migrate_config_document(revision_eleven)
+
+        self.assertEqual(
+            migrated.data["role_levels"]["bass"],
+            REVISION_TWELVE_BASS_LEVEL,
+        )
+        self.assertEqual(migrated.data["config_revision"], 12)
+        self.assertEqual(
+            migrated.changed_paths,
+            ("$.role_levels.bass", "$.config_revision"),
+        )
+
+    def test_revision_twelve_preserves_a_custom_bass_level(self) -> None:
+        revision_eleven = copy.deepcopy(self.shipped)
+        revision_eleven["config_revision"] = 11
+        revision_eleven["role_levels"]["bass"] = 1.4
+
+        migrated = migrate_config_document(revision_eleven)
+
+        self.assertEqual(migrated.data["role_levels"]["bass"], 1.4)
         self.assertEqual(migrated.changed_paths, ("$.config_revision",))
 
     def test_revision_five_rejects_a_custom_tiny_mapping(self) -> None:

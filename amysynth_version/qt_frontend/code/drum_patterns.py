@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from statistics import median
 from types import MappingProxyType
 from typing import Any
 
@@ -14,6 +15,45 @@ PPQ = 96
 AMY_PPQ = 48
 KIT_FAMILIES = ("tiny", "gamma9001", "general_midi")
 FILL_DENSITY_BARS = (8, 7, 6, 5, 4, 3, 2, 1)
+
+
+def _integrated_fill_gains(
+    fill_items: list[dict[str, Any]],
+    *,
+    maximum_adjustment_db: float,
+) -> dict[str, float]:
+    """Level total hit weight within each five-fill musical family.
+
+    Mean loudness alone makes a short fill easy to miss and a long dense fill
+    dominate. Sum normalized hit amplitudes as a stable integration proxy,
+    keep the family median unchanged, and limit compensation so instrument
+    character and deliberately strong accents remain intact.
+    """
+
+    minimum_gain = 10.0 ** (-maximum_adjustment_db / 20.0)
+    maximum_gain = 10.0 ** (maximum_adjustment_db / 20.0)
+    weights_by_rhythm: dict[str, list[tuple[str, float]]] = {}
+    for item in fill_items:
+        fill_id = str(item["fill_id"])
+        events = item["timing"]["events"]
+        weight = sum(float(event["velocity"]) / 127.0 for event in events)
+        if weight <= 0.0:
+            raise ValueError(f"{fill_id} has no integrated hit weight")
+        weights_by_rhythm.setdefault(str(item["rhythm_id"]), []).append(
+            (fill_id, weight)
+        )
+
+    gains: dict[str, float] = {}
+    for rhythm_id, weighted_fills in weights_by_rhythm.items():
+        if len(weighted_fills) != 5:
+            raise ValueError(f"{rhythm_id} must have five fills for balance")
+        reference = float(median(weight for _, weight in weighted_fills))
+        for fill_id, weight in weighted_fills:
+            gains[fill_id] = max(
+                minimum_gain,
+                min(maximum_gain, reference / weight),
+            )
+    return gains
 
 
 @dataclass(frozen=True)
@@ -32,6 +72,7 @@ class DrumFill:
     beat_unit_ticks: int
     events: tuple[DrumEvent, ...]
     continue_roles: frozenset[str]
+    output_gain: float
 
 
 @dataclass(frozen=True)
@@ -254,6 +295,19 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
         directory / "drum_fill_continuation_roles.json",
         "drum_continuation_v1.schema.json",
     )
+    fill_levels = _read(
+        directory / "drum_fill_levels.json",
+        "drum_fill_levels_v1.schema.json",
+    )
+    global_fill_gain = float(fill_levels["global_gain"])
+    integration_balance = fill_levels["integration_balance"]
+    maximum_integration_adjustment_db = float(
+        integration_balance["maximum_adjustment_db"]
+    )
+    raw_fill_gains = fill_levels["per_fill"]
+    if not isinstance(raw_fill_gains, dict):
+        raise ValueError("fill level catalogue per_fill must be an object")
+    fill_gains = {str(key): float(value) for key, value in raw_fill_gains.items()}
     if int(activity.get("design_contract", {}).get("ppq", 0)) != PPQ:
         raise ValueError("drum activity catalogue must use 96 PPQ")
 
@@ -261,6 +315,10 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
     continuation_items = continuation.get("fills")
     if not isinstance(fill_items, list) or not isinstance(continuation_items, list):
         raise ValueError("fill timing and continuation catalogues require fills")
+    integration_gains = _integrated_fill_gains(
+        fill_items,
+        maximum_adjustment_db=maximum_integration_adjustment_db,
+    )
     continue_by_id = {
         str(item["fill_id"]): frozenset(
             str(role) for role in item["continue_roles"]
@@ -308,6 +366,11 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
                 for raw in timing["events"]
             ),
             continue_roles=continue_by_id[fill_id],
+            output_gain=(
+                global_fill_gain
+                * fill_gains.get(fill_id, 1.0)
+                * integration_gains[fill_id]
+            ),
         )
         if fill.index in fills_by_index:
             raise ValueError(f"duplicate fill index {fill.index}")
@@ -316,6 +379,14 @@ def load_drum_pattern_catalog(directory: Path) -> DrumPatternCatalog:
         fill.fill_id for fill in fills_by_index.values()
     }:
         raise ValueError("fill timing and continuation coverage differ")
+    unknown_fill_gains = set(fill_gains) - {
+        fill.fill_id for fill in fills_by_index.values()
+    }
+    if unknown_fill_gains:
+        raise ValueError(
+            "fill level catalogue contains unknown ids: "
+            + ", ".join(sorted(unknown_fill_gains))
+        )
 
     index_raw = fills_raw.get("rhythm_fill_index")
     if not isinstance(index_raw, dict):

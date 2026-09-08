@@ -97,7 +97,7 @@ class PackagingContracts(unittest.TestCase):
         self.assertTrue((FRONTEND / "music" / "catalogue_provenance.json").is_file())
         self.assertEqual(
             len(tuple((FRONTEND / "music" / "schema").glob("*.schema.json"))),
-            5,
+            6,
         )
 
     def test_network_permissions_match_current_release_targets(self) -> None:
@@ -188,7 +188,7 @@ class PackagingContracts(unittest.TestCase):
             encoding="utf-8"
         )
         architecture = (
-            REPOSITORY / "amysynth_version" / "design" / "architecture.md"
+            REPOSITORY / "amysynth_version" / "design" / "arch" / "architecture.md"
         ).read_text(encoding="utf-8")
         runtime_adapter = (
             FRONTEND / "code" / "runtime_platform_adapters.py"

@@ -54,6 +54,46 @@ class SoundBalanceFeatureTests(unittest.TestCase):
         plan = instrument_balance.build_plan()
         self.assertEqual(len(plan), 124)
         self.assertEqual({entry["note"] for entry in plan[0]["notes"]}, {40, 60, 84})
+
+    def test_factory_bass_volumes_retain_the_original_curated_values(self) -> None:
+        expected = (
+            0.34, 0.34, 0.42, 0.36, 0.40, 0.46, 0.99, 0.56, 0.62,
+            0.58, 0.64, 0.65, 0.68, 0.72, 0.70, 0.76, 0.80, 0.84,
+        )
+        actual = tuple(
+            float(
+                json.loads(
+                    (
+                        ROOT
+                        / "instruments"
+                        / "default_presets"
+                        / f"p{number}.json"
+                    ).read_text(encoding="utf-8")
+                )["volumes"]["bass"]
+            )
+            for number in range(1, 19)
+        )
+        for preset, (value, wanted) in enumerate(zip(actual, expected), start=1):
+            self.assertAlmostEqual(value, wanted, places=9, msg=f"P{preset}")
+
+    def test_balance_report_validator_rejects_silence_and_clipping(self) -> None:
+        report = {
+            f"synth_{index}": {
+                str(note): {
+                    "peak_dbfs": -20.0,
+                    "clipped_samples": 0,
+                }
+                for note in instrument_balance.NOTES
+            }
+            for index in range(124)
+        }
+        self.assertEqual(instrument_balance.validate_render_report(report), [])
+        report["synth_0"]["40"]["peak_dbfs"] = -90.0
+        report["synth_1"]["60"]["clipped_samples"] = 2
+        issues = instrument_balance.validate_render_report(report)
+        self.assertTrue(any("effectively silent" in issue for issue in issues))
+        self.assertTrue(any("clipped samples" in issue for issue in issues))
+
     def test_old_user_layout_migrates_without_overwriting(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

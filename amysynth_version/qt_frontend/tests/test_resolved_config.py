@@ -50,7 +50,7 @@ class ResolvedConfigTests(unittest.TestCase):
         self.assertEqual(resolved.capacities.max_sequencer_tags, 1280)
         self.assertEqual(resolved.capacities.max_sequence_events, 64)
         self.assertEqual(resolved.capacities.max_sequence_executions, 40)
-        self.assertEqual(resolved.role_level("bass"), 3.2)
+        self.assertEqual(resolved.role_level("bass"), 1.0)
         self.assertEqual(resolved.role_level("chord"), 1.0)
         self.assertEqual(resolved.role_level("unknown"), 1.0)
         self.assertFalse(resolved.debug.log_amy_commands)

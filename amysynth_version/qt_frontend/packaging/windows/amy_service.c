@@ -18,6 +18,7 @@ extern const int16_t gamma9001_pcm_data[];
 
 #define SERVICE_MAX_LINE MAX_MESSAGE_LEN
 #define SERVICE_PIPE_PATH 256
+#define SERVICE_SHARED_AUX_RETURNS 2
 
 // AMY's example helpers reference this platform hook.  The native service
 // supplies it here rather than linking the standalone amy-example program.
@@ -141,6 +142,7 @@ static int run_service(
     config.audio = no_audio ? AMY_AUDIO_IS_NONE : AMY_AUDIO_IS_MINIAUDIO;
     config.features.default_synths = 0;
     config.max_buses = 11;
+    config.max_reverb_rooms = SERVICE_SHARED_AUX_RETURNS;
     config.max_oscs = 336;
     config.max_sequencer_tags = 1280;
     config.max_sequence_events = 64;

@@ -38,6 +38,7 @@ class _Fill:
     beat_unit_ticks: int
     events: tuple[_Event, ...]
     continue_roles: frozenset[str]
+    output_gain: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -55,9 +56,12 @@ def _hit_body(
     velocity: int,
     *,
     fill: bool,
+    fill_id: str | None = None,
+    fill_gain: float = 1.0,
 ) -> str:
     kind = "f" if fill else "a"
-    return f"{kind}{rhythm_id}:{role}:{velocity}"
+    suffix = "" if fill_gain == 1.0 else f":gain={fill_gain:g}"
+    return f"{kind}{rhythm_id}:{role}:{velocity}{suffix}"
 
 
 class PureCommandPlanTests(unittest.TestCase):

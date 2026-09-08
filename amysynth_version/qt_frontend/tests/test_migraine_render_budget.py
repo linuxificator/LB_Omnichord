@@ -57,7 +57,7 @@ class MigraineRenderBudgetTests(unittest.TestCase):
         engine.deleteLater()
         QCoreApplication.processEvents()
 
-    def test_effect_has_a_bounded_cached_scene_graph_surface(self) -> None:
+    def test_effect_has_six_bounded_preloaded_sprite_frames(self) -> None:
         engine, component, window = self.create_window(
             b"""
 import QtQuick
@@ -79,17 +79,21 @@ Window {
 """,
         )
         migraine = window.findChild(QObject, "migraine")
-        cached_edge = window.findChild(QObject, "migraineCachedEdge")
         self.assertIsInstance(migraine, QQuickItem)
-        self.assertIsNotNone(cached_edge)
         assert isinstance(migraine, QQuickItem)
 
         descendants = quick_descendants(migraine)
         class_names = [item.metaObject().className() for item in descendants]
-        self.assertLessEqual(len(descendants), 12)
-        self.assertEqual(
-            sum("QQuickShape" in name for name in class_names),
-            3,
+        sprite_frames = [
+            item
+            for item in descendants
+            if item.objectName() == "migraineSpriteFrame"
+        ]
+        self.assertEqual(len(sprite_frames), 6)
+        self.assertLessEqual(len(descendants), 8)
+        self.assertFalse(any("QQuickShape" in name for name in class_names))
+        self.assertTrue(
+            all(float(frame.property("paintedWidth")) > 0 for frame in sprite_frames)
         )
         self.assertFalse(any("Particle" in name for name in class_names))
         self.assertFalse(any("Emitter" in name for name in class_names))
@@ -140,7 +144,7 @@ Window {
         # macOS' offscreen event dispatcher can defer a QML Timer past a
         # single short qWait even though its declared interval is unchanged.
         # Poll for delivery without weakening the actual contract: all 120
-        # inputs must still coalesce into exactly one geometry update.
+        # inputs must still coalesce into exactly one sprite-frame update.
         for _attempt in range(50):
             QTest.qWait(10)
             if int(window.property("morphUpdates")) >= 1:

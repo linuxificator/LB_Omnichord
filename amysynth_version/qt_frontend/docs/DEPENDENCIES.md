@@ -86,8 +86,8 @@ build provenance, not portable frontend runtime intent.
 
 All synthesis targets use
 `https://github.com/linuxificator/amy.git`, release branch
-`releases/amy_omnichord_R20260908T005616`, immutable commit
-`e9a96c20da31b4130a243bf75b984408c1dff5e0`. CI proves that the commit belongs
+`releases/amy_omnichord_R20260908T212305`, immutable commit
+`53a316068642ece2cb2d2bb0eedb76a039f7da1f`. CI proves that the commit belongs
 to the declared branch before using it.
 
 This is intentionally not a normal Python requirement. It supplies the C AMY
@@ -99,8 +99,7 @@ input across all platforms.
 Python/native test and hosted desktop service builds select Gamma9001 with
 `AMY_PCM_BANK=gamma9001` where `setup.py` is used. Windows and Android generate,
 link and register the same Gamma data through native build definitions. ESP32
-uses the same source lineage but remains an explicitly declared Tiny-bank
-target until its storage profile changes. Exact options and verification are owned by
+uses the same source lineage and Gamma9001 bank. Exact options and verification are owned by
 [`AMY_RELEASE.md`](../packaging/AMY_RELEASE.md) and the
 platform documentation. ESP32-P4 additionally defines `AMY_SHARED_REVERB=1`.
 Never update only one consumer.
@@ -150,10 +149,8 @@ required controls are in [`SIGNING_DECISION.md`](../packaging/SIGNING_DECISION.m
 
 ## Change rule
 
-Before proposing another external package, copy the
-[assessment template](../../design/dependency_assessments/README.md), date it,
-and reach an explicit
+Before proposing another external package, apply the assessment criteria in
+[`dependencies.md`](../../design/arch/dependencies.md) and record an explicit
 adopt/use-existing/implement-locally/defer outcome. An adoption must declare
 the package in the correct group and pass every platform where its importing
-code runs. The full selection criteria remain in
-[`CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md`](../../design/CODEX_HANDOVER_DEPENDENCY_SELECTION_AND_REUSE.md).
+code runs.

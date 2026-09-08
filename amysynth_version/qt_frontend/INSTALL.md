@@ -243,9 +243,9 @@ The supervisor gives each run a unique private pipe name. Qt connects with
 not linked into the frontend.
 
 The Windows service is built with Gamma9001, matching Linux, Raspberry Pi,
-macOS and Android. Its CMake target generates, links and registers the PCM blob;
-using a Tiny service with the shipped Gamma map is a release-blocking mismatch.
-ESP32-P4 remains a separately declared Tiny-bank firmware target.
+macOS, Android and ESP32-P4. Its CMake target generates, links and registers
+the PCM blob; using a Tiny service with the shipped Gamma map is a
+release-blocking mismatch.
 
 The package is currently experimental. GitHub's Windows Server 2025 job proves
 native compilation, offline non-silent PCM rendering, frozen QML/assets,
@@ -290,7 +290,7 @@ audio, MIDI or named-pipe behavior.
 
 The complete application uses eleven isolated AMY buses: four for OMNI, six
 for the individual MIDI instruments and one for MIDI drums. See
-`../design/architecture.md` for the authoritative mapping.
+`../design/arch/architecture.md` for the authoritative mapping.
 
 OMNI and MIDI each have independent header reverb state. Within either section,
 `DRM` decides whether that section's drum bus receives the same room.
@@ -327,7 +327,7 @@ the pinned LB Omnichord AMY release. Native suites start AMY with 11 buses, 336
 oscillators, 1280 reusable sequence tags, 64 events per definition and 40
 active or alignment-pending executions. `run_local.sh` provisions that release;
 `prepare_local_amy.sh` remains available for an explicit rebuild. The full suite and CI layout is documented in
-`../design/testing.md`.
+`../design/arch/testing.md`.
 
 ## Install a released Linux x86_64 AppImage
 

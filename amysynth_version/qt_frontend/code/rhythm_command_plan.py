@@ -46,6 +46,9 @@ class FillLike(Protocol):
     @property
     def events(self) -> Sequence[DrumEventLike]: ...
 
+    @property
+    def output_gain(self) -> float: ...
+
 
 class RhythmLike(Protocol):
     @property
@@ -70,6 +73,7 @@ class DrumHitBody(Protocol):
         *,
         fill: bool,
         fill_id: str | None = None,
+        fill_gain: float = 1.0,
     ) -> str: ...
 
 
@@ -532,16 +536,13 @@ def compile_fill_sequence(
     fill_id = getattr(fill, "fill_id", None)
     for event in fill.events:
         event_tick = event.tick // 2
-        body = (
-            hit_body(rhythm_id, event.role, event.velocity, fill=True)
-            if fill_id is None
-            else hit_body(
-                rhythm_id,
-                event.role,
-                event.velocity,
-                fill=True,
-                fill_id=fill_id,
-            )
+        body = hit_body(
+            rhythm_id,
+            event.role,
+            event.velocity,
+            fill=True,
+            fill_id=fill_id,
+            fill_gain=float(fill.output_gain),
         )
         events.append((event_tick, 0, body))
     return compile_sequence_definition(sequence_tag=sequence_tag, events=events)

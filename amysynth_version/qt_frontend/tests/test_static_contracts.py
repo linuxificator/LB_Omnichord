@@ -111,7 +111,7 @@ class StaticContractTests(unittest.TestCase):
         forbidden = [name for name in imported if name in {"amy", "c_amy"}]
         self.assertEqual(forbidden, [])
 
-    def test_codex_startup_reading_routes_existing_design_contracts(self) -> None:
+    def test_agent_startup_reading_routes_existing_design_contracts(self) -> None:
         repository = ROOT.parents[1]
         agents_path = repository / "AGENTS.md"
         design_root = ROOT.parent / "design"
@@ -119,31 +119,51 @@ class StaticContractTests(unittest.TestCase):
 
         agents = agents_path.read_text(encoding="utf-8")
         design_index = design_index_path.read_text(encoding="utf-8")
-        self.assertIn("## Required Codex startup reading", agents)
         self.assertIn("amysynth_version/README.md", agents)
         self.assertIn("amysynth_version/design/README.md", agents)
-        self.assertIn("task-routing table", agents)
 
         required_design_files = (
-            "principles.md",
-            "architecture.md",
-            "behavior.md",
-            "testing.md",
-            "gui.md",
-            "ui_behavior_reference.md",
-            "midi.md",
-            "midi_control.md",
-            "presets.md",
-            "sound_balance.md",
-            "rhythm_bahavior.md",
-            "tuning.md",
-            "use_cases.md",
-            "amy_interface.md",
-            "unclear.md",
+            "arch/principles.md",
+            "arch/architecture.md",
+            "arch/behavior.md",
+            "arch/testing.md",
+            "gui/contract.md",
+            "gui/behavior.md",
+            "controls/midi.md",
+            "controls/midi_control.md",
+            "controls/osc.md",
+            "music/presets.md",
+            "music/sound_balance.md",
+            "music/rhythm.md",
+            "music/sequences.md",
+            "music/tuning.md",
+            "music/use_cases.md",
+            "amy/interface.md",
+            "amy/sequencer.md",
+            "esp32/performance.md",
+            "platform/raspberry_pi/README.md",
         )
         for name in required_design_files:
             self.assertTrue((design_root / name).is_file(), name)
-            self.assertIn(name, design_index)
+
+        for category in (
+            "arch/",
+            "amy/",
+            "esp32/",
+            "gui/",
+            "controls/",
+            "music/",
+            "platform/",
+        ):
+            self.assertIn(category, design_index)
+
+        obsolete_roots = (
+            "code_quality_tasks",
+            "dependency_assessments",
+            "rhythm_rework",
+        )
+        for name in obsolete_roots:
+            self.assertFalse((design_root / name).exists(), name)
 
         required_frontend_contracts = (
             ROOT.parent / "README.md",
@@ -157,7 +177,10 @@ class StaticContractTests(unittest.TestCase):
         )
         for path in required_frontend_contracts:
             self.assertTrue(path.is_file(), str(path))
-        self.assertIn("WINDOWS_NATIVE.md", design_index)
+        windows_index = (
+            design_root / "platform" / "windows" / "README.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("WINDOWS_NATIVE.md", windows_index)
 
     def test_public_readme_uses_current_amy_and_qt_screenshots(self) -> None:
         repository = ROOT.parents[1]
@@ -988,27 +1011,24 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("PointerNormalization.verticalUnit", midi_strum)
         self.assertNotIn("controller", section)
 
-    def test_migraine_is_a_visual_only_bounded_cached_layer(self) -> None:
+    def test_migraine_is_a_visual_only_bounded_sprite(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
         migraine = (ROOT / "gui" / "Migraine.qml").read_text(encoding="utf-8")
 
-        self.assertIn("import QtQuick.Shapes", migraine)
+        self.assertNotIn("import QtQuick.Shapes", migraine)
         self.assertNotIn("import QtQuick.Particles", migraine)
         self.assertIn('objectName: "migraine"', migraine)
         self.assertIn("property int fadeDuration: 500", migraine)
         self.assertIn("property int morphInterval: 34", migraine)
-        self.assertIn('objectName: "migraineCachedEdge"', migraine)
-        self.assertIn("layer.enabled: true", migraine)
+        self.assertIn("readonly property int morphFrameCount: 6", migraine)
+        self.assertIn('objectName: "migraineSpriteFrame"', migraine)
+        self.assertIn('"migraine_frames/migraine_" + index + ".svg"', migraine)
+        self.assertIn("cache: true", migraine)
         self.assertIn("root.pendingMorphDistance += distance", migraine)
         self.assertIn("onTriggered: root.advanceMorph()", migraine)
-        self.assertIn("registration * 3.4", migraine)
-        self.assertIn("Math.cos(registrationAngle)", migraine)
-        self.assertIn("Math.sin(registrationAngle)", migraine)
-        self.assertIn("model: 3", migraine)
-        self.assertIn('objectName: "migraineSharpChromaEdge"', migraine)
-        self.assertIn("PathSvg {", migraine)
-        self.assertIn("joinStyle: ShapePath.MiterJoin", migraine)
-        self.assertIn("readonly property var pointAngles", migraine)
+        self.assertIn("model: root.morphFrameCount", migraine)
+        self.assertNotIn("PathSvg {", migraine)
         self.assertNotIn("ParticleSystem {", migraine)
         self.assertNotIn("ImageParticle {", migraine)
         self.assertNotIn("Emitter {", migraine)
@@ -1027,9 +1047,24 @@ class StaticContractTests(unittest.TestCase):
             strum.index("Migraine {") - 120:strum.index("Migraine {")
         ]
         self.assertNotIn("clip: true", migraine_layer)
-        self.assertIn("migraine.beginAt(points[0].x, points[0].y)", strum)
-        self.assertIn("migraine.moveTo(points[0].x, points[0].y)", strum)
+        self.assertIn("property Item visualOverlay: null", strum)
+        self.assertIn("root.mapToItem(root.visualOverlay, x, y)", strum)
+        self.assertIn(
+            "parent: root.visualOverlay ? root.visualOverlay : root",
+            strum,
+        )
+        self.assertIn("migraine.beginAt(visual.x, visual.y)", strum)
+        self.assertIn("migraine.moveTo(visual.x, visual.y)", strum)
         self.assertEqual(strum.count("migraine.release()"), 2)
+
+        content_start = main.index("id: contentArea")
+        content_end = main.index("id: strumVisualOverlay")
+        cached_surface = main[content_start:content_end]
+        self.assertIn("layer.enabled: true", cached_surface)
+        self.assertIn("visualOverlay: strumVisualOverlay", cached_surface)
+        overlay = main[content_end:]
+        self.assertIn("scale: viewport.fittedScale", overlay)
+        self.assertIn("visible: !window.midiScreen", overlay)
 
     def test_parameter_slider_live_edits_do_not_reset_repeater_models(self) -> None:
         app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")

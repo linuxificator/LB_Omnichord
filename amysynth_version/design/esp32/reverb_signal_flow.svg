@@ -1,0 +1,179 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#28323c"/>
+    </marker>
+    <style>
+      text { font-family: DejaVu Sans, Arial, sans-serif; fill: #17212b; }
+      .title { font-size: 30px; font-weight: 700; }
+      .subtitle { font-size: 18px; fill: #44515e; }
+      .label { font-size: 18px; font-weight: 700; }
+      .small { font-size: 15px; }
+      .tiny { font-size: 13px; }
+      .box { fill: #f7f9fb; stroke: #28323c; stroke-width: 2; rx: 10; }
+      .delay { fill: #e7f3ff; stroke: #20639b; stroke-width: 2; rx: 8; }
+      .lpf { fill: #fff2cc; stroke: #997000; stroke-width: 2; rx: 8; }
+      .matrix { fill: #e9f7e8; stroke: #2b7a3d; stroke-width: 2; rx: 10; }
+      .sum { fill: white; stroke: #8b3a62; stroke-width: 2; }
+      .io { fill: #f3e9ff; stroke: #673a91; stroke-width: 2; rx: 8; }
+      .line { fill: none; stroke: #28323c; stroke-width: 2.2; marker-end: url(#arrow); }
+      .feedback { fill: none; stroke: #b04444; stroke-width: 2.4; marker-end: url(#arrow); }
+      .early { fill: none; stroke: #20639b; stroke-width: 2.2; marker-end: url(#arrow); }
+      .wet { fill: none; stroke: #673a91; stroke-width: 2.2; marker-end: url(#arrow); }
+      .guide { fill: none; stroke: #87929c; stroke-width: 1.5; stroke-dasharray: 6 6; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1180" fill="white"/>
+  <text x="50" y="52" class="title">AMY stereo reverb — one 128-sample audio block</text>
+  <text x="50" y="83" class="subtitle">The inner signal-flow below runs once per sample; all ten circular-buffer cursors advance, then it repeats ×128.</text>
+
+  <!-- stereo input and early-reflection network -->
+  <rect x="45" y="130" width="135" height="58" class="io"/>
+  <text x="112" y="154" text-anchor="middle" class="label">Input R[n]</text>
+  <text x="112" y="177" text-anchor="middle" class="small">dry path retained</text>
+  <rect x="45" y="215" width="135" height="58" class="io"/>
+  <text x="112" y="239" text-anchor="middle" class="label">Input L[n]</text>
+  <text x="112" y="262" text-anchor="middle" class="small">or R if mono</text>
+
+  <rect x="235" y="118" width="1275" height="225" class="box"/>
+  <text x="260" y="148" class="label">Early-reflection network (six circular delay taps, cascaded per sample)</text>
+  <text x="260" y="176" class="small">Start: Racc = R[n] / 16, Lacc = L[n] / 16</text>
+
+  <g>
+    <rect x="270" y="202" width="170" height="74" class="delay"/>
+    <text x="355" y="228" text-anchor="middle" class="label">E1 ring</text>
+    <text x="355" y="251" text-anchor="middle" class="small">4096 allocated</text>
+    <text x="355" y="270" text-anchor="middle" class="small">tap 3319 samples</text>
+
+    <rect x="465" y="202" width="170" height="74" class="delay"/>
+    <text x="550" y="228" text-anchor="middle" class="label">E2 ring</text>
+    <text x="550" y="251" text-anchor="middle" class="small">2048 allocated</text>
+    <text x="550" y="270" text-anchor="middle" class="small">tap 1920 samples</text>
+
+    <rect x="660" y="202" width="170" height="74" class="delay"/>
+    <text x="745" y="228" text-anchor="middle" class="label">E3 ring</text>
+    <text x="745" y="251" text-anchor="middle" class="small">2048 allocated</text>
+    <text x="745" y="270" text-anchor="middle" class="small">tap 1138 samples</text>
+
+    <rect x="855" y="202" width="170" height="74" class="delay"/>
+    <text x="940" y="228" text-anchor="middle" class="label">E4 ring</text>
+    <text x="940" y="251" text-anchor="middle" class="small">1024 allocated</text>
+    <text x="940" y="270" text-anchor="middle" class="small">tap 855 samples</text>
+
+    <rect x="1050" y="202" width="170" height="74" class="delay"/>
+    <text x="1135" y="228" text-anchor="middle" class="label">E5 ring</text>
+    <text x="1135" y="251" text-anchor="middle" class="small">1024 allocated</text>
+    <text x="1135" y="270" text-anchor="middle" class="small">tap 722 samples</text>
+
+    <rect x="1245" y="202" width="170" height="74" class="delay"/>
+    <text x="1330" y="228" text-anchor="middle" class="label">E6 ring</text>
+    <text x="1330" y="251" text-anchor="middle" class="small">1024 allocated</text>
+    <text x="1330" y="270" text-anchor="middle" class="small">tap 602 samples</text>
+  </g>
+
+  <path d="M180 158 H235" class="early"/>
+  <path d="M180 244 H215 V183 H235" class="early"/>
+  <path d="M440 239 H465 M635 239 H660 M830 239 H855 M1025 239 H1050 M1220 239 H1245" class="early"/>
+  <text x="875" y="306" text-anchor="middle" class="tiny">For E1…E5: write Lacc → read delayed tap → Lacc = Racc − tap; Racc = Racc + tap. E6 produces EL; accumulated Racc produces ER.</text>
+
+  <!-- early outputs -->
+  <path d="M1415 222 H1540 V471 H1112" class="early"/>
+  <text x="1450" y="209" class="small">ER = Racc</text>
+  <path d="M1415 260 H1575 V631 H1112" class="early"/>
+  <text x="1450" y="288" class="small">EL = E6 tap</text>
+
+  <!-- feedback matrix -->
+  <rect x="85" y="430" width="300" height="505" class="matrix"/>
+  <text x="235" y="464" text-anchor="middle" class="label">4 × 4 feedback matrix</text>
+  <text x="110" y="502" class="small">write D1 ← d1 + d2 + d3 + d4</text>
+  <text x="110" y="542" class="small">write D2 ← d1 − d2 + d3 − d4</text>
+  <text x="110" y="582" class="small">write D3 ← d1 + d2 − d3 − d4</text>
+  <text x="110" y="622" class="small">write D4 ← d1 − d2 − d3 + d4</text>
+  <line x1="105" y1="650" x2="365" y2="650" class="guide"/>
+  <text x="110" y="682" class="small">No separate matrix buffer.</text>
+  <text x="110" y="709" class="small">The four signed sums are written</text>
+  <text x="110" y="736" class="small">into the four feedback rings.</text>
+  <text x="110" y="782" class="small">The liveness ÷ 2 factor is inside</text>
+  <text x="110" y="809" class="small">each lane's LPF/output stage.</text>
+  <text x="110" y="855" class="small">Red paths close the feedback loop</text>
+  <text x="110" y="882" class="small">once for every audio sample.</text>
+
+  <!-- feedback lanes -->
+  <g>
+    <text x="415" y="476" class="label">Lane 1</text>
+    <rect x="490" y="435" width="215" height="74" class="delay"/>
+    <text x="598" y="462" text-anchor="middle" class="label">D1 ring: 4096</text>
+    <text x="598" y="488" text-anchor="middle" class="small">tap 2586 samples</text>
+    <rect x="765" y="428" width="270" height="88" class="lpf"/>
+    <text x="900" y="454" text-anchor="middle" class="label">1-pole LPF 1</text>
+    <text x="900" y="477" text-anchor="middle" class="tiny">state smoothing + damping mix</text>
+    <text x="900" y="497" text-anchor="middle" class="tiny">then × (liveness / 2), Q8.23</text>
+    <circle cx="1100" cy="472" r="20" class="sum"/>
+    <text x="1100" y="478" text-anchor="middle" class="label">+</text>
+    <text x="1135" y="478" class="small">d1</text>
+
+    <text x="415" y="636" class="label">Lane 2</text>
+    <rect x="490" y="595" width="215" height="74" class="delay"/>
+    <text x="598" y="622" text-anchor="middle" class="label">D2 ring: 4096</text>
+    <text x="598" y="648" text-anchor="middle" class="small">tap 3062 samples</text>
+    <rect x="765" y="588" width="270" height="88" class="lpf"/>
+    <text x="900" y="614" text-anchor="middle" class="label">1-pole LPF 2</text>
+    <text x="900" y="637" text-anchor="middle" class="tiny">state smoothing + damping mix</text>
+    <text x="900" y="657" text-anchor="middle" class="tiny">then × (liveness / 2), Q8.23</text>
+    <circle cx="1100" cy="632" r="20" class="sum"/>
+    <text x="1100" y="638" text-anchor="middle" class="label">+</text>
+    <text x="1135" y="638" class="small">d2</text>
+
+    <text x="415" y="796" class="label">Lane 3</text>
+    <rect x="490" y="755" width="215" height="74" class="delay"/>
+    <text x="598" y="782" text-anchor="middle" class="label">D3 ring: 4096</text>
+    <text x="598" y="808" text-anchor="middle" class="small">tap 3286 samples</text>
+    <rect x="765" y="748" width="270" height="88" class="lpf"/>
+    <text x="900" y="774" text-anchor="middle" class="label">1-pole LPF 3</text>
+    <text x="900" y="797" text-anchor="middle" class="tiny">state smoothing + damping mix</text>
+    <text x="900" y="817" text-anchor="middle" class="tiny">then × (liveness / 2), Q8.23</text>
+    <text x="1080" y="798" class="small">d3</text>
+
+    <text x="415" y="956" class="label">Lane 4</text>
+    <rect x="490" y="915" width="215" height="74" class="delay"/>
+    <text x="598" y="942" text-anchor="middle" class="label">D4 ring: 4096</text>
+    <text x="598" y="968" text-anchor="middle" class="small">tap 3798 samples</text>
+    <rect x="765" y="908" width="270" height="88" class="lpf"/>
+    <text x="900" y="934" text-anchor="middle" class="label">1-pole LPF 4</text>
+    <text x="900" y="957" text-anchor="middle" class="tiny">state smoothing + damping mix</text>
+    <text x="900" y="977" text-anchor="middle" class="tiny">then × (liveness / 2), Q8.23</text>
+    <text x="1080" y="958" class="small">d4</text>
+  </g>
+
+  <!-- left-to-right lane arrows -->
+  <path d="M385 472 H490 M705 472 H765 M1035 472 H1080" class="line"/>
+  <path d="M385 632 H490 M705 632 H765 M1035 632 H1080" class="line"/>
+  <path d="M385 792 H490 M705 792 H765 M1035 792 H1170" class="line"/>
+  <path d="M385 952 H490 M705 952 H765 M1035 952 H1170" class="line"/>
+
+  <!-- wet output sums -->
+  <rect x="1370" y="430" width="340" height="90" class="io"/>
+  <text x="1540" y="458" text-anchor="middle" class="label">Output R[n]</text>
+  <text x="1540" y="484" text-anchor="middle" class="small">R[n] + reverb_level × d1</text>
+  <rect x="1370" y="590" width="340" height="90" class="io"/>
+  <text x="1540" y="618" text-anchor="middle" class="label">Output L[n]</text>
+  <text x="1540" y="644" text-anchor="middle" class="small">L[n] + reverb_level × d2</text>
+  <path d="M1120 472 H1370" class="wet"/>
+  <path d="M1120 632 H1370" class="wet"/>
+  <path d="M180 158 H1325 V448 H1370" class="guide"/>
+  <path d="M180 244 H1300 V608 H1370" class="guide"/>
+
+  <!-- feedback return bus -->
+  <path d="M1170 472 H1225 V1045 H235 V935" class="feedback"/>
+  <path d="M1170 632 H1200 V1025 H250 V935" class="feedback"/>
+  <path d="M1170 792 H1175 V1005 H265 V935" class="feedback"/>
+  <path d="M1170 952 V985 H280 V935" class="feedback"/>
+  <text x="730" y="1034" text-anchor="middle" class="small" fill="#b04444">d1, d2, d3, d4 return to the signed feedback matrix</text>
+
+  <!-- totals and LPF details -->
+  <rect x="85" y="1080" width="1625" height="70" class="box"/>
+  <text x="110" y="1108" class="label">Per reverb network:</text>
+  <text x="330" y="1108" class="small">27,648 stored 32-bit samples = 108 KiB, across 6 early-reflection + 4 feedback rings.</text>
+  <text x="110" y="1137" class="small">Per 128-sample block: 1,280 circular-buffer writes + 1,280 delayed reads; four stateful LPFs execute 128 times each.</text>
+</svg>
