@@ -1,9 +1,9 @@
 # AMY aux returns and ESP32-P4 reverb limit
 
 Status: implemented on AMY release branch
-`releases/amy_omnichord_R20260908T212305`. The immutable AMY commit must be
-read from `packaging/release_inputs.json` once that release is adopted by the
-Omnichord build.
+`releases/amy_omnichord_R20260908T212305` at immutable commit
+`53a316068642ece2cb2d2bb0eedb76a039f7da1f`, as recorded by
+`packaging/release_inputs.json`.
 
 ## Architecture decision
 
@@ -61,7 +61,6 @@ platforms the same routing and DSP are used, without P4 memory placement.
 
 ## Remaining platform work
 
-After the AMY release SHA is final, update `packaging/release_inputs.json` and
-its generated release documentation, then run the generic AMY regression
-matrix plus a clean ESP32-P4 v1/v3 build. Raspberry Pi CPU affinity remains a
-separate host-level performance experiment; it is not part of generic AMY.
+Run the generic AMY regression matrix plus clean ESP32-P4 v1/v3 builds before
+publishing an Omnichord release. Raspberry Pi CPU affinity remains a separate
+host-level performance experiment; it is not part of generic AMY.

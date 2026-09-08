@@ -17,7 +17,7 @@ buses, the sequence capacities listed in `performance.md`, two shared SRAM
 reverbs and 2 x 128 DMA frames.
 
 Release `R20260907T231243` was built from LB commit `c191e651` with AMY commit
-`e9a96c20` on `releases/amy_omnichord_R20260908T005616`. Every platform job,
+`53a31606` on `releases/amy_omnichord_R20260908T212305`. Every platform job,
 Android emulator and both P4 profiles passed. The published Pi AppImage and P4
 v1 image were then physically tested together:
 
@@ -32,4 +32,3 @@ v1 image were then physically tested together:
 Local esptool 4.7 identified this early P4 incorrectly as revision 0.0 and
 refused the image before writing. The current esptool-5 path is therefore the
 physically validated release route.
-

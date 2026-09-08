@@ -45,8 +45,7 @@ The active LB release supplies 1,280 definition identities, 64 events per
 definition and 40 active or alignment-pending executions. Inactive preloaded
 fills consume memory but negligible realtime processing.
 
-AMY release branch `releases/amy_omnichord_R20260908T005616` at
-`e9a96c20da31b4130a243bf75b984408c1dff5e0` is the current immutable consumer
+AMY release branch `releases/amy_omnichord_R20260908T212305` at
+`53a316068642ece2cb2d2bb0eedb76a039f7da1f` is the current immutable consumer
 pin. Exact current pins remain authoritative in
 `../../qt_frontend/packaging/release_inputs.json`.
-

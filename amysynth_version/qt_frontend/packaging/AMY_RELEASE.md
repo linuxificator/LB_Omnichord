@@ -6,8 +6,8 @@ Applies to: native tests, desktop services, Android Oboe and ESP32-P4
 Last verified: 2026-09-08
 
 Every LB Omnichord build uses AMY from the fork release branch
-`releases/amy_omnichord_R20260908T005616` at exact commit
-`e9a96c20da31b4130a243bf75b984408c1dff5e0`.
+`releases/amy_omnichord_R20260908T212305` at exact commit
+`53a316068642ece2cb2d2bb0eedb76a039f7da1f`.
 
 The machine authority for those values is `release_inputs.json` beside this
 document. Workflows and the ESP32 preparation script load it through
@@ -34,9 +34,9 @@ clock and sample consumer; a background miniaudio callback cannot steal the
 block whose peak is being asserted.
 
 The ESP32-P4 images use the same Gamma9001 source release. They additionally
-reserve two fixed 128 KiB internal-SRAM banks for the two shared reverb
-processors; the hosted builds allocate those processors through the normal
-AMY host allocator.
+reserve two fixed 128 KiB internal-SRAM banks and compile with
+`AMY_MAX_REVERBS=2`; the hosted builds allocate their two shared aux returns
+through the normal AMY host allocator without that compile-time ceiling.
 
 ## Updating AMY
 
