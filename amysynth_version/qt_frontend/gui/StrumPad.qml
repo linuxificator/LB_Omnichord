@@ -6,11 +6,18 @@ Item {
 
     required property var controller
     property bool ladderMode: false
+    property Item visualOverlay: null
 
     property bool gestureActive: false
 
     function normalizedY(y) {
         return PointerNormalization.verticalUnit(y, root.height)
+    }
+
+    function visualPoint(x, y) {
+        if (root.visualOverlay)
+            return root.mapToItem(root.visualOverlay, x, y)
+        return Qt.point(x, y)
     }
 
     Rectangle {
@@ -66,6 +73,7 @@ Item {
         Migraine {
             id: migraine
 
+            parent: root.visualOverlay ? root.visualOverlay : root
             width: 96
             height: 96
         }
@@ -103,7 +111,8 @@ Item {
                 root.normalizedY(points[0].y)
                 + (root.ladderMode ? 2.0 : 0.0)
             )
-            migraine.beginAt(points[0].x, points[0].y)
+            const visual = root.visualPoint(points[0].x, points[0].y)
+            migraine.beginAt(visual.x, visual.y)
         }
 
         onUpdated: (points) => {
@@ -118,7 +127,8 @@ Item {
                 root.normalizedY(points[0].y)
                 + (root.ladderMode ? 2.0 : 0.0)
             )
-            migraine.moveTo(points[0].x, points[0].y)
+            const visual = root.visualPoint(points[0].x, points[0].y)
+            migraine.moveTo(visual.x, visual.y)
         }
 
         onReleased: (points) => {

@@ -1012,6 +1012,7 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn("controller", section)
 
     def test_migraine_is_a_visual_only_bounded_cached_layer(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
         migraine = (ROOT / "gui" / "Migraine.qml").read_text(encoding="utf-8")
 
@@ -1050,9 +1051,24 @@ class StaticContractTests(unittest.TestCase):
             strum.index("Migraine {") - 120:strum.index("Migraine {")
         ]
         self.assertNotIn("clip: true", migraine_layer)
-        self.assertIn("migraine.beginAt(points[0].x, points[0].y)", strum)
-        self.assertIn("migraine.moveTo(points[0].x, points[0].y)", strum)
+        self.assertIn("property Item visualOverlay: null", strum)
+        self.assertIn("root.mapToItem(root.visualOverlay, x, y)", strum)
+        self.assertIn(
+            "parent: root.visualOverlay ? root.visualOverlay : root",
+            strum,
+        )
+        self.assertIn("migraine.beginAt(visual.x, visual.y)", strum)
+        self.assertIn("migraine.moveTo(visual.x, visual.y)", strum)
         self.assertEqual(strum.count("migraine.release()"), 2)
+
+        content_start = main.index("id: contentArea")
+        content_end = main.index("id: strumVisualOverlay")
+        cached_surface = main[content_start:content_end]
+        self.assertIn("layer.enabled: true", cached_surface)
+        self.assertIn("visualOverlay: strumVisualOverlay", cached_surface)
+        overlay = main[content_end:]
+        self.assertIn("scale: viewport.fittedScale", overlay)
+        self.assertIn("visible: !window.midiScreen", overlay)
 
     def test_parameter_slider_live_edits_do_not_reset_repeater_models(self) -> None:
         app_core = (ROOT / "code" / "app_core.py").read_text(encoding="utf-8")

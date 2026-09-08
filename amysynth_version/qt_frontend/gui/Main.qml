@@ -262,6 +262,13 @@ ApplicationWindow {
         Item {
             id: contentArea
 
+            // The control surface is visually stable while the strum contact
+            // marker moves. Cache it as one texture so a 120 Hz pointer does
+            // not submit every button, label and decoration on every frame.
+            // The moving marker is reparented to strumVisualOverlay below.
+            layer.enabled: true
+            layer.smooth: true
+
             implicitWidth:
                 window.strumX
                 + window.strumWidth
@@ -1551,6 +1558,7 @@ ApplicationWindow {
                     window.totalControlHeight
                 controller: backend
                 ladderMode: window.strumLadderMode
+                visualOverlay: strumVisualOverlay
             }
 
             MidiScreen {
@@ -1566,6 +1574,19 @@ ApplicationWindow {
                 onToggleTuningCouplingRequested:
                     window.tuningCoupled = !window.tuningCoupled
             }
+        }
+
+        Item {
+            id: strumVisualOverlay
+
+            x: contentArea.x
+            y: contentArea.y
+            width: contentArea.implicitWidth
+            height: contentArea.implicitHeight
+            scale: viewport.fittedScale
+            transformOrigin: Item.TopLeft
+            visible: !window.midiScreen
+            z: 20000
         }
     }
 }
