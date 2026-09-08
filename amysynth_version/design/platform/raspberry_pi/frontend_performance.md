@@ -41,6 +41,8 @@ commit `e9c9af9` by GitHub Actions run `34285965445`. Its checksum passed both
 before and after transfer to the Pi. The same artifact also started through
 `--serial --serial-port /dev/serial0 --serial-baud 1000000`, reported the
 physical serial backend and created no bundled local-AMY child process.
+That workflow subsequently completed successfully across the full Linux,
+Raspberry Pi, macOS, Windows, Android/emulator and ESP32-P4 matrix.
 
 The bounded sprite sequence preserves the pointed hollow RGB image, motion and
 half-second fade. Pointer input can remain at 120 Hz while the six already
