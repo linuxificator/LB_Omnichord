@@ -91,6 +91,18 @@ class SharedReverbRoutingTests(unittest.TestCase):
             p4_source,
         )
 
+        windows_service = (
+            ROOT / "packaging/windows/amy_service.c"
+        ).read_text()
+        self.assertIn(
+            f"#define SERVICE_SHARED_AUX_RETURNS {SHARED_REVERB_PROCESSOR_COUNT}",
+            windows_service,
+        )
+        self.assertIn(
+            "config.max_reverb_rooms = SERVICE_SHARED_AUX_RETURNS;",
+            windows_service,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
