@@ -100,6 +100,15 @@ class InstrumentDefaultTests(unittest.TestCase):
             600.0,
         )
 
+        dx7_attacks = {
+            synth.key: self.control_default(synth, "attack_ms")
+            for synth in self.synths
+            if synth.key.startswith("dx7_")
+        }
+        self.assertTrue(dx7_attacks)
+        self.assertLessEqual(max(dx7_attacks.values()), 40.0)
+        self.assertEqual(dx7_attacks["dx7_202"], 40.0)
+
     def test_four_edited_instruments_are_all_serialized_sparse(self) -> None:
         state = SynthState(self.synths, 0)
         changed_keys = ["juno_007", "juno_008", "juno_068", "dx7_143"]

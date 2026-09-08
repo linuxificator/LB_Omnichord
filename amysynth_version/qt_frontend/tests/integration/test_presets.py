@@ -56,6 +56,34 @@ def changed_control_value(control: dict[str, object]) -> float:
 
 
 class PresetIntegrationTests(unittest.TestCase):
+    def test_m12_strings_attack_reset_restores_catalogue_default(self) -> None:
+        """RST must restore an unbound edit in the reported M12 case."""
+
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            row = 0
+            app.action("selectMidiPreset", 12)
+            strings_index = synth_index("STRINGS 8")
+            self.assertEqual(int(app.action("midiSynthIndex", row)), strings_index)
+            default = control_default(strings_index, "attack_ms")
+            edited = 170.0 if abs(default - 170.0) > 1e-6 else 180.0
+            app.action("setMidiSynthControl", row, "attack_ms", edited)
+
+            changed = {
+                item["key"]: item
+                for item in list(app.action("midiCommonControls", row))
+                + list(app.action("midiExtraControls", row))
+            }
+            self.assertAlmostEqual(float(changed["attack_ms"]["value"]), edited)
+
+            app.action("resetMidiSynthRow", row)
+            reset = {
+                item["key"]: item
+                for item in list(app.action("midiCommonControls", row))
+                + list(app.action("midiExtraControls", row))
+            }
+            self.assertAlmostEqual(float(reset["attack_ms"]["value"]), default)
+
     def test_preset_cc_conflict_uses_preset_values_and_visual_handoff(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
@@ -317,6 +345,70 @@ class PresetIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(
                 int(app.query("selectedBassSynthIndex")), stored["bass"]
+            )
+
+    def test_chord_row_rst_restores_all_stored_row_fields(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            expected = tuple(
+                (
+                    int(app.action("chordIndexForRow", row)),
+                    int(app.action("octaveIndexForRow", row)),
+                    str(app.action("inversionLabelForRow", row)),
+                )
+                for row in range(4)
+            )
+            app.action("storeSelectedPreset")
+
+            for row in range(4):
+                app.action("setRowChordType", row, (expected[row][0] + 1) % 8)
+                app.action("setRowOctave", row, (expected[row][1] + 1) % 6)
+                app.action("cycleRowInversion", row)
+            app.action("resetChordRowsToPreset")
+
+            actual = tuple(
+                (
+                    int(app.action("chordIndexForRow", row)),
+                    int(app.action("octaveIndexForRow", row)),
+                    str(app.action("inversionLabelForRow", row)),
+                )
+                for row in range(4)
+            )
+            self.assertEqual(actual, expected)
+
+    def test_midi_rst_restores_entire_stored_row(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            row = 0
+            expected_index = int(app.action("midiSynthIndex", row))
+            expected_channel = int(app.action("midiChannel", row))
+            expected_volume = float(app.action("midiVolume", row))
+            controls = list(app.action("midiCommonControls", row)) + list(
+                app.action("midiExtraControls", row)
+            )
+            expected_attack = float(next(
+                item["value"] for item in controls if item["key"] == "attack_ms"
+            ))
+
+            synth_count = len(list(app.query("midiSynthNames")))
+            app.action("setMidiSynthIndex", row, (expected_index + 1) % synth_count)
+            app.action("cycleMidiChannel", row)
+            app.action("setMidiVolume", row, 0.91)
+            app.action("resetMidiSynthRow", row)
+
+            self.assertEqual(int(app.action("midiSynthIndex", row)), expected_index)
+            self.assertEqual(int(app.action("midiChannel", row)), expected_channel)
+            self.assertAlmostEqual(float(app.action("midiVolume", row)), expected_volume)
+            reset_controls = list(app.action("midiCommonControls", row)) + list(
+                app.action("midiExtraControls", row)
+            )
+            self.assertAlmostEqual(
+                float(next(
+                    item["value"]
+                    for item in reset_controls
+                    if item["key"] == "attack_ms"
+                )),
+                expected_attack,
             )
 
     def test_apg_ldr_mode_is_owned_by_omni_preset(self) -> None:

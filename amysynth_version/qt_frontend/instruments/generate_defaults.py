@@ -202,22 +202,26 @@ def dx7_native(patch: str) -> dict[str, float]:
 
 # The DX7 sliders control an additional ALGO-output ADSR.  These profiles are
 # intentionally broad and conservative so the original six-operator envelopes
-# still provide most of the character.
+# still provide most of the character.  Because this envelope is stacked on
+# top of the patch's native operator envelopes, its attack must remain short:
+# a second slow attack can make ordinary keyboard notes end before the patch is
+# audible.  The native envelopes remain responsible for intentional swells.
+MAX_ADDITIONAL_DX7_ATTACK_MS = 40.0
 DX7_ENVELOPES: list[tuple[tuple[str, ...], tuple[float, float, float, float]]] = [
     (("BRASS",), (40.0, 350.0, 0.88, 250.0)),
-    (("STRINGS",), (350.0, 1200.0, 0.82, 1200.0)),
+    (("STRINGS",), (40.0, 1200.0, 0.82, 1200.0)),
     (("E.PIANO", "PIANO"), (10.0, 3500.0, 0.30, 900.0)),
     (("BASS",), (10.0, 700.0, 0.55, 250.0)),
     (("VIBE",), (10.0, 2600.0, 0.10, 1500.0)),
     (("STEEL DRUM",), (10.0, 1800.0, 0.0, 1000.0)),
     (("CELESTE",), (10.0, 3000.0, 0.08, 1800.0)),
     (("E.ORGAN",), (10.0, 0.0, 1.0, 180.0)),
-    (("PIPES", "SAX"), (70.0, 300.0, 0.90, 300.0)),
+    (("PIPES", "SAX"), (40.0, 300.0, 0.90, 300.0)),
     (("GUITAR",), (10.0, 2200.0, 0.18, 700.0)),
     (("GLOKENSPL", "CHIMES"), (10.0, 5000.0, 0.0, 3000.0)),
     (("XYLOPHONE",), (10.0, 900.0, 0.0, 450.0)),
-    (("CHIME-STRG",), (250.0, 2500.0, 0.45, 2500.0)),
-    (("SHIMMER",), (450.0, 2500.0, 0.75, 3000.0)),
+    (("CHIME-STRG",), (40.0, 2500.0, 0.45, 2500.0)),
+    (("SHIMMER",), (40.0, 2500.0, 0.75, 3000.0)),
 ]
 
 
@@ -227,7 +231,7 @@ def dx7_envelope(label: str) -> dict[str, float]:
         if any(needle in upper for needle in needles):
             attack, decay, sustain, release = values
             return {
-                "attack_ms": attack,
+                "attack_ms": min(attack, MAX_ADDITIONAL_DX7_ATTACK_MS),
                 "decay_ms": decay,
                 "sustain": sustain,
                 "release_ms": release,

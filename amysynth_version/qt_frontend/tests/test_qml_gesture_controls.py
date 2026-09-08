@@ -128,6 +128,74 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_parameter_slider_rebinds_after_reset_model_replacement(self) -> None:
+        """An RST-style model refresh must move the visible native slider."""
+
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 360
+    height: 100
+    visible: true
+    property var controlModel: ({
+        "key": "attack_ms", "label": "Attack", "value": 40,
+        "minimum": 0, "maximum": 3000, "step": 10,
+        "decimals": 0, "unit": "ms", "scale": "linear"
+    })
+
+    ParameterSlider {
+        objectName: "resetParameter"
+        x: 20
+        y: 20
+        width: 320
+        height: 60
+        control: window.controlModel
+        onEdited: (key, value) => {
+            window.controlModel = {
+                "key": "attack_ms", "label": "Attack", "value": value,
+                "minimum": 0, "maximum": 3000, "step": 10,
+                "decimals": 0, "unit": "ms", "scale": "linear"
+            }
+        }
+    }
+}
+""",
+        )
+        parameter = window.findChild(QObject, "resetParameter")
+        slider = parameter.findChild(QObject, "nativeSlider") if parameter else None
+        self.assertIsNotNone(slider)
+        assert slider is not None
+
+        # A backend reset replaces QVariantMap modelData in the same way as
+        # MidiPlayerBackend._emit_state after RST.
+        window.setProperty(
+            "controlModel",
+            {
+                "key": "attack_ms",
+                "label": "Attack",
+                "value": 350.0,
+                "minimum": 0.0,
+                "maximum": 3000.0,
+                "step": 10.0,
+                "decimals": 0,
+                "unit": "ms",
+                "scale": "linear",
+            },
+        )
+        QCoreApplication.processEvents()
+        self.assertAlmostEqual(float(slider.property("value")), 350.0)
+        self.assert_slider_visuals_match_value(slider)
+
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
     def test_strum_migraine_tracks_mouse_without_owning_input_and_fades(self) -> None:
         engine, component, window = self.create_window(
             b"""
