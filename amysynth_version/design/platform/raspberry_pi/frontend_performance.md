@@ -26,13 +26,21 @@ is disabled. This is physical Pi evidence, not a portable CI timing threshold.
 | Published AppImage before isolation | 101.3% | 25.7% | 69.3% | 10.0% |
 | Same source revision before isolation | 90.1% | 23.4% | 61.2% | 9.5% |
 | Static UI cached, moving vector layer separate | 67.3% | 40.0% | 19.1% | 9.9% |
-| Six pre-rendered migraine frames | 58.0% | 33.6% | 16.2% | 10.5% |
+| Final source, six pre-rendered frames | 58.9% | 34.0% | 16.7% | 10.5% |
+| GitHub-built aarch64 AppImage | 58.5% | 33.4% | 16.2% | 11.2% |
 
-With no pointer input, the final source frontend used about 2.3% and the
-continuously rendering AMY service about 8.4%. The published-versus-source
+With no pointer input, the final AppImage frontend used about 2.6% and the
+continuously rendering AMY service about 8.0%. The published-versus-source
 difference is retained rather than hidden; the exact-source comparison proves
 that the dominant improvement comes from the QML change, not from debug-log or
 packaging differences.
+
+The packaged measurement used
+`LB_Omnichord.R20260908222746.RaspberryPi-aarch64.AppImage`, produced from
+commit `e9c9af9` by GitHub Actions run `34285965445`. Its checksum passed both
+before and after transfer to the Pi. The same artifact also started through
+`--serial --serial-port /dev/serial0 --serial-baud 1000000`, reported the
+physical serial backend and created no bundled local-AMY child process.
 
 The bounded sprite sequence preserves the pointed hollow RGB image, motion and
 half-second fade. Pointer input can remain at 120 Hz while the six already
