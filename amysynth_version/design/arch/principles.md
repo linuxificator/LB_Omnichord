@@ -37,6 +37,19 @@ dependency.
 
 New abstractions are added only when they reduce coupling or prevent regressions.
 
+## Extend existing AMY concepts first
+
+AMY-side integration work must reuse existing AMY concepts, data structures,
+APIs and render paths wherever they can express the required behavior. A new
+parallel subsystem is justified only when the existing design demonstrably
+cannot provide the required semantics or realtime performance.
+
+In particular, routing and effect inputs should be expressed as variants of
+the existing bus summation model. Shared reverb inputs use one reusable
+weighted subset-mix operation; they must not grow a separate application-
+specific mixer architecture. Platform acceleration may replace the mix
+kernel, but not its portable semantics.
+
 ## Code-quality non-regression
 
 Bug fixes must preserve the architectural and code-quality improvements already

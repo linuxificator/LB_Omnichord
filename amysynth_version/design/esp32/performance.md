@@ -81,6 +81,20 @@ Stored inactive definitions add negligible realtime load; active events and
 sounding synthesis determine it. Keep the 40-execution hard limit distinct
 from the conservative CPU envelope above.
 
+## Classic bus-effect control measurement
+
+An isolated build of the original P4 AMY path measured the same six EQ and
+five chorus chains at 495 us per block. The current implementation performs
+501 us of summed effect work but completes the parallel bus stage in 311 us;
+its complete fill phase is 493 us versus 672 us for the old serial path. Both
+runs used nine simultaneous instruments and had zero deadline misses.
+
+This proves that the remaining half millisecond is the established AMY effect
+cost, not subset-mixer overhead. It also proves that the subset path reduces
+wall time without using silent-effect shortcuts. See
+[`bus_effect_baseline.md`](bus_effect_baseline.md) for the source baseline,
+test load, component timings and interpretation.
+
 ## Rejected paths
 
 - Four per-bus reverbs: unnecessary and too costly.
