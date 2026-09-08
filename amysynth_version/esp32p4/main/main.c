@@ -22,6 +22,7 @@
 #include "lp_core_main.h"
 
 #include "lp_core/amy_uart_shared.h"
+#include "reverb_pie_bench.h"
 
 #ifdef GAMMA9001
 extern const int16_t gamma9001_pcm_data[];
@@ -381,6 +382,8 @@ void app_main(void)
         abort();
     }
 
+    reverb_pie_bench_run();
+
 
     /*
      * ----------------------------------------------------
@@ -426,6 +429,18 @@ void app_main(void)
     config.max_sequence_executions =
         CONFIG_OMNICHORD_P4_MAX_SEQUENCE_EXECUTIONS;
 
+    // Preserve independent distortion/EQ/chorus/echo on all eleven source
+    // buses, but mix their weighted sends into two reverb rooms. Processing
+    // two shared networks once per block is both the conventional aux-send
+    // topology and bounded enough for the ESP32-P4 real-time budget.
+    int16_t reverb_group_for_bus[CONFIG_OMNICHORD_P4_MAX_BUSES];
+    for (int bus = 0; bus < CONFIG_OMNICHORD_P4_MAX_BUSES; ++bus) {
+        reverb_group_for_bus[bus] =
+            bus < CONFIG_OMNICHORD_P4_REVERB_GROUP_SPLIT_BUS ? 0 : 1;
+    }
+    config.max_reverb_groups = 2;
+    config.reverb_group_for_bus = reverb_group_for_bus;
+
     /* Large persistent pools live in external RAM. DMA/render scratch and
      * FreeRTOS stacks remain internal. */
     const uint32_t external_ram =
@@ -433,9 +448,15 @@ void app_main(void)
     const uint32_t internal_ram =
         MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
     config.ram_caps_events = external_ram;
-    config.ram_caps_oscs = external_ram;
-    config.ram_caps_synth = external_ram;
+    /* Oscillator and modulation state is touched repeatedly for every sample.
+     * Keeping it in PSRAM makes a real Juno/DX7 chord miss the 128-sample
+     * render deadline even though bulk sequence/sample storage fits there
+     * well.  Reserve internal RAM for this render-hot state. */
+    config.ram_caps_oscs = internal_ram;
+    config.ram_caps_synth = internal_ram;
     config.ram_caps_delay = external_ram;
+    config.ram_caps_reverb_early = internal_ram;
+    config.ram_caps_reverb_feedback = external_ram;
     config.ram_caps_sample = external_ram;
     config.ram_caps_sysex = external_ram;
     config.ram_caps_block = internal_ram;
@@ -462,6 +483,9 @@ void app_main(void)
     amy_start(config);
 
     printf("AMY running\n");
+    printf("Internal RAM after AMY start: free=%u largest=%u bytes\n",
+           (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+           (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
 
 
     /*

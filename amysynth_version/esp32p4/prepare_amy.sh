@@ -48,6 +48,7 @@ idf_component_register(
         "src/custom.c"
         "src/cv_trigger.c"
         "src/delay.c"
+        "src/delay_esp32p4.S"
         "src/envelope.c"
         "src/examples.c"
         "src/filters.c"
@@ -75,6 +76,7 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     AMY_ESP_I2S_DMA_FRAME_NUM=64
     AMY_WAVETABLE=1
     GAMMA9001=1
+    AMY_ESP32P4_PIE_REVERB=1
 )
 
 target_compile_options(${COMPONENT_LIB} PRIVATE
