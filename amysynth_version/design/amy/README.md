@@ -7,6 +7,8 @@ Last verified: 2026-09-08
 - `interface.md` owns the frontend/wire boundary.
 - `sequencer.md` consolidates the current reusable-sequence implementation,
   compatibility and realtime publication model.
+- `aux_returns.md` records generic shared effect routing and the P4-specific
+  built-in-reverb resource limit.
 - `maintenance.md` records independently discovered AMY defects and fixes.
 - `../esp32/` owns target-specific performance, reverb and firmware evidence.
 

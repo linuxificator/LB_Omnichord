@@ -111,6 +111,7 @@ class FirmwareContractTests(unittest.TestCase):
         source = (ROOT / "main/main.c").read_text()
         defaults = (ROOT / "sdkconfig.defaults").read_text()
         package = (ROOT / "package_firmware.sh").read_text()
+        prepare = (ROOT / "prepare_amy.sh").read_text()
 
         self.assertIn("AMY_REVERB_BANK_BYTES (128U * 1024U)", source)
         self.assertIn("AMY_REVERB_BANK_COUNT 2U", source)
@@ -120,6 +121,7 @@ class FirmwareContractTests(unittest.TestCase):
         self.assertNotIn("= heap_caps_aligned_alloc", source)
         self.assertIn("config.reverb_room_memory = s_amy_reverb_banks", source)
         self.assertIn("config.reverb_room_memory_bytes = AMY_REVERB_BANK_BYTES", source)
+        self.assertIn("AMY_MAX_REVERBS=2", prepare)
         self.assertIn("CONFIG_CACHE_L2_CACHE_SIZE=0x20000", defaults)
         self.assertIn("reserved_region_amy_reverb_room_0", package)
         self.assertIn("reserved_region_amy_reverb_room_1", package)
