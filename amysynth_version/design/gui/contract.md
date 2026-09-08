@@ -196,13 +196,14 @@ only their passive section background.
 
 The OMNI strum's `Migraine` contact feedback is one portable visual component;
 there is no Raspberry-Pi-specific appearance or fallback. It must track mouse
-and touch input at a 120 Hz display rate without coupling every pointer event to
-new path geometry. The pointed hollow RGB outline is cached as one render
-layer, contains no per-edge particle-emitter fan-out, and advances its subtle
+and touch input at a 120 Hz display rate without coupling pointer events to
+runtime vector-path construction or tessellation. The pointed hollow RGB
+outline uses six pre-rendered SVG sprite frames and advances its subtle
 shape/color-registration phase at no more than 30 Hz. Position tracking and
 the half-second release fade remain lightweight scene-graph transform/opacity
-changes. This rendering budget is part of the behavior contract because UI
-load must not consume the audio service's scheduling headroom.
+changes. The complete static control surface is cached separately from this
+moving overlay. This rendering budget is part of the behavior contract because
+UI load must not consume the audio service's scheduling headroom.
 
 `Main.qml` remains the top-level window/layout facade, while complete title and
 strum-note-guide sections live in `OmniTitleSection.qml` and

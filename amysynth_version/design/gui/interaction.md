@@ -18,9 +18,10 @@ Controller indicators use explicit state, not color inference. A single click
 starts learning when free and unlinks when bound. Musical keyboard Note On/Off
 messages are never treated as controller buttons.
 
-The strum `Migraine` visual is transparent to input, cached, contains no
-particle-emitter fan-out and updates its shape at a bounded 30 Hz while pointer
-input may run at 120 Hz. Its release fade remains visual-only. Shared tests
-exercise mouse and touch semantics and the render-cost contract on every
-package toolchain; physical GPU/audio acceptance remains platform evidence.
-
+The strum `Migraine` visual is transparent to input, uses a bounded set of
+pre-rendered frames, contains no particle-emitter fan-out or runtime path
+tessellation, and updates its shape at a bounded 30 Hz while pointer input may
+run at 120 Hz. Its release fade remains visual-only. Shared tests exercise
+mouse and touch semantics, preload every sprite and enforce the render-cost
+structure on every package toolchain; physical GPU/audio acceptance remains
+platform evidence.
