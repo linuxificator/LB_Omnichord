@@ -32,8 +32,11 @@ from drum_patterns import DrumEvent, DrumPatternCatalog, load_drum_pattern_catal
 
 SAMPLE_RATE = int(amy.AMY_SAMPLE_RATE)
 BLOCK_SIZE = int(amy.AMY_BLOCK_SIZE)
-MAX_ABSOLUTE_LOUDNESS_DELTA_LU = 5.25
-MAX_PEAK_DELTA_DB = 4.5
+# The original measured-output limits plus the maximum intentional integration
+# correction.  The integration contract below tests the direction explicitly;
+# these remain broad transient/clipping guardrails rather than loudness targets.
+MAX_ABSOLUTE_LOUDNESS_DELTA_LU = 8.25
+MAX_PEAK_DELTA_DB = 7.5
 
 
 def _rhythm_tempos() -> dict[str, float]:
@@ -144,10 +147,18 @@ def build_report() -> dict[str, object]:
                 )
                 base_metrics = audio_metrics(base, SAMPLE_RATE)
                 fill_metrics = audio_metrics(rendered_fill, SAMPLE_RATE)
+                integrated_hit_weight = sum(
+                    event.velocity / 127.0 for event in fill.events
+                )
                 fills[fill.fill_id] = {
                     "duration_ticks": fill.duration_ticks,
                     "event_count": len(fill.events),
                     "output_gain": fill.output_gain,
+                    "integrated_hit_weight": round(integrated_hit_weight, 9),
+                    "levelled_hit_weight": round(
+                        integrated_hit_weight * fill.output_gain,
+                        9,
+                    ),
                     "base": base_metrics,
                     "fill": fill_metrics,
                     "loudness_delta_lu": round(
@@ -199,8 +210,9 @@ def validate_report(report: dict[str, object]) -> list[str]:
                 issues.append(f"{fill_id}: rendered {clipped} clipped samples")
 
     # These reported regressions are useful sentinels in addition to the broad
-    # catalogue limits: Funk F3 was conspicuously hot, while Breakbeat F1/F5
-    # sat at opposite ends of that rhythm's fill range.
+    # catalogue limits. Funk F3 was conspicuously hot. Breakbeat and Garage
+    # 2-step proved that equal mean loudness does not make short and dense fills
+    # equally salient; their gains must now move in opposite directions.
     funk_f3 = flattened.get("drum_fill_0093_funk")
     if funk_f3 and (
         abs(float(funk_f3["loudness_delta_lu"])) > 3.0
@@ -210,14 +222,21 @@ def validate_report(report: dict[str, object]) -> list[str]:
     breakbeat_f1 = flattened.get("drum_fill_0146_breakbeat")
     breakbeat_f5 = flattened.get("drum_fill_0150_breakbeat")
     if breakbeat_f1 and breakbeat_f5:
-        spread = abs(
-            float(breakbeat_f1["loudness_delta_lu"])
-            - float(breakbeat_f5["loudness_delta_lu"])
-        )
-        if spread > 2.0:
-            issues.append(
-                f"Breakbeat F1/F5 loudness spread {spread:.3f} LU exceeds 2 LU"
-            )
+        if not (
+            float(breakbeat_f1["output_gain"]) > 0.72
+            and float(breakbeat_f5["output_gain"]) < 0.72
+        ):
+            issues.append("Breakbeat F1/F5 integration correction is reversed")
+    garage_f1 = flattened.get("drum_fill_0141_garage_2step")
+    garage_f4 = flattened.get("drum_fill_0144_garage_2step")
+    garage_f5 = flattened.get("drum_fill_0145_garage_2step")
+    if garage_f1 and garage_f4 and garage_f5:
+        if not (
+            float(garage_f1["output_gain"])
+            > float(garage_f4["output_gain"])
+            > float(garage_f5["output_gain"])
+        ):
+            issues.append("Garage 2-step F1/F4/F5 integration order regressed")
     return issues
 
 

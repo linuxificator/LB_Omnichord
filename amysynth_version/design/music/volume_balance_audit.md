@@ -84,25 +84,38 @@ The resulting data policy is intentionally small:
 - a global fill gain of `0.72` (-2.85 dB) creates headroom;
 - 38 sparse per-fill multipliers correct measured within-style loudness or
   transient outliers;
+- a general correction compares the total normalized hit velocity within each
+  rhythm's F1--F5 family, keeps its median unchanged, raises lighter fills and
+  lowers denser fills, with either adjustment capped at 3 dB;
 - event velocities, timing and instrument choices remain canonical data;
 - normal drum activity is unchanged.
 
-After correction, the complete catalogue has median delta +0.864 LU, p10
--3.938 LU, p90 +4.502 LU, and no clipped samples. The extreme loudness deltas
-are -5.204 and +5.188 LU and the maximum peak delta is +4.369 dB. These bounds
-deliberately allow musically meaningful variation between sparse and dense
-fills.
+The integration correction is necessary because average loudness over a fill
+window can rate a brief F1 transient and a long F5 sequence similarly, even
+though the accumulated sequence is much more prominent in musical context.
+Summed hit velocity is deliberately only a bounded correction proxy: the
+native render measurements and sparse exceptions continue to account for the
+very different spectra and envelopes of kicks, snares, toms and cymbals.
+
+After correction, the complete catalogue has median delta +1.131 LU, p10
+-4.001 LU, p90 +3.988 LU, and no clipped samples. The extreme loudness deltas
+are -7.294 and +8.064 LU and the maximum peak delta is +7.107 dB. These wider
+instantaneous bounds are expected after the bounded integration correction;
+clipping and correction direction are enforced independently.
 
 The reported examples now measure as follows against their replaced segment:
 
 | Fill | Loudness delta | Peak delta |
 | --- | ---: | ---: |
-| Funk F3 | +2.134 LU | +0.846 dB |
-| Breakbeat F1 | -0.358 LU | -0.600 dB |
-| Breakbeat F5 | -1.669 LU | +2.018 dB |
+| Funk F3 | -0.868 LU | -2.154 dB |
+| Breakbeat F1 | +2.643 LU | +2.403 dB |
+| Breakbeat F5 | -4.578 LU | -0.892 dB |
+| Garage 2-step F1 | +2.440 LU | +3.233 dB |
+| Garage 2-step F5 | -2.746 LU | -0.976 dB |
 
-`tests/drum_fill_balance.py --check` enforces the catalogue bounds plus the
-Funk F3 and Breakbeat F1/F5 regression cases:
+`tests/drum_fill_balance.py --check` enforces catalogue loudness, peak and
+clipping guardrails plus Funk F3 and the correction direction for Breakbeat
+and Garage 2-step. Unit tests prove the general median and +/-3 dB rules:
 
 ```sh
 ../../.venv/bin/python tests/drum_fill_balance.py --check \

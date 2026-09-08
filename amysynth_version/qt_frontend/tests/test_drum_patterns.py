@@ -22,6 +22,7 @@ from amy_transport import (  # noqa: E402
 from drum_patterns import (  # noqa: E402
     FILL_DENSITY_BARS,
     KIT_FAMILIES,
+    _integrated_fill_gains,
     load_drum_pattern_catalog,
 )
 from config_loader import load_resolved_amy_config  # noqa: E402
@@ -339,19 +340,65 @@ class DrumPatternTests(unittest.TestCase):
                     fill.fill_id,
                 )
 
-    def test_fill_output_balance_is_global_with_sparse_measured_exceptions(self) -> None:
+    def test_fill_output_balance_combines_headroom_exceptions_and_integration(self) -> None:
         fills = {
             fill.fill_id: fill
             for rhythm in self.catalog.rhythms.values()
             for fill in rhythm.fills
         }
         self.assertEqual(len(fills), 270)
-        self.assertAlmostEqual(fills["drum_fill_0093_funk"].output_gain, 0.72)
+        maximum_boost = 10.0 ** (3.0 / 20.0)
+        maximum_cut = 10.0 ** (-3.0 / 20.0)
+        self.assertAlmostEqual(
+            fills["drum_fill_0093_funk"].output_gain,
+            0.72 * maximum_cut,
+        )
         self.assertAlmostEqual(
             fills["drum_fill_0146_breakbeat"].output_gain,
-            0.72 * 1.529,
+            0.72 * 1.529 * maximum_boost,
         )
-        self.assertAlmostEqual(fills["drum_fill_0150_breakbeat"].output_gain, 0.72)
+        self.assertAlmostEqual(
+            fills["drum_fill_0150_breakbeat"].output_gain,
+            0.5151496062992126,
+        )
+
+        garage = [
+            fills[f"drum_fill_{index:04d}_garage_2step"]
+            for index in range(141, 146)
+        ]
+        self.assertAlmostEqual(garage[3].output_gain, 0.72)
+        self.assertGreater(garage[0].output_gain, garage[3].output_gain)
+        self.assertLess(garage[4].output_gain, garage[3].output_gain)
+        self.assertAlmostEqual(
+            garage[4].output_gain,
+            0.72 * (10.74803149606299 / 14.842519685039374),
+        )
+
+    def test_fill_integration_balance_keeps_median_and_limits_both_directions(self) -> None:
+        def fill(fill_id: str, velocities: list[int]) -> dict[str, object]:
+            return {
+                "fill_id": fill_id,
+                "rhythm_id": "test",
+                "timing": {
+                    "events": [{"velocity": velocity} for velocity in velocities]
+                },
+            }
+
+        gains = _integrated_fill_gains(
+            [
+                fill("very_light", [20]),
+                fill("light", [64]),
+                fill("median", [100]),
+                fill("dense", [100, 100]),
+                fill("very_dense", [127, 127, 127]),
+            ],
+            maximum_adjustment_db=3.0,
+        )
+        self.assertAlmostEqual(gains["median"], 1.0)
+        self.assertAlmostEqual(gains["very_light"], 10.0 ** (3.0 / 20.0))
+        self.assertGreater(gains["light"], 1.0)
+        self.assertAlmostEqual(gains["very_dense"], 10.0 ** (-3.0 / 20.0))
+        self.assertLess(gains["dense"], 1.0)
 
     def test_every_kit_resolves_without_changing_timing(self) -> None:
         for rhythm in self.catalog.rhythms.values():

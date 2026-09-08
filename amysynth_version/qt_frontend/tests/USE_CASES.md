@@ -872,9 +872,13 @@ regression proves that hold promotion stops only future starts and emits no imme
   remain canonical musical data.
 - A separate fill-output catalogue applies common headroom and sparse measured
   exceptions only while fill hit bodies are compiled.
+- Within every five-fill rhythm family, total normalized hit velocity is
+  balanced around the family median. Light fills are raised, dense fills are
+  lowered, and either direction is limited to 3 dB.
 - Native Gamma9001 CI renders all 270 fills against the equal-duration ending
-  of activity level 3. It enforces loudness/peak bounds and specifically guards
-  Funk F3 and the Breakbeat F1/F5 spread.
+  of activity level 3. It enforces loudness/peak/clipping bounds and
+  specifically guards Funk F3 plus the intended Breakbeat and Garage 2-step
+  F1/F5 correction direction.
 - Normal percussion activity output is unchanged by fill gain.
 
 ### TUNING — all note-producing paths follow the selected tuning

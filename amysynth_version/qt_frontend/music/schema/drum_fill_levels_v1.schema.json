@@ -1,11 +1,23 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["schema_version", "global_gain", "per_fill"],
+  "required": ["schema_version", "global_gain", "integration_balance", "per_fill"],
   "additionalProperties": false,
   "properties": {
     "schema_version": {"const": 1},
     "global_gain": {"type": "number", "exclusiveMinimum": 0, "maximum": 2},
+    "integration_balance": {
+      "type": "object",
+      "required": ["maximum_adjustment_db"],
+      "additionalProperties": false,
+      "properties": {
+        "maximum_adjustment_db": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 6
+        }
+      }
+    },
     "per_fill": {
       "type": "object",
       "additionalProperties": {

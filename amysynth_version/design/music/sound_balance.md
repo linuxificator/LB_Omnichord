@@ -155,10 +155,15 @@ because accompaniment gates and patch envelopes dominate that comparison.
 
 Gamma9001 fills have a separate data-owned output gain in
 `music/drums/drum_fill_levels.json`. A common `0.72` factor provides transient
-headroom; sparse per-fill multipliers correct measured within-style outliers
-without rewriting event velocities, instrumentation or dynamics. The receiver
-applies that factor only while compiling fill hit bodies, so normal activity
-patterns and the canonical fill dataset retain their meaning. See
+headroom; sparse per-fill multipliers correct measured within-style outliers.
+A general per-rhythm integration correction also compares the sum of hit
+velocities across each F1--F5 family: it raises light fills, lowers dense fills,
+keeps the family median unchanged and is capped at +/-3 dB. This avoids using
+mean loudness alone, which understates how strongly a long sequence of
+transients is perceived. None of these corrections rewrites event velocities,
+instrumentation or dynamics. The receiver applies the resulting factor only
+while compiling fill hit bodies, so normal activity patterns and the canonical
+fill dataset retain their meaning. See
 [`volume_balance_audit.md`](volume_balance_audit.md) for measurements and
 acceptance bounds.
 
