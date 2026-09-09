@@ -38,7 +38,13 @@ range (`0..16383`) for numeric mapping. This makes a centered pitch-bend wheel
 or encoder neutral, while movement away from center can be learned and mapped to
 any continuous control with higher resolution than CC.
 
-CC-style controller buttons use value zero as released and any nonzero value as
+CC-style controller buttons transmit only the endpoint pair 0 (released) and
+127 (pressed). After both endpoints have been observed without an intermediate
+value, the indicator is automatically rendered as a pushbutton while retaining
+its ordinary `(channel, controller)` CC identity and preset format. Seeing any
+intermediate value permanently classifies that source as a rotary control for
+the current application run, even if it later visits both endpoints. Bound
+button actions continue to treat zero as released and any nonzero value as
 pressed. Musical Note On/Off events are not button-learn sources because the
 MIDI protocol does not reliably distinguish a keyboard key from a controller pad
 that happens to transmit notes. If a specific device needs note-transmitting
@@ -52,7 +58,8 @@ current width. Every visible indicator preserves the existing `74x68` hit
 target and shows its source label and state LED. CC sources render as F06-style
 studio-console potentiometers rotating across 270 degrees. Pitch Bend renders
 as an F06-style encoder with a center detent and 14-bit input mapped to display
-travel. CC sources that are bound to application button targets render as
+travel. Endpoint-only CC sources and CC sources that are bound to application
+button targets render as
 illuminated F06-style pushbuttons: pressed buttons light and depress,
 released/tap buttons return to the idle button surface.
 

@@ -240,6 +240,11 @@ installation failed to show or release chord-key interaction correctly.
 - Repeated identical values produce no activity.
 - A later changed value creates/updates the indicator and its LRU timestamp.
 - Raw running-status CC bytes must satisfy the same behavior.
+- Realtime Clock bytes produce neither application events nor MIDI-tech LED
+  activity, including when interleaved inside a valid channel message.
+- A CC source observed using only both endpoints 0 and 127 is presented as a
+  pushbutton. One intermediate value permanently makes it a rotary source for
+  that run, so a normal knob visiting its endpoints is not misclassified.
 
 **MIDI-CC-02 — visible capacity, LRU and outgoing animation**
 

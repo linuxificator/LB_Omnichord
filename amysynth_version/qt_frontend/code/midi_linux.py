@@ -109,8 +109,8 @@ class LinuxRawMidiReader:
                                 pass
                             streams.pop(descriptor, None)
                             continue
-                        self._emitter.activity(self._technology.key)
-                        self._parser.feed(data, streams[descriptor])
+                        if self._parser.feed(data, streams[descriptor]):
+                            self._emitter.activity(self._technology.key)
                     if not streams:
                         break
             finally:
@@ -309,8 +309,8 @@ class AlsaSequencerMidiReader:
                     finally:
                         library.snd_seq_free_event(event_pointer)
                     if size > 0:
-                        self._emitter.activity(self._technology.key)
-                        self._parser.feed(buffer.raw[:size], state)
+                        if self._parser.feed(buffer.raw[:size], state):
+                            self._emitter.activity(self._technology.key)
                     pending -= 1
         finally:
             self._available = False

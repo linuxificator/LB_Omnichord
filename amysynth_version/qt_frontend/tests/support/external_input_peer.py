@@ -23,9 +23,14 @@ OSC_MESSAGES: tuple[tuple[str, bool | float], ...] = (
 )
 MIDI_BYTES = bytes(
     (
+        # Controllers may send clock continuously. It is intentionally noise
+        # to the application parser and technology-activity indicator.
+        0xF8,
+        0xF8,
         0xB0,
         119,
         24,
+        0xF8,
         119,
         96,
         0x90,

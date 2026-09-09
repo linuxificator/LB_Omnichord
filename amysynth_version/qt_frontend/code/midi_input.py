@@ -185,10 +185,18 @@ class MidiByteStreamParser:
             return 2
         return 0
 
-    def feed(self, data: bytes, state: MidiByteStreamState) -> None:
+    def feed(self, data: bytes, state: MidiByteStreamState) -> bool:
+        """Parse bytes and report whether they contained application input.
+
+        MIDI realtime bytes, including Clock, may occur between any two data
+        bytes.  They neither disturb running status nor count as user input.
+        Native readers use the return value to keep clock-only traffic from
+        pulsing their activity indicator.
+        """
         running = state.running_status
         pending = list(state.pending)
         sysex = state.in_sysex
+        accepted = False
 
         for byte in data:
             if byte >= 0xF8:
@@ -229,6 +237,7 @@ class MidiByteStreamParser:
                     velocity,
                     velocity > 0,
                 )
+                accepted = True
             elif high == 0x80:
                 note, velocity = payload
                 self._emitter.note(
@@ -238,6 +247,7 @@ class MidiByteStreamParser:
                     velocity,
                     False,
                 )
+                accepted = True
             elif high == 0xB0:
                 controller, value = payload
                 self._emitter.control(
@@ -246,6 +256,7 @@ class MidiByteStreamParser:
                     controller,
                     value,
                 )
+                accepted = True
             elif high == 0xE0:
                 lsb, msb = payload
                 self._emitter.control(
@@ -254,7 +265,9 @@ class MidiByteStreamParser:
                     PITCH_BEND_CONTROLLER,
                     int(lsb) | (int(msb) << 7),
                 )
+                accepted = True
 
         state.running_status = running
         state.pending = bytes(pending)
         state.in_sysex = sysex
+        return accepted

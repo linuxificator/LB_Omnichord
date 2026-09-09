@@ -39,14 +39,19 @@ are merged. This prevents one device's partial running-status message from
 corrupting another device's input. The merged events parse Note On, Note Off,
 velocity-zero Note Off, Control Change, Pitch Bend and running status. System
 real-time bytes are ignored; SysEx and Program Change are not application
-inputs. A channel-status byte by itself creates no indicator. The first value
+inputs. MIDI Clock (`0xF8`) therefore neither creates an application event nor
+pulses the input-technology activity LED, even when a connected device sends it
+continuously. A channel-status byte by itself creates no indicator. The first value
 seen for each channel/controller pair establishes a baseline; only a later,
 different value counts as control movement. Pitch Bend is the exception to the
 zero-baseline rule: its baseline is the MIDI center value, so moving a spring
 loaded wheel or encoder away from center creates an indicator immediately.
 This prevents controller-state snapshots sent during a VMPK channel switch from
 creating indicators. Actual CC, Pitch Bend and MIDI-button changes drive the
-left-to-right, capacity-aware indicators.
+left-to-right, capacity-aware indicators. An ordinary CC is presented as a
+pushbutton once both endpoint values 0 and 127 have been observed without any
+intermediate value. Observing an intermediate value permanently classifies
+that source as a rotary control for the current run.
 Changed MIDI control sources also enter the explicit MIDI-learn system defined
 in `midi_control.md`. Unbound controls remain display-only. Bound continuous
 sources map to one numeric target and still apply through the target's normal
