@@ -352,6 +352,61 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertEqual(mapped, binding)
         self.assertTrue(state.is_target_bound(binding))
 
+    def test_soft_button_binding_acts_on_its_first_press(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = {
+            "id": "omni:rhythm-toggle",
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle",
+        }
+        state.replace_screen_bindings(
+            "omni",
+            [((16, 115), binding, True)],
+            now=1.0,
+        )
+
+        changed, mapped, key = state.observe(16, 115, 127, now=2.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(mapped, binding)
+        self.assertEqual(key, (16, 115))
+        self.assertTrue(state.is_target_bound(binding))
+
+    def test_soft_button_release_still_establishes_a_quiet_baseline(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = {
+            "id": "omni:chord-gate",
+            "screen": "omni",
+            "kind": "button",
+            "action": "chord_gate",
+        }
+        state.replace_screen_bindings(
+            "omni",
+            [((16, 117), binding, True)],
+            now=1.0,
+        )
+
+        changed, mapped, key = state.observe(16, 117, 0, now=2.0)
+        self.assertFalse(changed)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+
+        changed, mapped, key = state.observe(16, 117, 127, now=3.0)
+        self.assertTrue(changed)
+        self.assertEqual(mapped, binding)
+        self.assertEqual(key, (16, 117))
+
+    def test_unknown_cc_first_packet_remains_only_a_baseline(self) -> None:
+        state = MidiControlState(capacity=2)
+
+        changed, mapped, key = state.observe(1, 99, 127, now=1.0)
+
+        self.assertFalse(changed)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+        self.assertEqual(state.values[(1, 99)], 127)
+
     def test_screen_specific_bindings_round_trip(self) -> None:
         state = MidiControlState(capacity=4)
         midi_target = target("midi")

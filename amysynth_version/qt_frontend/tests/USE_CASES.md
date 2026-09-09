@@ -434,7 +434,9 @@ installation failed to show or release chord-key interaction correctly.
 - Factory mappings are dormant `activate_on_input` declarations. Loading a
   preset without the controller attached neither shows green bindings nor
   protects target values. The first genuine matching event activates the
-  binding and applies immediately.
+  binding and applies immediately. A declared pushbutton's first nonzero CC
+  packet after startup is a genuine press and performs its action; an initial
+  release and the first packet from an unknown ordinary CC remain baselines.
 - Chord-type wheels behave like numeric sliders: direct wheel, group UP/DWN or
   RST interaction releases their binding before applying the screen edit, and
   later source movement restores it only when the selected preset declares it.

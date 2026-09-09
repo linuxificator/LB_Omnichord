@@ -118,9 +118,11 @@ class PresetIntegrationTests(unittest.TestCase):
             )
 
             self.assertFalse(bool(app.query("rhythmRunning")))
-            app.action("injectMidiControl", 16, 115, 0)
             app.action("injectMidiControl", 16, 115, 127)
-            self.assertTrue(bool(app.query("rhythmRunning")))
+            self.assertTrue(
+                bool(app.query("rhythmRunning")),
+                "the first factory Play press after startup was only a baseline",
+            )
             app.action("injectMidiControl", 16, 115, 0)
             app.action("toggleRhythm")
             self.assertFalse(bool(app.query("rhythmRunning")))
@@ -151,9 +153,12 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(states[(16, 115)], "bound")
 
             self.assertNotEqual(int(app.query("chordGateState")), 1)
-            app.action("injectMidiControl", 16, 117, 0)
             app.action("injectMidiControl", 16, 117, 127)
-            self.assertEqual(int(app.query("chordGateState")), 1)
+            self.assertEqual(
+                int(app.query("chordGateState")),
+                1,
+                "the first factory Chord press after startup was only a baseline",
+            )
 
             app.action("pressChord", 0, 0)
             app.action("releaseChord", 0, 0)

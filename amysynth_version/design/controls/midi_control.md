@@ -149,8 +149,12 @@ does not become green, protect a value or acquire target authority merely
 because its preset was loaded. The first genuine event from that source binds
 and applies immediately. This keeps the application fully usable when the
 named controller is absent while retaining ordinary MIDI identities that work
-with any compatible control surface. User-learned bindings remain immediately
-active unless they explicitly opt into this policy.
+with any compatible control surface. For a declared pushbutton, a nonzero CC
+received as its first packet is itself a genuine press and performs the action;
+it is not consumed as a continuous-controller baseline. An initial zero packet
+remains a quiet released baseline, and undeclared CC sources retain the normal
+first-value baseline rule. User-learned bindings remain immediately active
+unless they explicitly opt into this policy.
 
 Unlinking always makes the controller visible when capacity allows.
 The blue state is an inactivity notice, not a latch: the next genuine CC

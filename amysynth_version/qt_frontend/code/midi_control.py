@@ -325,6 +325,14 @@ class MidiControlState:
         if previous is None:
             if source_type == "pitch_bend":
                 previous = self.default_value_for_key(key)
+            elif source_type == "cc" and self._is_declared_button_press(
+                key,
+                value,
+            ):
+                # A known pushbutton's first press is an action, not a
+                # controller snapshot. Its declared target supplies the
+                # semantic information that an unbound CC cannot provide.
+                previous = 0
             elif source_type in ("note_button", "osc_button"):
                 if value <= 0:
                     return False, None, None
@@ -357,16 +365,35 @@ class MidiControlState:
     def _preset_target_for_key(
         self,
         key: ControlKey,
-    ) -> tuple[str, dict[str, Any]] | None:
+    ) -> tuple[str, dict[str, Any], bool] | None:
         candidates = [
-            (self._preset_screen_revision.get(screen, -1), screen, target)
+            (
+                self._preset_screen_revision.get(screen, -1),
+                screen,
+                target,
+                bool(self._preset_activation_by_screen.get(screen, {}).get(key)),
+            )
             for screen, bindings in self._preset_bindings_by_screen.items()
             if (target := bindings.get(key)) is not None
         ]
         if not candidates:
             return None
-        _revision, screen, target = max(candidates, key=lambda item: item[0])
-        return screen, copy.deepcopy(target)
+        _revision, screen, target, activate_on_input = max(
+            candidates,
+            key=lambda item: item[0],
+        )
+        return screen, copy.deepcopy(target), activate_on_input
+
+    def _is_declared_button_press(self, key: ControlKey, value: int) -> bool:
+        if value <= 0:
+            return False
+        target = self.bindings.get(key)
+        if target is None:
+            preset_binding = self._preset_target_for_key(key)
+            if preset_binding is None or not preset_binding[2]:
+                return False
+            target = preset_binding[1]
+        return str(target.get("kind", "")) == "button"
 
     def _bind_key_to_target(
         self,
@@ -402,7 +429,7 @@ class MidiControlState:
         preset_binding = self._preset_target_for_key(key)
         if preset_binding is None:
             return None
-        screen, target = preset_binding
+        screen, target, _activate_on_input = preset_binding
         self._bind_key_to_target(
             key,
             target,
