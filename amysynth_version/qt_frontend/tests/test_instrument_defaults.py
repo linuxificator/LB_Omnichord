@@ -62,7 +62,7 @@ class InstrumentDefaultTests(unittest.TestCase):
         return client
 
     def test_every_slider_has_explicit_physical_range(self) -> None:
-        self.assertEqual(len(self.synths), 124)
+        self.assertEqual(len(self.synths), 125)
         self.assertIn("physical_strings", self.by_key)
         physical = self.by_key["physical_strings"]
         self.assertEqual(physical.label, "Ph. Strings")
@@ -108,6 +108,23 @@ class InstrumentDefaultTests(unittest.TestCase):
         self.assertTrue(dx7_attacks)
         self.assertLessEqual(max(dx7_attacks.values()), 40.0)
         self.assertEqual(dx7_attacks["dx7_202"], 40.0)
+
+        tb303 = self.by_key["tb303"]
+        self.assertEqual(tb303.label, "TB-303")
+        self.assertEqual(
+            tuple(control.key for control in tb303.controls),
+            (
+                "waveform",
+                "filter_hz",
+                "resonance",
+                "filter_env_octaves",
+                "filter_decay_ms",
+                "accent_amount",
+                "portamento_ms",
+            ),
+        )
+        self.assertEqual(self.control_default(tb303, "filter_hz"), 400.0)
+        self.assertEqual(self.control_default(tb303, "portamento_ms"), 60.0)
 
     def test_four_edited_instruments_are_all_serialized_sparse(self) -> None:
         state = SynthState(self.synths, 0)

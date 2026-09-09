@@ -25,6 +25,10 @@ CONTROL_LIMITS: dict[str, tuple[float, float]] = {
     # physical decay control. Keep it distinct from DX7 feedback so the two
     # synth engines can expose appropriate UI ranges without weakening either.
     "ks_feedback": (0.90, 0.9999),
+    "waveform": (0.0, 1.0),
+    "filter_env_octaves": (0.0, 5.0),
+    "filter_decay_ms": (30.0, 3000.0),
+    "accent_amount": (0.0, 1.0),
 }
 
 

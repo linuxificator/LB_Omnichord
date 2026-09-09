@@ -36,6 +36,8 @@ from musical_state import TuningSnapshot, tune_note
 from gm_percussion import midi_drum_amplitude, resolve_gm_percussion
 from midi_levels import midi_pitched_synth_level, normalized_midi_velocity
 from synth_programs import resolve_program
+from tb303 import PROGRAM_KIND as TB303_PROGRAM_KIND
+from tb303 import Tb303Parameters, compile_voice_commands
 from synth_state import SynthState
 from shared_reverb import (
     MIDI_REVERB_PROCESSOR,
@@ -249,18 +251,26 @@ class MidiAmyEngine:
         patch = self._patch(key)
 
         if program is not None and not program.is_rom_patch:
-            if program.kind != "karplus_strong":
-                raise ValueError(f"unsupported MIDI synth program {program.kind!r}")
-            wave = 6 if program.wave is None else int(program.wave)
-            feedback = 0.985 if program.feedback is None else float(program.feedback)
             self._wire(f"i{synth}iv{self.voices}in1iy{bus}Z")
-            self._wire(f"v0w{wave}b{self._f(feedback)}i{synth}Z")
-            if "ks_feedback" in params:
-                value = max(
-                    0.0,
-                    min(0.9999, float(params["ks_feedback"])),
-                )
-                self._wire(f"v0b{self._f(value)}i{synth}Z")
+            if program.kind == "karplus_strong":
+                wave = 6 if program.wave is None else int(program.wave)
+                feedback = 0.985 if program.feedback is None else float(program.feedback)
+                self._wire(f"v0w{wave}b{self._f(feedback)}i{synth}Z")
+                if "ks_feedback" in params:
+                    value = max(
+                        0.0,
+                        min(0.9999, float(params["ks_feedback"])),
+                    )
+                    self._wire(f"v0b{self._f(value)}i{synth}Z")
+            elif program.kind == TB303_PROGRAM_KIND:
+                for command in compile_voice_commands(
+                    synth=synth,
+                    parameters=Tb303Parameters.from_mapping(params),
+                    initialize=True,
+                ):
+                    self._wire(command)
+            else:
+                raise ValueError(f"unsupported MIDI synth program {program.kind!r}")
         elif patch is not None:
             if row in self._configured_rows:
                 self._wire(f"K{patch}i{synth}Z")

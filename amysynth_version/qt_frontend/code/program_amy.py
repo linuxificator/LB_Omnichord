@@ -5,6 +5,9 @@ from typing import Any
 import amy_transport as base
 from config_loader import ResolvedAmyConfig
 from synth_programs import SynthProgram, resolve_program
+from tb303 import PROGRAM_KIND as TB303_PROGRAM_KIND
+from tb303 import SEQUENCE_PARAMETER_KEYS as TB303_SEQUENCE_PARAMETER_KEYS
+from tb303 import Tb303Parameters, compile_voice_commands
 
 
 KS_WAVE = 6
@@ -81,10 +84,10 @@ class ProgramAmySerialClient(base.AmySerialClient):
         self._apply_reverb_buses()
 
     def _set_rhythm_config(self, payload_text: str) -> None:
-        """Use the common nested-pattern transport for every synth program."""
+        """Use the common reusable-sequence transport for every synth program."""
         super()._set_rhythm_config(payload_text)
 
-    def _configure_physical_one(
+    def _configure_program_one(
         self, role: str, synth: int, program: SynthProgram
     ) -> None:
         self._bump_synth_generation(synth)
@@ -107,6 +110,15 @@ class ProgramAmySerialClient(base.AmySerialClient):
             wave = KS_WAVE if program.wave is None else int(program.wave)
             feedback = 0.985 if program.feedback is None else program.feedback
             self._wire(f"v0w{wave}b{self._f(feedback)}i{synth}Z")
+        elif program.kind == TB303_PROGRAM_KIND:
+            parameters = Tb303Parameters.from_mapping(self.synth_params[role])
+            for command in compile_voice_commands(
+                synth=synth,
+                parameters=parameters,
+                selected_keys=(),
+                initialize=True,
+            ):
+                self._wire(command)
         else:
             raise ValueError(f"unsupported non-ROM program {program.kind!r}")
 
@@ -115,17 +127,33 @@ class ProgramAmySerialClient(base.AmySerialClient):
         self._wire(f"i{synth}iV{self._f(level)}Z")
         self._apply_reverb_bus(bus)
 
-    def _physical_param_commands(
-        self, role: str, synth: int, program: SynthProgram
+    def _program_param_commands(
+        self,
+        role: str,
+        synth: int,
+        program: SynthProgram,
+        parameter_keys: set[str] | None = None,
     ) -> list[str]:
-        if program.kind != "karplus_strong":
-            return []
-        feedback = self.synth_params[role].get(
-            KS_DECAY_CONTROL,
-            0.985 if program.feedback is None else program.feedback,
-        )
-        feedback = max(0.0, min(0.9999, float(feedback)))
-        return [f"v0b{self._f(feedback)}i{synth}Z"]
+        if program.kind == "karplus_strong":
+            if parameter_keys is not None and KS_DECAY_CONTROL not in parameter_keys:
+                return []
+            feedback = self.synth_params[role].get(
+                KS_DECAY_CONTROL,
+                0.985 if program.feedback is None else program.feedback,
+            )
+            feedback = max(0.0, min(0.9999, float(feedback)))
+            return [f"v0b{self._f(feedback)}i{synth}Z"]
+        if program.kind == TB303_PROGRAM_KIND:
+            return list(
+                compile_voice_commands(
+                    synth=synth,
+                    parameters=Tb303Parameters.from_mapping(
+                        self.synth_params[role]
+                    ),
+                    selected_keys=parameter_keys,
+                )
+            )
+        return []
 
     def _strum_note_on(self, note: float) -> None:
         program = self._program("strum")
@@ -148,8 +176,8 @@ class ProgramAmySerialClient(base.AmySerialClient):
             super()._configure_synth(role)
             return
         for synth in self._role_synth_ids(role):
-            self._configure_physical_one(role, synth, program)
-            for command in self._physical_param_commands(role, synth, program):
+            self._configure_program_one(role, synth, program)
+            for command in self._program_param_commands(role, synth, program):
                 self._wire(command)
 
     def _apply_supported_params(
@@ -161,11 +189,20 @@ class ProgramAmySerialClient(base.AmySerialClient):
         if program is None or program.is_rom_patch:
             super()._apply_supported_params(role, parameter_keys)
             return
-        if parameter_keys is not None and KS_DECAY_CONTROL not in parameter_keys:
-            return
         for synth in self._role_synth_ids(role):
-            for command in self._physical_param_commands(role, synth, program):
+            for command in self._program_param_commands(
+                role,
+                synth,
+                program,
+                parameter_keys,
+            ):
                 self._wire(command)
+
+    def _bass_sequence_parameters(self) -> Tb303Parameters | None:
+        program = self._program("bass")
+        if program is None or program.kind != TB303_PROGRAM_KIND:
+            return None
+        return Tb303Parameters.from_mapping(self.synth_params["bass"])
 
     def _apply_synth_state(
         self,
@@ -186,10 +223,19 @@ class ProgramAmySerialClient(base.AmySerialClient):
         if program is None:
             print(f"AMY warning: refusing unknown synth program {name!r}", flush=True)
             return
+        old_name = self.selected_synth[role]
+        old_program = resolve_program(old_name, config)
+        old_is_tb303 = (
+            old_program is not None and old_program.kind == TB303_PROGRAM_KIND
+        )
+        new_is_tb303 = program.kind == TB303_PROGRAM_KIND
+
         if program.is_rom_patch:
             super()._apply_synth_state(
                 role, name, params, force_patch=force_patch
             )
+            if role == "bass" and self.rhythm_running and old_is_tb303:
+                self._replace_lane("bass")
             return
 
         old_params = dict(self.synth_params[role])
@@ -214,6 +260,21 @@ class ProgramAmySerialClient(base.AmySerialClient):
 
         if role == "chord" and patch_required:
             self._restore_manual_chord_after_patch()
+        if (
+            role == "bass"
+            and self.rhythm_running
+            and (
+                old_is_tb303 != new_is_tb303
+                or (
+                    new_is_tb303
+                    and bool(
+                        (changed_keys | removed_keys)
+                        & TB303_SEQUENCE_PARAMETER_KEYS
+                    )
+                )
+            )
+        ):
+            self._replace_lane("bass")
 
 
 class ProgramAmySocketClient(ProgramAmySerialClient):

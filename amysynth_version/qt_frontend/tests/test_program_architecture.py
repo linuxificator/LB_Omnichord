@@ -15,6 +15,7 @@ if str(CODE) not in sys.path:
 
 from config_loader import load_amy_config, load_resolved_amy_config  # noqa: E402
 from synth_programs import resolve_program  # noqa: E402
+from tb303 import Tb303Parameters, compile_voice_commands  # noqa: E402
 
 
 class ProgramArchitectureTests(unittest.TestCase):
@@ -264,6 +265,33 @@ class ProgramArchitectureTests(unittest.TestCase):
         self.assertEqual(program.oscs_per_voice, 1)
         self.assertGreater(program.feedback, 0.9)
         self.assertLess(program.feedback, 1.0)
+
+    def test_tb303_is_a_named_one_oscillator_program(self) -> None:
+        config = load_resolved_amy_config(ROOT / "config" / "amy_config.json")
+        program = resolve_program("tb303", config)
+        self.assertIsNotNone(program)
+        assert program is not None
+        self.assertEqual(program.kind, "tb303")
+        self.assertEqual(program.oscs_per_voice, 1)
+        self.assertFalse(program.is_rom_patch)
+
+    def test_tb303_initialization_and_live_controls_do_not_duplicate_commands(
+        self,
+    ) -> None:
+        parameters = Tb303Parameters()
+        fixed = compile_voice_commands(
+            synth=1,
+            parameters=parameters,
+            selected_keys=(),
+            initialize=True,
+        )
+        controls = compile_voice_commands(synth=1, parameters=parameters)
+        self.assertEqual(
+            fixed,
+            ("v0G4A2,1,0,1,20,0i1Z", "v0m0i1Z"),
+        )
+        self.assertEqual(len(controls), 4)
+        self.assertFalse(set(fixed) & set(controls))
 
 
 if __name__ == "__main__":

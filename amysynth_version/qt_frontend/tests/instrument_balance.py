@@ -27,6 +27,7 @@ def build_plan(*, use_instrument_levels: bool = True) -> list[dict[str, object]]
     config = json.loads((ROOT / "config" / "amy_config.json").read_text())
     synths = list(catalog["synths"])
     synths.append({"key": "physical_strings", "label": "Ph. Strings"})
+    synths.append({"key": "tb303", "label": "TB-303"})
     compatibility = config.get("patch_compatibility", {})
     instrument_levels = config.get("instrument_levels", {})
     from amy_transport import AmySerialClient
@@ -50,11 +51,22 @@ def build_plan(*, use_instrument_levels: bool = True) -> list[dict[str, object]]
             patch = int(key[4:])
         else:
             patch = None
-        setup = (
-            ["i2iv2in1iy2Z", "v0w6b0.985i2Z", "i2iy2Z"]
-            if patch is None
-            else [f"K{patch}i2iv2iy2Z"]
-        )
+        if key == "physical_strings":
+            setup = ["i2iv2in1iy2Z", "v0w6b0.985i2Z", "i2iy2Z"]
+        elif key == "tb303":
+            from tb303 import Tb303Parameters, compile_voice_commands
+
+            setup = ["i2iv2in1iy2Z"]
+            setup.extend(
+                compile_voice_commands(
+                    synth=2,
+                    parameters=Tb303Parameters(),
+                    initialize=True,
+                )
+            )
+        else:
+            assert patch is not None
+            setup = [f"K{patch}i2iv2iy2Z"]
         multiplier = (
             float(instrument_levels.get(key, 1.0))
             if use_instrument_levels
@@ -181,10 +193,11 @@ def validate_render_report(report: dict[str, object]) -> list[str]:
                 issues.append(
                     f"{synth} note {note}: {metrics['clipped_samples']} clipped samples"
                 )
-    expected_count = 124 if all(
+    instrument_count = len(build_plan())
+    expected_count = instrument_count if all(
         isinstance(metrics, dict) and "peak_dbfs" in metrics
         for metrics in report.values()
-    ) else 124 * len(NOTES)
+    ) else instrument_count * len(NOTES)
     if capture_count != expected_count:
         issues.append(
             f"expected {expected_count} metric groups, received {capture_count}"

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, TypeVar
 
 from amy_parameter_plan import format_amy_float
+from tb303 import Tb303Parameters, articulation_fields
 
 
 ScheduledEvent = tuple[int, int, str]
@@ -376,6 +377,7 @@ def compile_bass_events(
     synth: int,
     bass_gate_beats: float,
     ppq: int,
+    tb303_parameters: Tb303Parameters | None = None,
 ) -> tuple[ScheduledEvent, ...]:
     """Compile bass activity or riff data into scheduled wire bodies."""
 
@@ -392,6 +394,15 @@ def compile_bass_events(
         source_events = bass_riff.get("events", [])
         if not isinstance(source_events, list):
             return ()
+        if tb303_parameters is not None:
+            return _compile_tb303_events(
+                source_events=source_events,
+                source_ppq=source_ppq,
+                period=riff_period,
+                synth=synth,
+                ppq=ppq,
+                parameters=tb303_parameters,
+            )
         for event in source_events:
             if not isinstance(event, dict):
                 continue
@@ -424,6 +435,37 @@ def compile_bass_events(
     source_events = config.get("bass_events", [])
     if not isinstance(source_events, list):
         return ()
+    if tb303_parameters is not None:
+        activity_events = [
+            {
+                "tick": round(float(event.get("time", 0.0)) * ppq),
+                "duration_ticks": max(1, round(bass_gate_beats * ppq)),
+                "note": float(bass_notes[int(event.get("degree", 0)) % len(bass_notes)]),
+                "velocity": max(
+                    0,
+                    min(
+                        127,
+                        round(
+                            float(event.get("amp", 1.0))
+                            * BASS_ACTIVITY_VELOCITY_GAIN
+                            * 127.0
+                        ),
+                    ),
+                ),
+                "accent": bool(event.get("accent", False)),
+                "slide_to_next": False,
+            }
+            for event in source_events
+            if isinstance(event, dict)
+        ]
+        return _compile_tb303_events(
+            source_events=activity_events,
+            source_ppq=ppq,
+            period=period,
+            synth=synth,
+            ppq=ppq,
+            parameters=tb303_parameters,
+        )
     for event in source_events:
         if not isinstance(event, dict):
             continue
@@ -449,6 +491,77 @@ def compile_bass_events(
             )
         )
     return tuple(events)
+
+
+def _compile_tb303_events(
+    *,
+    source_events: Sequence[Any],
+    source_ppq: int,
+    period: int,
+    synth: int,
+    ppq: int,
+    parameters: Tb303Parameters,
+) -> tuple[ScheduledEvent, ...]:
+    """Compile one monophonic phrase; AMY remains the sole timing owner."""
+
+    scheduled: list[tuple[int, int, str]] = []
+    scaled: list[tuple[int, int, float, float, bool, bool]] = []
+    for event in source_events:
+        if not isinstance(event, Mapping):
+            continue
+        tick = round(float(event.get("tick", 0)) * ppq / source_ppq)
+        duration = max(
+            1,
+            round(float(event.get("duration_ticks", 1)) * ppq / source_ppq),
+        )
+        velocity = max(
+            0.0,
+            min(1.0, float(event.get("velocity", 0)) / 127.0),
+        )
+        scaled.append(
+            (
+                tick,
+                duration,
+                float(event.get("note", 36.0)),
+                velocity,
+                bool(event.get("accent", False)),
+                bool(event.get("slide_to_next", False)),
+            )
+        )
+
+    for index, (tick, duration, note, velocity, accent, slide_out) in enumerate(scaled):
+        slide_in = index > 0 and scaled[index - 1][5]
+        # AMY cannot independently retrigger only the accent envelope. An
+        # accent at a legato destination is therefore deliberately ignored.
+        fields = articulation_fields(parameters, accent=accent and not slide_in)
+        portamento = parameters.portamento_ms if slide_in else 0.0
+        velocity_field = "" if slide_in else f"l{format_amy_float(velocity)}"
+        scheduled.append(
+            (
+                tick % period,
+                1,
+                f"{fields}m{max(0, round(portamento))}"
+                f"n{format_amy_float(note)}{velocity_field}i{synth}",
+            )
+        )
+
+        if slide_out:
+            continue
+        end_tick = tick + duration
+        next_tick = scaled[index + 1][0] if index + 1 < len(scaled) else period
+        if index + 1 < len(scaled) and end_tick > next_tick:
+            # A monophonic retrigger supersedes the old logical note. Its old
+            # release must not silence the newer attack.
+            continue
+        scheduled.append((end_tick % period, 0, f"l0i{synth}"))
+
+    return tuple(
+        (tick, period, body)
+        for tick, _priority, body in sorted(
+            scheduled,
+            key=lambda item: (item[0], item[1]),
+        )
+    )
 
 
 def drum_quantum(rhythm: RhythmLike) -> int:
