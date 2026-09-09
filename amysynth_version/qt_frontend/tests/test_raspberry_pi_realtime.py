@@ -64,7 +64,12 @@ class RaspberryPiRealtimeTests(unittest.TestCase):
 
     def test_pipewire_pulse_is_identified_by_its_native_thread_name(self) -> None:
         with (
-            mock.patch.object(realtime, "_process_ids", return_value=(1001, 1012)),
+            mock.patch.object(
+                realtime,
+                "systemd_pipewire_pids",
+                return_value={"pipewire": 1001, "pipewire-pulse": 1012},
+            ),
+            mock.patch.object(realtime, "_owned_process", return_value=True),
             mock.patch.object(realtime, "_process_executable", return_value="pipewire"),
             mock.patch.object(
                 realtime,
@@ -85,10 +90,26 @@ class RaspberryPiRealtimeTests(unittest.TestCase):
             loops = realtime.discover_pipewire_loops(os.getuid())
         self.assertEqual(loops, {"pipewire": 1002, "pipewire-pulse": 1013})
 
+    def test_pipewire_pids_come_from_exact_systemd_user_units(self) -> None:
+        completed = subprocess.CompletedProcess(
+            [],
+            0,
+            "MainPID=1001\nId=pipewire.service\n\n"
+            "MainPID=1012\nId=pipewire-pulse.service\n",
+            "",
+        )
+        with mock.patch.object(
+            realtime.subprocess, "run", return_value=completed
+        ) as run:
+            pids = realtime.systemd_pipewire_pids()
+        self.assertEqual(pids, {"pipewire": 1001, "pipewire-pulse": 1012})
+        self.assertIn("pipewire.service", run.call_args.args[0])
+        self.assertIn("pipewire-pulse.service", run.call_args.args[0])
+
     def test_exact_child_pid_is_required_and_never_discovered_by_name(self) -> None:
         with (
             mock.patch.object(realtime, "_owned_process", return_value=False),
-            mock.patch.object(realtime, "_process_ids") as process_ids,
+            mock.patch.object(realtime, "systemd_pipewire_pids") as pipewire_pids,
         ):
             result = realtime.apply_runtime_policy(
                 4242,
@@ -97,7 +118,7 @@ class RaspberryPiRealtimeTests(unittest.TestCase):
         self.assertTrue(result.applicable)
         self.assertFalse(result.applied)
         self.assertIn("exact AMY child PID", result.issue)
-        process_ids.assert_not_called()
+        pipewire_pids.assert_not_called()
 
     def test_wrapper_applies_the_measured_policy_once_to_exact_threads(self) -> None:
         calls: list[tuple[int, frozenset[int], int]] = []

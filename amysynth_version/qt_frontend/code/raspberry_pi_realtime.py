@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import os
 import shlex
+import subprocess
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -203,23 +204,6 @@ def select_active_worker(pid: int, seconds: float = 0.35) -> int:
     return max(deltas, key=deltas.__getitem__)
 
 
-def _process_ids(uid: int) -> tuple[int, ...]:
-    result: list[int] = []
-    try:
-        entries = Path("/proc").iterdir()
-    except OSError:
-        return ()
-    for entry in entries:
-        if not entry.name.isdigit():
-            continue
-        try:
-            if entry.stat().st_uid == uid:
-                result.append(int(entry.name))
-        except (FileNotFoundError, PermissionError, ProcessLookupError):
-            continue
-    return tuple(sorted(result))
-
-
 def _process_executable(pid: int) -> str:
     try:
         return Path(os.readlink(f"/proc/{pid}/exe")).name
@@ -231,18 +215,55 @@ def _thread_name(pid: int, tid: int) -> str:
     return _read_text(Path(f"/proc/{pid}/task/{tid}/comm"))
 
 
+def systemd_pipewire_pids() -> dict[str, int]:
+    try:
+        result = subprocess.run(
+            [
+                "systemctl",
+                "--user",
+                "show",
+                "pipewire.service",
+                "pipewire-pulse.service",
+                "--property=Id",
+                "--property=MainPID",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
+        return {}
+    if result.returncode != 0:
+        return {}
+    services: dict[str, int] = {}
+    for block in result.stdout.split("\n\n"):
+        values = dict(
+            line.split("=", 1) for line in block.splitlines() if "=" in line
+        )
+        service = values.get("Id", "").removesuffix(".service")
+        try:
+            pid = int(values.get("MainPID", "0"))
+        except ValueError:
+            continue
+        if service in PIPEWIRE_PRIORITIES and pid > 0:
+            services[service] = pid
+    return services
+
+
 def discover_pipewire_loops(uid: int) -> dict[str, int]:
     loops: dict[str, int] = {}
-    for pid in _process_ids(uid):
+    for process_name, pid in systemd_pipewire_pids().items():
+        if not _owned_process(pid, uid):
+            continue
         executable = _process_executable(pid)
-        process_name = _thread_name(pid, pid)
         # pipewire-pulse is normally an alternate invocation of the pipewire
         # binary, so /proc/PID/exe resolves to "pipewire" for both services.
-        # Require that native binary and use the kernel's exact main-thread
-        # name to distinguish the two standard services.
+        # systemd owns the identity; also require the native binary and exact
+        # kernel main-thread name before trusting its data-loop TID.
         if (
             executable not in PIPEWIRE_PRIORITIES
-            or process_name not in PIPEWIRE_PRIORITIES
+            or _thread_name(pid, pid) != process_name
         ):
             continue
         matching = [
