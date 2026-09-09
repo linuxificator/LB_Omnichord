@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 
@@ -80,28 +82,28 @@ Item {
 
                 height: buttonRow.height
                 text:
-                    root.levelLabels.length > index
-                    ? String(root.levelLabels[index])
-                    : String(modelData)
+                    root.levelLabels.length > levelButton.index
+                    ? String(root.levelLabels[levelButton.index])
+                    : String(levelButton.modelData)
 
                 property bool selectedState:
                     root.currentLevel
-                    === Number(modelData)
+                    === Number(levelButton.modelData)
                 property var midiTarget:
                     root.midiTargetForLevel === null
                     ? ({})
-                    : root.midiTargetForLevel(Number(modelData))
+                    : root.midiTargetForLevel(Number(levelButton.modelData))
 
                 font.pixelSize: 13
                 font.bold: true
 
                 contentItem: Text {
-                    text: parent.text
+                    text: levelButton.text
                     color:
-                        parent.selectedState
+                        levelButton.selectedState
                         ? root.selectedTextColor
                         : root.textColor
-                    font: parent.font
+                    font: levelButton.font
                     horizontalAlignment:
                         Text.AlignHCenter
                     verticalAlignment:
@@ -111,16 +113,16 @@ Item {
                 background: Rectangle {
                     radius: 6
                     color:
-                        parent.selectedState
+                        levelButton.selectedState
                         ? root.selectedColor
                         : (
-                            parent.pressed
+                            levelButton.pressed
                             ? "#e1ca6a"
                             : root.idleColor
                         )
                     border.color: root.borderColor
                     border.width:
-                        parent.selectedState ? 2 : 1
+                        levelButton.selectedState ? 2 : 1
                 }
 
                 MidiButtonLed {
@@ -133,7 +135,7 @@ Item {
 
                 onClicked:
                     root.selected(
-                        Number(modelData)
+                        Number(levelButton.modelData)
                     )
             }
         }

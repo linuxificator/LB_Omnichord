@@ -13,6 +13,12 @@ sys.path.insert(0, str(CODE))
 
 from app_core import load_chords, load_rhythm_catalog  # noqa: E402
 from bass_riffs import load_bass_riff_catalog, transpose_riff_events  # noqa: E402
+from rhythm_command_plan import (  # noqa: E402
+    compile_bass_events,
+    compile_sequence_definition,
+)
+from tb303 import Tb303Parameters  # noqa: E402
+from wire_frames import MAX_WIRE_REQUEST_BYTES, validate_wire_request  # noqa: E402
 
 
 class BassRiffCatalogTests(unittest.TestCase):
@@ -78,11 +84,44 @@ class BassRiffCatalogTests(unittest.TestCase):
             [event["note"] + 4 for event in c_events],
             [event["note"] for event in e_events],
         )
-        for key in ("tick", "duration_ticks", "velocity"):
+        for key in (
+            "tick",
+            "duration_ticks",
+            "velocity",
+            "accent",
+            "slide_to_next",
+        ):
             self.assertEqual(
                 [event[key] for event in c_events],
                 [event[key] for event in e_events],
             )
+
+    def test_articulation_flags_survive_validated_loading(self) -> None:
+        accented = next(
+            event
+            for riff in self.catalog.riffs
+            for event in riff.events
+            if event.accent
+        )
+        sliding = next(
+            event
+            for riff in self.catalog.riffs
+            for event in riff.events
+            if event.slide_to_next
+        )
+        self.assertIs(accented.accent, True)
+        self.assertIs(sliding.slide_to_next, True)
+
+        riff = next(
+            riff
+            for riff in self.catalog.riffs
+            if any(event.accent or event.slide_to_next for event in riff.events)
+        )
+        transposed = transpose_riff_events(riff, 11)
+        self.assertEqual(
+            [(event.accent, event.slide_to_next) for event in riff.events],
+            [(event["accent"], event["slide_to_next"]) for event in transposed],
+        )
 
     def test_rank_selection_uses_weight_and_can_retain_compatible_identity(
         self,
@@ -171,6 +210,41 @@ class BassRiffCatalogTests(unittest.TestCase):
             self.catalog._by_id[riff.riff_id] = riff
         with self.assertRaises(TypeError):
             self.catalog._by_context[("new", "context")] = (riff,)
+
+    def test_every_tb303_riff_fits_native_sequence_and_wire_limits(self) -> None:
+        largest: tuple[int, str] = (0, "")
+        for riff in self.catalog.riffs:
+            payload = {
+                "ppq": riff.ppq,
+                "phrase_ticks": riff.phrase_ticks,
+                "events": list(transpose_riff_events(riff, 0)),
+            }
+            events = compile_bass_events(
+                config={"length_beats": 4, "bass_mode": "riff"},
+                running=True,
+                bass_notes=(),
+                bass_riff=payload,
+                synth=1,
+                bass_gate_beats=0.25,
+                ppq=48,
+                tb303_parameters=Tb303Parameters(),
+            )
+            largest = max(largest, (len(events), riff.riff_id))
+            self.assertLessEqual(len(events), 64, riff.riff_id)
+            definition = compile_sequence_definition(
+                sequence_tag=113,
+                events=events,
+            )
+            for command in definition.commands:
+                encoded = command.encode("ascii")
+                self.assertLessEqual(
+                    len(encoded),
+                    MAX_WIRE_REQUEST_BYTES,
+                    riff.riff_id,
+                )
+                self.assertEqual(validate_wire_request(encoded), command)
+
+        self.assertEqual(largest, (45, "bass_shared_0969"))
 
 
 if __name__ == "__main__":

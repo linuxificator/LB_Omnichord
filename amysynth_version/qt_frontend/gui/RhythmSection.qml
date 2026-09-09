@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 
@@ -48,13 +50,14 @@ Item {
                 function onRhythmStateChanged() { root.synchronizeWheel() }
             }
             delegate: Item {
+                id: rhythmItem
                 required property var modelData
                 required property int index
                 width: rhythmWheel.width
                 height: rhythmWheel.height / rhythmWheel.visibleItemCount
                 Text {
                     anchors.centerIn: parent; width: parent.width - 10
-                    text: modelData; color: root.wheelTextColor; elide: Text.ElideRight
+                    text: rhythmItem.modelData; color: root.wheelTextColor; elide: Text.ElideRight
                     horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                     font.pixelSize: Math.abs(Tumbler.displacement) < 0.5 ? 18 : 15
                     font.bold: Math.abs(Tumbler.displacement) < 0.5
@@ -65,7 +68,7 @@ Item {
                     gesturePolicy: TapHandler.DragThreshold
 
                     onTapped:
-                        rhythmWheel.currentIndex = index
+                        rhythmWheel.currentIndex = rhythmItem.index
                 }
             }
             onCurrentIndexChanged: {

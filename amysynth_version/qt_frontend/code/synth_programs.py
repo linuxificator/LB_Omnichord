@@ -28,6 +28,16 @@ class SynthProgram:
 def resolve_program(key: str, config: ResolvedAmyConfig) -> SynthProgram | None:
     key = str(key)
 
+    # This application-owned subtractive voice has a stable public catalogue
+    # key, just like the derived Juno/DX7 keys below. Its sound controls live
+    # in the instrument catalogue, not in editable transport configuration.
+    if key == "tb303":
+        return SynthProgram(
+            key=key,
+            kind="tb303",
+            oscs_per_voice=1,
+        )
+
     raw = config.synth_program(key)
     if raw is not None:
         kind = str(raw.get("type", "")).strip().lower()

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import "PointerNormalization.js" as PointerNormalization
 
@@ -11,7 +13,7 @@ Item {
     property color padColor: "#5d9fd0"
     property bool gestureActive: false
 
-    function normalizedY(y) {
+    function normalizedY(y: real): real {
         return PointerNormalization.verticalUnit(y, root.height)
     }
 
@@ -41,18 +43,19 @@ Item {
         model: 15
 
         Rectangle {
+            id: guideLine
             required property int index
 
             x: 12
             y:
                 18
-                + index
+                + guideLine.index
                 * (root.height - 36) / 14
             width: root.width - 24
-            height: index % 2 === 0 ? 2 : 1
+            height: guideLine.index % 2 === 0 ? 2 : 1
             radius: 1
             color:
-                index % 2 === 0
+                guideLine.index % 2 === 0
                 ? Qt.lighter(root.padColor, 1.35)
                 : Qt.lighter(root.padColor, 1.12)
             opacity: root.gestureActive ? 1.0 : 0.75

@@ -641,7 +641,7 @@ emitted/backend value did not detect that visual regression.
 - DX7 operator envelopes remain AMY factory-patch authority.
 - The application-owned global output ADSR layered over them has an attack of
   at most 40 ms for every DX7 catalogue entry.
-- The native balance sweep renders all 124 instruments at notes 40, 60 and 84
+- The native balance sweep renders all 125 instruments at notes 40, 60 and 84
   and rejects effectively silent or clipped captures.
 
 **Failure history:** MIDI M12 `STRINGS 8` added a second 350 ms attack over its
@@ -860,8 +860,11 @@ regression proves that hold promotion stops only future starts and emits no imme
   presets.
 - Riff selector changes replace only bass tags and never stop/reset transport
   or edit the percussion/automatic-chord ranges.
-- TB-303 accent/slide annotations in the source catalogue are not runtime
-  behavior in this release.
+- TB-303 uses authored accents on detached attacks and authored slide edges.
+  An accent on the destination of an already sounding slide is deliberately
+  ignored because the current AMY envelope operation would also retrigger the
+  amplitude envelope. Other bass instruments ignore both annotations and keep
+  their original note durations and velocities.
 
 **RHYTHM-11 — A selects complete circular chord arpeggios**
 

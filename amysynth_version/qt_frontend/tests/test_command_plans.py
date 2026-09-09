@@ -21,6 +21,7 @@ from rhythm_command_plan import (  # noqa: E402
     compile_fill_schedule,
     compile_tagged_lane,
 )
+from tb303 import Tb303Parameters  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -256,6 +257,120 @@ class PureCommandPlanTests(unittest.TestCase):
             ppq=48,
         )
         self.assertEqual(riff[0][2], "n36l0.503937008i2")
+
+    def test_tb303_slide_chain_is_native_and_ignores_destination_accent(self) -> None:
+        events = compile_bass_events(
+            config={"length_beats": 4, "bass_mode": "riff"},
+            running=True,
+            bass_notes=(),
+            bass_riff={
+                "ppq": 48,
+                "phrase_ticks": 192,
+                "events": [
+                    {
+                        "tick": 0,
+                        "duration_ticks": 12,
+                        "note": 36,
+                        "velocity": 100,
+                        "accent": True,
+                        "slide_to_next": True,
+                    },
+                    {
+                        "tick": 24,
+                        "duration_ticks": 12,
+                        "note": 38,
+                        "velocity": 90,
+                        "accent": True,
+                        "slide_to_next": True,
+                    },
+                    {
+                        "tick": 48,
+                        "duration_ticks": 12,
+                        "note": 40,
+                        "velocity": 80,
+                        "accent": False,
+                        "slide_to_next": False,
+                    },
+                ],
+            },
+            synth=1,
+            bass_gate_beats=0.25,
+            ppq=48,
+            tb303_parameters=Tb303Parameters(),
+        )
+        self.assertEqual(
+            events,
+            (
+                (0, 192, "a1.175F,,,,2.7m0n36l0.787401575i1"),
+                (24, 192, "a1F,,,,2m60n38i1"),
+                (48, 192, "a1F,,,,2m60n40i1"),
+                (60, 192, "l0i1"),
+            ),
+        )
+        self.assertNotIn("l", events[1][2])
+        self.assertIn("a1F,,,,2", events[1][2])
+
+    def test_tb303_activity_uses_accent_without_changing_ordinary_plan(self) -> None:
+        config = {
+            "length_beats": 4,
+            "bass_events": [
+                {"time": 1, "degree": 1, "amp": 0.5, "accent": True},
+            ],
+        }
+        ordinary = compile_bass_events(
+            config=config,
+            running=True,
+            bass_notes=(36.0, 40.0),
+            bass_riff=None,
+            synth=1,
+            bass_gate_beats=0.25,
+            ppq=48,
+        )
+        tb303 = compile_bass_events(
+            config=config,
+            running=True,
+            bass_notes=(36.0, 40.0),
+            bass_riff=None,
+            synth=1,
+            bass_gate_beats=0.25,
+            ppq=48,
+            tb303_parameters=Tb303Parameters(),
+        )
+        self.assertEqual(ordinary, ((48, 192, "n40l0.7i1"), (60, 192, "n40l0i1")))
+        self.assertEqual(
+            tb303,
+            (
+                (48, 192, "a1.175F,,,,2.7m0n40l0.700787402i1"),
+                (60, 192, "l0i1"),
+            ),
+        )
+
+    def test_tb303_loop_release_precedes_next_attack_at_tick_zero(self) -> None:
+        events = compile_bass_events(
+            config={"length_beats": 1, "bass_mode": "riff"},
+            running=True,
+            bass_notes=(),
+            bass_riff={
+                "ppq": 48,
+                "phrase_ticks": 48,
+                "events": [
+                    {
+                        "tick": 0,
+                        "duration_ticks": 48,
+                        "note": 36,
+                        "velocity": 100,
+                        "accent": False,
+                        "slide_to_next": False,
+                    }
+                ],
+            },
+            synth=1,
+            bass_gate_beats=0.25,
+            ppq=48,
+            tb303_parameters=Tb303Parameters(),
+        )
+        self.assertEqual(events[0], (0, 48, "l0i1"))
+        self.assertIn("n36", events[1][2])
 
     def test_drum_and_fill_plans_are_deterministic(self) -> None:
         fill = _Fill(

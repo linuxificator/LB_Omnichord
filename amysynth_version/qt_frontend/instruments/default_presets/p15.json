@@ -33,7 +33,7 @@
       "parameters": {}
     },
     "bass": {
-      "selected": "dx7_143",
+      "selected": "tb303",
       "parameters": {}
     }
   },
@@ -49,6 +49,7 @@
   },
   "rhythm": {
     "selected": "trance",
+    "bass_riff_selector": 4,
     "settings": {
       "pop_8": {
         "tempo": 108.0,
@@ -216,7 +217,7 @@
         "tempo": 140.0,
         "percussion_activity": 4,
         "chord_activity": 4,
-        "bass_activity": 4
+        "bass_activity": 5
       },
       "garage_2step": {
         "tempo": 132.0,

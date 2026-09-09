@@ -17,11 +17,11 @@ Item {
     signal edited(string key, real value)
     signal activated()
 
-    function isLogScale() {
+    function isLogScale(): bool {
         return String(root.control.scale || "linear") === "log"
     }
 
-    function controlToSlider(value) {
+    function controlToSlider(value: real): real {
         const numericValue = Number(value)
         if (!isLogScale())
             return numericValue
@@ -29,11 +29,11 @@ Item {
         return Math.log(Math.max(numericValue, minimum))
     }
 
-    function sliderToControl(value) {
+    function sliderToControl(value: real): real {
         return isLogScale() ? Math.exp(Number(value)) : Number(value)
     }
 
-    function midiNoteName(value) {
+    function midiNoteName(value: real): string {
         const rounded = Math.round(Number(value))
         const names = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
         const note = ((rounded % 12) + 12) % 12
@@ -41,7 +41,7 @@ Item {
         return names[note] + octave
     }
 
-    function formattedValue(value) {
+    function formattedValue(value: real): string {
         const unit = String(root.control.unit || "")
         if (unit === "note")
             return midiNoteName(value)

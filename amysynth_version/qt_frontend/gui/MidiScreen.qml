@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
@@ -232,13 +234,14 @@ Item {
         model: root.synthThemes
 
         delegate: MidiSynthSection {
+            id: midiSynthRow
             required property var modelData
             required property int index
 
             x: 0
             y:
                 root.hostWindow.rhythmY
-                + index
+                + midiSynthRow.index
                 * (
                     root.hostWindow.sectionHeight
                     + root.hostWindow.sectionGap
@@ -249,7 +252,7 @@ Item {
             height: root.hostWindow.sectionHeight
 
             controller: midiBackend
-            rowIndex: index
+            rowIndex: midiSynthRow.index
             synthModel: midiBackend.synthNames
             leftRailWidth: root.hostWindow.leftRailWidth
             contentX: root.hostWindow.contentX
@@ -257,10 +260,10 @@ Item {
             volumeWidth: root.hostWindow.volumeWidth
             wheelWidth: root.hostWindow.wheelWidth
 
-            panelColor: modelData.panel
-            borderColor: modelData.border
-            accentColor: modelData.accent
-            textColor: modelData.text
+            panelColor: midiSynthRow.modelData.panel
+            borderColor: midiSynthRow.modelData.border
+            accentColor: midiSynthRow.modelData.accent
+            textColor: midiSynthRow.modelData.text
 
             onInteracted: (rowIndex) =>
                 root.activeMidiRow = rowIndex
@@ -325,10 +328,11 @@ Item {
                 model: root.midiControlModel
 
                 delegate: Button {
+                    id: midiControlIndicator
                     required property var modelData
                     width: midiControlBar.indicatorWidth
                     height: 68
-                    enabled: !modelData.evicting
+                    enabled: !midiControlIndicator.modelData.evicting
                     padding: 0
                     background: Item {}
                     contentItem: Item {}
@@ -341,21 +345,21 @@ Item {
                         height: 10
                         radius: 5
                         color: {
-                            if (modelData.evicting)
+                            if (midiControlIndicator.modelData.evicting)
                                 return "#9b3030"
-                            if (modelData.state === "learn")
+                            if (midiControlIndicator.modelData.state === "learn")
                                 return "#f22b2b"
-                            if (modelData.state === "bound")
+                            if (midiControlIndicator.modelData.state === "bound")
                                 return "#35b85a"
-                            if (modelData.state === "blue")
+                            if (midiControlIndicator.modelData.state === "blue")
                                 return "#3186d7"
                             return "#a5a5a0"
                         }
 
                         SequentialAnimation on opacity {
                             running:
-                                modelData.state === "learn"
-                                && !modelData.evicting
+                                midiControlIndicator.modelData.state === "learn"
+                                && !midiControlIndicator.modelData.evicting
                             loops: Animation.Infinite
                             NumberAnimation { from: 1.0; to: 0.2; duration: 240 }
                             NumberAnimation { from: 0.2; to: 1.0; duration: 240 }
@@ -369,10 +373,10 @@ Item {
                         width: 52
                         height: 52
                         readonly property bool pitchBend:
-                            modelData.displayType === "pitch_bend"
+                            midiControlIndicator.modelData.displayType === "pitch_bend"
                         readonly property bool noteButton:
-                            modelData.displayType === "note_button"
-                            || modelData.displayType === "button"
+                            midiControlIndicator.modelData.displayType === "note_button"
+                            || midiControlIndicator.modelData.displayType === "button"
 
                         PhysicalRotary {
                             visible: !hardwareControl.noteButton
@@ -380,13 +384,13 @@ Item {
                             width: 52
                             height: 52
                             family:
-                                modelData.displayProtocol === "osc" ? 1 : 6
+                                midiControlIndicator.modelData.displayProtocol === "osc" ? 1 : 6
                             encoder: hardwareControl.pitchBend
                             from: 0
                             to: 127
-                            value: Number(modelData.displayValue)
+                            value: Number(midiControlIndicator.modelData.displayValue)
                             physicalInteractive: false
-                            opacity: modelData.evicting ? 0.55 : 1.0
+                            opacity: midiControlIndicator.modelData.evicting ? 0.55 : 1.0
                         }
 
                         PhysicalPushButton {
@@ -395,9 +399,10 @@ Item {
                             width: 58
                             height: 42
                             family:
-                                modelData.displayProtocol === "osc" ? 1 : 6
+                                midiControlIndicator.modelData.displayProtocol === "osc" ? 1 : 6
                             forcedDown:
-                                modelData.buttonDown && !modelData.evicting
+                                midiControlIndicator.modelData.buttonDown
+                                && !midiControlIndicator.modelData.evicting
                         }
                     }
 
@@ -405,7 +410,7 @@ Item {
                         anchors.bottom: parent.bottom
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: parent.width
-                        text: modelData.displayLabel
+                        text: midiControlIndicator.modelData.displayLabel
                         color: "#292927"
                         font.pixelSize: 11
                         horizontalAlignment: Text.AlignHCenter
@@ -413,7 +418,7 @@ Item {
                     }
 
                     SequentialAnimation on opacity {
-                        running: Boolean(modelData.evicting)
+                        running: Boolean(midiControlIndicator.modelData.evicting)
                         loops: 2
                         NumberAnimation { from: 1.0; to: 0.2; duration: 100 }
                         NumberAnimation { from: 0.2; to: 1.0; duration: 100 }
@@ -421,8 +426,8 @@ Item {
 
                     onClicked: {
                         midiBackend.clickControlIndicator(
-                            modelData.channel,
-                            modelData.controller
+                            midiControlIndicator.modelData.channel,
+                            midiControlIndicator.modelData.controller
                         )
                     }
                 }
@@ -467,8 +472,9 @@ Item {
                 model: root.inputTechModel
 
                 delegate: InputTechnologyIndicator {
+                    id: inputTechnologyIndicator
                     required property var modelData
-                    technology: modelData
+                    technology: inputTechnologyIndicator.modelData
                 }
             }
         }

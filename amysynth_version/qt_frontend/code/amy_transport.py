@@ -44,6 +44,7 @@ from transport_scheduler import (
     encode_command,
 )
 from transport_sinks import QtLocalByteSink, SerialByteSink, UnixByteSink
+from tb303 import Tb303Parameters
 
 
 AMY_PPQ = 48
@@ -1154,11 +1155,17 @@ class AmySerialClient:
                     synth=self.synth_id["bass"],
                     bass_gate_beats=rhythm_cfg.bass_gate_beats,
                     ppq=AMY_PPQ,
+                    tb303_parameters=self._bass_sequence_parameters(),
                 )
             )
         if lane_name == "chords":
             return self._chord_sequence_plan()[1]
         raise KeyError(lane_name)
+
+    def _bass_sequence_parameters(self) -> Tb303Parameters | None:
+        """Extension point for programs with bass-only event articulation."""
+
+        return None
 
     def _drum_quantum(self) -> int:
         config = self.rhythm_config

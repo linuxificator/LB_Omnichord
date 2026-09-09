@@ -4,7 +4,7 @@ import re
 import time
 import unittest
 
-from catalog import control_default, patch_for_index, synth_index
+from catalog import control_default, patch_for_index, synth_index, synths
 from harness import HeadlessApp
 
 
@@ -49,6 +49,36 @@ def wire_float(value: float) -> str:
 
 
 class NativeRhythmTests(unittest.TestCase):
+    def test_tb303_bass_sequence_is_executed_by_native_amy(self) -> None:
+        tb303_index = len(synths()) + 1
+        with HeadlessApp(native_amy=True) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("setBassSynthIndex", tb303_index)
+            app.action("selectChord", 0, 0)
+            app.action("setRhythmBassActivity", 2.0)
+            if not bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+            if int(app.query("chordGateState")) != 2:
+                app.action("toggleChordGate")
+            app.action("setPercussionVolume", 0.0)
+
+            start = app.bridge.count()
+            app.bridge.reset_audio_peak()
+            app.action("toggleRhythm")
+            app.bridge.wait_for_line_match(
+                lambda line: re.match(r"^H\d+,\d+,56a", line) is not None,
+                "native TB-303 bass event",
+                start=start,
+                timeout=8.0,
+            )
+            produced_audio = app.bridge.render_until_audio(9.0)
+            if not produced_audio:
+                app.bridge.checkpoint("tb303-no-audio", synths=(1,))
+            self.assertTrue(
+                produced_audio,
+                "native AMY produced no TB-303 bass audio after one full phrase",
+            )
+
     def test_cold_start_activates_visible_percussion_level_immediately(self) -> None:
         with HeadlessApp(native_amy=True) as app:
             app.bridge.wait_idle(timeout=10.0)

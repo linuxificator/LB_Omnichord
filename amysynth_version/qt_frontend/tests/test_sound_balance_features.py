@@ -54,7 +54,7 @@ class SoundBalanceFeatureTests(unittest.TestCase):
 
     def test_balance_plan_covers_every_omni_instrument_and_register(self) -> None:
         plan = instrument_balance.build_plan()
-        self.assertEqual(len(plan), 124)
+        self.assertEqual(len(plan), 125)
         self.assertEqual({entry["note"] for entry in plan[0]["notes"]}, {40, 60, 84})
 
     def test_factory_bass_volumes_retain_the_original_curated_values(self) -> None:
@@ -104,6 +104,21 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             delta=0.01,
         )
 
+    def test_activity_catalogue_retains_only_explicit_tb303_accents(self) -> None:
+        rhythms = json.loads(
+            (ROOT / "music" / "rhythms.json").read_text(encoding="utf-8")
+        )["rhythms"]
+        events = [
+            event
+            for rhythm in rhythms
+            for level in rhythm["bass_levels"]
+            for event in level
+        ]
+        accents = [event for event in events if event.get("accent") is True]
+        self.assertEqual(len(accents), 395)
+        self.assertTrue(all(event.get("accent") in (None, True) for event in events))
+        self.assertTrue(all("slide_to_next" not in event for event in events))
+
     def test_balance_report_validator_rejects_silence_and_clipping(self) -> None:
         report = {
             f"synth_{index}": {
@@ -113,7 +128,7 @@ class SoundBalanceFeatureTests(unittest.TestCase):
                 }
                 for note in instrument_balance.NOTES
             }
-            for index in range(124)
+            for index in range(125)
         }
         self.assertEqual(instrument_balance.validate_render_report(report), [])
         report["synth_0"]["40"]["peak_dbfs"] = -90.0

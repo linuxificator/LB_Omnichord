@@ -8,6 +8,8 @@ Last verified: 2026-09-08
 - `rhythm.md`: transport, tempo, fills and activity behavior.
 - `bass_riffs.md`: simple-bass pitch sources and the ranked independent riff
   catalogue.
+- `tb303.md`: shared TB-303-style instrument, bass-only articulation and
+  AMY-owned timing limits.
 - `midi_percussion.md`: complete GM note resolution and MIDI/sequencer level
   reference.
 - `midi_pitched_balance.md`: common velocity and output-level reference for

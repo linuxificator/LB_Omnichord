@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 
@@ -140,6 +142,7 @@ Item {
             }
 
             delegate: Item {
+                id: synthItem
                 required property var modelData
                 required property int index
 
@@ -149,7 +152,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     width: parent.width - 10
-                    text: modelData
+                    text: synthItem.modelData
                     color: root.textColor
                     elide: Text.ElideRight
                     horizontalAlignment: Text.AlignHCenter
@@ -168,7 +171,7 @@ Item {
 
                 TapHandler {
                     gesturePolicy: TapHandler.DragThreshold
-                    onTapped: synthWheel.currentIndex = index
+                    onTapped: synthWheel.currentIndex = synthItem.index
                 }
             }
 
