@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "tool_version": "6.10.3",
-  "total_warnings": 341,
+  "total_warnings": 334,
   "warnings": [
     {"path": "gui/ActivitySelector.qml", "id": "unqualified", "count": 17},
     {"path": "gui/BindableSlider.qml", "id": "unqualified", "count": 1},
@@ -9,7 +9,6 @@
     {"path": "gui/MidiScreen.qml", "id": "unqualified", "count": 54},
     {"path": "gui/MidiSynthSection.qml", "id": "unqualified", "count": 37},
     {"path": "gui/MidiUtilitySection.qml", "id": "unqualified", "count": 12},
-    {"path": "gui/RhythmSection.qml", "id": "unqualified", "count": 7},
     {"path": "gui/StrumNoteGuide.qml", "id": "unqualified", "count": 9},
     {"path": "gui/SynthSection.qml", "id": "unqualified", "count": 33},
     {"path": "gui/UtilitySection.qml", "id": "unqualified", "count": 12}
