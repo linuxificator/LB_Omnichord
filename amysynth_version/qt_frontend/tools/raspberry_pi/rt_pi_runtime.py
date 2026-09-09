@@ -122,6 +122,23 @@ def discover_pipewire(uid: int | None = None) -> list[int]:
     return result
 
 
+def runtime_signature(service_pid: int, uid: int | None = None) -> tuple[object, ...]:
+    """Return the identities whose replacement requires policy reapplication."""
+
+    pipewire_loops = tuple(
+        (pid, tid)
+        for pid in discover_pipewire(uid)
+        for tid in task_ids(pid)
+        if _read(Path(f"/proc/{pid}/task/{tid}/comm")) == "data-loop.0"
+    )
+    return (
+        service_pid,
+        parent_pid(service_pid),
+        tuple(task_ids(service_pid)),
+        pipewire_loops,
+    )
+
+
 def set_thread_policy(tid: int, cpus: set[int], fifo_priority: int = 0) -> None:
     os.sched_setaffinity(tid, cpus)
     policy = os.SCHED_FIFO if fifo_priority else os.SCHED_OTHER
@@ -228,17 +245,20 @@ def main() -> int:
         print(json.dumps(result, indent=2))
         return 0
 
-    applied: set[int] = set()
+    applied: dict[int, tuple[object, ...]] = {}
     while True:
         live = set(services())
-        applied.intersection_update(live)
-        for pid in sorted(live - applied):
+        applied = {pid: signature for pid, signature in applied.items() if pid in live}
+        for pid in sorted(live):
+            signature = runtime_signature(pid, uid)
+            if applied.get(pid) == signature:
+                continue
             try:
                 result = apply_split_policy(pid, uid)
             except (OSError, RuntimeError, ProcessLookupError) as exc:
                 print(f"PID {pid}: {exc}", flush=True)
             else:
-                applied.add(pid)
+                applied[pid] = runtime_signature(pid, uid)
                 print(json.dumps(result), flush=True)
         time.sleep(args.interval)
 

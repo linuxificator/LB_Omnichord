@@ -1,7 +1,7 @@
 # Raspberry Pi realtime audio research
 
-Status: in progress on Pi 4; Pi 5 pending physical availability  
-Branch: `research/rt_pi`  
+Status: Pi 4 complete; Pi 5 pending physical availability
+Branch: `research/rt_pi`
 Release under test: `R20260909T010905`
 
 ## Scope and invariants
@@ -65,8 +65,11 @@ which both removes the race and matches a cold application start.
   logs from a separate process, generates bounded synthetic loads and samples
   per-thread CPU/run-queue delay through `/proc`.
 
-The final profile choice and measured latency/dropout comparison will be added
-after the isolated boots and targeted FIFO experiments.
+All helpers remain external to both application processes. In particular,
+`rt_pi_runtime.py` finds the live `--amy-service` child, measures which of its
+non-main threads is actually rendering, and applies realtime policy only to
+that callback. It never gives the entire AMY or frontend process FIFO policy.
+It also discovers PipeWire's `data-loop.0` threads rather than relying on PIDs.
 
 ## Production-log replay: first comparisons
 
@@ -84,11 +87,77 @@ deadline checks.
 | Stock boot, `performance`, unrestricted | 6.154% | 5.161 ms | +0 | none |
 | CPU3 isolated, complete audio chain pinned, normal policy | 6.725% | 274.138 ms | +0 | none |
 | CPU3 isolated, PipeWire FIFO 80/75 and AMY FIFO 70 | 6.603% | 1,931.416 ms | +0 | none |
+| CPUs 2-3 isolated, AMY CPU3 / PipeWire CPU2, normal | 6.224% | 1.181 ms | +0 | none |
+| CPUs 2-3 isolated, AMY CPU3 / PipeWire CPU2, FIFO | 6.117% | 0.215 ms | +0 | none |
 
 The performance governor is already a clear improvement. One-core isolation
 eliminates observed PipeWire errors but substantially increases aggregate
 callback wait because AMY and the two PipeWire stages serialize on the same
 core. FIFO protects deadlines but does not manufacture CPU time; its aggregate
 wait is worse still behind the deliberately higher-priority audio-server
-stages. This profile is therefore not a candidate default. The two-core split
-must be measured before choosing a profile.
+stages. This one-core profile is therefore not a candidate. Splitting the
+stages between two isolated cores removes
+that artificial queue. The targeted FIFO split is the accepted Pi 4 profile.
+
+## Tail latency with the complete application
+
+The final test ran the published AppImage on hardware Wayland/V3D at 120 Hz.
+An independent Linux `uinput` process delivered 7,200 real touch updates over
+the production strum in 60 seconds. The frontend and AMY stayed separate
+processes and communicated only over the packaged Unix wire socket.
+
+- AMY callback CPU was 6.982% of one core; aggregate run delay was 0.069 ms.
+- The frontend used about 27-36% of one core-equivalent across repeated runs;
+  its largest contributors were the main and QSG render threads.
+- PipeWire client and sink error counters did not increase.
+- AMY reported neither overload nor slot exhaustion, and firmware reported
+  `throttled=0x0`.
+
+A 30-second scheduler trace captured 6,761 complete callbacks:
+
+| Callback metric | Median | p99 | Maximum |
+|---|---:|---:|---:|
+| Wake to scheduled | 0.006 ms | 0.011 ms | 0.026 ms |
+| Scheduled to switch-out | 0.372 ms | 0.511 ms | 1.024 ms |
+
+The trace is observational and was collected after the policy was applied; its
+output is not emitted from the realtime thread. IRQ deltas during active audio
+showed both relevant DMA IRQs on housekeeping CPU 0. CPU 2/3 saw timer and
+inter-processor activity but no device IRQ leakage.
+
+## Capacity under isolation and targeted realtime policy
+
+Each capacity point used a fresh packaged AMY service, its normal wire socket,
+both shared reverb processors, and a deliberately quiet level. Quiet is only
+for hearing safety; these oscillators are active and rendered.
+
+| Workload | Active AMY capacity | Callback CPU | p99 callback runtime | Result |
+|---|---:|---:|---:|---|
+| Sine | 336 oscillators | 14.569% | not traced | configured limit reached |
+| 24 dB filtered saw | 336 oscillators | 15.285% | not traced | configured limit reached |
+| DX7 patch 129 | 42 voices / 336 oscillators | 28.483% | 1.778 ms | configured limit reached |
+
+The DX7 maximum callback runtime was 2.226 ms. Even this worst tested sustained
+load remains below the callback period, so the 336-oscillator build limit is
+reached before the Pi 4 compute limit. This is not permission to increase the
+product limit without a separate transient/event-burst study.
+
+## Kernel decision
+
+The installed Raspberry Pi kernel provides kernel preemption, threaded IRQ
+support and CPU isolation, but not `PREEMPT_RT`, `NO_HZ_FULL` or
+RCU callback offload. Debian offers a generic `linux-image-rt-arm64` 6.12
+package while this board runs Raspberry Pi's 6.18 kernel and firmware/driver
+integration. Installing that generic kernel remotely would create a boot and
+hardware-support experiment, not a controlled scheduler comparison. It was
+therefore deliberately not installed. The measured stock Pi kernel plus
+`threadirqs`, isolation and targeted FIFO already meets the observed deadline.
+
+## Conclusion
+
+The recommended dedicated Pi 4 profile is `audio-split`: performance governor,
+CPUs 2-3 isolated from normal scheduling, IRQ default affinity on CPUs 0-1,
+PipeWire data loops on CPU 2 at FIFO 80/75, and only the detected AMY callback
+on CPU 3 at FIFO 70. The application and all its logic remain portable. The
+profile is a reversible host-integration choice documented in
+[`realtime_howto.md`](realtime_howto.md), not an application default.
