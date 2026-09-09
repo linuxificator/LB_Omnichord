@@ -242,7 +242,11 @@ def main() -> int:
         snapshot, updated = apply_profile(args.profile)
         print(f"snapshot: {snapshot}")
         print(f"next boot: {updated}", end="")
-        print("reboot is required; verify after reconnecting")
+        active, _checks = verify_profile(args.profile)
+        if active:
+            print("profile is already active; reboot is not required")
+        else:
+            print("reboot is required; verify after reconnecting")
         return 0
     if args.command == "rollback":
         print(f"restored: {rollback(args.snapshot)}")

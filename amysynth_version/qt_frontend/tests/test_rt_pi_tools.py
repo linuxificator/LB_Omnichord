@@ -126,6 +126,12 @@ class RtPiConfigTests(unittest.TestCase):
         self.assertEqual(fields[1], output.name)
         self.assertEqual(fields[0], hashlib.sha256(source.encode()).hexdigest())
 
+    def test_apply_reports_whether_the_running_kernel_needs_a_reboot(self) -> None:
+        source = (TOOLS / "rt_pi_config.py").read_text(encoding="utf-8")
+        self.assertIn("active, _checks = verify_profile(args.profile)", source)
+        self.assertIn("profile is already active; reboot is not required", source)
+        self.assertIn("reboot is required; verify after reconnecting", source)
+
 
 class RtPiBenchmarkTests(unittest.TestCase):
     def test_wire_log_parser_selects_session_and_retains_timing(self) -> None:
