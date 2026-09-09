@@ -33,7 +33,7 @@
       "parameters": {}
     },
     "bass": {
-      "selected": "juno_036",
+      "selected": "tb303",
       "parameters": {}
     }
   },
@@ -49,6 +49,7 @@
   },
   "rhythm": {
     "selected": "techno",
+    "bass_riff_selector": 3,
     "settings": {
       "pop_8": {
         "tempo": 108.0,
@@ -210,7 +211,7 @@
         "tempo": 134.0,
         "percussion_activity": 4,
         "chord_activity": 3,
-        "bass_activity": 4
+        "bass_activity": 5
       },
       "trance": {
         "tempo": 138.0,

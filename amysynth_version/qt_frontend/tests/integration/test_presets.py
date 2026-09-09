@@ -5,7 +5,7 @@ import re
 import time
 import unittest
 
-from catalog import control_default, entry_for_index, synth_index
+from catalog import control_default, entry_for_index, synth_index, synths
 from harness import HeadlessApp
 
 
@@ -56,6 +56,20 @@ def changed_control_value(control: dict[str, object]) -> float:
 
 
 class PresetIntegrationTests(unittest.TestCase):
+    def test_electronic_factory_presets_select_tb303_riff_defaults(self) -> None:
+        tb303_index = len(synths()) + 1
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            for preset, rank in ((14, 3), (15, 4), (17, 5)):
+                with self.subTest(preset=preset):
+                    app.action("selectPreset", preset)
+                    self.assertEqual(
+                        int(app.query("selectedBassSynthIndex")),
+                        tb303_index,
+                    )
+                    self.assertTrue(bool(app.query("bassRiffMode")))
+                    self.assertEqual(int(app.query("bassRiffSelector")), rank)
+
     def test_factory_controller_defaults_and_manual_takeover_round_trip(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=8.0)
