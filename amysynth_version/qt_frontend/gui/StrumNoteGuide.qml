@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 
 Item {
@@ -12,6 +14,7 @@ Item {
         model: root.noteModel
 
         delegate: Rectangle {
+            id: noteMarker
             required property var modelData
             required property int index
 
@@ -25,7 +28,7 @@ Item {
                 if (noteRepeater.count <= 1)
                     return (root.height - height) / 2
                 return root.verticalMargin
-                    + index * availableHeight / (noteRepeater.count - 1)
+                    + noteMarker.index * availableHeight / (noteRepeater.count - 1)
             }
             color: "#dcecf7"
             border.color: "#8bb9d8"
@@ -33,7 +36,7 @@ Item {
 
             Text {
                 anchors.fill: parent
-                text: String(modelData)
+                text: String(noteMarker.modelData)
                 color: "#08243d"
                 font.pixelSize: 15
                 font.bold: true
