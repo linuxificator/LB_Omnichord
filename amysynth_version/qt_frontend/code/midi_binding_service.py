@@ -22,6 +22,7 @@ TargetNormalizer = Callable[[Any], dict[str, Any] | None]
 class BindingEntry:
     key: ControlKey
     target_items: tuple[tuple[str, Any], ...]
+    activate_on_input: bool = False
 
     def target(self) -> dict[str, Any]:
         return copy.deepcopy(dict(self.target_items))
@@ -103,7 +104,16 @@ class MidiBindingService:
                 continue
             if source_type == "cc" and not 0 <= key[1] <= 127:
                 continue
-            entries.append(BindingEntry(key, tuple(sorted(copy.deepcopy(target).items()))))
+            activate_on_input = raw.get("activate_on_input", False)
+            if not isinstance(activate_on_input, bool):
+                continue
+            entries.append(
+                BindingEntry(
+                    key,
+                    tuple(sorted(copy.deepcopy(target).items())),
+                    activate_on_input,
+                )
+            )
         return tuple(entries)
 
     @staticmethod
@@ -111,6 +121,15 @@ class MidiBindingService:
         entries: tuple[BindingEntry, ...],
     ) -> list[tuple[ControlKey, dict[str, Any]]]:
         return [(entry.key, entry.target()) for entry in entries]
+
+    @staticmethod
+    def as_preset_state_entries(
+        entries: tuple[BindingEntry, ...],
+    ) -> list[tuple[ControlKey, dict[str, Any], bool]]:
+        return [
+            (entry.key, entry.target(), entry.activate_on_input)
+            for entry in entries
+        ]
 
     def replace_screen(
         self,
@@ -121,7 +140,7 @@ class MidiBindingService:
             return bool(
                 self.state.replace_screen_bindings(
                     str(screen),
-                    self.as_state_entries(entries),
+                    self.as_preset_state_entries(entries),
                 )
             )
 

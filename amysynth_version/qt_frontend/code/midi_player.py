@@ -1550,12 +1550,18 @@ class MidiPlayerBackend(QObject):
         self,
         screen: str,
         data: Any,
+        *,
+        include_dormant: bool = True,
     ) -> list[tuple[tuple[int, int], dict[str, Any]]]:
         entries = self._binding_service().normalize_entries(
             screen,
             data,
             self._normalize_control_target,
         )
+        if not include_dormant:
+            entries = tuple(
+                entry for entry in entries if not entry.activate_on_input
+            )
         return MidiBindingService.as_state_entries(entries)
 
     def capture_bound_control_values(
@@ -1568,7 +1574,11 @@ class MidiPlayerBackend(QObject):
     ) -> list[tuple[dict[str, Any], float]]:
         screen = str(screen)
         incoming_entries = (
-            self._normalized_binding_entries(screen, incoming_bindings)
+            self._normalized_binding_entries(
+                screen,
+                incoming_bindings,
+                include_dormant=False,
+            )
             if incoming_bindings is not None
             else []
         )

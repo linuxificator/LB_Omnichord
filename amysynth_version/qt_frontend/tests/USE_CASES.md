@@ -305,10 +305,12 @@ installation failed to show or release chord-key interaction correctly.
   the same release-before-edit ordering.
 - There is no separate double-click/double-tap unlink gesture.
 - The controller becomes blue and visible when capacity permits.
-- If the selected preset still declares the released binding, the next genuine
-  source movement restores it to green and immediately applies that event.
+- If the selected preset still declares the binding released by numeric UI
+  takeover, the next genuine source movement restores it to green and
+  immediately applies that event.
 - A binding learned only in runtime remains grey after the next movement until
-  the preset is stored. Storing a preset after unlinking records its removal.
+  the preset is stored. Clicking its green source in the grey bar is explicit
+  unlink: storing after that click records its removal.
 - Without movement, blue expires and removes the indicator after 30 seconds.
 
 **MIDI-CC-07 — hidden instrument targets reactivate on MIDI and OMNI**
@@ -429,6 +431,10 @@ installation failed to show or release chord-key interaction correctly.
   newly reached notes once and supplies no velocity.
 - Direct mouse/touch strumming and screen button taps never unlink their
   external bindings; only the matching grey-bar control can unlink them.
+- Factory mappings are dormant `activate_on_input` declarations. Loading a
+  preset without the controller attached neither shows green bindings nor
+  protects target values. The first genuine matching event activates the
+  binding and applies immediately.
 - Chord-type wheels behave like numeric sliders: direct wheel, group UP/DWN or
   RST interaction releases their binding before applying the screen edit, and
   later source movement restores it only when the selected preset declares it.

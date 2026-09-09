@@ -15,9 +15,11 @@ the pad labelled **Custom**.
 
 ## Factory control bindings
 
-Every shipped OMNI preset also contains the same ordinary MIDI bindings for
-the FLkey Mini's factory controls. They are not device-detection rules: any
-controller emitting the same standard messages gets the same result.
+Every shipped OMNI preset also contains the same MIDI binding declarations for
+the FLkey Mini's factory controls. They are dormant until their first genuine
+input, so an absent controller does not lock or preserve any screen value just
+by loading a preset. They are not device-detection rules: any controller
+emitting the same standard messages gets the same result.
 
 | FLkey source | MIDI message | OMNI target |
 | --- | --- | --- |
@@ -28,13 +30,14 @@ controller emitting the same standard messages gets the same result.
 | Play | channel 16 CC115 | rhythm start/stop |
 | Stop | channel 16 CC117 | automatic CHORD ON/OFF |
 
-Moving a bound screen slider or chord-type wheel temporarily hands that target
-to mouse/touch. Moving the preset-declared hardware control takes it back and
-applies the incoming value immediately. The two transport buttons and strum
-remain usable from both hardware and screen and can be unlinked only from the
-grey controller bar. Pitch Bend follows the existing coupled-tuning setting,
-so it controls both OMNI and MIDI tuning while coupling is enabled. CC1 changes
-strum position only; the preset's strum volume remains in force.
+The first genuine event activates its declared binding and applies the value
+immediately. Moving a bound screen slider or chord-type wheel temporarily hands
+that target to mouse/touch. Moving the preset-declared hardware control takes
+it back and applies the incoming value immediately. The two transport buttons
+and strum remain usable from both hardware and screen and can be unlinked only
+from the grey controller bar. Pitch Bend follows the existing coupled-tuning
+setting, so it controls both OMNI and MIDI tuning while coupling is enabled.
+CC1 changes strum position only; the preset's strum volume remains in force.
 
 The reviewed authoring copy of this shared mapping is
 [`default_omni_midi_control_bindings.json`](../../qt_frontend/instruments/default_omni_midi_control_bindings.json).

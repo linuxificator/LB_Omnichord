@@ -126,14 +126,15 @@ increment or decrement releases the binding before applying its step. There is
 no separate double-click/double-tap unlink gesture.
 
 Runtime ownership and the selected preset's declaration are separate. If the
-released binding is still declared by the selected preset, the next genuinely
-changed value from that source restores the binding and applies that very value
-immediately. This makes the last control surface that the performer actually
-moves authoritative. A runtime-only learned binding has no such fallback until
-the preset is stored. Storing after an unlink records the unlink and therefore
-removes the fallback. A source which has no selected-preset declaration keeps
-the older behavior: its next movement merely ends the blue state and leaves it
-unbound.
+binding released by numeric UI takeover is still declared by the selected
+preset, the next genuinely changed value from that source restores the binding
+and applies that very value immediately. This makes the last control surface
+that the performer actually moves authoritative. A runtime-only learned
+binding has no such fallback until the preset is stored. Clicking the green
+source in the grey bar is the explicit removal operation; storing after that
+click omits the declaration. A source which has no selected-preset declaration
+keeps the older behavior: its next movement merely ends the blue state and
+leaves it unbound.
 
 Button targets and the OMNI strum-position target are deliberate exceptions to
 manual-takeover unlinking. Their screen controls remain usable alongside the
@@ -141,6 +142,15 @@ external source and never release their binding. They can be unlinked only by
 clicking their green controller representation in the grey input bar. If the
 selected preset still declares that binding, the next genuine source event
 restores it and is handled immediately.
+
+Factory control-surface defaults use the optional preset flag
+`activate_on_input: true`. Such a declaration is persisted but dormant: it
+does not become green, protect a value or acquire target authority merely
+because its preset was loaded. The first genuine event from that source binds
+and applies immediately. This keeps the application fully usable when the
+named controller is absent while retaining ordinary MIDI identities that work
+with any compatible control surface. User-learned bindings remain immediately
+active unless they explicitly opt into this policy.
 
 Unlinking always makes the controller visible when capacity allows.
 The blue state is an inactivity notice, not a latch: the next genuine CC
@@ -220,12 +230,14 @@ parameters and the bound section volume. A hidden instrument-specific
 parameter remains protected without selecting that instrument.
 
 A runtime preset switch preserves the current value of every target bound
-immediately before the switch and every target declared by the destination
-preset. The destination preset still replaces that screen's binding set as
-specified below; only the protected numeric values survive the transition.
-Initial application startup may load all stored values because it is not a
-live preset switch. After either operation, the next genuine CC movement
-continues through the normal mapped setter path.
+immediately before the switch and every immediately-active target declared by
+the destination preset. A dormant `activate_on_input` declaration does not
+protect a value until its source has actually taken ownership. The destination
+preset still replaces that screen's binding set as specified below; only the
+protected numeric values survive the transition. Initial application startup
+may load all stored values because it is not a live preset switch. After either
+operation, the next genuine CC movement continues through the normal mapped
+setter path.
 
 There is one deliberate exception. If the same channel/controller pair is
 currently bound to target A and the destination preset assigns it to a

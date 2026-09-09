@@ -70,9 +70,9 @@ class PresetIntegrationTests(unittest.TestCase):
                 (item["channel"], item["controller"]): item["state"]
                 for item in app.action("midiControlIndicators")
             }
-            self.assertTrue(expected_sources.issubset(states))
             self.assertTrue(
-                all(states[source] == "bound" for source in expected_sources)
+                all(states.get(source) != "bound" for source in expected_sources),
+                "dormant factory controls claimed targets before real input",
             )
 
             bass_target = {
@@ -118,13 +118,30 @@ class PresetIntegrationTests(unittest.TestCase):
             )
 
             self.assertFalse(bool(app.query("rhythmRunning")))
+            app.action("injectMidiControl", 16, 115, 0)
+            app.action("injectMidiControl", 16, 115, 127)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+            app.action("injectMidiControl", 16, 115, 0)
+            app.action("toggleRhythm")
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            self.assertEqual(
+                app.action(
+                    "midiControlTargetVisualState",
+                    {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_toggle",
+                    },
+                ),
+                "bound",
+                "screen button unexpectedly unlinked its controller",
+            )
             app.action("clickMidiControlIndicator", 16, 115)
             states = {
                 (item["channel"], item["controller"]): item["state"]
                 for item in app.action("midiControlIndicators")
             }
             self.assertEqual(states[(16, 115)], "blue")
-            app.action("injectMidiControl", 16, 115, 0)
             app.action("injectMidiControl", 16, 115, 127)
             self.assertTrue(bool(app.query("rhythmRunning")))
             states = {
@@ -329,22 +346,19 @@ class PresetIntegrationTests(unittest.TestCase):
                     / "p1.json"
                 ).read_text(encoding="utf-8")
             )
-            self.assertEqual(
-                midi_data["midi_control_bindings"][0]["controller"],
-                20,
+            midi_binding = next(
+                entry
+                for entry in midi_data["midi_control_bindings"]
+                if entry.get("controller") == 20
             )
-            self.assertEqual(
-                midi_data["midi_control_bindings"][0]["target"]["screen"],
-                "midi",
+            omni_binding = next(
+                entry
+                for entry in omni_data["midi_control_bindings"]
+                if entry.get("controller") == 21
+                and entry.get("target", {}).get("role") == "chord"
             )
-            self.assertEqual(
-                omni_data["midi_control_bindings"][0]["controller"],
-                21,
-            )
-            self.assertEqual(
-                omni_data["midi_control_bindings"][0]["target"]["screen"],
-                "omni",
-            )
+            self.assertEqual(midi_binding["target"]["screen"], "midi")
+            self.assertEqual(omni_binding["target"]["screen"], "omni")
 
             app.action("selectMidiPreset", 2)
             app.action("selectPreset", 2)

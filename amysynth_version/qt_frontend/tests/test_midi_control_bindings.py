@@ -285,9 +285,9 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertIsNone(mapped)
         self.assertEqual(state.status((1, 7)), "idle")
 
-    def test_storing_manual_unlink_removes_preset_reactivation(self) -> None:
+    def test_storing_after_ui_takeover_retains_preset_reactivation(self) -> None:
         state = MidiControlState(capacity=2)
-        binding = target("removed")
+        binding = target("temporarily-released")
         state.replace_screen_bindings(
             "midi",
             [((1, 7), binding)],
@@ -301,8 +301,56 @@ class MidiControlStateTests(unittest.TestCase):
 
         self.assertTrue(changed)
         self.assertEqual(key, (1, 7))
+        self.assertEqual(mapped, binding)
+        self.assertTrue(state.is_target_bound(binding))
+
+    def test_storing_after_grey_bar_unlink_removes_preset_reactivation(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = target("explicitly-removed")
+        state.replace_screen_bindings(
+            "midi",
+            [((1, 7), binding)],
+            now=1.0,
+        )
+        state.observe(1, 7, 0, now=1.1)
+        self.assertTrue(state.indicator_clicked((1, 7), now=2.0))
+        state.remember_active_bindings_as_preset("midi")
+
+        changed, mapped, key = state.observe(1, 7, 1, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(key, (1, 7))
         self.assertIsNone(mapped)
         self.assertFalse(state.is_target_bound(binding))
+
+    def test_soft_binding_is_dormant_until_real_input_and_survives_store(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = target("factory-default", screen="omni")
+        state.replace_screen_bindings(
+            "omni",
+            [((1, 1), binding, True)],
+            now=1.0,
+        )
+
+        self.assertFalse(state.is_target_bound(binding))
+        self.assertEqual(
+            state.serialize_bindings("omni"),
+            [
+                {
+                    "channel": 1,
+                    "controller": 1,
+                    "activate_on_input": True,
+                    "target": binding,
+                }
+            ],
+        )
+        state.remember_active_bindings_as_preset("omni")
+        state.observe(1, 1, 0, now=2.0)
+        changed, mapped, _key = state.observe(1, 1, 64, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(mapped, binding)
+        self.assertTrue(state.is_target_bound(binding))
 
     def test_screen_specific_bindings_round_trip(self) -> None:
         state = MidiControlState(capacity=4)

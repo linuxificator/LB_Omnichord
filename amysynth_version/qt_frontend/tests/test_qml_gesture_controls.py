@@ -380,6 +380,7 @@ Window {
     visible: true
     property int startCount: 0
     property int activationCount: 0
+    property int releaseCount: 0
 
     QtObject {
         id: fakeController
@@ -393,6 +394,9 @@ Window {
         function activateControlTarget(target) {
             window.activationCount += 1
             return window.activationCount === 1
+        }
+        function releaseControlTarget(target) {
+            window.releaseCount += 1
         }
     }
 
@@ -427,6 +431,7 @@ Window {
         QCoreApplication.processEvents()
         self.assertEqual(int(window.property("activationCount")), 2)
         self.assertEqual(int(window.property("startCount")), 1)
+        self.assertEqual(int(window.property("releaseCount")), 0)
 
         window.deleteLater()
         component.deleteLater()
