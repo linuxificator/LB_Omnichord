@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import ast
+import importlib.util
 import os
 import subprocess
 import sys
@@ -251,21 +251,40 @@ print('OK')
         self.assertEqual(result.stdout.strip(), "OK")
 
     def test_appimage_passes_the_child_pid_without_name_lookup(self) -> None:
-        tree = ast.parse(
-            (ROOT / "packaging" / "appimage_entry.py").read_text(encoding="utf-8")
+        spec = importlib.util.spec_from_file_location(
+            "appimage_entry_realtime_test",
+            ROOT / "packaging" / "appimage_entry.py",
         )
-        calls = [
-            node
-            for node in ast.walk(tree)
-            if isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "apply_runtime_policy"
-        ]
-        self.assertEqual(len(calls), 1)
-        argument = calls[0].args[0]
-        self.assertIsInstance(argument, ast.Attribute)
-        assert isinstance(argument, ast.Attribute)
-        self.assertEqual((argument.value.id, argument.attr), ("service", "pid"))
+        assert spec is not None and spec.loader is not None
+        entry = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(entry)
+
+        service = mock.Mock(pid=4242)
+        service.poll.return_value = None
+        socket = mock.Mock()
+        socket.is_socket.return_value = True
+        frontend = mock.Mock()
+        frontend.main.return_value = 0
+        application = realtime.PolicyApplication(True, True, amy_audio_tid=4243)
+        imported_realtime = sys.modules["raspberry_pi_realtime"]
+
+        with (
+            mock.patch.object(entry.subprocess, "Popen", return_value=service),
+            mock.patch.object(entry, "socket_path", return_value=socket),
+            mock.patch.object(entry, "import_frontend", return_value=frontend),
+            mock.patch.object(
+                imported_realtime,
+                "apply_runtime_policy",
+                return_value=application,
+            ) as apply,
+            mock.patch.dict(os.environ, {}, clear=False),
+        ):
+            result = entry.run_frontend(["--windowed"])
+
+        self.assertEqual(result, 0)
+        apply.assert_called_once_with(4242, pin_caller=True)
+        frontend.main.assert_called_once()
+        service.terminate.assert_called_once()
 
 
 if __name__ == "__main__":

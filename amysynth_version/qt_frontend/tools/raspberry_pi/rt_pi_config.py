@@ -14,6 +14,7 @@ import json
 import os
 import platform
 import shlex
+import stat
 import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -146,6 +147,7 @@ def snapshot_boot_cmdline(profile: str) -> Path:
         "profile_requested": profile,
         "source": str(BOOT_CMDLINE),
         "sha256": sha256_bytes(original),
+        "mode": stat.S_IMODE(BOOT_CMDLINE.stat().st_mode),
     }
     (snapshot / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -157,14 +159,16 @@ def snapshot_boot_cmdline(profile: str) -> Path:
     return snapshot
 
 
-def apply_profile(name: str) -> tuple[Path, str]:
+def apply_profile(name: str) -> tuple[Path | None, str]:
     _require_root()
     profile = PROFILES[name]
     original = BOOT_CMDLINE.read_text(encoding="utf-8")
     updated = update_kernel_cmdline(original, profile)
+    if updated == original:
+        return None, updated
+    original_mode = stat.S_IMODE(BOOT_CMDLINE.stat().st_mode)
     snapshot = snapshot_boot_cmdline(name)
-    if updated != original:
-        _atomic_write(BOOT_CMDLINE, updated.encode(), 0o755)
+    _atomic_write(BOOT_CMDLINE, updated.encode(), original_mode)
     return snapshot, updated
 
 
@@ -177,7 +181,11 @@ def rollback(snapshot: Path | None) -> Path:
     original = (snapshot / "cmdline.txt").read_bytes()
     if sha256_bytes(original) != manifest["sha256"]:
         raise RuntimeError(f"snapshot checksum mismatch: {snapshot}")
-    _atomic_write(BOOT_CMDLINE, original, 0o755)
+    try:
+        current_mode = stat.S_IMODE(BOOT_CMDLINE.stat().st_mode)
+    except FileNotFoundError:
+        current_mode = 0o644
+    _atomic_write(BOOT_CMDLINE, original, int(manifest.get("mode", current_mode)))
     return snapshot
 
 
@@ -240,7 +248,7 @@ def main() -> int:
         return 0
     if args.command == "apply":
         snapshot, updated = apply_profile(args.profile)
-        print(f"snapshot: {snapshot}")
+        print(f"snapshot: {snapshot if snapshot is not None else 'unchanged'}")
         print(f"next boot: {updated}", end="")
         active, _checks = verify_profile(args.profile)
         if active:

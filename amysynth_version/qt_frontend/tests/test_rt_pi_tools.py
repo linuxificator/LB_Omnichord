@@ -3,10 +3,12 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import subprocess
+import stat
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +51,12 @@ asset_builder = load_path(
 
 
 class RtPiConfigTests(unittest.TestCase):
+    def test_runtime_boot_contract_matches_configuration_authority(self) -> None:
+        self.assertEqual(
+            realtime_status.EXPECTED_BOOT_ARGUMENTS,
+            frozenset(config.PROFILES["audio-split"].boot_arguments),
+        )
+
     def test_profiles_replace_only_owned_kernel_arguments(self) -> None:
         original = (
             "console=tty1 root=PARTUUID=abc rootwait quiet "
@@ -67,6 +75,30 @@ class RtPiConfigTests(unittest.TestCase):
             config.PROFILES["stock"],
         )
         self.assertEqual(updated, "root=/dev/mmcblk0 custom=yes\n")
+
+    def test_apply_is_idempotent_and_preserves_boot_file_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            boot = root / "cmdline.txt"
+            state = root / "state"
+            boot.write_text("root=/dev/mmcblk0 rootwait\n", encoding="utf-8")
+            boot.chmod(0o640)
+            with (
+                mock.patch.object(config, "BOOT_CMDLINE", boot),
+                mock.patch.object(config, "STATE_ROOT", state),
+                mock.patch.object(config, "_require_root"),
+            ):
+                first, _updated = config.apply_profile("audio-split")
+                latest = (state / "latest-snapshot").read_text(encoding="utf-8")
+                second, _unchanged = config.apply_profile("audio-split")
+
+            self.assertIsNotNone(first)
+            self.assertIsNone(second)
+            self.assertEqual(
+                stat.S_IMODE(boot.stat().st_mode),
+                0o640,
+            )
+            self.assertEqual((state / "latest-snapshot").read_text(), latest)
 
     def test_startup_status_is_silent_outside_pi_4_and_pi_5(self) -> None:
         status = realtime_status.evaluate_realtime(

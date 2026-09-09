@@ -786,6 +786,8 @@ jobs:
           bash -n "rpi-realtime-dist/$setup_file"
           "rpi-realtime-dist/$setup_file" --help | grep '^Usage:'
           (cd rpi-realtime-dist && sha256sum --check "$setup_file.sha256")
+          printf '%s\n' "$(cat rpi-realtime-dist/$setup_file.sha256)" \
+            > rpi-realtime-subject.sha256
 
       - name: Verify exact five-platform asset set
         env:
@@ -828,6 +830,12 @@ jobs:
         with:
           subject-checksums: firmware-subject.sha256
 
+      - name: Attest Raspberry Pi realtime setup provenance
+        id: rpi-realtime-provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: rpi-realtime-subject.sha256
+
       - name: Preserve and independently verify signed attestations
         env:
           GH_TOKEN: ${{ github.token }}
@@ -840,6 +848,8 @@ jobs:
             "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
           cp '${{ steps.firmware-provenance.outputs.bundle-path }}' \
             "LB_Omnichord.${RELEASE_TAG}.ESP32P4.provenance.sigstore.json"
+          cp '${{ steps.rpi-realtime-provenance.outputs.bundle-path }}' \
+            "LB_Omnichord.${RELEASE_STAMP}.Pi4-Pi5-realtime-setup.provenance.sigstore.json"
           while read -r package; do
             gh attestation verify "dist/$package" \
               --repo "$GITHUB_REPOSITORY"
@@ -849,6 +859,9 @@ jobs:
           done < <(jq -r '.packages[].file' release-manifest.json)
           firmware_zip="LB_Omnichord.${RELEASE_TAG}.ESP32P4.zip"
           gh attestation verify "firmware-dist/$firmware_zip" \
+            --repo "$GITHUB_REPOSITORY"
+          setup_file="LB_Omnichord.${RELEASE_STAMP}.Pi4-Pi5-realtime-setup.sh"
+          gh attestation verify "rpi-realtime-dist/$setup_file" \
             --repo "$GITHUB_REPOSITORY"
 
       - name: Create tag and platform release
@@ -866,6 +879,7 @@ jobs:
             "LB_Omnichord.${RELEASE_STAMP}.provenance.sigstore.json"
             "LB_Omnichord.${RELEASE_STAMP}.sbom.sigstore.json"
             "LB_Omnichord.${RELEASE_TAG}.ESP32P4.provenance.sigstore.json"
+            "LB_Omnichord.${RELEASE_STAMP}.Pi4-Pi5-realtime-setup.provenance.sigstore.json"
           )
           linux_file="LB_Omnichord.${RELEASE_STAMP}.Linux-x86_64.AppImage"
           pi_file="LB_Omnichord.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage"
@@ -923,7 +937,7 @@ jobs:
             echo
             echo "AMY fork release: \`$AMY_RELEASE_BRANCH\` at immutable build commit \`$AMY_COMMIT\`."
             echo
-            echo 'Each application package has signed GitHub build-provenance and SPDX 2.3 SBOM attestations. The ESP32-P4 firmware has a separate signed build-provenance attestation. Download an asset and verify it with `gh attestation verify ASSET --repo linuxificator/LB_Omnichord`; add `--predicate-type https://spdx.dev/Document/v2.3` for an application package to verify and inspect its SBOM attestation.'
+            echo 'Each application package has signed GitHub build-provenance and SPDX 2.3 SBOM attestations. The ESP32-P4 firmware and Raspberry Pi realtime setup script each have a separate signed build-provenance attestation. Download an asset and verify it with `gh attestation verify ASSET --repo linuxificator/LB_Omnichord`; add `--predicate-type https://spdx.dev/Document/v2.3` for an application package to verify and inspect its SBOM attestation.'
           } > release-notes.md
           for index in "${!release_assets[@]}"; do
             release_assets[$index]="dist/${release_assets[$index]}"
