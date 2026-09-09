@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 import tomllib
 import unittest
@@ -18,6 +19,8 @@ PROFILE = (
 )
 SYSEX = PROFILE.with_suffix(".syx")
 CHECKSUMS = PROFILE.parent / "SHA256SUMS"
+DEFAULT_BINDINGS = FRONTEND / "instruments" / "default_omni_midi_control_bindings.json"
+OMNI_FACTORY_PRESETS = FRONTEND / "instruments" / "default_presets"
 
 if str(CODE) not in sys.path:
     sys.path.insert(0, str(CODE))
@@ -32,6 +35,19 @@ EXPECTED_NOTES = (
 
 
 class ControllerProfileTests(unittest.TestCase):
+    def test_every_factory_omni_preset_has_reviewed_controller_defaults(self) -> None:
+        expected = json.loads(DEFAULT_BINDINGS.read_text(encoding="utf-8"))
+        self.assertEqual(len(expected), 12)
+
+        for number in range(1, 19):
+            with self.subTest(preset=number):
+                preset = json.loads(
+                    (OMNI_FACTORY_PRESETS / f"p{number}.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(preset.get("midi_control_bindings"), expected)
+
     def test_flkey_mini_profile_is_a_distinct_channel_ten_gm_kit(self) -> None:
         with PROFILE.open("rb") as handle:
             profile = tomllib.load(handle)

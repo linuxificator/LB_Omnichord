@@ -56,6 +56,102 @@ def changed_control_value(control: dict[str, object]) -> float:
 
 
 class PresetIntegrationTests(unittest.TestCase):
+    def test_factory_controller_defaults_and_manual_takeover_round_trip(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            expected_sources = {
+                (1, 1),
+                *((1, controller) for controller in range(21, 29)),
+                (1, 128),
+                (16, 115),
+                (16, 117),
+            }
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertTrue(expected_sources.issubset(states))
+            self.assertTrue(
+                all(states[source] == "bound" for source in expected_sources)
+            )
+
+            bass_target = {
+                "screen": "omni",
+                "kind": "volume",
+                "role": "bass",
+            }
+            app.action("injectMidiControl", 1, 22, 0)
+            app.action("injectMidiControl", 1, 22, 127)
+            self.assertAlmostEqual(float(app.query("bassVolume")), 1.0)
+
+            app.action("manuallyEditMidiControlTarget", bass_target)
+            app.action("setBassVolume", 0.41)
+            self.assertAlmostEqual(float(app.query("bassVolume")), 0.41)
+            app.action("injectMidiControl", 1, 22, 126)
+            self.assertAlmostEqual(float(app.query("bassVolume")), 0.99)
+            self.assertEqual(
+                app.action("midiControlTargetVisualState", bass_target),
+                "bound",
+            )
+
+            app.action("injectMidiPitchBend", 1, 16383)
+            self.assertEqual(int(app.query("tuningReference")), 466)
+            self.assertEqual(int(app.action("midiTuningReference")), 466)
+
+            old_chord = int(app.action("chordIndexForRow", 0))
+            app.action("injectMidiControl", 1, 25, 0)
+            app.action("injectMidiControl", 1, 25, 127)
+            self.assertNotEqual(int(app.action("chordIndexForRow", 0)), old_chord)
+            chord_target = {
+                "screen": "omni",
+                "kind": "chord_type",
+                "row": 0,
+            }
+            app.action("manuallyEditMidiControlTarget", chord_target)
+            app.action("setRowChordType", 0, old_chord)
+            self.assertEqual(int(app.action("chordIndexForRow", 0)), old_chord)
+            app.action("injectMidiControl", 1, 25, 64)
+            self.assertNotEqual(int(app.action("chordIndexForRow", 0)), old_chord)
+            self.assertEqual(
+                app.action("midiControlTargetVisualState", chord_target),
+                "bound",
+            )
+
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            app.action("clickMidiControlIndicator", 16, 115)
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(16, 115)], "blue")
+            app.action("injectMidiControl", 16, 115, 0)
+            app.action("injectMidiControl", 16, 115, 127)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(16, 115)], "bound")
+
+            self.assertNotEqual(int(app.query("chordGateState")), 1)
+            app.action("injectMidiControl", 16, 117, 0)
+            app.action("injectMidiControl", 16, 117, 127)
+            self.assertEqual(int(app.query("chordGateState")), 1)
+
+            app.action("pressChord", 0, 0)
+            app.action("releaseChord", 0, 0)
+            start = app.bridge.count()
+            app.action("injectMidiControl", 1, 1, 0)
+            app.action("injectMidiControl", 1, 1, 64)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertTrue(
+                any(
+                    "i2" in line and "n" in line and "l" in line
+                    for line in app.bridge.lines_since(start)
+                ),
+                "factory CC1 strum binding emitted no synth-2 note",
+            )
+
     def test_m12_strings_attack_reset_restores_catalogue_default(self) -> None:
         """RST must restore an unbound edit in the reported M12 case."""
 

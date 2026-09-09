@@ -643,6 +643,26 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("performanceBackend.rollChordRows(-1)", qml)
         self.assertIn("performanceBackend.rollChordRows(1)", qml)
 
+    def test_strum_buttons_and_chord_wheels_have_explicit_midi_ownership(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
+
+        gate_start = main.index("id: chordGateButton")
+        gate_end = main.index("RainbowModeButton {", gate_start)
+        gate = main[gate_start:gate_end]
+        self.assertIn('"action": "chord_gate"', gate)
+        self.assertIn("MidiButtonLed {", gate)
+        self.assertIn("window.midiButtonHandled(chordGateButton.midiTarget)", gate)
+
+        self.assertIn('"kind": "chord_type"', main)
+        self.assertIn("function handleChordTypeEdit(chordIndex)", main)
+        self.assertIn("releaseControlTargetForManualEdit(", main)
+        self.assertIn("function releaseChordTypeBindings()", main)
+
+        self.assertIn('"kind": "strum_position"', strum)
+        self.assertIn("activateControlTarget(root.midiTarget)", strum)
+        self.assertNotIn("releaseControlTargetForManualEdit", strum)
+
     def test_chord_left_controls_span_two_rows_with_equal_spacing(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         panel_start = qml.index("id: chordControlPanel")

@@ -13,6 +13,34 @@ The profile changes only the FLkey's pad **Custom Mode**. Its other pad modes
 are unaffected. Enter the configured mode by holding **Shift** and pressing
 the pad labelled **Custom**.
 
+## Factory control bindings
+
+Every shipped OMNI preset also contains the same ordinary MIDI bindings for
+the FLkey Mini's factory controls. They are not device-detection rules: any
+controller emitting the same standard messages gets the same result.
+
+| FLkey source | MIDI message | OMNI target |
+| --- | --- | --- |
+| Pitch strip | channel 1 Pitch Bend | shared tuning reference |
+| Modulation strip | channel 1 CC1 | OMNI strum position |
+| Knobs 1--4 | channel 1 CC21--24 | drum, bass, strum and chord volume |
+| Knobs 5--8 | channel 1 CC25--28 | chord-type rows 1--4 |
+| Play | channel 16 CC115 | rhythm start/stop |
+| Stop | channel 16 CC117 | automatic CHORD ON/OFF |
+
+Moving a bound screen slider or chord-type wheel temporarily hands that target
+to mouse/touch. Moving the preset-declared hardware control takes it back and
+applies the incoming value immediately. The two transport buttons and strum
+remain usable from both hardware and screen and can be unlinked only from the
+grey controller bar. Pitch Bend follows the existing coupled-tuning setting,
+so it controls both OMNI and MIDI tuning while coupling is enabled. CC1 changes
+strum position only; the preset's strum volume remains in force.
+
+The reviewed authoring copy of this shared mapping is
+[`default_omni_midi_control_bindings.json`](../../qt_frontend/instruments/default_omni_midi_control_bindings.json).
+Each factory OMNI preset embeds its own copy so storing or editing one preset
+can change its bindings independently.
+
 ## Layout
 
 Pad numbers follow the physical device and `ncc`: 1--8 are the upper row from
