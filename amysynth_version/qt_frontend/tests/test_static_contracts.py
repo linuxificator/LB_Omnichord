@@ -1031,6 +1031,16 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("PointerNormalization.verticalUnit", midi_strum)
         self.assertNotIn("controller", section)
 
+    def test_tuning_edit_handlers_declare_their_signal_value(self) -> None:
+        for name in ("UtilitySection.qml", "MidiUtilitySection.qml"):
+            with self.subTest(component=name):
+                source = (ROOT / "gui" / name).read_text(encoding="utf-8")
+                self.assertIn(
+                    "onEdited: (value) =>",
+                    source,
+                    "implicit signal-parameter injection is deprecated in Qt 6",
+                )
+
     def test_migraine_is_a_visual_only_bounded_sprite(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
