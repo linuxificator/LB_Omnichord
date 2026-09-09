@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "tool_version": "6.10.3",
-  "total_warnings": 214,
+  "total_warnings": 184,
   "warnings": [
     {"path": "gui/BindableSlider.qml", "id": "unqualified", "count": 1},
     {"path": "gui/Main.qml", "id": "unqualified", "count": 159},
-    {"path": "gui/MidiScreen.qml", "id": "unqualified", "count": 54}
+    {"path": "gui/MidiScreen.qml", "id": "unqualified", "count": 24}
   ]
 }
