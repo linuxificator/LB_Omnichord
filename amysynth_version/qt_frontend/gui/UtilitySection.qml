@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
@@ -146,6 +148,7 @@ Item {
             }
 
             delegate: Item {
+                id: tuningItem
                 required property var modelData
                 required property int index
 
@@ -157,7 +160,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     width: parent.width - 10
-                    text: modelData
+                    text: tuningItem.modelData
                     color: "#482507"
                     horizontalAlignment:
                         Text.AlignHCenter
@@ -187,7 +190,7 @@ Item {
 
                     onTapped:
                         tuningWheel.currentIndex =
-                            index
+                            tuningItem.index
                 }
             }
 
