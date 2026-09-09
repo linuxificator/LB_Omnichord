@@ -24,6 +24,8 @@ tests and documentation belong to `amysynth_version`.
 - [`controls/`](controls/README.md): MIDI, OSC and external-control learning.
 - [`music/`](music/README.md): presets, rhythm, sequences, balance and tuning.
 - [`platform/`](platform/README.md): desktop/mobile packaging and Raspberry Pi.
+- [`quality_todo/`](quality_todo/README.md): bounded, evidence-backed quality
+  work that has been identified but is not yet an active implementation.
 
 ## Required reading
 
