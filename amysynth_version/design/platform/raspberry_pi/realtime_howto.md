@@ -101,12 +101,14 @@ permission after reconnecting:
 ulimit -r
 ```
 
-Expected: `80` or greater. The installer also places standard drop-ins under
-`/etc/systemd/user/{pipewire,pipewire-pulse}.service.d/` and configuration
-under `/etc/pipewire/{pipewire,pipewire-pulse}.conf.d/`. Systemd supplies the
+Expected: `80` or greater. The installer also places standard per-user
+drop-ins under `~/.config/systemd/user/{pipewire,pipewire-pulse}.service.d/`
+and configuration under
+`~/.config/pipewire/{pipewire,pipewire-pulse}.conf.d/`. Systemd supplies the
 resource limit; each PipeWire process uses its own `module-rt` and
 `thread.affinity` support to create its `data-loop.0` on CPU 2 at FIFO 80 or
-75. Application code does not mutate PipeWire threads.
+75. No other desktop user is affected, and application code does not mutate
+PipeWire threads.
 
 There is no privileged runtime service. Start `run_local.sh` or the AppImage
 normally. Its existing wrapper starts AMY and already owns the exact child PID
@@ -186,6 +188,10 @@ First disable the persistent governor and remove the optional user limit:
 ```sh
 sudo systemctl disable --now lb-omnichord-performance.service
 sudo rm /etc/security/limits.d/95-lb-omnichord-realtime.conf
+rm ~/.config/pipewire/pipewire.conf.d/95-lb-omnichord-realtime.conf
+rm ~/.config/pipewire/pipewire-pulse.conf.d/95-lb-omnichord-realtime.conf
+rm ~/.config/systemd/user/pipewire.service.d/95-lb-omnichord-realtime.conf
+rm ~/.config/systemd/user/pipewire-pulse.service.d/95-lb-omnichord-realtime.conf
 sudo python3 tools/raspberry_pi/rt_pi_config.py set-governor ondemand
 ```
 

@@ -5,8 +5,6 @@ source_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 install_root="/usr/local/lib/lb-omnichord-rt"
 unit_root="/etc/systemd/system"
 limits_file="/etc/security/limits.d/95-lb-omnichord-realtime.conf"
-pipewire_config_root="/etc/pipewire"
-user_unit_root="/etc/systemd/user"
 display_name="${LB_OMNICHORD_RELEASE_ASSET:-$(basename -- "$0")}"
 target_user="${SUDO_USER:-}"
 
@@ -59,6 +57,15 @@ if [[ ! "$target_user" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || ! id "$target_user" >/de
     echo "Invalid local user: $target_user" >&2
     exit 1
 fi
+target_group="$(id -gn "$target_user")"
+target_record="$(getent passwd "$target_user")"
+IFS=: read -r _name _password _uid _gid _gecos target_home _shell <<<"$target_record"
+if [[ ! -d "$target_home" || "$target_home" != /* ]]; then
+    echo "Invalid home directory for $target_user: $target_home" >&2
+    exit 1
+fi
+pipewire_config_root="$target_home/.config/pipewire"
+user_unit_root="$target_home/.config/systemd/user"
 
 required_files=(
     rt_pi_config.py
@@ -82,19 +89,30 @@ install -m 755 \
 install -m 644 \
     "$source_root/lb-omnichord-performance.service" \
     "$unit_root/"
-install -d -m 755 \
+install -d -o "$target_user" -g "$target_group" -m 755 \
     "$pipewire_config_root/pipewire.conf.d" \
     "$pipewire_config_root/pipewire-pulse.conf.d" \
     "$user_unit_root/pipewire.service.d" \
     "$user_unit_root/pipewire-pulse.service.d"
-install -m 644 "$source_root/pipewire-lb-realtime.conf" \
+install -o "$target_user" -g "$target_group" -m 644 \
+    "$source_root/pipewire-lb-realtime.conf" \
     "$pipewire_config_root/pipewire.conf.d/95-lb-omnichord-realtime.conf"
-install -m 644 "$source_root/pipewire-pulse-lb-realtime.conf" \
+install -o "$target_user" -g "$target_group" -m 644 \
+    "$source_root/pipewire-pulse-lb-realtime.conf" \
     "$pipewire_config_root/pipewire-pulse.conf.d/95-lb-omnichord-realtime.conf"
-install -m 644 "$source_root/pipewire-service-limits.conf" \
+install -o "$target_user" -g "$target_group" -m 644 \
+    "$source_root/pipewire-service-limits.conf" \
     "$user_unit_root/pipewire.service.d/95-lb-omnichord-realtime.conf"
-install -m 644 "$source_root/pipewire-service-limits.conf" \
+install -o "$target_user" -g "$target_group" -m 644 \
+    "$source_root/pipewire-service-limits.conf" \
     "$user_unit_root/pipewire-pulse.service.d/95-lb-omnichord-realtime.conf"
+
+# Remove system-wide drop-ins from the short-lived development version. The
+# policy belongs only to the explicitly selected desktop user.
+rm -f -- /etc/pipewire/pipewire.conf.d/95-lb-omnichord-realtime.conf
+rm -f -- /etc/pipewire/pipewire-pulse.conf.d/95-lb-omnichord-realtime.conf
+rm -f -- /etc/systemd/user/pipewire.service.d/95-lb-omnichord-realtime.conf
+rm -f -- /etc/systemd/user/pipewire-pulse.service.d/95-lb-omnichord-realtime.conf
 
 limits_temporary="$(mktemp)"
 trap 'rm -f -- "$limits_temporary"' EXIT

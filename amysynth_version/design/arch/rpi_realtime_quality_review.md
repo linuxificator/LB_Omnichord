@@ -21,7 +21,7 @@ lives in packaging tooling; AMY remains a separate exact wrapper-owned child.
 The final design uses existing authorities:
 
 - PAM grants the selected login user `RLIMIT_RTPRIO=80`;
-- systemd user-unit drop-ins grant the same limit to PipeWire;
+- per-user systemd unit drop-ins grant the same limit to PipeWire;
 - PipeWire `module-rt` and `thread.affinity` own both `data-loop.0` threads;
 - the existing launcher confines itself and its exact AMY child, identifies
   the active child worker once, and applies CPU3/FIFO70 only to that thread;
@@ -61,7 +61,8 @@ process scan, custom lifecycle token or test-only production endpoint.
 - Generated release installer passes `bash -n`, payload-integrity validation
   and its executable `--help` contract.
 - A clean Pi 4 reboot produced PAM/user and PipeWire limits of 80, PipeWire at
-  CPU2/FIFO80, pipewire-pulse at CPU2/FIFO75 and no watcher service.
+  CPU2/FIFO80, pipewire-pulse at CPU2/FIFO75 and no watcher service. The
+  drop-ins live only in the selected user's normal configuration tree.
 - Normal `run_local.sh` selected its exact AMY child callback at CPU3/FIFO70,
   kept other service/frontend work on CPUs 0-1 and showed no startup warning.
 - A 20-second external 120 Hz uinput sweep retained all policies, reported no
