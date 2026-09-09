@@ -89,7 +89,7 @@ Frame {
 
     padding: 4
 
-    function clamp(value) {
+    function clamp(value: int): int {
         return Math.max(
             root.fromValue,
             Math.min(root.toValue, value)

@@ -43,7 +43,7 @@ Frame {
 
     padding: 4
 
-    function clamp(value) {
+    function clamp(value: real): real {
         return Math.max(
             0.0,
             Math.min(1.0, value)

@@ -200,7 +200,7 @@ ApplicationWindow {
         }
     }
 
-    function octaveColor(index) {
+    function octaveColor(index: int): color {
         return [
             "#4d0812",
             "#70101a",
@@ -211,7 +211,7 @@ ApplicationWindow {
         ][index]
     }
 
-    function octaveTextColor(index) {
+    function octaveTextColor(index: int): color {
         return index >= 5 ? "#3b0808" : "#ffffff"
     }
 
