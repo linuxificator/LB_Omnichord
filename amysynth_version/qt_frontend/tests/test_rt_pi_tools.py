@@ -86,6 +86,17 @@ class RtPiBenchmarkTests(unittest.TestCase):
         selected = benchmark.select_audio_thread(samples, 100)
         self.assertEqual(selected.tid, 101)
 
+    def test_interrupt_parser_keeps_per_cpu_counts_and_description(self) -> None:
+        sample = """\
+           CPU0       CPU1       CPU2       CPU3
+ 15:        903          0          0          0    GICv2 114 Level DMA IRQ
+IPI0:       100        200        300        400       Rescheduling interrupts
+"""
+        parsed = benchmark.parse_interrupts(sample)
+        self.assertEqual(parsed["15"][0], [903, 0, 0, 0])
+        self.assertIn("DMA IRQ", parsed["15"][1])
+        self.assertEqual(parsed["IPI0"][0], [100, 200, 300, 400])
+
     def test_external_strum_is_bounded_and_returns_to_start(self) -> None:
         points = strum.sweep_points(
             width=1920,

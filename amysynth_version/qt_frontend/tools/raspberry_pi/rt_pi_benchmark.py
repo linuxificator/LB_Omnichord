@@ -35,6 +35,40 @@ class ThreadSample:
     timeslices: int
 
 
+def parse_interrupts(text: str) -> dict[str, tuple[list[int], str]]:
+    lines = text.splitlines()
+    if not lines:
+        return {}
+    cpu_count = len(re.findall(r"\bCPU\d+\b", lines[0]))
+    result: dict[str, tuple[list[int], str]] = {}
+    for line in lines[1:]:
+        match = re.match(r"^\s*([^:]+):\s+(.*)$", line)
+        if match is None:
+            continue
+        fields = match.group(2).split()
+        try:
+            counts = [int(value) for value in fields[:cpu_count]]
+        except (ValueError, IndexError):
+            continue
+        result[match.group(1).strip()] = (counts, " ".join(fields[cpu_count:]))
+    return result
+
+
+def sample_interrupts(seconds: float) -> list[dict[str, object]]:
+    before = parse_interrupts(Path("/proc/interrupts").read_text(encoding="utf-8"))
+    time.sleep(seconds)
+    after = parse_interrupts(Path("/proc/interrupts").read_text(encoding="utf-8"))
+    result = []
+    for irq, (later, description) in after.items():
+        if irq not in before:
+            continue
+        earlier = before[irq][0]
+        delta = [right - left for left, right in zip(earlier, later)]
+        if sum(delta):
+            result.append({"irq": irq, "delta": delta, "description": description})
+    return sorted(result, key=lambda item: -sum(item["delta"]))
+
+
 def parse_wire_log(path: Path, session: int = -1) -> list[WireEvent]:
     sessions: list[list[tuple[datetime, str, str]]] = []
     current: list[tuple[datetime, str, str]] | None = None
@@ -199,6 +233,8 @@ def _parser() -> argparse.ArgumentParser:
     sample_parser = sub.add_parser("sample-threads")
     sample_parser.add_argument("--pid", type=int, required=True)
     sample_parser.add_argument("--seconds", type=float, default=5.0)
+    irq_parser = sub.add_parser("sample-irqs")
+    irq_parser.add_argument("--seconds", type=float, default=5.0)
     synth = sub.add_parser("synthetic")
     synth.add_argument("--socket", type=Path, required=True)
     synth.add_argument("--profile", choices=("sine", "filtered-saw", "dx7"), required=True)
@@ -217,6 +253,9 @@ def main() -> int:
         samples = sample_threads(args.pid, args.seconds)
         print(json.dumps([asdict(item) for item in samples], indent=2))
         print(json.dumps({"audio_candidate": asdict(select_audio_thread(samples, args.pid))}))
+        return 0
+    if args.command == "sample-irqs":
+        print(json.dumps(sample_interrupts(args.seconds), indent=2))
         return 0
     if args.command == "synthetic":
         commands = synthetic_commands(args.profile, args.count)
