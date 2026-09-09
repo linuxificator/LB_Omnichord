@@ -290,6 +290,23 @@ def _policy_matches(
         return False
 
 
+def _non_realtime_housekeeping(tid: int) -> bool:
+    try:
+        reset_on_fork = getattr(os, "SCHED_RESET_ON_FORK", 0)
+        scheduler = os.sched_getscheduler(tid) & ~reset_on_fork
+        realtime_schedulers = {
+            value
+            for name in ("SCHED_FIFO", "SCHED_RR", "SCHED_DEADLINE")
+            if (value := getattr(os, name, None)) is not None
+        }
+        return (
+            os.sched_getaffinity(tid) == HOUSEKEEPING_CPUS
+            and scheduler not in realtime_schedulers
+        )
+    except (OSError, ProcessLookupError):
+        return False
+
+
 def verify_runtime_policy(
     service_pid: int,
     *,
@@ -318,8 +335,7 @@ def verify_runtime_policy(
     if frontend_pid is not None:
         frontend_threads = task_ids(frontend_pid)
         if not frontend_threads or any(
-            not _policy_matches(tid, HOUSEKEEPING_CPUS, os.SCHED_OTHER, 0)
-            for tid in frontend_threads
+            not _non_realtime_housekeeping(tid) for tid in frontend_threads
         ):
             return False, "the frontend is not confined to housekeeping CPUs"
 

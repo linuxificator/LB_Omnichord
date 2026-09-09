@@ -46,14 +46,19 @@ cannot satisfy the requirement; sunk implementation effort is not evidence.
 
 ## Native platform mechanisms first
 
-For Linux integration, first identify and use the mechanism already owned by
-the Linux kernel or the relevant standard subsystem: for example PAM resource
-limits, systemd unit policy, PipeWire configuration, udev, D-Bus or the normal
-freedesktop interface. Assume a general systems problem has an established
-solution until investigation shows otherwise. Preserve that solution's normal
-authority and lifecycle instead of copying it into application code. Keep
-platform-specific composition in adapters and packaging so the portable
-application remains identical on every platform.
+On every platform, first identify and use the native, established mechanism.
+For Linux this includes mechanisms owned by the kernel or standard subsystem:
+PAM resource limits, systemd unit policy, PipeWire configuration, udev, D-Bus
+and normal freedesktop interfaces. Assume a general systems problem has an
+established solution until investigation shows otherwise. Preserve that
+solution's normal authority and lifecycle instead of copying it into
+application code.
+
+Other platforms may lack an equivalent. After verifying that absence, use the
+proven Linux ownership and lifecycle as a design reference, but express it
+through that platform's adapter rather than transplanting Linux APIs or
+branches into portable code. Platform-specific composition stays in adapters
+and packaging so the application itself remains identical everywhere.
 
 ## Extend existing AMY concepts first
 

@@ -46,6 +46,22 @@ class RaspberryPiRealtimeTests(unittest.TestCase):
             os.sched_param(80),
         )
 
+    def test_frontend_allows_native_non_realtime_scheduler_classes(self) -> None:
+        batch = getattr(os, "SCHED_BATCH", os.SCHED_OTHER)
+        with (
+            mock.patch.object(
+                realtime.os,
+                "sched_getaffinity",
+                return_value=realtime.HOUSEKEEPING_CPUS,
+            ),
+            mock.patch.object(
+                realtime.os,
+                "sched_getscheduler",
+                return_value=batch,
+            ),
+        ):
+            self.assertTrue(realtime._non_realtime_housekeeping(1234))
+
     def test_pipewire_pulse_is_identified_by_its_native_thread_name(self) -> None:
         with (
             mock.patch.object(realtime, "_process_ids", return_value=(1001, 1012)),
@@ -153,6 +169,9 @@ class RaspberryPiRealtimeTests(unittest.TestCase):
                 return_value={"pipewire": 5001, "pipewire-pulse": 5002},
             ),
             mock.patch.object(realtime, "_policy_matches", side_effect=matches),
+            mock.patch.object(
+                realtime, "_non_realtime_housekeeping", return_value=True
+            ),
         ):
             valid, issue = realtime.verify_runtime_policy(
                 4242, frontend_pid=6001

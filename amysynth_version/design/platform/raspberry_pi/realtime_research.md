@@ -176,11 +176,18 @@ on CPU 3 at FIFO 70. The application and all its logic remain portable. The
 profile is a reversible host-integration choice documented in
 [`realtime_howto.md`](realtime_howto.md), not an application default.
 
-An earlier final reboot verified that CPU isolation and the performance
-governor return automatically and that a newly started AppImage can receive the
-measured thread layout. The current simpler implementation must repeat that
-physical acceptance with PAM permission and one-shot wrapper application; the
-measured audio layout itself is unchanged. A separate post-boot control drove
-a clean packaged AMY service over its Unix wire socket and its bounded 440 Hz
-oscillator was physically heard through the HDMI sink. This distinguishes the
-intentionally near-silent capacity workloads from an audio-routing failure.
+On 2026-09-09 a clean reboot physically verified the simplified production
+route. The `lawaai` login and both PipeWire services inherited
+`RLIMIT_RTPRIO=80`; PipeWire created its own loops at CPU2/FIFO80 and
+CPU2/FIFO75. `run_local.sh` then assigned its exact AMY child callback to
+CPU3/FIFO70 and confined frontend and non-audio service work to CPUs 0-1. The
+frontend produced no realtime warning or QML binding-loop diagnostic. An
+external 120 Hz kernel-uinput sweep ran for 20 seconds without policy drift,
+AMY overload/dropout output or throttling (`throttled=0x0`). This validates the
+native PAM/systemd/PipeWire plus one-shot wrapper design; the measured audio
+layout itself is unchanged.
+
+A separate post-boot control also drove a clean packaged AMY service over its
+Unix wire socket and its bounded 440 Hz oscillator was physically heard
+through the HDMI sink. This distinguishes the intentionally near-silent
+capacity workloads from an audio-routing failure.
