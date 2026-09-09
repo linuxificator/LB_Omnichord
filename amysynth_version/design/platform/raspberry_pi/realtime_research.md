@@ -67,3 +67,28 @@ which both removes the race and matches a cold application start.
 
 The final profile choice and measured latency/dropout comparison will be added
 after the isolated boots and targeted FIFO experiments.
+
+## Production-log replay: first comparisons
+
+The last physical Pi session contains 12,949 wire commands over 148.488
+seconds, including 1,470 strum events plus rhythm, fill, bass and chord
+changes. Replaying it at original timestamps from a separate process provides
+the first repeatable scheduling comparison. `run_delay` is the Linux
+`schedstat` aggregate for the callback thread, not an individual worst-case
+latency; PipeWire's error-counter delta and AMY's overload log remain the
+deadline checks.
+
+| Boot/runtime policy | Callback CPU | Callback run delay | PipeWire client errors | AMY overload |
+|---|---:|---:|---:|---:|
+| Stock boot, `ondemand`, unrestricted | 12.384% | 12.059 ms | +2 | none |
+| Stock boot, `performance`, unrestricted | 6.154% | 5.161 ms | +0 | none |
+| CPU3 isolated, complete audio chain pinned, normal policy | 6.725% | 274.138 ms | +0 | none |
+| CPU3 isolated, PipeWire FIFO 80/75 and AMY FIFO 70 | 6.603% | 1,931.416 ms | +0 | none |
+
+The performance governor is already a clear improvement. One-core isolation
+eliminates observed PipeWire errors but substantially increases aggregate
+callback wait because AMY and the two PipeWire stages serialize on the same
+core. FIFO protects deadlines but does not manufacture CPU time; its aggregate
+wait is worse still behind the deliberately higher-priority audio-server
+stages. This profile is therefore not a candidate default. The two-core split
+must be measured before choosing a profile.
