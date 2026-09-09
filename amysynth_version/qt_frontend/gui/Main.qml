@@ -151,6 +151,16 @@ ApplicationWindow {
         return midiBackend.midiButtonTargetBlocked(target)
     }
 
+    function releaseChordTypeBindings() {
+        for (let row = 0; row < 4; ++row) {
+            midiBackend.releaseControlTargetForManualEdit({
+                "screen": "omni",
+                "kind": "chord_type",
+                "row": row
+            })
+        }
+    }
+
     function setFullscreenMode(fullscreen) {
         if (fullscreen) {
             window.showFullScreen()
@@ -786,6 +796,32 @@ ApplicationWindow {
 
                         required property int index
                         property int rowIndex: index
+                        property var chordTypeMidiTarget: ({
+                            "screen": "omni",
+                            "kind": "chord_type",
+                            "row": rowIndex
+                        })
+                        readonly property string chordTypeMidiState: {
+                            midiBackend.bindingVersion
+                            return midiBackend.controlTargetVisualState(
+                                chordTypeMidiTarget
+                            )
+                        }
+
+                        function handleChordTypeEdit(chordIndex) {
+                            if (midiBackend.activateControlTarget(chordTypeMidiTarget))
+                                return false
+                            if (
+                                chordTypeMidiState === "preset-displaced"
+                                || chordTypeMidiState === "preset-incoming"
+                            )
+                                return false
+                            midiBackend.releaseControlTargetForManualEdit(
+                                chordTypeMidiTarget
+                            )
+                            backend.setRowChordType(rowIndex, chordIndex)
+                            return true
+                        }
 
                         width:
                             window.maximumChordRowWidth
@@ -827,7 +863,10 @@ ApplicationWindow {
                                 panelColor: "#e5d9b2"
                                 borderColor: "#9f9165"
                                 textColor: "#4a4022"
-                                onClicked: backend.resetChordRowsToPreset()
+                                onClicked: {
+                                    window.releaseChordTypeBindings()
+                                    backend.resetChordRowsToPreset()
+                                }
                             }
 
                             PresetResetButton {
@@ -837,7 +876,10 @@ ApplicationWindow {
                                 panelColor: "#e5d9b2"
                                 borderColor: "#9f9165"
                                 textColor: "#4a4022"
-                                onClicked: performanceBackend.rollChordRows(-1)
+                                onClicked: {
+                                    window.releaseChordTypeBindings()
+                                    performanceBackend.rollChordRows(-1)
+                                }
                             }
 
                             PresetResetButton {
@@ -847,7 +889,10 @@ ApplicationWindow {
                                 panelColor: "#e5d9b2"
                                 borderColor: "#9f9165"
                                 textColor: "#4a4022"
-                                onClicked: performanceBackend.rollChordRows(1)
+                                onClicked: {
+                                    window.releaseChordTypeBindings()
+                                    performanceBackend.rollChordRows(1)
+                                }
                             }
                         }
 
@@ -1034,12 +1079,15 @@ ApplicationWindow {
                                             && !syncingFromBackend
                                             && currentIndex >= 0
                                         ) {
-                                            backend
-                                                .setRowChordType(
-                                                    rowItem
-                                                        .rowIndex,
-                                                    currentIndex
+                                            if (!rowItem.handleChordTypeEdit(currentIndex)) {
+                                                syncingFromBackend = true
+                                                currentIndex = backend.chordIndexForRow(
+                                                    rowItem.rowIndex
                                                 )
+                                                Qt.callLater(function() {
+                                                    chordWheel.syncingFromBackend = false
+                                                })
+                                            }
                                         }
                                     }
 
@@ -1058,7 +1106,17 @@ ApplicationWindow {
                                     radius: 7
                                     color: "transparent"
                                     border.color:
-                                        window.accentColor
+                                        rowItem.chordTypeMidiState === "bound"
+                                        ? "#35b85a"
+                                        : (
+                                            rowItem.chordTypeMidiState === "preset-displaced"
+                                            ? "#f22b2b"
+                                            : (
+                                                rowItem.chordTypeMidiState === "preset-incoming"
+                                                ? "#3186d7"
+                                                : window.accentColor
+                                            )
+                                        )
                                     border.width: 2
                                 }
                             }
@@ -1487,6 +1545,11 @@ ApplicationWindow {
                     - window.controlSpacing
                 height: window.rowHeight
                 text: performanceBackend.chordGateButtonText
+                property var midiTarget: ({
+                    "screen": "omni",
+                    "kind": "button",
+                    "action": "chord_gate"
+                })
 
                 readonly property bool selectedState:
                     performanceBackend.chordGateState === 1
@@ -1520,8 +1583,18 @@ ApplicationWindow {
                         chordGateButton.selectedState ? 2 : 1
                 }
 
-                onClicked:
-                    performanceBackend.toggleChordGate()
+                MidiButtonLed {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 8
+                    z: 2
+                    midiControlRouter: midiBackend
+                    midiTarget: chordGateButton.midiTarget
+                }
+
+                onClicked: {
+                    if (!window.midiButtonHandled(chordGateButton.midiTarget))
+                        performanceBackend.toggleChordGate()
+                }
             }
 
             RainbowModeButton {
@@ -1557,6 +1630,7 @@ ApplicationWindow {
                 height:
                     window.totalControlHeight
                 controller: backend
+                midiControlRouter: midiBackend
                 ladderMode: window.strumLadderMode
                 visualOverlay: strumVisualOverlay
             }

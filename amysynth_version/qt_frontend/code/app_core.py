@@ -1059,6 +1059,7 @@ class InstrumentBackend(QObject):
         self._pitch_bend_returning = False
 
         self._strum_last_index: int | None = None
+        self._external_strum_last_index: int | None = None
         self._strum_ladder_mode = False
 
         # A held chord temporarily suppresses automatic rhythmic chords
@@ -2458,6 +2459,14 @@ class InstrumentBackend(QObject):
             chord_key = str(stored.get("chord", fallback["chord"]))
             octave_key = str(stored.get("octave", fallback["octave"]))
             chord_index = suffix_to_index.get(chord_key, suffix_to_index[str(fallback["chord"])])
+            if self._midi_control_blocks(
+                {
+                    "screen": "omni",
+                    "kind": "chord_type",
+                    "row": row_index,
+                }
+            ):
+                chord_index = self._row_chord_indexes[row_index]
             octave_index = octave_to_index.get(octave_key, octave_to_index[str(fallback["octave"])])
             self._row_chord_indexes[row_index] = chord_index
             self._row_octave_indexes[row_index] = octave_index
@@ -2778,6 +2787,14 @@ class InstrumentBackend(QObject):
         chord_index: int,
     ) -> None:
         if not 0 <= row_index < ROW_COUNT:
+            return
+        if self._midi_control_blocks(
+            {
+                "screen": "omni",
+                "kind": "chord_type",
+                "row": row_index,
+            }
+        ):
             return
         if not 0 <= chord_index < len(self._chords):
             return
@@ -3387,6 +3404,20 @@ class InstrumentBackend(QObject):
             ),
         )
 
+    def _play_strum_motion(
+        self,
+        old_index: int | None,
+        new_index: int,
+    ) -> None:
+        if old_index is None:
+            self._play_strum_index(new_index)
+            return
+        if new_index == old_index:
+            return
+        direction = 1 if new_index > old_index else -1
+        for index in range(old_index + direction, new_index + direction, direction):
+            self._play_strum_index(index)
+
     @Slot(float)
     def strumTap(self, normalized_y: float) -> None:
         index = self._strum_index(normalized_y)
@@ -3439,29 +3470,22 @@ class InstrumentBackend(QObject):
             self._strum_last_index = None
             return
 
-        if self._strum_last_index is None:
-            self._strum_last_index = new_index
-            return
-
         old_index = self._strum_last_index
-
-        if new_index == old_index:
-            return
-
-        direction = 1 if new_index > old_index else -1
-
-        for index in range(
-            old_index + direction,
-            new_index + direction,
-            direction,
-        ):
-            self._play_strum_index(index)
-
+        self._play_strum_motion(old_index, new_index)
         self._strum_last_index = new_index
 
     @Slot()
     def strumEnd(self) -> None:
         self._strum_last_index = None
+
+    def strumControlPosition(self, normalized_y: float) -> None:
+        """Apply one sample from a generic continuous strum-position source."""
+        new_index = self._strum_index(normalized_y)
+        if new_index is None:
+            self._external_strum_last_index = None
+            return
+        self._play_strum_motion(self._external_strum_last_index, new_index)
+        self._external_strum_last_index = new_index
 
     def _selected_synth(
         self,

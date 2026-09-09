@@ -188,13 +188,15 @@ include:
 - OMNI panic;
 - OMNI rhythm transport, percussion activity, fill toggles, chord activity,
   chord arpeggio enable, chord arpeggio rate, chord arpeggio direction, bass
-  activity and APG/LDR strum-ladder mode;
+  activity, automatic-chord gate and APG/LDR strum-ladder mode;
 - MIDI row channel cycling.
 
 The backend treats MIDI button bindings as application button actions, not as
 AMY-specific behavior. Pressing a learned controller button calls the same
 backend action as a screen tap. Releasing it clears the held state. A tap-style
-MIDI button therefore behaves like a screen tap.
+MIDI button therefore behaves like a screen tap. Tapping the corresponding
+screen button does not unlink it; button bindings are removed only from their
+controller representation in the grey bar.
 
 For on/off MIDI buttons, the pressed state is a temporary takeover of the bound
 application button. The takeover is scoped to the target's logical group so the

@@ -10,6 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
+import app_core  # noqa: E402
 from midi_player import (  # noqa: E402
     DEFAULT_CHORD_INPUT_CHANNEL,
     DEFAULT_MIDI_CHANNELS,
@@ -91,6 +92,20 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_external_strum_position_crosses_each_new_note_once(self) -> None:
+        backend = app_core.InstrumentBackend.__new__(app_core.InstrumentBackend)
+        backend._external_strum_last_index = None
+        backend._strum_index = lambda value: int(round(float(value) * 4))
+        played: list[int] = []
+        backend._play_strum_index = played.append
+
+        backend.strumControlPosition(0.25)
+        backend.strumControlPosition(0.26)
+        backend.strumControlPosition(0.75)
+
+        self.assertEqual(played, [1, 2, 3])
+        self.assertEqual(backend._external_strum_last_index, 3)
+
     def test_every_factory_preset_reserves_channel_one_and_uses_gm_drums(self) -> None:
         self.assertEqual(DEFAULT_CHORD_INPUT_CHANNEL, 1)
         self.assertEqual(DEFAULT_MIDI_CHANNELS, (2, 3, 4, 5, 6, 10))
@@ -308,6 +323,68 @@ class MidiAmyEngineTests(unittest.TestCase):
         expected = round(20.0 * (20000.0 / 20.0) ** (64.0 / 127.0))
         self.assertEqual(middle, expected)
         self.assertNotAlmostEqual(middle, (20.0 + 20000.0) / 2.0)
+
+    def test_strum_and_chord_row_are_generic_continuous_targets(self) -> None:
+        calls: list[tuple[object, ...]] = []
+        owner = type(
+            "Owner",
+            (),
+            {
+                "_chords": tuple(range(40)),
+                "_synths": (),
+                "strumControlPosition": lambda _self, value: calls.append(
+                    ("strum", value)
+                ),
+                "setRowChordType": lambda _self, row, index: calls.append(
+                    ("chord", row, index)
+                ),
+            },
+        )()
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = owner
+        backend.definitions = ()
+        backend._applying_midi_control = 0
+        backend._midi_control_state = MidiControlState()
+
+        strum = backend._normalize_control_target(
+            {"screen": "omni", "kind": "strum_position"}
+        )
+        chord = backend._normalize_control_target(
+            {"screen": "omni", "kind": "chord_type", "row": 2}
+        )
+        self.assertIsNotNone(strum)
+        self.assertIsNotNone(chord)
+        assert strum is not None
+        assert chord is not None
+
+        backend._apply_control_target(strum, 127, (1, 1))
+        backend._apply_control_target(chord, 64, (1, 25))
+
+        self.assertEqual(calls[0], ("strum", 0.0))
+        self.assertEqual(calls[1], ("chord", 2, 20))
+
+    def test_chord_gate_button_uses_existing_performance_action(self) -> None:
+        calls: list[str] = []
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = type(
+            "Owner",
+            (),
+            {"toggleChordGate": lambda _self: calls.append("chord_gate")},
+        )()
+        backend._midi_control_lock = threading.Lock()
+        backend._held_midi_button_targets = set()
+        backend._applying_midi_control = 0
+        target = {
+            "id": "omni:button:chord_gate",
+            "screen": "omni",
+            "kind": "button",
+            "action": "chord_gate",
+        }
+
+        backend._apply_button_target(target, True)
+        backend._apply_button_target(target, False)
+
+        self.assertEqual(calls, ["chord_gate"])
 
     def test_preset_binding_loader_accepts_new_source_types(self) -> None:
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)

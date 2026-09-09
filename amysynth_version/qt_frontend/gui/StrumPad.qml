@@ -5,10 +5,16 @@ Item {
     id: root
 
     required property var controller
+    property var midiControlRouter: null
+    property var midiTarget: ({
+        "screen": "omni",
+        "kind": "strum_position"
+    })
     property bool ladderMode: false
     property Item visualOverlay: null
 
     property bool gestureActive: false
+    property bool bindingGesture: false
 
     function normalizedY(y) {
         return PointerNormalization.verticalUnit(y, root.height)
@@ -106,6 +112,13 @@ Item {
             if (!points || points.length === 0)
                 return
 
+            root.bindingGesture = (
+                root.midiControlRouter
+                && root.midiControlRouter.activateControlTarget(root.midiTarget)
+            )
+            if (root.bindingGesture)
+                return
+
             root.gestureActive = true
             root.controller.strumStart(
                 root.normalizedY(points[0].y)
@@ -132,6 +145,10 @@ Item {
         }
 
         onReleased: (points) => {
+            if (root.bindingGesture) {
+                root.bindingGesture = false
+                return
+            }
             if (!root.gestureActive)
                 return
 
@@ -141,6 +158,10 @@ Item {
         }
 
         onCanceled: (points) => {
+            if (root.bindingGesture) {
+                root.bindingGesture = false
+                return
+            }
             if (!root.gestureActive)
                 return
 

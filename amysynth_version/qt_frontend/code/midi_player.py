@@ -1009,8 +1009,16 @@ class MidiPlayerBackend(QObject):
             "rhythm_fill_density",
             "bass_voicing",
             "bass_riff_selector",
+            "strum_position",
         ):
             target["id"] = f"omni:{kind}"
+            return target
+        if screen == "omni" and kind == "chord_type":
+            row = int(raw.get("row", -1))
+            if not 0 <= row < app_core.ROW_COUNT:
+                return None
+            target["row"] = row
+            target["id"] = f"omni:chord_type:{row}"
             return target
         if kind == "button":
             action = str(raw.get("action", ""))
@@ -1082,6 +1090,10 @@ class MidiPlayerBackend(QObject):
                 1.0,
                 "linear",
             )
+        if kind == "strum_position":
+            return 0.0, 1.0, 0.0, "linear"
+        if kind == "chord_type":
+            return 0.0, float(len(self.owner._chords) - 1), 1.0, "linear"
         return None
 
     def _mapped_target_value(
@@ -1257,6 +1269,16 @@ class MidiPlayerBackend(QObject):
             self._apply_midi_setter(self.owner.setBassVoicingShift, value)
         elif kind == "bass_riff_selector":
             self._apply_midi_setter(self.owner.setBassRiffSelector, value)
+        elif kind == "strum_position":
+            # Conventional MIDI controls increase bottom-to-top; the screen
+            # strum coordinate increases top-to-bottom.
+            self._apply_midi_setter(self.owner.strumControlPosition, 1.0 - value)
+        elif kind == "chord_type":
+            self._apply_midi_setter(
+                self.owner.setRowChordType,
+                int(target["row"]),
+                int(round(value)),
+            )
 
     @staticmethod
     def _is_button_target(target: dict[str, Any]) -> bool:
@@ -1371,6 +1393,8 @@ class MidiPlayerBackend(QObject):
                 )
             elif action == "chord_arpeggio_direction":
                 self._apply_midi_setter(self.owner.toggleChordArpeggioDirection)
+            elif action == "chord_gate":
+                self._apply_midi_setter(self.owner.toggleChordGate)
 
     @Slot(int, int)
     def clickControlIndicator(self, channel: int, controller: int) -> None:
@@ -1632,6 +1656,8 @@ class MidiPlayerBackend(QObject):
             return float(self.owner._bass_voicing_shift)
         if kind == "bass_riff_selector":
             return float(self.owner.bassRiffSelector)
+        if kind == "chord_type":
+            return float(self.owner.chordIndexForRow(int(target["row"])))
         return None
 
     def restore_control_values(
@@ -1691,6 +1717,10 @@ class MidiPlayerBackend(QObject):
                 elif kind == "bass_riff_selector":
                     self.owner._choose_bass_riff(
                         fallback_selector=int(round(value)),
+                    )
+                elif kind == "chord_type":
+                    self.owner._row_chord_indexes[int(target["row"])] = int(
+                        round(value)
                     )
 
     def replace_control_bindings(self, screen: str, data: Any) -> None:
