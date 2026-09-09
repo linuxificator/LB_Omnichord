@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -27,6 +28,25 @@ runtime = load("rt_pi_runtime")
 trace = load("rt_pi_trace")
 
 
+def load_path(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+realtime_status = load_path(
+    "raspberry_pi_realtime",
+    ROOT / "code" / "raspberry_pi_realtime.py",
+)
+asset_builder = load_path(
+    "build_rpi_realtime_setup",
+    ROOT / "packaging" / "build_rpi_realtime_setup.py",
+)
+
+
 class RtPiConfigTests(unittest.TestCase):
     def test_profiles_replace_only_owned_kernel_arguments(self) -> None:
         original = (
@@ -46,6 +66,65 @@ class RtPiConfigTests(unittest.TestCase):
             config.PROFILES["stock"],
         )
         self.assertEqual(updated, "root=/dev/mmcblk0 custom=yes\n")
+
+    def test_startup_status_is_silent_outside_pi_4_and_pi_5(self) -> None:
+        status = realtime_status.evaluate_realtime(
+            realtime_status.RealtimeFacts("generic arm64", "", "", (), False)
+        )
+        self.assertFalse(status.applicable)
+        self.assertTrue(status.complete)
+        self.assertEqual(status.missing, ())
+
+    def test_startup_status_reports_every_incomplete_realtime_layer(self) -> None:
+        status = realtime_status.evaluate_realtime(
+            realtime_status.RealtimeFacts(
+                "Raspberry Pi 5 Model B Rev 1.0",
+                "console=tty1 rootwait",
+                "",
+                ("ondemand",),
+                False,
+            )
+        )
+        self.assertTrue(status.applicable)
+        self.assertFalse(status.complete)
+        self.assertEqual(len(status.missing), 4)
+
+    def test_startup_status_accepts_the_measured_split_profile(self) -> None:
+        status = realtime_status.evaluate_realtime(
+            realtime_status.RealtimeFacts(
+                "Raspberry Pi 4 Model B Rev 1.1",
+                "rootwait isolcpus=domain,managed_irq,2-3 "
+                "irqaffinity=0-1 threadirqs",
+                "2-3",
+                ("performance", "performance"),
+                True,
+            )
+        )
+        self.assertTrue(status.applicable)
+        self.assertTrue(status.complete)
+        self.assertEqual(status.missing, ())
+
+    def test_release_setup_asset_is_named_versioned_and_self_contained(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output, checksum = asset_builder.build(
+                "R20260909153000",
+                Path(temporary),
+            )
+            source = output.read_text(encoding="utf-8")
+            fields = checksum.read_text(encoding="ascii").split()
+
+        self.assertEqual(
+            output.name,
+            "LB_Omnichord.R20260909153000.Pi4-Pi5-realtime-setup.sh",
+        )
+        self.assertIn("Raspberry Pi 4", source)
+        self.assertIn("Raspberry Pi 5", source)
+        self.assertIn("apply --profile audio-split", source)
+        self.assertIn("set-governor performance", source)
+        self.assertIn("lb-omnichord-rt-policy@$target_user.service", source)
+        self.assertIn("rt_pi_runtime.py", source)
+        self.assertEqual(fields[1], output.name)
+        self.assertEqual(fields[0], hashlib.sha256(source.encode()).hexdigest())
 
 
 class RtPiBenchmarkTests(unittest.TestCase):

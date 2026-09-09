@@ -40,6 +40,20 @@ class RuntimeAdapterTests(unittest.TestCase):
         self.assertNotIn("sys.stdout is None", main)
         self.assertNotIn("fatal-error", main)
 
+    def test_startup_warning_is_presented_without_pi_policy_in_the_core(self) -> None:
+        app_core = (CODE / "app_core.py").read_text(encoding="utf-8")
+        main_qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        adapter = (CODE / "runtime_platform_adapters.py").read_text(encoding="utf-8")
+        pi_adapter = (CODE / "raspberry_pi_realtime.py").read_text(encoding="utf-8")
+
+        self.assertIn("runtime.startup_warnings", app_core)
+        self.assertIn('"startupWarningMessages"', app_core)
+        self.assertIn("startupWarningDialog", main_qml)
+        self.assertIn("startup_warning_messages", adapter)
+        self.assertIn("Pi4-Pi5-realtime-setup.sh", pi_adapter)
+        self.assertNotIn("isolcpus", app_core)
+        self.assertNotIn("sched_setscheduler", app_core)
+
 
 if __name__ == "__main__":
     unittest.main()

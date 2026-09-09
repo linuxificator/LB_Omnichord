@@ -10,6 +10,15 @@ PipeWire's audio data loops. The UI, operating system and device IRQs use CPUs
 desktop. It changes only Raspberry Pi host configuration; it does not patch
 AMY or LB Omnichord and does not weaken the wire/socket process boundary.
 
+Every GitHub release includes a self-contained installer named
+`LB_Omnichord.RYYYYMMDDHHMMSS.Pi4-Pi5-realtime-setup.sh`. It embeds the exact
+versioned helpers and systemd units described below, applies the reversible
+`audio-split` boot profile, sets the performance governor, enables both
+services for the selected desktop user, and tells the user whether a reboot is
+still required. The application warning points to this asset when boot
+arguments, CPU 2-3 isolation, the governor or the runtime policy is missing.
+The manual steps remain documented for inspection and rollback.
+
 ## Why this layout
 
 The governor made the largest single improvement. Putting AMY and both

@@ -3961,6 +3961,9 @@ def run_application(
     args.amy_socket = runtime.amy_socket
     args.amy_local_name = runtime.amy_local_name
 
+    for warning in runtime.startup_warnings:
+        print(f"Warning: {warning}", file=sys.stderr, flush=True)
+
     for diagnostic in dependencies.display_diagnostics(QGuiApplication.platformName()):
         print(diagnostic, file=sys.stderr, flush=True)
 
@@ -4006,6 +4009,10 @@ def run_application(
     context.setContextProperty(
         "sliderTrace",
         bool(args.slider_trace) or os.environ.get("OMNICHORD_SLIDER_TRACE") == "1",
+    )
+    context.setContextProperty(
+        "startupWarningMessages",
+        list(runtime.startup_warnings),
     )
     context.setContextProperty(
         "chordNames",

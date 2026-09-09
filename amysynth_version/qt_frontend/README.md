@@ -194,6 +194,7 @@ has separate sections and downloads for:
 
 - Linux x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Linux-x86_64.AppImage`
 - Raspberry Pi 4/5: `LB_Omnichord.RYYYYMMDDHHMMSS.RaspberryPi-aarch64.AppImage`
+- Pi 4/5 realtime setup: `LB_Omnichord.RYYYYMMDDHHMMSS.Pi4-Pi5-realtime-setup.sh`
 - macOS Apple Silicon: `LB_Omnichord.RYYYYMMDDHHMMSS.macOS-arm64.dmg`
 - Windows x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Windows-x86_64.zip`
 - Android arm64: `LB_Omnichord.RYYYYMMDDHHMMSS.Android-arm64.apk`
@@ -202,6 +203,11 @@ has separate sections and downloads for:
 Each package has a matching `.sha256` asset. All timestamps are UTC. The P4
 ZIP retains the exact release tag, including `T`, as both its filename and its
 single extracted root directory.
+
+The Pi setup script is a separately checksummed, self-contained host installer
+generated from the versioned realtime tools in this repository. It configures
+the same measured profile checked by both source and packaged startup; it is
+not an application runtime dependency.
 
 Every package contains the Qt frontend and supported AMY fork with the
 Gamma9001 PCM drum bank. At runtime they remain separate processes connected by the

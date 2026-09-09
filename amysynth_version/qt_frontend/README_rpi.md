@@ -34,6 +34,24 @@ chmod +x LB_Omnichord.R*.RaspberryPi-aarch64.AppImage
 ./LB_Omnichord.R*.RaspberryPi-aarch64.AppImage
 ```
 
+For reliable local audio under load, download the matching
+`LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh` and `.sha256` assets from the same
+release. Verify and install the measured, reversible host profile once:
+
+```bash
+sha256sum --check LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh.sha256
+chmod +x LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh
+sudo ./LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh --user "$USER"
+sudo reboot
+```
+
+The installer accepts only Pi 4/5 hardware, preserves the original boot
+command line in a checksummed rollback snapshot, activates the performance
+governor, and installs the measured AMY/PipeWire scheduling watcher. Both the
+AppImage and `run_local.sh` display a startup warning when any part of that
+profile is absent. No warning is displayed on non-Pi systems or after the full
+profile is active.
+
 To use the ESP32-P4 connected to the configured `/dev/serial0` at 1,000,000
 baud:
 
