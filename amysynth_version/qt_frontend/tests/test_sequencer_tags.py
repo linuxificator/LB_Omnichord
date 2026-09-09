@@ -241,7 +241,9 @@ class SequencerTagTests(unittest.TestCase):
             len(riff["timing"]["events"]) * 2
             for riff in self.riffs
         )
-        self.assertEqual(riff_tags, 34)
+        # The ranked catalogue deliberately permits 25-note phrases. Each
+        # note consumes one onset and one release tag in the repeating lane.
+        self.assertEqual(riff_tags, 50)
         self.assertLessEqual(riff_tags, int(ranges["bass"]["count"]))
 
     def test_one_tag_tracks_one_event_and_clear_is_targeted(self) -> None:

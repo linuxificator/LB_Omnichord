@@ -1,8 +1,8 @@
 # AMY aux returns and ESP32-P4 reverb limit
 
 Status: implemented on AMY release branch
-`releases/amy_omnichord_R20260908T212305` at immutable commit
-`53a316068642ece2cb2d2bb0eedb76a039f7da1f`, as recorded by
+`releases/amy_omnichord_R20260909T024424` at immutable commit
+`282b1e434595e6524a1da8e0abb254d13c95af09`, as recorded by
 `packaging/release_inputs.json`.
 
 ## Architecture decision

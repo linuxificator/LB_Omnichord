@@ -346,6 +346,35 @@ class MidiControlStateTests(unittest.TestCase):
         self.assertEqual(model["displayLabel"], "CH1 CC21")
         self.assertFalse(model["buttonDown"])
 
+    def test_endpoint_only_cc_is_presented_as_pushbutton(self) -> None:
+        state = MidiControlState(capacity=4)
+
+        state.observe(1, 21, 0, now=1.0)
+        changed, _mapped, key = state.observe(1, 21, 127, now=2.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(key, (1, 21))
+        model = state.visible_model(now=2.0)[0]
+        self.assertEqual(model["inputType"], "cc")
+        self.assertEqual(model["displayType"], "button")
+        self.assertTrue(model["buttonDown"])
+
+        state.observe(1, 21, 0, now=3.0)
+        self.assertFalse(state.visible_model(now=3.0)[0]["buttonDown"])
+
+    def test_intermediate_cc_value_permanently_selects_rotary_presentation(self) -> None:
+        state = MidiControlState(capacity=4)
+
+        state.observe(1, 21, 0, now=1.0)
+        state.observe(1, 21, 127, now=2.0)
+        self.assertEqual(state.visible_model(now=2.0)[0]["displayType"], "button")
+
+        state.observe(1, 21, 64, now=3.0)
+        self.assertEqual(state.visible_model(now=3.0)[0]["displayType"], "cc")
+        state.observe(1, 21, 127, now=4.0)
+        state.observe(1, 21, 0, now=5.0)
+        self.assertEqual(state.visible_model(now=5.0)[0]["displayType"], "cc")
+
     def test_non_cc_bindings_serialize_source_type(self) -> None:
         state = MidiControlState(capacity=4)
         button_target = {

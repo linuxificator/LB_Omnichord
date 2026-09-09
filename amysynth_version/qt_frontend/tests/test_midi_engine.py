@@ -11,11 +11,22 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 from midi_player import (  # noqa: E402
+    DEFAULT_CHORD_INPUT_CHANNEL,
+    DEFAULT_MIDI_CHANNELS,
+    LEGACY_FACTORY_MIDI_CHANNELS,
     MidiAmyEngine,
     MidiPlayerBackend,
+    _migrated_factory_channel_defaults,
 )
 from midi_control import NOTE_BUTTON_OFFSET, PITCH_BEND_CONTROLLER  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
+from gm_percussion import (  # noqa: E402
+    GM_PERCUSSION_NAMES,
+    MIDI_DRUM_REFERENCE_ROW_VOLUME,
+    OMNI_REFERENCE_PERCUSSION_VOLUME,
+    midi_drum_amplitude,
+    resolve_gm_percussion,
+)
 from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
 from resolved_config import resolve_amy_config_data  # noqa: E402
 from synth_state import SynthState  # noqa: E402
@@ -80,6 +91,141 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_every_factory_preset_reserves_channel_one_and_uses_gm_drums(self) -> None:
+        self.assertEqual(DEFAULT_CHORD_INPUT_CHANNEL, 1)
+        self.assertEqual(DEFAULT_MIDI_CHANNELS, (2, 3, 4, 5, 6, 10))
+        for number in range(1, 19):
+            with self.subTest(preset=number):
+                data = json.loads(
+                    (
+                        ROOT
+                        / "instruments"
+                        / "midi_default_presets"
+                        / f"m{number}.json"
+                    ).read_text(encoding="utf-8")
+                )
+                self.assertEqual(
+                    tuple(int(row["channel"]) for row in data["rows"]),
+                    DEFAULT_MIDI_CHANNELS,
+                )
+                self.assertEqual(data["rows"][-1]["selected"], "drum_kit_0")
+
+    def test_only_untouched_legacy_factory_channels_are_migrated(self) -> None:
+        stored: dict[str, object] | None = None
+        factory: dict[str, object] | None = None
+        for number in (1, 18):
+            factory = json.loads(
+                (
+                    ROOT
+                    / "instruments"
+                    / "midi_default_presets"
+                    / f"m{number}.json"
+                ).read_text(encoding="utf-8")
+            )
+            stored = json.loads(json.dumps(factory))
+            for row, channel in zip(stored["rows"], LEGACY_FACTORY_MIDI_CHANNELS):
+                row["channel"] = channel
+            if number == 18:
+                stored["rows"][-1]["selected"] = "physical_strings"
+                stored["rows"][-1]["volume"] = 0.34
+
+            self.assertEqual(
+                _migrated_factory_channel_defaults(stored, factory),
+                factory,
+            )
+
+        assert stored is not None and factory is not None
+        customized = json.loads(json.dumps(stored))
+        customized["rows"][0]["volume"] = 0.99
+        self.assertIsNone(
+            _migrated_factory_channel_defaults(customized, factory)
+        )
+
+    def test_all_general_midi_percussion_notes_resolve(self) -> None:
+        client = _Client()
+        drums = client.resolved_config.drums
+        configured = dict(drums.sample_map)
+        sounds = {
+            note: resolve_gm_percussion(
+                note,
+                kit=drums.kit,
+                configured_samples=configured,
+            )
+            for note in GM_PERCUSSION_NAMES
+        }
+
+        self.assertEqual(set(sounds), set(range(35, 82)))
+        self.assertTrue(all(sound is not None for sound in sounds.values()))
+        self.assertIsNone(
+            resolve_gm_percussion(34, kit=drums.kit, configured_samples=configured)
+        )
+        self.assertIsNone(
+            resolve_gm_percussion(82, kit=drums.kit, configured_samples=configured)
+        )
+
+    def test_reported_controller_notes_and_duplicate_note_60_all_emit_hits(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        notes = (48, 50, 51, 53, 55, 56, 58, 60, 60, 62, 63, 65, 67, 68, 70, 72)
+        for note in notes:
+            engine.drum_hit(note, 60, MIDI_DRUM_REFERENCE_ROW_VOLUME)
+
+        commands = [value for kind, value in client.events if kind == "wire"]
+        self.assertEqual(len(commands), len(notes))
+        self.assertEqual(sum("p5n65" in command for command in commands), 2)
+
+    def test_midi_velocity_60_matches_equal_velocity_omni_reference(self) -> None:
+        gain = 5.0
+        midi = midi_drum_amplitude(
+            60,
+            MIDI_DRUM_REFERENCE_ROW_VOLUME,
+            gain,
+        )
+        omni = (60.0 / 127.0) * gain * OMNI_REFERENCE_PERCUSSION_VOLUME
+
+        self.assertAlmostEqual(midi, omni)
+        self.assertLess(
+            midi_drum_amplitude(30, MIDI_DRUM_REFERENCE_ROW_VOLUME, gain),
+            midi,
+        )
+        self.assertGreater(
+            midi_drum_amplitude(120, MIDI_DRUM_REFERENCE_ROW_VOLUME, gain),
+            midi,
+        )
+        self.assertEqual(midi_drum_amplitude(60, 0.0, gain), 0.0)
+
+    def test_drum_row_uses_configured_channel_and_release_does_not_retrigger(self) -> None:
+        class Engine:
+            def __init__(self) -> None:
+                self.hits: list[tuple[int, int, float]] = []
+
+            def drum_hit(self, note: int, velocity: int, volume: float) -> None:
+                self.hits.append((note, velocity, volume))
+
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = type(
+            "Owner",
+            (),
+            {"processExternalChordInput": lambda *_args: None},
+        )()
+        backend.engine = Engine()
+        backend.channels = [6, 99, 99, 99, 99, 99]
+        backend.volumes = [0.28] * 6
+        backend._chord_input_channel = 99
+        backend._is_drum = lambda row: row == 0
+
+        backend.process_midi_note(5, 60, 60, True)
+        backend.process_midi_note(6, 60, 60, True)
+        backend.process_midi_note(6, 60, 0, False)
+
+        self.assertEqual(backend.engine.hits, [(60, 60, 0.28)])
+
+        backend.channels[0] = 0
+        backend.process_midi_note(11, 62, 70, True)
+        self.assertEqual(backend.engine.hits[-1], (62, 70, 0.28))
+
     def test_pcm_drum_synth_ignores_note_offs_without_tracking_them(self) -> None:
         client = _Client()
         MidiAmyEngine(client)

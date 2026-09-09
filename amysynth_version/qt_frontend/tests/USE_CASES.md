@@ -212,10 +212,14 @@ installation failed to show or release chord-key interaction correctly.
 - Reconfiguring a synth or rebuilding after panic reapplies the owning master
   gain so a patch cannot bypass it.
 
-**MIDI-06 — channel 7 selects bottom-row OMNI chords monophonically**
+**MIDI-06 — channel 1 selects bottom-row OMNI chords monophonically**
 
-- The white top-right selector defaults to 7 and cycles through `1..16,A`
+- The white top-right selector defaults to 1 and cycles through `1..16,A`
   using the same display and channel semantics as the MIDI-row selectors.
+- Factory MIDI rows default to `2,3,4,5,6,10`, reserving channel 1 for this
+  chord input and assigning the final factory drum-kit row to GM channel 10.
+- An exact untouched user copy of the old factory `1,2,3,4,5,6` channel layout
+  migrates once; any customized preset remains user-authoritative.
 - A matching Note On plays the bottom chord row from the exact incoming MIDI
   root; Note Off releases it. MIDI notes 24--95 select the matching O1--O6
   button, while roots outside that range remain exact and select no octave
@@ -240,6 +244,11 @@ installation failed to show or release chord-key interaction correctly.
 - Repeated identical values produce no activity.
 - A later changed value creates/updates the indicator and its LRU timestamp.
 - Raw running-status CC bytes must satisfy the same behavior.
+- Realtime Clock bytes produce neither application events nor MIDI-tech LED
+  activity, including when interleaved inside a valid channel message.
+- A CC source observed using only both endpoints 0 and 127 is presented as a
+  pushbutton. One intermediate value permanently makes it a rotary source for
+  that run, so a normal knob visiting its endpoints is not misclassified.
 
 **MIDI-CC-02 — visible capacity, LRU and outgoing animation**
 
@@ -808,17 +817,25 @@ regression proves that hold promotion stops only future starts and emits no imme
 **RHYTHM-10 — R selects independent, live-transposed bass riffs**
 
 - Selecting `R` changes `bass voicing` into a discrete `riff selector` whose
-  `1..N` range is the stable catalogue order for the current rhythm ID and exact
-  chord suffix. Levels 1–4 restore the voicing slider and simple bass patterns.
+  fixed `1..5` range selects the catalogue's authored activity rank for the
+  current rhythm ID and exact chord suffix. Levels 1–4 restore the voicing
+  slider and simple bass patterns.
 - A riff uses only its own 96-PPQ ticks, durations, pitches and velocities; it
   is never generated from or quantized to `rhythms.json` `bass_levels`.
 - C2-normalized pitches transpose by the active chord root and use normal OMNI
   tuning. A root change alters pitch but not timing, duration or velocity.
+- For simple activity, APG draws pitch from active chord tones and LDR from the
+  existing chord-specific ladder collection. Changing APG/LDR while playing
+  replaces only the bass lane and preserves transport and phase.
 - If a playing riff remains compatible after an available-set change, its ID is
-  retained and the selector follows its position in the new set. Otherwise the
-  preset selector, or the application default for legacy presets, is used.
+  retained and its authored rank remains selected. Otherwise a deterministic
+  weighted candidate at the current rank is used. A stopped preset/rhythm
+  change recalls its stored rank, or the application default for legacy
+  presets.
 - Riff selector changes replace only bass tags and never stop/reset transport
   or edit the percussion/automatic-chord ranges.
+- TB-303 accent/slide annotations in the source catalogue are not runtime
+  behavior in this release.
 
 **RHYTHM-11 — A selects complete circular chord arpeggios**
 

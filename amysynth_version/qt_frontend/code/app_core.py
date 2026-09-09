@@ -3256,11 +3256,15 @@ class InstrumentBackend(QObject):
         if self._active_row < 0 or self._active_root_semitone < 0:
             return []
 
-        chord = self._chords[self._row_chord_indexes[self._active_row]]
+        pattern = self._active_strum_pattern()
+        if pattern is None:
+            return []
+        _chord, intervals, _degree_offsets = pattern
 
-        # One low-register octave of unique chord tones. The bass remains
-        # rooted around octave 2 regardless of the selected chord octave.
-        pitch_classes = sorted({interval % 12 for interval in chord.intervals})
+        # Use the selected APG or chord-specific LDR pitch collection in one
+        # low-register octave. Activity timing remains independent of actual
+        # strum gestures and the selected chord octave.
+        pitch_classes = sorted({interval % 12 for interval in intervals})
         bass_root = 36 + self._active_root_semitone
 
         return [bass_root + pitch_class for pitch_class in pitch_classes]
@@ -3402,6 +3406,11 @@ class InstrumentBackend(QObject):
         self._strum_ladder_mode = enabled
         self.strumModeChanged.emit()
         self.strumNoteNamesChanged.emit()
+        if self._active_row >= 0 and self._active_root_semitone >= 0:
+            # The simple bass activities use this same pitch collection. A
+            # bass-only lane replacement is selected downstream; transport,
+            # riffs and the manual chord voice remain untouched.
+            self._send_chord_state(play_now=False)
 
     @Slot(bool)
     def setStrumLadderMode(self, enabled: bool) -> None:

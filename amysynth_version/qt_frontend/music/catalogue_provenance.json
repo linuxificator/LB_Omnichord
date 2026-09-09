@@ -13,13 +13,13 @@
   "catalogues": [
     {
       "path": "music/omnichord_bass_riffs.json",
-      "sha256": "595d15dd739cd628a4ba98c1f2034b14eb1d0d6eb204180f5c4a4d505db4bde9",
+      "sha256": "7aa92ece9951194352fe90a2092ded9637ff36a97813bb147ea1d419b20c13ae",
       "count_path": [
         "riffs"
       ],
-      "expected_count": 756,
+      "expected_count": 1664,
       "schema": "music/schema/bass_riffs_v1.schema.json",
-      "process": "hand-curated/generated design catalogue; source bibliography is embedded; no generator is currently recorded"
+      "process": "LB-authored 2026-09-08 shared C/C2-normalized phrase catalogue; compatibility lists replace the expanded rhythm/chord matrix, all 1,944 contexts expose ranks 1..5, ordinary audible event signatures are unique, and source bibliography plus theory-derived provenance are embedded"
     },
     {
       "path": "music/drums/drum_activity_timing.json",

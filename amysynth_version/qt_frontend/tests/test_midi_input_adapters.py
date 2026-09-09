@@ -92,6 +92,33 @@ class MidiInputAdapterTests(unittest.TestCase):
             ],
         )
 
+    def test_note_on_velocity_zero_is_normalized_to_release(self) -> None:
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(OrderedMidiInputEmitter(events.append), "raw")
+
+        parser.feed(bytes([0x96, 60, 0]), MidiByteStreamState())
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual((events[0].channel, events[0].data), (7, 60))
+        self.assertFalse(events[0].is_on)
+
+    def test_realtime_clock_is_not_application_input_or_activity(self) -> None:
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(OrderedMidiInputEmitter(events.append), "raw")
+        state = MidiByteStreamState()
+
+        accepted = parser.feed(bytes([0xF8] * 24), state)
+
+        self.assertFalse(accepted)
+        self.assertEqual(events, [])
+
+        accepted = parser.feed(bytes([0x90, 60, 0xF8, 100]), state)
+        self.assertTrue(accepted)
+        self.assertEqual(
+            [(event.kind, event.data, event.value) for event in events],
+            [("note", 60, 100)],
+        )
+
     def test_emitter_delivers_nothing_after_close(self) -> None:
         events: list[MidiInputEvent] = []
         emitter = OrderedMidiInputEmitter(events.append)

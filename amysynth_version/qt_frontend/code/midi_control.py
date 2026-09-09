@@ -56,6 +56,8 @@ class MidiControlState:
         self._osc_keys: dict[tuple[str, int], ControlKey] = {}
         self._osc_sources: dict[ControlKey, OscSourceDefinition] = {}
         self._next_osc_controller = 0
+        self._cc_endpoint_values: dict[ControlKey, set[int]] = {}
+        self._continuous_cc_keys: set[ControlKey] = set()
 
     @staticmethod
     def key(channel: int, controller: int) -> ControlKey:
@@ -133,6 +135,22 @@ class MidiControlState:
 
     def default_value_for_key(self, key: ControlKey) -> int:
         return 8192 if self.source_type(key) == "pitch_bend" else 0
+
+    def _observe_cc_shape(self, key: ControlKey, value: int) -> None:
+        """Classify endpoint-only CC switches without changing CC identity."""
+        if key in self._continuous_cc_keys:
+            return
+        if value not in (0, 127):
+            self._continuous_cc_keys.add(key)
+            self._cc_endpoint_values.pop(key, None)
+            return
+        self._cc_endpoint_values.setdefault(key, set()).add(value)
+
+    def is_endpoint_button(self, key: ControlKey) -> bool:
+        return (
+            key not in self._continuous_cc_keys
+            and self._cc_endpoint_values.get(key) == {0, 127}
+        )
 
     def display_value_for_key(self, key: ControlKey, value: int) -> int:
         maximum = self.value_max_for_key(key)
@@ -280,6 +298,8 @@ class MidiControlState:
     ) -> tuple[bool, dict[str, Any] | None, ControlKey | None]:
         source_type = self.source_type(key)
         value = max(0, min(self.value_max_for_key(key), int(value)))
+        if source_type == "cc":
+            self._observe_cc_shape(key, value)
         previous = self.values.get(key)
         self.values[key] = value
         if previous is None:
@@ -341,6 +361,8 @@ class MidiControlState:
             )
             display_type = self.source_type(display_key)
             display_target = self.bindings.get(display_key)
+            if display_type == "cc" and self.is_endpoint_button(display_key):
+                display_type = "button"
             if (
                 display_type in ("cc", "osc")
                 and isinstance(display_target, dict)

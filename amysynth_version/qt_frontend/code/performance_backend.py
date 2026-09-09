@@ -7,7 +7,11 @@ from typing import Any, ClassVar
 from PySide6.QtCore import Property, Signal, Slot
 
 import app_core
-from bass_riffs import BassRiffDefinition, transpose_riff_events
+from bass_riffs import (
+    BASS_RIFF_RANK_MAX,
+    clamp_bass_riff_rank,
+    transpose_riff_events,
+)
 from performance_logic import (
     clamp_bass_voicing_shift,
     roll_bass_voicing,
@@ -161,10 +165,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Property(int, notify=bassVoicingChanged)
     def bassRiffSelectorMaximum(self) -> int:
-        candidates = self._available_bass_riffs()
-        if candidates:
-            return len(candidates)
-        return max(1, self._bass_riff_selector)
+        return BASS_RIFF_RANK_MAX
 
     @Property(str, notify=bassVoicingChanged)
     def selectedBassRiffId(self) -> str:
@@ -181,17 +182,11 @@ class InstrumentBackend(app_core.InstrumentBackend):
         chord = self._chords[self._row_chord_indexes[self._active_row]]
         return self._selected_rhythm().key, chord.suffix
 
-    def _available_bass_riffs(self) -> tuple[BassRiffDefinition, ...]:
-        context = self._current_bass_riff_context()
-        if context is None:
-            return ()
-        return self._bass_riffs.candidates(*context)
-
     def _default_bass_riff_selector(self) -> int:
         rhythm = self._defaults.get("rhythm", {})
         if not isinstance(rhythm, dict):
             return 1
-        return max(1, int(rhythm.get("bass_riff_selector", 1)))
+        return clamp_bass_riff_rank(rhythm.get("bass_riff_selector", 1))
 
     def _preset_bass_riff_selector(
         self,
@@ -201,22 +196,11 @@ class InstrumentBackend(app_core.InstrumentBackend):
         rhythm = source.get("rhythm", {})
         if not isinstance(rhythm, dict):
             return self._default_bass_riff_selector()
-        return max(
-            1,
-            int(
-                rhythm.get(
-                    "bass_riff_selector",
-                    self._default_bass_riff_selector(),
-                )
-            ),
-        )
-
-    def _bass_riff_is_playing(self) -> bool:
-        return bool(
-            self._rhythm_running
-            and self._bass_running
-            and self.bassRiffMode
-            and self._active_bass_riff_id
+        return clamp_bass_riff_rank(
+            rhythm.get(
+                "bass_riff_selector",
+                self._default_bass_riff_selector(),
+            )
         )
 
     def _choose_bass_riff(
@@ -230,29 +214,22 @@ class InstrumentBackend(app_core.InstrumentBackend):
             self._active_bass_riff_id,
             self._bass_riff_context,
         )
-        candidates = self._available_bass_riffs()
         self._bass_riff_context = self._current_bass_riff_context()
-        selected_index: int | None = None
-        if preserve_riff_id:
-            selected_index = next(
-                (
-                    index
-                    for index, riff in enumerate(candidates)
-                    if riff.riff_id == preserve_riff_id
-                ),
-                None,
+        target_rank = clamp_bass_riff_rank(fallback_selector)
+        selected = (
+            self._bass_riffs.choose(
+                *self._bass_riff_context,
+                target_rank,
+                preserve_riff_id=preserve_riff_id,
             )
-        if selected_index is None and candidates:
-            selected_index = max(
-                0,
-                min(len(candidates) - 1, int(fallback_selector) - 1),
-            )
-        if selected_index is None:
-            self._bass_riff_selector = max(1, int(fallback_selector))
+            if self._bass_riff_context is not None
+            else None
+        )
+        self._bass_riff_selector = target_rank
+        if selected is None:
             self._active_bass_riff_id = None
         else:
-            self._bass_riff_selector = selected_index + 1
-            self._active_bass_riff_id = candidates[selected_index].riff_id
+            self._active_bass_riff_id = selected.riff_id
         return previous != (
             self._bass_riff_selector,
             self._active_bass_riff_id,
@@ -271,11 +248,19 @@ class InstrumentBackend(app_core.InstrumentBackend):
             return False
         changed = self._choose_bass_riff(
             fallback_selector=(
-                self._preset_bass_riff_selector()
+                (
+                    self._bass_riff_selector
+                    if self._rhythm_running
+                    else self._preset_bass_riff_selector()
+                )
                 if fallback_selector is None
                 else fallback_selector
             ),
-            preserve_riff_id=preserve_riff_id,
+            preserve_riff_id=(
+                self._active_bass_riff_id
+                if preserve_riff_id is None and self._rhythm_running
+                else preserve_riff_id
+            ),
         )
         if changed:
             self.bassVoicingChanged.emit()
@@ -283,14 +268,10 @@ class InstrumentBackend(app_core.InstrumentBackend):
         return changed
 
     def _current_bass_riff_payload(self) -> dict[str, Any] | None:
+        if self._current_bass_riff_context() != self._bass_riff_context:
+            self._reconcile_bass_riff_context(force=True)
         if not self.bassRiffMode:
             return None
-        if self._current_bass_riff_context() != self._bass_riff_context:
-            self._reconcile_bass_riff_context(
-                preserve_riff_id=(
-                    self._active_bass_riff_id if self._bass_riff_is_playing() else None
-                )
-            )
         riff = self._bass_riffs.by_id(self._active_bass_riff_id)
         if riff is None or self._active_root_semitone < 0:
             return None
@@ -371,6 +352,34 @@ class InstrumentBackend(app_core.InstrumentBackend):
             json.dumps(payload, separators=(",", ":")),
         )
 
+    def _set_active_chord(
+        self,
+        row_index: int,
+        root_semitone: int,
+        *,
+        root_midi_override: int | None = None,
+    ) -> None:
+        """Apply root changes with the documented stopped/running rank policy."""
+
+        target_rank = (
+            self._bass_riff_selector
+            if self._rhythm_running
+            else self._preset_bass_riff_selector()
+        )
+        preserve_riff_id = (
+            self._active_bass_riff_id if self._rhythm_running else None
+        )
+        super()._set_active_chord(
+            row_index,
+            root_semitone,
+            root_midi_override=root_midi_override,
+        )
+        self._reconcile_bass_riff_context(
+            fallback_selector=target_rank,
+            preserve_riff_id=preserve_riff_id,
+            force=True,
+        )
+
     @Slot()
     def toggleChordGate(self) -> None:
         if self._chord_gate_state == CHORD_GATE_ON:
@@ -447,11 +456,15 @@ class InstrumentBackend(app_core.InstrumentBackend):
     def setBassRiffSelector(self, value: float) -> None:
         if self._midi_control_blocks({"screen": "omni", "kind": "bass_riff_selector"}):
             return
-        candidates = self._available_bass_riffs()
-        if not candidates:
+        selected = clamp_bass_riff_rank(value)
+        context = self._current_bass_riff_context()
+        riff = (
+            self._bass_riffs.choose(*context, selected)
+            if context is not None
+            else None
+        )
+        if riff is None:
             return
-        selected = max(1, min(len(candidates), int(round(float(value)))))
-        riff = candidates[selected - 1]
         if (
             selected == self._bass_riff_selector
             and riff.riff_id == self._active_bass_riff_id
@@ -495,7 +508,10 @@ class InstrumentBackend(app_core.InstrumentBackend):
         previous_index = self._rhythm.selected_index
         if rhythm_index == previous_index:
             return
-        preserve_riff_id = self._active_bass_riff_id if self._bass_riff_is_playing() else None
+        live_riff_rank = self._bass_riff_selector
+        preserve_riff_id = (
+            self._active_bass_riff_id if self._rhythm_running else None
+        )
         live_controls = (
             self._rhythm.tempo_by_rhythm[previous_index],
             self._rhythm.busyness_by_rhythm[previous_index],
@@ -515,6 +531,11 @@ class InstrumentBackend(app_core.InstrumentBackend):
                 self._rhythm.fill_density_index_by_rhythm[rhythm_index],
             ) = live_controls
         self._reconcile_bass_riff_context(
+            fallback_selector=(
+                live_riff_rank
+                if self._rhythm_running
+                else self._preset_bass_riff_selector()
+            ),
             preserve_riff_id=preserve_riff_id,
             force=True,
         )
@@ -560,9 +581,9 @@ class InstrumentBackend(app_core.InstrumentBackend):
         )
 
     def _apply_preset_data(self, data: dict[str, Any]) -> None:
-        live_bass_riff_id = (
-            self._active_bass_riff_id if self._bass_riff_is_playing() else None
-        )
+        rhythm_was_running = self._rhythm_running
+        live_bass_riff_rank = self._bass_riff_selector
+        live_bass_riff_id = self._active_bass_riff_id if rhythm_was_running else None
         super()._apply_preset_data(data)
         rhythm = data.get("rhythm", {})
         if not isinstance(rhythm, dict):
@@ -600,7 +621,9 @@ class InstrumentBackend(app_core.InstrumentBackend):
         )
         stored_riff_selector = self._preset_bass_riff_selector(data)
         self._reconcile_bass_riff_context(
-            fallback_selector=stored_riff_selector,
+            fallback_selector=(
+                live_bass_riff_rank if rhythm_was_running else stored_riff_selector
+            ),
             preserve_riff_id=live_bass_riff_id,
             force=True,
         )

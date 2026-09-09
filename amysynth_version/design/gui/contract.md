@@ -62,7 +62,7 @@ OMNI chord-input channel selector. Its right edge aligns with the right edge of
 the purple preset panel below it, and its vertical center aligns with `PNC!`
 and `FSC`. It has the same 62-pixel diameter, typography and two-pixel circular
 border as the six MIDI-row channel selectors, but uses black text and border.
-It displays `7` at startup and cycles through `1..16,A` on a click or tap. The
+It displays `1` at startup and cycles through `1..16,A` on a click or tap. The
 corresponding note ownership and bottom-row chord/octave feedback contract is
 defined in [`../controls/midi.md`](../controls/midi.md).
 
@@ -136,9 +136,10 @@ arpeggio controls remain unchanged.
 
 With bass activity 1 through 4, the lower bass slider is labelled `bass
 voicing` and keeps its `-6..6` inversion range. Selecting `R` changes that same
-Qt slider to `riff selector`, with the discrete range `1..N` for the riffs
-compatible with the current rhythm and chord suffix. No custom pointer or
-gesture handling is introduced for either function.
+Qt slider to `riff selector`, with the fixed discrete range `1..5`. Each value
+selects an authored activity rank among riffs compatible with the current
+rhythm and chord suffix; it is not a position in a variable-length list. No
+custom pointer or gesture handling is introduced for either function.
 
 The `CHORD ON/OFF` button reports its current state: `CHORD ON` means sequencer
 chords are enabled and `CHORD OFF` means they are disabled. Its ON appearance

@@ -17,7 +17,12 @@ Each MIDI row has:
 - volume
 - its own AMY bus (4 through 9)
 
-Default channels are 1-6. Duplicate channel assignments are allowed.
+The chord-input selector defaults to channel 1. The six MIDI rows default to
+channels `2,3,4,5,6,10`; the final purple row is the drum kit on General MIDI
+percussion channel 10. Duplicate channel assignments remain allowed. Existing
+user presets retain their explicit channel choices. A user preset that is an
+exact, untouched copy of the former factory `1,2,3,4,5,6` layout is upgraded
+to the new defaults when first opened.
 
 MIDI input tech selection is controlled by `midi_input.tech_profile`. The
 shipped value is `auto`: ordinary packages derive the closest profile from
@@ -39,14 +44,19 @@ are merged. This prevents one device's partial running-status message from
 corrupting another device's input. The merged events parse Note On, Note Off,
 velocity-zero Note Off, Control Change, Pitch Bend and running status. System
 real-time bytes are ignored; SysEx and Program Change are not application
-inputs. A channel-status byte by itself creates no indicator. The first value
+inputs. MIDI Clock (`0xF8`) therefore neither creates an application event nor
+pulses the input-technology activity LED, even when a connected device sends it
+continuously. A channel-status byte by itself creates no indicator. The first value
 seen for each channel/controller pair establishes a baseline; only a later,
 different value counts as control movement. Pitch Bend is the exception to the
 zero-baseline rule: its baseline is the MIDI center value, so moving a spring
 loaded wheel or encoder away from center creates an indicator immediately.
 This prevents controller-state snapshots sent during a VMPK channel switch from
 creating indicators. Actual CC, Pitch Bend and MIDI-button changes drive the
-left-to-right, capacity-aware indicators.
+left-to-right, capacity-aware indicators. An ordinary CC is presented as a
+pushbutton once both endpoint values 0 and 127 have been observed without any
+intermediate value. Observing an intermediate value permanently classifies
+that source as a rotary control for the current run.
 Changed MIDI control sources also enter the explicit MIDI-learn system defined
 in `midi_control.md`. Unbound controls remain display-only. Bound continuous
 sources map to one numeric target and still apply through the target's normal
@@ -61,7 +71,7 @@ Channel 0 in a row means omni/all incoming channels.
 
 The white round selector at the top-right of the MIDI screen reserves one
 incoming MIDI channel for monophonic OMNI chord selection. It starts at channel
-7 and cycles through `1..16,A` with the same channel convention as a MIDI synth
+1 and cycles through `1..16,A` with the same channel convention as a MIDI synth
 row; `A` means every incoming channel. The selector is live performance state,
 not part of an OMNI or MIDI preset.
 

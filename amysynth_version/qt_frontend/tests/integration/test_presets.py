@@ -835,6 +835,7 @@ class PresetIntegrationTests(unittest.TestCase):
             preset_two["rhythm"]["chord_arpeggio_enabled"] = False
             preset_two["rhythm"]["chord_arpeggio_rate"] = 1
             preset_two["rhythm"]["chord_arpeggio_direction"] = "up"
+            preset_two["rhythm"]["bass_riff_selector"] = 2
             target_octaves = ("O5", "O1", "O2", "O6")
             for row, octave in zip(preset_two["chord_rows"], target_octaves):
                 row["octave"] = octave
@@ -855,6 +856,7 @@ class PresetIntegrationTests(unittest.TestCase):
             app.action("setRhythmChordActivity", 3.0)
             app.action("setRhythmBassActivity", 4.0)
             app.action("setBassVoicingShift", -2.0)
+            app.action("setBassRiffSelector", 5.0)
             app.action("toggleRhythmFill", 4)
             app.action("setRhythmFillDensity", 6.0)
             app.action("setChordArpeggioRate", 3.0)
@@ -889,6 +891,7 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("rhythmChordActivity")), 3)
             self.assertEqual(int(app.query("rhythmBassActivity")), 4)
             self.assertEqual(int(app.query("bassVoicingShift")), -2)
+            self.assertEqual(int(app.query("bassRiffSelector")), 5)
             self.assertEqual(
                 list(app.query("rhythmFillEnabled")),
                 [False, False, False, False, True],
@@ -941,6 +944,7 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(stored_settings["fill_order"], [4])
             self.assertEqual(int(stored_settings["fill_density_bars"]), 2)
             self.assertEqual(int(stored["rhythm"]["bass_voicing_shift"]), -2)
+            self.assertEqual(int(stored["rhythm"]["bass_riff_selector"]), 5)
             self.assertTrue(bool(stored["rhythm"]["chord_arpeggio_enabled"]))
             self.assertEqual(
                 int(stored["rhythm"]["chord_arpeggio_rate"]), 3
@@ -1037,13 +1041,27 @@ class PresetIntegrationTests(unittest.TestCase):
             self.assertEqual(int(app.query("bassRiffSelector")), 4)
             self.assertEqual(
                 str(app.query("selectedBassRiffId")),
-                "riff_0004_pop_8_root_fifth",
+                "bass_shared_0032",
             )
 
             app.action("setBassRiffSelector", 2.0)
             app.action("storeSelectedPreset")
             stored = json.loads(preset_path.read_text(encoding="utf-8"))
             self.assertEqual(int(stored["rhythm"]["bass_riff_selector"]), 2)
+
+    def test_legacy_riff_selector_above_five_clamps_to_highest_rank(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            preset_path = app.home / ".omnichord" / "omni_presets" / "p2.json"
+            preset = json.loads(preset_path.read_text(encoding="utf-8"))
+            preset["rhythm"]["selected"] = "pop_8"
+            preset["rhythm"]["bass_riff_selector"] = 99
+            preset_path.write_text(json.dumps(preset), encoding="utf-8")
+
+            app.action("selectPreset", 2)
+            app.action("selectChord", 0, 0)
+            self.assertEqual(int(app.query("bassRiffSelectorMaximum")), 5)
+            self.assertEqual(int(app.query("bassRiffSelector")), 5)
 
 
 if __name__ == "__main__":

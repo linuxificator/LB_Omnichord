@@ -488,7 +488,23 @@ class SerialIntegrationTests(unittest.TestCase):
             c_events = riff_note_ons(c_lines)
             self.assertEqual(
                 [event[3] for event in c_events],
-                [36.0, 43.0, 48.0, 43.0, 36.0, 31.0, 36.0, 43.0],
+                [
+                    36.0,
+                    43.0,
+                    48.0,
+                    48.0,
+                    43.0,
+                    43.0,
+                    43.0,
+                    45.0,
+                    45.0,
+                    42.0,
+                    43.0,
+                    38.0,
+                    43.0,
+                    38.0,
+                    43.0,
+                ],
             )
             self.assertTrue(c_events)
             for _tick, _period, tag, _note, _velocity in c_events:
@@ -512,7 +528,23 @@ class SerialIntegrationTests(unittest.TestCase):
             e_events = riff_note_ons(app.bridge.lines_since(transpose_start))
             self.assertEqual(
                 [event[3] for event in e_events],
-                [40.0, 47.0, 52.0, 47.0, 40.0, 35.0, 40.0, 47.0],
+                [
+                    40.0,
+                    47.0,
+                    52.0,
+                    52.0,
+                    47.0,
+                    47.0,
+                    47.0,
+                    49.0,
+                    49.0,
+                    46.0,
+                    47.0,
+                    42.0,
+                    47.0,
+                    42.0,
+                    47.0,
+                ],
             )
             self.assertEqual(
                 [
@@ -526,7 +558,7 @@ class SerialIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(
                 str(app.query("selectedBassRiffId")),
-                "riff_0004_pop_8_root_fifth",
+                "bass_shared_0032",
             )
 
     def test_chord_arpeggio_uses_all_notes_and_only_the_chord_lane(self) -> None:
