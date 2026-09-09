@@ -19,6 +19,9 @@ EMBEDDED_FILES = (
     ("install_realtime_profile.sh", 0o755),
     ("rt_pi_config.py", 0o755),
     ("lb-omnichord-performance.service", 0o644),
+    ("pipewire-service-limits.conf", 0o644),
+    ("pipewire-lb-realtime.conf", 0o644),
+    ("pipewire-pulse-lb-realtime.conf", 0o644),
 )
 
 

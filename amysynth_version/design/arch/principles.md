@@ -44,6 +44,17 @@ framework and library mechanisms already intended to solve it. A custom
 protocol, daemon or state machine needs evidence that the standard mechanism
 cannot satisfy the requirement; sunk implementation effort is not evidence.
 
+## Native platform mechanisms first
+
+For Linux integration, first identify and use the mechanism already owned by
+the Linux kernel or the relevant standard subsystem: for example PAM resource
+limits, systemd unit policy, PipeWire configuration, udev, D-Bus or the normal
+freedesktop interface. Assume a general systems problem has an established
+solution until investigation shows otherwise. Preserve that solution's normal
+authority and lifecycle instead of copying it into application code. Keep
+platform-specific composition in adapters and packaging so the portable
+application remains identical on every platform.
+
 ## Extend existing AMY concepts first
 
 AMY-side integration work must reuse existing AMY concepts, data structures,

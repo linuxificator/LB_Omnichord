@@ -101,20 +101,27 @@ permission after reconnecting:
 ulimit -r
 ```
 
-Expected: `80` or greater. There is no privileged runtime service. Start
-`run_local.sh` or the AppImage normally. Its existing wrapper starts AMY and
-already owns the exact child PID returned by `Popen`/`$!`. Once the audio
-thread exists, the wrapper performs one policy operation:
+Expected: `80` or greater. The installer also places standard drop-ins under
+`/etc/systemd/user/{pipewire,pipewire-pulse}.service.d/` and configuration
+under `/etc/pipewire/{pipewire,pipewire-pulse}.conf.d/`. Systemd supplies the
+resource limit; each PipeWire process uses its own `module-rt` and
+`thread.affinity` support to create its `data-loop.0` on CPU 2 at FIFO 80 or
+75. Application code does not mutate PipeWire threads.
+
+There is no privileged runtime service. Start `run_local.sh` or the AppImage
+normally. Its existing wrapper starts AMY and already owns the exact child PID
+returned by `Popen`/`$!`. Once the audio thread exists, the wrapper performs
+one policy operation:
 
 1. confine the frontend and AMY non-audio threads to CPUs 0-1;
 2. measure the busiest non-main thread of that exact AMY child;
 3. assign only that callback to CPU 3/FIFO 70;
-4. locate the exact `pipewire` and `pipewire-pulse` executables' single
-   `data-loop.0` threads and assign them to CPU 2/FIFO 80 and 75;
+4. verify PipeWire's own `data-loop.0` policies;
 5. read every affinity, scheduler and priority back before reporting success.
 
 The wrapper never searches for AMY by process name or command line. It has no
-registration socket, polling loop, watcher daemon or lifecycle protocol. AMY's
+registration socket, polling loop, watcher daemon or lifecycle protocol. It
+does not take over PipeWire policy from systemd/PipeWire. AMY's
 audio callback is stable for the lifetime of the local service; restarting the
 application starts a new service and repeats the one-shot operation. The
 frontend receives the exact child PID only to verify the applied state for its

@@ -267,6 +267,8 @@ def set_thread_policy(
 ) -> None:
     os.sched_setaffinity(tid, cpus)
     scheduler = os.SCHED_FIFO if fifo_priority else os.SCHED_OTHER
+    reset_on_fork = getattr(os, "SCHED_RESET_ON_FORK", 0)
+    scheduler |= os.sched_getscheduler(tid) & reset_on_fork
     os.sched_setscheduler(tid, scheduler, os.sched_param(fifo_priority))
 
 
@@ -277,9 +279,11 @@ def _policy_matches(
     priority: int,
 ) -> bool:
     try:
+        reset_on_fork = getattr(os, "SCHED_RESET_ON_FORK", 0)
+        active_scheduler = os.sched_getscheduler(tid) & ~reset_on_fork
         return (
             os.sched_getaffinity(tid) == cpus
-            and os.sched_getscheduler(tid) == scheduler
+            and active_scheduler == scheduler
             and os.sched_getparam(tid).sched_priority == priority
         )
     except (OSError, ProcessLookupError):
@@ -319,7 +323,11 @@ def verify_runtime_policy(
         ):
             return False, "the frontend is not confined to housekeeping CPUs"
 
-    loops = discover_pipewire_loops(owner)
+    return verify_pipewire_policy(owner)
+
+
+def verify_pipewire_policy(uid: int) -> tuple[bool, str]:
+    loops = discover_pipewire_loops(uid)
     if set(loops) != set(PIPEWIRE_PRIORITIES):
         return False, "both PipeWire data-loop.0 threads were not found"
     for executable, priority in PIPEWIRE_PRIORITIES.items():
@@ -351,9 +359,9 @@ def apply_runtime_policy(
             "the exact AMY child PID is absent or is not owned by this user",
         )
     try:
-        loops = discover_pipewire_loops(uid)
-        if set(loops) != set(PIPEWIRE_PRIORITIES):
-            raise RuntimeError("both PipeWire data-loop.0 threads were not found")
+        pipewire_ready, pipewire_issue = verify_pipewire_policy(uid)
+        if not pipewire_ready:
+            raise RuntimeError(pipewire_issue)
         audio_tid = select_active_worker(service_pid)
 
         if pin_caller:
@@ -362,9 +370,6 @@ def apply_runtime_policy(
         for tid in task_ids(service_pid):
             set_thread_policy(tid, HOUSEKEEPING_CPUS)
         set_thread_policy(audio_tid, AMY_AUDIO_CPUS, AMY_AUDIO_PRIORITY)
-
-        for executable, priority in PIPEWIRE_PRIORITIES.items():
-            set_thread_policy(loops[executable], PIPEWIRE_CPUS, priority)
 
         verified, issue = verify_runtime_policy(
             service_pid,

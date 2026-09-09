@@ -168,6 +168,8 @@ class RtPiConfigTests(unittest.TestCase):
         self.assertIn("apply --profile audio-split", installer)
         self.assertIn("set-governor performance", installer)
         self.assertIn("rtprio 80", installer)
+        self.assertIn("pipewire.service.d", installer)
+        self.assertIn("pipewire.conf.d", installer)
         self.assertNotIn("enable --now \"lb-omnichord-rt-policy", installer)
         self.assertIn("Raspberry Pi 4", installer)
         self.assertIn("Raspberry Pi 5", installer)

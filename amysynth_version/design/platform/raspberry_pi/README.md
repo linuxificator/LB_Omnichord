@@ -17,10 +17,13 @@ For a dedicated instrument, a reversible Pi 4 host profile has been physically
 measured and is provisionally shared with Pi 5: CPUs 0-1 handle the frontend,
 OS and IRQs, CPU 2 handles the two PipeWire data loops, and CPU 3 handles only
 AMY's detected audio callback. The installer uses the standard Linux PAM
-realtime-priority limit to grant the desktop user permission. The existing
-source/AppImage launch wrapper then applies the policy once to the exact AMY
-child PID it started and reads every setting back. There is no privileged
-watcher, name-based AMY selection, polling or private lifecycle protocol.
+realtime-priority limit to grant the desktop user permission. Systemd grants
+the same limit to its PipeWire user services; PipeWire's own `module-rt` and
+data-loop affinity configuration own those threads. The existing source or
+AppImage launch wrapper applies policy once only to itself and the exact AMY
+child PID it started, then reads every relevant setting back. There is no
+privileged watcher, name-based AMY selection, polling or private lifecycle
+protocol.
 Serial/ESP32 mode does not request or warn about host-AMY policy. An incomplete
 profile produces a visible warning and names the matching release installer.
 See [`realtime_howto.md`](realtime_howto.md); pinning the complete audio chain

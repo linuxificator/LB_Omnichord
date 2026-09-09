@@ -5,6 +5,8 @@ source_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 install_root="/usr/local/lib/lb-omnichord-rt"
 unit_root="/etc/systemd/system"
 limits_file="/etc/security/limits.d/95-lb-omnichord-realtime.conf"
+pipewire_config_root="/etc/pipewire"
+user_unit_root="/etc/systemd/user"
 display_name="${LB_OMNICHORD_RELEASE_ASSET:-$(basename -- "$0")}"
 target_user="${SUDO_USER:-}"
 
@@ -61,6 +63,9 @@ fi
 required_files=(
     rt_pi_config.py
     lb-omnichord-performance.service
+    pipewire-service-limits.conf
+    pipewire-lb-realtime.conf
+    pipewire-pulse-lb-realtime.conf
 )
 for required_file in "${required_files[@]}"; do
     if [[ ! -f "$source_root/$required_file" ]]; then
@@ -77,6 +82,19 @@ install -m 755 \
 install -m 644 \
     "$source_root/lb-omnichord-performance.service" \
     "$unit_root/"
+install -d -m 755 \
+    "$pipewire_config_root/pipewire.conf.d" \
+    "$pipewire_config_root/pipewire-pulse.conf.d" \
+    "$user_unit_root/pipewire.service.d" \
+    "$user_unit_root/pipewire-pulse.service.d"
+install -m 644 "$source_root/pipewire-lb-realtime.conf" \
+    "$pipewire_config_root/pipewire.conf.d/95-lb-omnichord-realtime.conf"
+install -m 644 "$source_root/pipewire-pulse-lb-realtime.conf" \
+    "$pipewire_config_root/pipewire-pulse.conf.d/95-lb-omnichord-realtime.conf"
+install -m 644 "$source_root/pipewire-service-limits.conf" \
+    "$user_unit_root/pipewire.service.d/95-lb-omnichord-realtime.conf"
+install -m 644 "$source_root/pipewire-service-limits.conf" \
+    "$user_unit_root/pipewire-pulse.service.d/95-lb-omnichord-realtime.conf"
 
 limits_temporary="$(mktemp)"
 trap 'rm -f -- "$limits_temporary"' EXIT
@@ -96,6 +114,6 @@ python3 "$install_root/rt_pi_config.py" set-governor performance
 systemctl daemon-reload
 systemctl enable --now lb-omnichord-performance.service
 
-echo "Realtime permission and the performance governor are configured for $target_user."
+echo "Realtime permission, PipeWire policy and the performance governor are configured for $target_user."
 echo "Reboot this Raspberry Pi so the boot profile and new login limit are active."
 echo "Rollback instructions: $install_root/rt_pi_config.py rollback --snapshot PATH"

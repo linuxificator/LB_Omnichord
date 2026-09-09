@@ -28,6 +28,24 @@ def complete_facts() -> realtime.RealtimeFacts:
 
 
 class RaspberryPiRealtimeTests(unittest.TestCase):
+    def test_policy_change_preserves_pipewire_reset_on_fork_flag(self) -> None:
+        reset = getattr(os, "SCHED_RESET_ON_FORK", 0x40000000)
+        with (
+            mock.patch.object(realtime.os, "sched_setaffinity"),
+            mock.patch.object(
+                realtime.os,
+                "sched_getscheduler",
+                return_value=os.SCHED_OTHER | reset,
+            ),
+            mock.patch.object(realtime.os, "sched_setscheduler") as scheduler,
+        ):
+            realtime.set_thread_policy(1041, realtime.PIPEWIRE_CPUS, 80)
+        scheduler.assert_called_once_with(
+            1041,
+            os.SCHED_FIFO | reset,
+            os.sched_param(80),
+        )
+
     def test_pipewire_pulse_is_identified_by_its_native_thread_name(self) -> None:
         with (
             mock.patch.object(realtime, "_process_ids", return_value=(1001, 1012)),
@@ -77,8 +95,8 @@ class RaspberryPiRealtimeTests(unittest.TestCase):
             mock.patch.object(realtime, "select_active_worker", return_value=4243) as select,
             mock.patch.object(
                 realtime,
-                "discover_pipewire_loops",
-                return_value={"pipewire": 5001, "pipewire-pulse": 5002},
+                "verify_pipewire_policy",
+                return_value=(True, ""),
             ),
             mock.patch.object(realtime, "set_thread_policy", side_effect=set_policy),
             mock.patch.object(
@@ -101,8 +119,6 @@ class RaspberryPiRealtimeTests(unittest.TestCase):
                 (4243, realtime.HOUSEKEEPING_CPUS, 0),
                 (4244, realtime.HOUSEKEEPING_CPUS, 0),
                 (4243, realtime.AMY_AUDIO_CPUS, 70),
-                (5001, realtime.PIPEWIRE_CPUS, 80),
-                (5002, realtime.PIPEWIRE_CPUS, 75),
             ],
         )
 

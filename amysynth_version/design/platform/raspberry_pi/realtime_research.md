@@ -67,13 +67,14 @@ which both removes the race and matches a cold application start.
 
 All measurement helpers remain external to both application processes. The
 production integration grants the desktop user a standard PAM
-`RLIMIT_RTPRIO=80` allowance. The already existing source/AppImage wrapper
-knows the immutable PID returned when it starts AMY, measures that exact
-child's active non-main worker, and applies realtime policy only to that
-callback. It discovers PipeWire by exact executable plus `data-loop.0` thread
-identity and immediately reads all policies back. The frontend receives the
-exact child PID and independently verifies the result. No registration
-protocol, privileged watcher or repeated process scan is involved.
+`RLIMIT_RTPRIO=80` allowance. Systemd user-unit drop-ins grant that limit to
+PipeWire; PipeWire's own `module-rt` and `thread.affinity` settings create its
+two data loops with the measured policies. The already existing
+source/AppImage wrapper knows the immutable PID returned when it starts AMY,
+measures that exact child's active non-main worker, and applies realtime
+policy only to that callback. The frontend receives the exact child PID and
+independently reads back AMY, frontend and PipeWire state. No registration
+protocol, privileged watcher or repeated AMY process scan is involved.
 
 Two watcher prototypes were rejected. A 0.5-second process-table poll consumed
 about 6.6% of one core. A later credential-bound Unix-socket design avoided
