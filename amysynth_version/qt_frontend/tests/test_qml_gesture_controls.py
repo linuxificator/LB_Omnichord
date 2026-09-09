@@ -366,6 +366,77 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_strum_learn_touch_is_consumed_but_bound_touch_still_plays(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 180
+    height: 220
+    visible: true
+    property int startCount: 0
+    property int activationCount: 0
+    property int releaseCount: 0
+
+    QtObject {
+        id: fakeController
+        function strumStart(value) { window.startCount += 1 }
+        function strumMove(value) {}
+        function strumEnd() {}
+    }
+
+    QtObject {
+        id: fakeRouter
+        function activateControlTarget(target) {
+            window.activationCount += 1
+            return window.activationCount === 1
+        }
+        function releaseControlTarget(target) {
+            window.releaseCount += 1
+        }
+    }
+
+    StrumPad {
+        x: 30
+        y: 10
+        width: 120
+        height: 200
+        controller: fakeController
+        midiControlRouter: fakeRouter
+    }
+}
+""",
+        )
+        point = QPoint(90, 100)
+        QTest.mouseClick(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            point,
+        )
+        QCoreApplication.processEvents()
+        self.assertEqual(int(window.property("activationCount")), 1)
+        self.assertEqual(int(window.property("startCount")), 0)
+
+        QTest.mouseClick(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            point,
+        )
+        QCoreApplication.processEvents()
+        self.assertEqual(int(window.property("activationCount")), 2)
+        self.assertEqual(int(window.property("startCount")), 1)
+        self.assertEqual(int(window.property("releaseCount")), 0)
+
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
     def test_flat_f01_osc_controls_keep_mechanical_value_feedback(self) -> None:
         engine, component, window = self.create_window(
             b"""

@@ -379,5 +379,113 @@
   "tuning": {
     "mode": "EQ",
     "reference_hz": 440
-  }
+  },
+  "midi_control_bindings": [
+    {
+      "channel": 1,
+      "source_type": "pitch_bend",
+      "activate_on_input": true,
+      "target": {
+        "kind": "pitch_bend"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 1,
+      "activate_on_input": true,
+      "target": {
+        "kind": "strum_position"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 21,
+      "activate_on_input": true,
+      "target": {
+        "kind": "volume",
+        "role": "percussion"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 22,
+      "activate_on_input": true,
+      "target": {
+        "kind": "volume",
+        "role": "bass"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 23,
+      "activate_on_input": true,
+      "target": {
+        "kind": "volume",
+        "role": "strum"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 24,
+      "activate_on_input": true,
+      "target": {
+        "kind": "volume",
+        "role": "chord"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 25,
+      "activate_on_input": true,
+      "target": {
+        "kind": "chord_type",
+        "row": 0
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 26,
+      "activate_on_input": true,
+      "target": {
+        "kind": "chord_type",
+        "row": 1
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 27,
+      "activate_on_input": true,
+      "target": {
+        "kind": "chord_type",
+        "row": 2
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 28,
+      "activate_on_input": true,
+      "target": {
+        "kind": "chord_type",
+        "row": 3
+      }
+    },
+    {
+      "channel": 16,
+      "controller": 115,
+      "activate_on_input": true,
+      "target": {
+        "kind": "button",
+        "action": "rhythm_toggle"
+      }
+    },
+    {
+      "channel": 16,
+      "controller": 117,
+      "activate_on_input": true,
+      "target": {
+        "kind": "button",
+        "action": "chord_gate"
+      }
+    }
+  ]
 }

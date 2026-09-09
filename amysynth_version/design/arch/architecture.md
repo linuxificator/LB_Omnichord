@@ -158,13 +158,16 @@ Persistent phrase execution follows the stricter ownership contract in
 nor owns execution snapshots, repeat completion, phrase releases or finite
 gate expiry.
 
-Tuning, active-chord identity and live-performance context cross the OMNI/MIDI
-boundary only as frozen values from `musical_state.py`. That pure module owns
-reference/bend clamping, key-dependent intonation and chord pitch-class
+Static tuning, active-chord identity and live-performance context cross the
+OMNI/MIDI boundary only as frozen values from `musical_state.py`. That pure
+module owns reference clamping, key-dependent intonation and chord pitch-class
 derivation. MIDI may read `performance_snapshot()` but must not reach into
 OMNI's chord catalogue, row selection or intonation-table fields. The snapshot
 does not transfer synth ownership: OMNI remains responsible for synths 0–4 and
 MIDI for synths 5–11, with note lifetime managed by their existing owners.
+Transient pitch bend deliberately bypasses this split: both screens and the
+factory MIDI wheel drive one OMNI-owned AMY-global wire value. It never enters
+the tuning snapshot or forces stored sequence definitions to be republished.
 
 OMNI preset dictionaries cross into application state through the pure
 `preset_plan.py` boundary. It normalizes chord rows, levels, effects, rhythm

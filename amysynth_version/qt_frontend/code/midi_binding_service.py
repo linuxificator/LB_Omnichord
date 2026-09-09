@@ -22,6 +22,7 @@ TargetNormalizer = Callable[[Any], dict[str, Any] | None]
 class BindingEntry:
     key: ControlKey
     target_items: tuple[tuple[str, Any], ...]
+    activate_on_input: bool = False
 
     def target(self) -> dict[str, Any]:
         return copy.deepcopy(dict(self.target_items))
@@ -61,13 +62,23 @@ class MidiBindingService:
             target_data = raw.get("target")
             if not isinstance(target_data, dict):
                 continue
+            source_type = str(raw.get("source_type", "cc"))
             target_source = dict(target_data)
             target_source["screen"] = str(screen)
+            # Presets written before global bend was separated from static
+            # tuning used Pitch Bend as a 415..466 Hz reference controller.
+            # Preserve those user presets by migrating that exact declaration
+            # to the transient OMNI-owned AMY bend target on load.
+            if (
+                source_type == "pitch_bend"
+                and str(screen) == "omni"
+                and str(target_source.get("kind", "")) == "tuning_reference"
+            ):
+                target_source["kind"] = "pitch_bend"
             target = normalize_target(target_source)
             if target is None:
                 continue
             try:
-                source_type = str(raw.get("source_type", "cc"))
                 if source_type == "osc":
                     address = str(raw.get("address", ""))
                     argument = int(raw.get("argument", 0))
@@ -103,7 +114,16 @@ class MidiBindingService:
                 continue
             if source_type == "cc" and not 0 <= key[1] <= 127:
                 continue
-            entries.append(BindingEntry(key, tuple(sorted(copy.deepcopy(target).items()))))
+            activate_on_input = raw.get("activate_on_input", False)
+            if not isinstance(activate_on_input, bool):
+                continue
+            entries.append(
+                BindingEntry(
+                    key,
+                    tuple(sorted(copy.deepcopy(target).items())),
+                    activate_on_input,
+                )
+            )
         return tuple(entries)
 
     @staticmethod
@@ -111,6 +131,15 @@ class MidiBindingService:
         entries: tuple[BindingEntry, ...],
     ) -> list[tuple[ControlKey, dict[str, Any]]]:
         return [(entry.key, entry.target()) for entry in entries]
+
+    @staticmethod
+    def as_preset_state_entries(
+        entries: tuple[BindingEntry, ...],
+    ) -> list[tuple[ControlKey, dict[str, Any], bool]]:
+        return [
+            (entry.key, entry.target(), entry.activate_on_input)
+            for entry in entries
+        ]
 
     def replace_screen(
         self,
@@ -121,7 +150,7 @@ class MidiBindingService:
             return bool(
                 self.state.replace_screen_bindings(
                     str(screen),
-                    self.as_state_entries(entries),
+                    self.as_preset_state_entries(entries),
                 )
             )
 

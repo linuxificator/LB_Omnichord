@@ -309,9 +309,10 @@ Important regression tests:
   writes and survives section RST and runtime preset selection on both screens,
   including hidden instrument targets and bindings introduced by the
   destination preset
-- MIDI-bound tempo and effective tuning disable and grey their UP/DOWN buttons;
-  tuning recoupling takes authority from a bound side and refuses divergent
-  dual-bound references
+- MIDI-bound tempo disables and greys its UP/DOWN buttons; a MIDI-bound static
+  tuning reference remains protected while the separate global bend buttons
+  remain live; tuning recoupling takes authority from a bound side and refuses
+  divergent dual-bound references
 - OMNI and MIDI reverb level reaches 3.0 through UI/backend clamping, MIDI CC
   mapping and the owned AMY bus commands
 - MIDI CC running status updates indicators without changing musical state;

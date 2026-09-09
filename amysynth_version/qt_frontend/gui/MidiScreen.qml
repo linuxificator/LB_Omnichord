@@ -11,12 +11,6 @@ Item {
     property int activeMidiRow: 0
     property var midiControlModel: []
     property var inputTechModel: midiBackend.midiInputTechs
-    readonly property bool tuningMidiLocked:
-        root.hostWindow.midiTuningMidiBound
-        || (
-            root.tuningCoupled
-            && root.hostWindow.omniTuningMidiBound
-        )
 
     signal showOmniRequested()
     signal toggleTuningCouplingRequested()
@@ -206,18 +200,12 @@ Item {
         width: 42
         height: 42
         text: "UP"
-        enabled: !root.tuningMidiLocked
         panelColor: "#efb05c"
         borderColor: "#a75d0a"
         textColor: "#492606"
         onPressedChanged: {
-            if (pressed) {
-                if (root.tuningCoupled) backend.beginPitchBend(1)
-                else midiBackend.beginPitchBend(1)
-            } else {
-                if (root.tuningCoupled) backend.endPitchBend()
-                else midiBackend.endPitchBend()
-            }
+            if (pressed) backend.beginPitchBend(1)
+            else backend.endPitchBend()
         }
     }
 
@@ -231,18 +219,12 @@ Item {
         width: 42
         height: 42
         text: "DWN"
-        enabled: !root.tuningMidiLocked
         panelColor: "#efb05c"
         borderColor: "#a75d0a"
         textColor: "#492606"
         onPressedChanged: {
-            if (pressed) {
-                if (root.tuningCoupled) backend.beginPitchBend(-1)
-                else midiBackend.beginPitchBend(-1)
-            } else {
-                if (root.tuningCoupled) backend.endPitchBend()
-                else midiBackend.endPitchBend()
-            }
+            if (pressed) backend.beginPitchBend(-1)
+            else backend.endPitchBend()
         }
     }
 

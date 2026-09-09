@@ -643,6 +643,26 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("performanceBackend.rollChordRows(-1)", qml)
         self.assertIn("performanceBackend.rollChordRows(1)", qml)
 
+    def test_strum_buttons_and_chord_wheels_have_explicit_midi_ownership(self) -> None:
+        main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
+        strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
+
+        gate_start = main.index("id: chordGateButton")
+        gate_end = main.index("RainbowModeButton {", gate_start)
+        gate = main[gate_start:gate_end]
+        self.assertIn('"action": "chord_gate"', gate)
+        self.assertIn("MidiButtonLed {", gate)
+        self.assertIn("window.midiButtonHandled(chordGateButton.midiTarget)", gate)
+
+        self.assertIn('"kind": "chord_type"', main)
+        self.assertIn("function handleChordTypeEdit(chordIndex)", main)
+        self.assertIn("releaseControlTargetForManualEdit(", main)
+        self.assertIn("function releaseChordTypeBindings()", main)
+
+        self.assertIn('"kind": "strum_position"', strum)
+        self.assertIn("activateControlTarget(root.midiTarget)", strum)
+        self.assertNotIn("releaseControlTargetForManualEdit", strum)
+
     def test_chord_left_controls_span_two_rows_with_equal_spacing(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         panel_start = qml.index("id: chordControlPanel")
@@ -1011,6 +1031,16 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("PointerNormalization.verticalUnit", midi_strum)
         self.assertNotIn("controller", section)
 
+    def test_tuning_edit_handlers_declare_their_signal_value(self) -> None:
+        for name in ("UtilitySection.qml", "MidiUtilitySection.qml"):
+            with self.subTest(component=name):
+                source = (ROOT / "gui" / name).read_text(encoding="utf-8")
+                self.assertIn(
+                    "onEdited: (value) =>",
+                    source,
+                    "implicit signal-parameter injection is deprecated in Qt 6",
+                )
+
     def test_migraine_is_a_visual_only_bounded_sprite(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         strum = (ROOT / "gui" / "StrumPad.qml").read_text(encoding="utf-8")
@@ -1233,14 +1263,16 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("function onRhythmStateChanged()", qml)
         self.assertIn("rhythmTransportSymbol.requestPaint()", qml)
 
-    def test_midi_owned_tempo_and_tuning_nudges_are_grey_and_disabled(self) -> None:
+    def test_midi_owned_tempo_is_locked_but_global_bend_remains_live(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
         button = (ROOT / "gui" / "PresetResetButton.qml").read_text(encoding="utf-8")
         compact_button = " ".join(button.split())
-        self.assertEqual(main.count("enabled: !window.omniTuningLocked"), 2)
         self.assertEqual(main.count("enabled: !window.rhythmTempoMidiBound"), 2)
-        self.assertEqual(midi.count("enabled: !root.tuningMidiLocked"), 2)
+        self.assertNotIn("omniTuningLocked", main)
+        self.assertNotIn("tuningMidiLocked", midi)
+        self.assertEqual(midi.count("backend.beginPitchBend("), 2)
+        self.assertNotIn("midiBackend.beginPitchBend(", midi)
         self.assertIn('enabled ? root.textColor : "#686864"', button)
         self.assertIn(
             '? (root.pressed ? Qt.darker(root.panelColor, 1.08) : root.panelColor) : "#bdbdb8"',

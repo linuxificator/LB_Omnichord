@@ -13,6 +13,11 @@ Switching OMNI/MIDI is display-only. Existing notes, rhythms, drums, and sequenc
 
 The MIDI strum is a preview instrument. It uses the selected MIDI row instrument and MIDI routing, not the Omnichord strum synth.
 
+An external control bound to the OMNI strum is different from the MIDI-screen
+preview: it supplies positions to the same OMNI strum instrument and musical
+note collection as touch/mouse input. It does not supply velocity and it does
+not disable or unlink direct screen strumming.
+
 Preview note lifetime is bounded by the selected row's four-voice allocation.
 Before another onset would require AMY voice stealing, the oldest preview note
 is explicitly released. The renewed tail timer releases only notes that remain

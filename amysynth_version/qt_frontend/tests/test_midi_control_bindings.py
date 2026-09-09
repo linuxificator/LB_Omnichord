@@ -246,6 +246,167 @@ class MidiControlStateTests(unittest.TestCase):
         assert visible is not None
         self.assertEqual(visible["value"], 2)
 
+    def test_genuine_movement_restores_manually_released_preset_binding(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = target("preset-volume")
+        state.replace_screen_bindings(
+            "midi",
+            [((1, 7), binding)],
+            now=1.0,
+        )
+        state.observe(1, 7, 0, now=1.1)
+        state.observe(1, 7, 63, now=1.2)
+
+        self.assertTrue(
+            state.release_target_for_manual_edit(binding, now=2.0)
+        )
+        self.assertEqual(state.status((1, 7)), "blue")
+
+        changed, mapped, key = state.observe(1, 7, 64, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(key, (1, 7))
+        self.assertEqual(mapped, binding)
+        self.assertEqual(state.status((1, 7)), "bound")
+        self.assertTrue(state.is_target_bound(binding))
+
+    def test_unsaved_runtime_binding_does_not_reactivate_after_manual_release(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = target("runtime-only")
+        change(state, 7, now=1.0)
+        state.indicator_clicked((1, 7), now=1.1)
+        state.bind_learned_target(binding, now=1.2)
+        state.release_target_for_manual_edit(binding, now=2.0)
+
+        changed, mapped, key = state.observe(1, 7, 2, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(key, (1, 7))
+        self.assertIsNone(mapped)
+        self.assertEqual(state.status((1, 7)), "idle")
+
+    def test_storing_after_ui_takeover_retains_preset_reactivation(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = target("temporarily-released")
+        state.replace_screen_bindings(
+            "midi",
+            [((1, 7), binding)],
+            now=1.0,
+        )
+        state.observe(1, 7, 0, now=1.1)
+        state.release_target_for_manual_edit(binding, now=2.0)
+        state.remember_active_bindings_as_preset("midi")
+
+        changed, mapped, key = state.observe(1, 7, 1, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(key, (1, 7))
+        self.assertEqual(mapped, binding)
+        self.assertTrue(state.is_target_bound(binding))
+
+    def test_storing_after_grey_bar_unlink_removes_preset_reactivation(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = target("explicitly-removed")
+        state.replace_screen_bindings(
+            "midi",
+            [((1, 7), binding)],
+            now=1.0,
+        )
+        state.observe(1, 7, 0, now=1.1)
+        self.assertTrue(state.indicator_clicked((1, 7), now=2.0))
+        state.remember_active_bindings_as_preset("midi")
+
+        changed, mapped, key = state.observe(1, 7, 1, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(key, (1, 7))
+        self.assertIsNone(mapped)
+        self.assertFalse(state.is_target_bound(binding))
+
+    def test_soft_binding_is_dormant_until_real_input_and_survives_store(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = target("factory-default", screen="omni")
+        state.replace_screen_bindings(
+            "omni",
+            [((1, 1), binding, True)],
+            now=1.0,
+        )
+
+        self.assertFalse(state.is_target_bound(binding))
+        self.assertEqual(
+            state.serialize_bindings("omni"),
+            [
+                {
+                    "channel": 1,
+                    "controller": 1,
+                    "activate_on_input": True,
+                    "target": binding,
+                }
+            ],
+        )
+        state.remember_active_bindings_as_preset("omni")
+        state.observe(1, 1, 0, now=2.0)
+        changed, mapped, _key = state.observe(1, 1, 64, now=3.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(mapped, binding)
+        self.assertTrue(state.is_target_bound(binding))
+
+    def test_soft_button_binding_acts_on_its_first_press(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = {
+            "id": "omni:rhythm-toggle",
+            "screen": "omni",
+            "kind": "button",
+            "action": "rhythm_toggle",
+        }
+        state.replace_screen_bindings(
+            "omni",
+            [((16, 115), binding, True)],
+            now=1.0,
+        )
+
+        changed, mapped, key = state.observe(16, 115, 127, now=2.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(mapped, binding)
+        self.assertEqual(key, (16, 115))
+        self.assertTrue(state.is_target_bound(binding))
+
+    def test_soft_button_release_still_establishes_a_quiet_baseline(self) -> None:
+        state = MidiControlState(capacity=2)
+        binding = {
+            "id": "omni:chord-gate",
+            "screen": "omni",
+            "kind": "button",
+            "action": "chord_gate",
+        }
+        state.replace_screen_bindings(
+            "omni",
+            [((16, 117), binding, True)],
+            now=1.0,
+        )
+
+        changed, mapped, key = state.observe(16, 117, 0, now=2.0)
+        self.assertFalse(changed)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+
+        changed, mapped, key = state.observe(16, 117, 127, now=3.0)
+        self.assertTrue(changed)
+        self.assertEqual(mapped, binding)
+        self.assertEqual(key, (16, 117))
+
+    def test_unknown_cc_first_packet_remains_only_a_baseline(self) -> None:
+        state = MidiControlState(capacity=2)
+
+        changed, mapped, key = state.observe(1, 99, 127, now=1.0)
+
+        self.assertFalse(changed)
+        self.assertIsNone(mapped)
+        self.assertIsNone(key)
+        self.assertEqual(state.values[(1, 99)], 127)
+
     def test_screen_specific_bindings_round_trip(self) -> None:
         state = MidiControlState(capacity=4)
         midi_target = target("midi")

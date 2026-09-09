@@ -35,8 +35,10 @@ creating indicators, selecting instruments or changing audio state.
 
 Pitch Bend uses MIDI center (`8192`) as its baseline and full 14-bit input
 range (`0..16383`) for numeric mapping. This makes a centered pitch-bend wheel
-or encoder neutral, while movement away from center can be learned and mapped to
-any continuous control with higher resolution than CC.
+or encoder neutral, while movement away from center can be learned and mapped
+to any continuous control with higher resolution than CC. The factory mapping
+is the special transient `omni:pitch_bend` target: it sends AMY's global bend
+directly and is not a 415–466 Hz tuning-reference edit.
 
 CC-style controller buttons transmit only the endpoint pair 0 (released) and
 127 (pressed). After both endpoints have been observed without an intermediate
@@ -125,6 +127,37 @@ not unlink. For click-only numeric controls such as volume and tuning, the first
 increment or decrement releases the binding before applying its step. There is
 no separate double-click/double-tap unlink gesture.
 
+Runtime ownership and the selected preset's declaration are separate. If the
+binding released by numeric UI takeover is still declared by the selected
+preset, the next genuinely changed value from that source restores the binding
+and applies that very value immediately. This makes the last control surface
+that the performer actually moves authoritative. A runtime-only learned
+binding has no such fallback until the preset is stored. Clicking the green
+source in the grey bar is the explicit removal operation; storing after that
+click omits the declaration. A source which has no selected-preset declaration
+keeps the older behavior: its next movement merely ends the blue state and
+leaves it unbound.
+
+Button targets and the OMNI strum-position target are deliberate exceptions to
+manual-takeover unlinking. Their screen controls remain usable alongside the
+external source and never release their binding. They can be unlinked only by
+clicking their green controller representation in the grey input bar. If the
+selected preset still declares that binding, the next genuine source event
+restores it and is handled immediately.
+
+Factory control-surface defaults use the optional preset flag
+`activate_on_input: true`. Such a declaration is persisted but dormant: it
+does not become green, protect a value or acquire target authority merely
+because its preset was loaded. The first genuine event from that source binds
+and applies immediately. This keeps the application fully usable when the
+named controller is absent while retaining ordinary MIDI identities that work
+with any compatible control surface. For a declared pushbutton, a nonzero CC
+received as its first packet is itself a genuine press and performs the action;
+it is not consumed as a continuous-controller baseline. An initial zero packet
+remains a quiet released baseline, and undeclared CC sources retain the normal
+first-value baseline rule. User-learned bindings remain immediately active
+unless they explicitly opt into this policy.
+
 Unlinking always makes the controller visible when capacity allows.
 The blue state is an inactivity notice, not a latch: the next genuine CC
 movement ends it immediately and leaves the controller visible as an ordinary
@@ -142,6 +175,9 @@ Every continuous numeric control is bindable:
 - OMNI and MIDI tuning reference;
 - rhythm tempo;
 - bass voicing and the dynamic bass riff selector.
+- each of the four OMNI chord-type rows;
+- the OMNI strum position, where the source value selects position while the
+  preset's normal strum volume remains authoritative.
 
 MIDI CC values `0..127` map over the complete visible slider travel. Pitch Bend
 values `0..16383` map over the same target range, with center at roughly the
@@ -168,13 +204,15 @@ include:
 - OMNI panic;
 - OMNI rhythm transport, percussion activity, fill toggles, chord activity,
   chord arpeggio enable, chord arpeggio rate, chord arpeggio direction, bass
-  activity and APG/LDR strum-ladder mode;
+  activity, automatic-chord gate and APG/LDR strum-ladder mode;
 - MIDI row channel cycling.
 
 The backend treats MIDI button bindings as application button actions, not as
 AMY-specific behavior. Pressing a learned controller button calls the same
 backend action as a screen tap. Releasing it clears the held state. A tap-style
-MIDI button therefore behaves like a screen tap.
+MIDI button therefore behaves like a screen tap. Tapping the corresponding
+screen button does not unlink it; button bindings are removed only from their
+controller representation in the grey bar.
 
 For on/off MIDI buttons, the pressed state is a temporary takeover of the bound
 application button. The takeover is scoped to the target's logical group so the
@@ -198,12 +236,14 @@ parameters and the bound section volume. A hidden instrument-specific
 parameter remains protected without selecting that instrument.
 
 A runtime preset switch preserves the current value of every target bound
-immediately before the switch and every target declared by the destination
-preset. The destination preset still replaces that screen's binding set as
-specified below; only the protected numeric values survive the transition.
-Initial application startup may load all stored values because it is not a
-live preset switch. After either operation, the next genuine CC movement
-continues through the normal mapped setter path.
+immediately before the switch and every immediately-active target declared by
+the destination preset. A dormant `activate_on_input` declaration does not
+protect a value until its source has actually taken ownership. The destination
+preset still replaces that screen's binding set as specified below; only the
+protected numeric values survive the transition. Initial application startup
+may load all stored values because it is not a live preset switch. After either
+operation, the next genuine CC movement continues through the normal mapped
+setter path.
 
 There is one deliberate exception. If the same channel/controller pair is
 currently bound to target A and the destination preset assigns it to a

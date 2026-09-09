@@ -547,15 +547,30 @@ class InstrumentBackend(app_core.InstrumentBackend):
     def rollChordRows(self, direction: int) -> None:
         if int(direction) == 0:
             return
-        self._row_chord_indexes = roll_chord_indexes(
+        rolled = roll_chord_indexes(
             self._row_chord_indexes,
             len(self._chords),
             direction,
         )
-        self._row_inversion_indexes = [0] * app_core.ROW_COUNT
+        changed_rows = [
+            row_index
+            for row_index in range(app_core.ROW_COUNT)
+            if not self._midi_control_blocks(
+                {
+                    "screen": "omni",
+                    "kind": "chord_type",
+                    "row": row_index,
+                }
+            )
+        ]
+        if not changed_rows:
+            return
+        for row_index in changed_rows:
+            self._row_chord_indexes[row_index] = rolled[row_index]
+            self._row_inversion_indexes[row_index] = 0
         self._strum_last_index = None
         self._emit_state_changed()
-        for row_index in range(app_core.ROW_COUNT):
+        for row_index in changed_rows:
             self._refresh_row_chord_notes(row_index)
 
     def _reset_presettable_state_to_defaults(self) -> None:

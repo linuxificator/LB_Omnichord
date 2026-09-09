@@ -1625,6 +1625,8 @@ class AmySerialClient:
                 return
             if self.rhythm_running:
                 self._replace_lane("chords")
+        elif address == a["pitch_bend"]:
+            self._wire(f"s{self._f(float(value))}Z")
         elif address == a["rhythm_running"]:
             new_state = bool(int(value))
             if new_state:

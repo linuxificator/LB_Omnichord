@@ -305,9 +305,13 @@ installation failed to show or release chord-key interaction correctly.
   the same release-before-edit ordering.
 - There is no separate double-click/double-tap unlink gesture.
 - The controller becomes blue and visible when capacity permits.
-- The next genuine CC movement changes a blue controller immediately into an
-  ordinary grey unbound indicator. Without movement, blue expires and removes
-  the indicator after 30 seconds.
+- If the selected preset still declares the binding released by numeric UI
+  takeover, the next genuine source movement restores it to green and
+  immediately applies that event.
+- A binding learned only in runtime remains grey after the next movement until
+  the preset is stored. Clicking its green source in the grey bar is explicit
+  unlink: storing after that click records its removal.
+- Without movement, blue expires and removes the indicator after 30 seconds.
 
 **MIDI-CC-07 — hidden instrument targets reactivate on MIDI and OMNI**
 
@@ -415,6 +419,28 @@ installation failed to show or release chord-key interaction correctly.
 - Tap-only actions, including panic, store-preset and cycle-channel, trigger on
   press but do not create held takeover state. Unrelated screen buttons remain
   usable while any hardware button is held.
+
+**MIDI-CC-15 — preset controller defaults remain ordinary generic bindings**
+
+- Every factory OMNI preset maps channel-1 Pitch Bend to global AMY bend, channel
+  1 CC1 to OMNI strum position, CC21..24 to percussion/bass/strum/chord volume,
+  CC25..28 to chord-type rows 1..4, and channel-16 CC115/117 to rhythm and
+  automatic-chord transport respectively.
+- Pitch Bend is one transient global performance value and never changes the
+  coupled or decoupled A-reference, intonation mode, or stored sequence
+  definitions. CC strum position uses the preset strum volume, crosses
+  newly reached notes once and supplies no velocity.
+- Direct mouse/touch strumming and screen button taps never unlink their
+  external bindings; only the matching grey-bar control can unlink them.
+- Factory mappings are dormant `activate_on_input` declarations. Loading a
+  preset without the controller attached neither shows green bindings nor
+  protects target values. The first genuine matching event activates the
+  binding and applies immediately. A declared pushbutton's first nonzero CC
+  packet after startup is a genuine press and performs its action; an initial
+  release and the first packet from an unknown ordinary CC remain baselines.
+- Chord-type wheels behave like numeric sliders: direct wheel, group UP/DWN or
+  RST interaction releases their binding before applying the screen edit, and
+  later source movement restores it only when the selected preset declares it.
 
 Unit tests cover the state machine and mapping math. Headless frontend tests use
 simulated user actions plus simulated MIDI CC input and inspect state, preset

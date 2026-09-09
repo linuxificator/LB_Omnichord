@@ -34,7 +34,7 @@ class MidiBindingServiceTests(unittest.TestCase):
             "midi",
             [
                 {"channel": 1, "controller": 7, "target": {"id": "volume"}},
-                {"channel": 2, "source_type": "pitch_bend", "target": {"id": "bend"}},
+                {"channel": 2, "source_type": "pitch_bend", "activate_on_input": True, "target": {"id": "bend"}},
                 {"channel": 3, "source_type": "note_button", "note": 60, "target": {"id": "tap"}},
                 {"source_type": "osc", "address": "/fader", "argument": 0, "value_type": "continuous", "target": {"id": "osc"}},
                 {"channel": 4, "source_type": "unknown", "target": {"id": "bad"}},
@@ -52,6 +52,24 @@ class MidiBindingServiceTests(unittest.TestCase):
                 self.state.osc_key("/fader", 0),
             ),
         )
+        self.assertFalse(entries[0].activate_on_input)
+        self.assertTrue(entries[1].activate_on_input)
+
+    def test_rejects_non_boolean_activation_policy(self) -> None:
+        entries = self.service.normalize_entries(
+            "omni",
+            [
+                {
+                    "channel": 1,
+                    "controller": 1,
+                    "activate_on_input": "yes",
+                    "target": {"id": "strum"},
+                }
+            ],
+            normalize_target,
+        )
+
+        self.assertEqual(entries, ())
 
     def test_rejects_invalid_osc_binding_identity(self) -> None:
         entries = self.service.normalize_entries(
@@ -81,6 +99,31 @@ class MidiBindingServiceTests(unittest.TestCase):
 
         self.assertEqual(self.service.serialize("midi")[0]["target"]["screen"], "midi")
         self.assertEqual(self.service.serialize("omni")[0]["target"]["screen"], "omni")
+
+    def test_dormant_preset_binding_round_trips_and_activates_on_input(self) -> None:
+        entries = self.service.normalize_entries(
+            "omni",
+            [
+                {
+                    "channel": 1,
+                    "controller": 1,
+                    "activate_on_input": True,
+                    "target": {"id": "strum"},
+                }
+            ],
+            normalize_target,
+        )
+
+        self.service.replace_screen("omni", entries)
+        self.assertEqual(self.state.bindings, {})
+        self.assertTrue(self.service.serialize("omni")[0]["activate_on_input"])
+
+        self.state.observe(1, 1, 0, now=1.0)
+        changed, mapped, _key = self.state.observe(1, 1, 64, now=2.0)
+
+        self.assertTrue(changed)
+        self.assertEqual(mapped, {"id": "strum", "screen": "omni"})
+        self.assertEqual(self.state.status((1, 1)), "bound")
 
     def test_presentation_is_an_immutable_detached_snapshot(self) -> None:
         self.state.observe(1, 7, 0, now=1.0)

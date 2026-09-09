@@ -13,6 +13,10 @@ OSC_CONTROL_CHANNEL = 17
 OSC_VALUE_MAX = 1_000_000
 
 ControlKey = tuple[int, int]
+PresetBindingEntry = (
+    tuple[ControlKey, dict[str, Any]]
+    | tuple[ControlKey, dict[str, Any], bool]
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +62,22 @@ class MidiControlState:
         self._next_osc_controller = 0
         self._cc_endpoint_values: dict[ControlKey, set[int]] = {}
         self._continuous_cc_keys: set[ControlKey] = set()
+        # A preset binding and its current runtime ownership are related but
+        # deliberately not identical. Manual UI takeover removes the active
+        # binding while retaining this selected-preset declaration, allowing
+        # genuine activity from that same source to take control back.
+        # Factory mappings may additionally be dormant until their first real
+        # input, so merely loading a preset never makes absent hardware own UI
+        # state. Explicit grey-bar unlinking suppresses a declaration when the
+        # preset is next stored.
+        self._preset_bindings_by_screen: dict[
+            str,
+            dict[ControlKey, dict[str, Any]],
+        ] = {}
+        self._preset_activation_by_screen: dict[str, dict[ControlKey, bool]] = {}
+        self._preset_unlinks_by_screen: dict[str, set[ControlKey]] = {}
+        self._preset_screen_revision: dict[str, int] = {}
+        self._preset_revision_clock = 0
 
     @staticmethod
     def key(channel: int, controller: int) -> ControlKey:
@@ -305,6 +325,14 @@ class MidiControlState:
         if previous is None:
             if source_type == "pitch_bend":
                 previous = self.default_value_for_key(key)
+            elif source_type == "cc" and self._is_declared_button_press(
+                key,
+                value,
+            ):
+                # A known pushbutton's first press is an action, not a
+                # controller snapshot. Its declared target supplies the
+                # semantic information that an unbound CC cannot provide.
+                previous = 0
             elif source_type in ("note_button", "osc_button"):
                 if value <= 0:
                     return False, None, None
@@ -330,7 +358,85 @@ class MidiControlState:
                 }
             )
         target = self.bindings.get(key)
+        if target is None:
+            target = self.restore_preset_binding(key, now=now)
         return True, copy.deepcopy(target) if target else None, key
+
+    def _preset_target_for_key(
+        self,
+        key: ControlKey,
+    ) -> tuple[str, dict[str, Any], bool] | None:
+        candidates = [
+            (
+                self._preset_screen_revision.get(screen, -1),
+                screen,
+                target,
+                bool(self._preset_activation_by_screen.get(screen, {}).get(key)),
+            )
+            for screen, bindings in self._preset_bindings_by_screen.items()
+            if (target := bindings.get(key)) is not None
+        ]
+        if not candidates:
+            return None
+        _revision, screen, target, activate_on_input = max(
+            candidates,
+            key=lambda item: item[0],
+        )
+        return screen, copy.deepcopy(target), activate_on_input
+
+    def _is_declared_button_press(self, key: ControlKey, value: int) -> bool:
+        if value <= 0:
+            return False
+        target = self.bindings.get(key)
+        if target is None:
+            preset_binding = self._preset_target_for_key(key)
+            if preset_binding is None or not preset_binding[2]:
+                return False
+            target = preset_binding[1]
+        return str(target.get("kind", "")) == "button"
+
+    def _bind_key_to_target(
+        self,
+        key: ControlKey,
+        target: dict[str, Any],
+        *,
+        now: float,
+    ) -> None:
+        target_id = self.target_id(target)
+        previous_target = self.bindings.pop(key, None)
+        if previous_target is not None:
+            self._target_to_control.pop(self.target_id(previous_target), None)
+
+        displaced = self._target_to_control.pop(target_id, None)
+        if displaced is not None and displaced != key:
+            self.bindings.pop(displaced, None)
+            self.blue_since[displaced] = now
+            self.ensure_visible(displaced, now=now)
+
+        self.bindings[key] = copy.deepcopy(target)
+        self._target_to_control[target_id] = key
+        self.blue_since.pop(key, None)
+        self.ensure_visible(key, now=now)
+
+    def restore_preset_binding(
+        self,
+        key: ControlKey,
+        *,
+        now: float | None = None,
+    ) -> dict[str, Any] | None:
+        """Restore selected-preset ownership for one moving source, if any."""
+        key = self._normalized_registered_key(key)
+        preset_binding = self._preset_target_for_key(key)
+        if preset_binding is None:
+            return None
+        screen, target, _activate_on_input = preset_binding
+        self._bind_key_to_target(
+            key,
+            target,
+            now=time.monotonic() if now is None else float(now),
+        )
+        self._preset_unlinks_by_screen.setdefault(screen, set()).discard(key)
+        return target
 
     def visible_model(self, *, now: float | None = None) -> list[dict[str, Any]]:
         now = time.monotonic() if now is None else float(now)
@@ -424,7 +530,12 @@ class MidiControlState:
 
         bound_target = self.bindings.get(key)
         if bound_target is not None:
-            return self._unbind_target(bound_target, now)
+            changed = self._unbind_target(bound_target, now)
+            if changed:
+                screen = str(bound_target.get("screen", ""))
+                if screen:
+                    self._preset_unlinks_by_screen.setdefault(screen, set()).add(key)
+            return changed
 
         self.learn_key = key
         self.blue_since.pop(key, None)
@@ -441,23 +552,8 @@ class MidiControlState:
         if self.learn_key is None:
             return False
         key = self.learn_key
-        target_id = self.target_id(target)
-
-        previous_target = self.bindings.get(key)
-        if previous_target is not None:
-            self._target_to_control.pop(self.target_id(previous_target), None)
-
-        displaced = self._target_to_control.get(target_id)
-        if displaced is not None and displaced != key:
-            self.bindings.pop(displaced, None)
-            self.blue_since[displaced] = now
-            self.ensure_visible(displaced, now=now)
-
-        self.bindings[key] = copy.deepcopy(target)
-        self._target_to_control[target_id] = key
-        self.blue_since.pop(key, None)
+        self._bind_key_to_target(key, target, now=now)
         self.learn_key = None
-        self.ensure_visible(key, now=now)
         return True
 
     def is_target_bound(self, target: dict[str, Any]) -> bool:
@@ -555,9 +651,7 @@ class MidiControlState:
 
     def serialize_bindings(self, screen: str) -> list[dict[str, Any]]:
         result: list[dict[str, Any]] = []
-        for key, target in sorted(self.bindings.items()):
-            if str(target.get("screen")) != str(screen):
-                continue
+        for key, target, activate_on_input in self._preset_serialization_items(screen):
             source_type = self.source_type(key)
             osc_source = self._osc_sources.get(key)
             if osc_source is not None:
@@ -578,19 +672,83 @@ class MidiControlState:
                 entry["source_type"] = source_type
                 if source_type == "note_button":
                     entry["note"] = key[1] - NOTE_BUTTON_OFFSET
+            if activate_on_input:
+                entry["activate_on_input"] = True
             result.append(entry)
         return result
+
+    def _preset_serialization_items(
+        self,
+        screen: str,
+    ) -> list[tuple[ControlKey, dict[str, Any], bool]]:
+        screen = str(screen)
+        declarations = self._preset_bindings_by_screen.get(screen, {})
+        activation = self._preset_activation_by_screen.get(screen, {})
+        suppressed = self._preset_unlinks_by_screen.get(screen, set())
+        selected: dict[ControlKey, tuple[dict[str, Any], bool]] = {}
+        used_targets: set[str] = set()
+
+        for key, target in self.bindings.items():
+            if str(target.get("screen", "")) != screen:
+                continue
+            declared = declarations.get(key)
+            soft = bool(
+                activation.get(key, False)
+                and declared is not None
+                and self.target_id(declared) == self.target_id(target)
+            )
+            selected[key] = (copy.deepcopy(target), soft)
+            used_targets.add(self.target_id(target))
+
+        for key, target in declarations.items():
+            target_id = self.target_id(target)
+            if key in suppressed or key in selected or target_id in used_targets:
+                continue
+            selected[key] = (
+                copy.deepcopy(target),
+                bool(activation.get(key, False)),
+            )
+            used_targets.add(target_id)
+
+        return [
+            (key, target, soft)
+            for key, (target, soft) in sorted(selected.items())
+        ]
 
     def replace_screen_bindings(
         self,
         screen: str,
-        entries: Iterable[tuple[ControlKey, dict[str, Any]]],
+        entries: Iterable[PresetBindingEntry],
         *,
         now: float | None = None,
     ) -> bool:
         now = time.monotonic() if now is None else float(now)
         screen = str(screen)
-        entries = list(entries)
+        normalized_entries: list[tuple[ControlKey, dict[str, Any], bool]] = []
+        for entry in entries:
+            if len(entry) == 2:
+                raw_key, target = entry
+                activate_on_input = False
+            else:
+                raw_key, target, activate_on_input = entry
+            normalized_entries.append(
+                (
+                    self._normalized_registered_key(raw_key),
+                    copy.deepcopy(target),
+                    bool(activate_on_input),
+                )
+            )
+        self._preset_revision_clock += 1
+        self._preset_screen_revision[screen] = self._preset_revision_clock
+        self._preset_bindings_by_screen[screen] = {
+            key: copy.deepcopy(target)
+            for key, target, _activate_on_input in normalized_entries
+        }
+        self._preset_activation_by_screen[screen] = {
+            key: activate_on_input
+            for key, _target, activate_on_input in normalized_entries
+        }
+        self._preset_unlinks_by_screen[screen] = set()
         previous_bindings = {
             key: copy.deepcopy(target)
             for key, target in self.bindings.items()
@@ -605,10 +763,16 @@ class MidiControlState:
             target = self.bindings.pop(key)
             self._target_to_control.pop(self.target_id(target), None)
 
-        for raw_key, target in entries:
-            key = self._normalized_registered_key(raw_key)
+        for key, target, activate_on_input in normalized_entries:
             target_id = self.target_id(target)
             previous_target = previous_bindings.get(key)
+            keep_active = bool(
+                activate_on_input
+                and previous_target is not None
+                and self.target_id(previous_target) == target_id
+            )
+            if activate_on_input and not keep_active:
+                continue
             if (
                 previous_target is not None
                 and self.target_id(previous_target) != target_id
@@ -634,3 +798,17 @@ class MidiControlState:
             self.blue_since.pop(key, None)
             self.ensure_visible(key, now=now)
         return bool(removed) or bool(self.bindings)
+
+    def remember_active_bindings_as_preset(self, screen: str) -> None:
+        """Commit one screen's runtime bindings as its stored preset set."""
+        screen = str(screen)
+        items = self._preset_serialization_items(screen)
+        self._preset_revision_clock += 1
+        self._preset_screen_revision[screen] = self._preset_revision_clock
+        self._preset_bindings_by_screen[screen] = {
+            key: copy.deepcopy(target) for key, target, _soft in items
+        }
+        self._preset_activation_by_screen[screen] = {
+            key: soft for key, _target, soft in items
+        }
+        self._preset_unlinks_by_screen[screen] = set()

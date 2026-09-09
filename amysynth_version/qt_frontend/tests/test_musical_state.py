@@ -19,9 +19,9 @@ from musical_state import (  # noqa: E402
 
 
 class MusicalStateTests(unittest.TestCase):
-    def test_equal_temperament_reference_and_bend_are_clamped(self) -> None:
+    def test_equal_temperament_reference_is_fractional_and_clamped(self) -> None:
         self.assertAlmostEqual(tune_note(TuningSnapshot("EQ", 440.0), 60), 60.0)
-        high = TuningSnapshot("EQ", 460.0, bend_offset_hz=20.0)
+        high = TuningSnapshot("EQ", 480.0)
         self.assertEqual(high.effective_reference_hz, 466.0)
         self.assertAlmostEqual(
             tune_note(high, 69),

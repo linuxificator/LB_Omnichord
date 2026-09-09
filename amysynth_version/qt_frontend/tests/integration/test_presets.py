@@ -56,6 +56,160 @@ def changed_control_value(control: dict[str, object]) -> float:
 
 
 class PresetIntegrationTests(unittest.TestCase):
+    def test_factory_controller_defaults_and_manual_takeover_round_trip(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            expected_sources = {
+                (1, 1),
+                *((1, controller) for controller in range(21, 29)),
+                (1, 128),
+                (16, 115),
+                (16, 117),
+            }
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertTrue(
+                all(states.get(source) != "bound" for source in expected_sources),
+                "dormant factory controls claimed targets before real input",
+            )
+
+            bass_target = {
+                "screen": "omni",
+                "kind": "volume",
+                "role": "bass",
+            }
+            app.action("injectMidiControl", 1, 22, 0)
+            app.action("injectMidiControl", 1, 22, 127)
+            self.assertAlmostEqual(float(app.query("bassVolume")), 1.0)
+
+            app.action("manuallyEditMidiControlTarget", bass_target)
+            app.action("setBassVolume", 0.41)
+            self.assertAlmostEqual(float(app.query("bassVolume")), 0.41)
+            app.action("injectMidiControl", 1, 22, 126)
+            self.assertAlmostEqual(float(app.query("bassVolume")), 0.99)
+            self.assertEqual(
+                app.action("midiControlTargetVisualState", bass_target),
+                "bound",
+            )
+
+            tuning_before_bend = int(app.query("tuningReference"))
+            bend_start = app.bridge.count()
+            app.action("injectMidiPitchBend", 1, 16383)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(
+                int(app.query("tuningReference")),
+                tuning_before_bend,
+                "global Pitch Bend changed the persistent A-reference",
+            )
+            bend_lines = app.bridge.lines_since(bend_start)
+            self.assertTrue(
+                any(line.startswith("s0.166") for line in bend_lines),
+                "factory Pitch Bend did not reach AMY's global bend field",
+            )
+            self.assertEqual(
+                int(app.action("midiTuningReference")),
+                tuning_before_bend,
+            )
+
+            old_chord = int(app.action("chordIndexForRow", 0))
+            app.action("injectMidiControl", 1, 25, 0)
+            app.action("injectMidiControl", 1, 25, 127)
+            self.assertNotEqual(int(app.action("chordIndexForRow", 0)), old_chord)
+            chord_target = {
+                "screen": "omni",
+                "kind": "chord_type",
+                "row": 0,
+            }
+            app.action("manuallyEditMidiControlTarget", chord_target)
+            app.action("setRowChordType", 0, old_chord)
+            self.assertEqual(int(app.action("chordIndexForRow", 0)), old_chord)
+            app.action("injectMidiControl", 1, 25, 64)
+            self.assertNotEqual(int(app.action("chordIndexForRow", 0)), old_chord)
+            self.assertEqual(
+                app.action("midiControlTargetVisualState", chord_target),
+                "bound",
+            )
+
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            app.action("injectMidiControl", 16, 115, 127)
+            self.assertTrue(
+                bool(app.query("rhythmRunning")),
+                "the first factory Play press after startup was only a baseline",
+            )
+            app.action("injectMidiControl", 16, 115, 0)
+
+            # A high-rate bend while a chord and rhythm are active must stay
+            # one global AMY parameter stream. It must not rebuild quantized
+            # bass/chord sequence definitions or consume execution slots.
+            app.action("pressChord", 0, 0)
+            app.bridge.wait_idle(timeout=3.0)
+            bend_start = app.bridge.count()
+            for value in range(8200, 9000, 20):
+                app.action("injectMidiPitchBend", 1, value)
+            app.bridge.wait_idle(timeout=3.0)
+            bend_lines = app.bridge.lines_since(bend_start)
+            self.assertGreaterEqual(
+                sum(line.startswith("s") for line in bend_lines),
+                20,
+            )
+            self.assertFalse(
+                any(line.startswith(("HC56,", "HC112,")) for line in bend_lines),
+                "Pitch Bend republished quantized rhythm lanes",
+            )
+            app.action("injectMidiPitchBend", 1, 8192)
+            app.action("releaseChord", 0, 0)
+            app.action("toggleRhythm")
+            self.assertFalse(bool(app.query("rhythmRunning")))
+            self.assertEqual(
+                app.action(
+                    "midiControlTargetVisualState",
+                    {
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "rhythm_toggle",
+                    },
+                ),
+                "bound",
+                "screen button unexpectedly unlinked its controller",
+            )
+            app.action("clickMidiControlIndicator", 16, 115)
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(16, 115)], "blue")
+            app.action("injectMidiControl", 16, 115, 127)
+            self.assertTrue(bool(app.query("rhythmRunning")))
+            states = {
+                (item["channel"], item["controller"]): item["state"]
+                for item in app.action("midiControlIndicators")
+            }
+            self.assertEqual(states[(16, 115)], "bound")
+
+            self.assertNotEqual(int(app.query("chordGateState")), 1)
+            app.action("injectMidiControl", 16, 117, 127)
+            self.assertEqual(
+                int(app.query("chordGateState")),
+                1,
+                "the first factory Chord press after startup was only a baseline",
+            )
+
+            app.action("pressChord", 0, 0)
+            app.action("releaseChord", 0, 0)
+            start = app.bridge.count()
+            app.action("injectMidiControl", 1, 1, 0)
+            app.action("injectMidiControl", 1, 1, 64)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertTrue(
+                any(
+                    "i2" in line and "n" in line and "l" in line
+                    for line in app.bridge.lines_since(start)
+                ),
+                "factory CC1 strum binding emitted no synth-2 note",
+            )
+
     def test_m12_strings_attack_reset_restores_catalogue_default(self) -> None:
         """RST must restore an unbound edit in the reported M12 case."""
 
@@ -233,22 +387,19 @@ class PresetIntegrationTests(unittest.TestCase):
                     / "p1.json"
                 ).read_text(encoding="utf-8")
             )
-            self.assertEqual(
-                midi_data["midi_control_bindings"][0]["controller"],
-                20,
+            midi_binding = next(
+                entry
+                for entry in midi_data["midi_control_bindings"]
+                if entry.get("controller") == 20
             )
-            self.assertEqual(
-                midi_data["midi_control_bindings"][0]["target"]["screen"],
-                "midi",
+            omni_binding = next(
+                entry
+                for entry in omni_data["midi_control_bindings"]
+                if entry.get("controller") == 21
+                and entry.get("target", {}).get("role") == "chord"
             )
-            self.assertEqual(
-                omni_data["midi_control_bindings"][0]["controller"],
-                21,
-            )
-            self.assertEqual(
-                omni_data["midi_control_bindings"][0]["target"]["screen"],
-                "omni",
-            )
+            self.assertEqual(midi_binding["target"]["screen"], "midi")
+            self.assertEqual(omni_binding["target"]["screen"], "omni")
 
             app.action("selectMidiPreset", 2)
             app.action("selectPreset", 2)

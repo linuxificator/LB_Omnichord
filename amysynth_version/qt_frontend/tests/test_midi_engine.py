@@ -5,15 +5,19 @@ import sys
 import threading
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
+import app_core  # noqa: E402
 from midi_player import (  # noqa: E402
     DEFAULT_CHORD_INPUT_CHANNEL,
     DEFAULT_MIDI_CHANNELS,
     LEGACY_FACTORY_MIDI_CHANNELS,
+    MIDI_PRESET_COUNT,
+    MIDI_ROW_COUNT,
     MidiAmyEngine,
     MidiPlayerBackend,
     _migrated_factory_channel_defaults,
@@ -26,6 +30,13 @@ from gm_percussion import (  # noqa: E402
     OMNI_REFERENCE_PERCUSSION_VOLUME,
     midi_drum_amplitude,
     resolve_gm_percussion,
+)
+from midi_levels import (  # noqa: E402
+    MIDI_PITCHED_REFERENCE_ROW_VOLUME,
+    MIDI_PITCHED_REFERENCE_VELOCITY,
+    OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+    midi_pitched_synth_level,
+    normalized_midi_velocity,
 )
 from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
 from resolved_config import resolve_amy_config_data  # noqa: E402
@@ -91,6 +102,20 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_external_strum_position_crosses_each_new_note_once(self) -> None:
+        backend = app_core.InstrumentBackend.__new__(app_core.InstrumentBackend)
+        backend._external_strum_last_index = None
+        backend._strum_index = lambda value: int(round(float(value) * 4))
+        played: list[int] = []
+        backend._play_strum_index = played.append
+
+        backend.strumControlPosition(0.25)
+        backend.strumControlPosition(0.26)
+        backend.strumControlPosition(0.75)
+
+        self.assertEqual(played, [1, 2, 3])
+        self.assertEqual(backend._external_strum_last_index, 3)
+
     def test_every_factory_preset_reserves_channel_one_and_uses_gm_drums(self) -> None:
         self.assertEqual(DEFAULT_CHORD_INPUT_CHANNEL, 1)
         self.assertEqual(DEFAULT_MIDI_CHANNELS, (2, 3, 4, 5, 6, 10))
@@ -308,6 +333,68 @@ class MidiAmyEngineTests(unittest.TestCase):
         expected = round(20.0 * (20000.0 / 20.0) ** (64.0 / 127.0))
         self.assertEqual(middle, expected)
         self.assertNotAlmostEqual(middle, (20.0 + 20000.0) / 2.0)
+
+    def test_strum_and_chord_row_are_generic_continuous_targets(self) -> None:
+        calls: list[tuple[object, ...]] = []
+        owner = type(
+            "Owner",
+            (),
+            {
+                "_chords": tuple(range(40)),
+                "_synths": (),
+                "strumControlPosition": lambda _self, value: calls.append(
+                    ("strum", value)
+                ),
+                "setRowChordType": lambda _self, row, index: calls.append(
+                    ("chord", row, index)
+                ),
+            },
+        )()
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = owner
+        backend.definitions = ()
+        backend._applying_midi_control = 0
+        backend._midi_control_state = MidiControlState()
+
+        strum = backend._normalize_control_target(
+            {"screen": "omni", "kind": "strum_position"}
+        )
+        chord = backend._normalize_control_target(
+            {"screen": "omni", "kind": "chord_type", "row": 2}
+        )
+        self.assertIsNotNone(strum)
+        self.assertIsNotNone(chord)
+        assert strum is not None
+        assert chord is not None
+
+        backend._apply_control_target(strum, 127, (1, 1))
+        backend._apply_control_target(chord, 64, (1, 25))
+
+        self.assertEqual(calls[0], ("strum", 0.0))
+        self.assertEqual(calls[1], ("chord", 2, 20))
+
+    def test_chord_gate_button_uses_existing_performance_action(self) -> None:
+        calls: list[str] = []
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = type(
+            "Owner",
+            (),
+            {"toggleChordGate": lambda _self: calls.append("chord_gate")},
+        )()
+        backend._midi_control_lock = threading.Lock()
+        backend._held_midi_button_targets = set()
+        backend._applying_midi_control = 0
+        target = {
+            "id": "omni:button:chord_gate",
+            "screen": "omni",
+            "kind": "button",
+            "action": "chord_gate",
+        }
+
+        backend._apply_button_target(target, True)
+        backend._apply_button_target(target, False)
+
+        self.assertEqual(calls, ["chord_gate"])
 
     def test_preset_binding_loader_accepts_new_source_types(self) -> None:
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
@@ -577,6 +664,44 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(applied[0][2], (1, PITCH_BEND_CONTROLLER))
         self.assertEqual(applied[0][0]["id"], "midi:master_volume")
 
+    def test_global_pitch_bend_target_delegates_raw_14_bit_value_to_omni(self) -> None:
+        values: list[int] = []
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = SimpleNamespace(setMidiPitchBend=values.append)
+        backend._applying_midi_control = 0
+
+        backend._apply_control_target(
+            {
+                "id": "omni:pitch_bend",
+                "screen": "omni",
+                "kind": "pitch_bend",
+            },
+            12345,
+            (1, PITCH_BEND_CONTROLLER),
+        )
+
+        self.assertEqual(values, [12345])
+
+    def test_legacy_factory_pitch_bend_binding_migrates_from_reference(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._midi_control_state = MidiControlState()
+
+        entries = backend._normalized_binding_entries(
+            "omni",
+            [
+                {
+                    "channel": 1,
+                    "source_type": "pitch_bend",
+                    "activate_on_input": True,
+                    "target": {"kind": "tuning_reference"},
+                }
+            ],
+        )
+
+        self.assertEqual(entries[0][0], (1, PITCH_BEND_CONTROLLER))
+        self.assertEqual(entries[0][1]["kind"], "pitch_bend")
+        self.assertEqual(entries[0][1]["id"], "omni:pitch_bend")
+
     def test_indicator_click_unlinks_green_before_blue_can_start_learn(self) -> None:
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
         backend._midi_control_state = MidiControlState()
@@ -606,7 +731,82 @@ class MidiAmyEngineTests(unittest.TestCase):
         engine = MidiAmyEngine(client)
         client.events.clear()
         engine.configure_row(0, "dx7_215", {}, 0.5)
-        self.assertIn(("wire", "i5iV0.2Z"), client.events)
+        expected = midi_pitched_synth_level(0.5, 0.4)
+        self.assertIn(("wire", f"i5iV{expected:.9g}Z"), client.events)
+
+    def test_every_factory_pitched_row_uses_the_same_reference_policy(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        reference_velocity = normalized_midi_velocity(
+            MIDI_PITCHED_REFERENCE_VELOCITY,
+        )
+
+        checked = 0
+        for number in range(1, MIDI_PRESET_COUNT + 1):
+            data = json.loads(
+                (
+                    ROOT
+                    / "instruments"
+                    / "midi_default_presets"
+                    / f"m{number}.json"
+                ).read_text(encoding="utf-8")
+            )
+            for row in data["rows"]:
+                key = str(row["selected"])
+                if key == "drum_kit_0":
+                    continue
+                stored_volume = float(row["volume"])
+                actual = engine.pitched_row_level(key, stored_volume) * reference_velocity
+                expected = (
+                    OMNI_REFERENCE_CHORD_NOTE_LEVEL
+                    * stored_volume
+                    / MIDI_PITCHED_REFERENCE_ROW_VOLUME
+                    * client.resolved_config.instrument_level(key)
+                )
+                self.assertAlmostEqual(actual, expected)
+                checked += 1
+
+        self.assertEqual(checked, MIDI_PRESET_COUNT * (MIDI_ROW_COUNT - 1))
+
+    def test_velocity_60_pitched_midi_note_matches_chord_note_reference(self) -> None:
+        synth_level = midi_pitched_synth_level(
+            MIDI_PITCHED_REFERENCE_ROW_VOLUME,
+        )
+        velocity_level = normalized_midi_velocity(
+            MIDI_PITCHED_REFERENCE_VELOCITY,
+        )
+
+        self.assertAlmostEqual(
+            synth_level * velocity_level,
+            OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+        )
+        self.assertLess(
+            midi_pitched_synth_level(0.25) * velocity_level,
+            OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+        )
+        self.assertGreater(
+            midi_pitched_synth_level(0.35) * velocity_level,
+            OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+        )
+
+    def test_pitched_midi_keeps_standard_velocity_in_note_command(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        engine.note_on(0, 2, 60, 60.0, MIDI_PITCHED_REFERENCE_VELOCITY)
+
+        commands = [value for kind, value in client.events if kind == "wire"]
+        self.assertEqual(commands, ["n60l0.472440945i5Z"])
+
+    def test_effective_pitched_level_is_not_clipped_at_unity(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        engine.set_row_volume(0, 1.25)
+
+        self.assertEqual(client.events, [("wire", "i5iV1.25Z")])
 
     def test_rom_patch_waits_before_parameters_and_routing(self) -> None:
         client = _Client()
@@ -627,7 +827,10 @@ class MidiAmyEngineTests(unittest.TestCase):
                 ("wire", "compat-215-5"),
                 ("wire", "v0o7i5Z"),
                 ("wire", "i5iy4Z"),
-                ("wire", "i5iV0.28Z"),
+                (
+                    "wire",
+                    f"i5iV{midi_pitched_synth_level(0.28):.9g}Z",
+                ),
                 ("wire", "y4h0Z"),
                 ("wire", "y4hS1,1Z"),
                 ("wire", "y4V1Z"),

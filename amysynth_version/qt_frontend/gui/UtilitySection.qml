@@ -240,7 +240,7 @@ Item {
             "kind": "tuning_reference"
         })
 
-        onEdited:
+        onEdited: (value) =>
             root.controller
                 .setTuningReference(value)
     }

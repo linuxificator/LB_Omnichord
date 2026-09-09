@@ -34,6 +34,7 @@ from osc_input import (
 )
 from musical_state import TuningSnapshot, tune_note
 from gm_percussion import midi_drum_amplitude, resolve_gm_percussion
+from midi_levels import midi_pitched_synth_level, normalized_midi_velocity
 from synth_programs import resolve_program
 from synth_state import SynthState
 from shared_reverb import (
@@ -157,12 +158,12 @@ class MidiAmyEngine:
     def _f(self, value: float) -> str:
         return self.client._f(value)
 
-    def balanced_volume(self, key: str, volume: float) -> float:
-        multiplier = max(
-            0.0,
+    def pitched_row_level(self, key: str, volume: float) -> float:
+        """Resolve the row UI level to AMY's calibrated output multiplier."""
+        return midi_pitched_synth_level(
+            volume,
             self.client.resolved_config.instrument_level(str(key)),
         )
-        return float(volume) * multiplier
 
     def _patch(self, key: str) -> int | None:
         patch_map = getattr(self.client, "patch_map", {})
@@ -278,12 +279,15 @@ class MidiAmyEngine:
 
         self._configured_rows.add(row)
         self._route(synth, bus)
-        self.set_row_volume(row, self.balanced_volume(key, volume))
+        self.set_row_volume(row, self.pitched_row_level(key, volume))
         self._apply_reverb_bus(bus)
         self._apply_master_bus(bus)
 
     def set_row_volume(self, row: int, volume: float) -> None:
-        value = max(0.0, min(1.0, float(volume)))
+        # ``volume`` is already an effective output gain.  It may exceed one
+        # at deliberately high UI levels; AMY's iV is an output multiplier,
+        # not a normalized control or note velocity.
+        value = max(0.0, float(volume))
         self._wire(f"i{self.row_synths[row]}iV{self._f(value)}Z")
 
     def set_reverb(
@@ -350,7 +354,7 @@ class MidiAmyEngine:
         old = self._active_notes.pop(key, None)
         if old is not None:
             self._wire(f"n{self._f(old)}l0i{synth}Z")
-        level = max(0.0, min(1.0, int(velocity) / 127.0))
+        level = normalized_midi_velocity(velocity)
         self._wire(f"n{self._f(note)}l{self._f(level)}i{synth}Z")
         self._active_notes[key] = float(note)
 
@@ -367,7 +371,7 @@ class MidiAmyEngine:
         velocity: int = 105,
     ) -> None:
         synth = self.row_synths[row]
-        level = max(0.0, min(1.0, velocity / 127.0))
+        level = normalized_midi_velocity(velocity)
         midi_key = int(round(note))
 
         with self._preview_lock:
@@ -499,12 +503,6 @@ class MidiPlayerBackend(QObject):
         self._tuning_coupled = True
         self._tuning_mode_index = int(owner.selectedTuningModeIndex)
         self._tuning_reference = float(owner.tuningReference)
-        self._bend_offset = 0.0
-        self._bend_direction = 0
-        self._bend_returning = False
-        self._bend_timer = QTimer(self)
-        self._bend_timer.setInterval(100)
-        self._bend_timer.timeout.connect(self._bend_tick)
 
         self._reverb_level = 0.0
         self._reverb_liveness = 0.5
@@ -625,7 +623,7 @@ class MidiPlayerBackend(QObject):
 
     @Property(int, notify=tuningChanged)
     def tuningReference(self) -> int:
-        return int(round(self._effective_local_reference()))
+        return int(round(self._tuning_reference))
 
     @Property(float, notify=reverbLevelChanged)
     def reverbLevel(self) -> float:
@@ -788,6 +786,7 @@ class MidiPlayerBackend(QObject):
                 value_type,
             )
             was_blue = control_key in self._midi_control_state.blue_since
+            was_bound = control_key in self._midi_control_state.bindings
             changed, target, key = self._midi_control_state.observe_osc(
                 address,
                 argument,
@@ -800,7 +799,10 @@ class MidiPlayerBackend(QObject):
             blue_cleared = (
                 was_blue and control_key not in self._midi_control_state.blue_since
             )
-        if blue_cleared:
+            preset_binding_restored = (
+                not was_bound and control_key in self._midi_control_state.bindings
+            )
+        if blue_cleared or preset_binding_restored:
             self._sync_blue_timer()
             self._bump_binding_state()
         scaled_value = int(
@@ -821,6 +823,7 @@ class MidiPlayerBackend(QObject):
         control_key = self._midi_control_state.key(channel, controller)
         with self._midi_control_lock:
             was_blue = control_key in self._midi_control_state.blue_since
+            was_bound = control_key in self._midi_control_state.bindings
             changed, target, key = self._midi_control_state.observe(
                 channel,
                 controller,
@@ -830,7 +833,10 @@ class MidiPlayerBackend(QObject):
             if not changed or key is None:
                 return
             blue_cleared = was_blue and control_key not in self._midi_control_state.blue_since
-        if blue_cleared:
+            preset_binding_restored = (
+                not was_bound and control_key in self._midi_control_state.bindings
+            )
+        if blue_cleared or preset_binding_restored:
             self._sync_blue_timer()
             self._bump_binding_state()
         if target is not None:
@@ -846,6 +852,7 @@ class MidiPlayerBackend(QObject):
         control_key = self._midi_control_state.key(channel, controller)
         with self._midi_control_lock:
             was_blue = control_key in self._midi_control_state.blue_since
+            was_bound = control_key in self._midi_control_state.bindings
             changed, target, key = self._midi_control_state.observe(
                 channel,
                 controller,
@@ -855,7 +862,10 @@ class MidiPlayerBackend(QObject):
             if not changed or key is None:
                 return
             blue_cleared = was_blue and control_key not in self._midi_control_state.blue_since
-        if blue_cleared:
+            preset_binding_restored = (
+                not was_bound and control_key in self._midi_control_state.bindings
+            )
+        if blue_cleared or preset_binding_restored:
             self._sync_blue_timer()
             self._bump_binding_state()
         if target is not None:
@@ -991,14 +1001,25 @@ class MidiPlayerBackend(QObject):
         ):
             target["id"] = f"{screen}:{kind}"
             return target
+        if screen == "omni" and kind == "pitch_bend":
+            target["id"] = "omni:pitch_bend"
+            return target
 
         if screen == "omni" and kind in (
             "rhythm_tempo",
             "rhythm_fill_density",
             "bass_voicing",
             "bass_riff_selector",
+            "strum_position",
         ):
             target["id"] = f"omni:{kind}"
+            return target
+        if screen == "omni" and kind == "chord_type":
+            row = int(raw.get("row", -1))
+            if not 0 <= row < app_core.ROW_COUNT:
+                return None
+            target["row"] = row
+            target["id"] = f"omni:chord_type:{row}"
             return target
         if kind == "button":
             action = str(raw.get("action", ""))
@@ -1070,6 +1091,10 @@ class MidiPlayerBackend(QObject):
                 1.0,
                 "linear",
             )
+        if kind == "strum_position":
+            return 0.0, 1.0, 0.0, "linear"
+        if kind == "chord_type":
+            return 0.0, float(len(self.owner._chords) - 1), 1.0, "linear"
         return None
 
     def _mapped_target_value(
@@ -1144,6 +1169,12 @@ class MidiPlayerBackend(QObject):
         midi_value: int,
         source_key: tuple[int, int] | None = None,
     ) -> None:
+        if str(target.get("kind", "")) == "pitch_bend":
+            self._apply_midi_setter(
+                self.owner.setMidiPitchBend,
+                int(midi_value),
+            )
+            return
         value = self._mapped_target_value(target, midi_value, source_key)
         if value is None:
             return
@@ -1245,6 +1276,16 @@ class MidiPlayerBackend(QObject):
             self._apply_midi_setter(self.owner.setBassVoicingShift, value)
         elif kind == "bass_riff_selector":
             self._apply_midi_setter(self.owner.setBassRiffSelector, value)
+        elif kind == "strum_position":
+            # Conventional MIDI controls increase bottom-to-top; the screen
+            # strum coordinate increases top-to-bottom.
+            self._apply_midi_setter(self.owner.strumControlPosition, 1.0 - value)
+        elif kind == "chord_type":
+            self._apply_midi_setter(
+                self.owner.setRowChordType,
+                int(target["row"]),
+                int(round(value)),
+            )
 
     @staticmethod
     def _is_button_target(target: dict[str, Any]) -> bool:
@@ -1359,6 +1400,8 @@ class MidiPlayerBackend(QObject):
                 )
             elif action == "chord_arpeggio_direction":
                 self._apply_midi_setter(self.owner.toggleChordArpeggioDirection)
+            elif action == "chord_gate":
+                self._apply_midi_setter(self.owner.toggleChordGate)
 
     @Slot(int, int)
     def clickControlIndicator(self, channel: int, controller: int) -> None:
@@ -1514,12 +1557,18 @@ class MidiPlayerBackend(QObject):
         self,
         screen: str,
         data: Any,
+        *,
+        include_dormant: bool = True,
     ) -> list[tuple[tuple[int, int], dict[str, Any]]]:
         entries = self._binding_service().normalize_entries(
             screen,
             data,
             self._normalize_control_target,
         )
+        if not include_dormant:
+            entries = tuple(
+                entry for entry in entries if not entry.activate_on_input
+            )
         return MidiBindingService.as_state_entries(entries)
 
     def capture_bound_control_values(
@@ -1532,7 +1581,11 @@ class MidiPlayerBackend(QObject):
     ) -> list[tuple[dict[str, Any], float]]:
         screen = str(screen)
         incoming_entries = (
-            self._normalized_binding_entries(screen, incoming_bindings)
+            self._normalized_binding_entries(
+                screen,
+                incoming_bindings,
+                include_dormant=False,
+            )
             if incoming_bindings is not None
             else []
         )
@@ -1620,6 +1673,8 @@ class MidiPlayerBackend(QObject):
             return float(self.owner._bass_voicing_shift)
         if kind == "bass_riff_selector":
             return float(self.owner.bassRiffSelector)
+        if kind == "chord_type":
+            return float(self.owner.chordIndexForRow(int(target["row"])))
         return None
 
     def restore_control_values(
@@ -1680,6 +1735,10 @@ class MidiPlayerBackend(QObject):
                     self.owner._choose_bass_riff(
                         fallback_selector=int(round(value)),
                     )
+                elif kind == "chord_type":
+                    self.owner._row_chord_indexes[int(target["row"])] = int(
+                        round(value)
+                    )
 
     def replace_control_bindings(self, screen: str, data: Any) -> None:
         service = self._binding_service()
@@ -1692,6 +1751,10 @@ class MidiPlayerBackend(QObject):
         self._sync_blue_timer()
         self._sync_preset_feedback_timer()
         self._bump_binding_state()
+
+    def remember_active_bindings_as_preset(self, screen: str) -> None:
+        with self._midi_control_lock:
+            self._midi_control_state.remember_active_bindings_as_preset(screen)
 
     def _emit_state(self) -> None:
         self._state_version += 1
@@ -1815,7 +1878,7 @@ class MidiPlayerBackend(QObject):
             key = str(self._runtime(row).selected_definition.key)
             self.engine.set_row_volume(
                 row,
-                self.engine.balanced_volume(key, value),
+                self.engine.pitched_row_level(key, value),
             )
         self._emit_state()
 
@@ -2015,6 +2078,7 @@ class MidiPlayerBackend(QObject):
             snapshot,
         )
         self._preset_reference = json.loads(json.dumps(snapshot))
+        self.remember_active_bindings_as_preset("midi")
         self._refresh_preset_binding_locations()
         self.presetStored.emit(self._selected_preset)
 
@@ -2063,8 +2127,6 @@ class MidiPlayerBackend(QObject):
         if coupled == self._tuning_coupled:
             return
         self._tuning_coupled = coupled
-        self._stop_bend()
-        self._bend_offset = 0.0
         self.tuningChanged.emit()
 
     def syncFromOmni(self) -> None:
@@ -2075,24 +2137,15 @@ class MidiPlayerBackend(QObject):
         )
         changed = mode_index != self._tuning_mode_index or (
             not reference_blocked
-            and (
-                not math.isclose(
-                    reference,
-                    self._tuning_reference,
-                    abs_tol=1e-9,
-                )
-                or not math.isclose(
-                    self._bend_offset,
-                    0.0,
-                    abs_tol=1e-9,
-                )
+            and not math.isclose(
+                reference,
+                self._tuning_reference,
+                abs_tol=1e-9,
             )
         )
         self._tuning_mode_index = mode_index
         if not reference_blocked:
             self._tuning_reference = reference
-            self._stop_bend()
-            self._bend_offset = 0.0
         if changed:
             self.tuningChanged.emit()
 
@@ -2111,8 +2164,6 @@ class MidiPlayerBackend(QObject):
         if self.manual_change_blocked({"screen": "midi", "kind": "tuning_reference"}):
             return
         value = max(415, min(466, int(value)))
-        self._stop_bend()
-        self._bend_offset = 0.0
         if math.isclose(
             self._tuning_reference,
             float(value),
@@ -2123,64 +2174,13 @@ class MidiPlayerBackend(QObject):
         self._tuning_reference = float(value)
         self.tuningChanged.emit()
 
-    def _effective_local_reference(self) -> float:
-        return max(
-            415.0,
-            min(466.0, self._tuning_reference + self._bend_offset),
-        )
-
-    def _stop_bend(self) -> None:
-        self._bend_timer.stop()
-        self._bend_direction = 0
-        self._bend_returning = False
-
-    def _bend_tick(self) -> None:
-        old = self._bend_offset
-        if self._bend_returning:
-            if abs(old) <= 1.0:
-                self._bend_offset = 0.0
-                self._stop_bend()
-            else:
-                self._bend_offset = old - math.copysign(1.0, old)
-        else:
-            candidate = old + float(self._bend_direction)
-            self._bend_offset = max(
-                415.0 - self._tuning_reference,
-                min(466.0 - self._tuning_reference, candidate),
-            )
-        if not math.isclose(old, self._bend_offset, abs_tol=1e-9):
-            self.tuningChanged.emit()
-
     @Slot(int)
     def beginPitchBend(self, direction: int) -> None:
-        if self._tuning_coupled:
-            self.owner.beginPitchBend(direction)
-            return
-        if self.manual_change_blocked({"screen": "midi", "kind": "tuning_reference"}):
-            self._stop_bend()
-            self._bend_offset = 0.0
-            return
-        self._bend_direction = 1 if int(direction) > 0 else -1
-        self._bend_returning = False
-        if not self._bend_timer.isActive():
-            self._bend_timer.start()
+        self.owner.beginPitchBend(direction)
 
     @Slot()
     def endPitchBend(self) -> None:
-        if self._tuning_coupled:
-            self.owner.endPitchBend()
-            return
-        if self.manual_change_blocked({"screen": "midi", "kind": "tuning_reference"}):
-            self._stop_bend()
-            self._bend_offset = 0.0
-            return
-        self._bend_direction = 0
-        if math.isclose(self._bend_offset, 0.0, abs_tol=1e-9):
-            self._stop_bend()
-        else:
-            self._bend_returning = True
-            if not self._bend_timer.isActive():
-                self._bend_timer.start()
+        self.owner.endPitchBend()
 
     def _chord_context(self) -> tuple[int, set[int]]:
         chord = self.owner.performance_snapshot().chord
@@ -2194,7 +2194,6 @@ class MidiPlayerBackend(QObject):
             else TuningSnapshot(
                 mode=app_core.TUNING_MODE_NAMES[self._tuning_mode_index],
                 reference_hz=self._tuning_reference,
-                bend_offset_hz=self._bend_offset,
                 intonation_tables=owner_tuning.intonation_tables,
             )
         )

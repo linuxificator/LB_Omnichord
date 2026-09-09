@@ -16,14 +16,13 @@ IntonationMatrix = tuple[tuple[float, ...], ...]
 class TuningSnapshot:
     mode: str
     reference_hz: float
-    bend_offset_hz: float = 0.0
     intonation_tables: tuple[tuple[str, IntonationMatrix], ...] = ()
 
     @property
     def effective_reference_hz(self) -> float:
         return max(
             MIN_TUNING_REFERENCE_HZ,
-            min(MAX_TUNING_REFERENCE_HZ, self.reference_hz + self.bend_offset_hz),
+            min(MAX_TUNING_REFERENCE_HZ, self.reference_hz),
         )
 
     def table(self) -> IntonationMatrix | None:
