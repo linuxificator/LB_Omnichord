@@ -167,3 +167,11 @@ PipeWire data loops on CPU 2 at FIFO 80/75, and only the detected AMY callback
 on CPU 3 at FIFO 70. The application and all its logic remain portable. The
 profile is a reversible host-integration choice documented in
 [`realtime_howto.md`](realtime_howto.md), not an application default.
+
+One final reboot verified that CPU isolation, the performance governor and
+both enabled policy services return automatically. The watcher detected a new
+full-AppImage AMY child and reapplied the measured thread layout. A separate
+post-boot control then drove a clean packaged AMY service over its Unix wire
+socket; its bounded 440 Hz oscillator was physically heard through the HDMI
+sink. This distinguishes the intentionally near-silent capacity workloads from
+an audio-routing failure.
