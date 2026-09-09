@@ -28,6 +28,29 @@ def complete_facts() -> realtime.RealtimeFacts:
 
 
 class RaspberryPiRealtimeTests(unittest.TestCase):
+    def test_pipewire_pulse_is_identified_by_its_native_thread_name(self) -> None:
+        with (
+            mock.patch.object(realtime, "_process_ids", return_value=(1001, 1012)),
+            mock.patch.object(realtime, "_process_executable", return_value="pipewire"),
+            mock.patch.object(
+                realtime,
+                "task_ids",
+                side_effect=lambda pid: (pid, pid + 1),
+            ),
+            mock.patch.object(
+                realtime,
+                "_thread_name",
+                side_effect=lambda pid, tid: {
+                    (1001, 1001): "pipewire",
+                    (1001, 1002): "data-loop.0",
+                    (1012, 1012): "pipewire-pulse",
+                    (1012, 1013): "data-loop.0",
+                }[(pid, tid)],
+            ),
+        ):
+            loops = realtime.discover_pipewire_loops(os.getuid())
+        self.assertEqual(loops, {"pipewire": 1002, "pipewire-pulse": 1013})
+
     def test_exact_child_pid_is_required_and_never_discovered_by_name(self) -> None:
         with (
             mock.patch.object(realtime, "_owned_process", return_value=False),

@@ -235,13 +235,21 @@ def discover_pipewire_loops(uid: int) -> dict[str, int]:
     loops: dict[str, int] = {}
     for pid in _process_ids(uid):
         executable = _process_executable(pid)
-        if executable not in PIPEWIRE_PRIORITIES:
+        process_name = _thread_name(pid, pid)
+        # pipewire-pulse is normally an alternate invocation of the pipewire
+        # binary, so /proc/PID/exe resolves to "pipewire" for both services.
+        # Require that native binary and use the kernel's exact main-thread
+        # name to distinguish the two standard services.
+        if (
+            executable not in PIPEWIRE_PRIORITIES
+            or process_name not in PIPEWIRE_PRIORITIES
+        ):
             continue
         matching = [
             tid for tid in task_ids(pid) if _thread_name(pid, tid) == "data-loop.0"
         ]
         if len(matching) == 1:
-            loops[executable] = matching[0]
+            loops[process_name] = matching[0]
     return loops
 
 
@@ -343,17 +351,18 @@ def apply_runtime_policy(
             "the exact AMY child PID is absent or is not owned by this user",
         )
     try:
+        loops = discover_pipewire_loops(uid)
+        if set(loops) != set(PIPEWIRE_PRIORITIES):
+            raise RuntimeError("both PipeWire data-loop.0 threads were not found")
+        audio_tid = select_active_worker(service_pid)
+
         if pin_caller:
             for tid in task_ids(os.getpid()):
                 set_thread_policy(tid, HOUSEKEEPING_CPUS)
         for tid in task_ids(service_pid):
             set_thread_policy(tid, HOUSEKEEPING_CPUS)
-        audio_tid = select_active_worker(service_pid)
         set_thread_policy(audio_tid, AMY_AUDIO_CPUS, AMY_AUDIO_PRIORITY)
 
-        loops = discover_pipewire_loops(uid)
-        if set(loops) != set(PIPEWIRE_PRIORITIES):
-            raise RuntimeError("both PipeWire data-loop.0 threads were not found")
         for executable, priority in PIPEWIRE_PRIORITIES.items():
             set_thread_policy(loops[executable], PIPEWIRE_CPUS, priority)
 
