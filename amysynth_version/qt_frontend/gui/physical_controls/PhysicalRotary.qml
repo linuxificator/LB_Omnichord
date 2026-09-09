@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Shapes
@@ -90,6 +92,7 @@ Dial {
         Repeater {
             model: control.calibrated ? 11 : 0
             delegate: Item {
+                id: scaleTick
                 required property int index
                 anchors.fill: parent
                 rotation: -135 + index * 27
@@ -97,7 +100,7 @@ Dial {
                     x: parent.width / 2 - 1
                     y: control.size * 0.03
                     width: 2
-                    height: index % 5 === 0
+                    height: scaleTick.index % 5 === 0
                         ? control.size * 0.12
                         : control.size * 0.075
                     radius: 1
@@ -149,9 +152,10 @@ Dial {
             Repeater {
                 model: control.encoder ? 16 : 18
                 delegate: Item {
+                    id: gripTick
                     required property int index
                     anchors.fill: parent
-                    rotation: index * (control.encoder ? 22.5 : 20)
+                    rotation: gripTick.index * (control.encoder ? 22.5 : 20)
                     Rectangle {
                         x: parent.width / 2 - 1
                         y: 2
