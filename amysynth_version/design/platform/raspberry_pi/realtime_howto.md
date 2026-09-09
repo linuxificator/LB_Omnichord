@@ -1,7 +1,8 @@
 # Dedicated Raspberry Pi realtime audio setup
 
 Status: physically validated on Raspberry Pi 4; Raspberry Pi 5 measurements pending
-Validated release: `R20260909T010905`
+Validated AppImage: `R20260909161844`
+Validated GitHub run: `34375905899`
 Validated kernel: Raspberry Pi `6.18.34+rpt-rpi-v8`, `PREEMPT`
 
 This procedure reserves CPU 3 for AMY's audio callback and CPU 2 for
@@ -40,9 +41,22 @@ Do not apply FIFO to the full frontend or AMY process. Only the callback and
 two PipeWire data loops are bounded audio threads; making arbitrary workers
 realtime can starve the system.
 
-## 1. Prepare and inspect
+## 1. Install the current profile
 
-Run from a checkout of this branch on the Pi:
+The normal route is the matching release asset:
+
+```sh
+chmod +x LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh
+sudo ./LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh --user "$USER"
+sudo reboot
+```
+
+The script verifies its embedded payload before changing the host. After the
+reboot, start the AppImage or `run_local.sh` normally. Absence of the realtime
+warning is based on complete read-back, not on assuming that installation
+succeeded.
+
+For development or inspection, run from a checkout on the Pi:
 
 ```sh
 cd amysynth_version/qt_frontend
@@ -54,14 +68,17 @@ Confirm that the model has four CPUs and that the kernel reports
 `CONFIG_CPU_ISOLATION=y` and `CONFIG_IRQ_FORCED_THREADING=y`. Keep SSH or local
 console access available for the first reboot.
 
-From a source checkout, the complete setup can be applied with the committed
-installer instead of performing sections 2 and 3 separately:
+The committed source installer performs the same operation:
 
 ```sh
 sudo tools/raspberry_pi/install_realtime_profile.sh --user "$USER"
 ```
 
-## 2. Apply the reversible boot profile
+## 2. What the installer changes
+
+Internally, the installer applies the following reversible boot profile. The
+direct command is documented for auditing and recovery work; normal users
+should run the complete installer from section 1 instead.
 
 ```sh
 sudo python3 tools/raspberry_pi/rt_pi_config.py apply --profile audio-split
@@ -85,7 +102,7 @@ python3 tools/raspberry_pi/rt_pi_config.py verify --profile audio-split
 Expected: isolated CPUs `2-3` and active boot arguments. Verification reports
 the governor separately because it is a runtime setting.
 
-## 3. Grant realtime permission and launch normally
+### Realtime permission and native service ownership
 
 The installer writes one standard PAM limit for the selected user:
 
@@ -121,9 +138,8 @@ one policy operation:
 4. verify PipeWire's own `data-loop.0` policies;
 5. read every affinity, scheduler and priority back before reporting success.
 
-The wrapper never searches for AMY by process name or command line. It has no
-registration socket, polling loop, watcher daemon or lifecycle protocol. It
-does not take over PipeWire policy from systemd/PipeWire. AMY's
+The wrapper never searches for AMY by process name or command line. It does
+not take over PipeWire policy from systemd/PipeWire. AMY's
 audio callback is stable for the lifetime of the local service; restarting the
 application starts a new service and repeats the one-shot operation. The
 frontend receives the exact child PID only to verify the applied state for its
@@ -141,7 +157,7 @@ when boot isolation, governor, `rtprio`, exact AMY callback, frontend and both
 PipeWire loop policies all match. Serial/ESP32 mode deliberately bypasses this
 host-AMY policy and warning.
 
-## 4. Repeat the physical acceptance test
+## 3. Repeat the physical acceptance test
 
 Start the AppImage normally on hardware Wayland/OpenGL. In a second terminal:
 
@@ -170,7 +186,7 @@ sudo python3 tools/raspberry_pi/rt_pi_trace.py \
 Tracing stores events in the kernel buffer and summarizes only after capture;
 it does not print from the audio callback.
 
-## 5. Capacity measurement
+## 4. Capacity measurement
 
 `rt_pi_benchmark.py` talks to a standalone packaged `--amy-service` through
 its Unix socket. Use a fresh service for every workload. The validated build

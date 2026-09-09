@@ -54,6 +54,9 @@ process scan, custom lifecycle token or test-only production endpoint.
    object/PID flow rather than by matching its source text.
 10. The QML warning dialog has explicit geometry. Physical startup and a 120 Hz
     input run produced no binding-loop diagnostics.
+11. Packaged host-tool execution no longer inherits AppImage/PyInstaller's
+    private `LD_LIBRARY_PATH` or `LD_PRELOAD`. The adapter invokes canonical
+    `/usr/bin/systemctl` while preserving the actual user-session environment.
 
 ## Test evidence
 
@@ -69,6 +72,11 @@ process scan, custom lifecycle token or test-only production endpoint.
   overload/dropout/binding-loop messages and ended with `throttled=0x0`.
 - Physical serial-mode startup created no host AMY process and no false
   realtime warning.
+- Complete GitHub run `34375905899` passed Linux x86_64, Raspberry Pi aarch64,
+  Windows, macOS, both Android architectures and emulator, and both ESP32-P4
+  board variants. Its checksum-verified Pi AppImage `R20260909161844` passed a
+  physical post-reboot startup and an external 20-second 120 Hz touch sweep
+  with no warning, overload, dropout, binding loop or throttling.
 
 Every release remains gated by the normal unit/quality matrix. The aarch64
 package job also exercises package startup and the shared 120 Hz visual-cost
@@ -78,9 +86,6 @@ acceptance after its first release.
 ## Remaining non-blocking evidence
 
 - Repeat the physical measurements on a Pi 5 when hardware is available.
-- Physically retest the first GitHub-built AppImage containing this exact
-  wrapper revision; source-wrapper behavior and package composition are already
-  covered, but hosted CI cannot prove physical scheduler latency.
 - If a future AMY backend recreates its callback thread without restarting its
   service process, characterize that lifecycle before adding any reapplication
   mechanism. Current miniaudio service behavior keeps the callback stable, so

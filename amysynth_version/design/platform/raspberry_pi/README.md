@@ -33,9 +33,13 @@ to one core was measured to be substantially worse.
 ignored virtual environment and prepares the pinned AMY dependency when
 needed. Released packages never rely on that environment.
 
-Release `R20260907T231243` was physically accepted on a 2 GiB Pi 4 at 120 Hz
-with V3D acceleration in both service and `/dev/serial0` modes. This supersedes
-earlier notes that Pi graphics or packaging still awaited first validation.
+AppImage `R20260909161844`, built by the complete successful platform run
+`34375905899`, was physically accepted on a 2 GiB Pi 4 after a clean reboot.
+The packaged launcher applied the exact runtime layout above and an external
+20-second 120 Hz touch sweep produced no warning, overload, dropout, binding
+loop or throttling. Source and `/dev/serial0` modes were also physically
+validated. This is the current setup; earlier watcher- and process-discovery
+designs are not supported deployment alternatives.
 
 [`frontend_performance.md`](frontend_performance.md) records the reproducible
 120 Hz physical-input benchmark, rejected alternatives and acceptance limits.

@@ -3,7 +3,7 @@
 Status: authoritative baseline contract
 Owner: application architecture
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-03
+Last verified: 2026-09-09
 
 ## Wire protocol boundary
 

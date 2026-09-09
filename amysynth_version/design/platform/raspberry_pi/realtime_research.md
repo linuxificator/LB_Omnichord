@@ -2,7 +2,8 @@
 
 Status: Pi 4 complete; Pi 5 pending physical availability
 Branch: `research/rt_pi`
-Release under test: `R20260909T010905`
+Measurement baseline: `R20260909T010905`
+Current packaged acceptance: `R20260909161844` (GitHub run `34375905899`)
 
 ## Scope and invariants
 
@@ -196,3 +197,14 @@ A separate post-boot control also drove a clean packaged AMY service over its
 Unix wire socket and its bounded 440 Hz oscillator was physically heard
 through the HDMI sink. This distinguishes the intentionally near-silent
 capacity workloads from an audio-routing failure.
+
+The final packaged acceptance exposed one boundary defect that the source
+launcher could not reproduce: AppImage/PyInstaller sets `LD_LIBRARY_PATH` to
+its private libraries, and host `systemctl` inherited that loader path. The
+host binary consequently exited before querying the user manager. The Linux
+adapter now invokes canonical `/usr/bin/systemctl` with AppImage loader
+injections removed while retaining user-session variables. A regression test
+covers that environment boundary. AppImage `R20260909161844` then found both
+systemd-owned PipeWire loops, applied the exact AMY policy and completed an
+external 20-second 120 Hz sweep with no warning, overload, dropout, binding
+loop or throttling.
