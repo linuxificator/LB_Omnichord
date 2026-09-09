@@ -61,7 +61,7 @@ Item {
         }
     ]
 
-    function beginAt(x, y) {
+    function beginAt(x: real, y: real): void {
         const wasVisible = root.visible
         root.animatePosition = wasVisible
         root.targetCenterX = x
@@ -73,7 +73,7 @@ Item {
         root.active = true
     }
 
-    function moveTo(x, y) {
+    function moveTo(x: real, y: real): void {
         const distance = Math.hypot(
             x - root.targetCenterX,
             y - root.targetCenterY
@@ -85,7 +85,7 @@ Item {
         root.y = y - root.height / 2
     }
 
-    function advanceMorph() {
+    function advanceMorph(): void {
         if (root.pendingMorphDistance < 0.1)
             return
         root.morphPhase = (
@@ -98,7 +98,7 @@ Item {
         root.pendingMorphDistance = 0
     }
 
-    function release() {
+    function release(): void {
         root.pendingMorphDistance = 0
         root.active = false
     }

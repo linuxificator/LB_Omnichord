@@ -18,11 +18,11 @@ Item {
     property bool gestureActive: false
     property bool bindingGesture: false
 
-    function normalizedY(y) {
+    function normalizedY(y: real): real {
         return PointerNormalization.verticalUnit(y, root.height)
     }
 
-    function visualPoint(x, y) {
+    function visualPoint(x: real, y: real): point {
         if (root.visualOverlay)
             return root.mapToItem(root.visualOverlay, x, y)
         return Qt.point(x, y)

@@ -13,7 +13,7 @@ Item {
     property color padColor: "#5d9fd0"
     property bool gestureActive: false
 
-    function normalizedY(y) {
+    function normalizedY(y: real): real {
         return PointerNormalization.verticalUnit(y, root.height)
     }
 
