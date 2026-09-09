@@ -23,6 +23,8 @@ def load(name: str):
 config = load("rt_pi_config")
 benchmark = load("rt_pi_benchmark")
 strum = load("strum_uinput")
+runtime = load("rt_pi_runtime")
+trace = load("rt_pi_trace")
 
 
 class RtPiConfigTests(unittest.TestCase):
@@ -98,6 +100,36 @@ class RtPiBenchmarkTests(unittest.TestCase):
         self.assertEqual(points[0], points[-1])
         self.assertEqual(points[0].x, round(1919 * 0.94))
         self.assertLess(points[0].y, points[len(points) // 2].y)
+
+    def test_runtime_discovers_only_explicit_amy_service(self) -> None:
+        commands = {
+            10: "/tmp/LB_Omnichord --amy-service --socket /tmp/a.sock",
+            11: "/tmp/LB_Omnichord",
+            12: "python something.py --amy-service-like",
+        }
+        original_ids = runtime.process_ids
+        original_command = runtime.process_command
+        try:
+            runtime.process_ids = lambda _uid=None: list(commands)
+            runtime.process_command = commands.__getitem__
+            self.assertEqual(runtime.discover_amy_services(), [10])
+        finally:
+            runtime.process_ids = original_ids
+            runtime.process_command = original_command
+
+    def test_trace_parser_reports_wake_and_runtime_tail(self) -> None:
+        sample = """\
+ worker-9 [003] 1.000000: sched_wakeup: comm=audio pid=42 prio=50 target_cpu=003
+ idle-0 [003] 1.000100: sched_switch: prev_comm=idle prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=audio next_pid=42 next_prio=50
+ audio-42 [003] 1.000900: sched_switch: prev_comm=audio prev_pid=42 prev_prio=50 prev_state=S ==> next_comm=idle next_pid=0 next_prio=120
+ worker-9 [003] 2.000000: sched_wakeup: comm=audio pid=42 prio=50 target_cpu=003
+ idle-0 [003] 2.000300: sched_switch: prev_comm=idle prev_pid=0 prev_prio=120 prev_state=R ==> next_comm=audio next_pid=42 next_prio=50
+ audio-42 [003] 2.001100: sched_switch: prev_comm=audio prev_pid=42 prev_prio=50 prev_state=S ==> next_comm=idle next_pid=0 next_prio=120
+"""
+        result = trace.parse_trace(sample, 42)
+        self.assertEqual(result["wake_to_run"]["samples"], 2)
+        self.assertAlmostEqual(result["wake_to_run"]["max_ms"], 0.3)
+        self.assertAlmostEqual(result["run_to_switch_out"]["median_ms"], 0.8)
 
 
 if __name__ == "__main__":
