@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -26,7 +27,7 @@ class BassRiffCatalogTests(unittest.TestCase):
         )
 
     def test_catalog_has_stable_unique_ids_and_full_coverage(self) -> None:
-        self.assertEqual(len(self.catalog.riffs), 756)
+        self.assertEqual(len(self.catalog.riffs), 1664)
         self.assertEqual(
             len({riff.index for riff in self.catalog.riffs}),
             len(self.catalog.riffs),
@@ -40,8 +41,21 @@ class BassRiffCatalogTests(unittest.TestCase):
             for rhythm in self.rhythms
             for chord in self.chords
         ]
-        self.assertEqual(min(candidate_counts), 4)
-        self.assertEqual(max(candidate_counts), 9)
+        self.assertEqual(min(candidate_counts), 5)
+        self.assertEqual(max(candidate_counts), 10)
+        for rhythm in self.rhythms:
+            for chord in self.chords:
+                self.assertEqual(
+                    {
+                        riff.activity_rank
+                        for riff in self.catalog.candidates(
+                            rhythm.key,
+                            chord.suffix,
+                        )
+                    },
+                    {1, 2, 3, 4, 5},
+                    f"{rhythm.key}/{chord.suffix}",
+                )
 
     def test_every_event_is_ordered_and_inside_its_own_phrase(self) -> None:
         for riff in self.catalog.riffs:
@@ -55,7 +69,7 @@ class BassRiffCatalogTests(unittest.TestCase):
                 self.assertGreater(event.duration_ticks, 0, riff.riff_id)
 
     def test_transposition_changes_only_pitch(self) -> None:
-        riff = self.catalog.by_id("riff_0004_pop_8_root_fifth")
+        riff = self.catalog.by_id("bass_shared_0001")
         self.assertIsNotNone(riff)
         assert riff is not None
         c_events = transpose_riff_events(riff, 0)
@@ -69,6 +83,74 @@ class BassRiffCatalogTests(unittest.TestCase):
                 [event[key] for event in c_events],
                 [event[key] for event in e_events],
             )
+
+    def test_rank_selection_uses_weight_and_can_retain_compatible_identity(
+        self,
+    ) -> None:
+        preferred = self.catalog.choose("disco", "minor6", 5)
+        self.assertIsNotNone(preferred)
+        assert preferred is not None
+        self.assertEqual(preferred.riff_id, "bass_shared_0725")
+
+        retained = self.catalog.choose(
+            "disco",
+            "minor6",
+            5,
+            preserve_riff_id="bass_shared_0726",
+        )
+        self.assertIsNotNone(retained)
+        assert retained is not None
+        self.assertEqual(retained.riff_id, "bass_shared_0726")
+
+        # Identity never overrides the requested musical activity rank.
+        changed_rank = self.catalog.choose(
+            "disco",
+            "minor6",
+            4,
+            preserve_riff_id="bass_shared_0726",
+        )
+        self.assertIsNotNone(changed_rank)
+        assert changed_rank is not None
+        self.assertEqual(changed_rank.activity_rank, 4)
+
+    def test_catalogue_is_c_normalized_and_unique_for_ordinary_basses(self) -> None:
+        raw = json.loads(
+            (FRONTEND / "music" / "omnichord_bass_riffs.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        signatures: set[tuple[object, ...]] = set()
+        for row in raw["riffs"]:
+            self.assertEqual(row["normalized_root"], "C", row["riff_id"])
+            self.assertEqual(row["normalized_anchor_midi"], 36, row["riff_id"])
+            timing = row["timing"]
+            signature = (
+                row["meter"],
+                timing["ppq"],
+                timing["phrase_ticks"],
+                tuple(
+                    (
+                        event["tick"],
+                        event["duration_ticks"],
+                        event["pitch_offset_semitones_from_C2"],
+                        event["velocity"],
+                    )
+                    for event in timing["events"]
+                ),
+            )
+            self.assertNotIn(signature, signatures, row["riff_id"])
+            signatures.add(signature)
+
+        # Root transposition is the only pitch transformation: every phrase
+        # remains in the playable bass register for every chromatic root.
+        for riff in self.catalog.riffs:
+            for root in range(12):
+                events = transpose_riff_events(riff, root)
+                self.assertTrue(events, riff.riff_id)
+                self.assertTrue(
+                    all(0 <= event["note"] <= 127 for event in events),
+                    f"{riff.riff_id}/root={root}",
+                )
 
     def test_riff_loader_never_depends_on_legacy_bass_levels(self) -> None:
         path = CODE / "bass_riffs.py"

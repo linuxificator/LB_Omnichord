@@ -8,6 +8,13 @@ from typing import Any
 
 from catalog_schema import read_versioned_catalog
 
+BASS_RIFF_RANK_MIN = 1
+BASS_RIFF_RANK_MAX = 5
+
+
+def clamp_bass_riff_rank(value: int | float) -> int:
+    return max(BASS_RIFF_RANK_MIN, min(BASS_RIFF_RANK_MAX, int(round(value))))
+
 
 @dataclass(frozen=True)
 class BassRiffEvent:
@@ -25,6 +32,8 @@ class BassRiffDefinition:
     normalized_anchor_midi: int
     compatible_chords: tuple[str, ...]
     compatible_rhythms: tuple[str, ...]
+    activity_rank: int
+    selection_weight: int
     ppq: int
     phrase_ticks: int
     events: tuple[BassRiffEvent, ...]
@@ -47,7 +56,16 @@ class BassRiffCatalog:
                     ).append(riff)
         self._by_context = MappingProxyType(
             {
-                context: tuple(sorted(values, key=lambda riff: riff.index))
+                context: tuple(
+                    sorted(
+                        values,
+                        key=lambda riff: (
+                            riff.activity_rank,
+                            -riff.selection_weight,
+                            riff.index,
+                        ),
+                    )
+                )
                 for context, values in by_context.items()
             }
         )
@@ -58,6 +76,49 @@ class BassRiffCatalog:
         chord_suffix: str,
     ) -> tuple[BassRiffDefinition, ...]:
         return self._by_context.get((rhythm_id, chord_suffix), ())
+
+    def candidates_at_rank(
+        self,
+        rhythm_id: str,
+        chord_suffix: str,
+        activity_rank: int,
+    ) -> tuple[BassRiffDefinition, ...]:
+        """Return deterministic candidates for one visible activity rank."""
+
+        rank = clamp_bass_riff_rank(activity_rank)
+        return tuple(
+            riff
+            for riff in self.candidates(rhythm_id, chord_suffix)
+            if riff.activity_rank == rank
+        )
+
+    def choose(
+        self,
+        rhythm_id: str,
+        chord_suffix: str,
+        activity_rank: int,
+        *,
+        preserve_riff_id: str | None = None,
+    ) -> BassRiffDefinition | None:
+        """Choose within a rank, retaining identity when still compatible."""
+
+        candidates = self.candidates_at_rank(
+            rhythm_id,
+            chord_suffix,
+            activity_rank,
+        )
+        if preserve_riff_id:
+            preserved = next(
+                (
+                    riff
+                    for riff in candidates
+                    if riff.riff_id == preserve_riff_id
+                ),
+                None,
+            )
+            if preserved is not None:
+                return preserved
+        return candidates[0] if candidates else None
 
     def by_id(self, riff_id: str | None) -> BassRiffDefinition | None:
         if not riff_id:
@@ -110,15 +171,21 @@ def _validate_context_coverage(
     known_chords: set[str],
 ) -> None:
     missing = [
-        (rhythm_id, chord_suffix)
+        (rhythm_id, chord_suffix, ranks)
         for rhythm_id in sorted(known_rhythms)
         for chord_suffix in sorted(known_chords)
-        if len(catalog.candidates(rhythm_id, chord_suffix)) < 3
+        if (
+            ranks := {
+                riff.activity_rank
+                for riff in catalog.candidates(rhythm_id, chord_suffix)
+            }
+        )
+        != set(range(BASS_RIFF_RANK_MIN, BASS_RIFF_RANK_MAX + 1))
     ]
     if missing:
         raise ValueError(
-            "bass riff catalogue has fewer than three candidates for "
-            f"{missing[0][0]!r}/{missing[0][1]!r}"
+            "bass riff catalogue does not provide ranks 1..5 for "
+            f"{missing[0][0]!r}/{missing[0][1]!r}; got {sorted(missing[0][2])}"
         )
 
 
@@ -167,6 +234,14 @@ def load_bass_riff_catalog(
         )
         if anchor != 36:
             raise ValueError(f"bass riff {riff_id!r} is not anchored at C2")
+        activity_rank = _required_int(row.get("activity_rank"), "activity_rank")
+        if not BASS_RIFF_RANK_MIN <= activity_rank <= BASS_RIFF_RANK_MAX:
+            raise ValueError(f"bass riff {riff_id!r} has invalid activity rank")
+        selection_weight = _required_int(
+            row.get("selection_weight"), "selection_weight"
+        )
+        if selection_weight <= 0:
+            raise ValueError(f"bass riff {riff_id!r} has invalid selection weight")
 
         compatible_rhythms = tuple(
             str(value)
@@ -250,6 +325,8 @@ def load_bass_riff_catalog(
                 normalized_anchor_midi=anchor,
                 compatible_chords=compatible_chords,
                 compatible_rhythms=compatible_rhythms,
+                activity_rank=activity_rank,
+                selection_weight=selection_weight,
                 ppq=ppq,
                 phrase_ticks=phrase_ticks,
                 events=tuple(events),
