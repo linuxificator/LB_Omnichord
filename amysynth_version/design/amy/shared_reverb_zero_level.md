@@ -1,7 +1,7 @@
 # Disabled shared-return regression
 
 Status: fixed in pinned AMY commit
-`282b1e434595e6524a1da8e0abb254d13c95af09`
+`5e3cd575fc744b9a0cd3e9014030acc7bf4dc5c2`
 
 ## Symptom
 

@@ -1253,14 +1253,16 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn("function onRhythmStateChanged()", qml)
         self.assertIn("rhythmTransportSymbol.requestPaint()", qml)
 
-    def test_midi_owned_tempo_and_tuning_nudges_are_grey_and_disabled(self) -> None:
+    def test_midi_owned_tempo_is_locked_but_global_bend_remains_live(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")
         button = (ROOT / "gui" / "PresetResetButton.qml").read_text(encoding="utf-8")
         compact_button = " ".join(button.split())
-        self.assertEqual(main.count("enabled: !window.omniTuningLocked"), 2)
         self.assertEqual(main.count("enabled: !window.rhythmTempoMidiBound"), 2)
-        self.assertEqual(midi.count("enabled: !root.tuningMidiLocked"), 2)
+        self.assertNotIn("omniTuningLocked", main)
+        self.assertNotIn("tuningMidiLocked", midi)
+        self.assertEqual(midi.count("backend.beginPitchBend("), 2)
+        self.assertNotIn("midiBackend.beginPitchBend(", midi)
         self.assertIn('enabled ? root.textColor : "#686864"', button)
         self.assertIn(
             '? (root.pressed ? Qt.darker(root.panelColor, 1.08) : root.panelColor) : "#bdbdb8"',

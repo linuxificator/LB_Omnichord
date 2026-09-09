@@ -51,6 +51,16 @@ musical data and policy; AMY owns local phase, execution lifetime, repeats and
 immutable execution snapshots. The complete boundary and regression rules are
 in [`../music/sequences.md`](../music/sequences.md).
 
+## Pitch bend
+
+Transient performance bend uses AMY's existing global `s<octaves>Z` wire
+field. A 14-bit MIDI Pitch Bend message maps to AMY's conventional
+approximately ±2-semitone range; the on-screen UP/DOWN controls use the same
+global field with a ±1-semitone limit and a smooth return to zero. Static
+A-reference and EQ/HARM/JV corrections remain fractional note values. Pitch
+bend therefore sends no note replacements and never republishes a reusable
+sequence definition.
+
 ## Testing
 
 Wire command streams can be captured and compared between transports.

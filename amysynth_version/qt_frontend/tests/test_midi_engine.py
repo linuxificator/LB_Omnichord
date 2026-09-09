@@ -5,6 +5,7 @@ import sys
 import threading
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -653,6 +654,44 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(applied[0][1], 8192)
         self.assertEqual(applied[0][2], (1, PITCH_BEND_CONTROLLER))
         self.assertEqual(applied[0][0]["id"], "midi:master_volume")
+
+    def test_global_pitch_bend_target_delegates_raw_14_bit_value_to_omni(self) -> None:
+        values: list[int] = []
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = SimpleNamespace(setMidiPitchBend=values.append)
+        backend._applying_midi_control = 0
+
+        backend._apply_control_target(
+            {
+                "id": "omni:pitch_bend",
+                "screen": "omni",
+                "kind": "pitch_bend",
+            },
+            12345,
+            (1, PITCH_BEND_CONTROLLER),
+        )
+
+        self.assertEqual(values, [12345])
+
+    def test_legacy_factory_pitch_bend_binding_migrates_from_reference(self) -> None:
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend._midi_control_state = MidiControlState()
+
+        entries = backend._normalized_binding_entries(
+            "omni",
+            [
+                {
+                    "channel": 1,
+                    "source_type": "pitch_bend",
+                    "activate_on_input": True,
+                    "target": {"kind": "tuning_reference"},
+                }
+            ],
+        )
+
+        self.assertEqual(entries[0][0], (1, PITCH_BEND_CONTROLLER))
+        self.assertEqual(entries[0][1]["kind"], "pitch_bend")
+        self.assertEqual(entries[0][1]["id"], "omni:pitch_bend")
 
     def test_indicator_click_unlinks_green_before_blue_can_start_learn(self) -> None:
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)

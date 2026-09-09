@@ -48,6 +48,7 @@ ADDRESSES = (
     "rhythm_config",
     "rhythm_running",
     "rhythm_chord_enabled",
+    "pitch_bend",
     "panic",
 )
 

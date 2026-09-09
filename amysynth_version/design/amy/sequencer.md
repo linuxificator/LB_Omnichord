@@ -33,6 +33,14 @@ classes are not repeatedly scanned, and uniform periodic definitions advance
 from their previous due position. These are generic performance improvements
 with unchanged ordering and tick semantics.
 
+Aligned replacement is also bounded before its musical boundary. After one
+stop/reset/start transaction has reserved a not-yet-started execution for a
+tag and exact boundary, a newer transaction for that same tag and boundary
+updates the pending execution to the newest immutable definition instead of
+allocating another slot. Ordinary repeated starts without that matching stop
+remain independent overlapping executions. This protects any fast controller
+that revises quantized material; it is not an application-specific rule.
+
 ## Compatibility
 
 The intentional source compatibility change is that repeating a stored tag
@@ -45,7 +53,7 @@ The active LB release supplies 1,280 definition identities, 64 events per
 definition and 40 active or alignment-pending executions. Inactive preloaded
 fills consume memory but negligible realtime processing.
 
-AMY release branch `releases/amy_omnichord_R20260909T024424` at
-`282b1e434595e6524a1da8e0abb254d13c95af09` is the current immutable consumer
+AMY release branch `releases/amy_omnichord_R20260909T140940` at
+`5e3cd575fc744b9a0cd3e9014030acc7bf4dc5c2` is the current immutable consumer
 pin. Exact current pins remain authoritative in
 `../../qt_frontend/packaging/release_inputs.json`.

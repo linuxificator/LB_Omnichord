@@ -173,6 +173,9 @@ EXTERNAL_CHORD_VOICE_ID = "external-midi-chord"
 TUNING_MODE_NAMES = ("HARM", "EQ", "JV")
 DEFAULT_TUNING_MODE_INDEX = 1
 DEFAULT_TUNING_REFERENCE = 440
+UI_PITCH_BEND_LIMIT_OCTAVES = 1.0 / 12.0
+UI_PITCH_BEND_STEP_OCTAVES = 1.0 / 300.0
+MIDI_PITCH_BEND_RANGE_OCTAVES = 1.0 / 6.0
 REVERB_LEVEL_MAX = 3.0
 
 PRESET_COUNT = 18
@@ -883,6 +886,7 @@ class InstrumentBackend(QObject):
         rhythm_config_address: str,
         rhythm_running_address: str,
         rhythm_chord_enabled_address: str,
+        pitch_bend_address: str,
         panic_address: str,
         debug_enabled: bool,
         debug_file: Path | None,
@@ -920,6 +924,7 @@ class InstrumentBackend(QObject):
         self._rhythm_config_address = rhythm_config_address
         self._rhythm_running_address = rhythm_running_address
         self._rhythm_chord_enabled_address = rhythm_chord_enabled_address
+        self._pitch_bend_address = pitch_bend_address
         self._panic_address = panic_address
 
         self._preset_dir = PRESET_DIRECTORY
@@ -1049,13 +1054,14 @@ class InstrumentBackend(QObject):
         ]
         self._tempo_nudge_pressed = False
 
-        # Pitch bend is deliberately transient. _tuning_reference remains the
-        # stored/preset A-reference; this offset returns to zero on release.
+        # Pitch bend is one transient AMY-global performance control. Static
+        # tuning reference/mode may be decoupled between OMNI and MIDI, but
+        # neither owns a second bend state or bakes bend into note definitions.
         self._pitch_bend_timer = QTimer(self)
         self._pitch_bend_timer.setInterval(100)
         self._pitch_bend_timer.timeout.connect(self._pitch_bend_tick)
         self._pitch_bend_direction = 0
-        self._pitch_bend_offset_hz = 0.0
+        self._pitch_bend_octaves = 0.0
         self._pitch_bend_returning = False
 
         self._strum_last_index: int | None = None
@@ -1658,7 +1664,6 @@ class InstrumentBackend(QObject):
         return TuningSnapshot(
             mode=TUNING_MODE_NAMES[self._tuning_mode_index],
             reference_hz=float(self._tuning_reference),
-            bend_offset_hz=float(self._pitch_bend_offset_hz),
             intonation_tables=self._frozen_intonation_tables,
         )
 
@@ -1776,33 +1781,45 @@ class InstrumentBackend(QObject):
         self._pitch_bend_direction = 0
         self._pitch_bend_returning = False
 
-    def _publish_pitch_bend(self) -> None:
-        self.tuningChanged.emit()
-        self._refresh_tuning_on_active_notes()
+    def _send_pitch_bend(self) -> None:
+        self._client.send_message(
+            self._pitch_bend_address,
+            self._pitch_bend_octaves,
+        )
+
+    def _set_pitch_bend(self, octaves: float) -> None:
+        value = max(-1.0, min(1.0, float(octaves)))
+        if math.isclose(value, self._pitch_bend_octaves, abs_tol=1e-9):
+            return
+        self._pitch_bend_octaves = value
+        self._send_pitch_bend()
 
     def _pitch_bend_tick(self) -> None:
-        previous = self._pitch_bend_offset_hz
+        previous = self._pitch_bend_octaves
         if self._pitch_bend_returning:
-            if abs(previous) <= 1.0:
-                self._pitch_bend_offset_hz = 0.0
+            if abs(previous) <= UI_PITCH_BEND_STEP_OCTAVES:
                 self._stop_pitch_bend()
+                self._set_pitch_bend(0.0)
             else:
-                self._pitch_bend_offset_hz = previous - math.copysign(1.0, previous)
+                self._set_pitch_bend(
+                    previous
+                    - math.copysign(UI_PITCH_BEND_STEP_OCTAVES, previous)
+                )
         else:
-            candidate = previous + float(self._pitch_bend_direction)
-            base = float(self._tuning_reference)
-            self._pitch_bend_offset_hz = max(415.0 - base, min(466.0 - base, candidate))
-            if math.isclose(self._pitch_bend_offset_hz, previous, abs_tol=1e-9):
+            candidate = previous + (
+                float(self._pitch_bend_direction)
+                * UI_PITCH_BEND_STEP_OCTAVES
+            )
+            candidate = max(
+                -UI_PITCH_BEND_LIMIT_OCTAVES,
+                min(UI_PITCH_BEND_LIMIT_OCTAVES, candidate),
+            )
+            if math.isclose(candidate, previous, abs_tol=1e-9):
                 return
-        if not math.isclose(previous, self._pitch_bend_offset_hz, abs_tol=1e-9):
-            self._publish_pitch_bend()
+            self._set_pitch_bend(candidate)
 
     @Slot(int)
     def beginPitchBend(self, direction: int) -> None:
-        if self._midi_control_blocks({"screen": "omni", "kind": "tuning_reference"}):
-            self._stop_pitch_bend()
-            self._pitch_bend_offset_hz = 0.0
-            return
         direction = 1 if int(direction) > 0 else -1
         self._pitch_bend_direction = direction
         self._pitch_bend_returning = False
@@ -1811,25 +1828,28 @@ class InstrumentBackend(QObject):
 
     @Slot()
     def endPitchBend(self) -> None:
-        if self._midi_control_blocks({"screen": "omni", "kind": "tuning_reference"}):
-            self._stop_pitch_bend()
-            self._pitch_bend_offset_hz = 0.0
-            return
         self._pitch_bend_direction = 0
-        if math.isclose(self._pitch_bend_offset_hz, 0.0, abs_tol=1e-9):
+        if math.isclose(self._pitch_bend_octaves, 0.0, abs_tol=1e-9):
             self._stop_pitch_bend()
             return
         self._pitch_bend_returning = True
         if not self._pitch_bend_timer.isActive():
             self._pitch_bend_timer.start()
 
+    def setMidiPitchBend(self, value: int) -> None:
+        self._stop_pitch_bend()
+        raw = max(0, min(16383, int(value)))
+        self._set_pitch_bend(
+            (raw - 8192)
+            * MIDI_PITCH_BEND_RANGE_OCTAVES
+            / 8192.0
+        )
+
     @Slot(int)
     def setTuningReference(self, value: int) -> None:
         if self._midi_control_blocks({"screen": "omni", "kind": "tuning_reference"}):
             return
         clamped = max(415, min(466, int(value)))
-        self._stop_pitch_bend()
-        self._pitch_bend_offset_hz = 0.0
 
         if clamped == self._tuning_reference:
             self.tuningChanged.emit()
@@ -2150,8 +2170,6 @@ class InstrumentBackend(QObject):
             415,
             min(466, int(tuning.get("reference_hz", DEFAULT_TUNING_REFERENCE))),
         )
-        self._stop_pitch_bend()
-        self._pitch_bend_offset_hz = 0.0
         self._stop_tempo_nudge()
         self._strum_ladder_mode = False
 
@@ -2295,8 +2313,6 @@ class InstrumentBackend(QObject):
             self._rhythm.fill_density_index_by_rhythm[index] = setting.fill_density_index
         self._tuning_mode_index = plan.tuning_mode_index
         self._tuning_reference = int(plan.tuning_reference_hz)
-        self._stop_pitch_bend()
-        self._pitch_bend_offset_hz = 0.0
         self._stop_tempo_nudge()
 
         # The active chord and its touch lifecycle are live performance state,
@@ -2482,6 +2498,8 @@ class InstrumentBackend(QObject):
     @Slot()
     def panic(self) -> None:
         # Stop and invalidate all performance state locally first.
+        self._stop_pitch_bend()
+        self._pitch_bend_octaves = 0.0
         self._rhythm_running = False
         self._running_tempo = None
         self._bass_running = False
@@ -2503,6 +2521,7 @@ class InstrumentBackend(QObject):
             self._panic_address,
             1,
         )
+        self._send_pitch_bend()
 
         # Redundant explicit state messages keep the UI and receiver state
         # converged after the hard AMY reset/rebuild.
@@ -3576,6 +3595,7 @@ class InstrumentBackend(QObject):
             self._percussion_volume,
         )
         self._send_reverb_state()
+        self._send_pitch_bend()
         self._send_synth_state("chord")
         self._send_synth_state("strum")
         self._send_synth_state("bass")
@@ -3854,6 +3874,10 @@ def parse_arguments(
     parser.add_argument(
         "--rhythm-chord-enabled-address",
         default="/rhythm/chord/enabled",
+    )
+    parser.add_argument(
+        "--pitch-bend-address",
+        default="/performance/pitch-bend",
     )
     parser.add_argument(
         "--panic-address",

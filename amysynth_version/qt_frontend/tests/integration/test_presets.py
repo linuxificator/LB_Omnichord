@@ -94,9 +94,24 @@ class PresetIntegrationTests(unittest.TestCase):
                 "bound",
             )
 
+            tuning_before_bend = int(app.query("tuningReference"))
+            bend_start = app.bridge.count()
             app.action("injectMidiPitchBend", 1, 16383)
-            self.assertEqual(int(app.query("tuningReference")), 466)
-            self.assertEqual(int(app.action("midiTuningReference")), 466)
+            app.bridge.wait_idle(timeout=3.0)
+            self.assertEqual(
+                int(app.query("tuningReference")),
+                tuning_before_bend,
+                "global Pitch Bend changed the persistent A-reference",
+            )
+            bend_lines = app.bridge.lines_since(bend_start)
+            self.assertTrue(
+                any(line.startswith("s0.166") for line in bend_lines),
+                "factory Pitch Bend did not reach AMY's global bend field",
+            )
+            self.assertEqual(
+                int(app.action("midiTuningReference")),
+                tuning_before_bend,
+            )
 
             old_chord = int(app.action("chordIndexForRow", 0))
             app.action("injectMidiControl", 1, 25, 0)
@@ -124,6 +139,27 @@ class PresetIntegrationTests(unittest.TestCase):
                 "the first factory Play press after startup was only a baseline",
             )
             app.action("injectMidiControl", 16, 115, 0)
+
+            # A high-rate bend while a chord and rhythm are active must stay
+            # one global AMY parameter stream. It must not rebuild quantized
+            # bass/chord sequence definitions or consume execution slots.
+            app.action("pressChord", 0, 0)
+            app.bridge.wait_idle(timeout=3.0)
+            bend_start = app.bridge.count()
+            for value in range(8200, 9000, 20):
+                app.action("injectMidiPitchBend", 1, value)
+            app.bridge.wait_idle(timeout=3.0)
+            bend_lines = app.bridge.lines_since(bend_start)
+            self.assertGreaterEqual(
+                sum(line.startswith("s") for line in bend_lines),
+                20,
+            )
+            self.assertFalse(
+                any(line.startswith(("HC56,", "HC112,")) for line in bend_lines),
+                "Pitch Bend republished quantized rhythm lanes",
+            )
+            app.action("injectMidiPitchBend", 1, 8192)
+            app.action("releaseChord", 0, 0)
             app.action("toggleRhythm")
             self.assertFalse(bool(app.query("rhythmRunning")))
             self.assertEqual(

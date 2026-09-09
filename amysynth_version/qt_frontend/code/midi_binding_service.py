@@ -62,13 +62,23 @@ class MidiBindingService:
             target_data = raw.get("target")
             if not isinstance(target_data, dict):
                 continue
+            source_type = str(raw.get("source_type", "cc"))
             target_source = dict(target_data)
             target_source["screen"] = str(screen)
+            # Presets written before global bend was separated from static
+            # tuning used Pitch Bend as a 415..466 Hz reference controller.
+            # Preserve those user presets by migrating that exact declaration
+            # to the transient OMNI-owned AMY bend target on load.
+            if (
+                source_type == "pitch_bend"
+                and str(screen) == "omni"
+                and str(target_source.get("kind", "")) == "tuning_reference"
+            ):
+                target_source["kind"] = "pitch_bend"
             target = normalize_target(target_source)
             if target is None:
                 continue
             try:
-                source_type = str(raw.get("source_type", "cc"))
                 if source_type == "osc":
                     address = str(raw.get("address", ""))
                     argument = int(raw.get("argument", 0))

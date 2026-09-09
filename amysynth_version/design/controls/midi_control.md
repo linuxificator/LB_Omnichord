@@ -35,8 +35,10 @@ creating indicators, selecting instruments or changing audio state.
 
 Pitch Bend uses MIDI center (`8192`) as its baseline and full 14-bit input
 range (`0..16383`) for numeric mapping. This makes a centered pitch-bend wheel
-or encoder neutral, while movement away from center can be learned and mapped to
-any continuous control with higher resolution than CC.
+or encoder neutral, while movement away from center can be learned and mapped
+to any continuous control with higher resolution than CC. The factory mapping
+is the special transient `omni:pitch_bend` target: it sends AMY's global bend
+directly and is not a 415–466 Hz tuning-reference edit.
 
 CC-style controller buttons transmit only the endpoint pair 0 (released) and
 127 (pressed). After both endpoints have been observed without an intermediate

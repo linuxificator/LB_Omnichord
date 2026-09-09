@@ -422,12 +422,13 @@ installation failed to show or release chord-key interaction correctly.
 
 **MIDI-CC-15 — preset controller defaults remain ordinary generic bindings**
 
-- Every factory OMNI preset maps channel-1 Pitch Bend to shared tuning, channel
+- Every factory OMNI preset maps channel-1 Pitch Bend to global AMY bend, channel
   1 CC1 to OMNI strum position, CC21..24 to percussion/bass/strum/chord volume,
   CC25..28 to chord-type rows 1..4, and channel-16 CC115/117 to rhythm and
   automatic-chord transport respectively.
-- Coupled tuning applies Pitch Bend to OMNI and MIDI synths through the existing
-  shared-tuning path. CC strum position uses the preset strum volume, crosses
+- Pitch Bend is one transient global performance value and never changes the
+  coupled or decoupled A-reference, intonation mode, or stored sequence
+  definitions. CC strum position uses the preset strum volume, crosses
   newly reached notes once and supplies no velocity.
 - Direct mouse/touch strumming and screen button taps never unlink their
   external bindings; only the matching grey-bar control can unlink them.

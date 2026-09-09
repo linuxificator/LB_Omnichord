@@ -208,6 +208,7 @@ def address_map(args: Namespace) -> dict[str, str]:
         "rhythm_config": str(args.rhythm_config_address),
         "rhythm_running": str(args.rhythm_running_address),
         "rhythm_chord_enabled": str(args.rhythm_chord_enabled_address),
+        "pitch_bend": str(args.pitch_bend_address),
         "panic": str(args.panic_address),
     }
 
@@ -314,6 +315,7 @@ def compose_application_graph(
         rhythm_config_address=args.rhythm_config_address,
         rhythm_running_address=args.rhythm_running_address,
         rhythm_chord_enabled_address=args.rhythm_chord_enabled_address,
+        pitch_bend_address=args.pitch_bend_address,
         panic_address=args.panic_address,
         debug_enabled=bool(args.debug or args.debug_file is not None),
         debug_file=args.debug_file,

@@ -499,12 +499,6 @@ class MidiPlayerBackend(QObject):
         self._tuning_coupled = True
         self._tuning_mode_index = int(owner.selectedTuningModeIndex)
         self._tuning_reference = float(owner.tuningReference)
-        self._bend_offset = 0.0
-        self._bend_direction = 0
-        self._bend_returning = False
-        self._bend_timer = QTimer(self)
-        self._bend_timer.setInterval(100)
-        self._bend_timer.timeout.connect(self._bend_tick)
 
         self._reverb_level = 0.0
         self._reverb_liveness = 0.5
@@ -625,7 +619,7 @@ class MidiPlayerBackend(QObject):
 
     @Property(int, notify=tuningChanged)
     def tuningReference(self) -> int:
-        return int(round(self._effective_local_reference()))
+        return int(round(self._tuning_reference))
 
     @Property(float, notify=reverbLevelChanged)
     def reverbLevel(self) -> float:
@@ -1003,6 +997,9 @@ class MidiPlayerBackend(QObject):
         ):
             target["id"] = f"{screen}:{kind}"
             return target
+        if screen == "omni" and kind == "pitch_bend":
+            target["id"] = "omni:pitch_bend"
+            return target
 
         if screen == "omni" and kind in (
             "rhythm_tempo",
@@ -1168,6 +1165,12 @@ class MidiPlayerBackend(QObject):
         midi_value: int,
         source_key: tuple[int, int] | None = None,
     ) -> None:
+        if str(target.get("kind", "")) == "pitch_bend":
+            self._apply_midi_setter(
+                self.owner.setMidiPitchBend,
+                int(midi_value),
+            )
+            return
         value = self._mapped_target_value(target, midi_value, source_key)
         if value is None:
             return
@@ -2120,8 +2123,6 @@ class MidiPlayerBackend(QObject):
         if coupled == self._tuning_coupled:
             return
         self._tuning_coupled = coupled
-        self._stop_bend()
-        self._bend_offset = 0.0
         self.tuningChanged.emit()
 
     def syncFromOmni(self) -> None:
@@ -2132,24 +2133,15 @@ class MidiPlayerBackend(QObject):
         )
         changed = mode_index != self._tuning_mode_index or (
             not reference_blocked
-            and (
-                not math.isclose(
-                    reference,
-                    self._tuning_reference,
-                    abs_tol=1e-9,
-                )
-                or not math.isclose(
-                    self._bend_offset,
-                    0.0,
-                    abs_tol=1e-9,
-                )
+            and not math.isclose(
+                reference,
+                self._tuning_reference,
+                abs_tol=1e-9,
             )
         )
         self._tuning_mode_index = mode_index
         if not reference_blocked:
             self._tuning_reference = reference
-            self._stop_bend()
-            self._bend_offset = 0.0
         if changed:
             self.tuningChanged.emit()
 
@@ -2168,8 +2160,6 @@ class MidiPlayerBackend(QObject):
         if self.manual_change_blocked({"screen": "midi", "kind": "tuning_reference"}):
             return
         value = max(415, min(466, int(value)))
-        self._stop_bend()
-        self._bend_offset = 0.0
         if math.isclose(
             self._tuning_reference,
             float(value),
@@ -2180,64 +2170,13 @@ class MidiPlayerBackend(QObject):
         self._tuning_reference = float(value)
         self.tuningChanged.emit()
 
-    def _effective_local_reference(self) -> float:
-        return max(
-            415.0,
-            min(466.0, self._tuning_reference + self._bend_offset),
-        )
-
-    def _stop_bend(self) -> None:
-        self._bend_timer.stop()
-        self._bend_direction = 0
-        self._bend_returning = False
-
-    def _bend_tick(self) -> None:
-        old = self._bend_offset
-        if self._bend_returning:
-            if abs(old) <= 1.0:
-                self._bend_offset = 0.0
-                self._stop_bend()
-            else:
-                self._bend_offset = old - math.copysign(1.0, old)
-        else:
-            candidate = old + float(self._bend_direction)
-            self._bend_offset = max(
-                415.0 - self._tuning_reference,
-                min(466.0 - self._tuning_reference, candidate),
-            )
-        if not math.isclose(old, self._bend_offset, abs_tol=1e-9):
-            self.tuningChanged.emit()
-
     @Slot(int)
     def beginPitchBend(self, direction: int) -> None:
-        if self._tuning_coupled:
-            self.owner.beginPitchBend(direction)
-            return
-        if self.manual_change_blocked({"screen": "midi", "kind": "tuning_reference"}):
-            self._stop_bend()
-            self._bend_offset = 0.0
-            return
-        self._bend_direction = 1 if int(direction) > 0 else -1
-        self._bend_returning = False
-        if not self._bend_timer.isActive():
-            self._bend_timer.start()
+        self.owner.beginPitchBend(direction)
 
     @Slot()
     def endPitchBend(self) -> None:
-        if self._tuning_coupled:
-            self.owner.endPitchBend()
-            return
-        if self.manual_change_blocked({"screen": "midi", "kind": "tuning_reference"}):
-            self._stop_bend()
-            self._bend_offset = 0.0
-            return
-        self._bend_direction = 0
-        if math.isclose(self._bend_offset, 0.0, abs_tol=1e-9):
-            self._stop_bend()
-        else:
-            self._bend_returning = True
-            if not self._bend_timer.isActive():
-                self._bend_timer.start()
+        self.owner.endPitchBend()
 
     def _chord_context(self) -> tuple[int, set[int]]:
         chord = self.owner.performance_snapshot().chord
@@ -2251,7 +2190,6 @@ class MidiPlayerBackend(QObject):
             else TuningSnapshot(
                 mode=app_core.TUNING_MODE_NAMES[self._tuning_mode_index],
                 reference_hz=self._tuning_reference,
-                bend_offset_hz=self._bend_offset,
                 intonation_tables=owner_tuning.intonation_tables,
             )
         )

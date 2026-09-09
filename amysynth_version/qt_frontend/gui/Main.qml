@@ -119,23 +119,6 @@ ApplicationWindow {
     property bool midiScreen: false
     property bool tuningCoupled: true
     property bool strumLadderMode: backend.strumLadderMode
-    readonly property bool omniTuningMidiBound: {
-        midiBackend.bindingVersion
-        return midiBackend.isControlTargetBound({
-            "screen": "omni",
-            "kind": "tuning_reference"
-        })
-    }
-    readonly property bool midiTuningMidiBound: {
-        midiBackend.bindingVersion
-        return midiBackend.isControlTargetBound({
-            "screen": "midi",
-            "kind": "tuning_reference"
-        })
-    }
-    readonly property bool omniTuningLocked:
-        window.omniTuningMidiBound
-        || (window.tuningCoupled && window.midiTuningMidiBound)
     readonly property bool rhythmTempoMidiBound: {
         midiBackend.bindingVersion
         return midiBackend.isControlTargetBound({
@@ -391,7 +374,6 @@ ApplicationWindow {
                 width: 42
                 height: 42
                 text: "UP"
-                enabled: !window.omniTuningLocked
                 panelColor: "#efb05c"
                 borderColor: "#a75d0a"
                 textColor: "#492606"
@@ -407,7 +389,6 @@ ApplicationWindow {
                 width: 42
                 height: 42
                 text: "DWN"
-                enabled: !window.omniTuningLocked
                 panelColor: "#efb05c"
                 borderColor: "#a75d0a"
                 textColor: "#492606"
