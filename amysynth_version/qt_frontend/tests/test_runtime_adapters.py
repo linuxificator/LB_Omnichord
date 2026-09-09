@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import sys
 import unittest
 from pathlib import Path
@@ -39,6 +40,23 @@ class RuntimeAdapterTests(unittest.TestCase):
             self.assertNotIn(forbidden, app_core)
         self.assertNotIn("sys.stdout is None", main)
         self.assertNotIn("fatal-error", main)
+
+    def test_startup_warning_is_presented_without_pi_policy_in_the_core(self) -> None:
+        tree = ast.parse((CODE / "app_core.py").read_text(encoding="utf-8"))
+        imported = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+            for alias in node.names
+        }
+        called_names = {
+            node.func.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+        self.assertNotIn("raspberry_pi_realtime", imported)
+        self.assertNotIn("rt_policy_registration", imported)
+        self.assertNotIn("sched_setscheduler", called_names)
 
 
 if __name__ == "__main__":

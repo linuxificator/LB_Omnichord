@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
+import io
+import subprocess
+import stat
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools" / "raspberry_pi"
+sys.path.insert(0, str(ROOT / "code"))
 
 
 def load(name: str):
@@ -23,11 +30,35 @@ def load(name: str):
 config = load("rt_pi_config")
 benchmark = load("rt_pi_benchmark")
 strum = load("strum_uinput")
-runtime = load("rt_pi_runtime")
 trace = load("rt_pi_trace")
 
 
+def load_path(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+realtime_status = load_path(
+    "raspberry_pi_realtime",
+    ROOT / "code" / "raspberry_pi_realtime.py",
+)
+asset_builder = load_path(
+    "build_rpi_realtime_setup",
+    ROOT / "packaging" / "build_rpi_realtime_setup.py",
+)
+
+
 class RtPiConfigTests(unittest.TestCase):
+    def test_runtime_boot_contract_matches_configuration_authority(self) -> None:
+        self.assertEqual(
+            realtime_status.EXPECTED_BOOT_ARGUMENTS,
+            frozenset(config.PROFILES["audio-split"].boot_arguments),
+        )
+
     def test_profiles_replace_only_owned_kernel_arguments(self) -> None:
         original = (
             "console=tty1 root=PARTUUID=abc rootwait quiet "
@@ -46,6 +77,185 @@ class RtPiConfigTests(unittest.TestCase):
             config.PROFILES["stock"],
         )
         self.assertEqual(updated, "root=/dev/mmcblk0 custom=yes\n")
+
+    def test_apply_is_idempotent_and_preserves_boot_file_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            boot = root / "cmdline.txt"
+            state = root / "state"
+            boot.write_text("root=/dev/mmcblk0 rootwait\n", encoding="utf-8")
+            boot.chmod(0o640)
+            with (
+                mock.patch.object(config, "BOOT_CMDLINE", boot),
+                mock.patch.object(config, "STATE_ROOT", state),
+                mock.patch.object(config, "_require_root"),
+            ):
+                first, _updated = config.apply_profile("audio-split")
+                latest = (state / "latest-snapshot").read_text(encoding="utf-8")
+                second, _unchanged = config.apply_profile("audio-split")
+
+            self.assertIsNotNone(first)
+            self.assertIsNone(second)
+            self.assertEqual(
+                stat.S_IMODE(boot.stat().st_mode),
+                0o640,
+            )
+            self.assertEqual((state / "latest-snapshot").read_text(), latest)
+
+    def test_startup_status_is_silent_outside_pi_4_and_pi_5(self) -> None:
+        status = realtime_status.evaluate_realtime(
+            realtime_status.RealtimeFacts("generic arm64", "", "", (), 0)
+        )
+        self.assertFalse(status.applicable)
+        self.assertTrue(status.complete)
+        self.assertEqual(status.missing, ())
+
+    def test_startup_status_reports_every_incomplete_realtime_layer(self) -> None:
+        status = realtime_status.evaluate_realtime(
+            realtime_status.RealtimeFacts(
+                "Raspberry Pi 5 Model B Rev 1.0",
+                "console=tty1 rootwait",
+                "",
+                ("ondemand",),
+                0,
+            )
+        )
+        self.assertTrue(status.applicable)
+        self.assertFalse(status.complete)
+        self.assertEqual(len(status.missing), 5)
+
+    def test_startup_status_accepts_the_measured_split_profile(self) -> None:
+        status = realtime_status.evaluate_realtime(
+            realtime_status.RealtimeFacts(
+                "Raspberry Pi 4 Model B Rev 1.1",
+                "rootwait isolcpus=domain,managed_irq,2-3 "
+                "irqaffinity=0-1 threadirqs",
+                "2-3",
+                ("performance", "performance"),
+                80,
+                True,
+            )
+        )
+        self.assertTrue(status.applicable)
+        self.assertTrue(status.complete)
+        self.assertEqual(status.missing, ())
+
+    def test_release_setup_asset_is_named_versioned_and_self_contained(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output, checksum = asset_builder.build(
+                "R20260909153000",
+                Path(temporary),
+            )
+            source = output.read_text(encoding="utf-8")
+            fields = checksum.read_text(encoding="ascii").split()
+
+        self.assertEqual(
+            output.name,
+            "LB_Omnichord.R20260909153000.Pi4-Pi5-realtime-setup.sh",
+        )
+        self.assertIn("install_realtime_profile.sh", source)
+        self.assertNotIn("rt_pi_runtime.py", source)
+        self.assertIn("sha256sum --check --status", source)
+        for file_name, _mode in asset_builder.EMBEDDED_FILES:
+            self.assertIn(asset_builder._encoded(TOOLS / file_name), source)
+        self.assertEqual(fields[1], output.name)
+        self.assertEqual(fields[0], hashlib.sha256(source.encode()).hexdigest())
+
+    def test_release_setup_asset_has_valid_shell_and_verified_payloads(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output, _checksum = asset_builder.build(
+                "R20260909153000", Path(temporary)
+            )
+            syntax = subprocess.run(
+                ["bash", "-n", str(output)], capture_output=True, text=True
+            )
+            help_result = subprocess.run(
+                ["bash", str(output), "--help"], capture_output=True, text=True
+            )
+        self.assertEqual(syntax.returncode, 0, syntax.stderr)
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn("Usage:", help_result.stdout)
+
+    def test_release_setup_asset_rejects_a_corrupted_embedded_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output, _checksum = asset_builder.build(
+                "R20260909153000", Path(temporary)
+            )
+            source = output.read_text(encoding="utf-8")
+            marker = "__LB_OMNICHORD_INSTALL_REALTIME_PROFILE_SH__"
+            start = source.index("\n", source.index(marker)) + 1
+            replacement = "A" if source[start] != "A" else "B"
+            output.write_text(
+                source[:start] + replacement + source[start + 1 :],
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                ["bash", str(output), "--help"], capture_output=True, text=True
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("integrity check", result.stderr)
+
+    def test_checkout_setup_script_is_the_release_asset_authority(self) -> None:
+        installer = (TOOLS / "install_realtime_profile.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("apply --profile audio-split", installer)
+        self.assertIn("set-governor performance", installer)
+        self.assertIn("rtprio 80", installer)
+        self.assertIn("pipewire.service.d", installer)
+        self.assertIn("pipewire.conf.d", installer)
+        self.assertNotIn("enable --now \"lb-omnichord-rt-policy", installer)
+        self.assertIn("Raspberry Pi 4", installer)
+        self.assertIn("Raspberry Pi 5", installer)
+        self.assertIn(
+            '("install_realtime_profile.sh", 0o755)',
+            (ROOT / "packaging" / "build_rpi_realtime_setup.py").read_text(
+                encoding="utf-8"
+            ),
+        )
+
+    def test_startup_warning_keeps_checksum_details_out_of_the_ui(self) -> None:
+        def inspect(**_overrides):
+            return realtime_status.RealtimeFacts(
+                "Raspberry Pi 4 Model B Rev 1.1",
+                "rootwait",
+                "",
+                ("ondemand",),
+                0,
+            )
+
+        result = realtime_status.prepare_realtime_startup(
+            "/tmp/amy.sock",
+            inspector=inspect,
+        )
+        warning = result.warnings[0]
+
+        self.assertIn("run it with sudo", warning)
+        self.assertNotIn("sha256", warning.casefold())
+        self.assertNotIn("checksum", warning.casefold())
+
+    def test_apply_reports_whether_the_running_kernel_needs_a_reboot(self) -> None:
+        for active, expected in (
+            (True, "profile is already active; reboot is not required"),
+            (False, "reboot is required; verify after reconnecting"),
+        ):
+            with (
+                self.subTest(active=active),
+                mock.patch.object(
+                    config, "apply_profile", return_value=(None, "rootwait\n")
+                ),
+                mock.patch.object(
+                    config, "verify_profile", return_value=(active, {})
+                ),
+                mock.patch.object(
+                    sys,
+                    "argv",
+                    ["rt_pi_config.py", "apply", "--profile", "audio-split"],
+                ),
+                redirect_stdout(output := io.StringIO()),
+            ):
+                self.assertEqual(config.main(), 0)
+            self.assertIn(expected, output.getvalue())
 
 
 class RtPiBenchmarkTests(unittest.TestCase):
@@ -111,68 +321,6 @@ IPI0:       100        200        300        400       Rescheduling interrupts
         self.assertEqual(points[0], points[-1])
         self.assertEqual(points[0].x, round(1919 * 0.94))
         self.assertLess(points[0].y, points[len(points) // 2].y)
-
-    def test_runtime_discovers_only_explicit_amy_service(self) -> None:
-        commands = {
-            10: "/tmp/LB_Omnichord --amy-service --socket /tmp/a.sock",
-            11: "/tmp/LB_Omnichord",
-            12: "python something.py --amy-service-like",
-        }
-        original_ids = runtime.process_ids
-        original_command = runtime.process_command
-        try:
-            runtime.process_ids = lambda _uid=None: list(commands)
-            runtime.process_command = commands.__getitem__
-            self.assertEqual(runtime.discover_amy_services(), [10])
-        finally:
-            runtime.process_ids = original_ids
-            runtime.process_command = original_command
-
-    def test_runtime_reads_frontend_parent(self) -> None:
-        original_read = runtime._read
-        try:
-            runtime._read = lambda path: "Name:\ttest\nPPid:\t123\n"
-            self.assertEqual(runtime.parent_pid(456), 123)
-        finally:
-            runtime._read = original_read
-
-    def test_runtime_never_treats_init_as_a_frontend(self) -> None:
-        original_parent = runtime.parent_pid
-        original_command = runtime.process_command
-        try:
-            runtime.parent_pid = lambda _pid: 1
-            runtime.process_command = lambda _pid: "/sbin/init"
-            self.assertIsNone(runtime.frontend_parent_pid(456))
-
-            runtime.parent_pid = lambda _pid: 123
-            runtime.process_command = lambda _pid: "/tmp/LB_Omnichord --fullscreen"
-            self.assertEqual(runtime.frontend_parent_pid(456), 123)
-
-            runtime.process_command = lambda _pid: "/usr/lib/systemd/systemd"
-            self.assertIsNone(runtime.frontend_parent_pid(456))
-        finally:
-            runtime.parent_pid = original_parent
-            runtime.process_command = original_command
-
-    def test_runtime_signature_changes_when_audio_processes_change(self) -> None:
-        original_frontend = runtime.frontend_parent_pid
-        original_tasks = runtime.task_ids
-        original_pipewire = runtime.discover_pipewire
-        original_read = runtime._read
-        try:
-            runtime.frontend_parent_pid = lambda _pid: 50
-            runtime.task_ids = lambda pid: {60: [60, 61], 70: [70, 71]}[pid]
-            runtime.discover_pipewire = lambda _uid=None: [70]
-            runtime._read = lambda path: "data-loop.0" if path.parts[-2] == "71" else "other"
-            first = runtime.runtime_signature(60)
-            runtime.frontend_parent_pid = lambda _pid: 51
-            second = runtime.runtime_signature(60)
-            self.assertNotEqual(first, second)
-        finally:
-            runtime.frontend_parent_pid = original_frontend
-            runtime.task_ids = original_tasks
-            runtime.discover_pipewire = original_pipewire
-            runtime._read = original_read
 
     def test_trace_parser_reports_wake_and_runtime_tail(self) -> None:
         sample = """\

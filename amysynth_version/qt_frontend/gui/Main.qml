@@ -17,6 +17,29 @@ ApplicationWindow {
     title: "LB Omnichord"
     color: "#f4f0e6"
 
+    Dialog {
+        id: startupWarningDialog
+        anchors.centerIn: parent
+        width: Math.min(760, Math.max(420, parent.width - 80))
+        implicitHeight: 300
+        height: Math.min(implicitHeight, parent.height - 40)
+        modal: true
+        title: "Raspberry Pi realtime setup recommended"
+        standardButtons: Dialog.Ok
+
+        contentItem: Text {
+            text: startupWarningMessages.join("\n\n")
+            color: "#171717"
+            font.pixelSize: 18
+            wrapMode: Text.WordWrap
+        }
+
+        Component.onCompleted: {
+            if (startupWarningMessages.length > 0)
+                Qt.callLater(startupWarningDialog.open)
+        }
+    }
+
     property int rowHeight: 74
     property int titleHeight:
         Math.max(0, Number(headerTitleHeight))

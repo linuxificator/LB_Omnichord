@@ -134,7 +134,12 @@ class PackageEvidenceTests(unittest.TestCase):
         }
         self.assertEqual(failures, {"packaged-runtime"})
 
-    def test_qt_metaobject_warning_rejects_an_otherwise_complete_capture(self) -> None:
+    def test_qt_runtime_warning_rejects_an_otherwise_complete_capture(self) -> None:
+        for failure_marker in ("*** Sort Warning ***", "Binding loop detected"):
+            with self.subTest(failure_marker=failure_marker):
+                self._assert_runtime_failure_is_rejected(failure_marker)
+
+    def _assert_runtime_failure_is_rejected(self, failure_marker: str) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             artifact = root / "app"
@@ -168,7 +173,7 @@ class PackageEvidenceTests(unittest.TestCase):
                 "AMY service ready: socket\n"
                 "AMY backend: external socket\n"
                 "Captured omni.png\n"
-                "*** Sort Warning ***\n",
+                f"{failure_marker}\n",
                 encoding="utf-8",
             )
             input_log = root / "input.log"
@@ -199,7 +204,7 @@ class PackageEvidenceTests(unittest.TestCase):
             if item["identifier"] == "packaged-runtime"
         )
         self.assertFalse(runtime["passed"])
-        self.assertIn("*** Sort Warning ***", runtime["detail"])
+        self.assertIn(failure_marker, runtime["detail"])
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@
 Status: authoritative baseline contract
 Owner: application architecture
 Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-03
+Last verified: 2026-09-09
 
 ## Wire protocol boundary
 
@@ -36,6 +36,29 @@ dependency.
 ## Simplicity
 
 New abstractions are added only when they reduce coupling or prevent regressions.
+
+Do not "headbang": do not keep extending and repairing a difficult custom
+mechanism when its complexity is evidence that the design direction is wrong.
+Stop, restate the actual requirement, and re-evaluate the operating system,
+framework and library mechanisms already intended to solve it. A custom
+protocol, daemon or state machine needs evidence that the standard mechanism
+cannot satisfy the requirement; sunk implementation effort is not evidence.
+
+## Native platform mechanisms first
+
+On every platform, first identify and use the native, established mechanism.
+For Linux this includes mechanisms owned by the kernel or standard subsystem:
+PAM resource limits, systemd unit policy, PipeWire configuration, udev, D-Bus
+and normal freedesktop interfaces. Assume a general systems problem has an
+established solution until investigation shows otherwise. Preserve that
+solution's normal authority and lifecycle instead of copying it into
+application code.
+
+Other platforms may lack an equivalent. After verifying that absence, use the
+proven Linux ownership and lifecycle as a design reference, but express it
+through that platform's adapter rather than transplanting Linux APIs or
+branches into portable code. Platform-specific composition stays in adapters
+and packaging so the application itself remains identical everywhere.
 
 ## Extend existing AMY concepts first
 

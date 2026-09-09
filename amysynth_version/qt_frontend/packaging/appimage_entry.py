@@ -105,6 +105,17 @@ def run_frontend(arguments: list[str]) -> int:
                 raise RuntimeError("AMY service did not create its socket in time")
             time.sleep(0.05)
 
+        from raspberry_pi_realtime import apply_runtime_policy
+
+        policy = apply_runtime_policy(service.pid, pin_caller=True)
+        if policy.applicable and not policy.applied:
+            print(
+                f"Raspberry Pi realtime policy not applied: {policy.issue}",
+                file=sys.stderr,
+                flush=True,
+            )
+        os.environ["OMNICHORD_AMY_SERVICE_PID"] = str(service.pid)
+
         main = import_frontend()
 
         frontend_arguments = ["--amy-socket", str(socket), *arguments]

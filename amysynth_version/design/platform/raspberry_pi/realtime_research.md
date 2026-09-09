@@ -2,7 +2,8 @@
 
 Status: Pi 4 complete; Pi 5 pending physical availability
 Branch: `research/rt_pi`
-Release under test: `R20260909T010905`
+Measurement baseline: `R20260909T010905`
+Current packaged acceptance: `R20260909161844` (GitHub run `34375905899`)
 
 ## Scope and invariants
 
@@ -65,17 +66,25 @@ which both removes the race and matches a cold application start.
   logs from a separate process, generates bounded synthetic loads and samples
   per-thread CPU/run-queue delay through `/proc`.
 
-All helpers remain external to both application processes. In particular,
-`rt_pi_runtime.py` finds the live `--amy-service` child, measures which of its
-non-main threads is actually rendering, and applies realtime policy only to
-that callback. It never gives the entire AMY or frontend process FIFO policy.
-It also discovers PipeWire's `data-loop.0` threads rather than relying on PIDs.
-An initial 0.5-second process-table polling implementation consumed about 6.6%
-of one core and was rejected. The final watcher uses Linux process descriptors:
-it consumed 0.268 CPU-seconds while discovering and applying the policy, then
-its CPU counter did not increase during the following 33-second observation.
-It wakes when a watched AMY/PipeWire process exits, with only a 60-second
-topology health check while the processes remain stable.
+All measurement helpers remain external to both application processes. The
+production integration grants the desktop user a standard PAM
+`RLIMIT_RTPRIO=80` allowance. Systemd user-unit drop-ins grant that limit to
+PipeWire; PipeWire's own `module-rt` and `thread.affinity` settings create its
+two data loops with the measured policies. The already existing
+source/AppImage wrapper knows the immutable PID returned when it starts AMY,
+measures that exact child's active non-main worker, and applies realtime
+policy only to that callback. The frontend receives the exact child PID and
+independently reads back AMY, frontend and PipeWire state. No registration
+protocol, privileged watcher or repeated AMY process scan is involved.
+
+Two watcher prototypes were rejected. A 0.5-second process-table poll consumed
+about 6.6% of one core. A later credential-bound Unix-socket design avoided
+name matching, but introduced a daemon, registration protocol, lifecycle
+tokens and drift state for a policy needed only once after a wrapper-created
+child starts. Continuing to repair that design would have been "headbanging":
+complexity caused by the chosen mechanism rather than by the requirement. PAM
+realtime permission plus one-shot wrapper application uses the Linux mechanism
+intended for this case and has materially less state and failure surface.
 
 ## Production-log replay: first comparisons
 
@@ -168,10 +177,34 @@ on CPU 3 at FIFO 70. The application and all its logic remain portable. The
 profile is a reversible host-integration choice documented in
 [`realtime_howto.md`](realtime_howto.md), not an application default.
 
-One final reboot verified that CPU isolation, the performance governor and
-both enabled policy services return automatically. The watcher detected a new
-full-AppImage AMY child and reapplied the measured thread layout. A separate
-post-boot control then drove a clean packaged AMY service over its Unix wire
-socket; its bounded 440 Hz oscillator was physically heard through the HDMI
-sink. This distinguishes the intentionally near-silent capacity workloads from
-an audio-routing failure.
+On 2026-09-09 a clean reboot physically verified the simplified production
+route. The `lawaai` login and both PipeWire services inherited
+`RLIMIT_RTPRIO=80`; PipeWire created its own loops at CPU2/FIFO80 and
+CPU2/FIFO75. `run_local.sh` then assigned its exact AMY child callback to
+CPU3/FIFO70 and confined frontend and non-audio service work to CPUs 0-1. The
+frontend produced no realtime warning or QML binding-loop diagnostic. An
+external 120 Hz kernel-uinput sweep ran for 20 seconds without policy drift,
+AMY overload/dropout output or throttling (`throttled=0x0`). This validates the
+native PAM/systemd/PipeWire plus one-shot wrapper design; the measured audio
+layout itself is unchanged.
+
+The same source checkout was then started with `--serial`. It opened
+`/dev/serial0` at 1,000,000 baud, created no local AMY service and emitted no
+host-realtime warning. This proves the platform check does not confuse the
+external ESP32-P4 transport with a missing host-AMY policy.
+
+A separate post-boot control also drove a clean packaged AMY service over its
+Unix wire socket and its bounded 440 Hz oscillator was physically heard
+through the HDMI sink. This distinguishes the intentionally near-silent
+capacity workloads from an audio-routing failure.
+
+The final packaged acceptance exposed one boundary defect that the source
+launcher could not reproduce: AppImage/PyInstaller sets `LD_LIBRARY_PATH` to
+its private libraries, and host `systemctl` inherited that loader path. The
+host binary consequently exited before querying the user manager. The Linux
+adapter now invokes canonical `/usr/bin/systemctl` with AppImage loader
+injections removed while retaining user-session variables. A regression test
+covers that environment boundary. AppImage `R20260909161844` then found both
+systemd-owned PipeWire loops, applied the exact AMY policy and completed an
+external 20-second 120 Hz sweep with no warning, overload, dropout, binding
+loop or throttling.

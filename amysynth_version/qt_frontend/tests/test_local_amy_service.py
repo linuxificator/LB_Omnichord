@@ -99,7 +99,6 @@ class LocalAmyServiceTests(unittest.TestCase):
                 send_wire=sent.append,
                 _amy=native,
             )
-
             with (
                 patch.object(local_amy_service, "parse_arguments", return_value=args),
                 patch.object(

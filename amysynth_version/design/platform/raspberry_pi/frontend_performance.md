@@ -73,11 +73,11 @@ wake-to-completion latency (1.30-1.75 ms) than the unrestricted runs
 same as isolating it; kernel and PipeWire work can still contend there while
 AMY loses the scheduler's ability to migrate.
 
-The product consequently retains the operating system's affinity and normal
-scheduling policy. It does not add risky boot parameters, realtime priority or
-a platform-specific affinity watchdog. A future kernel-isolated-core profile
-would be a separate opt-in system-integration experiment and would need new
-physical latency evidence before becoming a product default.
+At that stage the product therefore retained the operating system's affinity
+and normal scheduling policy. The later isolated two-core experiment supplied
+the missing physical latency evidence and established the current opt-in host
+profile in `realtime_research.md`. It still does not add a platform-specific
+affinity watchdog or place scheduler logic in portable application code.
 
 ## Regression boundary
 
@@ -90,7 +90,8 @@ runners. It does enforce the causes that can be checked deterministically:
 - no runtime `QtQuick.Shapes` or particle-emitter fan-out is used;
 - mouse/touch gestures still traverse the shared production strum path;
 - local-service and serial modes retain identical application and wire-command
-  behavior; no host scheduler policy leaks into portable code.
+  behavior; the optional host policy remains in the Pi adapter and existing
+  launch wrappers, outside portable application and musical code.
 
 Physical acceptance repeats the external 120 Hz `uinput` sweep while observing
 frontend/AMY CPU and listening for dropouts. It is evidence in addition to the

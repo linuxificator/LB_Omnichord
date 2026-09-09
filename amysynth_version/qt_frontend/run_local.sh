@@ -132,6 +132,15 @@ if [[ ! -S "$socket_path" ]]; then
     exit 1
 fi
 
-"$venv_python" "$frontend_dir/code/main.py" \
+frontend_launcher=()
+if "$venv_python" "$frontend_dir/code/raspberry_pi_realtime.py" apply \
+    --service-pid "$amy_service_pid"; then
+    if command -v taskset >/dev/null 2>&1; then
+        frontend_launcher=(taskset -c 0-1)
+    fi
+fi
+
+OMNICHORD_AMY_SERVICE_PID="$amy_service_pid" \
+"${frontend_launcher[@]}" "$venv_python" "$frontend_dir/code/main.py" \
     --amy-socket "$socket_path" \
     "${application_args[@]}"
