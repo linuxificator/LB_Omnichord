@@ -65,11 +65,16 @@ which both removes the race and matches a cold application start.
   logs from a separate process, generates bounded synthetic loads and samples
   per-thread CPU/run-queue delay through `/proc`.
 
-All helpers remain external to both application processes. In particular,
-`rt_pi_runtime.py` finds the live `--amy-service` child, measures which of its
-non-main threads is actually rendering, and applies realtime policy only to
+All measurement helpers remain external to both application processes. The
+production integration now has a deliberately narrow registration client in
+each process: it identifies only its role and AMY wire endpoint. The external
+root watcher obtains its exact PID/UID/GID from `SO_PEERCRED`, measures which
+non-main AMY thread is actually rendering, and applies realtime policy only to
 that callback. It never gives the entire AMY or frontend process FIFO policy.
-It also discovers PipeWire's `data-loop.0` threads rather than relying on PIDs.
+It also discovers PipeWire's `data-loop.0` threads rather than relying on fixed
+PIDs. This replaced the research prototype's `--amy-service` command-line scan,
+which did not recognize the source-checkout service and was too easy to match
+incorrectly.
 An initial 0.5-second process-table polling implementation consumed about 6.6%
 of one core and was rejected. The final watcher uses Linux process descriptors:
 it consumed 0.268 CPU-seconds while discovering and applying the policy, then

@@ -24,6 +24,7 @@ RUNTIME_FAILURE_MARKERS = (
     "ReferenceError:",
     "QQmlApplicationEngine failed",
     "Cannot assign to non-existent property",
+    "Binding loop detected",
     "is not a function",
     "*** Sort Warning ***",
     "EGL not available",

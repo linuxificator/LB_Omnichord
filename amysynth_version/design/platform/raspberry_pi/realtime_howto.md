@@ -16,7 +16,8 @@ versioned helpers and systemd units described below, applies the reversible
 `audio-split` boot profile, sets the performance governor, enables both
 services for the selected desktop user, and tells the user whether a reboot is
 still required. The application warning points to this asset when boot
-arguments, CPU 2-3 isolation, the governor or the runtime policy is missing.
+arguments, CPU 2-3 isolation, the governor or the verified runtime policy for
+its own AMY endpoint is missing.
 The same installer source is committed as
 `qt_frontend/tools/raspberry_pi/install_realtime_profile.sh`; the release asset
 embeds and executes that file rather than maintaining a second setup sequence.
@@ -87,7 +88,7 @@ the governor separately because it is a runtime setting.
 ## 3. Install the runtime policy
 
 The two small services make the performance governor persistent and apply the
-measured policy whenever a packaged or local AMY service appears:
+measured policy whenever a packaged or local AMY service explicitly registers:
 
 ```sh
 sudo install -d -m 755 /usr/local/lib/lb-omnichord-rt
@@ -105,28 +106,40 @@ sudo systemctl enable --now \
   lb-omnichord-rt-policy@"$USER".service
 ```
 
-The watcher initially places all discovered frontend and AMY threads on CPUs
+The watcher does not select AMY or the frontend by executable name, parent,
+command-line substring or caller-supplied PID. Each process sends its semantic
+role and common absolute AMY wire-socket endpoint to
+`/run/lb-omnichord-rt/policy-UID.sock`. The socket is accessible only to that
+desktop UID. Linux `SO_PEERCRED` supplies the actual PID, UID and GID; the open
+connection remains its lifecycle token. A frontend registration can only
+match the AMY service registered for the same endpoint. This prevents an
+unrelated process with a similar name from accidentally receiving realtime
+policy and works identically for `run_local.sh` and the AppImage.
+
+The watcher places all exactly registered frontend and AMY threads on CPUs
 0-1. Newly created frontend threads inherit that affinity. It measures the
 active AMY worker before assigning only that TID to CPU 3/FIFO 70. PipeWire and
-pipewire-pulse `data-loop.0` are discovered by process/thread identity and
-assigned CPU 2/FIFO 80 and 75. No PID or IRQ number is hardcoded.
-After applying a policy, the watcher sleeps on Linux process descriptors; it
-does not continuously poll the process table. It wakes on an AMY/PipeWire
-restart or for a low-frequency health check.
-
-A parent is treated as a frontend only when it is an actual packaged
-`LB_Omnichord` process. A standalone `--amy-service` commonly has systemd as
-PID 1 for its parent; PID 1 and other launch supervisors are never retuned.
+pipewire-pulse `data-loop.0` are still discovered by their native process and
+thread identities and assigned CPU 2/FIFO 80 and 75. After applying the policy,
+the watcher reads back every scheduler, priority and affinity value before it
+acknowledges startup. It sleeps on the registration connections and Linux
+process descriptors, waking on process exit; a low-frequency health check also
+detects policy drift without continuous process-table polling.
 
 Check the result after starting LB Omnichord:
 
 ```sh
 sudo journalctl -u lb-omnichord-rt-policy@"$USER".service -n 5 --no-pager
-sudo python3 tools/raspberry_pi/rt_pi_runtime.py apply --user "$USER"
+python3 tools/raspberry_pi/rt_pi_runtime.py inspect --user "$USER"
 ```
 
-The second command is an explicit verification/reapply operation. It must show
-one AMY candidate on CPU 3/FIFO 70 and both PipeWire data loops on CPU 2.
+The journal must show separate `amy-service` and `frontend` registrations for
+the same endpoint. `inspect` reports the per-user registration socket and
+PipeWire processes. The startup dialog remains the user-facing aggregate check:
+it is suppressed only after the exact registered processes have been applied
+and read back successfully. The lower-level `apply` command is diagnostic-only
+and therefore requires explicit `--service-pid` and optional `--frontend-pid`;
+it deliberately has no process-name discovery fallback.
 
 ## 4. Repeat the physical acceptance test
 

@@ -7,11 +7,13 @@ Type=simple
 ExecStart=/usr/bin/python3 /usr/local/lib/lb-omnichord-rt/rt_pi_runtime.py watch --user %i
 Restart=always
 RestartSec=1
-CapabilityBoundingSet=CAP_SYS_NICE
+CapabilityBoundingSet=CAP_SYS_NICE CAP_CHOWN
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 NoNewPrivileges=true
+RuntimeDirectory=lb-omnichord-rt
+RuntimeDirectoryMode=0755
 
 [Install]
 WantedBy=multi-user.target

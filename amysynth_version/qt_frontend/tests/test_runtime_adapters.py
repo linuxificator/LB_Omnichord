@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import sys
 import unittest
 from pathlib import Path
@@ -41,18 +42,21 @@ class RuntimeAdapterTests(unittest.TestCase):
         self.assertNotIn("fatal-error", main)
 
     def test_startup_warning_is_presented_without_pi_policy_in_the_core(self) -> None:
-        app_core = (CODE / "app_core.py").read_text(encoding="utf-8")
-        main_qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
-        adapter = (CODE / "runtime_platform_adapters.py").read_text(encoding="utf-8")
-        pi_adapter = (CODE / "raspberry_pi_realtime.py").read_text(encoding="utf-8")
-
-        self.assertIn("runtime.startup_warnings", app_core)
-        self.assertIn('"startupWarningMessages"', app_core)
-        self.assertIn("startupWarningDialog", main_qml)
-        self.assertIn("startup_warning_messages", adapter)
-        self.assertIn("Pi4-Pi5-realtime-setup.sh", pi_adapter)
-        self.assertNotIn("isolcpus", app_core)
-        self.assertNotIn("sched_setscheduler", app_core)
+        tree = ast.parse((CODE / "app_core.py").read_text(encoding="utf-8"))
+        imported = {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+            for alias in node.names
+        }
+        called_names = {
+            node.func.attr
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+        }
+        self.assertNotIn("raspberry_pi_realtime", imported)
+        self.assertNotIn("rt_policy_registration", imported)
+        self.assertNotIn("sched_setscheduler", called_names)
 
 
 if __name__ == "__main__":

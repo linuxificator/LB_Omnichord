@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from config_loader import load_resolved_amy_config
+from rt_policy_registration import register_policy_role
 from shared_reverb import SHARED_REVERB_PROCESSOR_COUNT
 from unix_wire_socket import listen_unix_wire_socket
 from wire_frames import LfWireFrameParser, validate_wire_request
@@ -74,6 +75,8 @@ def main() -> int:
         max_sequence_executions=max_sequence_executions,
     )
 
+    realtime_registration = register_policy_role("amy-service", args.socket)
+
     running = True
 
     def stop(_signum: int, _frame: object) -> None:
@@ -115,6 +118,7 @@ def main() -> int:
     finally:
         server.close()
         remove_stale_socket(args.socket)
+        realtime_registration.close()
         stop_native = getattr(getattr(amy, "_amy", None), "stop", None)
         if callable(stop_native):
             stop_native()

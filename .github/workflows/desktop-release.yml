@@ -783,6 +783,8 @@ jobs:
             --release-stamp "$RELEASE_STAMP" \
             --output-dir rpi-realtime-dist
           setup_file="LB_Omnichord.${RELEASE_STAMP}.Pi4-Pi5-realtime-setup.sh"
+          bash -n "rpi-realtime-dist/$setup_file"
+          "rpi-realtime-dist/$setup_file" --help | grep '^Usage:'
           (cd rpi-realtime-dist && sha256sum --check "$setup_file.sha256")
 
       - name: Verify exact five-platform asset set

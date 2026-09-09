@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
+import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -10,6 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools" / "raspberry_pi"
+sys.path.insert(0, str(ROOT / "code"))
 
 
 def load(name: str):
@@ -125,6 +128,40 @@ class RtPiConfigTests(unittest.TestCase):
         self.assertEqual(fields[1], output.name)
         self.assertEqual(fields[0], hashlib.sha256(source.encode()).hexdigest())
 
+    def test_release_setup_asset_has_valid_shell_and_verified_payloads(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output, _checksum = asset_builder.build(
+                "R20260909153000", Path(temporary)
+            )
+            syntax = subprocess.run(
+                ["bash", "-n", str(output)], capture_output=True, text=True
+            )
+            help_result = subprocess.run(
+                ["bash", str(output), "--help"], capture_output=True, text=True
+            )
+        self.assertEqual(syntax.returncode, 0, syntax.stderr)
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn("Usage:", help_result.stdout)
+
+    def test_release_setup_asset_rejects_a_corrupted_embedded_helper(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output, _checksum = asset_builder.build(
+                "R20260909153000", Path(temporary)
+            )
+            source = output.read_text(encoding="utf-8")
+            marker = "__LB_OMNICHORD_INSTALL_REALTIME_PROFILE_SH__"
+            start = source.index("\n", source.index(marker)) + 1
+            replacement = "A" if source[start] != "A" else "B"
+            output.write_text(
+                source[:start] + replacement + source[start + 1 :],
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                ["bash", str(output), "--help"], capture_output=True, text=True
+            )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("integrity check", result.stderr)
+
     def test_checkout_setup_script_is_the_release_asset_authority(self) -> None:
         installer = (TOOLS / "install_realtime_profile.sh").read_text(
             encoding="utf-8"
@@ -141,21 +178,42 @@ class RtPiConfigTests(unittest.TestCase):
             ),
         )
 
+    def test_runtime_unit_can_create_a_private_per_user_registration_socket(self) -> None:
+        unit = (
+            TOOLS / "lb-omnichord-rt-policy@.service"
+        ).read_text(encoding="utf-8")
+        service = {
+            key: value
+            for line in unit.splitlines()
+            if "=" in line
+            for key, value in (line.split("=", 1),)
+        }
+        self.assertEqual(service["RuntimeDirectory"], "lb-omnichord-rt")
+        self.assertEqual(service["RuntimeDirectoryMode"], "0755")
+        self.assertEqual(
+            set(service["CapabilityBoundingSet"].split()),
+            {"CAP_SYS_NICE", "CAP_CHOWN"},
+        )
+
     def test_startup_warning_keeps_checksum_details_out_of_the_ui(self) -> None:
-        original_inspector = realtime_status.inspect_realtime_facts
-        try:
-            realtime_status.inspect_realtime_facts = lambda: (
-                realtime_status.RealtimeFacts(
-                    "Raspberry Pi 4 Model B Rev 1.1",
-                    "rootwait",
-                    "",
-                    ("ondemand",),
-                    False,
-                )
+        def inspect(**overrides):
+            return realtime_status.RealtimeFacts(
+                "Raspberry Pi 4 Model B Rev 1.1",
+                "rootwait",
+                "",
+                ("ondemand",),
+                bool(overrides.get("runtime_policy_active", False)),
             )
-            warning = realtime_status.startup_warning_messages()[0]
-        finally:
-            realtime_status.inspect_realtime_facts = original_inspector
+
+        registration = realtime_status.PolicyRegistration(
+            None, True, False, "policy not applied"
+        )
+        result = realtime_status.prepare_realtime_startup(
+            "/tmp/amy.sock",
+            inspector=inspect,
+            register=lambda _role, _endpoint: registration,
+        )
+        warning = result.warnings[0]
 
         self.assertIn("run it with sudo", warning)
         self.assertNotIn("sha256", warning.casefold())
@@ -232,64 +290,41 @@ IPI0:       100        200        300        400       Rescheduling interrupts
         self.assertEqual(points[0].x, round(1919 * 0.94))
         self.assertLess(points[0].y, points[len(points) // 2].y)
 
-    def test_runtime_discovers_only_explicit_amy_service(self) -> None:
-        commands = {
-            10: "/tmp/LB_Omnichord --amy-service --socket /tmp/a.sock",
-            11: "/tmp/LB_Omnichord",
-            12: "python something.py --amy-service-like",
-        }
-        original_ids = runtime.process_ids
-        original_command = runtime.process_command
-        try:
-            runtime.process_ids = lambda _uid=None: list(commands)
-            runtime.process_command = commands.__getitem__
-            self.assertEqual(runtime.discover_amy_services(), [10])
-        finally:
-            runtime.process_ids = original_ids
-            runtime.process_command = original_command
-
-    def test_runtime_reads_frontend_parent(self) -> None:
-        original_read = runtime._read
-        try:
-            runtime._read = lambda path: "Name:\ttest\nPPid:\t123\n"
-            self.assertEqual(runtime.parent_pid(456), 123)
-        finally:
-            runtime._read = original_read
-
-    def test_runtime_never_treats_init_as_a_frontend(self) -> None:
-        original_parent = runtime.parent_pid
-        original_command = runtime.process_command
-        try:
-            runtime.parent_pid = lambda _pid: 1
-            runtime.process_command = lambda _pid: "/sbin/init"
-            self.assertIsNone(runtime.frontend_parent_pid(456))
-
-            runtime.parent_pid = lambda _pid: 123
-            runtime.process_command = lambda _pid: "/tmp/LB_Omnichord --fullscreen"
-            self.assertEqual(runtime.frontend_parent_pid(456), 123)
-
-            runtime.process_command = lambda _pid: "/usr/lib/systemd/systemd"
-            self.assertIsNone(runtime.frontend_parent_pid(456))
-        finally:
-            runtime.parent_pid = original_parent
-            runtime.process_command = original_command
+    def test_runtime_registration_requires_protocol_role_and_absolute_endpoint(self) -> None:
+        valid = json.dumps(
+            {
+                "protocol": runtime.PROTOCOL,
+                "role": "amy-service",
+                "endpoint": "/tmp/a.sock",
+                "pid": 1,
+            }
+        ).encode()
+        self.assertEqual(runtime.parse_registration(valid), ("amy-service", "/tmp/a.sock"))
+        for invalid in (
+            {"protocol": "other", "role": "amy-service", "endpoint": "/tmp/a.sock"},
+            {"protocol": runtime.PROTOCOL, "role": "other", "endpoint": "/tmp/a.sock"},
+            {"protocol": runtime.PROTOCOL, "role": "frontend", "endpoint": "relative"},
+        ):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                runtime.parse_registration(json.dumps(invalid).encode())
 
     def test_runtime_signature_changes_when_audio_processes_change(self) -> None:
-        original_frontend = runtime.frontend_parent_pid
         original_tasks = runtime.task_ids
         original_pipewire = runtime.discover_pipewire
         original_read = runtime._read
         try:
-            runtime.frontend_parent_pid = lambda _pid: 50
-            runtime.task_ids = lambda pid: {60: [60, 61], 70: [70, 71]}[pid]
+            runtime.task_ids = lambda pid: {
+                50: [50, 52],
+                51: [51, 53],
+                60: [60, 61],
+                70: [70, 71],
+            }[pid]
             runtime.discover_pipewire = lambda _uid=None: [70]
             runtime._read = lambda path: "data-loop.0" if path.parts[-2] == "71" else "other"
-            first = runtime.runtime_signature(60)
-            runtime.frontend_parent_pid = lambda _pid: 51
-            second = runtime.runtime_signature(60)
+            first = runtime.runtime_signature(60, 50)
+            second = runtime.runtime_signature(60, 51)
             self.assertNotEqual(first, second)
         finally:
-            runtime.frontend_parent_pid = original_frontend
             runtime.task_ids = original_tasks
             runtime.discover_pipewire = original_pipewire
             runtime._read = original_read

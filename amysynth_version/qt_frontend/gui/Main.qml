@@ -26,7 +26,6 @@ ApplicationWindow {
         standardButtons: Dialog.Ok
 
         contentItem: Text {
-            width: startupWarningDialog.availableWidth
             text: startupWarningMessages.join("\n\n")
             color: "#171717"
             font.pixelSize: 18

@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import os
-import pwd
 import shlex
-import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable
+
+from rt_policy_registration import PolicyRegistration, register_policy_role
 
 
 EXPECTED_BOOT_ARGUMENTS = frozenset(
@@ -31,6 +30,7 @@ class RealtimeFacts:
     isolated_cpus: str
     governors: tuple[str, ...]
     runtime_policy_active: bool
+    runtime_policy_issue: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,7 +82,10 @@ def evaluate_realtime(facts: RealtimeFacts) -> RealtimeStatus:
     ):
         missing.append("performance CPU governor")
     if not facts.runtime_policy_active:
-        missing.append("AMY/PipeWire realtime policy service")
+        policy = "verified AMY/frontend/PipeWire realtime policy"
+        if facts.runtime_policy_issue:
+            policy += f": {facts.runtime_policy_issue}"
+        missing.append(policy)
     return RealtimeStatus(True, not missing, tuple(missing))
 
 
@@ -93,93 +96,67 @@ def _read_text(path: Path) -> str:
         return ""
 
 
-def _runtime_watcher_in_processes(
-    proc_root: Path,
-    identities: frozenset[str],
-) -> bool:
-    try:
-        entries: Iterable[Path] = proc_root.iterdir()
-    except OSError:
-        return False
-    for entry in entries:
-        if not entry.name.isdigit():
-            continue
-        raw = _read_text(entry / "cmdline")
-        tokens = tuple(token for token in raw.split("\0") if token)
-        if not tokens or "watch" not in tokens:
-            continue
-        if not any(Path(token).name == "rt_pi_runtime.py" for token in tokens):
-            continue
-        try:
-            user_index = tokens.index("--user") + 1
-        except (ValueError, IndexError):
-            continue
-        if user_index < len(tokens) and tokens[user_index] in identities:
-            return True
-    return False
-
-
-def _systemd_policy_active(user: str) -> bool:
-    try:
-        result = subprocess.run(
-            [
-                "systemctl",
-                "is-active",
-                "--quiet",
-                f"lb-omnichord-rt-policy@{user}.service",
-            ],
-            check=False,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=1.0,
-        )
-    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
-        return False
-    return result.returncode == 0
-
-
 def inspect_realtime_facts(
     *,
     root: Path = Path("/"),
-    uid: int | None = None,
-    service_active: Callable[[str], bool] = _systemd_policy_active,
+    runtime_policy_active: bool = False,
+    runtime_policy_issue: str = "",
 ) -> RealtimeFacts:
     model = _read_text(root / "proc" / "device-tree" / "model")
     if not is_supported_pi(model):
         return RealtimeFacts(model, "", "", (), False)
 
-    effective_uid = os.getuid() if uid is None else int(uid)
-    try:
-        user = pwd.getpwuid(effective_uid).pw_name
-    except KeyError:
-        user = str(effective_uid)
-    identities = frozenset((user, str(effective_uid)))
     sys_root = root / "sys" / "devices" / "system" / "cpu"
     governors = tuple(
         _read_text(path / "scaling_governor")
         for path in sorted((sys_root / "cpufreq").glob("policy*"))
-    )
-    policy_active = service_active(user) or _runtime_watcher_in_processes(
-        root / "proc",
-        identities,
     )
     return RealtimeFacts(
         model=model,
         kernel_cmdline=_read_text(root / "proc" / "cmdline"),
         isolated_cpus=_read_text(sys_root / "isolated"),
         governors=governors,
-        runtime_policy_active=policy_active,
+        runtime_policy_active=runtime_policy_active,
+        runtime_policy_issue=runtime_policy_issue,
     )
 
 
-def startup_warning_messages() -> tuple[str, ...]:
-    status = evaluate_realtime(inspect_realtime_facts())
+@dataclass(slots=True)
+class RealtimeStartup:
+    warnings: tuple[str, ...]
+    registration: PolicyRegistration | None = None
+
+    def close(self) -> None:
+        if self.registration is not None:
+            self.registration.close()
+
+
+def prepare_realtime_startup(
+    amy_endpoint: str | Path,
+    *,
+    inspector: Callable[..., RealtimeFacts] = inspect_realtime_facts,
+    register: Callable[..., PolicyRegistration] = register_policy_role,
+) -> RealtimeStartup:
+    static_facts = inspector()
+    if not is_supported_pi(static_facts.model):
+        return RealtimeStartup(())
+
+    registration = register("frontend", amy_endpoint)
+    facts = replace(
+        static_facts,
+        runtime_policy_active=registration.applied,
+        runtime_policy_issue=registration.issue,
+    )
+    status = evaluate_realtime(facts)
     if not status.applicable or status.complete:
-        return ()
+        return RealtimeStartup((), registration)
     missing = ", ".join(status.missing)
-    return (
-        "The tested Raspberry Pi realtime audio profile is not fully active "
-        f"({missing}). Audio can crackle under load. Download {REALTIME_ASSET_PATTERN} "
-        "from the same GitHub release, run it with sudo, and reboot when requested.",
+    return RealtimeStartup(
+        (
+            "The tested Raspberry Pi realtime audio profile is not fully active "
+            f"({missing}). Audio can crackle under load. Download "
+            f"{REALTIME_ASSET_PATTERN} from the same GitHub release, run it with "
+            "sudo, and reboot when requested.",
+        ),
+        registration,
     )
