@@ -1,8 +1,11 @@
 # QML modernization handover
 
-Status: proposed quality cycle; no implementation started
+Status: tasks 1-4 completed in `rework/quality_cycle_002`; tasks 5-7 deferred
 Owner: Qt/QML presentation and build tooling
 Recorded: 2026-09-09
+
+Implementation evidence and remaining work are recorded in
+[`quality_cycle_002_results.md`](quality_cycle_002_results.md).
 
 ## Purpose
 
@@ -21,7 +24,7 @@ Any future implementation must preserve the existing architecture contracts:
 - portable application behavior must not acquire platform branches;
 - performance claims require before/after measurements.
 
-## Current evidence
+## Initial evidence
 
 The following command was run from `qt_frontend/gui` using PySide 6.10.3:
 
@@ -31,14 +34,13 @@ pyside6-qmllint *.qml physical_controls/*.qml
 
 It completed successfully but reported:
 
-- 352 `unqualified` warnings;
+- 356 `unqualified` warnings;
 - 6 `missing-property` warnings;
-- 1 `index` warning;
 - 96 occurrences of `property var`;
 - 75 QML/JavaScript function declarations without a fully typed signature;
 - only 3 files with `pragma ComponentBehavior: Bound`.
 
-These numbers are an investigation baseline, not 455 confirmed defects.
+These numbers are an investigation baseline, not 362 confirmed defects.
 Several unqualified warnings concern Python objects published through
 `QQmlContext.setContextProperty()`, which `qmllint` cannot type. Some `var`
 properties legitimately carry Python `QObject` instances, maps, callbacks or
