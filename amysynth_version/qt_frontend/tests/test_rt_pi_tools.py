@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
+import io
 import subprocess
 import stat
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest import mock
 
@@ -233,10 +235,27 @@ class RtPiConfigTests(unittest.TestCase):
         self.assertNotIn("checksum", warning.casefold())
 
     def test_apply_reports_whether_the_running_kernel_needs_a_reboot(self) -> None:
-        source = (TOOLS / "rt_pi_config.py").read_text(encoding="utf-8")
-        self.assertIn("active, _checks = verify_profile(args.profile)", source)
-        self.assertIn("profile is already active; reboot is not required", source)
-        self.assertIn("reboot is required; verify after reconnecting", source)
+        for active, expected in (
+            (True, "profile is already active; reboot is not required"),
+            (False, "reboot is required; verify after reconnecting"),
+        ):
+            with (
+                self.subTest(active=active),
+                mock.patch.object(
+                    config, "apply_profile", return_value=(None, "rootwait\n")
+                ),
+                mock.patch.object(
+                    config, "verify_profile", return_value=(active, {})
+                ),
+                mock.patch.object(
+                    sys,
+                    "argv",
+                    ["rt_pi_config.py", "apply", "--profile", "audio-split"],
+                ),
+                redirect_stdout(output := io.StringIO()),
+            ):
+                self.assertEqual(config.main(), 0)
+            self.assertIn(expected, output.getvalue())
 
 
 class RtPiBenchmarkTests(unittest.TestCase):

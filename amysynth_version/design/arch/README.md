@@ -13,8 +13,9 @@ production/test process boundary.
 - `backlog.md` contains only work that remains relevant.
 - `dependencies.md` defines when external Python packages may be used.
 - `repository_hygiene.md` defines documentation and branch lifecycle.
+- `rpi_realtime_quality_review.md` records the focused architecture review of
+  the optional dedicated-Pi host profile.
 
 Completed task-by-task handovers were removed from the active tree after their
 lasting conclusions were consolidated here. Git history remains the audit
 trail.
-

@@ -187,6 +187,11 @@ AMY overload/dropout output or throttling (`throttled=0x0`). This validates the
 native PAM/systemd/PipeWire plus one-shot wrapper design; the measured audio
 layout itself is unchanged.
 
+The same source checkout was then started with `--serial`. It opened
+`/dev/serial0` at 1,000,000 baud, created no local AMY service and emitted no
+host-realtime warning. This proves the platform check does not confuse the
+external ESP32-P4 transport with a missing host-AMY policy.
+
 A separate post-boot control also drove a clean packaged AMY service over its
 Unix wire socket and its bounded 440 Hz oscillator was physically heard
 through the HDMI sink. This distinguishes the intentionally near-silent
