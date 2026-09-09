@@ -90,7 +90,8 @@ runners. It does enforce the causes that can be checked deterministically:
 - no runtime `QtQuick.Shapes` or particle-emitter fan-out is used;
 - mouse/touch gestures still traverse the shared production strum path;
 - local-service and serial modes retain identical application and wire-command
-  behavior; no host scheduler policy leaks into portable code.
+  behavior; the optional host policy remains in the Pi adapter and existing
+  launch wrappers, outside portable application and musical code.
 
 Physical acceptance repeats the external 120 Hz `uinput` sweep while observing
 frontend/AMY CPU and listening for dropouts. It is evidence in addition to the

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
-import json
 import subprocess
 import sys
 import tempfile
@@ -27,7 +26,6 @@ def load(name: str):
 config = load("rt_pi_config")
 benchmark = load("rt_pi_benchmark")
 strum = load("strum_uinput")
-runtime = load("rt_pi_runtime")
 trace = load("rt_pi_trace")
 
 
@@ -72,7 +70,7 @@ class RtPiConfigTests(unittest.TestCase):
 
     def test_startup_status_is_silent_outside_pi_4_and_pi_5(self) -> None:
         status = realtime_status.evaluate_realtime(
-            realtime_status.RealtimeFacts("generic arm64", "", "", (), False)
+            realtime_status.RealtimeFacts("generic arm64", "", "", (), 0)
         )
         self.assertFalse(status.applicable)
         self.assertTrue(status.complete)
@@ -85,12 +83,12 @@ class RtPiConfigTests(unittest.TestCase):
                 "console=tty1 rootwait",
                 "",
                 ("ondemand",),
-                False,
+                0,
             )
         )
         self.assertTrue(status.applicable)
         self.assertFalse(status.complete)
-        self.assertEqual(len(status.missing), 4)
+        self.assertEqual(len(status.missing), 5)
 
     def test_startup_status_accepts_the_measured_split_profile(self) -> None:
         status = realtime_status.evaluate_realtime(
@@ -100,6 +98,7 @@ class RtPiConfigTests(unittest.TestCase):
                 "irqaffinity=0-1 threadirqs",
                 "2-3",
                 ("performance", "performance"),
+                80,
                 True,
             )
         )
@@ -121,7 +120,7 @@ class RtPiConfigTests(unittest.TestCase):
             "LB_Omnichord.R20260909153000.Pi4-Pi5-realtime-setup.sh",
         )
         self.assertIn("install_realtime_profile.sh", source)
-        self.assertIn("rt_pi_runtime.py", source)
+        self.assertNotIn("rt_pi_runtime.py", source)
         self.assertIn("sha256sum --check --status", source)
         for file_name, _mode in asset_builder.EMBEDDED_FILES:
             self.assertIn(asset_builder._encoded(TOOLS / file_name), source)
@@ -168,7 +167,8 @@ class RtPiConfigTests(unittest.TestCase):
         )
         self.assertIn("apply --profile audio-split", installer)
         self.assertIn("set-governor performance", installer)
-        self.assertIn("lb-omnichord-rt-policy@$target_user.service", installer)
+        self.assertIn("rtprio 80", installer)
+        self.assertNotIn("enable --now \"lb-omnichord-rt-policy", installer)
         self.assertIn("Raspberry Pi 4", installer)
         self.assertIn("Raspberry Pi 5", installer)
         self.assertIn(
@@ -178,40 +178,19 @@ class RtPiConfigTests(unittest.TestCase):
             ),
         )
 
-    def test_runtime_unit_can_create_a_private_per_user_registration_socket(self) -> None:
-        unit = (
-            TOOLS / "lb-omnichord-rt-policy@.service"
-        ).read_text(encoding="utf-8")
-        service = {
-            key: value
-            for line in unit.splitlines()
-            if "=" in line
-            for key, value in (line.split("=", 1),)
-        }
-        self.assertEqual(service["RuntimeDirectory"], "lb-omnichord-rt")
-        self.assertEqual(service["RuntimeDirectoryMode"], "0755")
-        self.assertEqual(
-            set(service["CapabilityBoundingSet"].split()),
-            {"CAP_SYS_NICE"},
-        )
-
     def test_startup_warning_keeps_checksum_details_out_of_the_ui(self) -> None:
-        def inspect(**overrides):
+        def inspect(**_overrides):
             return realtime_status.RealtimeFacts(
                 "Raspberry Pi 4 Model B Rev 1.1",
                 "rootwait",
                 "",
                 ("ondemand",),
-                bool(overrides.get("runtime_policy_active", False)),
+                0,
             )
 
-        registration = realtime_status.PolicyRegistration(
-            None, True, False, "policy not applied"
-        )
         result = realtime_status.prepare_realtime_startup(
             "/tmp/amy.sock",
             inspector=inspect,
-            register=lambda _role, _endpoint: registration,
         )
         warning = result.warnings[0]
 
@@ -289,45 +268,6 @@ IPI0:       100        200        300        400       Rescheduling interrupts
         self.assertEqual(points[0], points[-1])
         self.assertEqual(points[0].x, round(1919 * 0.94))
         self.assertLess(points[0].y, points[len(points) // 2].y)
-
-    def test_runtime_registration_requires_protocol_role_and_absolute_endpoint(self) -> None:
-        valid = json.dumps(
-            {
-                "protocol": runtime.PROTOCOL,
-                "role": "amy-service",
-                "endpoint": "/tmp/a.sock",
-                "pid": 1,
-            }
-        ).encode()
-        self.assertEqual(runtime.parse_registration(valid), ("amy-service", "/tmp/a.sock"))
-        for invalid in (
-            {"protocol": "other", "role": "amy-service", "endpoint": "/tmp/a.sock"},
-            {"protocol": runtime.PROTOCOL, "role": "other", "endpoint": "/tmp/a.sock"},
-            {"protocol": runtime.PROTOCOL, "role": "frontend", "endpoint": "relative"},
-        ):
-            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
-                runtime.parse_registration(json.dumps(invalid).encode())
-
-    def test_runtime_signature_changes_when_audio_processes_change(self) -> None:
-        original_tasks = runtime.task_ids
-        original_pipewire = runtime.discover_pipewire
-        original_read = runtime._read
-        try:
-            runtime.task_ids = lambda pid: {
-                50: [50, 52],
-                51: [51, 53],
-                60: [60, 61],
-                70: [70, 71],
-            }[pid]
-            runtime.discover_pipewire = lambda _uid=None: [70]
-            runtime._read = lambda path: "data-loop.0" if path.parts[-2] == "71" else "other"
-            first = runtime.runtime_signature(60, 50)
-            second = runtime.runtime_signature(60, 51)
-            self.assertNotEqual(first, second)
-        finally:
-            runtime.task_ids = original_tasks
-            runtime.discover_pipewire = original_pipewire
-            runtime._read = original_read
 
     def test_trace_parser_reports_wake_and_runtime_tail(self) -> None:
         sample = """\

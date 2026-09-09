@@ -59,21 +59,13 @@ class _ServerProbe:
         self.close_count += 1
 
 
-class _RegistrationProbe:
-    def __init__(self) -> None:
-        self.closed = False
-
-    def close(self) -> None:
-        self.closed = True
-
-
 class LocalAmyServiceTests(unittest.TestCase):
     def run_service(
         self,
         chunks: list[bytes],
         *,
         stream: bool,
-    ) -> tuple[list[str], _ServerProbe, list[dict[str, int]], _RegistrationProbe]:
+    ) -> tuple[list[str], _ServerProbe, list[dict[str, int]]]:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config_path = root / "amy_config.json"
@@ -107,8 +99,6 @@ class LocalAmyServiceTests(unittest.TestCase):
                 send_wire=sent.append,
                 _amy=native,
             )
-            registration = _RegistrationProbe()
-
             with (
                 patch.object(local_amy_service, "parse_arguments", return_value=args),
                 patch.object(
@@ -118,23 +108,15 @@ class LocalAmyServiceTests(unittest.TestCase):
                 ),
                 patch.object(Path, "chmod", return_value=None),
                 patch.object(local_amy_service.signal, "signal", install_handler),
-                patch.object(
-                    local_amy_service,
-                    "register_policy_role",
-                    return_value=registration,
-                ) as register,
                 patch.dict(sys.modules, {"amy": amy}),
             ):
                 result = local_amy_service.main()
 
-            register.assert_called_once_with("amy-service", args.socket)
-
         self.assertEqual(result, 0)
-        self.assertTrue(registration.closed)
-        return sent, server, live_calls, registration
+        return sent, server, live_calls
 
     def test_stream_service_delivers_split_and_combined_valid_requests(self) -> None:
-        sent, server, live_calls, _registration = self.run_service(
+        sent, server, live_calls = self.run_service(
             [b"K215", b"i5Z\nn60l1i5Z\n"],
             stream=True,
         )
@@ -145,7 +127,7 @@ class LocalAmyServiceTests(unittest.TestCase):
         self.assertEqual(live_calls[0]["max_sequence_executions"], 40)
 
     def test_packet_service_preserves_one_valid_request_per_packet(self) -> None:
-        sent, _server, _live_calls, _registration = self.run_service(
+        sent, _server, _live_calls = self.run_service(
             [b"K215i5Z", b"n60l1i5Z"],
             stream=False,
         )

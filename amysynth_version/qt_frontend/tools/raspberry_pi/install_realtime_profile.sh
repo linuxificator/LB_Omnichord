@@ -4,6 +4,7 @@ set -euo pipefail
 source_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 install_root="/usr/local/lib/lb-omnichord-rt"
 unit_root="/etc/systemd/system"
+limits_file="/etc/security/limits.d/95-lb-omnichord-realtime.conf"
 display_name="${LB_OMNICHORD_RELEASE_ASSET:-$(basename -- "$0")}"
 target_user="${SUDO_USER:-}"
 
@@ -59,9 +60,7 @@ fi
 
 required_files=(
     rt_pi_config.py
-    rt_pi_runtime.py
     lb-omnichord-performance.service
-    lb-omnichord-rt-policy@.service
 )
 for required_file in "${required_files[@]}"; do
     if [[ ! -f "$source_root/$required_file" ]]; then
@@ -73,24 +72,30 @@ done
 install -d -m 755 "$install_root"
 install -m 755 \
     "$source_root/rt_pi_config.py" \
-    "$source_root/rt_pi_runtime.py" \
     "$source_root/install_realtime_profile.sh" \
     "$install_root/"
 install -m 644 \
     "$source_root/lb-omnichord-performance.service" \
-    "$source_root/lb-omnichord-rt-policy@.service" \
     "$unit_root/"
+
+limits_temporary="$(mktemp)"
+trap 'rm -f -- "$limits_temporary"' EXIT
+printf '%s - rtprio 80\n' "$target_user" >"$limits_temporary"
+install -d -m 755 /etc/security/limits.d
+install -m 644 "$limits_temporary" "$limits_file"
+
+# Remove the superseded experimental watcher from an earlier development
+# version. The normal launch wrapper now configures its exact AMY child once.
+systemctl disable --now "lb-omnichord-rt-policy@$target_user.service" \
+    >/dev/null 2>&1 || true
+rm -f -- "$unit_root/lb-omnichord-rt-policy@.service"
+rm -f -- "$install_root/rt_pi_runtime.py"
 
 python3 "$install_root/rt_pi_config.py" apply --profile audio-split
 python3 "$install_root/rt_pi_config.py" set-governor performance
 systemctl daemon-reload
 systemctl enable --now lb-omnichord-performance.service
-systemctl enable --now "lb-omnichord-rt-policy@$target_user.service"
 
-if python3 "$install_root/rt_pi_config.py" verify --profile audio-split >/dev/null; then
-    echo "Realtime boot profile is active; LB Omnichord is ready."
-else
-    echo "Realtime services are installed and enabled for $target_user."
-    echo "Reboot this Raspberry Pi, then start LB Omnichord again."
-fi
+echo "Realtime permission and the performance governor are configured for $target_user."
+echo "Reboot this Raspberry Pi so the boot profile and new login limit are active."
 echo "Rollback instructions: $install_root/rt_pi_config.py rollback --snapshot PATH"

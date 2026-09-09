@@ -18,9 +18,7 @@ RELEASE_PATTERN = re.compile(r"^R\d{14}$")
 EMBEDDED_FILES = (
     ("install_realtime_profile.sh", 0o755),
     ("rt_pi_config.py", 0o755),
-    ("rt_pi_runtime.py", 0o755),
     ("lb-omnichord-performance.service", 0o644),
-    ("lb-omnichord-rt-policy@.service", 0o644),
 )
 
 

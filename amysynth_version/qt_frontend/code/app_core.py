@@ -4073,7 +4073,6 @@ def run_application(
 
     if not engine.rootObjects():
         amy_client.close()
-        runtime.close()
         return 1
 
     backend.send_initial_state()
@@ -4136,6 +4135,5 @@ def run_application(
     # QML can no longer generate performance messages, so stop AMY and close
     # the UART before releasing the backend object that owns the client.
     amy_client.close()
-    runtime.close()
 
     return exit_code

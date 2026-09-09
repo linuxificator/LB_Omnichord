@@ -37,6 +37,13 @@ dependency.
 
 New abstractions are added only when they reduce coupling or prevent regressions.
 
+Do not "headbang": do not keep extending and repairing a difficult custom
+mechanism when its complexity is evidence that the design direction is wrong.
+Stop, restate the actual requirement, and re-evaluate the operating system,
+framework and library mechanisms already intended to solve it. A custom
+protocol, daemon or state machine needs evidence that the standard mechanism
+cannot satisfy the requirement; sunk implementation effort is not evidence.
+
 ## Extend existing AMY concepts first
 
 AMY-side integration work must reuse existing AMY concepts, data structures,

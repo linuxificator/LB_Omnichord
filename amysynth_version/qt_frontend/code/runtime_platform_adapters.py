@@ -2,13 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
-
-from raspberry_pi_realtime import prepare_realtime_startup
-
-
-def _no_op() -> None:
-    pass
+from raspberry_pi_realtime import (
+    prepare_realtime_startup,
+    service_pid_from_environment,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,7 +13,6 @@ class RuntimeOverrides:
     amy_socket: str | None
     amy_local_name: str | None
     startup_warnings: tuple[str, ...] = ()
-    close: Callable[[], None] = _no_op
 
 
 def resolve_package_runtime(
@@ -33,8 +29,11 @@ def resolve_package_runtime(
     if str(platform_name).casefold() != "android":
         if socket is None:
             return RuntimeOverrides(socket, local_name)
-        realtime = prepare_realtime_startup(socket)
-        return RuntimeOverrides(socket, local_name, realtime.warnings, realtime.close)
+        realtime = prepare_realtime_startup(
+            socket,
+            service_pid=service_pid_from_environment(),
+        )
+        return RuntimeOverrides(socket, local_name, realtime.warnings)
 
     files_dir = Path(private_files_dir)
     if not socket and not local_name:

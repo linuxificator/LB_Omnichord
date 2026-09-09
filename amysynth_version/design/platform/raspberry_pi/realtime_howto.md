@@ -12,12 +12,12 @@ AMY or LB Omnichord and does not weaken the wire/socket process boundary.
 
 Every GitHub release includes a self-contained installer named
 `LB_Omnichord.RYYYYMMDDHHMMSS.Pi4-Pi5-realtime-setup.sh`. It embeds the exact
-versioned helpers and systemd units described below, applies the reversible
-`audio-split` boot profile, sets the performance governor, enables both
-services for the selected desktop user, and tells the user whether a reboot is
-still required. The application warning points to this asset when boot
-arguments, CPU 2-3 isolation, the governor or the verified runtime policy for
-its own AMY endpoint is missing.
+versioned helper and systemd governor unit described below, applies the
+reversible `audio-split` boot profile, grants the selected desktop user a
+standard PAM realtime-priority limit, and requests a reboot. The application
+warning points to this asset when boot arguments, CPU 2-3 isolation, the
+governor, the user's realtime permission or the read-back runtime policy for
+the exact AMY child is missing.
 The same installer source is committed as
 `qt_frontend/tools/raspberry_pi/install_realtime_profile.sh`; the release asset
 embeds and executes that file rather than maintaining a second setup sequence.
@@ -85,62 +85,52 @@ python3 tools/raspberry_pi/rt_pi_config.py verify --profile audio-split
 Expected: isolated CPUs `2-3` and active boot arguments. Verification reports
 the governor separately because it is a runtime setting.
 
-## 3. Install the runtime policy
+## 3. Grant realtime permission and launch normally
 
-The two small services make the performance governor persistent and apply the
-measured policy whenever a packaged or local AMY service explicitly registers:
+The installer writes one standard PAM limit for the selected user:
 
-```sh
-sudo install -d -m 755 /usr/local/lib/lb-omnichord-rt
-sudo install -m 755 \
-  tools/raspberry_pi/rt_pi_config.py \
-  tools/raspberry_pi/rt_pi_runtime.py \
-  /usr/local/lib/lb-omnichord-rt/
-sudo install -m 644 \
-  tools/raspberry_pi/lb-omnichord-performance.service \
-  tools/raspberry_pi/lb-omnichord-rt-policy@.service \
-  /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now \
-  lb-omnichord-performance.service \
-  lb-omnichord-rt-policy@"$USER".service
+```text
+USER - rtprio 80
 ```
 
-The watcher does not select AMY or the frontend by executable name, parent,
-command-line substring or caller-supplied PID. Each process sends its semantic
-role and common absolute AMY wire-socket endpoint to
-`/run/lb-omnichord-rt/policy-UID.sock`. The socket remains root-owned and only
-grants connect permission; Linux `SO_PEERCRED` supplies the actual PID, UID
-and GID and rejects every UID except the configured desktop user. The open
-connection remains its lifecycle token. A frontend registration can only
-match the AMY service registered for the same endpoint. This prevents an
-unrelated process with a similar name from accidentally receiving realtime
-policy and works identically for `run_local.sh` and the AppImage.
-
-The watcher places all exactly registered frontend and AMY threads on CPUs
-0-1. Newly created frontend threads inherit that affinity. It measures the
-active AMY worker before assigning only that TID to CPU 3/FIFO 70. PipeWire and
-pipewire-pulse `data-loop.0` are still discovered by their native process and
-thread identities and assigned CPU 2/FIFO 80 and 75. After applying the policy,
-the watcher reads back every scheduler, priority and affinity value before it
-acknowledges startup. It sleeps on the registration connections and Linux
-process descriptors, waking on process exit; a low-frequency health check also
-detects policy drift without continuous process-table polling.
-
-Check the result after starting LB Omnichord:
+It also enables the small performance-governor service. A reboot creates a new
+login session with that limit and activates the boot arguments. Confirm the
+permission after reconnecting:
 
 ```sh
-sudo journalctl -u lb-omnichord-rt-policy@"$USER".service -n 5 --no-pager
-python3 tools/raspberry_pi/rt_pi_runtime.py inspect --user "$USER"
+ulimit -r
 ```
 
-The journal must show separate `amy-service` and `frontend` registrations for
-the same endpoint. `inspect` reports the per-user registration socket and
-PipeWire processes. The startup dialog remains the user-facing aggregate check:
-it is suppressed only after the exact registered processes have been applied
-and read back successfully. The lower-level `apply` command is diagnostic-only
-and therefore requires explicit `--service-pid` and optional `--frontend-pid`;
-it deliberately has no process-name discovery fallback.
+Expected: `80` or greater. There is no privileged runtime service. Start
+`run_local.sh` or the AppImage normally. Its existing wrapper starts AMY and
+already owns the exact child PID returned by `Popen`/`$!`. Once the audio
+thread exists, the wrapper performs one policy operation:
+
+1. confine the frontend and AMY non-audio threads to CPUs 0-1;
+2. measure the busiest non-main thread of that exact AMY child;
+3. assign only that callback to CPU 3/FIFO 70;
+4. locate the exact `pipewire` and `pipewire-pulse` executables' single
+   `data-loop.0` threads and assign them to CPU 2/FIFO 80 and 75;
+5. read every affinity, scheduler and priority back before reporting success.
+
+The wrapper never searches for AMY by process name or command line. It has no
+registration socket, polling loop, watcher daemon or lifecycle protocol. AMY's
+audio callback is stable for the lifetime of the local service; restarting the
+application starts a new service and repeats the one-shot operation. The
+frontend receives the exact child PID only to verify the applied state for its
+startup warning.
+
+For a source diagnostic after AMY has been started by a wrapper, use the PID
+that wrapper printed or exported:
+
+```sh
+python3 code/raspberry_pi_realtime.py inspect --service-pid "$OMNICHORD_AMY_SERVICE_PID"
+```
+
+The normal visible startup dialog is the aggregate check. It disappears only
+when boot isolation, governor, `rtprio`, exact AMY callback, frontend and both
+PipeWire loop policies all match. Serial/ESP32 mode deliberately bypasses this
+host-AMY policy and warning.
 
 ## 4. Repeat the physical acceptance test
 
@@ -184,12 +174,11 @@ audible oscillators are unsafe and do not make the capacity result stronger.
 
 ## Rollback
 
-First disable the runtime changes:
+First disable the persistent governor and remove the optional user limit:
 
 ```sh
-sudo systemctl disable --now \
-  lb-omnichord-rt-policy@"$USER".service \
-  lb-omnichord-performance.service
+sudo systemctl disable --now lb-omnichord-performance.service
+sudo rm /etc/security/limits.d/95-lb-omnichord-realtime.conf
 sudo python3 tools/raspberry_pi/rt_pi_config.py set-governor ondemand
 ```
 

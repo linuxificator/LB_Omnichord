@@ -66,21 +66,23 @@ which both removes the race and matches a cold application start.
   per-thread CPU/run-queue delay through `/proc`.
 
 All measurement helpers remain external to both application processes. The
-production integration now has a deliberately narrow registration client in
-each process: it identifies only its role and AMY wire endpoint. The external
-root watcher obtains its exact PID/UID/GID from `SO_PEERCRED`, measures which
-non-main AMY thread is actually rendering, and applies realtime policy only to
-that callback. It never gives the entire AMY or frontend process FIFO policy.
-It also discovers PipeWire's `data-loop.0` threads rather than relying on fixed
-PIDs. This replaced the research prototype's `--amy-service` command-line scan,
-which did not recognize the source-checkout service and was too easy to match
-incorrectly.
-An initial 0.5-second process-table polling implementation consumed about 6.6%
-of one core and was rejected. The final watcher uses Linux process descriptors:
-it consumed 0.268 CPU-seconds while discovering and applying the policy, then
-its CPU counter did not increase during the following 33-second observation.
-It wakes when a watched AMY/PipeWire process exits, with only a 60-second
-topology health check while the processes remain stable.
+production integration grants the desktop user a standard PAM
+`RLIMIT_RTPRIO=80` allowance. The already existing source/AppImage wrapper
+knows the immutable PID returned when it starts AMY, measures that exact
+child's active non-main worker, and applies realtime policy only to that
+callback. It discovers PipeWire by exact executable plus `data-loop.0` thread
+identity and immediately reads all policies back. The frontend receives the
+exact child PID and independently verifies the result. No registration
+protocol, privileged watcher or repeated process scan is involved.
+
+Two watcher prototypes were rejected. A 0.5-second process-table poll consumed
+about 6.6% of one core. A later credential-bound Unix-socket design avoided
+name matching, but introduced a daemon, registration protocol, lifecycle
+tokens and drift state for a policy needed only once after a wrapper-created
+child starts. Continuing to repair that design would have been "headbanging":
+complexity caused by the chosen mechanism rather than by the requirement. PAM
+realtime permission plus one-shot wrapper application uses the Linux mechanism
+intended for this case and has materially less state and failure surface.
 
 ## Production-log replay: first comparisons
 
@@ -173,10 +175,11 @@ on CPU 3 at FIFO 70. The application and all its logic remain portable. The
 profile is a reversible host-integration choice documented in
 [`realtime_howto.md`](realtime_howto.md), not an application default.
 
-One final reboot verified that CPU isolation, the performance governor and
-both enabled policy services return automatically. The watcher detected a new
-full-AppImage AMY child and reapplied the measured thread layout. A separate
-post-boot control then drove a clean packaged AMY service over its Unix wire
-socket; its bounded 440 Hz oscillator was physically heard through the HDMI
-sink. This distinguishes the intentionally near-silent capacity workloads from
-an audio-routing failure.
+An earlier final reboot verified that CPU isolation and the performance
+governor return automatically and that a newly started AppImage can receive the
+measured thread layout. The current simpler implementation must repeat that
+physical acceptance with PAM permission and one-shot wrapper application; the
+measured audio layout itself is unchanged. A separate post-boot control drove
+a clean packaged AMY service over its Unix wire socket and its bounded 440 Hz
+oscillator was physically heard through the HDMI sink. This distinguishes the
+intentionally near-silent capacity workloads from an audio-routing failure.
