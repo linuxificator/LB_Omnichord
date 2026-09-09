@@ -47,7 +47,9 @@ from user_data import MIDI_PRESET_DIR
 
 MIDI_ROW_COUNT = 6
 MIDI_PRESET_COUNT = 18
-DEFAULT_CHORD_INPUT_CHANNEL = 7
+DEFAULT_CHORD_INPUT_CHANNEL = 1
+DEFAULT_MIDI_CHANNELS = (2, 3, 4, 5, 6, 10)
+LEGACY_FACTORY_MIDI_CHANNELS = (1, 2, 3, 4, 5, 6)
 MIDI_DRUM_KEY = "drum_kit_0"
 MIDI_FACTORY_DIR = app_core.INSTRUMENT_DIR / "midi_default_presets"
 MIDI_LAST_PRESET_FILE = "last_preset.json"
@@ -80,6 +82,27 @@ class _QueuedOscInputEventRelay:
 
 def _write_json_atomic(path: Path, data: dict[str, Any]) -> None:
     JsonStore(path).write(data)
+
+
+def _migrated_factory_channel_defaults(
+    stored: dict[str, Any],
+    factory: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Upgrade only an untouched copy of the former factory channel layout."""
+    legacy_factory = json.loads(json.dumps(factory))
+    rows = legacy_factory.get("rows")
+    if not isinstance(rows, list) or len(rows) != MIDI_ROW_COUNT:
+        return None
+    for row, channel in zip(rows, LEGACY_FACTORY_MIDI_CHANNELS):
+        if not isinstance(row, dict):
+            return None
+        row["channel"] = channel
+    if legacy_factory.get("factory_name") == "Experimental":
+        rows[-1]["selected"] = "physical_strings"
+        rows[-1]["volume"] = 0.34
+    if stored != legacy_factory:
+        return None
+    return json.loads(json.dumps(factory))
 
 
 class MidiAmyEngine:
@@ -466,7 +489,7 @@ class MidiPlayerBackend(QObject):
         )
         self.definitions = tuple(synths) + (drum,)
         self.rows = [SynthState(self.definitions, 0) for _ in range(MIDI_ROW_COUNT)]
-        self.channels = [1, 2, 3, 4, 5, 6]
+        self.channels = list(DEFAULT_MIDI_CHANNELS)
         self._chord_input_channel = DEFAULT_CHORD_INPUT_CHANNEL
         self.volumes = [0.5] * MIDI_ROW_COUNT
         self._state_version = 0
@@ -1821,12 +1844,25 @@ class MidiPlayerBackend(QObject):
         MIDI_PRESET_DIR.mkdir(parents=True, exist_ok=True)
         for number in range(1, MIDI_PRESET_COUNT + 1):
             target = self._preset_path(number)
-            if target.exists():
-                continue
             factory = MIDI_FACTORY_DIR / f"m{number}.json"
-            if factory.exists():
-                data = json.loads(factory.read_text(encoding="utf-8"))
-                _write_json_atomic(target, data)
+            if not factory.exists():
+                continue
+            factory_data = json.loads(factory.read_text(encoding="utf-8"))
+            if not target.exists():
+                _write_json_atomic(target, factory_data)
+                continue
+            try:
+                stored_data = json.loads(target.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(stored_data, dict):
+                continue
+            migrated = _migrated_factory_channel_defaults(
+                stored_data,
+                factory_data,
+            )
+            if migrated is not None:
+                _write_json_atomic(target, migrated)
         last = MIDI_PRESET_DIR / MIDI_LAST_PRESET_FILE
         if not last.exists():
             _write_json_atomic(last, {"preset": 1})
@@ -1891,7 +1927,7 @@ class MidiPlayerBackend(QObject):
                 }
             )
             self.rows[index] = runtime
-            channel = int(row_data.get("channel", index + 1))
+            channel = int(row_data.get("channel", DEFAULT_MIDI_CHANNELS[index]))
             self.channels[index] = max(0, min(16, channel))
             self.volumes[index] = max(
                 0.0,
@@ -2011,7 +2047,7 @@ class MidiPlayerBackend(QObject):
         self.rows[row] = runtime
         self.channels[row] = max(
             0,
-            min(16, int(stored.get("channel", row + 1))),
+            min(16, int(stored.get("channel", DEFAULT_MIDI_CHANNELS[row]))),
         )
         self.volumes[row] = max(
             0.0,

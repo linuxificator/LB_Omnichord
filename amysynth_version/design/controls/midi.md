@@ -17,7 +17,12 @@ Each MIDI row has:
 - volume
 - its own AMY bus (4 through 9)
 
-Default channels are 1-6. Duplicate channel assignments are allowed.
+The chord-input selector defaults to channel 1. The six MIDI rows default to
+channels `2,3,4,5,6,10`; the final purple row is the drum kit on General MIDI
+percussion channel 10. Duplicate channel assignments remain allowed. Existing
+user presets retain their explicit channel choices. A user preset that is an
+exact, untouched copy of the former factory `1,2,3,4,5,6` layout is upgraded
+to the new defaults when first opened.
 
 MIDI input tech selection is controlled by `midi_input.tech_profile`. The
 shipped value is `auto`: ordinary packages derive the closest profile from
@@ -66,7 +71,7 @@ Channel 0 in a row means omni/all incoming channels.
 
 The white round selector at the top-right of the MIDI screen reserves one
 incoming MIDI channel for monophonic OMNI chord selection. It starts at channel
-7 and cycles through `1..16,A` with the same channel convention as a MIDI synth
+1 and cycles through `1..16,A` with the same channel convention as a MIDI synth
 row; `A` means every incoming channel. The selector is live performance state,
 not part of an OMNI or MIDI preset.
 

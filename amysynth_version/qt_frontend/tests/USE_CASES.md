@@ -212,10 +212,14 @@ installation failed to show or release chord-key interaction correctly.
 - Reconfiguring a synth or rebuilding after panic reapplies the owning master
   gain so a patch cannot bypass it.
 
-**MIDI-06 — channel 7 selects bottom-row OMNI chords monophonically**
+**MIDI-06 — channel 1 selects bottom-row OMNI chords monophonically**
 
-- The white top-right selector defaults to 7 and cycles through `1..16,A`
+- The white top-right selector defaults to 1 and cycles through `1..16,A`
   using the same display and channel semantics as the MIDI-row selectors.
+- Factory MIDI rows default to `2,3,4,5,6,10`, reserving channel 1 for this
+  chord input and assigning the final factory drum-kit row to GM channel 10.
+- An exact untouched user copy of the old factory `1,2,3,4,5,6` channel layout
+  migrates once; any customized preset remains user-authoritative.
 - A matching Note On plays the bottom chord row from the exact incoming MIDI
   root; Note Off releases it. MIDI notes 24--95 select the matching O1--O6
   button, while roots outside that range remain exact and select no octave

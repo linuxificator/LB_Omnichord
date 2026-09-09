@@ -56,7 +56,7 @@ Rules:
 - selecting an instrument must fully initialize the selected patch.
 - MIDI master volume and mute control only MIDI buses and remain independent
   of the OMNI master.
-- the white channel selector at the top-right defaults to 7 and maps one MIDI
+- the white channel selector at the top-right defaults to 1 and maps one MIDI
   key at a time to the bottom OMNI chord row; matching MIDI synth rows still
   receive the same note independently;
 

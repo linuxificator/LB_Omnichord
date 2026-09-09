@@ -11,8 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 from midi_player import (  # noqa: E402
+    DEFAULT_CHORD_INPUT_CHANNEL,
+    DEFAULT_MIDI_CHANNELS,
+    LEGACY_FACTORY_MIDI_CHANNELS,
     MidiAmyEngine,
     MidiPlayerBackend,
+    _migrated_factory_channel_defaults,
 )
 from midi_control import NOTE_BUTTON_OFFSET, PITCH_BEND_CONTROLLER  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
@@ -87,6 +91,56 @@ class _Client:
 
 
 class MidiAmyEngineTests(unittest.TestCase):
+    def test_every_factory_preset_reserves_channel_one_and_uses_gm_drums(self) -> None:
+        self.assertEqual(DEFAULT_CHORD_INPUT_CHANNEL, 1)
+        self.assertEqual(DEFAULT_MIDI_CHANNELS, (2, 3, 4, 5, 6, 10))
+        for number in range(1, 19):
+            with self.subTest(preset=number):
+                data = json.loads(
+                    (
+                        ROOT
+                        / "instruments"
+                        / "midi_default_presets"
+                        / f"m{number}.json"
+                    ).read_text(encoding="utf-8")
+                )
+                self.assertEqual(
+                    tuple(int(row["channel"]) for row in data["rows"]),
+                    DEFAULT_MIDI_CHANNELS,
+                )
+                self.assertEqual(data["rows"][-1]["selected"], "drum_kit_0")
+
+    def test_only_untouched_legacy_factory_channels_are_migrated(self) -> None:
+        stored: dict[str, object] | None = None
+        factory: dict[str, object] | None = None
+        for number in (1, 18):
+            factory = json.loads(
+                (
+                    ROOT
+                    / "instruments"
+                    / "midi_default_presets"
+                    / f"m{number}.json"
+                ).read_text(encoding="utf-8")
+            )
+            stored = json.loads(json.dumps(factory))
+            for row, channel in zip(stored["rows"], LEGACY_FACTORY_MIDI_CHANNELS):
+                row["channel"] = channel
+            if number == 18:
+                stored["rows"][-1]["selected"] = "physical_strings"
+                stored["rows"][-1]["volume"] = 0.34
+
+            self.assertEqual(
+                _migrated_factory_channel_defaults(stored, factory),
+                factory,
+            )
+
+        assert stored is not None and factory is not None
+        customized = json.loads(json.dumps(stored))
+        customized["rows"][0]["volume"] = 0.99
+        self.assertIsNone(
+            _migrated_factory_channel_defaults(customized, factory)
+        )
+
     def test_all_general_midi_percussion_notes_resolve(self) -> None:
         client = _Client()
         drums = client.resolved_config.drums
