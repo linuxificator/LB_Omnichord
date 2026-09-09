@@ -33,6 +33,7 @@ from osc_input import (
     OscInputPortFactory,
 )
 from musical_state import TuningSnapshot, tune_note
+from gm_percussion import midi_drum_amplitude, resolve_gm_percussion
 from synth_programs import resolve_program
 from synth_state import SynthState
 from shared_reverb import (
@@ -54,20 +55,6 @@ MIDI_PREVIEW_LOW = app_core.STRUM_LOW_MIDI
 MIDI_PREVIEW_HIGH = app_core.STRUM_HIGH_MIDI
 MIDI_REVERB_MAX = app_core.REVERB_LEVEL_MAX
 
-GM_DRUM_SAMPLE = {
-    35: "bd_haus",
-    36: "drum_bass_hard",
-    38: "drum_snare_hard",
-    40: "drum_snare_soft",
-    41: "drum_tom_lo_soft",
-    45: "drum_tom_mid_soft",
-    48: "drum_tom_hi_soft",
-    39: "perc_snap",
-    42: "drum_cymbal_closed",
-    44: "drum_cymbal_pedal",
-    46: "drum_cymbal_open",
-    51: "perc_bell",
-}
 PREVIEW_DRUM_NOTES = (36, 38, 42, 46, 41, 45, 48, 51)
 
 
@@ -412,15 +399,15 @@ class MidiAmyEngine:
         velocity: int,
         row_volume: float,
     ) -> None:
-        sample_name = GM_DRUM_SAMPLE.get(int(midi_note))
-        if sample_name is None:
-            return
-        hit = self.client.resolved_config.drums.sample(sample_name)
+        drums = self.client.resolved_config.drums
+        hit = resolve_gm_percussion(
+            midi_note,
+            kit=drums.kit,
+            configured_samples=dict(drums.sample_map),
+        )
         if hit is None:
             return
-        level = max(0.0, min(1.0, int(velocity) / 127.0))
-        gain = self.client.resolved_config.drums.velocity_gain
-        amp = level * gain * max(0.0, min(1.0, float(row_volume)))
+        amp = midi_drum_amplitude(velocity, row_volume, drums.velocity_gain)
         self._wire(f"p{hit.preset}n{self._f(float(hit.note))}l{self._f(amp)}i{self.drum_synth}Z")
 
     def all_notes_off(self) -> None:

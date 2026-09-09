@@ -55,7 +55,8 @@ class CatalogueProvenanceTests(unittest.TestCase):
         self.assertIsInstance(assignment.value, ast.Dict)
         assert isinstance(assignment.value, ast.Dict)
         keys = [ast.literal_eval(key) for key in assignment.value.keys]
-        self.assertEqual(len(keys), 121)
+        # Activity/fill roles plus complete patch-384 MIDI coverage.
+        self.assertEqual(len(keys), 140)
         self.assertEqual(len(set(keys)), len(keys))
 
     def test_wrong_catalogue_version_fails_at_the_schema_boundary(self) -> None:
