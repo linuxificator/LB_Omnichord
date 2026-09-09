@@ -98,13 +98,32 @@ class RaspberryPiRealtimeTests(unittest.TestCase):
             "MainPID=1012\nId=pipewire-pulse.service\n",
             "",
         )
-        with mock.patch.object(
-            realtime.subprocess, "run", return_value=completed
-        ) as run:
+        with (
+            mock.patch.object(
+                realtime.subprocess,
+                "run",
+                return_value=completed,
+            ) as run,
+            mock.patch.dict(
+                os.environ,
+                {
+                    "LD_LIBRARY_PATH": "/tmp/appimage/private-libraries",
+                    "LD_PRELOAD": "/tmp/appimage/private-preload.so",
+                    "XDG_RUNTIME_DIR": "/run/user/1000",
+                },
+                clear=True,
+            ),
+        ):
             pids = realtime.systemd_pipewire_pids()
         self.assertEqual(pids, {"pipewire": 1001, "pipewire-pulse": 1012})
-        self.assertIn("pipewire.service", run.call_args.args[0])
-        self.assertIn("pipewire-pulse.service", run.call_args.args[0])
+        command = run.call_args.args[0]
+        environment = run.call_args.kwargs["env"]
+        self.assertEqual(command[0], realtime.SYSTEMCTL)
+        self.assertIn("pipewire.service", command)
+        self.assertIn("pipewire-pulse.service", command)
+        self.assertNotIn("LD_LIBRARY_PATH", environment)
+        self.assertNotIn("LD_PRELOAD", environment)
+        self.assertEqual(environment["XDG_RUNTIME_DIR"], "/run/user/1000")
 
     def test_exact_child_pid_is_required_and_never_discovered_by_name(self) -> None:
         with (

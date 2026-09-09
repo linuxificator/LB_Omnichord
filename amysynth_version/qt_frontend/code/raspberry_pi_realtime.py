@@ -37,6 +37,7 @@ REALTIME_ASSET_PATTERN = (
     "LB_Omnichord.RYYYYMMDDHHMMSS.Pi4-Pi5-realtime-setup.sh"
 )
 SERVICE_PID_ENV = "OMNICHORD_AMY_SERVICE_PID"
+SYSTEMCTL = "/usr/bin/systemctl"
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,10 +217,18 @@ def _thread_name(pid: int, tid: int) -> str:
 
 
 def systemd_pipewire_pids() -> dict[str, int]:
+    # AppImage/PyInstaller deliberately points LD_LIBRARY_PATH at its bundled
+    # runtime.  A host executable must not inherit that private loader path:
+    # systemctl would otherwise load the packaged libsystemd dependencies and
+    # fail before it can query the user's systemd manager.  Keep this boundary
+    # explicit and use the operating system's canonical systemctl binary.
+    host_environment = os.environ.copy()
+    host_environment.pop("LD_LIBRARY_PATH", None)
+    host_environment.pop("LD_PRELOAD", None)
     try:
         result = subprocess.run(
             [
-                "systemctl",
+                SYSTEMCTL,
                 "--user",
                 "show",
                 "pipewire.service",
@@ -231,6 +240,7 @@ def systemd_pipewire_pids() -> dict[str, int]:
             capture_output=True,
             text=True,
             timeout=2,
+            env=host_environment,
         )
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
         return {}
