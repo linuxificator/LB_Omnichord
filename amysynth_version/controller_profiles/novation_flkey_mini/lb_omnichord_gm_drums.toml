@@ -1,0 +1,107 @@
+version = 2
+device = "flkey-mini-pads"
+name = "LB GM Drums"
+
+# All pads turn white while pressed. Idle colors group cymbals/hi-hats
+# (yellow), toms (green), snare/auxiliary sounds (red/orange), and kicks (blue).
+active-color = 3
+
+# Upper row, left to right: higher kit voices. The two crashes occupy the
+# outside edges, with hi-hats, rack toms and ride between them.
+[pads.1]
+color = 13
+[pads.1.note]
+pitch = 49 # Crash Cymbal 1
+channel = 10
+
+[pads.2]
+color = 13
+[pads.2.note]
+pitch = 42 # Closed Hi-Hat
+channel = 10
+
+[pads.3]
+color = 13
+[pads.3.note]
+pitch = 44 # Pedal Hi-Hat
+channel = 10
+
+[pads.4]
+color = 13
+[pads.4.note]
+pitch = 46 # Open Hi-Hat
+channel = 10
+
+[pads.5]
+color = 21
+[pads.5.note]
+pitch = 50 # High Tom
+channel = 10
+
+[pads.6]
+color = 21
+[pads.6.note]
+pitch = 48 # Hi-Mid Tom
+channel = 10
+
+[pads.7]
+color = 13
+[pads.7.note]
+pitch = 51 # Ride Cymbal 1
+channel = 10
+
+[pads.8]
+color = 13
+[pads.8.note]
+pitch = 57 # Crash Cymbal 2
+channel = 10
+
+# Lower row, left to right: auxiliary/snare voices on the left, the two bass
+# drums in the center, and progressively lower toms toward the right.
+[pads.9]
+color = 9
+[pads.9.note]
+pitch = 37 # Side Stick
+channel = 10
+
+[pads.10]
+color = 5
+[pads.10.note]
+pitch = 39 # Hand Clap
+channel = 10
+
+[pads.11]
+color = 5
+[pads.11.note]
+pitch = 38 # Acoustic Snare
+channel = 10
+
+[pads.12]
+color = 45
+[pads.12.note]
+pitch = 36 # Bass Drum 1
+channel = 10
+
+[pads.13]
+color = 45
+[pads.13.note]
+pitch = 35 # Acoustic Bass Drum
+channel = 10
+
+[pads.14]
+color = 21
+[pads.14.note]
+pitch = 45 # Low Tom
+channel = 10
+
+[pads.15]
+color = 21
+[pads.15.note]
+pitch = 43 # High Floor Tom
+channel = 10
+
+[pads.16]
+color = 21
+[pads.16.note]
+pitch = 41 # Low Floor Tom
+channel = 10

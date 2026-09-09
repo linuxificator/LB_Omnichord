@@ -24,6 +24,14 @@ user presets retain their explicit channel choices. A user preset that is an
 exact, untouched copy of the former factory `1,2,3,4,5,6` layout is upgraded
 to the new defaults when first opened.
 
+Controller-specific note layouts belong on the controller whenever that
+hardware provides a Custom Mode. They are not translation policy in the
+portable application. The optional
+[`FLkey Mini GM drum profile`](../../controller_profiles/novation_flkey_mini/README.md)
+configures that controller's pads to emit standard channel-10 GM percussion
+notes; the ordinary `Drum Kit 0` path then consumes them without an FLkey
+mapping table.
+
 MIDI input tech selection is controlled by `midi_input.tech_profile`. The
 shipped value is `auto`: ordinary packages derive the closest profile from
 Qt's platform abstraction and Python's runtime platform. A non-`auto` value is

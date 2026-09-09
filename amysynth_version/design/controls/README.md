@@ -12,3 +12,5 @@ MIDI and OSC share one external-control state machine and QML presentation but
 retain independent protocol adapters. Integration senders run outside the
 production application process.
 
+Optional device-side profiles that make third-party hardware emit these
+standard protocol messages live under [`../../controller_profiles/`](../../controller_profiles/README.md).
