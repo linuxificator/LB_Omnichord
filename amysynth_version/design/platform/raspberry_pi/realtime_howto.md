@@ -17,7 +17,14 @@ versioned helpers and systemd units described below, applies the reversible
 services for the selected desktop user, and tells the user whether a reboot is
 still required. The application warning points to this asset when boot
 arguments, CPU 2-3 isolation, the governor or the runtime policy is missing.
-The manual steps remain documented for inspection and rollback.
+The same installer source is committed as
+`qt_frontend/tools/raspberry_pi/install_realtime_profile.sh`; the release asset
+embeds and executes that file rather than maintaining a second setup sequence.
+It also verifies every embedded helper against a build-time SHA-256 digest
+before making host changes. The separately published checksum remains
+available for users who require an independently downloaded integrity check,
+but it is deliberately not part of the startup warning. The manual steps
+remain documented for inspection and rollback.
 
 ## Why this layout
 
@@ -45,6 +52,13 @@ sudo python3 tools/raspberry_pi/rt_pi_config.py plan --profile audio-split
 Confirm that the model has four CPUs and that the kernel reports
 `CONFIG_CPU_ISOLATION=y` and `CONFIG_IRQ_FORCED_THREADING=y`. Keep SSH or local
 console access available for the first reboot.
+
+From a source checkout, the complete setup can be applied with the committed
+installer instead of performing sections 2 and 3 separately:
+
+```sh
+sudo tools/raspberry_pi/install_realtime_profile.sh --user "$USER"
+```
 
 ## 2. Apply the reversible boot profile
 

@@ -35,19 +35,21 @@ chmod +x LB_Omnichord.R*.RaspberryPi-aarch64.AppImage
 ```
 
 For reliable local audio under load, download the matching
-`LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh` and `.sha256` assets from the same
-release. Verify and install the measured, reversible host profile once:
+`LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh` asset from the same release and
+install the measured, reversible host profile once:
 
 ```bash
-sha256sum --check LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh.sha256
 chmod +x LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh
 sudo ./LB_Omnichord.R*.Pi4-Pi5-realtime-setup.sh --user "$USER"
 sudo reboot
 ```
 
-The installer accepts only Pi 4/5 hardware, preserves the original boot
-command line in a checksummed rollback snapshot, activates the performance
-governor, and installs the measured AMY/PipeWire scheduling watcher. Both the
+The installer accepts only Pi 4/5 hardware, verifies its embedded setup
+payload, preserves the original boot command line in a checksummed rollback
+snapshot, activates the performance governor, and installs the measured
+AMY/PipeWire scheduling watcher. An independent `.sha256` asset remains
+available for users who want to verify the downloaded script itself, but this
+optional security step is not required by the startup instructions. Both the
 AppImage and `run_local.sh` display a startup warning when any part of that
 profile is absent. No warning is displayed on non-Pi systems or after the full
 profile is active.

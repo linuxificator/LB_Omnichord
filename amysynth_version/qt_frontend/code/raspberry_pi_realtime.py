@@ -181,6 +181,5 @@ def startup_warning_messages() -> tuple[str, ...]:
     return (
         "The tested Raspberry Pi realtime audio profile is not fully active "
         f"({missing}). Audio can crackle under load. Download {REALTIME_ASSET_PATTERN} "
-        "and its .sha256 file from the same GitHub release, verify it, then run "
-        "the setup script with sudo and reboot when requested.",
+        "from the same GitHub release, run it with sudo, and reboot when requested.",
     )

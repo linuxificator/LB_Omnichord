@@ -204,10 +204,11 @@ Each package has a matching `.sha256` asset. All timestamps are UTC. The P4
 ZIP retains the exact release tag, including `T`, as both its filename and its
 single extracted root directory.
 
-The Pi setup script is a separately checksummed, self-contained host installer
-generated from the versioned realtime tools in this repository. It configures
-the same measured profile checked by both source and packaged startup; it is
-not an application runtime dependency.
+The Pi setup script is a separately checksummed, self-contained host installer.
+It embeds the committed `tools/raspberry_pi/install_realtime_profile.sh` and
+its versioned helpers, verifies those embedded files before executing them,
+and configures the same measured profile checked by source and packaged
+startup. It is not an application runtime dependency.
 
 Every package contains the Qt frontend and supported AMY fork with the
 Gamma9001 PCM drum bank. At runtime they remain separate processes connected by the

@@ -16,6 +16,7 @@ FRONTEND = HERE.parent
 TOOLS = FRONTEND / "tools" / "raspberry_pi"
 RELEASE_PATTERN = re.compile(r"^R\d{14}$")
 EMBEDDED_FILES = (
+    ("install_realtime_profile.sh", 0o755),
     ("rt_pi_config.py", 0o755),
     ("rt_pi_runtime.py", 0o755),
     ("lb-omnichord-performance.service", 0o644),
@@ -42,60 +43,24 @@ def render_installer(release_stamp: str) -> str:
         "set -euo pipefail",
         "",
         f"release_asset={name!r}",
-        'install_root="/usr/local/lib/lb-omnichord-rt"',
-        'unit_root="/etc/systemd/system"',
-        'target_user="${SUDO_USER:-}"',
-        "",
-        "usage() {",
-        "    echo \"Usage: sudo ./$release_asset [--user USER]\"",
-        "}",
-        "",
-        "while [[ $# -gt 0 ]]; do",
-        '    case "$1" in',
-        '        --user) target_user="${2:-}"; shift 2 ;;',
-        "        -h|--help) usage; exit 0 ;;",
-        '        *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;',
-        "    esac",
-        "done",
-        "",
-        'if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then',
-        '    echo "Run this setup with sudo." >&2',
-        "    exit 1",
-        "fi",
-        'model="$(tr -d \'\\0\' </proc/device-tree/model 2>/dev/null || true)"',
-        'case "$model" in',
-        '    "Raspberry Pi 4"*|"Raspberry Pi 5"*) ;;',
-        '    *) echo "This asset supports Raspberry Pi 4 and Pi 5; found: ${model:-unknown}." >&2; exit 1 ;;',
-        "esac",
-        'if [[ -z "$target_user" || "$target_user" == "root" ]]; then',
-        '    echo "Could not infer the desktop user; pass --user USER." >&2',
-        "    exit 1",
-        "fi",
-        'if [[ ! "$target_user" =~ ^[a-z_][a-z0-9_-]*[$]?$ ]] || ! id "$target_user" >/dev/null 2>&1; then',
-        '    echo "Invalid local user: $target_user" >&2',
-        "    exit 1",
-        "fi",
-        "",
         'temporary="$(mktemp -d)"',
         'trap \'rm -rf -- "$temporary"\' EXIT',
         "decode_file() {",
-        '    local destination="$1" mode="$2"',
+        '    local destination="$1" mode="$2" expected="$3"',
         '    base64 --decode > "$temporary/payload"',
+        '    if ! printf "%s  %s\\n" "$expected" "$temporary/payload" | sha256sum --check --status -; then',
+        '        echo "Embedded setup payload failed its integrity check." >&2',
+        "        exit 1",
+        "    fi",
         '    install -m "$mode" "$temporary/payload" "$destination"',
         "}",
-        "",
-        'install -d -m 755 "$install_root"',
     ]
     for file_name, mode in EMBEDDED_FILES:
-        destination = (
-            f'$unit_root/{file_name}'
-            if file_name.endswith(".service")
-            else f'$install_root/{file_name}'
-        )
+        digest = hashlib.sha256((TOOLS / file_name).read_bytes()).hexdigest()
         marker = f"__LB_OMNICHORD_{file_name.upper().replace('.', '_').replace('@', 'AT')}__"
         sections.extend(
             (
-                f'decode_file "{destination}" {mode:o} <<\'{marker}\'',
+                f'decode_file "$temporary/{file_name}" {mode:o} {digest} <<\'{marker}\'',
                 _encoded(TOOLS / file_name),
                 marker,
             )
@@ -103,19 +68,8 @@ def render_installer(release_stamp: str) -> str:
     sections.extend(
         (
             "",
-            'python3 "$install_root/rt_pi_config.py" apply --profile audio-split',
-            'python3 "$install_root/rt_pi_config.py" set-governor performance',
-            "systemctl daemon-reload",
-            "systemctl enable --now lb-omnichord-performance.service",
-            'systemctl enable --now "lb-omnichord-rt-policy@$target_user.service"',
-            "",
-            'if python3 "$install_root/rt_pi_config.py" verify --profile audio-split >/dev/null; then',
-            '    echo "Realtime boot profile is active; LB Omnichord is ready."',
-            "else",
-            '    echo "Realtime services are installed and enabled for $target_user."',
-            '    echo "Reboot this Raspberry Pi, then start LB Omnichord again."',
-            "fi",
-            'echo "Rollback instructions: $install_root/rt_pi_config.py rollback --snapshot PATH"',
+            'LB_OMNICHORD_RELEASE_ASSET="$release_asset" \\',
+            '    "$temporary/install_realtime_profile.sh" "$@"',
             "",
         )
     )

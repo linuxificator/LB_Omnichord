@@ -117,14 +117,49 @@ class RtPiConfigTests(unittest.TestCase):
             output.name,
             "LB_Omnichord.R20260909153000.Pi4-Pi5-realtime-setup.sh",
         )
-        self.assertIn("Raspberry Pi 4", source)
-        self.assertIn("Raspberry Pi 5", source)
-        self.assertIn("apply --profile audio-split", source)
-        self.assertIn("set-governor performance", source)
-        self.assertIn("lb-omnichord-rt-policy@$target_user.service", source)
+        self.assertIn("install_realtime_profile.sh", source)
         self.assertIn("rt_pi_runtime.py", source)
+        self.assertIn("sha256sum --check --status", source)
+        for file_name, _mode in asset_builder.EMBEDDED_FILES:
+            self.assertIn(asset_builder._encoded(TOOLS / file_name), source)
         self.assertEqual(fields[1], output.name)
         self.assertEqual(fields[0], hashlib.sha256(source.encode()).hexdigest())
+
+    def test_checkout_setup_script_is_the_release_asset_authority(self) -> None:
+        installer = (TOOLS / "install_realtime_profile.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("apply --profile audio-split", installer)
+        self.assertIn("set-governor performance", installer)
+        self.assertIn("lb-omnichord-rt-policy@$target_user.service", installer)
+        self.assertIn("Raspberry Pi 4", installer)
+        self.assertIn("Raspberry Pi 5", installer)
+        self.assertIn(
+            '("install_realtime_profile.sh", 0o755)',
+            (ROOT / "packaging" / "build_rpi_realtime_setup.py").read_text(
+                encoding="utf-8"
+            ),
+        )
+
+    def test_startup_warning_keeps_checksum_details_out_of_the_ui(self) -> None:
+        original_inspector = realtime_status.inspect_realtime_facts
+        try:
+            realtime_status.inspect_realtime_facts = lambda: (
+                realtime_status.RealtimeFacts(
+                    "Raspberry Pi 4 Model B Rev 1.1",
+                    "rootwait",
+                    "",
+                    ("ondemand",),
+                    False,
+                )
+            )
+            warning = realtime_status.startup_warning_messages()[0]
+        finally:
+            realtime_status.inspect_realtime_facts = original_inspector
+
+        self.assertIn("run it with sudo", warning)
+        self.assertNotIn("sha256", warning.casefold())
+        self.assertNotIn("checksum", warning.casefold())
 
     def test_apply_reports_whether_the_running_kernel_needs_a_reboot(self) -> None:
         source = (TOOLS / "rt_pi_config.py").read_text(encoding="utf-8")
