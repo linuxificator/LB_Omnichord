@@ -197,6 +197,26 @@ case used 28.5% of callback-core time with 1.778 ms p99 runtime.
 Keep the synthetic level very low: CPU cost is unchanged, while hundreds of
 audible oscillators are unsafe and do not make the capacity result stronger.
 
+## Primary mechanism references
+
+- Linux [`sched(7)`](https://man7.org/linux/man-pages/man7/sched.7.html)
+  defines `RLIMIT_RTPRIO` as the ceiling that lets an unprivileged process set
+  `SCHED_FIFO`/`SCHED_RR` for its own threads or same-user target threads.
+- systemd
+  [`systemd.exec(5)`](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html)
+  owns per-service `LimitRTPRIO=`; a user service cannot raise it beyond the
+  limit inherited by its user manager, which is why both the login allowance
+  and explicit PipeWire unit limit are verified.
+- PipeWire's
+  [`module-rt`](https://docs.pipewire.org/page_module_rt.html) documents that
+  its realtime priority requires a matching `RLIMIT_RTPRIO` ceiling.
+- PipeWire's
+  [`pipewire.conf(5)`](https://docs.pipewire.org/page_man_pipewire_conf_5.html)
+  owns `loop.rt-prio`, `thread.name` and `thread.affinity` for its data loops.
+
+These are the authorities implemented by the setup. The application wrapper
+does not emulate their policy or lifecycle.
+
 ## Rollback
 
 First disable the persistent governor and remove the optional user limit:
