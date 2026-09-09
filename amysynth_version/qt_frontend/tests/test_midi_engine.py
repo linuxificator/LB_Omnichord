@@ -16,6 +16,8 @@ from midi_player import (  # noqa: E402
     DEFAULT_CHORD_INPUT_CHANNEL,
     DEFAULT_MIDI_CHANNELS,
     LEGACY_FACTORY_MIDI_CHANNELS,
+    MIDI_PRESET_COUNT,
+    MIDI_ROW_COUNT,
     MidiAmyEngine,
     MidiPlayerBackend,
     _migrated_factory_channel_defaults,
@@ -28,6 +30,13 @@ from gm_percussion import (  # noqa: E402
     OMNI_REFERENCE_PERCUSSION_VOLUME,
     midi_drum_amplitude,
     resolve_gm_percussion,
+)
+from midi_levels import (  # noqa: E402
+    MIDI_PITCHED_REFERENCE_ROW_VOLUME,
+    MIDI_PITCHED_REFERENCE_VELOCITY,
+    OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+    midi_pitched_synth_level,
+    normalized_midi_velocity,
 )
 from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
 from resolved_config import resolve_amy_config_data  # noqa: E402
@@ -722,7 +731,82 @@ class MidiAmyEngineTests(unittest.TestCase):
         engine = MidiAmyEngine(client)
         client.events.clear()
         engine.configure_row(0, "dx7_215", {}, 0.5)
-        self.assertIn(("wire", "i5iV0.2Z"), client.events)
+        expected = midi_pitched_synth_level(0.5, 0.4)
+        self.assertIn(("wire", f"i5iV{expected:.9g}Z"), client.events)
+
+    def test_every_factory_pitched_row_uses_the_same_reference_policy(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        reference_velocity = normalized_midi_velocity(
+            MIDI_PITCHED_REFERENCE_VELOCITY,
+        )
+
+        checked = 0
+        for number in range(1, MIDI_PRESET_COUNT + 1):
+            data = json.loads(
+                (
+                    ROOT
+                    / "instruments"
+                    / "midi_default_presets"
+                    / f"m{number}.json"
+                ).read_text(encoding="utf-8")
+            )
+            for row in data["rows"]:
+                key = str(row["selected"])
+                if key == "drum_kit_0":
+                    continue
+                stored_volume = float(row["volume"])
+                actual = engine.pitched_row_level(key, stored_volume) * reference_velocity
+                expected = (
+                    OMNI_REFERENCE_CHORD_NOTE_LEVEL
+                    * stored_volume
+                    / MIDI_PITCHED_REFERENCE_ROW_VOLUME
+                    * client.resolved_config.instrument_level(key)
+                )
+                self.assertAlmostEqual(actual, expected)
+                checked += 1
+
+        self.assertEqual(checked, MIDI_PRESET_COUNT * (MIDI_ROW_COUNT - 1))
+
+    def test_velocity_60_pitched_midi_note_matches_chord_note_reference(self) -> None:
+        synth_level = midi_pitched_synth_level(
+            MIDI_PITCHED_REFERENCE_ROW_VOLUME,
+        )
+        velocity_level = normalized_midi_velocity(
+            MIDI_PITCHED_REFERENCE_VELOCITY,
+        )
+
+        self.assertAlmostEqual(
+            synth_level * velocity_level,
+            OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+        )
+        self.assertLess(
+            midi_pitched_synth_level(0.25) * velocity_level,
+            OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+        )
+        self.assertGreater(
+            midi_pitched_synth_level(0.35) * velocity_level,
+            OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+        )
+
+    def test_pitched_midi_keeps_standard_velocity_in_note_command(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        engine.note_on(0, 2, 60, 60.0, MIDI_PITCHED_REFERENCE_VELOCITY)
+
+        commands = [value for kind, value in client.events if kind == "wire"]
+        self.assertEqual(commands, ["n60l0.472440945i5Z"])
+
+    def test_effective_pitched_level_is_not_clipped_at_unity(self) -> None:
+        client = _Client()
+        engine = MidiAmyEngine(client)
+        client.events.clear()
+
+        engine.set_row_volume(0, 1.25)
+
+        self.assertEqual(client.events, [("wire", "i5iV1.25Z")])
 
     def test_rom_patch_waits_before_parameters_and_routing(self) -> None:
         client = _Client()
@@ -743,7 +827,10 @@ class MidiAmyEngineTests(unittest.TestCase):
                 ("wire", "compat-215-5"),
                 ("wire", "v0o7i5Z"),
                 ("wire", "i5iy4Z"),
-                ("wire", "i5iV0.28Z"),
+                (
+                    "wire",
+                    f"i5iV{midi_pitched_synth_level(0.28):.9g}Z",
+                ),
                 ("wire", "y4h0Z"),
                 ("wire", "y4hS1,1Z"),
                 ("wire", "y4V1Z"),

@@ -34,6 +34,7 @@ from osc_input import (
 )
 from musical_state import TuningSnapshot, tune_note
 from gm_percussion import midi_drum_amplitude, resolve_gm_percussion
+from midi_levels import midi_pitched_synth_level, normalized_midi_velocity
 from synth_programs import resolve_program
 from synth_state import SynthState
 from shared_reverb import (
@@ -157,12 +158,12 @@ class MidiAmyEngine:
     def _f(self, value: float) -> str:
         return self.client._f(value)
 
-    def balanced_volume(self, key: str, volume: float) -> float:
-        multiplier = max(
-            0.0,
+    def pitched_row_level(self, key: str, volume: float) -> float:
+        """Resolve the row UI level to AMY's calibrated output multiplier."""
+        return midi_pitched_synth_level(
+            volume,
             self.client.resolved_config.instrument_level(str(key)),
         )
-        return float(volume) * multiplier
 
     def _patch(self, key: str) -> int | None:
         patch_map = getattr(self.client, "patch_map", {})
@@ -278,12 +279,15 @@ class MidiAmyEngine:
 
         self._configured_rows.add(row)
         self._route(synth, bus)
-        self.set_row_volume(row, self.balanced_volume(key, volume))
+        self.set_row_volume(row, self.pitched_row_level(key, volume))
         self._apply_reverb_bus(bus)
         self._apply_master_bus(bus)
 
     def set_row_volume(self, row: int, volume: float) -> None:
-        value = max(0.0, min(1.0, float(volume)))
+        # ``volume`` is already an effective output gain.  It may exceed one
+        # at deliberately high UI levels; AMY's iV is an output multiplier,
+        # not a normalized control or note velocity.
+        value = max(0.0, float(volume))
         self._wire(f"i{self.row_synths[row]}iV{self._f(value)}Z")
 
     def set_reverb(
@@ -350,7 +354,7 @@ class MidiAmyEngine:
         old = self._active_notes.pop(key, None)
         if old is not None:
             self._wire(f"n{self._f(old)}l0i{synth}Z")
-        level = max(0.0, min(1.0, int(velocity) / 127.0))
+        level = normalized_midi_velocity(velocity)
         self._wire(f"n{self._f(note)}l{self._f(level)}i{synth}Z")
         self._active_notes[key] = float(note)
 
@@ -367,7 +371,7 @@ class MidiAmyEngine:
         velocity: int = 105,
     ) -> None:
         synth = self.row_synths[row]
-        level = max(0.0, min(1.0, velocity / 127.0))
+        level = normalized_midi_velocity(velocity)
         midi_key = int(round(note))
 
         with self._preview_lock:
@@ -1874,7 +1878,7 @@ class MidiPlayerBackend(QObject):
             key = str(self._runtime(row).selected_definition.key)
             self.engine.set_row_volume(
                 row,
-                self.engine.balanced_volume(key, value),
+                self.engine.pitched_row_level(key, value),
             )
         self._emit_state()
 
