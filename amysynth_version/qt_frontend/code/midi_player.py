@@ -1667,15 +1667,9 @@ class MidiPlayerBackend(QObject):
                 elif kind == "bass_voicing":
                     self.owner._bass_voicing_shift = int(round(value))
                 elif kind == "bass_riff_selector":
-                    candidates = self.owner._available_bass_riffs()
-                    if candidates:
-                        selected = max(
-                            1,
-                            min(len(candidates), int(round(value))),
-                        )
-                        self.owner._bass_riff_selector = selected
-                        self.owner._active_bass_riff_id = candidates[selected - 1].riff_id
-                        self.owner._bass_riff_context = self.owner._current_bass_riff_context()
+                    self.owner._choose_bass_riff(
+                        fallback_selector=int(round(value)),
+                    )
 
     def replace_control_bindings(self, screen: str, data: Any) -> None:
         service = self._binding_service()

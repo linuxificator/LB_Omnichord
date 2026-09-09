@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import unittest
 import time
 
@@ -456,7 +457,7 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("setBassRiffSelector", 5.0)
             self.assertEqual(
                 str(app.query("selectedBassRiffId")),
-                "riff_0006_pop_8_minor_triadic",
+                "bass_shared_0045",
             )
 
             # With transport stopped, compatibility alone does not make a riff
@@ -471,23 +472,85 @@ class FrontendIntegrationTests(unittest.TestCase):
             app.action("toggleRhythm")
             app.bridge.wait_idle(timeout=8.0)
 
-            # The same riff is sixth in the new compatible set. While it is
-            # playing, identity wins and the slider follows its new position.
+            # The outgoing rank survives even though the exact phrase is not
+            # compatible with the altered destination chord.
             app.action("setRowChordType", 0, 33)
-            self.assertEqual(int(app.query("bassRiffSelector")), 6)
+            self.assertEqual(int(app.query("bassRiffSelector")), 5)
             self.assertEqual(
                 str(app.query("selectedBassRiffId")),
-                "riff_0006_pop_8_minor_triadic",
+                "bass_shared_0051",
             )
 
-            # That riff is not major-compatible, so this set change uses the
-            # preset/default selector position instead.
+            # A second live context change still keeps rank 5 and chooses its
+            # deterministic compatible destination phrase.
             app.action("setRowChordType", 0, 0)
-            self.assertEqual(int(app.query("bassRiffSelector")), 1)
+            self.assertEqual(int(app.query("bassRiffSelector")), 5)
             self.assertEqual(
                 str(app.query("selectedBassRiffId")),
-                "riff_0001_pop_8_root_pedal",
+                "bass_shared_0042",
             )
+
+    def test_riff_rank_continuity_depends_on_transport_not_bass_mode(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            app.action("setRhythmIndex", 0)  # pop_8
+            app.action("setRowChordType", 0, 1)  # minor
+            app.action("selectChord", 0, 0)
+            app.action("setBassRiffSelector", 4.0)
+            app.action("setRhythmBassActivity", 2.0)  # simple activity, not R
+            if bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+            app.action("toggleRhythm")
+
+            app.action("selectChord", 0, 4)  # root-only live change
+            self.assertEqual(int(app.query("bassRiffSelector")), 4)
+            app.action("setRowChordType", 0, 0)  # chord-type live change
+            self.assertEqual(int(app.query("bassRiffSelector")), 4)
+            app.action("setRhythmIndex", 1)  # rhythm live change
+            self.assertEqual(int(app.query("bassRiffSelector")), 4)
+
+            # Stopping alone retains the display. A subsequent stopped root
+            # selection resolves the preset/default rank, even though suffix
+            # and rhythm context keys themselves do not change.
+            app.action("toggleRhythm")
+            self.assertEqual(int(app.query("bassRiffSelector")), 4)
+            app.action("selectChord", 0, 5)
+            self.assertEqual(int(app.query("bassRiffSelector")), 1)
+
+    def test_ldr_switch_replaces_only_activity_bass_with_ladder_pitches(self) -> None:
+        bass_on = re.compile(r"^H\d+,\d+,\d+n(-?\d+(?:\.\d+)?)l(?!0(?:\.0+)?i1Z)")
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=8.0)
+            app.action("setRhythmIndex", 0)  # pop_8
+            app.action("setTuningModeIndex", 1)  # equal temperament
+            app.action("setRowChordType", 0, 0)  # major
+            app.action("selectChord", 0, 0)  # C
+            app.action("setRhythmBassActivity", 4.0)
+            if not bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+            app.action("toggleRhythm")
+            app.bridge.wait_idle(timeout=8.0)
+
+            checkpoint = app.bridge.count()
+            app.action("setStrumLadderMode", True)
+            app.bridge.wait_for_line_match(
+                lambda line: "n38l" in line and "i1Z" in line,
+                "LDR-only D bass pitch",
+                start=checkpoint,
+                timeout=3.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            lines = app.bridge.lines_since(checkpoint)
+            notes = {
+                float(match.group(1))
+                for line in lines
+                if (match := bass_on.match(line)) is not None
+            }
+            self.assertEqual(notes, {36.0, 38.0, 40.0, 43.0})
+            self.assertNotIn("zY0Z", lines)
+            self.assertNotIn("zY1Z", lines)
+            self.assertNotIn("S16384Z", lines)
+            self.assertNotIn("S20480Z", lines)
 
     def test_sustain_frontend_range_and_numeric_value(self) -> None:
         with HeadlessApp(native_amy=False) as app:

@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 import app_core  # noqa: E402
+import performance_backend  # noqa: E402
 from config_migrations import CURRENT_CONFIG_REVISION  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
 from midi_input import (  # noqa: E402
@@ -329,6 +330,54 @@ class SoundBalanceFeatureTests(unittest.TestCase):
             {note % 12 for note in backend._ladder_notes()},
             {0, 2, 4, 7, 9},
         )
+
+    def test_all_bass_activities_use_the_selected_apg_or_ldr_pitch_pool(self) -> None:
+        chords = app_core.load_chords(ROOT / "music" / "chords.csv")
+        backend = performance_backend.InstrumentBackend.__new__(
+            performance_backend.InstrumentBackend
+        )
+        backend._active_row = 0
+        backend._row_chord_indexes = [0]
+        backend._chords = chords
+
+        for chord_index, chord in enumerate(chords):
+            backend._row_chord_indexes[0] = chord_index
+            for root in range(12):
+                backend._active_root_semitone = root
+                for ladder in (False, True):
+                    backend._strum_ladder_mode = ladder
+                    expected_intervals = (
+                        app_core.ladder_pattern(chord.suffix)[0]
+                        if ladder
+                        else chord.intervals
+                    )
+                    expected_pitch_classes = {
+                        (root + interval) % 12 for interval in expected_intervals
+                    }
+                    for shift in range(
+                        -performance_backend.BASS_VOICING_LIMIT,
+                        performance_backend.BASS_VOICING_LIMIT + 1,
+                    ):
+                        backend._bass_voicing_shift = shift
+                        notes = backend._current_bass_notes()
+                        self.assertEqual(
+                            {note % 12 for note in notes},
+                            expected_pitch_classes,
+                            f"{chord.suffix}/root={root}/ladder={ladder}/shift={shift}",
+                        )
+                        self.assertEqual(
+                            len(notes),
+                            len(expected_pitch_classes),
+                            chord.suffix,
+                        )
+
+        backend._row_chord_indexes[0] = 0  # C major
+        backend._active_root_semitone = 0
+        backend._bass_voicing_shift = 0
+        backend._strum_ladder_mode = False
+        self.assertEqual(backend._current_bass_notes(), [36, 40, 43])
+        backend._strum_ladder_mode = True
+        self.assertEqual(backend._current_bass_notes(), [36, 38, 40, 43, 45])
 
     def test_every_chord_has_an_audited_ladder_with_all_chord_tones(self) -> None:
         chords = app_core.load_chords(ROOT / "music" / "chords.csv")
