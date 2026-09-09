@@ -353,9 +353,10 @@ class RegistrationWatcher:
         except BaseException:
             server.close()
             raise
-        if self.path.stat().st_uid != self.uid:
-            os.chown(self.path, self.uid, -1)
-        self.path.chmod(0o600)
+        # Keep the socket root-owned and grant connect permission only. Every
+        # request is still rejected unless SO_PEERCRED reports the configured
+        # desktop UID, so no ownership-changing capability is needed.
+        self.path.chmod(0o622)
         server.listen(8)
         server.setblocking(False)
         self.server = server

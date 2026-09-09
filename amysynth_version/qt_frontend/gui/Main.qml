@@ -21,6 +21,8 @@ ApplicationWindow {
         id: startupWarningDialog
         anchors.centerIn: parent
         width: Math.min(760, Math.max(420, parent.width - 80))
+        implicitHeight: 300
+        height: Math.min(implicitHeight, parent.height - 40)
         modal: true
         title: "Raspberry Pi realtime setup recommended"
         standardButtons: Dialog.Ok

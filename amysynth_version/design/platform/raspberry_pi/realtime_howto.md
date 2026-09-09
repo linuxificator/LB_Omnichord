@@ -109,8 +109,9 @@ sudo systemctl enable --now \
 The watcher does not select AMY or the frontend by executable name, parent,
 command-line substring or caller-supplied PID. Each process sends its semantic
 role and common absolute AMY wire-socket endpoint to
-`/run/lb-omnichord-rt/policy-UID.sock`. The socket is accessible only to that
-desktop UID. Linux `SO_PEERCRED` supplies the actual PID, UID and GID; the open
+`/run/lb-omnichord-rt/policy-UID.sock`. The socket remains root-owned and only
+grants connect permission; Linux `SO_PEERCRED` supplies the actual PID, UID
+and GID and rejects every UID except the configured desktop user. The open
 connection remains its lifecycle token. A frontend registration can only
 match the AMY service registered for the same endpoint. This prevents an
 unrelated process with a similar name from accidentally receiving realtime

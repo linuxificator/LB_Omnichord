@@ -192,7 +192,7 @@ class RtPiConfigTests(unittest.TestCase):
         self.assertEqual(service["RuntimeDirectoryMode"], "0755")
         self.assertEqual(
             set(service["CapabilityBoundingSet"].split()),
-            {"CAP_SYS_NICE", "CAP_CHOWN"},
+            {"CAP_SYS_NICE"},
         )
 
     def test_startup_warning_keeps_checksum_details_out_of_the_ui(self) -> None:

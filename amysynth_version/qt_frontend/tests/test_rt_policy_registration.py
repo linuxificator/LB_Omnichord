@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -103,6 +104,7 @@ class RegistrationBoundaryTests(unittest.TestCase):
                 watcher.open()
             except PermissionError as exc:
                 self.skipTest(f"sandbox blocks Unix sockets: {exc}")
+            self.assertEqual(stat.S_IMODE(watcher.path.stat().st_mode), 0o622)
             service = self._child("amy-service", endpoint, directory)
             frontend: subprocess.Popen[str] | None = None
             try:
@@ -127,6 +129,38 @@ class RegistrationBoundaryTests(unittest.TestCase):
                     if process is None:
                         continue
                     self._stop_child(process)
+                watcher.close()
+
+    def test_kernel_uid_mismatch_is_rejected_before_policy_application(self) -> None:
+        applied: list[bool] = []
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            watcher = runtime.RegistrationWatcher(
+                os.getuid(),
+                runtime_directory=directory,
+                apply_policy=lambda *_args, **_kwargs: applied.append(True),
+            )
+            try:
+                watcher.open()
+            except PermissionError as exc:
+                self.skipTest(f"sandbox blocks Unix sockets: {exc}")
+            service = self._child("amy-service", directory / "amy.sock", directory)
+            try:
+                events = watcher.selector.select(timeout=5)
+                self.assertTrue(events)
+                with mock.patch.object(
+                    runtime,
+                    "peer_credentials",
+                    return_value=(service.pid, os.getuid() + 1, os.getgid()),
+                ):
+                    registration = watcher.accept()
+                result = json.loads(service.stdout.readline())  # type: ignore[union-attr]
+                self.assertIsNone(registration)
+                self.assertFalse(result["accepted"])
+                self.assertIn("does not match", result["issue"])
+                self.assertEqual(applied, [])
+            finally:
+                self._stop_child(service)
                 watcher.close()
 
     def test_frontend_cannot_bind_to_an_unrelated_service_endpoint(self) -> None:
