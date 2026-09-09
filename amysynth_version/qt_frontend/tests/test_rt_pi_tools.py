@@ -136,22 +136,40 @@ IPI0:       100        200        300        400       Rescheduling interrupts
         finally:
             runtime._read = original_read
 
-    def test_runtime_signature_changes_when_audio_processes_change(self) -> None:
+    def test_runtime_never_treats_init_as_a_frontend(self) -> None:
         original_parent = runtime.parent_pid
+        original_command = runtime.process_command
+        try:
+            runtime.parent_pid = lambda _pid: 1
+            runtime.process_command = lambda _pid: "/sbin/init"
+            self.assertIsNone(runtime.frontend_parent_pid(456))
+
+            runtime.parent_pid = lambda _pid: 123
+            runtime.process_command = lambda _pid: "/tmp/LB_Omnichord --fullscreen"
+            self.assertEqual(runtime.frontend_parent_pid(456), 123)
+
+            runtime.process_command = lambda _pid: "/usr/lib/systemd/systemd"
+            self.assertIsNone(runtime.frontend_parent_pid(456))
+        finally:
+            runtime.parent_pid = original_parent
+            runtime.process_command = original_command
+
+    def test_runtime_signature_changes_when_audio_processes_change(self) -> None:
+        original_frontend = runtime.frontend_parent_pid
         original_tasks = runtime.task_ids
         original_pipewire = runtime.discover_pipewire
         original_read = runtime._read
         try:
-            runtime.parent_pid = lambda _pid: 50
+            runtime.frontend_parent_pid = lambda _pid: 50
             runtime.task_ids = lambda pid: {60: [60, 61], 70: [70, 71]}[pid]
             runtime.discover_pipewire = lambda _uid=None: [70]
             runtime._read = lambda path: "data-loop.0" if path.parts[-2] == "71" else "other"
             first = runtime.runtime_signature(60)
-            runtime.parent_pid = lambda _pid: 51
+            runtime.frontend_parent_pid = lambda _pid: 51
             second = runtime.runtime_signature(60)
             self.assertNotEqual(first, second)
         finally:
-            runtime.parent_pid = original_parent
+            runtime.frontend_parent_pid = original_frontend
             runtime.task_ids = original_tasks
             runtime.discover_pipewire = original_pipewire
             runtime._read = original_read

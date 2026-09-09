@@ -91,6 +91,10 @@ After applying a policy, the watcher sleeps on Linux process descriptors; it
 does not continuously poll the process table. It wakes on an AMY/PipeWire
 restart or for a low-frequency health check.
 
+A parent is treated as a frontend only when it is an actual packaged
+`LB_Omnichord` process. A standalone `--amy-service` commonly has systemd as
+PID 1 for its parent; PID 1 and other launch supervisors are never retuned.
+
 Check the result after starting LB Omnichord:
 
 ```sh

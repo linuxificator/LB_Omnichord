@@ -90,6 +90,19 @@ def parent_pid(pid: int) -> int | None:
     return value or None
 
 
+def frontend_parent_pid(service_pid: int) -> int | None:
+    """Return only a verified packaged frontend parent, never init/systemd."""
+
+    candidate = parent_pid(service_pid)
+    if candidate is None or candidate <= 1:
+        return None
+    command = process_command(candidate)
+    tokens = command.split()
+    if not tokens or "--amy-service" in tokens:
+        return None
+    return candidate if Path(tokens[0]).name == "LB_Omnichord" else None
+
+
 def select_active_worker(pid: int, seconds: float = 0.35) -> ThreadInfo:
     before = snapshot_threads(pid)
     time.sleep(seconds)
@@ -133,7 +146,7 @@ def runtime_signature(service_pid: int, uid: int | None = None) -> tuple[object,
     )
     return (
         service_pid,
-        parent_pid(service_pid),
+        frontend_parent_pid(service_pid),
         tuple(task_ids(service_pid)),
         pipewire_loops,
     )
@@ -169,7 +182,7 @@ def set_thread_policy(tid: int, cpus: set[int], fifo_priority: int = 0) -> None:
 def apply_split_policy(service_pid: int, uid: int | None = None) -> dict[str, object]:
     """Keep general work on 0-1, PipeWire on 2 and AMY callback on 3."""
 
-    frontend_pid = parent_pid(service_pid)
+    frontend_pid = frontend_parent_pid(service_pid)
     frontend_threads = task_ids(frontend_pid) if frontend_pid is not None else []
     for tid in frontend_threads:
         set_thread_policy(tid, {0, 1})
