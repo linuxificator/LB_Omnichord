@@ -31,9 +31,9 @@ Each riff already contains its own complete note-on timing in PPQ ticks.
 - rhythms: **54**
 - chord suffixes: **36**
 - rhythm/chord combinations: **1944**
-- riffs: **756**
-- minimum candidates for any rhythm/chord combination: **4**
-- maximum candidates for any rhythm/chord combination: **9**
+- riffs: **1664**
+- minimum candidates for any rhythm/chord combination: **5**
+- maximum candidates for any rhythm/chord combination: **10**
 - combinations with fewer than 3 candidates: **0**
 
 This means the catalogue already exceeds the hard requirement of at least one riff for every current rhythm/chord combination, and also meets the preferred target of at least three candidates everywhere.
@@ -159,7 +159,9 @@ A simple selector can:
    - `rhythm_id in compatible_rhythms`; and
    - `chord_suffix in compatible_chords`;
 4. optionally prefer riffs whose `compatible_scales` match a chosen tonal colour;
-5. choose among remaining riffs using `selection_weight`;
+5. select the requested authored `activity_rank` (`1..5`), retaining a
+   compatible stable riff ID where possible and using `selection_weight` only
+   to make a deterministic choice among candidates at that rank;
 6. transpose from C to the current chord root;
 7. schedule the riff's own PPQ events.
 
@@ -229,18 +231,33 @@ Tests must prove at minimum:
 6. every referenced scale ID exists in `scale_vocabulary`;
 7. every event tick lies inside its phrase;
 8. every event duration is positive;
-9. every current rhythm/chord combination has at least one candidate;
-10. preferably preserve the present stronger invariant of **>= 3**;
+9. every current rhythm/chord combination has each authored activity rank
+   `1..5`;
+10. preserve the present stronger invariant of **5..10 total candidates** per
+    context;
 11. transposition changes pitch only, never event timing;
 12. the riff subsystem does not read `bass_levels` to create or modify riff events;
 13. live riff changes do not stop/reset the AMY sequencer or affect drum/chord lanes.
 
 ## Current runtime choices
 
-The current runtime owns the GUI, one-based manual selection, preset selector
-storage, immediate lane-local replacement and AMY tag allocation as described
-by the authoritative documents above. Synth selection remains the existing
-bass-role responsibility.
+The current runtime owns the GUI, the fixed five-position selector, preset
+rank storage, immediate lane-local replacement and AMY tag allocation as
+described by the authoritative documents above. A selector value is an
+authored activity rank, not a position in a changing candidate list. This
+makes the same control mean progressively denser and more adventurous material
+for every rhythm and chord while stable riff IDs still prevent unnecessary
+changes during compatible live transitions. Synth selection remains the
+existing bass-role responsibility.
+
+The four simple activity levels select pitch source independently of timing:
+APG uses the active chord-tone collection and LDR uses the existing audited
+chord-specific ladder collection. They do not follow individual strum gestures
+and do not copy timing from the independent riff catalogue.
+
+The catalogue contains optional TB-303 authoring annotations. They are retained
+as forward-compatible data only: this implementation deliberately does not add
+accent, slide or TB-303-specific synthesis behavior.
 
 The invariant is: **a bass riff is its own musical phrase, with its own
 rhythm**. It must not be collapsed into the simple bass accompaniment.

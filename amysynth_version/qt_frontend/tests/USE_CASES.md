@@ -808,17 +808,25 @@ regression proves that hold promotion stops only future starts and emits no imme
 **RHYTHM-10 — R selects independent, live-transposed bass riffs**
 
 - Selecting `R` changes `bass voicing` into a discrete `riff selector` whose
-  `1..N` range is the stable catalogue order for the current rhythm ID and exact
-  chord suffix. Levels 1–4 restore the voicing slider and simple bass patterns.
+  fixed `1..5` range selects the catalogue's authored activity rank for the
+  current rhythm ID and exact chord suffix. Levels 1–4 restore the voicing
+  slider and simple bass patterns.
 - A riff uses only its own 96-PPQ ticks, durations, pitches and velocities; it
   is never generated from or quantized to `rhythms.json` `bass_levels`.
 - C2-normalized pitches transpose by the active chord root and use normal OMNI
   tuning. A root change alters pitch but not timing, duration or velocity.
+- For simple activity, APG draws pitch from active chord tones and LDR from the
+  existing chord-specific ladder collection. Changing APG/LDR while playing
+  replaces only the bass lane and preserves transport and phase.
 - If a playing riff remains compatible after an available-set change, its ID is
-  retained and the selector follows its position in the new set. Otherwise the
-  preset selector, or the application default for legacy presets, is used.
+  retained and its authored rank remains selected. Otherwise a deterministic
+  weighted candidate at the current rank is used. A stopped preset/rhythm
+  change recalls its stored rank, or the application default for legacy
+  presets.
 - Riff selector changes replace only bass tags and never stop/reset transport
   or edit the percussion/automatic-chord ranges.
+- TB-303 accent/slide annotations in the source catalogue are not runtime
+  behavior in this release.
 
 **RHYTHM-11 — A selects complete circular chord arpeggios**
 

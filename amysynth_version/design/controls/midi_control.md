@@ -211,7 +211,7 @@ normal live-value protection above.
 Live rhythm continuity has higher priority for the rhythm controls it protects.
 While rhythm transport is running, neither rhythm tempo nor bass voicing takes
 a destination-preset numeric value, including during a binding-conflict
-handoff. A bound riff selector maps over the currently available `1..N` range;
+handoff. A bound riff selector maps over the fixed authored `1..5` rank range;
 the `bass_voicing` and `bass_riff_selector` bindings remain distinct when the
 shared visual slider changes function. The binding handoff and its visual
 feedback still occur; only the currently effective musical value survives

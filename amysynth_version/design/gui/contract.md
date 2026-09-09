@@ -136,9 +136,10 @@ arpeggio controls remain unchanged.
 
 With bass activity 1 through 4, the lower bass slider is labelled `bass
 voicing` and keeps its `-6..6` inversion range. Selecting `R` changes that same
-Qt slider to `riff selector`, with the discrete range `1..N` for the riffs
-compatible with the current rhythm and chord suffix. No custom pointer or
-gesture handling is introduced for either function.
+Qt slider to `riff selector`, with the fixed discrete range `1..5`. Each value
+selects an authored activity rank among riffs compatible with the current
+rhythm and chord suffix; it is not a position in a variable-length list. No
+custom pointer or gesture handling is introduced for either function.
 
 The `CHORD ON/OFF` button reports its current state: `CHORD ON` means sequencer
 chords are enabled and `CHORD OFF` means they are disabled. Its ON appearance
