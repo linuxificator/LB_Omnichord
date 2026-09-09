@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 
@@ -80,17 +82,17 @@ Item {
 
                 height: buttonRow.height
                 text:
-                    root.levelLabels.length > index
-                    ? String(root.levelLabels[index])
-                    : String(modelData)
+                    root.levelLabels.length > levelButton.index
+                    ? String(root.levelLabels[levelButton.index])
+                    : String(levelButton.modelData)
 
                 property bool selectedState:
                     root.currentLevel
-                    === Number(modelData)
+                    === Number(levelButton.modelData)
                 property var midiTarget:
                     root.midiTargetForLevel === null
                     ? ({})
-                    : root.midiTargetForLevel(Number(modelData))
+                    : root.midiTargetForLevel(Number(levelButton.modelData))
 
                 font.pixelSize: 13
                 font.bold: true
@@ -133,7 +135,7 @@ Item {
 
                 onClicked:
                     root.selected(
-                        Number(modelData)
+                        Number(levelButton.modelData)
                     )
             }
         }
