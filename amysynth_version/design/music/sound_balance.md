@@ -153,6 +153,15 @@ a target that forces every deliberately transient or spectrally narrow patch
 to the same number. A universal gain derived from a held-note sweep is invalid
 because accompaniment gates and patch envelopes dominate that comparison.
 
+The independent riff catalogue and the older activity catalogue originally
+used different event-strength references. Riff velocities average 0.724,
+whereas activity amplitudes average 0.527; their note gates are comparable.
+Activity note-on levels therefore receive a bounded 1.4 source calibration
+(about +2.9 dB, capped at 1.0) before becoming AMY velocity. This aligns the
+strength of a note when switching between `R` and activity 1--4 without
+changing pattern density, gates, preset bass volume, patch normalization or
+any riff event.
+
 Gamma9001 fills have a separate data-owned output gain in
 `music/drums/drum_fill_levels.json`. A common `0.72` factor provides transient
 headroom; sparse per-fill multipliers correct measured within-style outliers.

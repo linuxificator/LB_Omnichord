@@ -52,6 +52,12 @@ cached independently, so moving the contact visual cannot invalidate it.
 
 ## CPU partition experiment
 
+This section records the earlier experiment without boot-time isolation. Its
+conclusion about merely pinning to an otherwise busy core remains valid, but it
+is superseded for dedicated installations by the properly isolated two-core
+experiment in [`realtime_research.md`](realtime_research.md). Isolation and
+splitting AMY from PipeWire are both material differences.
+
 Measurements with the fixed frontend compared the default scheduler with one
 and two CPUs withheld from Qt. Reserving two CPUs did not improve AMY: the host
 backend has one active render thread, and removing a second CPU only reduces

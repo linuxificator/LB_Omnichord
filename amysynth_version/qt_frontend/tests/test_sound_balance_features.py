@@ -23,6 +23,7 @@ from midi_input import (  # noqa: E402
 )
 import user_data  # noqa: E402
 import instrument_balance  # noqa: E402
+from rhythm_command_plan import BASS_ACTIVITY_VELOCITY_GAIN  # noqa: E402
 
 
 class SoundBalanceFeatureTests(unittest.TestCase):
@@ -76,6 +77,32 @@ class SoundBalanceFeatureTests(unittest.TestCase):
         )
         for preset, (value, wanted) in enumerate(zip(actual, expected), start=1):
             self.assertAlmostEqual(value, wanted, places=9, msg=f"P{preset}")
+
+    def test_activity_and_riff_catalogues_share_a_note_strength_reference(self) -> None:
+        rhythms = json.loads(
+            (ROOT / "music" / "rhythms.json").read_text(encoding="utf-8")
+        )["rhythms"]
+        riffs = json.loads(
+            (ROOT / "music" / "omnichord_bass_riffs.json").read_text(
+                encoding="utf-8"
+            )
+        )["riffs"]
+        activity = [
+            min(1.0, float(event["amp"]) * BASS_ACTIVITY_VELOCITY_GAIN)
+            for rhythm in rhythms
+            for level in rhythm["bass_levels"]
+            for event in level
+        ]
+        riff = [
+            float(event["velocity"]) / 127.0
+            for definition in riffs
+            for event in definition["timing"]["events"]
+        ]
+        self.assertAlmostEqual(
+            sum(activity) / len(activity),
+            sum(riff) / len(riff),
+            delta=0.01,
+        )
 
     def test_balance_report_validator_rejects_silence_and_clipping(self) -> None:
         report = {
