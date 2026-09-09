@@ -194,7 +194,7 @@ class PureCommandPlanTests(unittest.TestCase):
         )
         self.assertEqual(
             activity,
-            ((48, 192, "n40l0.5i2"), (60, 192, "n40l0i2")),
+            ((48, 192, "n40l0.7i2"), (60, 192, "n40l0i2")),
         )
         riff = compile_bass_events(
             config={"length_beats": 4, "bass_mode": "riff"},
@@ -220,6 +220,42 @@ class PureCommandPlanTests(unittest.TestCase):
             riff,
             ((12, 96, "n43l1i2"), (36, 96, "n43l0i2")),
         )
+
+    def test_bass_activity_calibration_is_bounded_and_riff_is_unchanged(self) -> None:
+        activity = compile_bass_events(
+            config={
+                "length_beats": 4,
+                "bass_events": [
+                    {"time": 0, "degree": 0, "amp": 0.88},
+                    {"time": 1, "degree": 0, "amp": 0.0},
+                ],
+            },
+            running=True,
+            bass_notes=(36.0,),
+            bass_riff=None,
+            synth=2,
+            bass_gate_beats=0.25,
+            ppq=48,
+        )
+        self.assertEqual(activity[0][2], "n36l1i2")
+        self.assertEqual(activity[2][2], "n36l0i2")
+
+        riff = compile_bass_events(
+            config={"length_beats": 4, "bass_mode": "riff"},
+            running=True,
+            bass_notes=(),
+            bass_riff={
+                "ppq": 48,
+                "phrase_ticks": 192,
+                "events": [
+                    {"tick": 0, "duration_ticks": 12, "note": 36, "velocity": 64}
+                ],
+            },
+            synth=2,
+            bass_gate_beats=0.25,
+            ppq=48,
+        )
+        self.assertEqual(riff[0][2], "n36l0.503937008i2")
 
     def test_drum_and_fill_plans_are_deterministic(self) -> None:
         fill = _Fill(

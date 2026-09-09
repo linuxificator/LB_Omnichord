@@ -27,6 +27,7 @@ import c_amy  # type: ignore  # noqa: E402
 
 from audio_metrics import audio_metrics  # noqa: E402
 from instrument_balance import build_plan  # noqa: E402
+from rhythm_command_plan import BASS_ACTIVITY_VELOCITY_GAIN  # noqa: E402
 
 
 SAMPLE_RATE = int(amy.AMY_SAMPLE_RATE)
@@ -80,6 +81,7 @@ def _render_pattern(
         off_block = round(off_seconds * SAMPLE_RATE / BLOCK_SIZE)
         level = max(0.0, min(1.0, float(event.get("amp", 1.0))))
         if role == "bass":
+            level = min(1.0, level * BASS_ACTIVITY_VELOCITY_GAIN)
             notes = (BASS_NOTES[int(event.get("degree", 0)) % len(BASS_NOTES)],)
         else:
             notes = CHORD_NOTES

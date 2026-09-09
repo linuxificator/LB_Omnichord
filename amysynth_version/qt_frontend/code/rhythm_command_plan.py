@@ -15,6 +15,12 @@ SEQUENCE_CONTROL_STOP = 0
 SEQUENCE_CONTROL_START = 1
 SEQUENCE_CONTROL_GATE = 2
 
+# The legacy activity catalogue was authored around a substantially quieter
+# event scale than the independent riff catalogue. This source calibration
+# aligns individual note strength while preserving activity dynamics, pattern
+# density, instrument/preset gain, and the riff path itself.
+BASS_ACTIVITY_VELOCITY_GAIN = 1.4
+
 
 class DrumEventLike(Protocol):
     @property
@@ -424,7 +430,13 @@ def compile_bass_events(
         degree = int(event.get("degree", 0))
         note = float(bass_notes[degree % len(bass_notes)])
         tick = round(float(event.get("time", 0.0)) * ppq)
-        velocity = max(0.0, min(1.0, float(event.get("amp", 1.0))))
+        velocity = max(
+            0.0,
+            min(
+                1.0,
+                float(event.get("amp", 1.0)) * BASS_ACTIVITY_VELOCITY_GAIN,
+            ),
+        )
         note_text = format_amy_float(note)
         events.extend(
             (
