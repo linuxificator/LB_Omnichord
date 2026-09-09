@@ -78,11 +78,44 @@ class BassRiffCatalogTests(unittest.TestCase):
             [event["note"] + 4 for event in c_events],
             [event["note"] for event in e_events],
         )
-        for key in ("tick", "duration_ticks", "velocity"):
+        for key in (
+            "tick",
+            "duration_ticks",
+            "velocity",
+            "accent",
+            "slide_to_next",
+        ):
             self.assertEqual(
                 [event[key] for event in c_events],
                 [event[key] for event in e_events],
             )
+
+    def test_articulation_flags_survive_validated_loading(self) -> None:
+        accented = next(
+            event
+            for riff in self.catalog.riffs
+            for event in riff.events
+            if event.accent
+        )
+        sliding = next(
+            event
+            for riff in self.catalog.riffs
+            for event in riff.events
+            if event.slide_to_next
+        )
+        self.assertIs(accented.accent, True)
+        self.assertIs(sliding.slide_to_next, True)
+
+        riff = next(
+            riff
+            for riff in self.catalog.riffs
+            if any(event.accent or event.slide_to_next for event in riff.events)
+        )
+        transposed = transpose_riff_events(riff, 11)
+        self.assertEqual(
+            [(event.accent, event.slide_to_next) for event in riff.events],
+            [(event["accent"], event["slide_to_next"]) for event in transposed],
+        )
 
     def test_rank_selection_uses_weight_and_can_retain_compatible_identity(
         self,

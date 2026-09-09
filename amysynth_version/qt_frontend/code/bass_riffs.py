@@ -22,6 +22,8 @@ class BassRiffEvent:
     duration_ticks: int
     pitch_offset: int
     velocity: int
+    accent: bool
+    slide_to_next: bool
 
 
 @dataclass(frozen=True)
@@ -301,12 +303,20 @@ def load_bass_riff_catalog(
                 "event.pitch_offset_semitones_from_C2",
             )
             velocity = _required_int(event.get("velocity"), "event.velocity")
+            accent = event.get("accent")
+            slide_to_next = event.get("slide_to_next")
             if tick < 0 or tick >= phrase_ticks or tick < previous_tick:
                 raise ValueError(f"bass riff {riff_id!r} has an invalid event tick")
             if duration <= 0:
                 raise ValueError(f"bass riff {riff_id!r} has a non-positive duration")
             if not 0 <= velocity <= 127:
                 raise ValueError(f"bass riff {riff_id!r} has an invalid velocity")
+            if not isinstance(accent, bool):
+                raise ValueError(f"bass riff {riff_id!r} has an invalid accent flag")
+            if not isinstance(slide_to_next, bool):
+                raise ValueError(
+                    f"bass riff {riff_id!r} has an invalid slide_to_next flag"
+                )
             previous_tick = tick
             events.append(
                 BassRiffEvent(
@@ -314,6 +324,8 @@ def load_bass_riff_catalog(
                     duration_ticks=duration,
                     pitch_offset=pitch_offset,
                     velocity=velocity,
+                    accent=accent,
+                    slide_to_next=slide_to_next,
                 )
             )
 
@@ -341,7 +353,7 @@ def load_bass_riff_catalog(
 def transpose_riff_events(
     riff: BassRiffDefinition,
     root_semitone: int,
-) -> tuple[dict[str, int], ...]:
+) -> tuple[dict[str, int | bool], ...]:
     root = int(root_semitone) % 12
     return tuple(
         {
@@ -349,6 +361,8 @@ def transpose_riff_events(
             "duration_ticks": event.duration_ticks,
             "note": riff.normalized_anchor_midi + event.pitch_offset + root,
             "velocity": event.velocity,
+            "accent": event.accent,
+            "slide_to_next": event.slide_to_next,
         }
         for event in riff.events
     )

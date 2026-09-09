@@ -255,9 +255,9 @@ APG uses the active chord-tone collection and LDR uses the existing audited
 chord-specific ladder collection. They do not follow individual strum gestures
 and do not copy timing from the independent riff catalogue.
 
-The catalogue contains optional TB-303 authoring annotations. They are retained
-as forward-compatible data only: this implementation deliberately does not add
-accent, slide or TB-303-specific synthesis behavior.
+The catalogue contains TB-303 articulation annotations. The loader retains
+them without changing ordinary-bass behavior; their bass-only interpretation
+and conservative accent-on-slide limit are specified in [`tb303.md`](tb303.md).
 
 The invariant is: **a bass riff is its own musical phrase, with its own
 rhythm**. It must not be collapsed into the simple bass accompaniment.
