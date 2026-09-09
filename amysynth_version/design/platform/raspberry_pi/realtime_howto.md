@@ -87,6 +87,9 @@ The watcher initially places all discovered frontend and AMY threads on CPUs
 active AMY worker before assigning only that TID to CPU 3/FIFO 70. PipeWire and
 pipewire-pulse `data-loop.0` are discovered by process/thread identity and
 assigned CPU 2/FIFO 80 and 75. No PID or IRQ number is hardcoded.
+After applying a policy, the watcher sleeps on Linux process descriptors; it
+does not continuously poll the process table. It wakes on an AMY/PipeWire
+restart or for a low-frequency health check.
 
 Check the result after starting LB Omnichord:
 

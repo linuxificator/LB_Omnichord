@@ -139,6 +139,27 @@ def runtime_signature(service_pid: int, uid: int | None = None) -> tuple[object,
     )
 
 
+def wait_for_process_exit(pids: set[int], timeout_seconds: float) -> bool:
+    """Sleep in the kernel until a watched process exits or health-check time."""
+
+    import select
+
+    poller = select.poll()
+    descriptors: list[int] = []
+    try:
+        for pid in sorted(pids):
+            try:
+                descriptor = os.pidfd_open(pid)
+            except (AttributeError, ProcessLookupError):
+                return True
+            descriptors.append(descriptor)
+            poller.register(descriptor, select.POLLIN)
+        return bool(poller.poll(round(timeout_seconds * 1000)))
+    finally:
+        for descriptor in descriptors:
+            os.close(descriptor)
+
+
 def set_thread_policy(tid: int, cpus: set[int], fifo_priority: int = 0) -> None:
     os.sched_setaffinity(tid, cpus)
     policy = os.SCHED_FIFO if fifo_priority else os.SCHED_OTHER
@@ -224,7 +245,7 @@ def main() -> int:
     parser.add_argument("command", choices=("inspect", "apply", "watch"))
     parser.add_argument("--user", default=str(os.getuid()))
     parser.add_argument("--service-pid", type=int)
-    parser.add_argument("--interval", type=float, default=0.5)
+    parser.add_argument("--interval", type=float, default=2.0)
     args = parser.parse_args()
     uid = _parse_uid(args.user)
     if args.command != "inspect":
@@ -245,22 +266,29 @@ def main() -> int:
         print(json.dumps(result, indent=2))
         return 0
 
-    applied: dict[int, tuple[object, ...]] = {}
     while True:
-        live = set(services())
-        applied = {pid: signature for pid, signature in applied.items() if pid in live}
-        for pid in sorted(live):
-            signature = runtime_signature(pid, uid)
-            if applied.get(pid) == signature:
-                continue
+        live = services()
+        if not live:
+            time.sleep(args.interval)
+            continue
+        applied: list[int] = []
+        for pid in live:
             try:
                 result = apply_split_policy(pid, uid)
             except (OSError, RuntimeError, ProcessLookupError) as exc:
                 print(f"PID {pid}: {exc}", flush=True)
             else:
-                applied[pid] = runtime_signature(pid, uid)
+                applied.append(pid)
                 print(json.dumps(result), flush=True)
-        time.sleep(args.interval)
+        if applied != live:
+            time.sleep(args.interval)
+            continue
+        signature = tuple(runtime_signature(pid, uid) for pid in live)
+        watched = set(live) | set(discover_pipewire(uid))
+        while not wait_for_process_exit(watched, 60):
+            current = tuple(runtime_signature(pid, uid) for pid in live)
+            if current != signature:
+                break
 
 
 if __name__ == "__main__":
