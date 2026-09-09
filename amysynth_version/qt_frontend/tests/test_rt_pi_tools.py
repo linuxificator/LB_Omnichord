@@ -22,6 +22,7 @@ def load(name: str):
 
 config = load("rt_pi_config")
 benchmark = load("rt_pi_benchmark")
+strum = load("strum_uinput")
 
 
 class RtPiConfigTests(unittest.TestCase):
@@ -82,6 +83,21 @@ class RtPiBenchmarkTests(unittest.TestCase):
         ]
         selected = benchmark.select_audio_thread(samples, 100)
         self.assertEqual(selected.tid, 101)
+
+    def test_external_strum_is_bounded_and_returns_to_start(self) -> None:
+        points = strum.sweep_points(
+            width=1920,
+            height=1080,
+            x_fraction=0.94,
+            y_min_fraction=0.16,
+            y_max_fraction=0.84,
+            rate_hz=120,
+            duration_seconds=1,
+        )
+        self.assertEqual(len(points), 120)
+        self.assertEqual(points[0], points[-1])
+        self.assertEqual(points[0].x, round(1919 * 0.94))
+        self.assertLess(points[0].y, points[len(points) // 2].y)
 
 
 if __name__ == "__main__":
