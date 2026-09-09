@@ -15,3 +15,5 @@ https://hackaday.io/project/206368-lb-omnichord
 If you create cool new stuff based on this software, use the tuning described in the README.md, or are inspired by any of the techniques used, please credit "Luciel's Birthday Omnichord" as the source and include this licence.
 
 *Despite common belief, birthdays are not tied to any particular day. According to special relativity, there are infinitely many possible observers whose reference frames are such that, at this very moment, Luciel is being born.
+
+This software uses AMY by Shore Pine, distributed under the MIT License: https://github.com/shorepine/amy
