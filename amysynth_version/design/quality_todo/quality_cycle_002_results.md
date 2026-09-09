@@ -69,6 +69,7 @@ The following checks passed on the development host with PySide 6.10.3:
 - `python tests/test_static_contracts.py`
 - `python tests/integration/test_frontend.py`
 - `python tests/integration/test_presets.py`
+- `python tests/run_tests.py --suite all` (the complete local suite)
 - an offscreen production capture that loaded `Main.qml` and rendered both the
   OMNI and MIDI screens through `capture_screenshots.py`
 
