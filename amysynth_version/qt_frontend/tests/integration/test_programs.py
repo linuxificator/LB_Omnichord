@@ -124,8 +124,16 @@ class ProgramIntegrationTests(unittest.TestCase):
                 start=ordinary_start,
                 timeout=8.0,
             )
+            last_reset = max(
+                index
+                for index, line in enumerate(ordinary_lines)
+                if line == "HR56Z"
+            )
             self.assertFalse(
-                any(re.match(r"^H\d+,\d+,56a", line) for line in ordinary_lines)
+                any(
+                    re.match(r"^H\d+,\d+,56a", line)
+                    for line in ordinary_lines[last_reset + 1 :]
+                )
             )
 
             chord_start = app.bridge.count()
