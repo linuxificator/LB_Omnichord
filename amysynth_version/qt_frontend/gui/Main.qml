@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
@@ -799,7 +801,7 @@ ApplicationWindow {
                         id: rowItem
 
                         required property int index
-                        property int rowIndex: index
+                        property int rowIndex: rowItem.index
                         property var chordTypeMidiTarget: ({
                             "screen": "omni",
                             "kind": "chord_type",
@@ -1014,6 +1016,7 @@ ApplicationWindow {
                                     }
 
                                     delegate: Item {
+                                        id: chordWheelItem
                                         required property var
                                             modelData
                                         required property int
@@ -1032,7 +1035,9 @@ ApplicationWindow {
                                             width:
                                                 parent.width
                                                 - 10
-                                            text: modelData
+                                            text:
+                                                chordWheelItem
+                                                    .modelData
                                             color:
                                                 window.textColor
                                             elide:
@@ -1073,7 +1078,8 @@ ApplicationWindow {
 
                                             onTapped:
                                                 chordWheel.currentIndex =
-                                                    index
+                                                    chordWheelItem
+                                                        .index
                                         }
                                     }
 
@@ -1138,7 +1144,7 @@ ApplicationWindow {
                                         "chordButton_"
                                         + rowItem.rowIndex
                                         + "_"
-                                        + modelData.semitone
+                                        + noteButton.modelData.semitone
 
                                     required property var
                                         modelData
@@ -1163,13 +1169,13 @@ ApplicationWindow {
                                         backend.debugChordTouch(
                                             "pressed",
                                             rowItem.rowIndex,
-                                            modelData.semitone,
+                                            noteButton.modelData.semitone,
                                             x,
                                             y
                                         )
                                         backend.pressChord(
                                             rowItem.rowIndex,
-                                            modelData.semitone
+                                            noteButton.modelData.semitone
                                         )
                                     }
 
@@ -1181,13 +1187,13 @@ ApplicationWindow {
                                         backend.debugChordTouch(
                                             "released",
                                             rowItem.rowIndex,
-                                            modelData.semitone,
+                                            noteButton.modelData.semitone,
                                             x,
                                             y
                                         )
                                         backend.releaseChord(
                                             rowItem.rowIndex,
-                                            modelData.semitone
+                                            noteButton.modelData.semitone
                                         )
                                         touchActive = false
                                     }
@@ -1200,13 +1206,13 @@ ApplicationWindow {
                                         backend.debugChordTouch(
                                             "long-pressed",
                                             rowItem.rowIndex,
-                                            modelData.semitone,
+                                            noteButton.modelData.semitone,
                                             chordPointer.point.position.x,
                                             chordPointer.point.position.y
                                         )
                                         backend.promoteChordHold(
                                             rowItem.rowIndex,
-                                            modelData.semitone
+                                            noteButton.modelData.semitone
                                         )
                                     }
 
@@ -1223,7 +1229,8 @@ ApplicationWindow {
                                                     .rowIndex
                                                 && backend
                                                     .activeRootSemitone
-                                                === modelData
+                                                === noteButton
+                                                    .modelData
                                                     .semitone
                                             )
                                         )
@@ -1234,7 +1241,7 @@ ApplicationWindow {
                                         radius: 8
 
                                         color:
-                                            modelData
+                                            noteButton.modelData
                                                 .accidental
                                             ? (
                                                 noteButton
@@ -1255,7 +1262,8 @@ ApplicationWindow {
                                             ? window
                                                 .accentColor
                                             : (
-                                                modelData
+                                                noteButton
+                                                    .modelData
                                                     .accidental
                                                 ? "#000000"
                                                 : "#9a967f"
@@ -1271,10 +1279,11 @@ ApplicationWindow {
                                         anchors.centerIn: parent
 
                                         text:
-                                            modelData.label
+                                            noteButton
+                                                .modelData.label
 
                                         color:
-                                            modelData
+                                            noteButton.modelData
                                                 .accidental
                                             ? "#ffffff"
                                             : "#111111"
@@ -1348,7 +1357,7 @@ ApplicationWindow {
                                             .octaveButtonWidth
                                     height:
                                         window.rowHeight
-                                    text: modelData
+                                    text: octaveButton.modelData
                                     enabled:
                                         rowItem.rowIndex !== 3
                                         || !backend.externalChordActive
@@ -1362,7 +1371,7 @@ ApplicationWindow {
                                                     rowItem
                                                         .rowIndex
                                                 )
-                                            === index
+                                            === octaveButton.index
                                         )
                                     }
 
@@ -1377,7 +1386,7 @@ ApplicationWindow {
                                             ? "#ffffff"
                                             : window
                                                 .octaveTextColor(
-                                                    index
+                                                    octaveButton.index
                                                 )
                                         font:
                                             octaveButton.font
@@ -1394,7 +1403,7 @@ ApplicationWindow {
                                             ? "#7142a6"
                                             : window
                                                 .octaveColor(
-                                                    index
+                                                    octaveButton.index
                                                 )
                                         opacity:
                                             octaveButton
@@ -1412,7 +1421,7 @@ ApplicationWindow {
                                     onClicked:
                                         backend.setRowOctave(
                                             rowItem.rowIndex,
-                                            index
+                                            octaveButton.index
                                         )
                                 }
                             }
