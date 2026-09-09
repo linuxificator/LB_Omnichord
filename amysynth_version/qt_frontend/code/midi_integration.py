@@ -43,6 +43,11 @@ class InstrumentBackend(OmniInstrumentBackend):
         self.presetStored.connect(
             self._midi_player.refreshPresetBindingLocations
         )
+        self.presetStored.connect(
+            lambda _number: self._midi_player.remember_active_bindings_as_preset(
+                "omni"
+            )
+        )
         self._midi_player.replace_control_bindings(
             "omni",
             self._pending_omni_control_bindings,

@@ -125,6 +125,23 @@ not unlink. For click-only numeric controls such as volume and tuning, the first
 increment or decrement releases the binding before applying its step. There is
 no separate double-click/double-tap unlink gesture.
 
+Runtime ownership and the selected preset's declaration are separate. If the
+released binding is still declared by the selected preset, the next genuinely
+changed value from that source restores the binding and applies that very value
+immediately. This makes the last control surface that the performer actually
+moves authoritative. A runtime-only learned binding has no such fallback until
+the preset is stored. Storing after an unlink records the unlink and therefore
+removes the fallback. A source which has no selected-preset declaration keeps
+the older behavior: its next movement merely ends the blue state and leaves it
+unbound.
+
+Button targets and the OMNI strum-position target are deliberate exceptions to
+manual-takeover unlinking. Their screen controls remain usable alongside the
+external source and never release their binding. They can be unlinked only by
+clicking their green controller representation in the grey input bar. If the
+selected preset still declares that binding, the next genuine source event
+restores it and is handled immediately.
+
 Unlinking always makes the controller visible when capacity allows.
 The blue state is an inactivity notice, not a latch: the next genuine CC
 movement ends it immediately and leaves the controller visible as an ordinary
@@ -142,6 +159,9 @@ Every continuous numeric control is bindable:
 - OMNI and MIDI tuning reference;
 - rhythm tempo;
 - bass voicing and the dynamic bass riff selector.
+- each of the four OMNI chord-type rows;
+- the OMNI strum position, where the source value selects position while the
+  preset's normal strum volume remains authoritative.
 
 MIDI CC values `0..127` map over the complete visible slider travel. Pitch Bend
 values `0..16383` map over the same target range, with center at roughly the

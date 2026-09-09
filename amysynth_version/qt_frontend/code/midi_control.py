@@ -58,6 +58,18 @@ class MidiControlState:
         self._next_osc_controller = 0
         self._cc_endpoint_values: dict[ControlKey, set[int]] = {}
         self._continuous_cc_keys: set[ControlKey] = set()
+        # A preset binding and its current runtime ownership are related but
+        # deliberately not identical. Manual UI takeover removes the active
+        # binding while retaining this selected-preset declaration, allowing
+        # genuine activity from that same source to take control back. A
+        # subsequently stored preset replaces the declaration with the then
+        # active bindings.
+        self._preset_bindings_by_screen: dict[
+            str,
+            dict[ControlKey, dict[str, Any]],
+        ] = {}
+        self._preset_screen_revision: dict[str, int] = {}
+        self._preset_revision_clock = 0
 
     @staticmethod
     def key(channel: int, controller: int) -> ControlKey:
@@ -330,7 +342,63 @@ class MidiControlState:
                 }
             )
         target = self.bindings.get(key)
+        if target is None:
+            target = self.restore_preset_binding(key, now=now)
         return True, copy.deepcopy(target) if target else None, key
+
+    def _preset_target_for_key(
+        self,
+        key: ControlKey,
+    ) -> dict[str, Any] | None:
+        candidates = [
+            (self._preset_screen_revision.get(screen, -1), target)
+            for screen, bindings in self._preset_bindings_by_screen.items()
+            if (target := bindings.get(key)) is not None
+        ]
+        if not candidates:
+            return None
+        return copy.deepcopy(max(candidates, key=lambda item: item[0])[1])
+
+    def _bind_key_to_target(
+        self,
+        key: ControlKey,
+        target: dict[str, Any],
+        *,
+        now: float,
+    ) -> None:
+        target_id = self.target_id(target)
+        previous_target = self.bindings.pop(key, None)
+        if previous_target is not None:
+            self._target_to_control.pop(self.target_id(previous_target), None)
+
+        displaced = self._target_to_control.pop(target_id, None)
+        if displaced is not None and displaced != key:
+            self.bindings.pop(displaced, None)
+            self.blue_since[displaced] = now
+            self.ensure_visible(displaced, now=now)
+
+        self.bindings[key] = copy.deepcopy(target)
+        self._target_to_control[target_id] = key
+        self.blue_since.pop(key, None)
+        self.ensure_visible(key, now=now)
+
+    def restore_preset_binding(
+        self,
+        key: ControlKey,
+        *,
+        now: float | None = None,
+    ) -> dict[str, Any] | None:
+        """Restore selected-preset ownership for one moving source, if any."""
+        key = self._normalized_registered_key(key)
+        target = self._preset_target_for_key(key)
+        if target is None:
+            return None
+        self._bind_key_to_target(
+            key,
+            target,
+            now=time.monotonic() if now is None else float(now),
+        )
+        return target
 
     def visible_model(self, *, now: float | None = None) -> list[dict[str, Any]]:
         now = time.monotonic() if now is None else float(now)
@@ -441,23 +509,8 @@ class MidiControlState:
         if self.learn_key is None:
             return False
         key = self.learn_key
-        target_id = self.target_id(target)
-
-        previous_target = self.bindings.get(key)
-        if previous_target is not None:
-            self._target_to_control.pop(self.target_id(previous_target), None)
-
-        displaced = self._target_to_control.get(target_id)
-        if displaced is not None and displaced != key:
-            self.bindings.pop(displaced, None)
-            self.blue_since[displaced] = now
-            self.ensure_visible(displaced, now=now)
-
-        self.bindings[key] = copy.deepcopy(target)
-        self._target_to_control[target_id] = key
-        self.blue_since.pop(key, None)
+        self._bind_key_to_target(key, target, now=now)
         self.learn_key = None
-        self.ensure_visible(key, now=now)
         return True
 
     def is_target_bound(self, target: dict[str, Any]) -> bool:
@@ -591,6 +644,12 @@ class MidiControlState:
         now = time.monotonic() if now is None else float(now)
         screen = str(screen)
         entries = list(entries)
+        self._preset_revision_clock += 1
+        self._preset_screen_revision[screen] = self._preset_revision_clock
+        self._preset_bindings_by_screen[screen] = {
+            self._normalized_registered_key(key): copy.deepcopy(target)
+            for key, target in entries
+        }
         previous_bindings = {
             key: copy.deepcopy(target)
             for key, target in self.bindings.items()
@@ -634,3 +693,14 @@ class MidiControlState:
             self.blue_since.pop(key, None)
             self.ensure_visible(key, now=now)
         return bool(removed) or bool(self.bindings)
+
+    def remember_active_bindings_as_preset(self, screen: str) -> None:
+        """Commit one screen's runtime bindings as its stored preset set."""
+        screen = str(screen)
+        self._preset_revision_clock += 1
+        self._preset_screen_revision[screen] = self._preset_revision_clock
+        self._preset_bindings_by_screen[screen] = {
+            key: copy.deepcopy(target)
+            for key, target in self.bindings.items()
+            if str(target.get("screen", "")) == screen
+        }

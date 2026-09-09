@@ -788,6 +788,7 @@ class MidiPlayerBackend(QObject):
                 value_type,
             )
             was_blue = control_key in self._midi_control_state.blue_since
+            was_bound = control_key in self._midi_control_state.bindings
             changed, target, key = self._midi_control_state.observe_osc(
                 address,
                 argument,
@@ -800,7 +801,10 @@ class MidiPlayerBackend(QObject):
             blue_cleared = (
                 was_blue and control_key not in self._midi_control_state.blue_since
             )
-        if blue_cleared:
+            preset_binding_restored = (
+                not was_bound and control_key in self._midi_control_state.bindings
+            )
+        if blue_cleared or preset_binding_restored:
             self._sync_blue_timer()
             self._bump_binding_state()
         scaled_value = int(
@@ -821,6 +825,7 @@ class MidiPlayerBackend(QObject):
         control_key = self._midi_control_state.key(channel, controller)
         with self._midi_control_lock:
             was_blue = control_key in self._midi_control_state.blue_since
+            was_bound = control_key in self._midi_control_state.bindings
             changed, target, key = self._midi_control_state.observe(
                 channel,
                 controller,
@@ -830,7 +835,10 @@ class MidiPlayerBackend(QObject):
             if not changed or key is None:
                 return
             blue_cleared = was_blue and control_key not in self._midi_control_state.blue_since
-        if blue_cleared:
+            preset_binding_restored = (
+                not was_bound and control_key in self._midi_control_state.bindings
+            )
+        if blue_cleared or preset_binding_restored:
             self._sync_blue_timer()
             self._bump_binding_state()
         if target is not None:
@@ -846,6 +854,7 @@ class MidiPlayerBackend(QObject):
         control_key = self._midi_control_state.key(channel, controller)
         with self._midi_control_lock:
             was_blue = control_key in self._midi_control_state.blue_since
+            was_bound = control_key in self._midi_control_state.bindings
             changed, target, key = self._midi_control_state.observe(
                 channel,
                 controller,
@@ -855,7 +864,10 @@ class MidiPlayerBackend(QObject):
             if not changed or key is None:
                 return
             blue_cleared = was_blue and control_key not in self._midi_control_state.blue_since
-        if blue_cleared:
+            preset_binding_restored = (
+                not was_bound and control_key in self._midi_control_state.bindings
+            )
+        if blue_cleared or preset_binding_restored:
             self._sync_blue_timer()
             self._bump_binding_state()
         if target is not None:
@@ -1693,6 +1705,10 @@ class MidiPlayerBackend(QObject):
         self._sync_preset_feedback_timer()
         self._bump_binding_state()
 
+    def remember_active_bindings_as_preset(self, screen: str) -> None:
+        with self._midi_control_lock:
+            self._midi_control_state.remember_active_bindings_as_preset(screen)
+
     def _emit_state(self) -> None:
         self._state_version += 1
         self.stateChanged.emit()
@@ -2015,6 +2031,7 @@ class MidiPlayerBackend(QObject):
             snapshot,
         )
         self._preset_reference = json.loads(json.dumps(snapshot))
+        self.remember_active_bindings_as_preset("midi")
         self._refresh_preset_binding_locations()
         self.presetStored.emit(self._selected_preset)
 
