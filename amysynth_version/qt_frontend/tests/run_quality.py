@@ -17,6 +17,7 @@ QUALITY = FRONTEND / "tests" / "quality"
 sys.path.insert(0, str(QUALITY))
 
 from repository_checks import run_repository_checks  # noqa: E402
+from qml_lint import run_qml_lint  # noqa: E402
 
 
 def run(command: list[str], *, expected: set[int] = {0}) -> subprocess.CompletedProcess[str]:
@@ -138,6 +139,7 @@ def main() -> int:
         FRONTEND,
         QUALITY / "quality_policy.json",
     )
+    run_qml_lint(FRONTEND, QUALITY)
     run([sys.executable, "-m", "ruff", "check", "."])
     check_mypy_ratchet()
     print("All quality guardrails passed.")
