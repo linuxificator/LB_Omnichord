@@ -70,6 +70,12 @@ All helpers remain external to both application processes. In particular,
 non-main threads is actually rendering, and applies realtime policy only to
 that callback. It never gives the entire AMY or frontend process FIFO policy.
 It also discovers PipeWire's `data-loop.0` threads rather than relying on PIDs.
+An initial 0.5-second process-table polling implementation consumed about 6.6%
+of one core and was rejected. The final watcher uses Linux process descriptors:
+it consumed 0.268 CPU-seconds while discovering and applying the policy, then
+its CPU counter did not increase during the following 33-second observation.
+It wakes when a watched AMY/PipeWire process exits, with only a 60-second
+topology health check while the processes remain stable.
 
 ## Production-log replay: first comparisons
 
