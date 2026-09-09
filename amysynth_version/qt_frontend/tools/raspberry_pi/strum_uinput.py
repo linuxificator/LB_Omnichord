@@ -25,6 +25,7 @@ ABS_MT_POSITION_Y = 0x36
 ABS_MT_TRACKING_ID = 0x39
 ABS_CNT = 0x40
 BUS_VIRTUAL = 0x06
+INPUT_PROP_DIRECT = 0x01
 
 
 def _ioc(direction: int, kind: int, number: int, size: int) -> int:
@@ -40,6 +41,7 @@ UI_DEV_DESTROY = _ioc(0, ord("U"), 2, 0)
 UI_SET_EVBIT = _iow("U", 100)
 UI_SET_KEYBIT = _iow("U", 101)
 UI_SET_ABSBIT = _iow("U", 103)
+UI_SET_PROPBIT = _iow("U", 110)
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +89,11 @@ class TouchDevice:
             fcntl.ioctl(self._file, UI_SET_EVBIT, event_type)
         for key in (BTN_TOUCH, BTN_TOOL_FINGER):
             fcntl.ioctl(self._file, UI_SET_KEYBIT, key)
+        # Without INPUT_PROP_DIRECT udev/libinput classifies this absolute
+        # device as a touchpad. Wayland then moves a pointer relative to its
+        # previous location rather than delivering screen coordinates to the
+        # production MultiPointTouchArea.
+        fcntl.ioctl(self._file, UI_SET_PROPBIT, INPUT_PROP_DIRECT)
         for axis in (
             ABS_X,
             ABS_Y,
