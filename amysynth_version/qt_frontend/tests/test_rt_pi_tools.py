@@ -128,6 +128,14 @@ IPI0:       100        200        300        400       Rescheduling interrupts
             runtime.process_ids = original_ids
             runtime.process_command = original_command
 
+    def test_runtime_reads_frontend_parent(self) -> None:
+        original_read = runtime._read
+        try:
+            runtime._read = lambda path: "Name:\ttest\nPPid:\t123\n"
+            self.assertEqual(runtime.parent_pid(456), 123)
+        finally:
+            runtime._read = original_read
+
     def test_trace_parser_reports_wake_and_runtime_tail(self) -> None:
         sample = """\
  worker-9 [003] 1.000000: sched_wakeup: comm=audio pid=42 prio=50 target_cpu=003

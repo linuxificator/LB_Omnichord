@@ -78,6 +78,18 @@ def snapshot_threads(pid: int) -> dict[int, ThreadInfo]:
     }
 
 
+def parent_pid(pid: int) -> int | None:
+    status = _read(Path(f"/proc/{pid}/status"))
+    match = next(
+        (line for line in status.splitlines() if line.startswith("PPid:")),
+        None,
+    )
+    if match is None:
+        return None
+    value = int(match.split(":", 1)[1])
+    return value or None
+
+
 def select_active_worker(pid: int, seconds: float = 0.35) -> ThreadInfo:
     before = snapshot_threads(pid)
     time.sleep(seconds)
@@ -119,6 +131,10 @@ def set_thread_policy(tid: int, cpus: set[int], fifo_priority: int = 0) -> None:
 def apply_split_policy(service_pid: int, uid: int | None = None) -> dict[str, object]:
     """Keep general work on 0-1, PipeWire on 2 and AMY callback on 3."""
 
+    frontend_pid = parent_pid(service_pid)
+    frontend_threads = task_ids(frontend_pid) if frontend_pid is not None else []
+    for tid in frontend_threads:
+        set_thread_policy(tid, {0, 1})
     for tid in task_ids(service_pid):
         set_thread_policy(tid, {0, 1})
     audio = select_active_worker(service_pid)
@@ -141,6 +157,11 @@ def apply_split_policy(service_pid: int, uid: int | None = None) -> dict[str, ob
         raise RuntimeError("did not find both PipeWire data-loop.0 threads")
     return {
         "amy": {**asdict(audio), "cpu": 3, "fifo": 70},
+        "frontend": {
+            "pid": frontend_pid,
+            "threads": len(frontend_threads),
+            "cpus": [0, 1],
+        },
         "pipewire": pipewire_result,
         "housekeeping_cpus": [0, 1],
     }
