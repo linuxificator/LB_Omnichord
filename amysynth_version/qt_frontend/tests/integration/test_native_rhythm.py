@@ -10,6 +10,7 @@ from harness import HeadlessApp
 
 CHORD_SEQUENCE_START = 1192
 DRUM_BASE_SEQUENCE_START = 1256
+BASS_SEQUENCE_START = 56
 
 
 def is_chord_trigger(line: str) -> bool:
@@ -61,9 +62,9 @@ class NativeRhythmTests(unittest.TestCase):
             if int(app.query("chordGateState")) != 2:
                 app.action("toggleChordGate")
             app.action("setPercussionVolume", 0.0)
+            app.bridge.wait_idle(timeout=8.0)
 
             start = app.bridge.count()
-            app.bridge.reset_audio_peak()
             app.action("toggleRhythm")
             app.bridge.wait_for_line_match(
                 lambda line: re.match(r"^H\d+,0,(?:5[7-9]|[6-9]\d|10\d|110)a", line)
@@ -72,6 +73,17 @@ class NativeRhythmTests(unittest.TestCase):
                 start=start,
                 timeout=8.0,
             )
+            # Child definitions and the repeating root are published before
+            # the transport starts. Do not let the tight offline-render loop
+            # race and starve the serial bridge before AMY has ingested both
+            # the group start and the final timebase start.
+            app.bridge.wait_for_lines(
+                [f"HC{BASS_SEQUENCE_START},1,1Z", "zY1Z"],
+                start=start,
+                timeout=8.0,
+            )
+            app.bridge.wait_idle(timeout=8.0)
+            app.bridge.reset_audio_peak()
             produced_audio = app.bridge.render_until_audio(9.0)
             if not produced_audio:
                 app.bridge.checkpoint("tb303-no-audio", synths=(1,))
