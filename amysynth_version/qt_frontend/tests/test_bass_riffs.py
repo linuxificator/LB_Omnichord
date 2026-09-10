@@ -13,10 +13,7 @@ sys.path.insert(0, str(CODE))
 
 from app_core import load_chords, load_rhythm_catalog  # noqa: E402
 from bass_riffs import load_bass_riff_catalog, transpose_riff_events  # noqa: E402
-from rhythm_command_plan import (  # noqa: E402
-    compile_bass_events,
-    compile_sequence_definition,
-)
+from rhythm_command_plan import compile_bass_sequence_plan  # noqa: E402
 from tb303 import Tb303Parameters  # noqa: E402
 from wire_frames import MAX_WIRE_REQUEST_BYTES, validate_wire_request  # noqa: E402
 
@@ -212,14 +209,16 @@ class BassRiffCatalogTests(unittest.TestCase):
             self.catalog._by_context[("new", "context")] = (riff,)
 
     def test_every_tb303_riff_fits_native_sequence_and_wire_limits(self) -> None:
-        largest: tuple[int, str] = (0, "")
+        largest_definition: tuple[int, str] = (0, "")
+        largest_gesture_count: tuple[int, str] = (0, "")
         for riff in self.catalog.riffs:
             payload = {
+                "id": riff.riff_id,
                 "ppq": riff.ppq,
                 "phrase_ticks": riff.phrase_ticks,
                 "events": list(transpose_riff_events(riff, 0)),
             }
-            events = compile_bass_events(
+            plan = compile_bass_sequence_plan(
                 config={"length_beats": 4, "bass_mode": "riff"},
                 running=True,
                 bass_notes=(),
@@ -227,15 +226,24 @@ class BassRiffCatalogTests(unittest.TestCase):
                 synth=1,
                 bass_gate_beats=0.25,
                 ppq=48,
+                sequence_start=56,
+                sequence_count=56,
                 tb303_parameters=Tb303Parameters(),
             )
-            largest = max(largest, (len(events), riff.riff_id))
-            self.assertLessEqual(len(events), 64, riff.riff_id)
-            definition = compile_sequence_definition(
-                sequence_tag=113,
-                events=events,
+            largest_gesture_count = max(
+                largest_gesture_count,
+                (plan.gesture_count, riff.riff_id),
             )
-            for command in definition.commands:
+            current_definition_events = 0
+            for command in plan.definitions:
+                if command.startswith("HR"):
+                    largest_definition = max(
+                        largest_definition,
+                        (current_definition_events, riff.riff_id),
+                    )
+                    current_definition_events = 0
+                else:
+                    current_definition_events += 1
                 encoded = command.encode("ascii")
                 self.assertLessEqual(
                     len(encoded),
@@ -243,8 +251,16 @@ class BassRiffCatalogTests(unittest.TestCase):
                     riff.riff_id,
                 )
                 self.assertEqual(validate_wire_request(encoded), command)
+            largest_definition = max(
+                largest_definition,
+                (current_definition_events, riff.riff_id),
+            )
+            self.assertLessEqual(current_definition_events, 64, riff.riff_id)
+            self.assertLessEqual(plan.gesture_count, 54, riff.riff_id)
 
-        self.assertEqual(largest, (45, "bass_shared_0969"))
+        self.assertGreater(largest_definition[0], 1)
+        self.assertLessEqual(largest_definition[0], 64)
+        self.assertEqual(largest_gesture_count, (20, "bass_shared_0969"))
 
 
 if __name__ == "__main__":

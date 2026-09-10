@@ -156,7 +156,10 @@ second application timer service.
 Persistent phrase execution follows the stricter ownership contract in
 [`../music/sequences.md`](../music/sequences.md): the frontend neither mirrors AMY's sequencer clock
 nor owns execution snapshots, repeat completion, phrase releases or finite
-gate expiry.
+gate expiry. Bass harmony publication likewise never observes current phase:
+a stable repeating launcher preserves phase, finite children own complete
+note/slide releases, and a finite AMY controller owns release-safe phrase
+replacement.
 
 Static tuning, active-chord identity and live-performance context cross the
 OMNI/MIDI boundary only as frozen values from `musical_state.py`. That pure

@@ -26,15 +26,20 @@ from drum_patterns import (
     load_drum_pattern_catalog,
 )
 from rhythm_command_plan import (
+    BassSequencePlan,
+    SEQUENCE_CONTROL_START,
+    SEQUENCE_CONTROL_STOP,
     compact_repeating_events,
-    compile_bass_events,
+    compile_bass_sequence_plan,
     compile_chord_sequence_plan,
     compile_drum_activity_sequences,
     compile_fill_sequence,
     compile_fill_schedule,
+    compile_sequence_definition,
     compile_tagged_lane,
     drum_quantum,
     fill_occurrences,
+    sequence_control_command,
 )
 from transport_scheduler import (
     ByteSink,
@@ -372,6 +377,9 @@ class AmySerialClient:
         self.chord_notes: list[float] = []
         self.bass_notes: list[float] = []
         self.bass_riff: dict[str, Any] | None = None
+        self._bass_plan: BassSequencePlan | None = None
+        self._bass_plan_active = False
+        self._bass_drain_bound = 0
         self.rhythm_config: dict[str, Any] | None = None
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
@@ -1102,7 +1110,7 @@ class AmySerialClient:
         # would accumulate start-pending executions. _start_rhythm() compiles
         # every lane from this latest state after resetting the timebase.
         if self.rhythm_running and self.bass_running:
-            self._replace_lane("bass")
+            self._replace_lane("bass", bass_restart=False)
         if self.rhythm_running:
             self._replace_lane("chords")
 
@@ -1140,24 +1148,174 @@ class AmySerialClient:
         )
         return list(plan.definitions), list(plan.triggers)
 
+    def _bass_sequence_plan(self) -> BassSequencePlan:
+        """Build bass gestures without observing AMY's runtime position."""
+
+        rhythm_cfg = self.resolved_config.rhythm
+        lane = self._sequencer_lanes["bass"]
+        return compile_bass_sequence_plan(
+            config=self.rhythm_config,
+            running=self.bass_running,
+            bass_notes=self.bass_notes,
+            bass_riff=self.bass_riff,
+            synth=self.synth_id["bass"],
+            bass_gate_beats=rhythm_cfg.bass_gate_beats,
+            ppq=AMY_PPQ,
+            sequence_start=lane.start,
+            sequence_count=lane.count,
+            tb303_parameters=self._bass_sequence_parameters(),
+        )
+
+    def _bass_definition_commands(self, plan: BassSequencePlan) -> list[str]:
+        """Publish future gestures and release definitions no longer referenced."""
+
+        lane = self._sequencer_lanes["bass"]
+        commands = list(plan.definitions)
+        previous_count = self._bass_plan.gesture_count if self._bass_plan else 0
+        for gesture_index in range(plan.gesture_count, previous_count):
+            commands.append(f"HR{lane.start + 1 + gesture_index}Z")
+        return commands
+
+    def _bass_clear_commands(self) -> list[str]:
+        """Stop bass-owned executions for an explicit mute/transport clear."""
+
+        lane = self._sequencer_lanes["bass"]
+        handover_tag = lane.end - 1
+        commands = [
+            sequence_control_command(
+                handover_tag,
+                SEQUENCE_CONTROL_STOP,
+                alignment=1,
+            ),
+            sequence_control_command(
+                lane.start,
+                SEQUENCE_CONTROL_STOP,
+                alignment=1,
+            ),
+        ]
+        commands.extend(
+            sequence_control_command(
+                lane.start + 1 + gesture_index,
+                SEQUENCE_CONTROL_STOP,
+                alignment=1,
+            )
+            for gesture_index in range(lane.count - 2)
+        )
+        commands.append(f"HR{lane.start}Z")
+        return commands
+
+    def _bass_update_commands(
+        self,
+        *,
+        restart_phrase: bool,
+        initial_start: bool = False,
+    ) -> list[str]:
+        """Publish bass state; every wait and boundary remains inside AMY."""
+
+        lane = self._sequencer_lanes["bass"]
+        handover_tag = lane.end - 1
+        plan = self._bass_sequence_plan()
+        previous = self._bass_plan
+
+        if not plan.triggers:
+            commands = self._bass_clear_commands()
+            commands.extend(self._bass_definition_commands(plan))
+            self._bass_plan = plan
+            self._bass_plan_active = False
+            self._bass_drain_bound = 0
+            return commands
+
+        definitions = self._bass_definition_commands(plan)
+        root_definition = compile_sequence_definition(
+            sequence_tag=lane.start,
+            events=plan.triggers,
+        )
+
+        if initial_start or not self._bass_plan_active or previous is None:
+            commands = [
+                sequence_control_command(
+                    handover_tag,
+                    SEQUENCE_CONTROL_STOP,
+                    alignment=1,
+                ),
+                *definitions,
+                *root_definition.commands,
+                sequence_control_command(
+                    lane.start,
+                    SEQUENCE_CONTROL_START,
+                    alignment=1,
+                ),
+            ]
+            self._bass_drain_bound = plan.drain_ticks
+        elif not restart_phrase and previous.identity == plan.identity:
+            # Pitch, velocity and TB-303 parameter publication changes only
+            # future finite gestures. The repeating root retains local phase.
+            commands = definitions
+            self._bass_drain_bound = max(
+                self._bass_drain_bound,
+                plan.drain_ticks,
+            )
+        else:
+            # Stop future old launches on the next AMY tick. The controller
+            # waits for the longest possibly active finite gesture before it
+            # starts the replacement at local tick zero. Keeping the largest
+            # published bound also makes rapid consecutive edits safe without
+            # mirroring AMY's clock or active execution state in Python.
+            drain_ticks = max(
+                self._bass_drain_bound,
+                previous.drain_ticks,
+                plan.drain_ticks,
+            )
+            handover = compile_sequence_definition(
+                sequence_tag=handover_tag,
+                events=(
+                    (
+                        0,
+                        0,
+                        sequence_control_command(
+                            lane.start,
+                            SEQUENCE_CONTROL_STOP,
+                            alignment=1,
+                        ),
+                    ),
+                    (
+                        drain_ticks + 1,
+                        0,
+                        sequence_control_command(
+                            lane.start,
+                            SEQUENCE_CONTROL_START,
+                            alignment=1,
+                        ),
+                    ),
+                ),
+            )
+            commands = [
+                sequence_control_command(
+                    handover_tag,
+                    SEQUENCE_CONTROL_STOP,
+                    alignment=1,
+                ),
+                *definitions,
+                *root_definition.commands,
+                *handover.commands,
+                sequence_control_command(
+                    handover_tag,
+                    SEQUENCE_CONTROL_START,
+                    alignment=1,
+                ),
+            ]
+            self._bass_drain_bound = drain_ticks
+
+        self._bass_plan = plan
+        self._bass_plan_active = True
+        return commands
+
     def _lane_events(self, lane_name: str) -> list[tuple[int, int, str]]:
         if lane_name == "drums":
             # Percussion uses reusable sequences; this lane carries fill triggers.
             return []
         if lane_name == "bass":
-            rhythm_cfg = self.resolved_config.rhythm
-            return list(
-                compile_bass_events(
-                    config=self.rhythm_config,
-                    running=self.bass_running,
-                    bass_notes=self.bass_notes,
-                    bass_riff=self.bass_riff,
-                    synth=self.synth_id["bass"],
-                    bass_gate_beats=rhythm_cfg.bass_gate_beats,
-                    ppq=AMY_PPQ,
-                    tb303_parameters=self._bass_sequence_parameters(),
-                )
-            )
+            return list(self._bass_sequence_plan().triggers)
         if lane_name == "chords":
             return self._chord_sequence_plan()[1]
         raise KeyError(lane_name)
@@ -1317,7 +1475,12 @@ class AmySerialClient:
             key: value for key, value in new_config.items() if key != "tempo"
         }
 
-    def _replace_lane(self, lane_name: str) -> None:
+    def _replace_lane(
+        self,
+        lane_name: str,
+        *,
+        bass_restart: bool = True,
+    ) -> None:
         lane = self._sequencer_lanes[lane_name]
         try:
             if lane_name == "drums":
@@ -1329,6 +1492,12 @@ class AmySerialClient:
                 sequence_commands, events = self._chord_sequence_plan()
                 for command in sequence_commands + lane.commands(events):
                     self.writer.low("chords", generation, command)
+            elif lane_name == "bass":
+                generation = self.writer.new_low_generation("bass")
+                for command in self._bass_update_commands(
+                    restart_phrase=bass_restart,
+                ):
+                    self.writer.low("bass", generation, command)
             else:
                 lane.enqueue(self._lane_events(lane_name))
         except ValueError as exc:
@@ -1374,9 +1543,14 @@ class AmySerialClient:
                 if lane_name == "chords":
                     sequence_commands, events = self._chord_sequence_plan()
                     commands.extend(sequence_commands)
+                    commands.extend(lane.commands(events))
                 else:
-                    events = self._lane_events(lane_name)
-                commands.extend(lane.commands(events))
+                    commands.extend(
+                        self._bass_update_commands(
+                            restart_phrase=not resume_transport,
+                            initial_start=resume_transport,
+                        )
+                    )
             except ValueError as exc:
                 print(f"AMY rhythm warning: {exc}", flush=True)
                 return
@@ -1462,6 +1636,8 @@ class AmySerialClient:
         if self.rhythm_running:
             return
         self.rhythm_running = True
+        self._bass_plan_active = False
+        self._bass_drain_bound = 0
         # Reset the AMY clock and discard old executions while retaining the
         # preloaded reusable definitions. The deterministic root-tag lanes
         # below replace or clear every future launch event they own.
@@ -1480,6 +1656,8 @@ class AmySerialClient:
         self._cancel_queued_rhythm_updates()
         self._wire("zY0Z")
         self._silence_accompaniment()
+        self._bass_plan_active = False
+        self._bass_drain_bound = 0
 
     def _cancel_strum_tail(self) -> None:
         with self._strum_lock:

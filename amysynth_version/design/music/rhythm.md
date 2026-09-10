@@ -67,9 +67,11 @@ The available riff set is the stable-index order of entries compatible with
 both the current rhythm ID and exact chord suffix. The one-based riff selector
 chooses within that set. Stored pitches are normalized to C2/MIDI 36; every
 event is transposed by the active chord root and then passes through the normal
-OMNI tuning conversion. A root change therefore changes pitch immediately for
-the replacement bass schedule without changing event ticks, durations,
-velocities, transport or sequencer timebase.
+OMNI tuning conversion. A root change therefore republishes future finite bass
+gestures without changing event ticks, durations, velocities, transport,
+sequencer timebase or the running riff's local phase. A gesture already in
+progress finishes its original release; the next detached onset observes the
+new harmony.
 
 When a chord-suffix, rhythm or preset change produces a new available set, a
 riff which is actually playing (`rhythmRunning`, bass transport and `R` all
@@ -77,7 +79,10 @@ active) is retained by stable riff ID when that ID occurs in the new set. The
 selector follows its possibly different one-based position. If it is not
 present, or no riff is playing, the selector uses the loaded preset's
 `bass_riff_selector`, clamped to the set, with the application default as the
-legacy fallback. Selector and mode changes replace only the bass root sequence.
+legacy fallback. A changed stable riff ID, selector, mode or activity is a
+phrase change: AMY stops future old launches, drains any finite old gesture and
+starts the replacement root from local tick zero. The frontend never observes
+the current tick or phrase position; see [`bass_handover.md`](bass_handover.md).
 
 ### 1.5 Chord activity and independent arpeggio mode
 
