@@ -417,6 +417,63 @@ class PureCommandPlanTests(unittest.TestCase):
                 tb303_parameters=Tb303Parameters(),
             )
 
+    def test_activity_release_across_wrap_stays_with_next_attack(self) -> None:
+        plan = self._bass_plan(
+            config={
+                "length_beats": 1,
+                "bass_events": [
+                    {"time": 0, "degree": 0, "amp": 0.5},
+                    {"time": 0.75, "degree": 1, "amp": 0.5},
+                ],
+            },
+            running=True,
+            bass_notes=(36.0, 40.0),
+            bass_riff=None,
+            synth=2,
+            bass_gate_beats=0.3,
+            ppq=48,
+        )
+
+        self.assertEqual(plan.triggers, ((36, 48, "HC21,1,1Z"),))
+        self.assertEqual(
+            plan.definitions,
+            (
+                "HR21Z",
+                "H0,0,21n40l0.7i2Z",
+                "H12,0,21n36l0.7i2Z",
+                "H26,0,21n36l0i2Z",
+            ),
+        )
+        self.assertEqual(plan.drain_ticks, 26)
+
+    def test_dense_activity_retriggers_get_release_safe_gestures(self) -> None:
+        plan = self._bass_plan(
+            config={
+                "length_beats": 1,
+                "bass_events": [
+                    {"time": 0, "degree": 0, "amp": 0.5},
+                    {"time": 0.25, "degree": 1, "amp": 0.5},
+                    {"time": 0.5, "degree": 0, "amp": 0.5},
+                    {"time": 0.75, "degree": 1, "amp": 0.5},
+                ],
+            },
+            running=True,
+            bass_notes=(36.0, 40.0),
+            bass_riff=None,
+            synth=2,
+            bass_gate_beats=0.3,
+            ppq=48,
+        )
+
+        self.assertEqual(
+            tuple(tick for tick, _period, _body in plan.triggers),
+            (0, 12, 24, 36),
+        )
+        self.assertEqual(plan.gesture_count, 4)
+        self.assertEqual(plan.drain_ticks, 11)
+        self.assertIn("H11,0,21n36l0i2Z", plan.definitions)
+        self.assertIn("H11,0,24n40l0i2Z", plan.definitions)
+
     def test_drum_and_fill_plans_are_deterministic(self) -> None:
         fill = _Fill(
             index=1,

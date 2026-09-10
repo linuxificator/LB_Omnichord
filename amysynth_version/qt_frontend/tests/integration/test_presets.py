@@ -906,6 +906,16 @@ class PresetIntegrationTests(unittest.TestCase):
             checkpoint = app.bridge.count()
 
             app.action("setRhythmIndex", 1)
+            app.bridge.wait_for_line_match(
+                lambda line: (
+                    (match := re.match(r"^H\d+,\d+,(\d+)", line)) is not None
+                    and 1256 <= int(match.group(1)) < 1280
+                    and "i0Z" in line
+                ),
+                "live style drum sequence publication",
+                start=checkpoint,
+                timeout=8.0,
+            )
             app.bridge.wait_idle(timeout=8.0)
 
             self.assertTrue(bool(app.query("rhythmRunning")))
@@ -956,7 +966,8 @@ class PresetIntegrationTests(unittest.TestCase):
                     and "i0Z" in line
                     for line in switched
                 ),
-                "live style switch did not author reusable drum-sequence events",
+                "live style switch did not author reusable drum-sequence events:\n"
+                + "\n".join(switched),
             )
             self.assertTrue(
                 any(re.match(r"^HC12(?:5[6-9]|[6-7]\d),1,", line) for line in switched),

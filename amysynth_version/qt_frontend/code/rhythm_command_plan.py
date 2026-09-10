@@ -456,7 +456,10 @@ def _scaled_bass_source(
             "accent": bool(event.get("accent", False)),
             "slide_to_next": False,
         })
-    events = tuple(events_list)
+    # Activity layers are cumulative catalogue data and are not required to be
+    # authored in chronological order. Preserve equal-tick source order while
+    # presenting one deterministic monophonic timeline to the gesture compiler.
+    events = tuple(sorted(events_list, key=lambda event: int(event["tick"])))
     timing = tuple((event["tick"], event["duration"]) for event in events)
     return (
         period,
@@ -470,11 +473,18 @@ def _scaled_bass_source(
     )
 
 
-def _bass_gesture_ranges(
+def _bass_gesture_sources(
     events: Sequence[Mapping[str, Any]],
     period: int,
-) -> tuple[tuple[int, int], ...]:
-    """Partition a monophonic phrase only at guaranteed silent boundaries."""
+) -> tuple[tuple[Mapping[str, Any], ...], ...]:
+    """Partition one circular phrase only at guaranteed silent boundaries.
+
+    A note near the phrase end may overlap the first note of the next repeat.
+    Rotate that connected gesture across the nominal wrap so its attack and
+    release stay in one finite AMY execution.  The returned copies use
+    monotonically increasing ticks; callers reduce only their root trigger
+    ticks modulo the phrase period.
+    """
 
     if not events:
         return ()
@@ -484,24 +494,65 @@ def _bass_gesture_ranges(
     if ordered_ticks[0] < 0 or ordered_ticks[-1] >= period:
         raise ValueError("bass event ticks must lie inside the phrase period")
 
-    ranges: list[tuple[int, int]] = []
-    start = 0
-    for index, event in enumerate(events[:-1]):
+    gaps: list[bool] = []
+    for index, event in enumerate(events):
         end_tick = int(event["tick"]) + int(event["duration"])
-        next_tick = int(events[index + 1]["tick"])
-        if not bool(event.get("slide_to_next", False)) and end_tick < next_tick:
-            ranges.append((start, index + 1))
-            start = index + 1
-    ranges.append((start, len(events)))
-
-    last = events[-1]
-    last_end = int(last["tick"]) + int(last["duration"])
-    first_next_cycle = period + int(events[0]["tick"])
-    if bool(last.get("slide_to_next", False)) or last_end >= first_next_cycle:
-        raise ValueError(
-            "bass phrase must contain a silent handover before its next repeat"
+        next_tick = (
+            int(events[index + 1]["tick"])
+            if index + 1 < len(events)
+            else period + int(events[0]["tick"])
         )
-    return tuple(ranges)
+        gaps.append(
+            not bool(event.get("slide_to_next", False)) and end_tick < next_tick
+        )
+    if not any(gaps):
+        # A dense series of distinct monophonic attacks already supersedes the
+        # preceding note at every onset. Turn that implicit retrigger boundary
+        # into an explicit one-tick release margin. This is not valid for one
+        # sustained note or for a slide chain, both of which must remain
+        # continuous and therefore have no release-safe handover.
+        if len(events) > 1 and not any(
+            bool(event.get("slide_to_next", False)) for event in events
+        ):
+            separated: list[tuple[Mapping[str, Any], ...]] = []
+            for index, source in enumerate(events):
+                next_tick = (
+                    int(events[index + 1]["tick"])
+                    if index + 1 < len(events)
+                    else period + int(events[0]["tick"])
+                )
+                interval = next_tick - int(source["tick"])
+                if interval < 2:
+                    break
+                event = dict(source)
+                event["duration"] = min(int(event["duration"]), interval - 1)
+                separated.append((event,))
+            else:
+                return tuple(separated)
+        raise ValueError(
+            "bass phrase must contain a silent handover somewhere in its cycle"
+        )
+
+    # Preserve source order whenever the nominal phrase edge is already safe.
+    # Otherwise cut at an internal gap and unwrap the events which cross the
+    # phrase boundary.  The final circular edge is then guaranteed to be a gap.
+    rotation = 0 if gaps[-1] else gaps.index(True) + 1
+    ordered: list[tuple[int, Mapping[str, Any]]] = []
+    for offset in range(len(events)):
+        source_index = (rotation + offset) % len(events)
+        event = dict(events[source_index])
+        if source_index < rotation:
+            event["tick"] = int(event["tick"]) + period
+        ordered.append((source_index, event))
+
+    gestures: list[tuple[Mapping[str, Any], ...]] = []
+    start = 0
+    for index, (source_index, _event) in enumerate(ordered[:-1]):
+        if gaps[source_index]:
+            gestures.append(tuple(event for _, event in ordered[start : index + 1]))
+            start = index + 1
+    gestures.append(tuple(event for _, event in ordered[start:]))
+    return tuple(gestures)
 
 
 def _ordinary_bass_gesture(
@@ -592,18 +643,17 @@ def compile_bass_sequence_plan(
         ppq=ppq,
         quantize_activity_velocity=tb303_parameters is not None,
     )
-    ranges = _bass_gesture_ranges(source_events, period)
-    if len(ranges) > sequence_count - 2:
+    gesture_sources = _bass_gesture_sources(source_events, period)
+    if len(gesture_sources) > sequence_count - 2:
         raise ValueError(
-            f"bass phrase needs {len(ranges)} gesture sequences; "
+            f"bass phrase needs {len(gesture_sources)} gesture sequences; "
             f"reserved capacity is {sequence_count - 2}"
         )
 
     definitions: list[str] = []
     triggers: list[ScheduledEvent] = []
     drain_ticks = 0
-    for gesture_index, (first, end) in enumerate(ranges):
-        source = source_events[first:end]
+    for gesture_index, source in enumerate(gesture_sources):
         gesture = (
             _tb303_bass_gesture(source, synth=synth, parameters=tb303_parameters)
             if tb303_parameters is not None
@@ -617,7 +667,7 @@ def compile_bass_sequence_plan(
         definitions.extend(definition.commands)
         triggers.append(
             (
-                gesture.start_tick,
+                gesture.start_tick % period,
                 period,
                 sequence_control_command(
                     sequence_tag,
@@ -638,7 +688,7 @@ def compile_bass_sequence_plan(
         tuple(definitions),
         tuple(triggers),
         identity,
-        len(ranges),
+        len(gesture_sources),
         drain_ticks,
     )
 

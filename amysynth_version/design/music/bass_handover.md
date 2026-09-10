@@ -69,10 +69,17 @@ steady bass adds one root and at most one child execution. A live phrase
 replacement adds one transient handover execution, keeping the known global
 worst case below the configured 40-execution limit.
 
-Every catalogue phrase contains a real silent boundary before its repeat. The
-compiler rejects a circular gesture whose release reaches the next occurrence;
-accepting it would make cross-execution release ordering dependent on execution
-slot order.
+Every active phrase must contain at least one real silent boundary somewhere
+in its cycle. When a final note's release crosses the nominal phrase wrap, the
+compiler rotates the finite-gesture partition at another silent boundary. The
+crossing note and the first attack of the next cycle then remain in one child,
+with deterministic attack/release ordering. A fully circular phrase with no
+silent handover anywhere is normally rejected because splitting it would make
+release ordering dependent on execution-slot order. A dense series of two or
+more distinct, non-slide monophonic attacks is the deliberate exception: every
+new attack already supersedes the previous note, so the compiler makes that
+implicit boundary explicit by releasing one AMY tick before the next attack.
+It does not apply this shortening to one sustained note or to a slide chain.
 
 ## Regression evidence
 
@@ -84,6 +91,11 @@ Tests prove that:
 - the controller drain cannot shrink during rapid consecutive edits;
 - TB-303 slide destinations, accent limitation and final all-off remain inside
   one immutable finite child;
+- an ordinary activity note which crosses the nominal repeat boundary remains
+  in one child with the next attack and therefore cannot release it from a
+  different execution;
+- a fully dense retrigger pattern receives explicit pre-attack releases, while
+  sustained notes and slides are never shortened to manufacture a boundary;
 - explicit bass-off cancels every possible bass child tag and sends an
   immediate synth release;
 - all catalogue definitions fit tag, event, wire-frame and execution limits;

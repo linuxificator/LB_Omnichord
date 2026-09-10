@@ -277,7 +277,9 @@ class SequencerTagTests(unittest.TestCase):
 
         worst_activity_gestures = (0, "")
         for rhythm in self.rhythms:
-            for level_index, events in enumerate(rhythm["bass_levels"][:4]):
+            # Compile every source level. The UI currently selects 0, 1, 2 and
+            # 4, so testing only the first four would miss the fullest level.
+            for level_index, events in enumerate(rhythm["bass_levels"]):
                 plan = compile_bass_sequence_plan(
                     config={
                         "id": rhythm["id"],
