@@ -14,7 +14,7 @@ sys.path.insert(0, str(CODE))
 
 from amy_parameter_plan import compile_parameter_commands  # noqa: E402
 from rhythm_command_plan import (  # noqa: E402
-    compile_bass_events,
+    compile_bass_sequence_plan,
     compile_chord_sequence_plan,
     compile_drum_activity_sequences,
     compile_fill_sequence,
@@ -66,6 +66,14 @@ def _hit_body(
 
 
 class PureCommandPlanTests(unittest.TestCase):
+    @staticmethod
+    def _bass_plan(**kwargs: object):
+        return compile_bass_sequence_plan(
+            sequence_start=20,
+            sequence_count=56,
+            **kwargs,
+        )
+
     def test_pure_modules_have_no_ui_or_transport_imports(self) -> None:
         forbidden = {
             "PySide6",
@@ -181,7 +189,7 @@ class PureCommandPlanTests(unittest.TestCase):
         )
 
     def test_bass_plan_supports_activity_and_riff_inputs(self) -> None:
-        activity = compile_bass_events(
+        activity = self._bass_plan(
             config={
                 "length_beats": 4,
                 "bass_events": [{"time": 1, "degree": 1, "amp": 0.5}],
@@ -193,11 +201,12 @@ class PureCommandPlanTests(unittest.TestCase):
             bass_gate_beats=0.25,
             ppq=48,
         )
+        self.assertEqual(activity.triggers, ((48, 192, "HC21,1,1Z"),))
         self.assertEqual(
-            activity,
-            ((48, 192, "n40l0.7i2"), (60, 192, "n40l0i2")),
+            activity.definitions,
+            ("HR21Z", "H0,0,21n40l0.7i2Z", "H12,0,21n40l0i2Z"),
         )
-        riff = compile_bass_events(
+        riff = self._bass_plan(
             config={"length_beats": 4, "bass_mode": "riff"},
             running=True,
             bass_notes=(),
@@ -217,13 +226,14 @@ class PureCommandPlanTests(unittest.TestCase):
             bass_gate_beats=0.25,
             ppq=48,
         )
+        self.assertEqual(riff.triggers, ((12, 96, "HC21,1,1Z"),))
         self.assertEqual(
-            riff,
-            ((12, 96, "n43l1i2"), (36, 96, "n43l0i2")),
+            riff.definitions,
+            ("HR21Z", "H0,0,21n43l1i2Z", "H24,0,21n43l0i2Z"),
         )
 
     def test_bass_activity_calibration_is_bounded_and_riff_is_unchanged(self) -> None:
-        activity = compile_bass_events(
+        activity = self._bass_plan(
             config={
                 "length_beats": 4,
                 "bass_events": [
@@ -238,10 +248,10 @@ class PureCommandPlanTests(unittest.TestCase):
             bass_gate_beats=0.25,
             ppq=48,
         )
-        self.assertEqual(activity[0][2], "n36l1i2")
-        self.assertEqual(activity[2][2], "n36l0i2")
+        self.assertIn("H0,0,21n36l1i2Z", activity.definitions)
+        self.assertIn("H12,0,21n36l0i2Z", activity.definitions)
 
-        riff = compile_bass_events(
+        riff = self._bass_plan(
             config={"length_beats": 4, "bass_mode": "riff"},
             running=True,
             bass_notes=(),
@@ -256,10 +266,46 @@ class PureCommandPlanTests(unittest.TestCase):
             bass_gate_beats=0.25,
             ppq=48,
         )
-        self.assertEqual(riff[0][2], "n36l0.503937008i2")
+        self.assertIn("H0,0,21n36l0.503937008i2Z", riff.definitions)
+
+    def test_bass_harmony_update_preserves_launcher_identity_and_phase(self) -> None:
+        common = {
+            "config": {"length_beats": 4, "bass_mode": "riff"},
+            "running": True,
+            "bass_notes": (),
+            "synth": 1,
+            "bass_gate_beats": 0.25,
+            "ppq": 48,
+        }
+        c_plan = self._bass_plan(
+            **common,
+            bass_riff={
+                "id": "same-riff",
+                "ppq": 48,
+                "phrase_ticks": 192,
+                "events": [
+                    {"tick": 24, "duration_ticks": 12, "note": 36, "velocity": 96}
+                ],
+            },
+        )
+        e_plan = self._bass_plan(
+            **common,
+            bass_riff={
+                "id": "same-riff",
+                "ppq": 48,
+                "phrase_ticks": 192,
+                "events": [
+                    {"tick": 24, "duration_ticks": 12, "note": 40, "velocity": 96}
+                ],
+            },
+        )
+
+        self.assertEqual(c_plan.identity, e_plan.identity)
+        self.assertEqual(c_plan.triggers, e_plan.triggers)
+        self.assertNotEqual(c_plan.definitions, e_plan.definitions)
 
     def test_tb303_slide_chain_is_native_and_ignores_destination_accent(self) -> None:
-        events = compile_bass_events(
+        plan = self._bass_plan(
             config={"length_beats": 4, "bass_mode": "riff"},
             running=True,
             bass_notes=(),
@@ -298,17 +344,19 @@ class PureCommandPlanTests(unittest.TestCase):
             ppq=48,
             tb303_parameters=Tb303Parameters(),
         )
+        self.assertEqual(plan.triggers, ((0, 192, "HC21,1,1Z"),))
         self.assertEqual(
-            events,
+            plan.definitions,
             (
-                (0, 192, "a1.175F,,,,2.7m0n36l0.787401575i1"),
-                (24, 192, "a1F,,,,2m60n38i1"),
-                (48, 192, "a1F,,,,2m60n40i1"),
-                (60, 192, "l0i1"),
+                "HR21Z",
+                "H0,0,21a1.175F,,,,2.7m0n36l0.787401575i1Z",
+                "H24,0,21a1F,,,,2m60n38i1Z",
+                "H48,0,21a1F,,,,2m60n40i1Z",
+                "H60,0,21l0i1Z",
             ),
         )
-        self.assertNotIn("l", events[1][2])
-        self.assertIn("a1F,,,,2", events[1][2])
+        self.assertNotIn("l", plan.definitions[2])
+        self.assertIn("a1F,,,,2", plan.definitions[2])
 
     def test_tb303_activity_uses_accent_without_changing_ordinary_plan(self) -> None:
         config = {
@@ -317,7 +365,7 @@ class PureCommandPlanTests(unittest.TestCase):
                 {"time": 1, "degree": 1, "amp": 0.5, "accent": True},
             ],
         }
-        ordinary = compile_bass_events(
+        ordinary = self._bass_plan(
             config=config,
             running=True,
             bass_notes=(36.0, 40.0),
@@ -326,7 +374,7 @@ class PureCommandPlanTests(unittest.TestCase):
             bass_gate_beats=0.25,
             ppq=48,
         )
-        tb303 = compile_bass_events(
+        tb303 = self._bass_plan(
             config=config,
             running=True,
             bass_notes=(36.0, 40.0),
@@ -336,41 +384,38 @@ class PureCommandPlanTests(unittest.TestCase):
             ppq=48,
             tb303_parameters=Tb303Parameters(),
         )
-        self.assertEqual(ordinary, ((48, 192, "n40l0.7i1"), (60, 192, "n40l0i1")))
-        self.assertEqual(
-            tb303,
-            (
-                (48, 192, "a1.175F,,,,2.7m0n40l0.700787402i1"),
-                (60, 192, "l0i1"),
-            ),
+        self.assertIn("H0,0,21n40l0.7i1Z", ordinary.definitions)
+        self.assertIn(
+            "H0,0,21a1.175F,,,,2.7m0n40l0.700787402i1Z",
+            tb303.definitions,
         )
+        self.assertIn("H12,0,21l0i1Z", tb303.definitions)
 
     def test_tb303_loop_release_precedes_next_attack_at_tick_zero(self) -> None:
-        events = compile_bass_events(
-            config={"length_beats": 1, "bass_mode": "riff"},
-            running=True,
-            bass_notes=(),
-            bass_riff={
-                "ppq": 48,
-                "phrase_ticks": 48,
-                "events": [
-                    {
-                        "tick": 0,
-                        "duration_ticks": 48,
-                        "note": 36,
-                        "velocity": 100,
-                        "accent": False,
-                        "slide_to_next": False,
-                    }
-                ],
-            },
-            synth=1,
-            bass_gate_beats=0.25,
-            ppq=48,
-            tb303_parameters=Tb303Parameters(),
-        )
-        self.assertEqual(events[0], (0, 48, "l0i1"))
-        self.assertIn("n36", events[1][2])
+        with self.assertRaisesRegex(ValueError, "silent handover"):
+            self._bass_plan(
+                config={"length_beats": 1, "bass_mode": "riff"},
+                running=True,
+                bass_notes=(),
+                bass_riff={
+                    "ppq": 48,
+                    "phrase_ticks": 48,
+                    "events": [
+                        {
+                            "tick": 0,
+                            "duration_ticks": 48,
+                            "note": 36,
+                            "velocity": 100,
+                            "accent": False,
+                            "slide_to_next": False,
+                        }
+                    ],
+                },
+                synth=1,
+                bass_gate_beats=0.25,
+                ppq=48,
+                tb303_parameters=Tb303Parameters(),
+            )
 
     def test_drum_and_fill_plans_are_deterministic(self) -> None:
         fill = _Fill(

@@ -62,6 +62,27 @@ class SequencerTagTests(unittest.TestCase):
             FRONTEND / "music" / "drums"
         )
 
+    def _bass_client(self, bass_riff: dict[str, object]) -> AmySerialClient:
+        client = AmySerialClient.__new__(AmySerialClient)
+        client.resolved_config = self.resolved_config
+        client.synth_id = {"bass": 1}
+        client.rhythm_config = {
+            "id": "test",
+            "length_beats": 4,
+            "bass_mode": "riff",
+        }
+        client.bass_running = True
+        client.bass_notes = []
+        client.bass_riff = bass_riff
+        client._bass_sequence_parameters = lambda: None
+        client._bass_plan = None
+        client._bass_plan_active = False
+        client._bass_drain_bound = 0
+        client._sequencer_lanes = {
+            "bass": _TaggedSequencerLane("bass", 56, 56, _WriterProbe())
+        }
+        return client
+
     def test_reserved_ranges_are_disjoint_and_inside_current_amy_limit(self) -> None:
         rhythm_cfg = self.config["rhythm"]
         max_tags = int(self.config["amy_max_sequencer_tags"])
@@ -217,7 +238,10 @@ class SequencerTagTests(unittest.TestCase):
                                 str(rhythm["id"])
                             ).levels
                         )
-                        total = drum_roles + chord_instances + 1
+                        # One bass launcher and at most one finite bass gesture
+                        # are active in steady state. A live riff handover adds
+                        # one short controller execution transiently.
+                        total = drum_roles + chord_instances + 2
                         details = (
                             str(rhythm["id"]),
                             source_level,
@@ -233,18 +257,22 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(worst_sequence_count[0], 2)
         self.assertEqual(
             worst_total,
-            (34, ("merengue", 4, 1, 7, 6, 27)),
+            (35, ("merengue", 4, 1, 7, 6, 27)),
         )
         self.assertLessEqual(worst_total[0], max_instances)
+        self.assertLessEqual(worst_total[0] + 1, max_instances)
 
-        riff_tags = max(
-            len(riff["timing"]["events"]) * 2
+        max_riff_gestures = max(
+            len(riff["timing"]["events"])
             for riff in self.riffs
         )
-        # The ranked catalogue deliberately permits 25-note phrases. Each
-        # note consumes one onset and one release tag in the repeating lane.
-        self.assertEqual(riff_tags, 50)
-        self.assertLessEqual(riff_tags, int(ranges["bass"]["count"]))
+        # This is a conservative bound: slide/overlap chains share one finite
+        # child. The bass range also reserves one root and one handover tag.
+        self.assertEqual(max_riff_gestures, 25)
+        self.assertLessEqual(
+            max_riff_gestures + 2,
+            int(ranges["bass"]["count"]),
+        )
 
     def test_one_tag_tracks_one_event_and_clear_is_targeted(self) -> None:
         writer = _WriterProbe()
@@ -268,6 +296,105 @@ class SequencerTagTests(unittest.TestCase):
         )
         self.assertIn("H0,16,10n60l1i1Z", commands)
         self.assertIn("H0,16,10n64l1i1Z", commands)
+
+    def test_bass_harmony_publication_does_not_restart_or_rephase_root(self) -> None:
+        riff = {
+            "id": "stable",
+            "ppq": 48,
+            "phrase_ticks": 192,
+            "events": [
+                {"tick": 24, "duration_ticks": 18, "note": 36, "velocity": 96},
+                {"tick": 96, "duration_ticks": 18, "note": 43, "velocity": 96},
+            ],
+        }
+        client = self._bass_client(riff)
+        initial = client._bass_update_commands(
+            restart_phrase=True,
+            initial_start=True,
+        )
+        self.assertIn("HR56Z", initial)
+        self.assertIn("H24,192,56HC57,1,1Z", initial)
+        self.assertIn("HC56,1,1Z", initial)
+
+        client.bass_riff = {
+            **riff,
+            "events": [
+                {**event, "note": int(event["note"]) + 4}
+                for event in riff["events"]
+            ],
+        }
+        harmony = client._bass_update_commands(restart_phrase=False)
+        self.assertIn("HR57Z", harmony)
+        self.assertIn("H0,0,57n40l0.755905512i1Z", harmony)
+        self.assertFalse(any(command.startswith("HR56") for command in harmony))
+        self.assertFalse(any(command.startswith("HC56") for command in harmony))
+        self.assertFalse(any(command.startswith("HR111") for command in harmony))
+
+    def test_riff_change_uses_amy_timed_graceful_handover(self) -> None:
+        old_riff = {
+            "id": "old",
+            "ppq": 48,
+            "phrase_ticks": 192,
+            "events": [
+                {"tick": 0, "duration_ticks": 30, "note": 36, "velocity": 96},
+            ],
+        }
+        client = self._bass_client(old_riff)
+        client._bass_update_commands(restart_phrase=True, initial_start=True)
+        client.bass_riff = {
+            "id": "new",
+            "ppq": 48,
+            "phrase_ticks": 192,
+            "events": [
+                {"tick": 72, "duration_ticks": 12, "note": 40, "velocity": 96},
+            ],
+        }
+
+        commands = client._bass_update_commands(restart_phrase=True)
+        self.assertEqual(commands[0], "HC111,0,1Z")
+        self.assertIn("HR56Z", commands)
+        self.assertIn("H72,192,56HC57,1,1Z", commands)
+        self.assertIn("HR111Z", commands)
+        self.assertIn("H0,0,111HC56,0,1Z", commands)
+        self.assertIn("H31,0,111HC56,1,1Z", commands)
+        self.assertEqual(commands[-1], "HC111,1,1Z")
+
+        # A later short riff cannot shrink the safety bound retained for a
+        # rapid edit while an earlier finite child may still be alive.
+        client.bass_riff = {
+            "id": "newer",
+            "ppq": 48,
+            "phrase_ticks": 192,
+            "events": [
+                {"tick": 0, "duration_ticks": 3, "note": 41, "velocity": 96},
+            ],
+        }
+        rapid = client._bass_update_commands(restart_phrase=True)
+        self.assertIn("H31,0,111HC56,1,1Z", rapid)
+
+    def test_explicit_bass_stop_cancels_children_and_releases_state(self) -> None:
+        client = self._bass_client(
+            {
+                "id": "playing",
+                "ppq": 48,
+                "phrase_ticks": 192,
+                "events": [
+                    {"tick": 0, "duration_ticks": 18, "note": 36, "velocity": 96},
+                    {"tick": 48, "duration_ticks": 18, "note": 43, "velocity": 96},
+                ],
+            }
+        )
+        client._bass_update_commands(restart_phrase=True, initial_start=True)
+        client.bass_running = False
+        commands = client._bass_update_commands(restart_phrase=True)
+        self.assertEqual(commands[:4], [
+            "HC111,0,1Z",
+            "HC56,0,1Z",
+            "HC57,0,1Z",
+            "HC58,0,1Z",
+        ])
+        self.assertFalse(client._bass_plan_active)
+        self.assertEqual(client._bass_drain_bound, 0)
 
     def test_sequence_wire_adapter_uses_explicit_h_family_operations(self) -> None:
         plan = compile_sequence_definition(

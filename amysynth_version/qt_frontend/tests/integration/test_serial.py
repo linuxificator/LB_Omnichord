@@ -1204,7 +1204,7 @@ class SerialIntegrationTests(unittest.TestCase):
                 lines: list[str] = []
                 while time.monotonic() < deadline:
                     lines = app.bridge.lines_since(start)
-                    if "HC56,0,0Z" in lines and "HR56Z" in lines:
+                    if "HC56,0,1Z" in lines and "HR56Z" in lines:
                         break
                     time.sleep(0.01)
                 else:

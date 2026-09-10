@@ -109,7 +109,8 @@ class ProgramIntegrationTests(unittest.TestCase):
             rhythm_start = app.bridge.count()
             app.action("toggleRhythm")
             app.bridge.wait_for_line_match(
-                lambda line: re.match(r"^H\d+,\d+,56a", line) is not None,
+                lambda line: re.match(r"^H\d+,0,(?:5[7-9]|[6-9]\d|10\d|110)a", line)
+                is not None,
                 "TB-303-articulated bass event",
                 start=rhythm_start,
                 timeout=8.0,
@@ -117,22 +118,22 @@ class ProgramIntegrationTests(unittest.TestCase):
 
             ordinary_start = app.bridge.count()
             app.action("setBassSynthIndex", 0)
-            app.bridge.wait_for_lines(["HR56Z"], start=ordinary_start, timeout=8.0)
             ordinary_lines = app.bridge.wait_for_line_match(
-                lambda line: re.match(r"^H\d+,\d+,56n", line) is not None,
+                lambda line: re.match(r"^H\d+,0,(?:5[7-9]|[6-9]\d|10\d|110)n", line)
+                is not None,
                 "ordinary bass event after leaving TB-303",
                 start=ordinary_start,
                 timeout=8.0,
             )
-            last_reset = max(
+            update_start = max(
                 index
                 for index, line in enumerate(ordinary_lines)
-                if line == "HR56Z"
+                if line == "HC111,0,1Z"
             )
             self.assertFalse(
                 any(
-                    re.match(r"^H\d+,\d+,56a", line)
-                    for line in ordinary_lines[last_reset + 1 :]
+                    re.match(r"^H\d+,0,(?:5[7-9]|[6-9]\d|10\d|110)a", line)
+                    for line in ordinary_lines[update_start + 1 :]
                 )
             )
 

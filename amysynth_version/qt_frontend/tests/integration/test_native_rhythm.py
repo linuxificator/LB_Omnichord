@@ -66,7 +66,8 @@ class NativeRhythmTests(unittest.TestCase):
             app.bridge.reset_audio_peak()
             app.action("toggleRhythm")
             app.bridge.wait_for_line_match(
-                lambda line: re.match(r"^H\d+,\d+,56a", line) is not None,
+                lambda line: re.match(r"^H\d+,0,(?:5[7-9]|[6-9]\d|10\d|110)a", line)
+                is not None,
                 "native TB-303 bass event",
                 start=start,
                 timeout=8.0,
