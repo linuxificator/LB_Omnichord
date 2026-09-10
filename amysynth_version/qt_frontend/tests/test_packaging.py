@@ -406,6 +406,12 @@ class PackagingContracts(unittest.TestCase):
             "python amysynth_version/qt_frontend/capture_screenshots.py",
             release,
         )
+        self.assertIn("sudo apt-get install -y libegl1 fonts-urw-base35", release)
+        self.assertIn(
+            "fc-match --format='%{family}\\n' 'URW Chancery L' "
+            "| grep -Fx 'Z003'",
+            release,
+        )
         self.assertIn(
             "python amysynth_version/qt_frontend/tools/"
             "update_release_screenshots.py",

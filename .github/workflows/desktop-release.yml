@@ -992,7 +992,8 @@ jobs:
       - name: Install screenshot dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1
+          sudo apt-get install -y libegl1 fonts-urw-base35
+          fc-match --format='%{family}\n' 'URW Chancery L' | grep -Fx 'Z003'
           python -m pip install \
             -c amysynth_version/qt_frontend/packaging/constraints/desktop-current.txt \
             -r amysynth_version/qt_frontend/requirements.txt
