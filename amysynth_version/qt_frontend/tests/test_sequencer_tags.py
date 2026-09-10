@@ -22,6 +22,7 @@ from drum_patterns import load_drum_pattern_catalog  # noqa: E402
 from config_loader import load_resolved_amy_config  # noqa: E402
 from rhythm_command_plan import (  # noqa: E402
     SEQUENCE_CONTROL_GATE,
+    compile_bass_sequence_plan,
     compile_sequence_definition,
     sequence_control_command,
 )
@@ -271,6 +272,34 @@ class SequencerTagTests(unittest.TestCase):
         self.assertEqual(max_riff_gestures, 25)
         self.assertLessEqual(
             max_riff_gestures + 2,
+            int(ranges["bass"]["count"]),
+        )
+
+        worst_activity_gestures = (0, "")
+        for rhythm in self.rhythms:
+            for level_index, events in enumerate(rhythm["bass_levels"][:4]):
+                plan = compile_bass_sequence_plan(
+                    config={
+                        "id": rhythm["id"],
+                        "length_beats": rhythm["length_beats"],
+                        "bass_activity": level_index + 1,
+                        "bass_events": events,
+                    },
+                    running=True,
+                    bass_notes=(36.0, 40.0, 43.0, 47.0),
+                    bass_riff=None,
+                    synth=1,
+                    bass_gate_beats=0.3,
+                    ppq=48,
+                    sequence_start=56,
+                    sequence_count=56,
+                )
+                worst_activity_gestures = max(
+                    worst_activity_gestures,
+                    (plan.gesture_count, str(rhythm["id"])),
+                )
+        self.assertLessEqual(
+            worst_activity_gestures[0] + 2,
             int(ranges["bass"]["count"]),
         )
 

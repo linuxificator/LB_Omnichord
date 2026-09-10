@@ -1171,6 +1171,46 @@ class SerialIntegrationTests(unittest.TestCase):
                 "stopping rhythm must not release a manually held chord",
             )
 
+    def test_chord_root_change_republishes_bass_gestures_without_rephasing(self) -> None:
+        with HeadlessApp(native_amy=False) as app:
+            app.bridge.wait_idle(timeout=10.0)
+            app.action("selectChord", 0, 0)
+            app.action("setRhythmBassActivity", 5.0)
+            if not bool(app.query("bassRunning")):
+                app.action("toggleBassRunning")
+            if not bool(app.query("rhythmRunning")):
+                start = app.bridge.count()
+                app.action("toggleRhythm")
+                app.bridge.wait_for_lines(["zY1Z"], start=start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            riff_id = str(app.query("selectedBassRiffId"))
+            self.assertTrue(riff_id)
+
+            start = app.bridge.count()
+            app.action("selectChord", 0, 2)
+            app.bridge.wait_for_lines(["HR57Z"], start=start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            lines = app.bridge.lines_since(start)
+
+            self.assertEqual(str(app.query("selectedBassRiffId")), riff_id)
+            self.assertTrue(any(line.startswith("H0,0,57n") for line in lines), lines)
+            self.assertNotIn("HR56Z", lines)
+            self.assertFalse(any(line.startswith("HC56,") for line in lines), lines)
+            self.assertNotIn("HR111Z", lines)
+
+            selector = int(app.query("bassRiffSelector"))
+            start = app.bridge.count()
+            app.action("setBassRiffSelector", 1 + selector % 5)
+            app.bridge.wait_for_lines(["HR111Z"], start=start, timeout=8.0)
+            app.bridge.wait_idle(timeout=8.0)
+            lines = app.bridge.lines_since(start)
+            self.assertIn("H0,0,111HC56,0,1Z", lines)
+            self.assertTrue(
+                any(re.match(r"^H\d+,0,111HC56,1,1Z$", line) for line in lines),
+                lines,
+            )
+            self.assertIn("HC111,1,1Z", lines)
+
     def test_tag_ranges_are_disjoint_and_lane_updates_do_not_cross(self) -> None:
         with HeadlessApp(native_amy=False) as app:
             app.bridge.wait_idle(timeout=10.0)

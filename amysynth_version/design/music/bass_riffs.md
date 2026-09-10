@@ -171,14 +171,18 @@ Do not make scale matching mandatory unless the UI later exposes a scale/mode ch
 
 The catalogue itself does not dictate one implementation. The adopted runtime
 policy preserves transport and the sequencer timebase, retains a compatible
-playing riff by stable ID, and otherwise uses the preset/default selector.
-Future bass events are replaced immediately at the current sequencer phase.
+playing riff by stable ID, and otherwise uses the preset/default selector. A
+stable riff's repeating launcher keeps its phase; new harmony is published
+only to future finite note/slide gestures. If riff identity changes, an
+AMY-owned finite controller starts the replacement at its own tick zero after
+the old gesture's safe release bound.
 The underlying musical safety rules remain:
 
 - preserve transport and sequencer timebase;
 - choose a compatible riff for the new chord/rhythm;
 - transpose to the new root;
-- use an explicitly designed lane-local replacement boundary;
+- use the AMY-owned phase-preserving or release-safe boundary described in
+  [`bass_handover.md`](bass_handover.md);
 - do not mutate the riff's internal rhythm.
 
 If a future product decision allows immediate mid-phrase replacement, that must still be implemented as a lane-local event replacement and not as transport restart.
@@ -237,7 +241,9 @@ Tests must prove at minimum:
     context;
 11. transposition changes pitch only, never event timing;
 12. the riff subsystem does not read `bass_levels` to create or modify riff events;
-13. live riff changes do not stop/reset the AMY sequencer or affect drum/chord lanes.
+13. live riff changes do not stop/reset the AMY sequencer or affect drum/chord lanes;
+14. chord/root changes preserve bass-root phase and alter only future finite gestures;
+15. explicit riff changes restart at local tick zero without leaving or truncating notes.
 
 ## Current runtime choices
 

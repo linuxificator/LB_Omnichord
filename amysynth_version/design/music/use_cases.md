@@ -77,3 +77,16 @@ Expected:
 
 Expected:
 - OMNI presets and MIDI presets remain independent
+
+## UC-009 Live bass harmony and phrase changes
+
+Given a running one- or two-bar bass riff:
+
+- selecting another root with the same compatible riff preserves its current
+  phase and applies the new harmony at the next detached bass gesture;
+- a sounding ordinary note or TB-303 slide/release gesture completes normally;
+- deliberately selecting another riff starts that riff from local tick zero at
+  the earliest guaranteed release-safe AMY boundary available without clock
+  observation;
+- no operation resets transport, reads the sequencer clock, uses a host timer,
+  leaves a note hanging or lets an old release truncate a new attack.

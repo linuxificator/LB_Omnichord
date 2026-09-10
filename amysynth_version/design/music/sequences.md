@@ -41,7 +41,11 @@ uses at most one parent/child level and never authors recursive control graphs.
 Each fill is defined once during `AmySerialClient` construction. Rhythm Start
 resets the timebase and active executions while retaining the catalogue.
 Activity changes may replace base-role sequences. Arpeggio, chord or pitch
-changes reset and rebuild a future definition behind a stable tag.
+changes reset and rebuild future definitions behind stable tags. Bass uses a
+phase-owning root plus finite release-owning gestures: chord/root changes
+replace only future gestures, whereas a real phrase change uses a finite
+AMY-timed handover controller. The complete distinction is specified in
+[`bass_handover.md`](bass_handover.md).
 
 An execution already running in AMY retains its original copy-on-write
 snapshot. LB therefore keeps no execution generation, phrase end time,
@@ -67,6 +71,8 @@ Tests must keep proving that:
 - live fill selection changes future launches only;
 - fill gates suppress event dispatch without killing ringing audio or moving phase;
 - arpeggio rate, direction, pitch and chord edits retain stable tag identity;
+- bass harmony edits preserve root phase, while explicit riff edits restart at
+  local tick zero only after an AMY-owned release-safe drain;
 - every running one-shot retains its original releases after a definition edit;
 - rhythm planning contains no host phrase timers, clock queries or execution state;
 - frontend planner and transport code import no AMY runtime API;
