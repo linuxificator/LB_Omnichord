@@ -38,6 +38,10 @@ if((~omniSamplePlaybackRate.value(440, 69, 100) - (2 ** (1 / 12))).abs
     failed = true;
     "VSCO_SFZ_TUNE_RATE_FAILED".postln;
 };
+if(~omniEvictSampleBytes.value(0).not) {
+    failed = true;
+    "VSCO_ZERO_PRESSURE_EVICTION_FAILED".postln;
+};
 if(failed) { 1.exit } {
     "VSCO_SAMPLE_LOADER_TEST_OK".postln;
     0.exit

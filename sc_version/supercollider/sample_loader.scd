@@ -44,25 +44,30 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
     var needed = (
         ~omniSampleBufferBytes + incomingBytes - ~omniSampleBudgetBytes
     ).max(0);
-    var candidates = ~omniSampleBuffers.keys.select { |sampleId|
-        ((~omniSampleProgramRefs[sampleId] ? 0) <= 0) and: {
-            (~omniSampleVoiceRefs[sampleId] ? 0) <= 0
-        }
-    }.sort { |left, right|
-        (~omniSampleLastUsed[left] ? 0) < (~omniSampleLastUsed[right] ? 0)
-    };
-    candidates.do { |sampleId|
-        if(needed > 0) {
-            var bytes = jsonAt.value(
-                ~omniSampleFiles[sampleId], "decoded_bytes"
-            ).asInteger;
-            ~omniSampleBuffers.removeAt(sampleId).free;
-            ~omniSampleBufferBytes = (~omniSampleBufferBytes - bytes).max(0);
-            ~omniSampleLastUsed.removeAt(sampleId);
-            needed = (needed - bytes).max(0);
+    var candidates;
+    if(needed <= 0) {
+        true
+    } {
+        candidates = ~omniSampleBuffers.keys.select { |sampleId|
+            ((~omniSampleProgramRefs[sampleId] ? 0) <= 0) and: {
+                (~omniSampleVoiceRefs[sampleId] ? 0) <= 0
+            }
+        }.asArray.sort { |left, right|
+            (~omniSampleLastUsed[left] ? 0) < (~omniSampleLastUsed[right] ? 0)
         };
+        candidates.do { |sampleId|
+            if(needed > 0) {
+                var bytes = jsonAt.value(
+                    ~omniSampleFiles[sampleId], "decoded_bytes"
+                ).asInteger;
+                ~omniSampleBuffers.removeAt(sampleId).free;
+                ~omniSampleBufferBytes = (~omniSampleBufferBytes - bytes).max(0);
+                ~omniSampleLastUsed.removeAt(sampleId);
+                needed = (needed - bytes).max(0);
+            };
+        };
+        needed <= 0
     };
-    needed <= 0
 };
 
 ~omniReleaseSampleProgram = { |program, revision|
