@@ -69,6 +69,25 @@ class TestRunnerTests(unittest.TestCase):
         self.assertEqual(command[-1], str(script))
         self.assertNotEqual(command[0], str(script))
 
+    def test_supercollider_scripts_use_headless_sclang_not_python(self) -> None:
+        script = run_tests.SC_ROOT / "syntax_check.scd"
+        self.assertEqual(
+            run_tests._command_for_script(script, Path("coverage")),
+            ["sclang", "-D", str(script)],
+        )
+
+    def test_all_includes_the_migration_release_gates(self) -> None:
+        self.assertEqual(
+            run_tests.ALL_ORDER[-5:],
+            (
+                "sc-compiler",
+                "sc-sequencer",
+                "sc-audio",
+                "sc-banks",
+                "sc-packaged",
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

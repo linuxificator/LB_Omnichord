@@ -16,6 +16,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
+SC_ROOT = ROOT.parent / "supercollider"
 
 SUITES: dict[str, tuple[Path, ...]] = {
     "quality": (
@@ -52,6 +53,28 @@ SUITES: dict[str, tuple[Path, ...]] = {
     "presets": (
         TESTS / "integration" / "test_presets.py",
     ),
+    "sc-compiler": (
+        SC_ROOT / "syntax_check.scd",
+        SC_ROOT / "tests" / "sclork_compile_audit.scd",
+        SC_ROOT / "tests" / "sclork_loader_test.scd",
+    ),
+    "sc-sequencer": (
+        SC_ROOT / "tests" / "sequencer_validation_test.scd",
+        SC_ROOT / "tests" / "sequencer_snapshot_test.scd",
+        TESTS / "test_supercollider_coordinator.py",
+    ),
+    "sc-audio": (
+        SC_ROOT / "tests" / "acid_voice_test.scd",
+    ),
+    "sc-banks": (
+        SC_ROOT / "tests" / "sample_loader_test.scd",
+        TESTS / "test_sfz_manifest_compiler.py",
+        TESTS / "test_vsco_manifest.py",
+        TESTS / "test_supercollider_drums.py",
+    ),
+    "sc-packaged": (
+        TESTS / "test_supercollider_package_contract.py",
+    ),
 }
 ALL_ORDER = (
     "quality",
@@ -64,6 +87,11 @@ ALL_ORDER = (
     "presets",
     "native-controls",
     "native-rhythm",
+    "sc-compiler",
+    "sc-sequencer",
+    "sc-audio",
+    "sc-banks",
+    "sc-packaged",
 )
 
 
@@ -120,6 +148,8 @@ def _prepare_suite_artifacts(artifact_root: Path, suite: str) -> Path:
 
 
 def _command_for_script(script: Path, coverage_directory: Path | None) -> list[str]:
+    if script.suffix == ".scd":
+        return ["sclang", "-D", str(script)]
     if coverage_directory is None:
         return [sys.executable, str(script)]
     return [
@@ -146,20 +176,31 @@ def run_script(
         env["COVERAGE_FILE"] = str(coverage_directory / ".coverage")
         env["COVERAGE_PROCESS_START"] = str(ROOT / ".coveragerc")
 
-    print(f"\n=== {suite}: {script.relative_to(ROOT)} ===", flush=True)
+    try:
+        display_path = script.relative_to(ROOT)
+    except ValueError:
+        display_path = script.relative_to(ROOT.parent)
+    print(f"\n=== {suite}: {display_path} ===", flush=True)
     started = time.monotonic()
-    completed = subprocess.run(
-        _command_for_script(script, coverage_directory),
-        cwd=ROOT,
-        env=env,
-        check=False,
-    )
+    if script.suffix == ".scd":
+        env.setdefault("QT_QPA_PLATFORM", "offscreen")
+    try:
+        completed = subprocess.run(
+            _command_for_script(script, coverage_directory),
+            cwd=ROOT,
+            env=env,
+            check=False,
+        )
+        returncode = completed.returncode
+    except FileNotFoundError as exc:
+        print(f"required test executable is unavailable: {exc}", file=sys.stderr)
+        returncode = 127
     duration = round(time.monotonic() - started, 6)
     return ScriptResult(
         suite=suite,
-        script=str(script.relative_to(ROOT)),
-        status="passed" if completed.returncode == 0 else "failed",
-        returncode=completed.returncode,
+        script=str(display_path),
+        status="passed" if returncode == 0 else "failed",
+        returncode=returncode,
         duration_seconds=duration,
     )
 

@@ -85,7 +85,7 @@ cleanup() {
     kill -TERM -- "-$sc_process_group" 2>/dev/null || true
     wait "$sc_process_group" 2>/dev/null || true
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT INT TERM HUP
 
 sleep 0.2
 kill -0 "$sc_process_group" 2>/dev/null || {
