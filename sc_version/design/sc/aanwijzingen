@@ -4,3 +4,5 @@ maak op github een aparte build voor dit systeem, en en zorg er voor dat een mer
 SC  version en AMY vesion kunnen dus onafhankelijk van elkaar gebouwd en getest worden en hebben hun eigen release.
 De huidige sc_version directory is initieel een kopie van de amy version.
 Werk in de branch version/supercollider
+De sample lib staat ook in ~/sample_lib/VSCO-2-CE-1.1.0/ lokaal uitgepakt
+Hou je aan de bestaande archtitectuur en code richtlijnen, de omnichord mag ook bij de supercollider sequencer niet zelf dingen moeten timen, geef het aan als dat niet kan, ga het niet toch implementeren.
