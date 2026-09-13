@@ -270,6 +270,12 @@ s.options.memSize = memKiB;
 s.options.numInputBusChannels = 0;
 s.options.numOutputBusChannels = 2;
 s.options.bindAddress = "127.0.0.1";
+if("OMNICHORD_SC_SYNTH_PROGRAM".getenv.notNil) {
+    s.options.program = "OMNICHORD_SC_SYNTH_PROGRAM".getenv;
+};
+if("OMNICHORD_SC_PLUGIN_PATH".getenv.notNil) {
+    s.options.ugenPluginsPath = "OMNICHORD_SC_PLUGIN_PATH".getenv;
+};
 
 s.waitForBoot({
     (scriptDirectory +/+ "core_synthdefs.scd").load;

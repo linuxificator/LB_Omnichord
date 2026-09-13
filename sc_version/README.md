@@ -1,35 +1,70 @@
-# Active AMY implementation
+# LB Omnichord — SuperCollider edition
 
-`amysynth_version` is the actively maintained LB Omnichord implementation.
-Its Qt frontend produces AMY wire commands for either a separate local AMY
-service or an ESP32-P4 target.
+This directory contains the independent SuperCollider implementation of LB
+Omnichord. It keeps the same Qt Quick instrument and musical catalogues as the
+AMY edition, while moving synthesis, sample playback, voice ownership, mixing
+and musical timing into a separately supervised headless `sclang`/`scsynth`
+runtime.
 
-The repository's Sonic Pi implementation is retained only as historical legacy
-material. It is not an alternative backend for this application, is outside the
-active design and test contracts, and must not be modified as part of AMY work.
-New behavior, fixes, documentation and tests belong under `amysynth_version`.
+The current supported target is Linux x86_64. Raspberry Pi, macOS, Windows,
+Android and ESP32-P4 remain targets of the AMY edition; this directory does
+not claim SuperCollider support for them yet.
 
-Start with `design/README.md` for behavioral contracts,
-`design/arch/testing.md` for the test/CI structure and `qt_frontend/INSTALL.md` for
-installation and launch instructions.
+![SuperCollider edition OMNI screen](./qt_frontend/screenshots/omni-R20260913T004923.png)
 
-Platform packages are published under the repository's
-[GitHub Releases](https://github.com/linuxificator/LB_Omnichord/releases) after
-the complete AMY regression matrix passes. Each release contains Linux x86_64
-and Raspberry Pi 4/5 aarch64 AppImages, a macOS Apple Silicon DMG and an
-experimental native Windows x86_64 zip, plus an experimental Android arm64
-APK. Releases also contain one dual-profile ESP32-P4 firmware ZIP with v1 and
-v3 images and old/new esptool flashers. Every application package contains the
-Qt frontend and compatible AMY runtime while
-preserving their separate-process wire-protocol boundary. Windows uses a
-private named pipe; Android embeds the lifecycle AAR and uses its app-private
-`amy.sock`; neither target runs the Linux AppImage through a compatibility
-layer.
+## Architecture
 
-The current validated baseline is `R20260907T231243`. Its complete matrix
-passed for Linux, Raspberry Pi, macOS, Windows, Android including emulator, and
-both ESP32-P4 firmware profiles. The published Raspberry Pi AppImage was also
-physically tested on a 2 GiB Pi 4 with hardware-accelerated Wayland/V3D, both
-with its bundled AMY service and through `/dev/serial0` to the published P4-v1
-firmware. macOS, Windows, Android and P4-v3 still retain the physical-device
-limitations stated by their platform contracts.
+The production boundary is a typed, versioned OSC protocol over loopback:
+
+```text
+Qt UI and policy -> immutable typed plans -> SuperCollider client
+                 -> headless sclang coordinator -> scsynth audio graph
+```
+
+Python owns user interaction, catalogues and immutable plan compilation.
+SuperCollider owns the clock, sequencing, note lifetimes and audio. The UI
+does not schedule musical events and does not import or run AMY. The launcher
+owns one SC process group and shuts it down with the frontend.
+
+## Run from source on Linux
+
+Install Python dependencies and SuperCollider, install the distribution's
+PipeWire JACK compatibility package when PipeWire is active, and unpack VSCO
+2 Community Edition at `~/sample_lib/VSCO-2-CE-1.1.0`. Then run:
+
+```bash
+cd sc_version/qt_frontend
+./run_local.sh --windowed
+```
+
+The launcher deliberately refuses to start raw JACK on a PipeWire desktop
+when `pw-jack` is unavailable, because raw JACK can take ownership of the
+audio device. Override that safety check only for a deliberately configured
+JACK system.
+
+Configuration is read from `qt_frontend/config/supercollider.json`. The VSCO
+root may use `~`; the application validates the configuration and waits for
+the initial GM percussion sample program before reporting the engine ready.
+
+## Tests and packages
+
+Run the local test matrix from `qt_frontend`:
+
+```bash
+python tests/run_tests.py --list
+python tests/run_tests.py --suite sc-frontend
+python tests/run_tests.py --suite sc-compiler
+python tests/run_tests.py --suite sc-sequencer
+python tests/run_tests.py --suite sc-audio
+python tests/run_tests.py --suite sc-banks
+```
+
+GitHub builds the Linux package independently in
+`supercollider-linux.yml`. A push tests and uploads a short-lived artifact;
+publishing a release requires a manual workflow run with `release=true` and
+uses an `R<UTC timestamp>-SC` tag. The VSCO recordings are not bundled and
+must be installed separately under their own CC0 license.
+
+See [the SC design status](./design/sc/STATUS.md),
+[the design index](./design/README.md), and
+[the frontend README](./qt_frontend/README.md) for exact scope and known gaps.

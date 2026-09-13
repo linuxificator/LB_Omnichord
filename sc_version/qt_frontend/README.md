@@ -1,269 +1,74 @@
-# LB Omnichord — AMY / ESP32-P4 version
+# SuperCollider Qt frontend
 
-This directory contains the actively developed Qt frontend for the AMY-based
-Omnichord. It sends native AMY wire commands either over UART to AMY on the
-ESP32-P4 or over local IPC to a separate desktop AMY service. Unix local IPC
-selects packet-preserving or LF-framed stream sockets by endpoint capability,
-not an OS-name branch; that currently yields packet sockets on Linux and stream
-sockets on macOS. Native Windows uses a private named pipe through Qt's
-`QLocalSocket`.
+This is the Qt/PySide6 frontend for the independent LB Omnichord
+SuperCollider edition. It shares the established UI and music catalogues with
+the AMY edition, but its production composition root uses only typed
+SuperCollider services. Legacy AMY modules retained as characterization
+oracles are excluded from the SC package and are not imported by its runtime.
 
-The Sonic Pi version elsewhere in the repository is frozen legacy material. It
-is not a backend option for this frontend and must not be changed as part of
-AMY work.
+## Process and timing boundary
 
-## Layout
+`code/main.py` composes the frontend, `supercollider_client.py` transports the
+versioned OSC protocol, and `supercollider_platform_adapter.py` owns one
+headless SC process group. `sclang` owns the `TempoClock`, immutable sequence
+definitions, execution state and voice handles; `scsynth` owns audio nodes,
+buses and effects. Python compiles complete immutable plans but never follows
+the beat or schedules note releases.
 
-- `code/` — Python application/backend, including synth, transport and shared MIDI/OSC-control state
-- `gui/` — QML interface components and GUI assets
-- `config/` — serial/application defaults
-- `instruments/` — curated AMY Juno/DX7 catalogue and 18 factory presets
-- `music/` — chord, rhythm and intonation definitions
-- `screenshots/` — current public OMNI and MIDI screen images used by the root README
-- `capture_screenshots.py` — deterministic offscreen capture of those real QML screens
-- `tests/` — unit, headless, serial and native-AMY regression tests plus fixtures
-- `rpi/` — Raspberry Pi startup/autostart helpers
-- `docs/` — active platform, dependency and behavior contracts plus historical implementation notes
+The Linux source launcher and frozen package both supervise SC separately from
+Qt. On a PipeWire desktop they use the distribution's `pw-jack` compatibility
+wrapper. They do not start a raw JACK server behind the user's back.
 
-Runtime, test, build and Android-host dependency ownership is documented in
-[DEPENDENCIES.md](docs/DEPENDENCIES.md). Install a named requirements group;
-do not copy package/version literals from workflow files.
+## Source run
 
-For Raspberry Pi installation, UART wiring, 1,000,000-baud 8N1 serial configuration, direct transport testing and startup instructions, see `README_rpi.md`.
+Requirements:
 
-For local Linux development with a separate AMY process, use:
+- Python dependencies from `requirements.txt`;
+- `sclang` and `scsynth` (3.13 is source-compatible; packages pin 3.14.1);
+- the Linux distribution's PipeWire JACK compatibility tools when applicable;
+- VSCO 2 Community Edition unpacked at
+  `~/sample_lib/VSCO-2-CE-1.1.0`, or a different path configured in
+  `config/supercollider.json`.
+
+Run:
 
 ```bash
 ./run_local.sh --windowed
 ```
 
-On its first source-checkout run this creates `.venv` and `.amy/<commit>` in
-the Git-clone root, installs the declared frontend requirements and builds the
-exact pinned Gamma9001 AMY service. Both directories are ignored by Git.
-Subsequent starts validate the requirements and AMY binary digest without
-network access unless the declared inputs changed or the environment was
-damaged. The Qt process still does not import AMY or own its lifetime; the
-launcher remains a shell-level convenience wrapper for two independent
-processes. Released packages contain their complete runtime and never use this
-source bootstrap or download dependencies at startup.
+`OMNICHORD_SC_CONFIG` may point to another validated SC configuration. Engine
+host addresses remain loopback-only in the current trust model.
 
-## Running
+## Test suites
 
-From this directory, the source launcher creates or validates the clone-root
-virtual environment and selects the physical UART without starting local AMY:
+The single runner is `tests/run_tests.py`:
 
 ```bash
-./run_local.sh --serial --windowed
+python tests/run_tests.py --suite quality
+python tests/run_tests.py --suite sc-frontend
+python tests/run_tests.py --suite sc-compiler
+python tests/run_tests.py --suite sc-sequencer
+python tests/run_tests.py --suite sc-audio
+python tests/run_tests.py --suite sc-banks
+python tests/run_tests.py --suite sc-packaged
+python tests/run_tests.py --suite platform-input-linux
 ```
 
-`main.py` addresses the canonical `gui/`, `config/`, `instruments/` and `music/` directories directly. There are no compatibility symlinks or duplicate runtime data files in `code/`.
+SC compiler tests load every vendored SCLOrk definition. NRT tests render
+audio without opening a device. Process-boundary tests launch a separate fake
+SC service rather than placing test receivers in production application code.
+Inherited AMY wire tests explicitly launch the frozen AMY frontend as a
+behavioral oracle; they do not describe the SC production architecture.
 
-## Public screenshots
+## Linux package and release
 
-Refresh the two screenshots used by the repository README with the same Python
-environment as the frontend:
+The SC workflow builds pinned headless SuperCollider 3.14.1 and a package named
+`LB_Omnichord.SC.R<timestamp>.Linux-x86_64.AppImage`. It verifies the bundled
+runtime without opening an audio device and publishes only when the manually
+dispatched workflow receives `release=true`. Ordinary pushes and merges run
+tests and upload artifacts but do not create releases.
 
-```bash
-python capture_screenshots.py
-```
-
-The helper runs the real frontend and QML scene through Qt's offscreen software
-renderer, uses an isolated temporary home and a drained pseudo-serial endpoint,
-selects C minor for the OMNI strum-note guide, and uses the public simulation
-inputs to stage MIDI and OSC rotary and pushbutton events in the grey controller
-bar. It overwrites only
-`screenshots/omni.png` and `screenshots/midi.png`; it does not read or alter the
-user's presets or connect to AMY hardware.
-
-After every successful `main` release, CI runs this same capture against the
-exact released commit. The captured PNGs must load as 1920x850 images and must
-have enough sampled color variation to rule out a blank or error screen. CI then
-stores them as release-tagged files such as `screenshots/omni-RYYYYMMDDTHHMMSS.png`
-and updates the repository README links in the same commit. That screenshot-only
-commit uses a human-readable `skip-rebuild` note plus GitHub's required
-`skip-checks:true` trailer; ordinary merges and pushes to `main` still run the
-complete release workflow.
-
-## Synth-state architecture
-
-Synth state is intentionally object-oriented and single-path.
-
-`code/synth_state.py` defines `SynthState`, which owns one logical role's selected instrument and all per-instrument slider values. The same object handles catalogue defaults, preset overlays, instrument switches, UI slider edits, QML control-model values, transport payloads, state copying and sparse preset serialization.
-
-`InstrumentBackend` therefore does not maintain a second slider/preset dictionary. Startup, preset loading, instrument selection and UI edits mutate the role's `SynthState` and publish the same logical state. A UI slider edit is not a special parameter packet: it modifies `SynthState`, then follows the same state-convergence path used after preset and instrument changes.
-
-The catalogue distinguishes an AMY `native_default` from the application/UI `default`. If both are equal, AMY's factory patch remains authoritative and that control is omitted from the engine-override payload. Application corrections, stored preset overrides and user edits are sent explicitly. On the receiver side, `AmySerialClient._apply_synth_state()` is the single normal convergence point; if an override is removed, it reloads the patch and reapplies the remaining overrides so the native value is restored deterministically.
-
-For the chord role, manual synth 3 and rhythm synth 4 are derived from this one logical state. When automatic rhythm chords start, only actual engine overrides are reasserted on rhythm synth 4 after the sequencer-reset guard and before automatic chord events are installed. Native factory coefficients are not redundantly rewritten.
-
-## Control units
-
-Frequency controls display real frequencies in Hz and use logarithmic slider travel. For Juno patches, `VCF base` is specifically the constant/base term of AMY's filter-frequency control model; the instantaneous cutoff also depends on note tracking, envelope and modulation coefficients stored in the factory patch. For example, Chorus Vibes has a native VCF base of about 27 Hz, but that does not mean its audible filter is fixed at 27 Hz.
-
-Time controls display milliseconds, resonance displays Q, and modulation depths retain their documented physical/domain units. If a MIDI-note-valued control is exposed, the UI formats it as a note name and octave such as `C4` or `F♯3`, not as a raw MIDI integer.
-
-## Audio level model
-
-The four OMNI volume sliders retain a uniform 0–1 UI range. AMY output level
-is the product of that UI value, a musical-role level and an optional
-instrument level. All role levels now default to unity. The former blanket
-3.2 bass multiplier compensated an older signal path and became excessive
-after the shared-bus mixer fixed that underlying loss. Configuration revision
-12 removes only that exact historical value; a user-customized bass level
-remains authoritative. The original curated per-preset bass volumes are
-unchanged.
-
-`instrument_levels` remains reserved for demonstrated patch-output anomalies
-and is independent of role. Offline audits use the actual accompaniment gates,
-velocities and factory volumes, plus ITU-R BS.1770 K-weighted loudness so low
-frequency sensitivity is considered in the measurement itself. Patch
-envelopes and spectra vary too much for a second universal bass correction;
-details and reproducible commands are in
-[`../design/music/volume_balance_audit.md`](../design/music/volume_balance_audit.md).
-
-## Runtime AMY allocation
-
-OMNI uses five independent AMY synth instances: drums 0, bass 1, strum 2,
-manually held chord 3 and rhythm-triggered chord 4. MIDI uses pitched synths
-5–10 and drum synth 11. Manual and rhythm chord voices share patch/settings but
-have independent voice pools and note lifetimes. The eleven-bus mapping is
-documented in `../design/arch/architecture.md`.
-
-Rhythm timing is compiled into AMY's 48-PPQ sequencer; Linux/Python is not used as the beat clock. A live tuning change updates the shared tuned chord state: held manual chords are retuned immediately, rhythm chord and bass sequencer events are rebuilt with the new pitches, and subsequent strum notes use the selected tuning. Bass retuning therefore appears in the AMY wire/debug stream mainly as rebuilt `H...n<note>...i1Z` sequencer events rather than standalone immediate bass note commands.
-
-Linux MIDI input opens ALSA raw-MIDI devices and an ALSA sequencer input port
-named `LB Omnichord / MIDI In`. Graph tools such as `qpwgraph` can connect VMPK,
-BLE MIDI bridges and MIDI Through directly to that port. See
-`../design/controls/midi.md`.
-
-OSC control input is portable across release platforms. By default it listens
-for OSC 1.0 UDP messages on every IPv4 interface at port 8000. Edit the
-`osc_input.listen_address` and `osc_input.listen_port` values in the user copy
-of `config/amy_config.json` to restrict or move it; use `127.0.0.1` for local-
-only control. Changing numeric or switch addresses appears in the same grey
-learn bar as MIDI, with flat F01 controls. OSC and MIDI share one-to-one target
-ownership and the same click/manual-takeover behavior. See
-`../design/controls/osc.md` for message, security and persistence rules.
-When configured, `OSC` also appears beside the MIDI input technologies: its LED
-is green while listening, flashes green on input and is red when its
-listener/network is unavailable. Removing the OSC endpoint from the user config
-removes that technology item entirely.
-
-On Linux, Raspberry Pi, macOS and Windows the listening endpoint also announces
-itself as the standard `_osc._udp` DNS-SD service named `LB Omnichord`.
-Compatible controller apps can therefore find it automatically. Set
-`osc_input.advertise` to `false` or change `osc_input.service_name` in the user
-configuration if desired; there is intentionally no UI preference. Android
-continues to accept configured OSC UDP input but does not advertise it because
-reliable mDNS there requires a native Android lifecycle bridge.
-
-The bass watermark uses `gui/tuba_watermark.png`, loaded by `gui/InstrumentWatermarks.qml`.
-
-## Regression tests
-
-`tests/USE_CASES.md` is the behavioral regression contract. Test subsets are selected with:
-
-```bash
-python tests/run_tests.py --list
-python tests/run_tests.py
-python tests/run_tests.py --suite unit
-python tests/run_tests.py --suite serial
-python tests/run_tests.py --suite native-rhythm
-```
-
-The component suites are `unit`, `frontend`, `serial`, `presets`,
-`native-controls` and `native-rhythm`; `all` runs them sequentially for
-local/manual use. The `unit` suite automatically includes every top-level
-`tests/test_*.py`. Pull requests targeting `main` and pushes to `main` run all
-component suites in parallel.
-
-Without `--suite`, the runner executes `unit`. The serial suite exercises the
-production `pyserial` writer through a Linux PTY. Native suites feed that same
-wire stream into the pinned LB Omnichord AMY release, started with 11 buses,
-336 oscillators and the reusable-sequence capacities in `INSTALL.md`, and verify
-resulting AMY synth state. A passing
-native test is therefore stronger than merely finding an expected command in
-the host log. See `../design/arch/testing.md` for the complete local/CI inventory.
-
-## Platform releases
-
-Every successful complete test run after an update to `main` publishes one
-release with five application-platform packages and ESP32-P4 firmware. Tags use
-`RYYYYMMDDTHHMMSS`; application asset timestamps omit the `T`. The release page
-has separate sections and downloads for:
-
-- Linux x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Linux-x86_64.AppImage`
-- Raspberry Pi 4/5: `LB_Omnichord.RYYYYMMDDHHMMSS.RaspberryPi-aarch64.AppImage`
-- Pi 4/5 realtime setup: `LB_Omnichord.RYYYYMMDDHHMMSS.Pi4-Pi5-realtime-setup.sh`
-- macOS Apple Silicon: `LB_Omnichord.RYYYYMMDDHHMMSS.macOS-arm64.dmg`
-- Windows x64: `LB_Omnichord.RYYYYMMDDHHMMSS.Windows-x86_64.zip`
-- Android arm64: `LB_Omnichord.RYYYYMMDDHHMMSS.Android-arm64.apk`
-- ESP32-P4 v1/v3: `LB_Omnichord.RYYYYMMDDTHHMMSS.ESP32P4.zip`
-
-Each package has a matching `.sha256` asset. All timestamps are UTC. The P4
-ZIP retains the exact release tag, including `T`, as both its filename and its
-single extracted root directory.
-
-The Pi setup script is a separately checksummed, self-contained host installer.
-It embeds the committed `tools/raspberry_pi/install_realtime_profile.sh` and
-its versioned helpers, verifies those embedded files before executing them,
-and configures the same measured profile checked by source and packaged
-startup. It is not an application runtime dependency.
-
-Every package contains the Qt frontend and supported AMY fork with the
-Gamma9001 PCM drum bank. At runtime they remain separate processes connected by the
-platform's private local transport. The Pi build requires 64-bit Raspberry Pi
-OS and uses a Pi 4 baseline that also runs on Pi 5. The macOS DMG is Apple
-Silicon-only and ad-hoc signed, but it is not signed with an Apple Developer ID
-and is not Apple-notarized. The Windows zip contains separate
-`LB_Omnichord.exe` and `amy_service.exe` binaries plus `LB_Omnichord.cmd` and
-the internal `run_windows.ps1` supervisor. Extract the complete zip and
-double-click `LB_Omnichord.cmd`; the wrapper applies an execution-policy bypass
-only to that one bundled launcher process and leaves startup failures visible.
-It uses a private Windows named pipe rather than WSL or a network listener. The
-zip is portable and contains its dependencies, but it is deliberately not a
-single executable: the frontend and AMY service remain separate processes and
-the extracted directory must stay together.
-
-The Android APK embeds the `amy-service` AAR from the pinned AMY Omnichord
-release branch and exact commit. Its unexported provider owns the separate
-`:amy` service process and Oboe output; PySide6 discovers the
-application-private files directory and sends ordinary AMY packets through
-`amy.sock`. The CI APK is debug-signed and is therefore an experimental
-sideloadable artifact, not a Play Store/update-channel build. See
-[the shared AMY release contract](packaging/AMY_RELEASE.md) and
-[the Android package contract](packaging/android/README.md).
-
-The ESP32-P4 ZIP contains separate `v1/` and `v3/` firmware directories plus
-Python flashers for esptool v4 and v5 syntax. It uses the same pinned AMY
-release with Gamma9001, 11 buses and reusable sequences. See
-[`../esp32p4/README.md`](../esp32p4/README.md) for the build and hardware
-verification boundary.
-
-To install the macOS build, open the DMG, drag `LB_Omnichord.app` to
-`Applications`, eject the DMG and try to open the app once. After macOS blocks
-that first launch, open Apple menu > `System Settings` > `Privacy & Security`,
-scroll down to `Security`, click `Open Anyway` beside the LB Omnichord message,
-authenticate if requested, then click `Open` in the repeated warning. `Open
-Anyway` is available for about one hour after the blocked launch attempt. This
-adds an exception for LB Omnichord only; disabling Gatekeeper or globally
-weakening `Allow applications downloaded from` is neither necessary nor
-recommended. See [Apple's current instructions](https://support.apple.com/en-gb/guide/mac-help/mh40616/mac).
-
-The first complete four-platform release, `R20260826T230234`, passed every
-frontend suite and package job on native GitHub runners. Windows validation
-included an offline native-AMY render and an end-to-end start of the extracted
-Qt frontend and AMY service over the named pipe. The earlier x64 release
-`R20260824T204611` was downloaded and physically tested on Linux with working
-UI and audio. Raspberry Pi, macOS and Windows still need physical-device/audio
-validation. Android also needs physical touchscreen/audio-route/latency
-validation. Windows MIDI input and measured low-latency audio tuning are also
-outstanding. See [the native Windows status and contract](docs/WINDOWS_NATIVE.md).
-Current macOS and Windows package jobs additionally drive quick-tap and hold
-gestures through the real packaged QML chord item; physical pointer and audio
-validation on those platforms remains outstanding.
-The Linux AppImage through WSL2/WSLg remains an optional diagnostic experiment,
-not a Windows release target. Use GitHub Releases for current artifacts rather
-than treating a baseline tag as a hard-coded update channel.
-
-[Open GitHub Releases](https://github.com/linuxificator/LB_Omnichord/releases)
+The current package is Linux x86_64 only and requires the host's normal audio
+session integration (`pw-jack` on PipeWire). The VSCO sample library is not
+embedded. See [third-party notices](./THIRD_PARTY_NOTICES.md) and
+[current implementation status](../design/sc/STATUS.md).

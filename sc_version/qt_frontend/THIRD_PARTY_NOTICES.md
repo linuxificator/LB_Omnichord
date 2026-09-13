@@ -3,6 +3,27 @@
 LB Omnichord desktop packages include the following separately licensed
 components in addition to the components recorded in the release SBOM.
 
+## SuperCollider 3.14.1
+
+SuperCollider is distributed under the GNU General Public License, version 3
+or later. The SC Linux edition includes a pinned, headless build. Corresponding
+source is available from
+<https://github.com/supercollider/supercollider/releases/tag/Version-3.14.1>.
+
+## SCLOrkSynths
+
+The vendored SCLOrkSynths snapshot is distributed under the GNU General Public
+License, version 3 or later. Its complete license and unmodified source are
+included under `supercollider/vendor/SCLOrkSynths`. Corresponding source is
+available from <https://github.com/SCLOrkHub/SCLOrkSynths>.
+
+## VSCO 2 Community Edition
+
+VSCO 2 Community Edition recordings are made available under CC0 1.0. They
+are not bundled with the application package; users install the sample bank
+separately. Source and license information are available from
+<https://github.com/sgossner/VSCO-2-CE>.
+
 ## python-zeroconf 0.151.3
 
 Copyright belongs to the python-zeroconf authors and contributors.
