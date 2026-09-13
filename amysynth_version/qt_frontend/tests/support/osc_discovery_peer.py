@@ -56,7 +56,12 @@ def advertise(name: str, port: int, ready: Path, stop: Path) -> int:
     osc_port.start()
     if osc_port.lifecycle != "ready":
         raise RuntimeError(osc_port.failure_reason)
-    ready.write_text(str(os.getpid()), encoding="utf-8")
+    # Publish readiness as one atomic state transition. Path.write_text()
+    # creates the destination before its contents are visible, so a separate
+    # browser process can otherwise observe an empty file on a busy runner.
+    temporary_ready = ready.with_name(f".{ready.name}.{os.getpid()}.tmp")
+    temporary_ready.write_text(str(os.getpid()), encoding="utf-8")
+    temporary_ready.replace(ready)
     try:
         deadline = time.monotonic() + 12.0
         while not stop.exists() and time.monotonic() < deadline:
