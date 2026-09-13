@@ -15,6 +15,7 @@ EventKind = Literal[
     "noteOn",
     "noteOff",
     "voiceSet",
+    "drumHit",
 ]
 DefinitionKind = Literal["root", "finite"]
 
@@ -57,6 +58,7 @@ class SequenceEvent:
             "noteOn",
             "noteOff",
             "voiceSet",
+            "drumHit",
         ):
             raise ProtocolValidationError(f"unknown event kind {self.kind!r}")
         for atom in self.atoms:
