@@ -10,6 +10,13 @@
 ~omniMaxTransactions = 64;
 ~omniMaxTransactionRecords = 20000;
 ~omniMaxExecutions = 256;
+~omniMaxSameBeatActions = 4096;
+~omniWakeTicket = 0;
+~omniWakeBeat = nil;
+~omniPendingActivations = List.new;
+~omniTransactionResultOrder = List.new;
+~omniMaxTransactionResults = 256;
+~omniTransactionTimeoutSeconds = 5;
 
 ~omniEventValidationError = { |action, atoms|
     var expected = Dictionary[
@@ -96,133 +103,366 @@
     };
 };
 
-~omniStopLane = { |lane|
-    var old = ~omniLanes[lane];
-    if(old.notNil) {
-        old[\routines].do { |routine| routine.stop };
-        old[\routines].clear;
+~omniStoreTransactionResult = {
+    |transactionId, stage, generation, effectiveBeat, code|
+    if(~omniTransactionResults[transactionId].isNil) {
+        ~omniTransactionResultOrder.add(transactionId);
+    };
+    ~omniTransactionResults[transactionId] = (
+        stage: stage, generation: generation, beat: effectiveBeat, code: code
+    );
+    while { ~omniTransactionResultOrder.size > ~omniMaxTransactionResults } {
+        ~omniTransactionResults.removeAt(~omniTransactionResultOrder.removeAt(0));
     };
 };
 
-~omniRunSequenceEvent = {
-    |event, executionId, isRoot, rootLane, rootGeneration|
+~omniPruneTransactions = {
+    var now = Main.elapsedTime;
+    var expired = List.new;
+    ~omniTransactions.keysValuesDo { |transactionId, transaction|
+        if((now - transaction[\createdAt]) > ~omniTransactionTimeoutSeconds) {
+            expired.add(transactionId);
+        };
+    };
+    expired.do { |transactionId| ~omniTransactions.removeAt(transactionId) };
+};
+
+~omniActionPhase = { |action|
+    if(["gateBegin", "rootStop", "rootStart"].includesEqual(action)) { 0 } {
+        if(action == "launch") { 1 } {
+            if(action == "noteOff") { 2 } {
+                if(action == "voiceSet") { 3 } { 4 }
+            }
+        }
+    }
+};
+
+~omniExecutionDueBeat = { |execution|
+    var events = execution[\definition][\events];
+    var index = execution[\nextIndex];
+    if(index < events.size) {
+        execution[\baseBeat] + (events[index][\tick] / 48)
+    } { nil }
+};
+
+~omniInvalidateWake = {
+    ~omniWakeTicket = ~omniWakeTicket + 1;
+    ~omniWakeBeat = nil;
+};
+
+~omniRemoveRootExecutions = { |lane, definitionId|
+    var remove = List.new;
+    ~omniExecutions.keysValuesDo { |executionId, execution|
+        if(execution[\root] and: {
+            (lane.isNil or: { execution[\lane] == lane }) and: {
+                definitionId.isNil or: {
+                    execution[\definition][\id] == definitionId
+                }
+            }
+        }) { remove.add(executionId) };
+    };
+    remove.do { |executionId| ~omniExecutions.removeAt(executionId) };
+};
+
+~omniStopLane = { |lane|
+    ~omniRemoveRootExecutions.value(lane.asString, nil);
+};
+
+~omniGateActive = { |target, scope, logicalTick|
+    var causes = ~omniGates[target.asString];
+    var expired = List.new;
+    var active = false;
+    if(causes.notNil) {
+        causes.keysValuesDo { |token, cause|
+            if(cause[\untilTick] <= logicalTick) {
+                expired.add(token);
+            } {
+                if(cause[\scope] == scope.asString) { active = true };
+            };
+        };
+        expired.do { |token| causes.removeAt(token) };
+        if(causes.isEmpty) { ~omniGates.removeAt(target.asString) };
+    };
+    active
+};
+
+~omniStartRoot = { |definition, lane, generation, startBeat|
+    var executionId;
+    if(definition[\events].notEmpty) {
+        ~omniExecutionOrdinal = ~omniExecutionOrdinal + 1;
+        executionId = "root/" ++ lane ++ "/" ++ ~omniExecutionOrdinal;
+        ~omniExecutions[executionId] = (
+            id: executionId,
+            definition: definition,
+            lane: lane.asString,
+            generation: generation.asInteger,
+            root: true,
+            baseBeat: startBeat,
+            nextIndex: 0,
+            creationOrdinal: ~omniExecutionOrdinal
+        );
+    };
+    executionId
+};
+
+~omniStartFinite = { |definitionId, parentExecution, startBeat|
+    var definition = ~omniDefinitions[definitionId.asString];
+    var finiteCount = ~omniExecutions.values.select {
+        |item| item[\root].not
+    }.size;
+    if(finiteCount >= ~omniMaxExecutions) {
+        ("LB_OMNICHORD_SC_EXECUTION_LIMIT definition=" ++ definitionId).warn;
+    } {
+        if(definition.notNil and: {
+            definition[\kind] == "finite" and: { definition[\events].notEmpty }
+        }) {
+            var executionId;
+            ~omniExecutionOrdinal = ~omniExecutionOrdinal + 1;
+            executionId = parentExecution ++ "/" ++ ~omniExecutionOrdinal;
+            ~omniExecutions[executionId] = (
+                id: executionId,
+                definition: definition,
+                lane: definition[\lane],
+                generation: definition[\revision],
+                root: false,
+                baseBeat: startBeat,
+                nextIndex: 0,
+                creationOrdinal: ~omniExecutionOrdinal
+            );
+        };
+    };
+};
+
+~omniStartNamedRoot = { |definitionId, startBeat|
+    var definition = ~omniDefinitions[definitionId.asString];
+    if(definition.notNil and: { definition[\kind] == "root" }) {
+        var lane = definition[\lane];
+        var state = ~omniLanes[lane];
+        if(state.notNil and: {
+            state[\definitionIds].includesEqual(definitionId.asString)
+        }) {
+            ~omniStartRoot.value(
+                definition, lane, state[\generation], startBeat
+            );
+        };
+    };
+};
+
+~omniRunSequenceEvent = { |event, execution, dueBeat|
     var action = event[\action];
     var atoms = event[\atoms];
-    var validRoot = isRoot.not or: {
-        var laneState = ~omniLanes[rootLane];
-        laneState.notNil and: { laneState[\generation] == rootGeneration };
+    var executionId = execution[\id];
+    var logicalTick = (dueBeat * 48).round.asInteger;
+    var suppressed = false;
+    if(action == "gateBegin") {
+        var target = atoms[0].asString;
+        var causes = ~omniGates[target];
+        if(causes.isNil) {
+            causes = Dictionary.new;
+            ~omniGates[target] = causes;
+        };
+        causes[atoms[1].asString] = (
+            untilTick: logicalTick + atoms[2].asInteger,
+            scope: atoms[3].asString
+        );
     };
-    if(validRoot) {
-        if(action == "launch") {
-            ~omniStartFinite.value(atoms[0].asString, executionId);
+    if(action == "rootStop") {
+        ~omniRemoveRootExecutions.value(nil, atoms[0].asString);
+    };
+    if(action == "rootStart") {
+        ~omniStartNamedRoot.value(atoms[0].asString, dueBeat);
+    };
+    if(action == "launch") {
+        suppressed = ~omniGateActive.value(
+            atoms[0].asString, "launch", logicalTick
+        );
+        if(suppressed.not) {
+            ~omniStartFinite.value(atoms[0].asString, executionId, dueBeat);
         };
-        if(action == "gateBegin") {
-            var untilTick = (~omniClock.beats * 48).floor + atoms[2].asInteger;
-            ~omniGates[atoms[0].asString] = untilTick;
-        };
-        if(action == "noteOn") {
-            var handle = executionId ++ "/" ++ atoms[0].asString;
+    };
+    if(action == "noteOff") {
+        ~omniReleaseHandle.value(executionId ++ "/" ++ atoms[0].asString);
+    };
+    if(action == "voiceSet") {
+        ~omniSetHandle.value(
+            executionId ++ "/" ++ atoms[0].asString,
+            atoms[1].asString,
+            atoms[2]
+        );
+    };
+    if(action == "noteOn") {
+        suppressed = ~omniGateActive.value(
+            atoms[1].asString, "noteOn", logicalTick
+        );
+        if(suppressed.not) {
             ~omniSpawnVoice.value(
-                atoms[1], handle, atoms[2], atoms[3], atoms[4],
-                atoms[5], atoms[6], atoms[9], [
-                    \articulation, atoms[7],
-                    \accent, atoms[8]
-                ]
+                atoms[1], executionId ++ "/" ++ atoms[0].asString,
+                atoms[2], atoms[3], atoms[4], atoms[5], atoms[6], atoms[9],
+                [\articulation, atoms[7], \accent, atoms[8]]
             );
         };
-        if(action == "noteOff") {
-            ~omniReleaseHandle.value(executionId ++ "/" ++ atoms[0].asString);
+    };
+    if(action == "drumHit") {
+        suppressed = execution[\root] and: {
+            ~omniGateActive.value(atoms[0], "drumHit", logicalTick)
         };
-        if(action == "voiceSet") {
-            ~omniSetHandle.value(
-                executionId ++ "/" ++ atoms[0].asString,
-                atoms[1].asString,
-                atoms[2]
+        if(suppressed.not) {
+            ~omniSpawnDrum.value(
+                atoms[0], atoms[1], atoms[2], atoms[3], atoms[4]
             );
         };
-        if(action == "drumHit") {
-            var role = atoms[0].asString;
-            var gateUntil = ~omniGates[role] ? -1;
-            var nowTick = (~omniClock.beats * 48).floor;
-            if(isRoot.not or: { nowTick >= gateUntil }) {
-                ~omniSpawnDrum.value(
-                    atoms[0], atoms[1], atoms[2], atoms[3], atoms[4]
-                );
+    };
+    if(~omniTraceSequenceEvent.notNil) {
+        ~omniTraceSequenceEvent.value(
+            logicalTick, executionId, execution[\definition][\id],
+            event[\ordinal], action, suppressed
+        );
+    };
+};
+
+~omniAdvanceExecution = { |execution|
+    if(~omniExecutions[execution[\id]] === execution) {
+        execution[\nextIndex] = execution[\nextIndex] + 1;
+        if(execution[\nextIndex] >= execution[\definition][\events].size) {
+            if(execution[\root]) {
+                execution[\nextIndex] = 0;
+                execution[\baseBeat] = execution[\baseBeat]
+                    + (execution[\definition][\period] / 48);
+            } {
+                ~omniExecutions.removeAt(execution[\id]);
             };
         };
     };
 };
 
-~omniScheduleDefinition = {
-    |definition, executionId, baseBeat, isRoot, rootLane, rootGeneration|
-    definition[\events].do { |event|
-        ~omniClock.schedAbs(baseBeat + (event[\tick] / 48), {
-            ~omniRunSequenceEvent.value(
-                event, executionId, isRoot, rootLane, rootGeneration
-            );
-            nil
-        });
-    };
-};
-
-~omniStartFinite = { |definitionId, parentExecution|
-    var definition = ~omniDefinitions[definitionId];
-    if(~omniExecutions.size >= ~omniMaxExecutions) {
-        ("LB_OMNICHORD_SC_EXECUTION_LIMIT definition=" ++ definitionId).warn;
-    } {
-    if(definition.notNil and: { definition[\kind] == "finite" }) {
-        var executionId;
-        var endTick = definition[\events].collect { |event| event[\tick] }.maxItem ? 0;
-        ~omniExecutionOrdinal = ~omniExecutionOrdinal + 1;
-        executionId = parentExecution ++ "/" ++ ~omniExecutionOrdinal;
-        ~omniExecutions[executionId] = definitionId;
-        ~omniScheduleDefinition.value(
-            definition, executionId, ~omniClock.beats, false, "", 0
-        );
-        ~omniClock.sched(endTick / 48, {
-            ~omniExecutions.removeAt(executionId);
-            nil
-        });
-    };
-    };
-};
-
-~omniStartRoot = { |definition, lane, generation, startBeat|
-    var routine = Routine({
-        var cycle = 0;
-        var period = definition[\period].asInteger / 48;
-        (startBeat - ~omniClock.beats).max(0).wait;
-        loop {
-            var baseBeat = startBeat + (cycle * period);
-            var executionId = lane ++ "/" ++ generation ++ "/" ++ cycle;
-            ~omniScheduleDefinition.value(
-                definition, executionId, baseBeat, true, lane, generation
-            );
-            cycle = cycle + 1;
-            period.wait;
+~omniDueItems = { |dueBeat|
+    var items = List.new;
+    ~omniExecutions.keysValuesDo { |executionId, execution|
+        var beat = ~omniExecutionDueBeat.value(execution);
+        if(beat.notNil and: { beat <= (dueBeat + 0.0000001) }) {
+            var event = execution[\definition][\events][execution[\nextIndex]];
+            items.add((
+                beat: beat,
+                phase: ~omniActionPhase.value(event[\action]),
+                creation: execution[\creationOrdinal],
+                ordinal: event[\ordinal],
+                event: event,
+                execution: execution
+            ));
         };
-    });
-    routine.play(~omniClock);
-    routine
+    };
+    items.asArray.sort { |left, right|
+        if(left[\beat] != right[\beat]) { left[\beat] < right[\beat] } {
+            if(left[\phase] != right[\phase]) {
+                left[\phase] < right[\phase]
+            } {
+                if(left[\creation] != right[\creation]) {
+                    left[\creation] < right[\creation]
+                } { left[\ordinal] < right[\ordinal] }
+            }
+        }
+    }
+};
+
+~omniWake = { |ticket, dueBeat|
+    var processed = 0;
+    if(ticket == ~omniWakeTicket) {
+        ~omniWakeBeat = nil;
+        ~omniApplyDueActivations.value(dueBeat);
+        while {
+            var due = ~omniDueItems.value(dueBeat);
+            due.notEmpty and: { processed < ~omniMaxSameBeatActions }
+        } {
+            var item = ~omniDueItems.value(dueBeat)[0];
+            ~omniRunSequenceEvent.value(
+                item[\event], item[\execution], item[\beat]
+            );
+            ~omniAdvanceExecution.value(item[\execution]);
+            processed = processed + 1;
+        };
+        if(processed >= ~omniMaxSameBeatActions) {
+            "LB_OMNICHORD_SC_SAME_BEAT_LIMIT".warn;
+        };
+        ~omniArmWake.value;
+    };
+    nil
+};
+
+~omniArmWake = {
+    var beats = ~omniExecutions.values.collect { |execution|
+        ~omniExecutionDueBeat.value(execution)
+    }.reject(_.isNil);
+    beats = beats ++ ~omniPendingActivations.collect { |item|
+        item[\effectiveBeat]
+    };
+    if(~omniTransportRunning and: { beats.notEmpty }) {
+        var beat = beats.minItem;
+        if(~omniWakeBeat.isNil or: { beat < (~omniWakeBeat - 0.0000001) }) {
+            var ticket;
+            ~omniWakeTicket = ~omniWakeTicket + 1;
+            ticket = ~omniWakeTicket;
+            ~omniWakeBeat = beat;
+            ~omniClock.schedAbs(beat, {
+                ~omniWake.value(ticket, beat)
+            });
+        };
+    };
 };
 
 ~omniActivateLane = { |lane, generation, definitionIds, effectiveBeat|
-    var routines = List.new;
     ~omniStopLane.value(lane);
     ~omniLanes[lane] = (
         generation: generation,
-        definitionIds: definitionIds,
-        routines: routines
+        definitionIds: definitionIds
     );
     if(~omniTransportRunning) {
         definitionIds.do { |definitionId|
             var definition = ~omniDefinitions[definitionId];
             if(definition.notNil and: { definition[\kind] == "root" }) {
-                routines.add(
-                    ~omniStartRoot.value(definition, lane, generation, effectiveBeat)
-                );
+                ~omniStartRoot.value(definition, lane, generation, effectiveBeat);
             };
         };
+        ~omniArmWake.value;
+    };
+};
+
+~omniApplyActivation = { |activation|
+    var transactionId = activation[\transactionId];
+    var transaction = activation[\transaction];
+    var effectiveBeat = activation[\effectiveBeat];
+    var current = ~omniLanes[transaction[\lane]];
+    var code = "ok";
+    if(current.notNil and: {
+        current[\generation] > transaction[\generation]
+    }) {
+        code = "obsolete-generation";
+    } {
+        ~omniActivateLane.value(
+            transaction[\lane], transaction[\generation],
+            activation[\roots], effectiveBeat
+        );
+    };
+    ~omniStoreTransactionResult.value(
+        transactionId, "applied", transaction[\generation], effectiveBeat, code
+    );
+    ~omniAck.value(
+        transactionId, "applied", transaction[\generation], effectiveBeat, code
+    );
+};
+
+~omniApplyDueActivations = { |dueBeat|
+    var due = ~omniPendingActivations.select { |activation|
+        activation[\effectiveBeat] <= (dueBeat + 0.0000001)
+    }.sort { |left, right|
+        if(left[\effectiveBeat] != right[\effectiveBeat]) {
+            left[\effectiveBeat] < right[\effectiveBeat]
+        } {
+            left[\transaction][\generation] < right[\transaction][\generation]
+        }
+    };
+    due.do { |activation|
+        ~omniPendingActivations.remove(activation);
+        ~omniApplyActivation.value(activation);
     };
 };
 
@@ -239,6 +479,7 @@
                     id: record[\id],
                     revision: record[\revision],
                     kind: record[\kind],
+                    lane: transaction[\lane],
                     period: record[\period],
                     eventCount: record[\eventCount],
                     events: List.new
@@ -316,9 +557,9 @@
         };
     };
     if(rejected.notNil) {
-        ~omniTransactionResults[transactionId] = (
-            stage: "rejected", generation: transaction[\generation],
-            beat: ~omniClock.beats, code: rejected
+        ~omniStoreTransactionResult.value(
+            transactionId, "rejected", transaction[\generation],
+            ~omniClock.beats, rejected
         );
         ~omniAck.value(
             transactionId, "rejected", transaction[\generation],
@@ -331,48 +572,27 @@
             var alignment = transaction[\alignment].max(1);
             var effectiveTick = ((nextTick + alignment - 1) / alignment).floor * alignment;
             var effectiveBeat = effectiveTick / 48;
-            ~omniTransactionResults[transactionId] = (
-                stage: "scheduled", generation: transaction[\generation],
-                beat: effectiveBeat, code: "ok"
+            ~omniStoreTransactionResult.value(
+                transactionId, "scheduled", transaction[\generation],
+                effectiveBeat, "ok"
             );
             ~omniAck.value(
                 transactionId, "scheduled", transaction[\generation], effectiveBeat, "ok"
             );
-            ~omniClock.schedAbs(effectiveBeat, {
-                var current = ~omniLanes[transaction[\lane]];
-                if(current.notNil and: {
-                    current[\generation] > transaction[\generation]
-                }) {
-                    ~omniTransactionResults[transactionId] = (
-                        stage: "applied", generation: transaction[\generation],
-                        beat: effectiveBeat, code: "obsolete-generation"
-                    );
-                    ~omniAck.value(
-                        transactionId, "applied", transaction[\generation],
-                        effectiveBeat, "obsolete-generation"
-                    );
-                } {
-                    ~omniActivateLane.value(
-                        transaction[\lane], transaction[\generation], roots, effectiveBeat
-                    );
-                    ~omniTransactionResults[transactionId] = (
-                        stage: "applied", generation: transaction[\generation],
-                        beat: effectiveBeat, code: "ok"
-                    );
-                    ~omniAck.value(
-                        transactionId, "applied", transaction[\generation],
-                        effectiveBeat, "ok"
-                    );
-                };
-                nil
-            });
+            ~omniPendingActivations.add((
+                transactionId: transactionId,
+                transaction: transaction,
+                roots: roots.asArray,
+                effectiveBeat: effectiveBeat
+            ));
+            ~omniArmWake.value;
         } {
             ~omniActivateLane.value(
                 transaction[\lane], transaction[\generation], roots, ~omniClock.beats
             );
-            ~omniTransactionResults[transactionId] = (
-                stage: "applied", generation: transaction[\generation],
-                beat: ~omniClock.beats, code: "ok"
+            ~omniStoreTransactionResult.value(
+                transactionId, "applied", transaction[\generation],
+                ~omniClock.beats, "ok"
             );
             ~omniAck.value(
                 transactionId, "applied", transaction[\generation],
@@ -386,6 +606,9 @@ OSCdef(\omniTxBegin, { |message|
     if(~omniSessionValid.value(message)) {
         var transactionId = message[2].asInteger;
         var result = ~omniTransactionResults[transactionId];
+        var existing;
+        ~omniPruneTransactions.value;
+        existing = ~omniTransactions[transactionId];
         if(result.notNil) {
             ~omniAck.value(
                 transactionId, result[\stage], result[\generation],
@@ -393,6 +616,17 @@ OSCdef(\omniTxBegin, { |message|
             );
         } {
             var count = message[5].asInteger;
+            if(existing.notNil) {
+                if(
+                    existing[\lane] != message[3].asString
+                    or: { existing[\generation] != message[4].asInteger }
+                    or: { existing[\count] != count }
+                    or: { existing[\applyMode] != message[6].asString }
+                    or: { existing[\alignment] != message[7].asInteger }
+                ) {
+                    existing[\rejected] = "conflicting-duplicate-begin";
+                };
+            } {
             if(count < 0 or: { count > ~omniMaxTransactionRecords }) {
                 ~omniAck.value(
                     transactionId, "rejected", message[4].asInteger,
@@ -412,8 +646,10 @@ OSCdef(\omniTxBegin, { |message|
                 applyMode: message[6].asString,
                 alignment: message[7].asInteger,
                 records: Array.newClear(count),
-                rejected: nil
+                rejected: nil,
+                createdAt: Main.elapsedTime
             );
+            };
             };
             };
         };
@@ -472,6 +708,10 @@ OSCdef(\omniTxCommit, { |message|
         var transaction = ~omniTransactions[transactionId];
         if(transaction.notNil) {
             if(transaction[\rejected].notNil) {
+                ~omniStoreTransactionResult.value(
+                    transactionId, "rejected", transaction[\generation],
+                    ~omniClock.beats, transaction[\rejected]
+                );
                 ~omniAck.value(
                     transactionId, "rejected", transaction[\generation],
                     ~omniClock.beats, transaction[\rejected]
@@ -479,13 +719,16 @@ OSCdef(\omniTxCommit, { |message|
             } {
                 if(transaction[\records].any(_.isNil)) {
                     ~omniAck.value(
-                        transactionId, "rejected", transaction[\generation],
+                        transactionId, "received", transaction[\generation],
                         ~omniClock.beats, "incomplete"
                     );
                 } {
                     ~omniPublishTransaction.value(transaction, transactionId);
                     ~omniTransactions.removeAt(transactionId);
                 };
+            };
+            if(transaction[\rejected].notNil) {
+                ~omniTransactions.removeAt(transactionId);
             };
         };
     };
@@ -495,10 +738,13 @@ OSCdef(\omniTransport, { |message|
     if(~omniSessionValid.value(message)) {
         var action = message[3].asString;
         ~omniClock.tempo = message[4].asFloat.max(1) / 60;
-        if(action == "start") {
+        if(action == "start" and: { ~omniTransportRunning.not }) {
             ~omniTransportEpoch = ~omniTransportEpoch + 1;
             ~omniClock.clear;
             ~omniClock.beats = 0;
+            ~omniExecutions.clear;
+            ~omniGates.clear;
+            ~omniInvalidateWake.value;
             ~omniTransportRunning = true;
             ~omniLanes.keysValuesDo { |lane, state|
                 ~omniActivateLane.value(
@@ -506,9 +752,24 @@ OSCdef(\omniTransport, { |message|
                 );
             };
         };
-        if((action == "stop") or: { action == "panic" }) {
-            ~omniLanes.keys.do { |lane| ~omniStopLane.value(lane) };
+        if(action == "stop") {
+            ~omniTransportEpoch = ~omniTransportEpoch + 1;
             ~omniClock.clear;
+            ~omniExecutions.clear;
+            ~omniGates.clear;
+            ~omniInvalidateWake.value;
+            ~omniTransportRunning = false;
+            if(~omniReleaseOwner.notNil) {
+                ["rhythm/drums", "rhythm/bass", "rhythm/chords", "omni/drums"]
+                    .do(~omniReleaseOwner);
+            };
+        };
+        if(action == "panic") {
+            ~omniTransportEpoch = ~omniTransportEpoch + 1;
+            ~omniClock.clear;
+            ~omniExecutions.clear;
+            ~omniGates.clear;
+            ~omniInvalidateWake.value;
             ~omniTransportRunning = false;
             ~omniPanic.value;
         };

@@ -22,8 +22,10 @@ from supercollider_client import SuperColliderClient  # noqa: E402
 
 
 class _FakeSuperCollider:
-    def __init__(self) -> None:
+    def __init__(self, *, incomplete_once: bool = False) -> None:
         self.messages: list[tuple[str, tuple[object, ...]]] = []
+        self.incomplete_once = incomplete_once
+        self.commit_count = 0
         self.ready = threading.Event()
         dispatcher = Dispatcher()
         dispatcher.set_default_handler(self._accept)
@@ -45,11 +47,20 @@ class _FakeSuperCollider:
                 client._sock.close()
             self.ready.set()
         elif address == "/omni/v1/tx/commit":
+            self.commit_count += 1
             client = SimpleUDPClient("127.0.0.1", int(self.messages[0][1][2]))
             try:
+                incomplete = self.incomplete_once and self.commit_count == 1
                 client.send_message(
                     "/omni/v1/ack",
-                    [arguments[0], arguments[1], "applied", 1, 0.0, "ok"],
+                    [
+                        arguments[0],
+                        arguments[1],
+                        "received" if incomplete else "applied",
+                        1,
+                        0.0,
+                        "incomplete" if incomplete else "ok",
+                    ],
                 )
             finally:
                 client._sock.close()
@@ -198,6 +209,38 @@ class SuperColliderClientTests(unittest.TestCase):
         )
         packet_indexes = [arguments[2] for _address, arguments in transaction[1:-1]]
         self.assertEqual(packet_indexes, [0, 1, 2])
+
+    def test_incomplete_transaction_retries_same_indexed_payload(self) -> None:
+        from engine_protocol import SequenceDefinition
+        from musical_sequence_plan import LanePlan
+
+        self.fake.close()
+        self.fake = _FakeSuperCollider(incomplete_once=True)
+        raw_config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        raw_config["language"]["port"] = self.fake.port
+        self.config_path.write_text(json.dumps(raw_config), encoding="utf-8")
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+        acknowledgement = client.publish_lane(
+            LanePlan(
+                lane="retry",
+                generation=1,
+                alignment_ticks=1,
+                definitions=(
+                    SequenceDefinition(
+                        "retry/root", 1, "root", "retry", 48, (), "fixture"
+                    ),
+                ),
+            )
+        )
+        client.close()
+        self.assertEqual(acknowledgement, ("applied", 1, 0.0, "ok"))
+        self.assertEqual(self.fake.commit_count, 2)
 
     def test_sample_program_activates_only_after_engine_ready_status(self) -> None:
         client = SuperColliderClient(

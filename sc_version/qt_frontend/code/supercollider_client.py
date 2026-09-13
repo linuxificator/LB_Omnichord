@@ -295,6 +295,10 @@ class SuperColliderClient:
                 acknowledgement = self._acknowledgements.get(transaction_id)
             if acknowledgement is None:
                 continue
+            if acknowledgement[0] == "received" and acknowledgement[3] == "incomplete":
+                with self._ack_condition:
+                    self._acknowledgements.pop(transaction_id, None)
+                continue
             if acknowledgement[0] == "rejected":
                 raise SuperColliderUnavailable(
                     f"SuperCollider rejected {plan.lane} generation "

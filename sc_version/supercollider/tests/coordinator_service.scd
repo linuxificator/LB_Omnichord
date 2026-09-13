@@ -28,6 +28,11 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
 ~omniSpawnDrum = { |role, program, note, velocity, logicalBus|
     [role, program, note, velocity, logicalBus]
 };
+~omniTraceSequenceEvent = {
+    |logicalTick, executionId, definitionId, eventOrdinal, action, suppressed|
+    ("LB_OMNI_TRACE|" ++ logicalTick ++ "|" ++ definitionId ++ "|"
+        ++ eventOrdinal ++ "|" ++ action ++ "|" ++ suppressed).postln;
+};
 
 thisProcess.openUDPPort(port);
 (directory +/+ "sequencer.scd").load;

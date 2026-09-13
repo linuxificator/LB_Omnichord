@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 
@@ -147,9 +148,117 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                     )
                 )
                 self.assertEqual(referenced[0], "applied")
+
+                gated = client.publish_lane(
+                    LanePlan(
+                        lane="gate-order",
+                        generation=1,
+                        alignment_ticks=1,
+                        definitions=(
+                            SequenceDefinition(
+                                definition_id="gate-order/control",
+                                revision=1,
+                                kind="root",
+                                lane="gate-order",
+                                period_ticks=48,
+                                events=(
+                                    SequenceEvent(0, 0, "launch", ("gate-order/a",)),
+                                    SequenceEvent(0, 1, "launch", ("gate-order/b",)),
+                                ),
+                                source_identity="gate-control",
+                            ),
+                            SequenceDefinition(
+                                definition_id="gate-order/a",
+                                revision=1,
+                                kind="finite",
+                                lane="gate-order",
+                                period_ticks=0,
+                                events=(
+                                    SequenceEvent(
+                                        0,
+                                        0,
+                                        "gateBegin",
+                                        ("snare", "gate-a", 1, "drumHit"),
+                                    ),
+                                ),
+                                source_identity="gate-a",
+                            ),
+                            SequenceDefinition(
+                                definition_id="gate-order/b",
+                                revision=1,
+                                kind="finite",
+                                lane="gate-order",
+                                period_ticks=0,
+                                events=(
+                                    SequenceEvent(
+                                        0,
+                                        0,
+                                        "gateBegin",
+                                        ("snare", "gate-b", 2, "drumHit"),
+                                    ),
+                                ),
+                                source_identity="gate-b",
+                            ),
+                            SequenceDefinition(
+                                definition_id="gate-order/drums",
+                                revision=1,
+                                kind="root",
+                                lane="gate-order",
+                                period_ticks=48,
+                                events=tuple(
+                                    SequenceEvent(
+                                        tick,
+                                        tick,
+                                        "drumHit",
+                                        (
+                                            "snare",
+                                            "sample.vsco.gm-styleperc",
+                                            38,
+                                            0.8,
+                                            0,
+                                        ),
+                                    )
+                                    for tick in range(3)
+                                ),
+                                source_identity="gate-drums",
+                            ),
+                        ),
+                    )
+                )
+                self.assertEqual(gated[0], "applied")
+                client._send_raw(
+                    "/omni/v1/transport",
+                    [client.session, client._next_message_id(), "start", 120.0],
+                )
+                time.sleep(0.15)
                 client.close()
             process.wait(timeout=3.0)
             self.assertEqual(process.returncode, 0)
+            assert process.stdout is not None
+            output.extend(process.stdout.readlines())
+            traces = [
+                line.strip().split("|")
+                for line in output
+                if line.startswith("LB_OMNI_TRACE|")
+            ]
+            tick_zero_actions = [
+                trace[4]
+                for trace in traces
+                if int(trace[1]) == 0 and trace[2].startswith("gate-order/")
+            ]
+            self.assertEqual(
+                tick_zero_actions,
+                ["launch", "gateBegin", "launch", "gateBegin", "drumHit"],
+            )
+            drum_suppression = [
+                (int(trace[1]), trace[5])
+                for trace in traces
+                if trace[4] == "drumHit" and trace[2] == "gate-order/drums"
+            ]
+            self.assertEqual(
+                drum_suppression[:3],
+                [(0, "true"), (1, "true"), (2, "false")],
+            )
         finally:
             if process.poll() is None:
                 process.terminate()
