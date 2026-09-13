@@ -23,14 +23,10 @@ from midi_integration import InstrumentBackend
 from midi_platform_adapters import production_midi_input_port
 from osc_input import production_osc_input_port
 from osc_discovery_platform_adapters import production_osc_service_advertiser
-from program_amy import (
-    ProgramAmyLocalClient,
-    ProgramAmySerialClient,
-    ProgramAmySocketClient,
-)
 from runtime_diagnostics import display_diagnostic_lines
 from runtime_paths import qt_private_files_dir
 from runtime_platform_adapters import resolve_package_runtime
+from supercollider_client import SuperColliderClient
 from windows_launcher import prepare_windowed_console_streams
 
 
@@ -70,6 +66,10 @@ def production_dependencies(
     """Construct the one production dependency graph without mutating modules."""
 
     paths = FrontendPaths.from_root(asset_root or FRONTEND_DIR)
+    sc_client = partial(
+        SuperColliderClient,
+        runtime_config_path=paths.config / "supercollider.json",
+    )
     return ApplicationDependencies(
         paths=paths,
         load_resolved_config=load_resolved_amy_config,
@@ -80,9 +80,9 @@ def production_dependencies(
         load_bass_riffs=load_bass_riff_catalog,
         load_title_config=app_core.load_title_config,
         load_intonation_table=app_core.load_intonation_table,
-        serial_client=cast(ClientFactory, ProgramAmySerialClient),
-        socket_client=cast(ClientFactory, ProgramAmySocketClient),
-        local_client=cast(ClientFactory, ProgramAmyLocalClient),
+        serial_client=cast(ClientFactory, sc_client),
+        socket_client=cast(ClientFactory, sc_client),
+        local_client=cast(ClientFactory, sc_client),
         midi_input_port=production_midi_input_port,
         osc_input_port=partial(
             production_osc_input_port,
@@ -92,6 +92,7 @@ def production_dependencies(
         resolve_package_runtime=resolve_package_runtime,
         display_diagnostics=display_diagnostic_lines,
         backend=cast(BackendFactory, InstrumentBackend),
+        engine_label="SuperCollider",
     )
 
 

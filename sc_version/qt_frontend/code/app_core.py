@@ -3971,7 +3971,9 @@ def run_application(
         selection: ClientSelection,
         resolved: ResolvedAmyConfig,
     ) -> None:
-        if selection.kind == "local":
+        if dependencies.engine_label == "SuperCollider":
+            message = "Audio backend: separate headless sclang/scsynth service"
+        elif selection.kind == "local":
             message = f"AMY backend: Qt local IPC {selection.endpoint}"
         elif selection.kind == "socket":
             message = f"AMY backend: external socket {selection.endpoint}"
@@ -3990,7 +3992,7 @@ def run_application(
         user_config_dir=user_config_dir,
         transport_notice=transport_notice,
     )
-    amy_client = graph.client
+    audio_client = graph.client
     backend = graph.backend
     midi_backend = backend.midiPlayer
     performance_backend = PerformanceQmlAdapter(backend)
@@ -4072,7 +4074,7 @@ def run_application(
     engine.load(QUrl.fromLocalFile(str(dependencies.paths.gui / "Main.qml")))
 
     if not engine.rootObjects():
-        amy_client.close()
+        audio_client.close()
         return 1
 
     backend.send_initial_state()
@@ -4132,8 +4134,8 @@ def run_application(
     # Destroy the QML engine/root objects first.
     del engine
 
-    # QML can no longer generate performance messages, so stop AMY and close
-    # the UART before releasing the backend object that owns the client.
-    amy_client.close()
+    # QML can no longer generate performance messages, so close the selected
+    # engine protocol before releasing the backend object that owns it.
+    audio_client.close()
 
     return exit_code

@@ -3,28 +3,14 @@ set -euo pipefail
 
 frontend_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd -- "$frontend_dir/../.." && pwd)"
-socket_path="${OMNICHORD_AMY_SOCKET:-$HOME/.omnichord/amy.sock}"
-release_inputs="$frontend_dir/packaging/release_inputs.py"
-amy_pcm_bank="$(python3 "$release_inputs" amy-values --field pcm_bank)"
-amy_commit="$(python3 "$release_inputs" amy-values --field commit)"
-
-transport_mode="socket"
-application_args=()
-for argument in "$@"; do
-    if [[ "$argument" == "--serial" ]]; then
-        transport_mode="serial"
-    else
-        application_args+=("$argument")
-    fi
-done
+sc_dir="$frontend_dir/../supercollider"
+sc_config="$frontend_dir/config/supercollider.json"
 
 if [[ -n "${OMNICHORD_VENV:-}" ]]; then
     venv_dir="$OMNICHORD_VENV"
 else
     venv_dir="$repo_dir/.venv"
 fi
-amy_root="${OMNICHORD_AMY_ROOT:-$repo_dir/.amy/$amy_commit}"
-
 if [[ ! -x "$venv_dir/bin/python" ]]; then
     echo "Creating source environment: $venv_dir"
     if ! python3 -m venv "$venv_dir"; then
@@ -34,15 +20,10 @@ if [[ ! -x "$venv_dir/bin/python" ]]; then
 fi
 
 venv_python="$venv_dir/bin/python"
-requirements_file="$frontend_dir/requirements-source.txt"
-if [[ "$transport_mode" == "serial" ]]; then
-    requirements_file="$frontend_dir/requirements.txt"
-fi
+requirements_file="$frontend_dir/requirements.txt"
 
 # This is a source-checkout convenience boundary, not a packaged application
-# startup path. Verify the frontend plus pinned AMY's declared Python
-# dependencies without consulting a package index; only a missing or
-# incompatible environment triggers installation.
+# startup path. Only a missing or incompatible environment triggers install.
 if ! "$venv_python" -m pip install \
     --disable-pip-version-check \
     --dry-run \
@@ -55,92 +36,57 @@ if ! "$venv_python" -m pip install \
         -r "$requirements_file"
 fi
 
-if [[ "$transport_mode" == "serial" ]]; then
-    "$venv_python" -m pip check
-    exec "$venv_python" "$frontend_dir/code/main.py" \
-        "${application_args[@]}"
-fi
-
-amy_stamp="$venv_dir/.lb-omnichord-amy"
-amy_contract="$amy_commit:$amy_pcm_bank"
-
-amy_contract_is_current() {
-    [[ -f "$amy_stamp" ]] || return 1
-    IFS= read -r stamped_contract < "$amy_stamp" || return 1
-    stamped_hash="$(sed -n '2p' "$amy_stamp")"
-    [[ "$stamped_contract" == "$amy_contract" ]] || return 1
-    amy_extension="$("$venv_python" -c 'import c_amy; print(c_amy.__file__)' 2>/dev/null)" \
-        || return 1
-    [[ -f "$amy_extension" ]] || return 1
-    actual_hash="$($venv_python - "$amy_extension" <<'PY'
-import hashlib
-import sys
-from pathlib import Path
-
-print(hashlib.sha256(Path(sys.argv[1]).read_bytes()).hexdigest())
-PY
-)"
-    [[ "$stamped_hash" == "$actual_hash" ]] || return 1
-    "$venv_python" - "$amy_extension" <<'PY' >/dev/null 2>&1
-import ctypes
-import sys
-
-library = ctypes.CDLL(sys.argv[1])
-getattr(library, "amy_set_gamma9001_pcm")
-getattr(library, "gamma9001_pcm_data")
-PY
-}
-
-if ! amy_contract_is_current; then
-    echo "Provisioning pinned $amy_pcm_bank AMY service in $venv_dir"
-    OMNICHORD_VENV="$venv_dir" \
-    OMNICHORD_AMY_ROOT="$amy_root" \
-        "$frontend_dir/prepare_local_amy.sh" --checkout
-    amy_contract_is_current || {
-        echo "AMY service verification failed after provisioning." >&2
-        exit 1
-    }
-fi
-
-# Run this after AMY provisioning as well: the installed AMY distribution has
-# its own dependency metadata, which is absent on a completely fresh venv
-# during the earlier requirements check.
 "$venv_python" -m pip check
 
-"$venv_python" "$frontend_dir/code/local_amy_service.py" \
-    --socket "$socket_path" \
-    --config "$frontend_dir/config/amy_config.json" &
-amy_service_pid=$!
-
-cleanup() {
-    kill "$amy_service_pid" 2>/dev/null || true
-    wait "$amy_service_pid" 2>/dev/null || true
-}
-trap cleanup EXIT INT TERM
-
-for _attempt in $(seq 1 100); do
-    [[ -S "$socket_path" ]] && break
-    kill -0 "$amy_service_pid" 2>/dev/null || {
-        wait "$amy_service_pid"
-        exit 1
-    }
-    sleep 0.05
-done
-
-if [[ ! -S "$socket_path" ]]; then
-    echo "AMY service did not create socket: $socket_path" >&2
+if ! command -v sclang >/dev/null 2>&1; then
+    echo "SuperCollider language runtime (sclang) is not installed." >&2
+    exit 1
+fi
+if ! command -v scsynth >/dev/null 2>&1; then
+    echo "SuperCollider audio server (scsynth) is not installed." >&2
     exit 1
 fi
 
-frontend_launcher=()
-if "$venv_python" "$frontend_dir/code/raspberry_pi_realtime.py" apply \
-    --service-pid "$amy_service_pid"; then
-    if command -v taskset >/dev/null 2>&1; then
-        frontend_launcher=(taskset -c 0-1)
+# Ubuntu's SuperCollider server links to JACK.  On a PipeWire desktop it must
+# use PipeWire's JACK compatibility shim.  Without it libjack may launch a raw
+# jackd which competes for the physical ALSA card and disrupts desktop audio.
+sc_launcher=()
+if systemctl --user is-active --quiet pipewire.service 2>/dev/null; then
+    if ! command -v pw-jack >/dev/null 2>&1; then
+        echo "PipeWire is active, but pw-jack is unavailable." >&2
+        echo "Install the distribution package 'pipewire-jack'; refusing to start raw jackd." >&2
+        exit 1
     fi
+    sc_launcher=(pw-jack)
 fi
 
-OMNICHORD_AMY_SERVICE_PID="$amy_service_pid" \
-"${frontend_launcher[@]}" "$venv_python" "$frontend_dir/code/main.py" \
-    --amy-socket "$socket_path" \
-    "${application_args[@]}"
+export OMNICHORD_SC_PORT
+export OMNICHORD_SC_SAMPLE_RATE
+export OMNICHORD_SC_BLOCK_SIZE
+export OMNICHORD_SC_MAX_NODES
+export OMNICHORD_SC_MEM_KIB
+OMNICHORD_SC_PORT="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" language.port)"
+OMNICHORD_SC_SAMPLE_RATE="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.sample_rate)"
+OMNICHORD_SC_BLOCK_SIZE="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.block_size)"
+OMNICHORD_SC_MAX_NODES="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.max_nodes)"
+OMNICHORD_SC_MEM_KIB="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.realtime_memory_kib)"
+
+# A dedicated process group gives this source supervisor exact ownership of
+# both sclang and the scsynth child it boots. It never kills another user's
+# unrelated SuperCollider process by executable name.
+setsid "${sc_launcher[@]}" sclang -D "$sc_dir/bootstrap.scd" &
+sc_process_group=$!
+
+cleanup() {
+    kill -TERM -- "-$sc_process_group" 2>/dev/null || true
+    wait "$sc_process_group" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+sleep 0.2
+kill -0 "$sc_process_group" 2>/dev/null || {
+    wait "$sc_process_group"
+    exit 1
+}
+
+"$venv_python" "$frontend_dir/code/main.py" "$@"

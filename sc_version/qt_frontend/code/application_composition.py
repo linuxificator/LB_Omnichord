@@ -84,6 +84,7 @@ class ApplicationDependencies:
     resolve_package_runtime: RuntimeResolver
     display_diagnostics: Callable[[str], tuple[str, ...]]
     backend: BackendFactory
+    engine_label: str = "AMY"
 
 
 @dataclass(frozen=True, slots=True)
