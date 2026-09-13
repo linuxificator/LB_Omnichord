@@ -38,6 +38,95 @@ def _identity(name: str, value: str) -> str:
     return result
 
 
+def _integer(name: str, value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ProtocolValidationError(f"{name} must be an integer")
+    return value
+
+
+def _number(name: str, value: object) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ProtocolValidationError(f"{name} must be numeric")
+    return _finite(name, float(value))
+
+
+def _atoms(kind: EventKind, values: tuple[str | int | float, ...]) -> None:
+    expected = {
+        "launch": 1,
+        "gateBegin": 4,
+        "rootStop": 1,
+        "rootStart": 1,
+        "noteOn": 10,
+        "noteOff": 2,
+        "voiceSet": 3,
+        "drumHit": 5,
+    }[kind]
+    if len(values) != expected:
+        raise ProtocolValidationError(
+            f"{kind} requires {expected} atoms, received {len(values)}"
+        )
+
+    if kind in ("launch", "rootStop", "rootStart"):
+        _identity(f"{kind} definition", str(values[0]))
+        return
+    if kind == "gateBegin":
+        _identity("gate target", str(values[0]))
+        _identity("gate token", str(values[1]))
+        if _integer("gate duration_ticks", values[2]) <= 0:
+            raise ProtocolValidationError("gate duration_ticks must be positive")
+        scope = _identity("gate scope", str(values[3]))
+        if scope not in ("drumHit", "launch", "noteOn"):
+            raise ProtocolValidationError(
+                "gate scope must be drumHit, launch or noteOn"
+            )
+        return
+    if kind == "noteOn":
+        _identity("note handle", str(values[0]))
+        _identity("note owner", str(values[1]))
+        _identity("note program", str(values[2]))
+        if _integer("program revision", values[3]) <= 0:
+            raise ProtocolValidationError("program revision must be positive")
+        logical_key = _integer("logical key", values[4])
+        if not 0 <= logical_key <= 127:
+            raise ProtocolValidationError("logical key must be in 0..127")
+        if _number("note frequency", values[5]) <= 0:
+            raise ProtocolValidationError("note frequency must be positive")
+        velocity = _number("note velocity", values[6])
+        if not 0 <= velocity <= 1:
+            raise ProtocolValidationError("note velocity must be in 0..1")
+        _identity("note articulation", str(values[7]))
+        accent = _integer("note accent", values[8])
+        if accent not in (0, 1):
+            raise ProtocolValidationError("note accent must be 0 or 1")
+        logical_bus = _integer("logical bus", values[9])
+        if not 0 <= logical_bus <= 10:
+            raise ProtocolValidationError("logical bus must be in 0..10")
+        return
+    if kind == "noteOff":
+        _identity("note handle", str(values[0]))
+        release_velocity = _number("release velocity", values[1])
+        if not 0 <= release_velocity <= 1:
+            raise ProtocolValidationError("release velocity must be in 0..1")
+        return
+    if kind == "voiceSet":
+        _identity("voice handle", str(values[0]))
+        _identity("voice parameter", str(values[1]))
+        _number("voice value", values[2])
+        return
+    if kind == "drumHit":
+        _identity("drum role", str(values[0]))
+        _identity("drum program", str(values[1]))
+        logical_key = _integer("drum logical key", values[2])
+        if not 0 <= logical_key <= 127:
+            raise ProtocolValidationError("drum logical key must be in 0..127")
+        velocity = _number("drum velocity", values[3])
+        if not 0 <= velocity <= 1:
+            raise ProtocolValidationError("drum velocity must be in 0..1")
+        logical_bus = _integer("logical bus", values[4])
+        if not 0 <= logical_bus <= 10:
+            raise ProtocolValidationError("logical bus must be in 0..10")
+
+
 @dataclass(frozen=True, slots=True)
 class SequenceEvent:
     tick: int
@@ -64,6 +153,7 @@ class SequenceEvent:
         for atom in self.atoms:
             if isinstance(atom, float):
                 _finite("event atom", atom)
+        _atoms(self.kind, self.atoms)
 
 
 @dataclass(frozen=True, slots=True)

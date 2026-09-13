@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 import sys
 import unittest
-from pathlib import Path
+
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
@@ -43,8 +44,24 @@ class EngineProtocolTests(unittest.TestCase):
 
     def test_definition_requires_stable_event_order_and_lifetime(self) -> None:
         events = (
-            SequenceEvent(0, 0, "noteOn", ("voice/0",)),
-            SequenceEvent(48, 1, "noteOff", ("voice/0",)),
+            SequenceEvent(
+                0,
+                0,
+                "noteOn",
+                (
+                    "voice/0",
+                    "bass",
+                    "sc.sclork.fmBass",
+                    1,
+                    36,
+                    65.4,
+                    0.8,
+                    "ordinary",
+                    0,
+                    1,
+                ),
+            ),
+            SequenceEvent(48, 1, "noteOff", ("voice/0", 0.0)),
         )
         definition = SequenceDefinition(
             "bass/gesture/00", 1, "finite", "bass", 0, events, "riff/42"
@@ -56,6 +73,61 @@ class EngineProtocolTests(unittest.TestCase):
             )
         with self.assertRaisesRegex(ProtocolValidationError, "root period"):
             SequenceDefinition("root/bass", 1, "root", "bass", 0, (), "fixture")
+
+
+class SequenceEventContractTests(unittest.TestCase):
+    def test_every_supported_action_accepts_its_exact_payload(self) -> None:
+        fixtures = (
+            ("launch", ("child",)),
+            ("gateBegin", ("snare", "fill/snare", 48, "drumHit")),
+            ("rootStop", ("bass/root",)),
+            ("rootStart", ("bass/root",)),
+            (
+                "noteOn",
+                (
+                    "voice",
+                    "bass",
+                    "sc.sclork.fmBass",
+                    1,
+                    36,
+                    65.4,
+                    0.8,
+                    "ordinary",
+                    0,
+                    1,
+                ),
+            ),
+            ("noteOff", ("voice", 0.0)),
+            ("voiceSet", ("voice", "frequency_hz", 73.4)),
+            ("drumHit", ("kick", "sample.vsco.gm-styleperc", 36, 0.8, 0)),
+        )
+        for kind, atoms in fixtures:
+            with self.subTest(kind=kind):
+                SequenceEvent(0, 0, kind, atoms)  # type: ignore[arg-type]
+
+    def test_payload_size_is_action_specific(self) -> None:
+        with self.assertRaisesRegex(
+            ProtocolValidationError,
+            "launch requires 1 atoms, received 0",
+        ):
+            SequenceEvent(0, 0, "launch", ())
+
+    def test_musical_ranges_are_checked_before_udp_delivery(self) -> None:
+        with self.assertRaisesRegex(ProtocolValidationError, "logical bus"):
+            SequenceEvent(
+                0,
+                0,
+                "drumHit",
+                ("kick", "sample.vsco.gm-styleperc", 36, 0.8, 11),
+            )
+        with self.assertRaisesRegex(ProtocolValidationError, "velocity"):
+            SequenceEvent(0, 0, "noteOff", ("voice", 1.1))
+
+    def test_gate_must_be_bounded_and_explicitly_scoped(self) -> None:
+        with self.assertRaisesRegex(ProtocolValidationError, "must be positive"):
+            SequenceEvent(0, 0, "gateBegin", ("snare", "fill", 0, "drumHit"))
+        with self.assertRaisesRegex(ProtocolValidationError, "gate scope"):
+            SequenceEvent(0, 0, "gateBegin", ("snare", "fill", 48, "everything"))
 
 
 if __name__ == "__main__":
