@@ -25,7 +25,9 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
     [owner, handle, program, revision, logicalKey, frequency,
         velocity, logicalBus, extraArgs]
 };
-~omniSpawnDrum = { |note, velocity, logicalBus| [note, velocity, logicalBus] };
+~omniSpawnDrum = { |program, note, velocity, logicalBus|
+    [program, note, velocity, logicalBus]
+};
 
 thisProcess.openUDPPort(port);
 (directory +/+ "sequencer.scd").load;
