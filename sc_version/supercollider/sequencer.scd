@@ -471,6 +471,40 @@
     };
 };
 
+~omniQueueActivation = { |activation|
+    var transaction = activation[\transaction];
+    var lane = transaction[\lane];
+    var generation = transaction[\generation];
+    var effectiveBeat = activation[\effectiveBeat];
+    var matching = ~omniPendingActivations.select { |pending|
+        (pending[\transaction][\lane] == lane) and: {
+            (pending[\effectiveBeat] - effectiveBeat).abs < 0.0000001
+        }
+    };
+    var newer = matching.detect { |pending|
+        pending[\transaction][\generation] > generation
+    };
+    if(newer.notNil) {
+        false
+    } {
+        matching.do { |pending|
+            var oldTransaction = pending[\transaction];
+            var oldId = pending[\transactionId];
+            ~omniPendingActivations.remove(pending);
+            ~omniStoreTransactionResult.value(
+                oldId, "superseded", oldTransaction[\generation],
+                pending[\effectiveBeat], "replaced-before-activation"
+            );
+            ~omniAck.value(
+                oldId, "superseded", oldTransaction[\generation],
+                pending[\effectiveBeat], "replaced-before-activation"
+            );
+        };
+        ~omniPendingActivations.add(activation);
+        true
+    }
+};
+
 ~omniPublishTransaction = { |transaction, transactionId|
     var definitions = Dictionary.new;
     var roots = List.new;
@@ -576,21 +610,33 @@
             var alignment = transaction[\alignment].max(1);
             var effectiveTick = ((nextTick + alignment - 1) / alignment).floor * alignment;
             var effectiveBeat = effectiveTick / 48;
-            ~omniStoreTransactionResult.value(
-                transactionId, "scheduled", transaction[\generation],
-                effectiveBeat, "ok"
-            );
-            ~omniAck.value(
-                transactionId, "scheduled", transaction[\generation], effectiveBeat, "ok"
-            );
-            ~omniPendingActivations.add((
+            var activation = (
                 transactionId: transactionId,
                 transaction: transaction,
                 definitions: definitions,
                 roots: roots.asArray,
                 effectiveBeat: effectiveBeat
-            ));
-            ~omniArmWake.value;
+            );
+            if(~omniQueueActivation.value(activation)) {
+                ~omniStoreTransactionResult.value(
+                    transactionId, "scheduled", transaction[\generation],
+                    effectiveBeat, "ok"
+                );
+                ~omniAck.value(
+                    transactionId, "scheduled", transaction[\generation],
+                    effectiveBeat, "ok"
+                );
+                ~omniArmWake.value;
+            } {
+                ~omniStoreTransactionResult.value(
+                    transactionId, "rejected", transaction[\generation],
+                    effectiveBeat, "obsolete-pending-generation"
+                );
+                ~omniAck.value(
+                    transactionId, "rejected", transaction[\generation],
+                    effectiveBeat, "obsolete-pending-generation"
+                );
+            };
         } {
             definitions.keysValuesDo { |id, definition|
                 ~omniDefinitions[id] = definition

@@ -22,6 +22,7 @@ var oldChild;
 var newChild;
 var activationDefinitions = Dictionary.new;
 var revisions;
+var queued;
 
 ~omniLanguagePort = 57149;
 ~omniClientSession = "snapshot-test";
@@ -65,6 +66,38 @@ revisions = ~omniExecutions.values.collect {
 }.sort;
 if(revisions != [1, 2]) {
     Error("running finite execution did not retain its snapshot").throw;
+};
+
+~omniPendingActivations.clear;
+queued = { |transactionId, lane, generation, beat| (
+    transactionId: transactionId,
+    transaction: (lane: lane, generation: generation),
+    definitions: Dictionary.new,
+    roots: [],
+    effectiveBeat: beat
+) };
+if(~omniQueueActivation.value(queued.value(10, "bass", 1, 4)).not) {
+    Error("first aligned activation was not queued").throw;
+};
+~omniQueueActivation.value(queued.value(11, "drums", 1, 4));
+~omniQueueActivation.value(queued.value(12, "bass", 1, 8));
+if(~omniQueueActivation.value(queued.value(13, "bass", 2, 4)).not) {
+    Error("newer same-boundary activation was not queued").throw;
+};
+if(~omniPendingActivations.size != 3) {
+    Error("same-lane replacement disturbed an independent boundary").throw;
+};
+if(~omniPendingActivations.any { |item| item[\transactionId] == 10 }) {
+    Error("superseded aligned activation remained queued").throw;
+};
+if(~omniTransactionResults[10][\code] != "replaced-before-activation") {
+    Error("superseded activation result was not retained").throw;
+};
+if(~omniQueueActivation.value(queued.value(14, "bass", 1, 4))) {
+    Error("obsolete out-of-order generation replaced a newer activation").throw;
+};
+if(~omniPendingActivations.any { |item| item[\transactionId] == 14 }) {
+    Error("obsolete generation was queued").throw;
 };
 
 "LB_OMNICHORD_SC_SEQUENCER_SNAPSHOT_OK".postln;

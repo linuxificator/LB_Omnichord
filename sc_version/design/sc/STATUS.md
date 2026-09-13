@@ -14,7 +14,7 @@ Target currently exercised: Linux x86_64
   quantization, note releases, gates and snapshot lifetimes.
 - Session reset, panic, exact voice handles and global pitch bend are wired
   through the SC runtime.
-- The three native acid voices support the current conservative TB-303
+- The four native acid voices support the current conservative TB-303
   articulation contract.
 - All 109 pinned SCLOrkSynths definitions compile and participate in the
   program catalogue; the automated NRT audit renders one representative note
@@ -24,6 +24,9 @@ Target currently exercised: Linux x86_64
   engine announces readiness.
 - MIDI and OSC integration tests keep the sender, frontend and engine receiver
   in separate processes.
+- Sequencer tests cover immutable running snapshots, overlapping finite
+  executions, root/child lifetime separation, exact release ownership,
+  overlapping half-open gates and same-boundary replacement coalescing.
 - A separate GitHub workflow builds pinned headless SuperCollider 3.14.1 and a
   Linux x86_64 AppImage. Publication requires an explicit `release=true`
   manual dispatch and uses an independent `-SC` release tag.
