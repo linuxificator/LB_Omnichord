@@ -4,6 +4,12 @@ on:
   push:
     branches: [main, testing/windows_smoke, integration/android_build]
   workflow_dispatch:
+    inputs:
+      release:
+        description: Build and publish an AMY edition release
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: desktop-package-release
@@ -21,6 +27,10 @@ jobs:
     uses: ./.github/workflows/amy-regression.yml
 
   release-metadata:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.release) ||
+      github.ref == 'refs/heads/testing/windows_smoke' ||
+      github.ref == 'refs/heads/integration/android_build'
     runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.release.outputs.tag }}
@@ -36,8 +46,7 @@ jobs:
 
   linux-appimages:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/main'
+      github.event_name == 'workflow_dispatch' && inputs.release
     needs: [tests, release-metadata]
     strategy:
       fail-fast: false
@@ -191,8 +200,7 @@ jobs:
 
   macos-dmg:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/main'
+      github.event_name == 'workflow_dispatch' && inputs.release
     needs: [tests, release-metadata]
     runs-on: macos-15
     timeout-minutes: 40
@@ -321,11 +329,9 @@ jobs:
     if: >-
       always() &&
       needs.release-metadata.result == 'success' &&
-      ((github.event_name == 'workflow_dispatch' &&
+      (((github.event_name == 'workflow_dispatch' && inputs.release) &&
         needs.tests.result == 'success') ||
-       github.ref == 'refs/heads/testing/windows_smoke' ||
-       (github.ref == 'refs/heads/main' &&
-        needs.tests.result == 'success'))
+       github.ref == 'refs/heads/testing/windows_smoke')
     needs: [tests, release-metadata]
     runs-on: windows-2025
     timeout-minutes: 45
@@ -477,8 +483,7 @@ jobs:
 
   android-packages:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/main' ||
+      (github.event_name == 'workflow_dispatch' && inputs.release) ||
       github.ref == 'refs/heads/integration/android_build'
     needs: [tests, release-metadata]
     runs-on: ubuntu-24.04
@@ -648,8 +653,7 @@ jobs:
 
   android-emulator:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/main' ||
+      (github.event_name == 'workflow_dispatch' && inputs.release) ||
       github.ref == 'refs/heads/integration/android_build'
     needs: [android-packages]
     runs-on: ubuntu-24.04
@@ -714,15 +718,17 @@ jobs:
 
   esp32p4-firmware:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/main'
+      github.event_name == 'workflow_dispatch' && inputs.release
     needs: [tests, release-metadata]
     uses: ./.github/workflows/esp32p4-build.yml
     with:
       profile: all
 
   publish-release:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release &&
+      github.ref == 'refs/heads/main'
     needs: [release-metadata, linux-appimages, macos-dmg, windows-native, android-packages, android-emulator, esp32p4-firmware]
     runs-on: ubuntu-24.04
     permissions:
@@ -967,7 +973,10 @@ jobs:
           diff -u expected-assets.txt published-assets.txt
 
   refresh-readme-screenshots:
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      inputs.release &&
+      github.ref == 'refs/heads/main'
     needs: [publish-release, release-metadata]
     runs-on: ubuntu-24.04
     permissions:

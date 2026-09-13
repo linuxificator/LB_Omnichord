@@ -283,15 +283,14 @@ class PackagingContracts(unittest.TestCase):
             release.count("github.event_name == 'workflow_dispatch'"),
             5,
         )
-        self.assertIn(
-            "publish-release:\n    if: github.ref == 'refs/heads/main'",
-            release,
-        )
-        self.assertIn(
-            "refresh-readme-screenshots:\n"
-            "    if: github.ref == 'refs/heads/main'",
-            release,
-        )
+        self.assertIn("description: Build and publish an AMY edition release", release)
+        self.assertIn("type: boolean", release)
+        publish = release[release.index("  publish-release:") :]
+        refresh = release[release.index("  refresh-readme-screenshots:") :]
+        for job in (publish, refresh):
+            self.assertIn("github.event_name == 'workflow_dispatch'", job)
+            self.assertIn("inputs.release", job)
+            self.assertIn("github.ref == 'refs/heads/main'", job)
         self.assertIn("needs.tests.result == 'success'", release)
         self.assertIn(
             "github.ref == 'refs/heads/testing/windows_smoke'",
