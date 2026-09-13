@@ -367,14 +367,15 @@
 
 ~omniWake = { |ticket, dueBeat|
     var processed = 0;
+    var due;
     if(ticket == ~omniWakeTicket) {
         ~omniWakeBeat = nil;
         ~omniApplyDueActivations.value(dueBeat);
         while {
-            var due = ~omniDueItems.value(dueBeat);
+            due = ~omniDueItems.value(dueBeat);
             due.notEmpty and: { processed < ~omniMaxSameBeatActions }
         } {
-            var item = ~omniDueItems.value(dueBeat)[0];
+            var item = due[0];
             ~omniRunSequenceEvent.value(
                 item[\event], item[\execution], item[\beat]
             );

@@ -42,6 +42,7 @@ jobs:
           cache-dependency-path: |
             sc_version/qt_frontend/requirements.txt
             sc_version/qt_frontend/requirements-build.txt
+            sc_version/qt_frontend/requirements-test.txt
             sc_version/qt_frontend/packaging/constraints/desktop-current.txt
 
       - name: Create build names
@@ -60,7 +61,8 @@ jobs:
             patchelf
           python -m pip install \
             -c sc_version/qt_frontend/packaging/constraints/desktop-current.txt \
-            -r sc_version/qt_frontend/requirements-build.txt
+            -r sc_version/qt_frontend/requirements-build.txt \
+            -r sc_version/qt_frontend/requirements-test.txt
 
       - name: Build pinned headless SuperCollider 3.14.1
         env:

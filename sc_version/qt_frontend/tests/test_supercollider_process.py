@@ -15,10 +15,47 @@ from supercollider_platform_adapter import (  # noqa: E402
     SuperColliderProcessError,
     SuperColliderSupervisor,
     locate_supercollider_runtime,
+    pipewire_jack_prefix,
 )
 
 
 class SuperColliderProcessTests(unittest.TestCase):
+    def test_pipewire_uses_distribution_jack_wrapper(self) -> None:
+        active = Mock(returncode=0)
+        with (
+            patch(
+                "supercollider_platform_adapter.subprocess.run",
+                return_value=active,
+            ),
+            patch(
+                "supercollider_platform_adapter.shutil.which",
+                side_effect=lambda name: {
+                    "systemctl": "/usr/bin/systemctl",
+                    "pw-jack": "/usr/bin/pw-jack",
+                }.get(name),
+            ),
+        ):
+            self.assertEqual(pipewire_jack_prefix(), ("/usr/bin/pw-jack",))
+
+    def test_pipewire_without_jack_wrapper_is_rejected(self) -> None:
+        active = Mock(returncode=0)
+        with (
+            patch(
+                "supercollider_platform_adapter.subprocess.run",
+                return_value=active,
+            ),
+            patch(
+                "supercollider_platform_adapter.shutil.which",
+                side_effect=lambda name: (
+                    "/usr/bin/systemctl" if name == "systemctl" else None
+                ),
+            ),
+            self.assertRaisesRegex(
+                SuperColliderProcessError, "pw-jack is unavailable"
+            ),
+        ):
+            pipewire_jack_prefix(environment={})
+
     def test_bundled_runtime_is_resolved_as_one_complete_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
