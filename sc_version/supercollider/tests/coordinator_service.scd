@@ -25,8 +25,8 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
     [owner, handle, program, revision, logicalKey, frequency,
         velocity, logicalBus, extraArgs]
 };
-~omniSpawnDrum = { |program, note, velocity, logicalBus|
-    [program, note, velocity, logicalBus]
+~omniSpawnDrum = { |role, program, note, velocity, logicalBus|
+    [role, program, note, velocity, logicalBus]
 };
 
 thisProcess.openUDPPort(port);

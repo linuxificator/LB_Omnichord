@@ -3,6 +3,7 @@
 var directory = thisProcess.nowExecutingPath.dirname;
 var manifestPath = directory +/+ "vsco-manifest.json";
 var manifest = manifestPath.parseJSONFile;
+var drumMap = (directory +/+ "drum-key-map.json").parseJSONFile;
 var jsonAt = { |object, key| object[key.asString] ? object[key.asSymbol] };
 var files = jsonAt.value(manifest, "files");
 var programs = jsonAt.value(manifest, "programs");
@@ -19,6 +20,16 @@ var regions = jsonAt.value(manifest, "regions");
 ~omniSampleBuffers = Dictionary.new;
 ~omniSampleBufferBytes = 0;
 ~omniSampleRoundRobin = Dictionary.new;
+~omniDrumSampleProgram = jsonAt.value(drumMap, "program_id").asString;
+~omniDrumRoleKeys = Dictionary.new;
+
+jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
+    ~omniDrumRoleKeys[role.asString] = key.asInteger;
+};
+
+~omniMapDrumKey = { |role, logicalKey|
+    ~omniDrumRoleKeys[role.asString] ? logicalKey.asInteger
+};
 
 files.do { |record|
     ~omniSampleFiles[jsonAt.value(record, "id").asString] = record;

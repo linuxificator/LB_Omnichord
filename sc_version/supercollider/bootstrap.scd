@@ -434,15 +434,15 @@ s.waitForBoot({
         };
     };
 
-    ~omniSpawnDrum = { |requestedProgram, note, velocity, logicalBus|
+    ~omniSpawnDrum = { |role, requestedProgram, note, velocity, logicalBus|
         ~omniDrumOrdinal = ~omniDrumOrdinal + 1;
-        if(~omniSampleReady.value(~omniDrumProgram, 1)) {
+        if(~omniSampleReady.value(~omniDrumSampleProgram, 1)) {
             ~omniSpawnSampleVoice.value(
                 "omni/drums",
                 "drum/" ++ ~omniDrumOrdinal,
-                ~omniDrumProgram,
+                ~omniDrumSampleProgram,
                 1,
-                note.asInteger.clip(0, 127),
+                ~omniMapDrumKey.value(role, note).clip(0, 127),
                 velocity,
                 logicalBus
             );
@@ -455,7 +455,7 @@ s.waitForBoot({
         };
     };
 
-    ~omniPrepareSampleProgram.value(~omniDrumProgram, 1);
+    ~omniPrepareSampleProgram.value(~omniDrumSampleProgram, 1);
 
     ~omniReady = true;
     ("LB_OMNICHORD_SC_READY port=" ++ languagePort).postln;
@@ -550,6 +550,7 @@ OSCdef(\omniDrumHit, { |message|
     if(~omniReady and: { ~omniSessionValid.value(message) }) {
         var logicalBus = message[6].asInteger.clip(0, 10);
         ~omniSpawnDrum.value(
+            "external_percussion",
             ~omniDrumProgram,
             message[4].asInteger,
             message[5].asFloat,

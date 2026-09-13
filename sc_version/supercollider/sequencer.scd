@@ -145,7 +145,9 @@
             var gateUntil = ~omniGates[role] ? -1;
             var nowTick = (~omniClock.beats * 48).floor;
             if(isRoot.not or: { nowTick >= gateUntil }) {
-                ~omniSpawnDrum.value(atoms[1], atoms[2], atoms[3], atoms[4]);
+                ~omniSpawnDrum.value(
+                    atoms[0], atoms[1], atoms[2], atoms[3], atoms[4]
+                );
             };
         };
     };
