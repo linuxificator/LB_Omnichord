@@ -3,6 +3,7 @@ from __future__ import annotations
 from argparse import Namespace
 from collections.abc import Sequence
 from functools import partial
+import os
 from pathlib import Path
 from typing import Any, cast
 
@@ -66,9 +67,15 @@ def production_dependencies(
     """Construct the one production dependency graph without mutating modules."""
 
     paths = FrontendPaths.from_root(asset_root or FRONTEND_DIR)
+    runtime_config_path = Path(
+        os.environ.get(
+            "OMNICHORD_SC_CONFIG",
+            str(paths.config / "supercollider.json"),
+        )
+    ).expanduser()
     sc_client = partial(
         SuperColliderClient,
-        runtime_config_path=paths.config / "supercollider.json",
+        runtime_config_path=runtime_config_path,
         asset_root=paths.root,
     )
     return ApplicationDependencies(

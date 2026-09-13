@@ -7,7 +7,6 @@ import socket
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import tty
 import unittest
@@ -15,6 +14,19 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
+FAKE_SC = ROOT / "tests" / "support" / "fake_supercollider_service.py"
+
+
+def free_udp_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
+
+
+def read_messages(path: Path) -> list[dict[str, object]]:
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line]
 
 
 class LinuxMidiInputIntegrationTests(unittest.TestCase):
@@ -76,46 +88,40 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
             preset_dir.joinpath("p2.json").write_text(
                 json.dumps(inactive_preset), encoding="utf-8"
             )
-            socket_path = temp / "amy.sock"
-            listener = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
-            listener.settimeout(15.0)
-            listener.bind(str(socket_path))
-            listener.listen(1)
-            socket_error: list[BaseException] = []
-            wire_packets: list[str] = []
-            application_connected = threading.Event()
-
-            def drain_amy_commands() -> None:
-                try:
-                    connection, _ = listener.accept()
-                    application_connected.set()
-                    with connection:
-                        while packet := connection.recv(65536):
-                            wire_packets.append(packet.decode("ascii"))
-                except OSError:
-                    # The test closes the listener during teardown.
-                    pass
-                except BaseException as exc:
-                    socket_error.append(exc)
-
-            receiver = threading.Thread(
-                target=drain_amy_commands,
-                name="midi-cc-test-amy-socket",
-                daemon=True,
+            sc_port = free_udp_port()
+            sc_log = temp / "supercollider-osc.jsonl"
+            sc_config = json.loads(
+                (ROOT / "config" / "supercollider.json").read_text(
+                    encoding="utf-8"
+                )
             )
-            receiver.start()
+            sc_config["language"]["port"] = sc_port
+            sc_config_path = temp / "supercollider.json"
+            sc_config_path.write_text(json.dumps(sc_config), encoding="utf-8")
+            fake_sc = subprocess.Popen(
+                [
+                    sys.executable,
+                    str(FAKE_SC),
+                    "--port",
+                    str(sc_port),
+                    "--log",
+                    str(sc_log),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
             env = dict(
                 os.environ,
                 HOME=str(temp),
                 QT_QPA_PLATFORM="offscreen",
                 QT_QUICK_BACKEND="software",
+                OMNICHORD_SC_CONFIG=str(sc_config_path),
             )
             process = subprocess.Popen(
                 [
                     sys.executable,
                     str(ROOT / "code" / "main.py"),
-                    "--amy-socket",
-                    str(socket_path),
                     "--windowed",
                     "--software-renderer",
                 ],
@@ -125,15 +131,26 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
                 text=True,
             )
             try:
-                self.assertTrue(application_connected.wait(timeout=10.0))
+                deadline = time.monotonic() + 10.0
+                while time.monotonic() < deadline:
+                    if any(
+                        item["address"] == "/omni/v1/hello"
+                        for item in read_messages(sc_log)
+                    ):
+                        break
+                    if process.poll() is not None or fake_sc.poll() is not None:
+                        break
+                    time.sleep(0.05)
+                else:
+                    self.fail("application did not connect to the SC test service")
                 time.sleep(0.5)
-                wire_packets.clear()
+                checkpoint = len(read_messages(sc_log))
                 os.write(midi_master, bytes((0xB0, 74, 0, 0xB0, 74, 1)))
                 deadline = time.monotonic() + 5.0
                 while time.monotonic() < deadline:
                     if any(
-                        packet.startswith("hR0,0.02,")
-                        for packet in wire_packets
+                        item["address"] == "/omni/v1/mixer/room"
+                        for item in read_messages(sc_log)[checkpoint:]
                     ):
                         break
                     if process.poll() is not None:
@@ -143,25 +160,26 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
                 if process.poll() is None:
                     process.terminate()
                 output, _ = process.communicate(timeout=3)
+                if fake_sc.poll() is None:
+                    fake_sc.terminate()
+                fake_output, _ = fake_sc.communicate(timeout=3)
                 os.close(midi_master)
                 os.close(midi_slave)
-                listener.close()
-                receiver.join(timeout=3.0)
 
-            self.assertEqual(socket_error, [])
-            self.assertFalse(receiver.is_alive())
             self.assertNotIn("TypeError", output)
             self.assertNotIn("QQmlApplicationEngine failed", output)
             self.assertNotIn("Cannot assign to non-existent property", output)
             self.assertNotIn("Required property", output)
+            self.assertEqual(fake_sc.returncode, 0, fake_output)
             self.assertTrue(
                 any(
-                    packet.startswith("hR0,0.02,")
-                    for packet in wire_packets
+                    item["address"] == "/omni/v1/mixer/room"
+                    for item in read_messages(sc_log)[checkpoint:]
                 ),
-                "bound CC did not change AMY reverb: "
+                "bound CC did not change SuperCollider room level: "
                 f"returncode={process.returncode!r}, "
-                f"packets={wire_packets!r}, output={output!r}",
+                f"messages={read_messages(sc_log)[checkpoint:]!r}, "
+                f"output={output!r}",
             )
 
 
