@@ -56,6 +56,9 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("description: Publish this tested SuperCollider Linux build", text)
         self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.release", text)
         self.assertIn("build_supercollider_runtime.sh", text)
+        self.assertIn("supercollider_release_evidence.py", text)
+        self.assertIn("release-manifest-sc.json", text)
+        self.assertIn("*.spdx.json", text)
         self.assertIn("--exclude-module c_amy", builder)
         self.assertIn("--add-data \"$sc_dir:supercollider\"", builder)
 

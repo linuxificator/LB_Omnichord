@@ -70,9 +70,12 @@ or physical latency/load acceptance. Those limitations remain explicit in
 `.github/workflows/supercollider-linux.yml` builds pinned headless
 SuperCollider 3.14.1, runs the SC and Linux input suites, constructs the Linux
 x86_64 AppImage, verifies its runtime without opening audio and uploads it as a
-short-lived artifact. The pinned runtime cache is keyed by version and build
-inputs, allowing package-only repairs without rebuilding SC while invalidating
-correctly after a runtime recipe change.
+short-lived artifact. That artifact includes a package checksum, a release
+manifest tying the binary to the tested source revision and pinned runtime
+inputs, and SPDX 2.3 evidence. The VSCO bank is identified as an external asset
+rather than falsely listed as package content. The pinned runtime cache is
+keyed by version and build inputs, allowing package-only repairs without
+rebuilding SC while invalidating correctly after a runtime recipe change.
 
 An ordinary push or merge never publishes an SC release. Manual dispatch with
 `release=true` publishes exactly the tested artifact under an independent

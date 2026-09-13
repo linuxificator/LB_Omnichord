@@ -129,6 +129,18 @@ jobs:
           ! "$package" --verify-package 2>&1 | grep -q 'c_amy'
           (cd dist && sha256sum "$(basename "$package")" > "$(basename "$package").sha256")
 
+      - name: Generate SC release manifest and SPDX evidence
+        working-directory: sc_version/qt_frontend
+        run: |
+          package="dist/LB_Omnichord.SC.${{ steps.names.outputs.release_stamp }}.Linux-x86_64.AppImage"
+          python packaging/supercollider_release_evidence.py \
+            --package "$package" \
+            --release-stamp '${{ steps.names.outputs.release_stamp }}' \
+            --source-commit '${{ github.sha }}' \
+            --inputs packaging/supercollider_release_inputs.json \
+            --manifest dist/release-manifest-sc.json \
+            --spdx "dist/LB_Omnichord.SC.${{ steps.names.outputs.release_stamp }}.spdx.json"
+
       - name: Upload tested SC Linux package
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -138,6 +150,8 @@ jobs:
             sc_version/qt_frontend/dist/*.AppImage.sha256
             sc_version/qt_frontend/dist/*.AppImage.package-audit.json
             sc_version/qt_frontend/dist/*.AppImage.qml-imports.json
+            sc_version/qt_frontend/dist/release-manifest-sc.json
+            sc_version/qt_frontend/dist/*.spdx.json
           if-no-files-found: error
           retention-days: 7
 

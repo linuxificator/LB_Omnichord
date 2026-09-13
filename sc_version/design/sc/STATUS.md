@@ -29,7 +29,8 @@ Target currently exercised: Linux x86_64
   overlapping half-open gates and same-boundary replacement coalescing.
 - A separate GitHub workflow builds pinned headless SuperCollider 3.14.1 and a
   Linux x86_64 AppImage. Publication requires an explicit `release=true`
-  manual dispatch and uses an independent `-SC` release tag.
+  manual dispatch and uses an independent `-SC` release tag. Its artifact
+  carries a checksum, exact release manifest and SPDX 2.3 evidence.
 
 ## Not yet complete
 
