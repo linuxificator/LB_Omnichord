@@ -270,6 +270,56 @@ class SuperColliderClientTests(unittest.TestCase):
         self.assertEqual(client._selected_program["strum"], program)
         client.close()
 
+    def test_superseded_and_replaced_sample_revisions_are_released(self) -> None:
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+        client._set_program("strum", {"name": "sample.vsco.marimba", "params": []})
+        first_key = next(iter(client._pending_programs))
+        client._set_program("strum", {"name": "sample.vsco.vibraphone", "params": []})
+        second_key = next(iter(client._pending_programs))
+        self.assertNotEqual(first_key, second_key)
+        self.assertNotIn(first_key, client._pending_programs)
+
+        sender = SimpleUDPClient("127.0.0.1", client.reply_port)
+        try:
+            sender.send_message(
+                "/omni/v1/program/status",
+                [client.session, second_key[0], second_key[1], "ready", "ready"],
+            )
+        finally:
+            sender._sock.close()
+        deadline = time.monotonic() + 1.0
+        while client._selected_program["strum"] != second_key[0] and time.monotonic() < deadline:
+            time.sleep(0.01)
+        client._set_program("strum", {"name": "sample.vsco.xylophone", "params": []})
+        third_key = next(iter(client._pending_programs))
+        sender = SimpleUDPClient("127.0.0.1", client.reply_port)
+        try:
+            sender.send_message(
+                "/omni/v1/program/status",
+                [client.session, third_key[0], third_key[1], "ready", "ready"],
+            )
+        finally:
+            sender._sock.close()
+        deadline = time.monotonic() + 1.0
+        while client._selected_program["strum"] != third_key[0] and time.monotonic() < deadline:
+            time.sleep(0.01)
+        client.close()
+
+        releases = [
+            arguments
+            for address, arguments in self.fake.messages
+            if address == "/omni/v1/program/release"
+        ]
+        released_keys = {(str(item[2]), int(item[3])) for item in releases}
+        self.assertIn(first_key, released_keys)
+        self.assertIn(second_key, released_keys)
+
 
 if __name__ == "__main__":
     unittest.main()

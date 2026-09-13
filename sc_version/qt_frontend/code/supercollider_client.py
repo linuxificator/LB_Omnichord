@@ -179,11 +179,23 @@ class SuperColliderClient:
         if status == "error":
             self._program_errors[role] = detail
             self._pending_programs.pop((program_id, revision), None)
+            self._release_program(program_id, revision)
             return
         if status != "ready":
             return
         self._pending_programs.pop((program_id, revision), None)
         self._activate_program(role, program_id, revision, parameters)
+
+    def _release_program(self, program_id: str, revision: int) -> None:
+        self._send_raw(
+            "/omni/v1/program/release",
+            [
+                self.session,
+                self._next_message_id(),
+                str(program_id),
+                int(revision),
+            ],
+        )
 
     def _await_ready(self) -> None:
         deadline = time.monotonic() + self.runtime_config.language.startup_timeout_seconds
@@ -528,6 +540,16 @@ class SuperColliderClient:
         owners = ("omni/manual", "omni/automatic") if role == "chord" else (f"omni/{role}",)
         sample_program = name.startswith("sample.")
         if sample_program:
+            superseded = [
+                key
+                for key, (pending_role, _parameters) in self._pending_programs.items()
+                if pending_role == role
+            ]
+            for pending_program, pending_revision in superseded:
+                self._pending_programs.pop(
+                    (pending_program, pending_revision), None
+                )
+                self._release_program(pending_program, pending_revision)
             self._pending_programs[(name, revision)] = (role, parameters)
         for owner in owners:
             self.configure_part(
@@ -547,10 +569,16 @@ class SuperColliderClient:
         revision: int,
         parameters: dict[str, float],
     ) -> None:
+        previous_program = self._selected_program[role]
+        previous_revision = self._program_revision[role]
         self._selected_program[role] = program_id
         self._program_revision[role] = revision
         self._program_params[role] = dict(parameters)
         self._program_errors.pop(role, None)
+        if previous_program.startswith("sample.") and (
+            previous_program != program_id or previous_revision != revision
+        ):
+            self._release_program(previous_program, previous_revision)
         if role == "bass":
             self._publish_bass_lane()
         elif role == "chord":

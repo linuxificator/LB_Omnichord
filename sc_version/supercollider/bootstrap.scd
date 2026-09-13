@@ -71,6 +71,11 @@ thisProcess.openUDPPort(languagePort);
 ~omniReleaseHandle = { |handle|
     var record = ~omniVoices.removeAt(handle.asString);
     if(record.notNil) {
+        if(record[\sample] == true) {
+            record[\sampleNodes].do { |sampleNode|
+                sampleNode[\node].set(\gate, 0)
+            };
+        } {
         if(record[\outputNode].notNil) {
             record[\outputNode].set(\gate, 0);
             if(record[\releaseMode] == \gated) {
@@ -78,6 +83,7 @@ thisProcess.openUDPPort(languagePort);
             };
         } {
             record[\sourceNode].set(\gate, 0);
+        };
         };
     };
 };
@@ -189,6 +195,17 @@ OSCdef(\omniProgramValue, { |message|
         };
     };
 }, '/omni/v1/program/value', recvPort: languagePort);
+
+OSCdef(\omniProgramRelease, { |message|
+    if(~omniSessionValid.value(message)) {
+        var program = message[3].asString;
+        var revision = message[4].asInteger;
+        ~omniPrograms.removeAt(~omniProgramKey.value(program, revision));
+        if(~omniReleaseSampleProgram.notNil) {
+            ~omniReleaseSampleProgram.value(program, revision);
+        };
+    };
+}, '/omni/v1/program/release', recvPort: languagePort);
 
 (scriptDirectory +/+ "sequencer.scd").load;
 

@@ -20,6 +20,10 @@ var regions = jsonAt.value(manifest, "regions");
 ~omniSampleBuffers = Dictionary.new;
 ~omniSampleBufferBytes = 0;
 ~omniSampleRoundRobin = Dictionary.new;
+~omniSampleProgramRefs = Dictionary.new;
+~omniSampleVoiceRefs = Dictionary.new;
+~omniSampleLastUsed = Dictionary.new;
+~omniSampleUseOrdinal = 0;
 ~omniDrumSampleProgram = jsonAt.value(drumMap, "program_id").asString;
 ~omniDrumRoleKeys = Dictionary.new;
 
@@ -29,6 +33,56 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
 
 ~omniMapDrumKey = { |role, logicalKey|
     ~omniDrumRoleKeys[role.asString] ? logicalKey.asInteger
+};
+
+~omniTouchSample = { |sampleId|
+    ~omniSampleUseOrdinal = ~omniSampleUseOrdinal + 1;
+    ~omniSampleLastUsed[sampleId.asString] = ~omniSampleUseOrdinal;
+};
+
+~omniEvictSampleBytes = { |incomingBytes|
+    var needed = (
+        ~omniSampleBufferBytes + incomingBytes - ~omniSampleBudgetBytes
+    ).max(0);
+    var candidates = ~omniSampleBuffers.keys.select { |sampleId|
+        ((~omniSampleProgramRefs[sampleId] ? 0) <= 0) and: {
+            (~omniSampleVoiceRefs[sampleId] ? 0) <= 0
+        }
+    }.sort { |left, right|
+        (~omniSampleLastUsed[left] ? 0) < (~omniSampleLastUsed[right] ? 0)
+    };
+    candidates.do { |sampleId|
+        if(needed > 0) {
+            var bytes = jsonAt.value(
+                ~omniSampleFiles[sampleId], "decoded_bytes"
+            ).asInteger;
+            ~omniSampleBuffers.removeAt(sampleId).free;
+            ~omniSampleBufferBytes = (~omniSampleBufferBytes - bytes).max(0);
+            ~omniSampleLastUsed.removeAt(sampleId);
+            needed = (needed - bytes).max(0);
+        };
+    };
+    needed <= 0
+};
+
+~omniReleaseSampleProgram = { |program, revision|
+    var stateKey = program.asString ++ "@" ++ revision.asInteger;
+    var state = ~omniSampleStates[stateKey];
+    if(state.notNil) {
+        if(state[\status] == \loading) {
+            state[\cancelled] = true;
+        } {
+            if(state[\status] == \ready) {
+                state[\sampleIds].do { |sampleId|
+                    ~omniSampleProgramRefs[sampleId] = (
+                        (~omniSampleProgramRefs[sampleId] ? 0) - 1
+                    ).max(0);
+                };
+            };
+            ~omniSampleStates.removeAt(stateKey);
+            ~omniEvictSampleBytes.value(0);
+        };
+    };
 };
 
 files.do { |record|
@@ -79,7 +133,24 @@ regions.do { |record|
                     jsonAt.value(~omniSampleFiles[sampleId], "decoded_bytes").asInteger
                 } { 0 }
             };
-            if((~omniSampleBufferBytes + newBytes) > ~omniSampleBudgetBytes) {
+            var missing = sampleIds.detect { |sampleId|
+                var file = ~omniSampleFiles[sampleId];
+                var relative = jsonAt.value(file, "relative_path").asString;
+                PathName(~omniSampleRoot +/+ relative).isFile.not
+            };
+            if(missing.notNil) {
+                ~omniSampleStates[stateKey] = (
+                    status: \error,
+                    detail: "sample-file-missing"
+                );
+                ~omniSampleStatusReply.value(
+                    programId,
+                    revision,
+                    "error",
+                    "sample-file-missing"
+                );
+            } {
+            if(~omniEvictSampleBytes.value(newBytes).not) {
                 ~omniSampleStates[stateKey] = (
                     status: \error,
                     detail: "program-combination-exceeds-memory-profile"
@@ -91,7 +162,18 @@ regions.do { |record|
                     "program-combination-exceeds-memory-profile"
                 );
             } {
-                ~omniSampleStates[stateKey] = (status: \loading, detail: "loading");
+                state = (
+                    status: \loading,
+                    detail: "loading",
+                    sampleIds: sampleIds,
+                    cancelled: false
+                );
+                ~omniSampleStates[stateKey] = state;
+                sampleIds.do { |sampleId|
+                    ~omniSampleProgramRefs[sampleId] =
+                        (~omniSampleProgramRefs[sampleId] ? 0) + 1;
+                    ~omniTouchSample.value(sampleId);
+                };
                 Routine({
                     sampleIds.do { |sampleId|
                         if(~omniSampleBuffers[sampleId].isNil) {
@@ -106,12 +188,24 @@ regions.do { |record|
                         };
                     };
                     s.sync;
-                    ~omniSampleStates[stateKey] = (status: \ready, detail: "ready");
-                    ~omniSampleStatusReply.value(
-                        programId, revision, "ready", "ready"
-                    );
+                    if(state[\cancelled]) {
+                        sampleIds.do { |sampleId|
+                            ~omniSampleProgramRefs[sampleId] = (
+                                (~omniSampleProgramRefs[sampleId] ? 0) - 1
+                            ).max(0);
+                        };
+                        ~omniSampleStates.removeAt(stateKey);
+                        ~omniEvictSampleBytes.value(0);
+                    } {
+                        state[\status] = \ready;
+                        state[\detail] = "ready";
+                        ~omniSampleStatusReply.value(
+                            programId, revision, "ready", "ready"
+                        );
+                    };
                     nil
                 }).play(AppClock);
+            };
             };
         } {
             ~omniSampleStatusReply.value(
@@ -249,8 +343,16 @@ SynthDef(\omniSampleStereo, {
                     \pitchBendBus, ~omniBendBus.index
                 ]
             );
-            sampleNodes.add((node: node, center: center, tune: tune));
+            ~omniSampleVoiceRefs[sampleId] =
+                (~omniSampleVoiceRefs[sampleId] ? 0) + 1;
+            ~omniTouchSample.value(sampleId);
+            sampleNodes.add((
+                node: node, sampleId: sampleId, center: center, tune: tune
+            ));
             node.onFree {
+                ~omniSampleVoiceRefs[sampleId] = (
+                    (~omniSampleVoiceRefs[sampleId] ? 0) - 1
+                ).max(0);
                 remaining = remaining - 1;
                 if(remaining <= 0) {
                     group.free;
