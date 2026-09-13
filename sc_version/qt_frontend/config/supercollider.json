@@ -4,7 +4,7 @@
   "language": {
     "host": "127.0.0.1",
     "port": 57140,
-    "startup_timeout_seconds": 8.0,
+    "startup_timeout_seconds": 30.0,
     "message_payload_bytes": 1000
   },
   "server": {
@@ -15,7 +15,7 @@
     "realtime_memory_kib": 262144
   },
   "samples": {
-    "vsco_root": "/home/jeroen/sample_lib/VSCO-2-CE-1.1.0",
+    "vsco_root": "~/sample_lib/VSCO-2-CE-1.1.0",
     "ram_budget_mib": 4096
   }
 }

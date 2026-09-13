@@ -460,9 +460,25 @@ s.waitForBoot({
     };
 
     ~omniPrepareSampleProgram.value(~omniDrumSampleProgram, 1);
-
-    ~omniReady = true;
-    ("LB_OMNICHORD_SC_READY port=" ++ languagePort).postln;
+    Routine({
+        var stateKey = ~omniDrumSampleProgram ++ "@1";
+        var state;
+        while { ~omniReady.not } {
+            state = ~omniSampleStates[stateKey];
+            if(state.notNil and: { state[\status] == \ready }) {
+                ~omniReady = true;
+                ("LB_OMNICHORD_SC_READY port=" ++ languagePort).postln;
+            };
+            if(state.notNil and: { state[\status] == \error }) {
+                ("LB_OMNICHORD_SC_BOOT_FAILED required-program="
+                    ++ ~omniDrumSampleProgram ++ " detail="
+                    ++ state[\detail]).postln;
+                s.quit;
+                2.exit;
+            };
+            if(~omniReady.not) { 0.02.wait };
+        };
+    }).play(AppClock);
 }, {
     "LB_OMNICHORD_SC_BOOT_FAILED".postln;
     2.exit;

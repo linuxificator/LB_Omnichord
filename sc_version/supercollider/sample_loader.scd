@@ -11,7 +11,7 @@ var regions = jsonAt.value(manifest, "regions");
 
 ~omniSampleRoot = "OMNICHORD_SC_VSCO_ROOT".getenv ? "";
 ~omniSampleBudgetBytes = (
-    ("OMNICHORD_SC_SAMPLE_RAM_MIB".getenv ? "4096").asInteger * 1024 * 1024
+    ("OMNICHORD_SC_SAMPLE_RAM_MIB".getenv ? "4096").asFloat * 1024 * 1024
 );
 ~omniSampleFiles = Dictionary.new;
 ~omniSamplePrograms = Dictionary.new;

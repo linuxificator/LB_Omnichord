@@ -5,6 +5,11 @@ var failed = false;
 var selection;
 
 (directory +/+ "sample_loader.scd").load;
+if(~omniSampleBudgetBytes < 4294967296) {
+    failed = true;
+    ("VSCO_SAMPLE_BUDGET_OVERFLOW_FAILED "
+        ++ ~omniSampleBudgetBytes).postln;
+};
 if(~omniSampleFiles.size != 3168) {
     failed = true;
     ("VSCO_FILE_COUNT_FAILED " ++ ~omniSampleFiles.size).postln;
