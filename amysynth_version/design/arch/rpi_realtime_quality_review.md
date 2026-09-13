@@ -82,6 +82,9 @@ process scan, custom lifecycle token or test-only production endpoint.
   board variants. Its checksum-verified Pi AppImage `R20260909161844` passed a
   physical post-reboot startup and an external 20-second 120 Hz touch sweep
   with no warning, overload, dropout, binding loop or throttling.
+- On a Pi 5 using `ondemand`, the revised policy selected exactly one packaged
+  AMY callback on CPU3/FIFO70, kept its other threads on CPUs 0-1, retained
+  both PipeWire loops on CPU2/FIFO80/75, and passed aggregate startup read-back.
 
 Every release remains gated by the normal unit/quality matrix. The aarch64
 package job also exercises package startup and the shared 120 Hz visual-cost
@@ -90,7 +93,8 @@ acceptance after its first release.
 
 ## Remaining non-blocking evidence
 
-- Repeat the physical measurements on a Pi 5 when hardware is available.
+- Repeat full maximum-capacity and 120 Hz physical measurements on the Pi 5;
+  the core placement and startup policy have already been validated there.
 - If a future AMY backend recreates its callback thread without restarting its
   service process, characterize that lifecycle before adding any reapplication
   mechanism. Current miniaudio service behavior keeps the callback stable, so

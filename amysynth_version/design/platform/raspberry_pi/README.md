@@ -2,7 +2,7 @@
 
 Status: physically validated platform contract
 Owner: Raspberry Pi integration
-Last verified: 2026-09-09
+Last verified: 2026-09-13
 
 The aarch64 AppImage targets Pi 4 and Pi 5 and is self-contained. It must use
 the hardware Wayland/OpenGL path when available; `--software-renderer` is a
@@ -16,7 +16,9 @@ service and sends the identical wire stream to ESP32-P4; `--serial-port` and
 For a dedicated instrument, a reversible Pi 4 host profile has been physically
 measured and is provisionally shared with Pi 5: CPUs 0-1 handle the frontend,
 OS and IRQs, CPU 2 handles the two PipeWire data loops, and CPU 3 handles only
-AMY's detected audio callback. The installer uses the standard Linux PAM
+AMY's detected audio callback. CPU frequency scaling remains under Raspberry
+Pi OS's normal `ondemand` governor; no product service holds the shared clock
+at its maximum. The installer uses the standard Linux PAM
 realtime-priority limit to grant the desktop user permission. Systemd grants
 the same limit to its PipeWire user services; PipeWire's own `module-rt` and
 data-loop affinity configuration own those threads. The existing source or
@@ -40,6 +42,12 @@ The packaged launcher applied the exact runtime layout above and an external
 loop or throttling. Source and `/dev/serial0` modes were also physically
 validated. This is the current setup; earlier watcher- and process-discovery
 designs are not supported deployment alternatives.
+
+On a Pi 5 Model B Rev 1.1, the revised `ondemand` startup contract was also
+validated against an exact packaged AMY child. It selected one callback on
+CPU 3 at FIFO 70, left both other AMY threads on CPUs 0-1 at normal priority,
+retained PipeWire's two loops on CPU 2 at FIFO 80/75, and produced no startup
+warning after complete read-back.
 
 [`frontend_performance.md`](frontend_performance.md) records the reproducible
 120 Hz physical-input benchmark, rejected alternatives and acceptance limits.

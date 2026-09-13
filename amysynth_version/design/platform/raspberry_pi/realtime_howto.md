@@ -1,6 +1,6 @@
 # Dedicated Raspberry Pi realtime audio setup
 
-Status: physically validated on Raspberry Pi 4; Pi 5 governor/core validation in progress
+Status: physically validated on Raspberry Pi 4 and Pi 5
 Validated AppImage: `R20260909161844`
 Validated GitHub run: `34375905899`
 Validated kernel: Raspberry Pi `6.18.34+rpt-rpi-v8`, `PREEMPT`
@@ -204,6 +204,18 @@ case used 28.5% of callback-core time with 1.778 ms p99 runtime.
 
 Keep the synthetic level very low: CPU cost is unchanged, while hundreds of
 audible oscillators are unsafe and do not make the capacity result stronger.
+
+## Pi 5 default-governor validation
+
+On 2026-09-13 a Pi 5 Model B Rev 1.1 was checked with its shared CPU-frequency
+policy set to `ondemand`. CPUs 2-3 remained boot-isolated and the legacy
+performance-governor service was disabled and inactive. Applying the revised
+wrapper policy to its exact packaged AMY child selected one callback thread on
+CPU 3 at FIFO 70. Both other AMY threads remained on CPUs 0-1 at normal
+priority; PipeWire and PipeWire-Pulse retained CPU 2 at FIFO 80 and 75. A
+complete startup-policy read-back returned no warning. This confirms that
+dynamic frequency scaling does not prevent the dedicated-core layout from
+being applied.
 
 ## Primary mechanism references
 

@@ -1,6 +1,6 @@
 # Raspberry Pi realtime audio research
 
-Status: Pi 4 measurement complete; Pi 5 default-governor validation in progress
+Status: Pi 4 measurement complete; Pi 5 default-governor/core policy validated
 Branch: `research/rt_pi`
 Measurement baseline: `R20260909T010905`
 Current packaged acceptance: `R20260909161844` (GitHub run `34375905899`)
@@ -210,3 +210,12 @@ covers that environment boundary. AppImage `R20260909161844` then found both
 systemd-owned PipeWire loops, applied the exact AMY policy and completed an
 external 20-second 120 Hz sweep with no warning, overload, dropout, binding
 loop or throttling.
+
+On 2026-09-13 the revised runtime contract was checked on a Pi 5 Model B Rev
+1.1 with its shared frequency policy at the Raspberry Pi OS `ondemand`
+default. CPUs 2-3 and IRQ placement remained isolated as designed. The exact
+packaged AMY child had one callback on CPU 3/FIFO70 and its remaining threads
+on CPUs 0-1/SCHED_OTHER; PipeWire retained CPU 2/FIFO80 and
+PipeWire-Pulse CPU 2/FIFO75. The revised aggregate startup check was silent.
+This is evidence for correct policy placement under dynamic scaling, not a new
+Pi 5 maximum-capacity measurement.
