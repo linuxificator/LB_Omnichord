@@ -315,7 +315,8 @@
     if(~omniTraceSequenceEvent.notNil) {
         ~omniTraceSequenceEvent.value(
             logicalTick, executionId, execution[\definition][\id],
-            event[\ordinal], action, suppressed
+            execution[\definition][\revision], event[\ordinal],
+            action, suppressed
         );
     };
 };
@@ -437,6 +438,9 @@
     }) {
         code = "obsolete-generation";
     } {
+        activation[\definitions].keysValuesDo { |id, definition|
+            ~omniDefinitions[id] = definition
+        };
         ~omniActivateLane.value(
             transaction[\lane], transaction[\generation],
             activation[\roots], effectiveBeat
@@ -566,7 +570,6 @@
             ~omniClock.beats, rejected
         );
     } {
-        definitions.keysValuesDo { |id, definition| ~omniDefinitions[id] = definition };
         if(~omniTransportRunning) {
             var nextTick = (~omniClock.beats * 48).floor + 1;
             var alignment = transaction[\alignment].max(1);
@@ -582,11 +585,15 @@
             ~omniPendingActivations.add((
                 transactionId: transactionId,
                 transaction: transaction,
+                definitions: definitions,
                 roots: roots.asArray,
                 effectiveBeat: effectiveBeat
             ));
             ~omniArmWake.value;
         } {
+            definitions.keysValuesDo { |id, definition|
+                ~omniDefinitions[id] = definition
+            };
             ~omniActivateLane.value(
                 transaction[\lane], transaction[\generation], roots, ~omniClock.beats
             );

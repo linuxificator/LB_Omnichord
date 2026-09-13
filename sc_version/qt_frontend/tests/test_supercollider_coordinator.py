@@ -242,7 +242,7 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                 if line.startswith("LB_OMNI_TRACE|")
             ]
             tick_zero_actions = [
-                trace[4]
+                trace[5]
                 for trace in traces
                 if int(trace[1]) == 0 and trace[2].startswith("gate-order/")
             ]
@@ -251,9 +251,9 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                 ["launch", "gateBegin", "launch", "gateBegin", "drumHit"],
             )
             drum_suppression = [
-                (int(trace[1]), trace[5])
+                (int(trace[1]), trace[6])
                 for trace in traces
-                if trace[4] == "drumHit" and trace[2] == "gate-order/drums"
+                if trace[5] == "drumHit" and trace[2] == "gate-order/drums"
             ]
             self.assertEqual(
                 drum_suppression[:3],

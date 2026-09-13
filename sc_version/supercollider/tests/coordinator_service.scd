@@ -29,9 +29,11 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
     [role, program, note, velocity, logicalBus]
 };
 ~omniTraceSequenceEvent = {
-    |logicalTick, executionId, definitionId, eventOrdinal, action, suppressed|
+    |logicalTick, executionId, definitionId, revision, eventOrdinal,
+        action, suppressed|
     ("LB_OMNI_TRACE|" ++ logicalTick ++ "|" ++ definitionId ++ "|"
-        ++ eventOrdinal ++ "|" ++ action ++ "|" ++ suppressed).postln;
+        ++ revision ++ "|" ++ eventOrdinal ++ "|" ++ action ++ "|"
+        ++ suppressed).postln;
 };
 
 thisProcess.openUDPPort(port);
