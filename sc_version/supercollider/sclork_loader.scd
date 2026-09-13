@@ -53,9 +53,6 @@ PathName(adapterRoot).files
     if(~omniSynthHasControl.value(name, \freq)) {
         args.add(\freq); args.add(frequency);
     };
-    if(~omniSynthHasControl.value(name, \amp)) {
-        args.add(\amp); args.add(1.0);
-    };
     if(~omniSynthHasControl.value(name, \pan)) {
         args.add(\pan); args.add(0.0);
     };

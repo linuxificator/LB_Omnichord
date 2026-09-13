@@ -6,6 +6,9 @@ var expected = [
     \pulseRisset,
     \pluck,
     \sawSynth,
+    \sosBell,
+    \kik3,
+    \kickBlocks,
     \waveguideFlute
 ];
 var failed = false;
@@ -29,6 +32,10 @@ if(~omniSclorkProgramName.value("legacy.program").notNil) {
 if(~omniSynthHasControl.value(\fmBass, \freq).not) {
     failed = true;
     "SCLORK_LOADER_CONTROL_FAILED".postln;
+};
+if(~omniSclorkArgs.value(\everythingRhodes, 0, 440, []).includesEqual(\amp)) {
+    failed = true;
+    "SCLORK_LOADER_OVERRODE_NATIVE_AMP_FAILED".postln;
 };
 if(failed) { 1.exit } {
     "SCLORK_LOADER_TEST_OK".postln;

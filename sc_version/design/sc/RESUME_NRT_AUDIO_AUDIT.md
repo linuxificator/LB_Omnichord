@@ -49,6 +49,10 @@ as numeric envelope curves:
 The generated report records RMS, peak, silence and clipping observations per
 program. Silence is a blocking failure. Peak/clipping values are measurements,
 not yet a claim that all programs have been perceptually loudness-normalized.
+The loader preserves each upstream program's authored amplitude default and
+applies note velocity in the owned output stage. Forcing every unrelated
+SynthDef's `amp` control to `1` caused avoidable internal clipping and erased
+the source library's intended gain staging.
 
 ## Local prerequisite still missing
 
