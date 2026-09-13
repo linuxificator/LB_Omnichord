@@ -60,6 +60,13 @@ SC service rather than placing test receivers in production application code.
 Inherited AMY wire tests explicitly launch the frozen AMY frontend as a
 behavioral oracle; they do not describe the SC production architecture.
 
+Reference UI captures live in `screenshots/`. A deterministic offscreen pair
+can be refreshed without starting an audio engine:
+
+```bash
+python capture_screenshots.py
+```
+
 ## Linux package and release
 
 The SC workflow builds pinned headless SuperCollider 3.14.1 and a package named

@@ -67,6 +67,7 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
             sc_port = free_port(socket.SOCK_DGRAM)
             api_port = free_port(socket.SOCK_STREAM)
             engine_log = temp / "engine.jsonl"
+            engine_ready = temp / "engine.ready"
             runtime = json.loads(
                 (ROOT / "config" / "supercollider.json").read_text()
             )
@@ -82,12 +83,26 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
                     str(sc_port),
                     "--log",
                     str(engine_log),
+                    "--ready-file",
+                    str(engine_ready),
                 ],
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 start_new_session=True,
             )
+            engine_deadline = time.monotonic() + 3
+            while not engine_ready.exists() and time.monotonic() < engine_deadline:
+                if engine.poll() is not None:
+                    break
+                time.sleep(0.01)
+            if not engine_ready.exists():
+                engine_stdout, engine_stderr = stop_process(engine)
+                self.fail(
+                    "fake SC service did not bind before frontend startup:\n"
+                    + engine_stdout
+                    + engine_stderr
+                )
             env = dict(
                 os.environ,
                 HOME=str(temp),
@@ -105,18 +120,28 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
                 start_new_session=True,
             )
             try:
+                healthy = False
                 deadline = time.monotonic() + 12
                 while time.monotonic() < deadline:
                     try:
                         if request_json(api_port, "GET", "/health").get("ok"):
+                            healthy = True
                             break
                     except (URLError, TimeoutError, ConnectionError):
                         pass
                     if application.poll() is not None or engine.poll() is not None:
                         break
                     time.sleep(0.05)
-                else:
-                    self.fail("SC frontend did not become healthy")
+                if not healthy:
+                    app_stdout, app_stderr = stop_process(application)
+                    engine_stdout, engine_stderr = stop_process(engine)
+                    self.fail(
+                        "SC frontend did not become healthy:\n"
+                        + app_stdout
+                        + app_stderr
+                        + engine_stdout
+                        + engine_stderr
+                    )
 
                 checkpoint = len(messages(engine_log))
                 pressed = request_json(

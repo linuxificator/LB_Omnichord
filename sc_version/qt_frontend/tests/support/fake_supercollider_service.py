@@ -19,6 +19,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--log", type=Path, required=True)
+    parser.add_argument("--ready-file", type=Path)
     return parser.parse_args()
 
 
@@ -82,6 +83,9 @@ def main() -> int:
 
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
+    if args.ready_file is not None:
+        args.ready_file.parent.mkdir(parents=True, exist_ok=True)
+        args.ready_file.touch()
     service.run()
     return 0
 
