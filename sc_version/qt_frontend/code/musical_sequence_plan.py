@@ -7,6 +7,7 @@ from typing import Any
 
 from drum_patterns import DrumPatternCatalog
 from engine_protocol import PPQ, SequenceDefinition, SequenceEvent
+from bass_sequence_source import bass_gesture_sources, scaled_bass_source
 
 
 @dataclass(frozen=True, slots=True)
@@ -157,6 +158,112 @@ def compile_chord_lane(
         source_identity=f"{config.get('id', '')}:chord-root",
     )
     return LanePlan(lane, generation, 1, (root, *children))
+
+
+def compile_bass_lane(
+    *,
+    config: Mapping[str, Any] | None,
+    running: bool,
+    bass_notes: Sequence[float],
+    bass_gate_beats: float,
+    program_id: str,
+    program_revision: int,
+    logical_bus: int,
+    generation: int,
+) -> LanePlan:
+    """Compile monophonic finite bass gestures and a phase-owning root."""
+
+    lane = "bass"
+    if not config or not running:
+        return LanePlan(lane, generation, 1, ())
+    raw_riff = config.get("bass_riff")
+    bass_riff = raw_riff if isinstance(raw_riff, Mapping) else None
+    period, source_events, identity = scaled_bass_source(
+        config=config,
+        bass_notes=bass_notes,
+        bass_riff=bass_riff,
+        bass_gate_beats=bass_gate_beats,
+        ppq=PPQ,
+        quantize_activity_velocity=False,
+    )
+    sources = bass_gesture_sources(source_events, period)
+    definitions: list[SequenceDefinition] = []
+    launches: list[SequenceEvent] = []
+    for gesture_index, source in enumerate(sources):
+        child_id = f"bass/gesture/{gesture_index}"
+        start_tick = int(source[0]["tick"])
+        events: list[SequenceEvent] = []
+        ordinal = 0
+        previous_slides = False
+        for note_index, note_event in enumerate(source):
+            tick = int(note_event["tick"]) - start_tick
+            note = float(note_event["note"])
+            accent = bool(note_event.get("accent", False)) and not previous_slides
+            if previous_slides:
+                events.append(
+                    _event(tick, ordinal, "voiceSet", "voice", "frequency_hz", _frequency(note))
+                )
+                ordinal += 1
+            else:
+                events.append(
+                    _event(
+                        tick,
+                        ordinal,
+                        "noteOn",
+                        "voice",
+                        "rhythm/bass",
+                        program_id,
+                        int(program_revision),
+                        max(0, min(127, int(round(note)))),
+                        _frequency(note),
+                        float(note_event["velocity"]),
+                        "accent" if accent else "ordinary",
+                        1 if accent else 0,
+                        int(logical_bus),
+                    )
+                )
+                ordinal += 1
+            slides = bool(note_event.get("slide_to_next", False))
+            end_tick = int(note_event["tick"]) + int(note_event["duration"])
+            next_tick = (
+                int(source[note_index + 1]["tick"])
+                if note_index + 1 < len(source)
+                else None
+            )
+            if not slides and (next_tick is None or end_tick <= next_tick):
+                events.append(
+                    _event(end_tick - start_tick, ordinal, "noteOff", "voice", 0.0)
+                )
+                ordinal += 1
+            previous_slides = slides
+        definitions.append(
+            SequenceDefinition(
+                definition_id=child_id,
+                revision=generation,
+                kind="finite",
+                lane=lane,
+                period_ticks=0,
+                events=tuple(sorted(events, key=lambda item: (item.tick, item.ordinal))),
+                source_identity=f"{identity!r}:{gesture_index}",
+            )
+        )
+        launches.append(
+            _event(start_tick % period, gesture_index, "launch", child_id)
+        )
+    if launches:
+        definitions.insert(
+            0,
+            SequenceDefinition(
+                definition_id="bass/root",
+                revision=generation,
+                kind="root",
+                lane=lane,
+                period_ticks=period,
+                events=tuple(sorted(launches, key=lambda item: (item.tick, item.ordinal))),
+                source_identity=f"{identity!r}:root",
+            ),
+        )
+    return LanePlan(lane, generation, 1, tuple(definitions))
 
 
 def _fill_occurrences(

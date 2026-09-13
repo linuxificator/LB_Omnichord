@@ -9,10 +9,61 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 from drum_patterns import load_drum_pattern_catalog  # noqa: E402
-from musical_sequence_plan import compile_chord_lane, compile_drum_lane  # noqa: E402
+from musical_sequence_plan import (  # noqa: E402
+    compile_bass_lane,
+    compile_chord_lane,
+    compile_drum_lane,
+)
 
 
 class MusicalSequencePlanTests(unittest.TestCase):
+    def test_bass_slide_updates_owned_voice_without_retrigger(self) -> None:
+        plan = compile_bass_lane(
+            config={
+                "id": "test",
+                "length_beats": 4,
+                "bass_mode": "riff",
+                "bass_riff": {
+                    "id": "acid",
+                    "ppq": 96,
+                    "phrase_ticks": 384,
+                    "events": [
+                        {
+                            "tick": 0,
+                            "duration_ticks": 96,
+                            "note": 36,
+                            "velocity": 100,
+                            "accent": True,
+                            "slide_to_next": True,
+                        },
+                        {
+                            "tick": 48,
+                            "duration_ticks": 48,
+                            "note": 43,
+                            "velocity": 90,
+                            "accent": True,
+                            "slide_to_next": False,
+                        },
+                    ],
+                },
+            },
+            running=True,
+            bass_notes=(36.0,),
+            bass_gate_beats=0.3,
+            program_id="sc.omni.acid303",
+            program_revision=3,
+            logical_bus=1,
+            generation=2,
+        )
+        root, child = plan.definitions
+        self.assertEqual(root.period_ticks, 192)
+        self.assertEqual(
+            [event.kind for event in child.events],
+            ["noteOn", "voiceSet", "noteOff"],
+        )
+        self.assertEqual(child.events[0].atoms[8], 1)
+        self.assertEqual(child.events[1].atoms[1], "frequency_hz")
+
     def test_chord_arpeggio_owns_exact_note_handles_and_48_ppq_releases(self) -> None:
         plan = compile_chord_lane(
             config={

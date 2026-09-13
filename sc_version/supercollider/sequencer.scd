@@ -50,7 +50,7 @@
             var handle = executionId ++ "/" ++ atoms[0].asString;
             ~omniSpawnVoice.value(
                 atoms[1], handle, atoms[2], atoms[3], atoms[4],
-                atoms[5], atoms[6], atoms[10], []
+                atoms[5], atoms[6], atoms[9], []
             );
         };
         if(action == "noteOff") {

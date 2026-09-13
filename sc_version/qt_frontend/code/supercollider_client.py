@@ -17,7 +17,12 @@ from pythonosc.udp_client import SimpleUDPClient
 from config_loader import ResolvedAmyConfig
 from drum_patterns import load_drum_pattern_catalog
 from engine_protocol import NoteOff, NoteOn, PROTOCOL_VERSION, VoiceSet
-from musical_sequence_plan import LanePlan, compile_chord_lane, compile_drum_lane
+from musical_sequence_plan import (
+    LanePlan,
+    compile_bass_lane,
+    compile_chord_lane,
+    compile_drum_lane,
+)
 from supercollider_config import (
     SuperColliderRuntimeConfig,
     load_supercollider_config,
@@ -486,6 +491,10 @@ class SuperColliderClient:
                 logical_bus,
                 parameters,
             )
+        if role == "bass":
+            self._publish_bass_lane()
+        elif role == "chord":
+            self._publish_chord_lane()
 
     def _manual_event(self, text: str) -> None:
         payload = json.loads(text)
@@ -545,6 +554,7 @@ class SuperColliderClient:
         self.bass_notes = [float(note) for note in payload.get("bass_notes", [])]
         self.rhythm_chord_enabled = bool(payload.get("rhythm_chord_enabled", False))
         self._publish_chord_lane()
+        self._publish_bass_lane()
 
     def _next_lane_generation(self, lane: str) -> int:
         self._lane_generations[lane] += 1
@@ -575,6 +585,21 @@ class SuperColliderClient:
                 catalog=self._drum_catalog,
                 kit=self.resolved_config.drums.kit,
                 logical_bus=self._role_bus("drums"),
+                generation=generation,
+            )
+        )
+
+    def _publish_bass_lane(self) -> None:
+        generation = self._next_lane_generation("bass")
+        self.publish_lane(
+            compile_bass_lane(
+                config=self.rhythm_config,
+                running=self.bass_running,
+                bass_notes=self.bass_notes,
+                bass_gate_beats=self.resolved_config.rhythm.bass_gate_beats,
+                program_id=self._selected_program["bass"],
+                program_revision=self._program_revision["bass"],
+                logical_bus=self._role_bus("bass"),
                 generation=generation,
             )
         )
@@ -642,6 +667,7 @@ class SuperColliderClient:
             self.bass_running = bool(int(value))
             if not self.bass_running:
                 self.release_owner("omni/bass")
+            self._publish_bass_lane()
         elif address == a["rhythm_config"]:
             payload = json.loads(str(value))
             if not isinstance(payload, dict):
@@ -649,6 +675,7 @@ class SuperColliderClient:
             self.rhythm_config = payload
             self._publish_drum_lane()
             self._publish_chord_lane()
+            self._publish_bass_lane()
         elif address == a["rhythm_chord_enabled"]:
             self.rhythm_chord_enabled = bool(int(value))
             self._publish_chord_lane()
@@ -662,6 +689,7 @@ class SuperColliderClient:
             if self.rhythm_running:
                 self._publish_drum_lane()
                 self._publish_chord_lane()
+                self._publish_bass_lane()
             self._send_raw(
                 "/omni/v1/transport",
                 [
