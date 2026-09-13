@@ -26,6 +26,81 @@ class SuperColliderProgram:
     release_mode: str
 
 
+def display_name(native_name: str) -> str:
+    """Turn an upstream symbol into a compact, stable browser label."""
+
+    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", native_name)
+    words = re.sub(r"(?<=[A-Za-z])(?=[0-9])", " ", words)
+    words = words.replace("_", " ")
+    return "SC " + " ".join(word.capitalize() for word in words.split())
+
+
+def _legacy_replacement(label: str) -> str:
+    text = label.casefold()
+    if "tb-303" in text:
+        return "acidOto3091"
+    if "physical" in text:
+        return "pluck"
+    if any(word in text for word in ("bass", "cello", "low dark")):
+        return "fmBass"
+    if any(word in text for word in ("flute", "piccolo", "recorder")):
+        return "waveguideFlute"
+    if any(word in text for word in ("violin", "string", "choir", "ensemble")):
+        return "prophet5pwmStrings"
+    if any(word in text for word in ("organ", "accordion", "calliope", "pipes")):
+        return "organTonewheel1"
+    if any(word in text for word in ("harpsichord", "clav")):
+        return "harpsichord2"
+    if any(word in text for word in ("rhodes", "e.piano", "elect. piano", "toy")):
+        return "FMRhodes1"
+    if "piano" in text:
+        return "cheapPiano1"
+    if any(word in text for word in ("guitar", "lute", "koto", "pluck", "pizzicato")):
+        return "pluck"
+    if "steel drum" in text:
+        return "steelDrum"
+    if "xylophone" in text:
+        return "xylophone"
+    if any(word in text for word in ("bell", "chime", "celeste", "vibe", "gong", "shimmer")):
+        return "glockenspiel"
+    if any(word in text for word in ("brass", "trumpet", "fanfare", "horn")):
+        return "cs80leadMH"
+    if any(word in text for word in ("sweep", "wah", "funky", "rise", "phase")):
+        return "midSideSaw"
+    if "pad" in text or "ethereal" in text or "sustainer" in text:
+        return "feedbackPad2"
+    if any(word in text for word in ("clarinet", "bassoon", "reed", "sax")):
+        return "defaultB"
+    return "defaultB"
+
+
+def build_legacy_program_map(legacy_catalog: Path) -> dict[str, object]:
+    """Create the explicit import sidecar for AMY-era program selections."""
+
+    raw = json.loads(legacy_catalog.read_text(encoding="utf-8"))
+    mappings = {
+        str(item["key"]): f"sc.sclork.{_legacy_replacement(str(item['label']))}"
+        for item in raw["synths"]
+    }
+    mappings["physical_strings"] = "sc.sclork.pluck"
+    mappings["tb303"] = "sc.sclork.acidOto3091"
+    return {
+        "schema_revision": 1,
+        "policy": "musical-family replacement; original AMY selection remains in preset data",
+        "mappings": dict(sorted(mappings.items())),
+    }
+
+
+def load_legacy_program_map(path: Path) -> dict[str, str]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or raw.get("schema_revision") != 1:
+        raise ValueError(f"{path} is not a supported program migration map")
+    mappings = raw.get("mappings")
+    if not isinstance(mappings, dict) or not mappings:
+        raise ValueError(f"{path} has no program mappings")
+    return {str(key): str(value) for key, value in mappings.items()}
+
+
 def _controls(source: str) -> tuple[str, ...]:
     code = _LINE_COMMENT.sub("", _BLOCK_COMMENT.sub("", source))
     match = _ARG_BLOCK.search(code) or _PIPE_BLOCK.search(code)

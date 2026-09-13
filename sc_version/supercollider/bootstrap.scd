@@ -44,15 +44,23 @@ thisProcess.openUDPPort(languagePort);
     program.asString ++ "@" ++ revision.asInteger.asString
 };
 
-~omniProgramArgs = { |program, revision|
+~omniPreparedArgs = { |program, revision|
     var record = ~omniPrograms[~omniProgramKey.value(program, revision)];
     var args = List.new;
     if(record.notNil) {
         record[\values].keysValuesDo { |name, value|
-            if(["gain", "attack", "release", "brightness"].includes(name)) {
-                args.add(name.asSymbol);
-                args.add(value);
-            };
+            args.add(name.asSymbol);
+            args.add(value);
+        };
+    };
+    args.asArray
+};
+
+~omniGenericArgs = { |program, revision|
+    var args = List.new;
+    ~omniPreparedArgs.value(program, revision).pairsDo { |name, value|
+        if([\gain, \attack, \release, \brightness].includes(name)) {
+            args.add(name); args.add(value);
         };
     };
     args.asArray
@@ -61,7 +69,14 @@ thisProcess.openUDPPort(languagePort);
 ~omniReleaseHandle = { |handle|
     var record = ~omniVoices.removeAt(handle.asString);
     if(record.notNil) {
-        record[\node].set(\gate, 0);
+        if(record[\outputNode].notNil) {
+            record[\outputNode].set(\gate, 0);
+            if(record[\releaseMode] == \gated) {
+                record[\sourceNode].set(\gate, 0);
+            };
+        } {
+            record[\sourceNode].set(\gate, 0);
+        };
     };
 };
 
@@ -199,6 +214,18 @@ s.waitForBoot({
         Out.ar(out, (signal * envelope * velocity.clip(0, 1) * gain) ! 2);
     }).add;
 
+    SynthDef(\omniVoiceOutput, {
+        |in=0, out=0, velocity=0.7, gain=1, pan=0, gate=1, release=0.22|
+        var input = In.ar(in, 2);
+        var envelope = EnvGen.kr(
+            Env.asr(0.003, 1, release.max(0.005)),
+            gate,
+            doneAction: Done.freeSelf
+        );
+        var signal = Balance2.ar(input[0], input[1], pan);
+        Out.ar(out, signal * envelope * velocity.clip(0, 1) * gain);
+    }).add;
+
     SynthDef(\omniBusStrip, {
         |in=0, out=0, roomOut=0, gain=1, roomSend=1|
         var signal = In.ar(in, 2);
@@ -215,6 +242,8 @@ s.waitForBoot({
         );
         Out.ar(out, wet * level.max(0) * master.clip(0, 1));
     }).add;
+
+    (scriptDirectory +/+ "sclork_loader.scd").load;
 
     s.sync;
 
@@ -246,18 +275,83 @@ s.waitForBoot({
     ~omniSpawnVoice = {
         |owner, handle, program, revision, logicalKey, frequency,
          velocity, logicalBus, extraArgs|
+        var nativeName = ~omniSclorkProgramName.value(program);
+        var preparedArgs = ~omniPreparedArgs.value(program, revision)
+            ++ (extraArgs ? []);
         ~omniReleaseHandle.value(handle);
-        ~omniVoices[handle] = (
-            node: Synth.tail(~omniSourceGroup, \omniVoice, [
+        if(nativeName.notNil and: {
+            SynthDescLib.global.at(nativeName).notNil
+        }) {
+            var voiceBus = Bus.audio(s, 2);
+            var outputRelease = 0.22;
+            var sourceNode;
+            var outputNode;
+            var record;
+            preparedArgs.pairsDo { |name, value|
+                if(name.asString == "release") { outputRelease = value };
+                if(name.asString == "release_ms") {
+                    outputRelease = value / 1000;
+                };
+            };
+            sourceNode = Synth.tail(
+                ~omniSourceGroup,
+                nativeName,
+                ~omniSclorkArgs.value(
+                    nativeName,
+                    voiceBus.index,
+                    frequency,
+                    preparedArgs
+                )
+            );
+            outputNode = Synth.after(sourceNode, \omniVoiceOutput, [
+                \in, voiceBus.index,
+                \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
+                \velocity, velocity,
+                \release, outputRelease.max(0.005)
+            ]);
+            record = (
+                sourceNode: sourceNode,
+                outputNode: outputNode,
+                voiceBus: voiceBus,
+                releaseMode: if(~omniSynthHasControl.value(nativeName, \gate)) {
+                    \gated
+                } {
+                    \natural
+                },
+                owner: owner.asString,
+                logicalKey: logicalKey.asInteger,
+                program: program.asString,
+                cleaned: false
+            );
+            ~omniVoices[handle] = record;
+            outputNode.onFree {
+                if(record[\cleaned].not) {
+                    record[\cleaned] = true;
+                    sourceNode.free;
+                    voiceBus.free;
+                    if(~omniVoices[handle] === record) {
+                        ~omniVoices.removeAt(handle);
+                    };
+                };
+            };
+            sourceNode.onFree {
+                if(record[\cleaned].not) { outputNode.set(\gate, 0) };
+            };
+        } {
+            ~omniVoices[handle] = (
+                sourceNode: Synth.tail(~omniSourceGroup, \omniVoice, [
                 \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
                 \freq, frequency,
                 \velocity, velocity,
                 \bendBus, ~omniBendBus.index
-            ] ++ ~omniProgramArgs.value(program, revision) ++ (extraArgs ? [])),
-            owner: owner.asString,
-            logicalKey: logicalKey.asInteger,
-            program: program.asString
-        );
+                ] ++ ~omniGenericArgs.value(program, revision)
+                    ++ (extraArgs ? [])),
+                outputNode: nil,
+                owner: owner.asString,
+                logicalKey: logicalKey.asInteger,
+                program: program.asString
+            );
+        };
     };
 
     ~omniSpawnDrum = { |note, velocity, logicalBus|
@@ -306,9 +400,15 @@ OSCdef(\omniVoiceSet, { |message|
         var parameter = message[4].asString;
         var value = message[5].asFloat;
         if(record.notNil) {
-            if(parameter == "frequency_hz") { record[\node].set(\freq, value) };
-            if(parameter == "gain") { record[\node].set(\gain, value) };
-            if(parameter == "brightness") { record[\node].set(\brightness, value) };
+            if(parameter == "frequency_hz") {
+                record[\sourceNode].set(\freq, value)
+            };
+            if(parameter == "gain") {
+                (record[\outputNode] ? record[\sourceNode]).set(\gain, value)
+            };
+            if(parameter == "brightness") {
+                record[\sourceNode].set(\brightness, value)
+            };
         };
     };
 }, '/omni/v1/voice/set', recvPort: languagePort);

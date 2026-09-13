@@ -62,7 +62,11 @@ class InstrumentDefaultTests(unittest.TestCase):
         return client
 
     def test_every_slider_has_explicit_physical_range(self) -> None:
-        self.assertEqual(len(self.synths), 125)
+        self.assertEqual(len(self.synths), 234)
+        self.assertEqual(
+            len([synth for synth in self.synths if synth.key.startswith("sc.sclork.")]),
+            109,
+        )
         self.assertIn("physical_strings", self.by_key)
         physical = self.by_key["physical_strings"]
         self.assertEqual(physical.label, "Ph. Strings")

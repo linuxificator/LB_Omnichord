@@ -1,0 +1,37 @@
+/* Evaluate the production loader without booting an audio server. */
+(
+var directory = thisProcess.nowExecutingPath.dirname.dirname;
+var expected = [
+    \acidOto3091,
+    \pulseRisset,
+    \pluck,
+    \sawSynth,
+    \waveguideFlute
+];
+var failed = false;
+
+(directory +/+ "sclork_loader.scd").load;
+expected.do { |name|
+    var description = SynthDescLib.global.at(name);
+    if(description.isNil) {
+        failed = true;
+        ("SCLORK_LOADER_MISSING " ++ name).postln;
+    };
+};
+if(~omniSclorkProgramName.value("sc.sclork.fmBass") != \fmBass) {
+    failed = true;
+    "SCLORK_LOADER_PROGRAM_ID_FAILED".postln;
+};
+if(~omniSclorkProgramName.value("legacy.program").notNil) {
+    failed = true;
+    "SCLORK_LOADER_LEGACY_ID_FAILED".postln;
+};
+if(~omniSynthHasControl.value(\fmBass, \freq).not) {
+    failed = true;
+    "SCLORK_LOADER_CONTROL_FAILED".postln;
+};
+if(failed) { 1.exit } {
+    "SCLORK_LOADER_TEST_OK".postln;
+    0.exit
+};
+)

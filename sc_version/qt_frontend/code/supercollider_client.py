@@ -27,6 +27,7 @@ from supercollider_config import (
     SuperColliderRuntimeConfig,
     load_supercollider_config,
 )
+from supercollider_programs import load_legacy_program_map
 
 
 class SuperColliderUnavailable(RuntimeError):
@@ -82,10 +83,14 @@ class SuperColliderClient:
         self._reply_thread.start()
         self._osc = SimpleUDPClient(language.host, language.port)
 
+        root = Path(asset_root) if asset_root is not None else runtime_config_path.parent.parent
+        self._legacy_program_map = load_legacy_program_map(
+            root / "instruments" / "supercollider-legacy-map.json"
+        )
         self._selected_program = {
-            "chord": resolved_config.synth_defaults.chord,
-            "strum": resolved_config.synth_defaults.strum,
-            "bass": resolved_config.synth_defaults.bass,
+            "chord": self._resolve_program(resolved_config.synth_defaults.chord),
+            "strum": self._resolve_program(resolved_config.synth_defaults.strum),
+            "bass": self._resolve_program(resolved_config.synth_defaults.bass),
         }
         self._program_revision = {"chord": 1, "strum": 1, "bass": 1}
         self._program_params: dict[str, dict[str, float]] = {
@@ -113,7 +118,7 @@ class SuperColliderClient:
         self._lane_generations = {"drums": 0, "bass": 0, "chords": 0}
         self._transaction_id = 0
         self._drum_catalog = load_drum_pattern_catalog(
-            (Path(asset_root) if asset_root is not None else runtime_config_path.parent.parent)
+            root
             / "music"
             / "drums"
         )
@@ -456,6 +461,12 @@ class SuperColliderClient:
     def _role_bus(self, role: str) -> int:
         return int(dict(self.resolved_config.layout.role_buses)[role])
 
+    def _resolve_program(self, program_id: str) -> str:
+        value = str(program_id)
+        if value.startswith("sc."):
+            return value
+        return self._legacy_program_map.get(value, "sc.sclork.defaultB")
+
     def _publish_role_level(self, role: str) -> None:
         self.set_logical_bus_level(
             self._role_bus(role),
@@ -468,14 +479,16 @@ class SuperColliderClient:
 
     def _set_program(self, role: str, value: Any) -> None:
         if isinstance(value, dict):
-            name = str(value.get("name", self._selected_program[role]))
+            name = self._resolve_program(
+                str(value.get("name", self._selected_program[role]))
+            )
             raw = value.get("params", [])
             parameters: dict[str, float] = {}
             if isinstance(raw, list):
                 for index in range(0, len(raw) - 1, 2):
                     parameters[str(raw[index])] = float(raw[index + 1])
         else:
-            name = str(value)
+            name = self._resolve_program(str(value))
             parameters = {}
         if name != self._selected_program[role] or parameters != self._program_params[role]:
             self._program_revision[role] += 1

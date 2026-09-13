@@ -111,6 +111,12 @@ class SuperColliderClientTests(unittest.TestCase):
         )
         self.assertTrue(self.fake.ready.wait(1.0))
         self.assertEqual(client.engine_session, "fake-engine")
+        self.assertTrue(
+            all(
+                program.startswith("sc.sclork.")
+                for program in client._selected_program.values()
+            )
+        )
         client.note_on(
             NoteOn(
                 owner="test",

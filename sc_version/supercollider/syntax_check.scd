@@ -4,7 +4,13 @@ var directory = thisProcess.nowExecutingPath.dirname;
 var files = [
     "sequencer.scd",
     "bootstrap.scd",
+    "sclork_loader.scd",
+    "adapters/pulseRisset.scd",
+    "adapters/pluck.scd",
+    "adapters/sawSynth.scd",
+    "adapters/waveguideFlute.scd",
     "tests/coordinator_service.scd",
+    "tests/sclork_loader_test.scd",
     "tests/sclork_compile_audit.scd"
 ];
 var failed = false;

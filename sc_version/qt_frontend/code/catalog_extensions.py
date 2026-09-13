@@ -5,6 +5,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import app_core
+from supercollider_programs import display_name, load_supercollider_programs
 
 
 PHYSICAL_STRINGS_KEY = "physical_strings"
@@ -100,4 +101,18 @@ def load_synth_catalog(
                 ),
             )
         )
+    supercollider_root = path.parents[1].parent / "supercollider"
+    known_keys = {synth.key for synth in synths}
+    for program in load_supercollider_programs(
+        supercollider_root / "sclork-programs.json"
+    ):
+        if program.program_id not in known_keys:
+            synths.append(
+                app_core.SynthDefinition(
+                    key=program.program_id,
+                    label=display_name(program.native_name),
+                    controls=(),
+                )
+            )
+            known_keys.add(program.program_id)
     return synths, chord_default, strum_default, bass_default
