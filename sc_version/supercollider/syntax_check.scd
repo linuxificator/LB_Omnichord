@@ -1,7 +1,7 @@
 /* Compile both service sources without evaluating them or opening audio. */
 (
 var directory = thisProcess.nowExecutingPath.dirname;
-var files = ["sequencer.scd", "bootstrap.scd"];
+var files = ["sequencer.scd", "bootstrap.scd", "tests/coordinator_service.scd"];
 var failed = false;
 files.do { |name|
     var result = thisProcess.interpreter.compileFile(directory +/+ name);
