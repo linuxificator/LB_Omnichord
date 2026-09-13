@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 from pythonosc.dispatcher import Dispatcher
@@ -197,6 +198,34 @@ class SuperColliderClientTests(unittest.TestCase):
         )
         packet_indexes = [arguments[2] for _address, arguments in transaction[1:-1]]
         self.assertEqual(packet_indexes, [0, 1, 2])
+
+    def test_sample_program_activates_only_after_engine_ready_status(self) -> None:
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+        previous = client._selected_program["strum"]
+        program = "sample.vsco.marimba"
+        client._set_program("strum", {"name": program, "params": []})
+        self.assertEqual(client._selected_program["strum"], previous)
+        pending_key = next(key for key in client._pending_programs if key[0] == program)
+
+        sender = SimpleUDPClient("127.0.0.1", client.reply_port)
+        try:
+            sender.send_message(
+                "/omni/v1/program/status",
+                [client.session, program, pending_key[1], "ready", "ready"],
+            )
+        finally:
+            sender._sock.close()
+        deadline = time.monotonic() + 1.0
+        while client._selected_program["strum"] != program and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(client._selected_program["strum"], program)
+        client.close()
 
 
 if __name__ == "__main__":

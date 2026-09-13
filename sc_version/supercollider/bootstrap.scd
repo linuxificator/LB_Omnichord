@@ -19,10 +19,10 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 ~omniLanguagePort = languagePort;
 ~omniClientSession = nil;
 ~omniEngineSession = ("sc-" ++ UniqueID.next.asString);
-~omniVoices = IdentityDictionary.new;
-~omniGestures = IdentityDictionary.new;
+~omniVoices = Dictionary.new;
+~omniGestures = Dictionary.new;
 ~omniMessageIds = IdentitySet.new;
-~omniPrograms = IdentityDictionary.new;
+~omniPrograms = Dictionary.new;
 ~omniBusLevels = Array.fill(11, 1.0);
 ~omniRoomLevels = [0.0, 0.0];
 ~omniClock = TempoClock.new(108 / 60);
@@ -165,8 +165,11 @@ OSCdef(\omniProgramPrepare, { |message|
             program: program,
             revision: revision,
             logicalBus: logicalBus,
-            values: IdentityDictionary.new
+            values: Dictionary.new
         );
+        if(~omniPrepareSampleProgram.notNil) {
+            ~omniPrepareSampleProgram.value(program, revision);
+        };
     };
 }, '/omni/v1/program/prepare', recvPort: languagePort);
 
@@ -269,6 +272,7 @@ s.waitForBoot({
 
     (scriptDirectory +/+ "sclork_loader.scd").load;
     (scriptDirectory +/+ "acid_voices.scd").load;
+    (scriptDirectory +/+ "sample_loader.scd").load;
 
     s.sync;
 
@@ -302,6 +306,7 @@ s.waitForBoot({
          velocity, logicalBus, extraArgs|
         var nativeName = ~omniSclorkProgramName.value(program);
         var acidName = ~omniAcidProgramName.value(program);
+        var sampleName = ~omniSampleProgramName.value(program);
         var preparedArgs = ~omniPreparedArgs.value(program, revision)
             ++ (extraArgs ? []);
         var accentValue = 0;
@@ -309,6 +314,14 @@ s.waitForBoot({
             if(name.asString == "accent") { accentValue = value };
         };
         ~omniReleaseHandle.value(handle);
+        if(sampleName.notNil and: {
+            ~omniSampleReady.value(sampleName, revision)
+        }) {
+            ~omniSpawnSampleVoice.value(
+                owner, handle, sampleName, revision, logicalKey,
+                velocity, logicalBus
+            );
+        } {
         if(acidName.notNil) {
             var sourceNode = Synth.tail(~omniSourceGroup, acidName, [
                     \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
@@ -413,6 +426,7 @@ s.waitForBoot({
                     ~omniVoices.removeAt(handle);
                 };
             };
+        };
         };
         };
     };

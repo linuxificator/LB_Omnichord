@@ -72,6 +72,7 @@ class SuperColliderClient:
         dispatcher = Dispatcher()
         dispatcher.map("/omni/v1/ready", self._accept_ready)
         dispatcher.map("/omni/v1/ack", self._accept_ack)
+        dispatcher.map("/omni/v1/program/status", self._accept_program_status)
         language = self.runtime_config.language
         self._reply_server = ThreadingOSCUDPServer((language.host, 0), dispatcher)
         self.reply_port = int(self._reply_server.server_address[1])
@@ -93,11 +94,16 @@ class SuperColliderClient:
             "bass": self._resolve_program(resolved_config.synth_defaults.bass),
         }
         self._program_revision = {"chord": 1, "strum": 1, "bass": 1}
+        self._program_counter = 1
         self._program_params: dict[str, dict[str, float]] = {
             "chord": {},
             "strum": {},
             "bass": {},
         }
+        self._pending_programs: dict[
+            tuple[str, int], tuple[str, dict[str, float]]
+        ] = {}
+        self._program_errors: dict[str, str] = {}
         self._role_levels = {
             "chord": 0.5,
             "strum": 0.5,
@@ -158,6 +164,26 @@ class SuperColliderClient:
         with self._ack_condition:
             self._acknowledgements[transaction_id] = acknowledgement
             self._ack_condition.notify_all()
+
+    def _accept_program_status(self, _address: str, *arguments: Any) -> None:
+        if len(arguments) != 5 or str(arguments[0]) != self.session:
+            return
+        program_id = str(arguments[1])
+        revision = int(arguments[2])
+        status = str(arguments[3])
+        detail = str(arguments[4])
+        pending = self._pending_programs.get((program_id, revision))
+        if pending is None:
+            return
+        role, parameters = pending
+        if status == "error":
+            self._program_errors[role] = detail
+            self._pending_programs.pop((program_id, revision), None)
+            return
+        if status != "ready":
+            return
+        self._pending_programs.pop((program_id, revision), None)
+        self._activate_program(role, program_id, revision, parameters)
 
     def _await_ready(self) -> None:
         deadline = time.monotonic() + self.runtime_config.language.startup_timeout_seconds
@@ -463,7 +489,7 @@ class SuperColliderClient:
 
     def _resolve_program(self, program_id: str) -> str:
         value = str(program_id)
-        if value.startswith("sc."):
+        if value.startswith(("sc.", "sample.")):
             return value
         return self._legacy_program_map.get(value, "sc.sclork.defaultB")
 
@@ -490,20 +516,37 @@ class SuperColliderClient:
         else:
             name = self._resolve_program(str(value))
             parameters = {}
-        if name != self._selected_program[role] or parameters != self._program_params[role]:
-            self._program_revision[role] += 1
-        self._selected_program[role] = name
-        self._program_params[role] = parameters
+        if name == self._selected_program[role] and parameters == self._program_params[role]:
+            return
+        self._program_counter += 1
+        revision = self._program_counter
         logical_bus = self._role_bus("chord" if role == "chord" else role)
         owners = ("omni/manual", "omni/automatic") if role == "chord" else (f"omni/{role}",)
+        sample_program = name.startswith("sample.")
+        if sample_program:
+            self._pending_programs[(name, revision)] = (role, parameters)
         for owner in owners:
             self.configure_part(
                 owner,
                 name,
-                self._program_revision[role],
+                revision,
                 logical_bus,
                 parameters,
             )
+        if not sample_program:
+            self._activate_program(role, name, revision, parameters)
+
+    def _activate_program(
+        self,
+        role: str,
+        program_id: str,
+        revision: int,
+        parameters: dict[str, float],
+    ) -> None:
+        self._selected_program[role] = program_id
+        self._program_revision[role] = revision
+        self._program_params[role] = dict(parameters)
+        self._program_errors.pop(role, None)
         if role == "bass":
             self._publish_bass_lane()
         elif role == "chord":

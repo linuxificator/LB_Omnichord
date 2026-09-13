@@ -193,6 +193,8 @@ def _cli() -> int:
             "server.block_size",
             "server.max_nodes",
             "server.realtime_memory_kib",
+            "samples.vsco_root",
+            "samples.ram_budget_mib",
         ),
     )
     args = parser.parse_args()

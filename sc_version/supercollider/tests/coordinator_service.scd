@@ -9,7 +9,7 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
 ~omniClock = TempoClock.new(2);
 ~omniTransportEpoch = 0;
 ~omniTransportRunning = false;
-~omniVoices = IdentityDictionary.new;
+~omniVoices = Dictionary.new;
 
 ~omniReply = { |address, path ... args|
     NetAddr(address.ip, address.port).sendMsg(path, *args);

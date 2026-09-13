@@ -1,0 +1,354 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import hashlib
+import json
+from pathlib import Path, PurePosixPath
+import re
+import wave
+from typing import Any
+
+
+COMPILER_VERSION = 1
+VSCO_SOURCE_PIN = "6dd651d55dde97fd4028699be9d4481f26917891"
+_HEADER = re.compile(r"<([A-Za-z]+)>")
+_OPCODE = re.compile(r"(?<!\S)([A-Za-z][A-Za-z0-9_]*)=")
+_NOTE = re.compile(r"^([a-gA-G])([#b]?)(-?[0-9]+)$")
+_KNOWN_OPCODES = {
+    "ampeg_attack",
+    "ampeg_dynamic",
+    "ampeg_release",
+    "default_path",
+    "group_label",
+    "hikey",
+    "hirand",
+    "hivel",
+    "lokey",
+    "lorand",
+    "lovel",
+    "pitch_keycenter",
+    "sample",
+    "seq_length",
+    "seq_position",
+    "sw_default",
+    "sw_hikey",
+    "sw_label",
+    "sw_last",
+    "sw_lokey",
+    "tune",
+    "volume",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class _SourceRegion:
+    source: Path
+    line: int
+    values: dict[str, str]
+
+
+def _slug(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.casefold()).strip("-")
+
+
+def _number(value: str | None, default: float) -> float:
+    if value is None:
+        return default
+    return float(value)
+
+
+def _midi_note(value: str | None, default: int) -> int:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        match = _NOTE.fullmatch(value.strip())
+        if match is None:
+            raise ValueError(f"invalid SFZ note {value!r}") from None
+        pitch_class = {
+            "c": 0,
+            "d": 2,
+            "e": 4,
+            "f": 5,
+            "g": 7,
+            "a": 9,
+            "b": 11,
+        }[match.group(1).casefold()]
+        accidental = {"": 0, "#": 1, "b": -1}[match.group(2)]
+        return (int(match.group(3)) + 1) * 12 + pitch_class + accidental
+
+
+def _opcodes(line: str) -> tuple[tuple[str, str], ...]:
+    source = line.split("//", 1)[0].strip()
+    matches = tuple(_OPCODE.finditer(source))
+    return tuple(
+        (
+            match.group(1),
+            source[match.end() : matches[index + 1].start()].strip()
+            if index + 1 < len(matches)
+            else source[match.end() :].strip(),
+        )
+        for index, match in enumerate(matches)
+    )
+
+
+def parse_sfz(path: Path) -> tuple[_SourceRegion, ...]:
+    """Resolve control/global/master/group inheritance into complete regions."""
+
+    scopes: dict[str, dict[str, str]] = {
+        "control": {},
+        "global": {},
+        "master": {},
+        "group": {},
+    }
+    current = "global"
+    regions: list[_SourceRegion] = []
+    region_values: dict[str, str] | None = None
+    region_line = 0
+
+    def finish_region() -> None:
+        nonlocal region_values
+        if region_values is not None:
+            regions.append(_SourceRegion(path, region_line, region_values))
+            region_values = None
+
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8-sig").splitlines(), start=1
+    ):
+        line = raw_line.split("//", 1)[0].strip()
+        if not line:
+            continue
+        header = _HEADER.search(line)
+        if header is not None:
+            finish_region()
+            current = header.group(1).casefold()
+            if current not in (*scopes, "region"):
+                raise ValueError(f"{path}:{line_number}: unsupported <{current}>")
+            if current in ("master", "group"):
+                scopes[current] = {}
+            if current == "region":
+                region_line = line_number
+                region_values = {
+                    **scopes["control"],
+                    **scopes["global"],
+                    **scopes["master"],
+                    **scopes["group"],
+                }
+            line = line[header.end() :].strip()
+        for key, value in _opcodes(line):
+            if key not in _KNOWN_OPCODES:
+                raise ValueError(f"{path}:{line_number}: unsupported opcode {key}")
+            if not value:
+                raise ValueError(f"{path}:{line_number}: empty opcode {key}")
+            if current == "region":
+                if region_values is None:
+                    raise AssertionError("region scope is not initialized")
+                region_values[key] = value
+            else:
+                scopes[current][key] = value
+    finish_region()
+    if not regions:
+        raise ValueError(f"{path} contains no regions")
+    return tuple(regions)
+
+
+def _relative_sample(root: Path, region: _SourceRegion) -> Path:
+    sample = region.values.get("sample")
+    if sample is None:
+        raise ValueError(f"{region.source}:{region.line}: region has no sample")
+    default_path = region.values.get("default_path", "")
+    portable = PurePosixPath(
+        (default_path + sample).replace("\\", "/").lstrip("/")
+    )
+    resolved = root.joinpath(*portable.parts).resolve()
+    try:
+        resolved.relative_to(root.resolve())
+    except ValueError:
+        raise ValueError(
+            f"{region.source}:{region.line}: sample escapes bank root"
+        ) from None
+    if not resolved.is_file():
+        raise ValueError(
+            f"{region.source}:{region.line}: missing sample {portable.as_posix()}"
+        )
+    return resolved
+
+
+def _audio_record(root: Path, path: Path) -> dict[str, Any]:
+    digest = hashlib.sha256()
+    pcm_digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    with wave.open(str(path), "rb") as source:
+        channels = source.getnchannels()
+        sample_width = source.getsampwidth()
+        sample_rate = source.getframerate()
+        frames = source.getnframes()
+        while chunk := source.readframes(65536):
+            pcm_digest.update(chunk)
+    relative = path.relative_to(root).as_posix()
+    return {
+        "id": "vsco-file-" + hashlib.sha256(relative.encode()).hexdigest()[:16],
+        "relative_path": relative,
+        "sha256": digest.hexdigest(),
+        "pcm_sha256": pcm_digest.hexdigest(),
+        "frames": frames,
+        "sample_rate": sample_rate,
+        "channels": channels,
+        "original_bit_depth": sample_width * 8,
+        "decoded_bytes": frames * channels * 4,
+    }
+
+
+def _region_record(
+    root: Path,
+    source: _SourceRegion,
+    program_id: str,
+    ordinal: int,
+    file_id: str,
+) -> dict[str, Any]:
+    values = source.values
+    key_center = _midi_note(values.get("pitch_keycenter"), 60)
+    articulation = values.get("sw_label", "default")
+    return {
+        "id": f"{program_id}.region-{ordinal}",
+        "program_id": program_id,
+        "articulation_id": _slug(articulation) or "default",
+        "sample_id": file_id,
+        "key_lo": _midi_note(values.get("lokey"), key_center),
+        "key_hi": _midi_note(values.get("hikey"), key_center),
+        "key_center": key_center,
+        "tune_cents": _number(values.get("tune"), 0.0),
+        "pitch_keytrack": 100,
+        "velocity_lo": int(_number(values.get("lovel"), 0)),
+        "velocity_hi": int(_number(values.get("hivel"), 127)),
+        "gain_db": _number(values.get("volume"), 0.0),
+        "trigger": "attack",
+        "rr_group": values.get("group_label"),
+        "rr_position": (
+            int(values["seq_position"]) if "seq_position" in values else None
+        ),
+        "rr_length": int(values["seq_length"]) if "seq_length" in values else None,
+        "random_lo": _number(values.get("lorand"), 0.0),
+        "random_hi": _number(values.get("hirand"), 1.0),
+        "envelope": {
+            "attack_sec": _number(values.get("ampeg_attack"), 0.001),
+            "release_sec": _number(values.get("ampeg_release"), 0.2),
+            "dynamic": int(_number(values.get("ampeg_dynamic"), 0)),
+        },
+        "key_conditions": {
+            "switch_lo": _midi_note(values.get("sw_lokey"), 0)
+            if "sw_lokey" in values
+            else None,
+            "switch_hi": _midi_note(values.get("sw_hikey"), 127)
+            if "sw_hikey" in values
+            else None,
+            "switch_last": _midi_note(values.get("sw_last"), -1)
+            if "sw_last" in values
+            else None,
+        },
+        "loop": {"mode": "none"},
+        "provenance": {
+            "source_file": source.source.name,
+            "line": source.line,
+        },
+    }
+
+
+def compile_vsco_manifest(root: Path) -> dict[str, Any]:
+    root = root.resolve()
+    sfz_files = sorted(root.glob("*.sfz"))
+    if len(sfz_files) != 75:
+        raise ValueError(f"expected 75 VSCO SFZ mappings, found {len(sfz_files)}")
+    parsed = {path: parse_sfz(path) for path in sfz_files}
+    referenced = {
+        _relative_sample(root, region)
+        for regions in parsed.values()
+        for region in regions
+    }
+    all_audio = {
+        path.resolve()
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.casefold() in (".wav", ".aif", ".aiff")
+    }
+    file_records = [_audio_record(root, path) for path in sorted(all_audio)]
+    file_ids = {root / record["relative_path"]: record["id"] for record in file_records}
+    programs: list[dict[str, Any]] = []
+    regions: list[dict[str, Any]] = []
+    for sfz_path, source_regions in parsed.items():
+        program_id = "sample.vsco." + _slug(sfz_path.stem)
+        first = source_regions[0].values
+        program_regions = []
+        for ordinal, source_region in enumerate(source_regions):
+            sample_path = _relative_sample(root, source_region)
+            record = _region_record(
+                root,
+                source_region,
+                program_id,
+                ordinal,
+                file_ids[sample_path],
+            )
+            regions.append(record)
+            program_regions.append(record["id"])
+        default_switch = first.get("sw_default")
+        default_articulation = next(
+            (
+                _slug(region.values.get("sw_label", "default")) or "default"
+                for region in source_regions
+                if default_switch is not None
+                and region.values.get("sw_last") == default_switch
+            ),
+            "default",
+        )
+        programs.append(
+            {
+                "id": program_id,
+                "display_name": sfz_path.stem.replace("-KS", ""),
+                "source_mapping": sfz_path.name,
+                "source_sha256": hashlib.sha256(sfz_path.read_bytes()).hexdigest(),
+                "default_articulation": default_articulation,
+                "articulations": sorted(
+                    {
+                        _slug(region.values.get("sw_label", "default")) or "default"
+                        for region in source_regions
+                    }
+                ),
+                "region_ids": program_regions,
+            }
+        )
+    coverage = [
+        {
+            "sample_id": record["id"],
+            "disposition": (
+                "mapped-region"
+                if (root / record["relative_path"]).resolve() in referenced
+                else "unmapped-source-audio"
+            ),
+        }
+        for record in file_records
+    ]
+    return {
+        "schema_revision": 1,
+        "compiler_version": COMPILER_VERSION,
+        "bank": {
+            "id": "vsco-2-ce",
+            "source_pin": VSCO_SOURCE_PIN,
+            "source_verification": "expected-pin; local extracted tree inventoried by hashes",
+            "license": "CC0-1.0",
+            "source_audio_count": len(all_audio),
+            "mapping_count": len(sfz_files),
+        },
+        "files": file_records,
+        "programs": programs,
+        "regions": regions,
+        "coverage": coverage,
+    }
+
+
+def write_manifest(manifest: dict[str, Any], output: Path) -> None:
+    output.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )

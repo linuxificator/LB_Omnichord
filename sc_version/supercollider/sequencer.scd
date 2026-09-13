@@ -2,9 +2,9 @@
 
 ~omniTransactions = IdentityDictionary.new;
 ~omniTransactionResults = IdentityDictionary.new;
-~omniDefinitions = IdentityDictionary.new;
-~omniLanes = IdentityDictionary.new;
-~omniGates = IdentityDictionary.new;
+~omniDefinitions = Dictionary.new;
+~omniLanes = Dictionary.new;
+~omniGates = Dictionary.new;
 ~omniExecutionOrdinal = 0;
 
 ~omniAck = { |transactionId, stage, generation, effectiveBeat, code|

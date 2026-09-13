@@ -5,6 +5,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 import app_core
+from sample_programs import load_vsco_programs
 from supercollider_programs import display_name, load_supercollider_programs
 
 
@@ -133,4 +134,16 @@ def load_synth_catalog(
                 )
             )
             known_keys.add(program_id)
+    for sample_program in load_vsco_programs(
+        supercollider_root / "vsco-manifest.json"
+    ):
+        if sample_program.program_id not in known_keys:
+            synths.append(
+                app_core.SynthDefinition(
+                    key=sample_program.program_id,
+                    label="VSCO " + sample_program.display_name,
+                    controls=(),
+                )
+            )
+            known_keys.add(sample_program.program_id)
     return synths, chord_default, strum_default, bass_default
