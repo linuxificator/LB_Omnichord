@@ -19,9 +19,11 @@ Target currently exercised: Linux x86_64
 - All 109 pinned SCLOrkSynths definitions compile and participate in the
   program catalogue; the automated NRT audit renders one representative note
   from each definition.
-- The generated VSCO manifest contains 75 programs and 3,163 sample regions.
-  Startup requires the initial GM percussion sample program to load before the
-  engine announces readiness.
+- The generated VSCO manifest contains all 75 source mappings and 3,163 sample
+  regions. Their complete keyswitch articulation set is exposed as 96 stable,
+  directly selectable program identities, so playable notes are never stolen
+  for frontend keyswitches. Startup requires the initial GM percussion sample
+  program to load before the engine announces readiness.
 - MIDI and OSC integration tests keep the sender, frontend and engine receiver
   in separate processes.
 - Sequencer tests cover immutable running snapshots, overlapping finite
@@ -35,8 +37,10 @@ Target currently exercised: Linux x86_64
 ## Not yet complete
 
 - The migration handover's additional large instrument banks are not imported.
-- VSCO import does not yet claim every advanced SFZ behavior, including all
-  sustain/release/loop, microphone and round-robin semantics.
+- VSCO import preserves its declared key/velocity/random/round-robin regions,
+  gain, tuning, attack/release and named keyswitch articulations. It does not
+  yet claim sample-header sustain/loop metadata or the advanced release,
+  sustain and microphone behavior needed by the additional planned banks.
 - Compiling and rendering every SCLOrk definition proves loadability and basic
   signal production, not musical calibration across registers, dynamics and
   long performances. Some definitions clip under the generic audit stimulus

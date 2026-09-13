@@ -30,6 +30,10 @@ Requirements:
   `~/sample_lib/VSCO-2-CE-1.1.0`, or a different path configured in
   `config/supercollider.json`.
 
+All 75 VSCO source mappings are catalogued. Keyswitch mappings are presented
+as explicit named articulation choices instead of reserving playable MIDI
+notes for engine-side keyswitch state.
+
 Run:
 
 ```bash

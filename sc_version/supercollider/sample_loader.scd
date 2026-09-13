@@ -16,6 +16,7 @@ var regions = jsonAt.value(manifest, "regions");
 ~omniSampleFiles = Dictionary.new;
 ~omniSamplePrograms = Dictionary.new;
 ~omniSampleRegions = Dictionary.new;
+~omniSampleAliases = Dictionary.new;
 ~omniSampleStates = Dictionary.new;
 ~omniSampleBuffers = Dictionary.new;
 ~omniSampleBufferBytes = 0;
@@ -108,8 +109,26 @@ files.do { |record|
 };
 programs.do { |record|
     var programId = jsonAt.value(record, "id").asString;
+    var defaultArticulation = jsonAt.value(
+        record, "default_articulation"
+    ).asString;
     ~omniSamplePrograms[programId] = record;
     ~omniSampleRegions[programId] = List.new;
+    ~omniSampleAliases[programId] = (
+        sourceProgramId: programId,
+        articulation: defaultArticulation
+    );
+    jsonAt.value(record, "articulations").do { |articulation|
+        var articulationId = articulation.asString;
+        if(articulationId != defaultArticulation) {
+            ~omniSampleAliases[
+                programId ++ ".art." ++ articulationId
+            ] = (
+                sourceProgramId: programId,
+                articulation: articulationId
+            );
+        };
+    };
 };
 regions.do { |record|
     var programId = jsonAt.value(record, "program_id").asString;
@@ -119,7 +138,7 @@ regions.do { |record|
 ~omniSampleProgramName = { |program|
     var text = program.asString;
     if(text.beginsWith("sample.vsco.") and: {
-        ~omniSamplePrograms[text].notNil
+        ~omniSampleAliases[text].notNil
     }) { text } { nil }
 };
 
@@ -140,10 +159,17 @@ regions.do { |record|
 ~omniPrepareSampleProgram = { |program, revision|
     var programId = ~omniSampleProgramName.value(program);
     if(programId.notNil) {
+        var alias = ~omniSampleAliases[programId];
+        var sourceProgramId = alias[\sourceProgramId];
+        var articulation = alias[\articulation];
         var stateKey = programId ++ "@" ++ revision.asInteger;
         var state = ~omniSampleStates[stateKey];
         if(state.isNil or: { state[\status] == \error }) {
-            var sampleIds = ~omniSampleRegions[programId]
+            var sampleIds = ~omniSampleRegions[sourceProgramId]
+                .select { |region|
+                    jsonAt.value(region, "articulation_id").asString
+                        == articulation
+                }
                 .collect { |region| jsonAt.value(region, "sample_id").asString }
                 .asSet.asArray;
             var newBytes = sampleIds.sum { |sampleId|
@@ -244,11 +270,12 @@ regions.do { |record|
 };
 
 ~omniSelectSampleRegions = { |program, logicalKey, velocity|
-    var programRecord = ~omniSamplePrograms[program.asString];
-    var articulation = jsonAt.value(programRecord, "default_articulation").asString;
+    var alias = ~omniSampleAliases[program.asString];
+    var sourceProgramId = alias[\sourceProgramId];
+    var articulation = alias[\articulation];
     var midiVelocity = (velocity.clip(0, 1) * 127).round.asInteger;
     var random = 1.0.rand;
-    var selected = ~omniSampleRegions[program.asString].select { |region|
+    var selected = ~omniSampleRegions[sourceProgramId].select { |region|
         (logicalKey >= jsonAt.value(region, "key_lo").asInteger)
         and: { logicalKey <= jsonAt.value(region, "key_hi").asInteger }
         and: { midiVelocity >= jsonAt.value(region, "velocity_lo").asInteger }

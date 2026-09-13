@@ -18,9 +18,20 @@ if(~omniSamplePrograms.size != 75) {
     failed = true;
     ("VSCO_PROGRAM_COUNT_FAILED " ++ ~omniSamplePrograms.size).postln;
 };
+if(~omniSampleAliases.size != 96) {
+    failed = true;
+    ("VSCO_PLAYABLE_PROGRAM_COUNT_FAILED "
+        ++ ~omniSampleAliases.size).postln;
+};
 if(~omniSampleProgramName.value("sample.vsco.fluteexpvib").isNil) {
     failed = true;
     "VSCO_PROGRAM_LOOKUP_FAILED".postln;
+};
+if(~omniSampleProgramName.value(
+    "sample.vsco.flute-ks.art.d-2-staccato"
+).isNil) {
+    failed = true;
+    "VSCO_ARTICULATION_PROGRAM_LOOKUP_FAILED".postln;
 };
 selection = ~omniSelectSampleRegions.value(
     "sample.vsco.fluteexpvib", 60, 0.5
@@ -28,6 +39,18 @@ selection = ~omniSelectSampleRegions.value(
 if(selection.isEmpty) {
     failed = true;
     "VSCO_REGION_SELECTION_FAILED".postln;
+};
+selection = ~omniSelectSampleRegions.value(
+    "sample.vsco.flute-ks.art.d-2-staccato", 72, 0.5
+);
+if(selection.isEmpty or: {
+    selection.any { |region|
+        (region["articulation_id"] ? region[\articulation_id]).asString
+            != "d-2-staccato"
+    }
+}) {
+    failed = true;
+    "VSCO_EXPLICIT_ARTICULATION_SELECTION_FAILED".postln;
 };
 if((~omniSamplePlaybackRate.value(440, 69, 0) - 1).abs > 0.000001) {
     failed = true;
