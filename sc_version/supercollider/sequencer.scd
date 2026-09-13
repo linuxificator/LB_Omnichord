@@ -5,7 +5,11 @@
 ~omniDefinitions = Dictionary.new;
 ~omniLanes = Dictionary.new;
 ~omniGates = Dictionary.new;
+~omniExecutions = Dictionary.new;
 ~omniExecutionOrdinal = 0;
+~omniMaxTransactions = 64;
+~omniMaxTransactionRecords = 20000;
+~omniMaxExecutions = 256;
 
 ~omniAck = { |transactionId, stage, generation, effectiveBeat, code|
     if(~omniReplyAddress.notNil) {
@@ -91,13 +95,23 @@
 
 ~omniStartFinite = { |definitionId, parentExecution|
     var definition = ~omniDefinitions[definitionId];
+    if(~omniExecutions.size >= ~omniMaxExecutions) {
+        ("LB_OMNICHORD_SC_EXECUTION_LIMIT definition=" ++ definitionId).warn;
+    } {
     if(definition.notNil and: { definition[\kind] == "finite" }) {
         var executionId;
+        var endTick = definition[\events].collect { |event| event[\tick] }.maxItem ? 0;
         ~omniExecutionOrdinal = ~omniExecutionOrdinal + 1;
         executionId = parentExecution ++ "/" ++ ~omniExecutionOrdinal;
+        ~omniExecutions[executionId] = definitionId;
         ~omniScheduleDefinition.value(
             definition, executionId, ~omniClock.beats, false, "", 0
         );
+        ~omniClock.sched(endTick / 48, {
+            ~omniExecutions.removeAt(executionId);
+            nil
+        });
+    };
     };
 };
 
@@ -107,7 +121,7 @@
         var period = definition[\period].asInteger / 48;
         (startBeat - ~omniClock.beats).max(0).wait;
         loop {
-            var baseBeat = ~omniClock.beats;
+            var baseBeat = startBeat + (cycle * period);
             var executionId = lane ++ "/" ++ generation ++ "/" ++ cycle;
             ~omniScheduleDefinition.value(
                 definition, executionId, baseBeat, true, lane, generation
@@ -141,7 +155,7 @@
 };
 
 ~omniPublishTransaction = { |transaction, transactionId|
-    var definitions = IdentityDictionary.new;
+    var definitions = Dictionary.new;
     var roots = List.new;
     var rejected = nil;
     transaction[\records].do { |record|
@@ -154,6 +168,15 @@
                 eventCount: record[\eventCount],
                 events: List.new
             );
+            if(["root", "finite"].includesEqual(record[\kind]).not) {
+                rejected = "invalid-definition-kind";
+            };
+            if((record[\kind] == "root") and: { record[\period] <= 0 }) {
+                rejected = "root-period-must-be-positive";
+            };
+            if((record[\kind] == "finite") and: { record[\period] != 0 }) {
+                rejected = "finite-period-must-be-zero";
+            };
             if(record[\kind] == "root") { roots.add(record[\id]) };
         };
     };
@@ -164,6 +187,15 @@
                 rejected = "event-references-missing-definition";
             } {
                 definition[\events].add(record);
+                if(record[\tick] < 0 or: { record[\ordinal] < 0 }) {
+                    rejected = "negative-event-position";
+                };
+                if([
+                    "launch", "gateBegin", "rootStop", "rootStart",
+                    "noteOn", "noteOff", "voiceSet", "drumHit"
+                ].includesEqual(record[\action]).not) {
+                    rejected = "invalid-event-action";
+                };
             };
         };
     };
@@ -210,16 +242,31 @@
                 transactionId, "scheduled", transaction[\generation], effectiveBeat, "ok"
             );
             ~omniClock.schedAbs(effectiveBeat, {
-                ~omniActivateLane.value(
-                    transaction[\lane], transaction[\generation], roots, effectiveBeat
-                );
-                ~omniTransactionResults[transactionId] = (
-                    stage: "applied", generation: transaction[\generation],
-                    beat: effectiveBeat, code: "ok"
-                );
-                ~omniAck.value(
-                    transactionId, "applied", transaction[\generation], effectiveBeat, "ok"
-                );
+                var current = ~omniLanes[transaction[\lane]];
+                if(current.notNil and: {
+                    current[\generation] > transaction[\generation]
+                }) {
+                    ~omniTransactionResults[transactionId] = (
+                        stage: "applied", generation: transaction[\generation],
+                        beat: effectiveBeat, code: "obsolete-generation"
+                    );
+                    ~omniAck.value(
+                        transactionId, "applied", transaction[\generation],
+                        effectiveBeat, "obsolete-generation"
+                    );
+                } {
+                    ~omniActivateLane.value(
+                        transaction[\lane], transaction[\generation], roots, effectiveBeat
+                    );
+                    ~omniTransactionResults[transactionId] = (
+                        stage: "applied", generation: transaction[\generation],
+                        beat: effectiveBeat, code: "ok"
+                    );
+                    ~omniAck.value(
+                        transactionId, "applied", transaction[\generation],
+                        effectiveBeat, "ok"
+                    );
+                };
                 nil
             });
         } {
@@ -248,15 +295,30 @@ OSCdef(\omniTxBegin, { |message|
                 result[\beat], result[\code]
             );
         } {
+            var count = message[5].asInteger;
+            if(count < 0 or: { count > ~omniMaxTransactionRecords }) {
+                ~omniAck.value(
+                    transactionId, "rejected", message[4].asInteger,
+                    ~omniClock.beats, "transaction-size-out-of-range"
+                );
+            } {
+            if(~omniTransactions.size >= ~omniMaxTransactions) {
+                ~omniAck.value(
+                    transactionId, "rejected", message[4].asInteger,
+                    ~omniClock.beats, "too-many-open-transactions"
+                );
+            } {
             ~omniTransactions[transactionId] = (
                 lane: message[3].asString,
                 generation: message[4].asInteger,
-                count: message[5].asInteger,
+                count: count,
                 applyMode: message[6].asString,
                 alignment: message[7].asInteger,
-                records: Array.newClear(message[5].asInteger),
+                records: Array.newClear(count),
                 rejected: nil
             );
+            };
+            };
         };
     };
 }, '/omni/v1/tx/begin', recvPort: ~omniLanguagePort);

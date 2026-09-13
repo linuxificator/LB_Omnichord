@@ -66,7 +66,7 @@ PathName(adapterRoot).files
         var target = mappings[key.asString] ? key.asSymbol;
         var value = rawValue;
         if(["attack_ms", "decay_ms", "release_ms", "portamento_ms"]
-            .includes(key.asString)) {
+            .includesEqual(key.asString)) {
             value = rawValue / 1000;
         };
         if(~omniSynthHasControl.value(name, target)) {

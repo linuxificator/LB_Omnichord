@@ -115,13 +115,13 @@
             { name.asSymbol }
         );
         var value = rawValue;
-        if(["filter_decay_ms", "portamento_ms"].includes(name.asString)) {
+        if(["filter_decay_ms", "portamento_ms"].includesEqual(name.asString)) {
             value = rawValue / 1000;
         };
         if(name.asString == "resonance") {
             value = rawValue.linlin(0.51, 12, 0, 1).clip(0, 1);
         };
-        if(["articulation", "accent"].includes(name.asString).not) {
+        if(["articulation", "accent"].includesEqual(name.asString).not) {
             args.add(target); args.add(value);
         };
     };

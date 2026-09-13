@@ -116,6 +116,7 @@ thisProcess.openUDPPort(languagePort);
     var handles = ~omniVoices.keys.asArray;
     handles.do(~omniReleaseHandle);
     ~omniGestures.clear;
+    if(~omniExecutions.notNil) { ~omniExecutions.clear };
 };
 
 OSCdef(\omniHello, { |message, time, address|

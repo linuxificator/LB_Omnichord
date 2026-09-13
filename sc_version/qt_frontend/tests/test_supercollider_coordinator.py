@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SC_ROOT = ROOT.parent / "supercollider"
 sys.path.insert(0, str(ROOT / "code"))
 
-from engine_protocol import SequenceDefinition  # noqa: E402
+from engine_protocol import SequenceDefinition, SequenceEvent  # noqa: E402
 from musical_sequence_plan import LanePlan  # noqa: E402
 from resolved_config import resolve_amy_config_data  # noqa: E402
 from supercollider_client import SuperColliderClient  # noqa: E402
@@ -112,6 +112,41 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                 )
                 self.assertEqual(result[0], "applied")
                 self.assertEqual(result[1], 1)
+                referenced = client.publish_lane(
+                    LanePlan(
+                        lane="string-reference",
+                        generation=1,
+                        alignment_ticks=1,
+                        definitions=(
+                            SequenceDefinition(
+                                definition_id="string-reference/root",
+                                revision=1,
+                                kind="root",
+                                lane="string-reference",
+                                period_ticks=48,
+                                events=(
+                                    SequenceEvent(
+                                        0,
+                                        0,
+                                        "launch",
+                                        ("string-reference/finite",),
+                                    ),
+                                ),
+                                source_identity="reference-fixture",
+                            ),
+                            SequenceDefinition(
+                                definition_id="string-reference/finite",
+                                revision=1,
+                                kind="finite",
+                                lane="string-reference",
+                                period_ticks=0,
+                                events=(),
+                                source_identity="finite-fixture",
+                            ),
+                        ),
+                    )
+                )
+                self.assertEqual(referenced[0], "applied")
                 client.close()
             process.wait(timeout=3.0)
             self.assertEqual(process.returncode, 0)
