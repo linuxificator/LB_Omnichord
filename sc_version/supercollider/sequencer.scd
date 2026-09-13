@@ -11,6 +11,76 @@
 ~omniMaxTransactionRecords = 20000;
 ~omniMaxExecutions = 256;
 
+~omniEventValidationError = { |action, atoms|
+    var expected = Dictionary[
+        "launch" -> 1,
+        "gateBegin" -> 4,
+        "rootStop" -> 1,
+        "rootStart" -> 1,
+        "noteOn" -> 10,
+        "noteOff" -> 2,
+        "voiceSet" -> 3,
+        "drumHit" -> 5
+    ];
+    var count = expected[action];
+    var error = nil;
+    if(count.isNil) {
+        error = "invalid-event-action";
+    } {
+        if(atoms.size != count) { error = "invalid-event-payload-size" };
+    };
+    if(error.isNil and: { action == "gateBegin" }) {
+        if(atoms[2].isNumber.not or: { atoms[2].asInteger <= 0 }) {
+            error = "gate-duration-must-be-positive";
+        };
+        if(["drumHit", "launch", "noteOn"].includesEqual(
+            atoms[3].asString
+        ).not) {
+            error = "invalid-gate-scope";
+        };
+    };
+    if(error.isNil and: { action == "noteOn" }) {
+        if(atoms[3].isNumber.not or: { atoms[3].asInteger <= 0 }) {
+            error = "invalid-program-revision";
+        };
+        if(atoms[4].isNumber.not or: {
+            atoms[4].asInteger < 0 or: { atoms[4].asInteger > 127 }
+        }) { error = "invalid-logical-key" };
+        if(atoms[5].isNumber.not or: { atoms[5].asFloat <= 0 }) {
+            error = "invalid-note-frequency";
+        };
+        if(atoms[6].isNumber.not or: {
+            atoms[6].asFloat < 0 or: { atoms[6].asFloat > 1 }
+        }) { error = "invalid-note-velocity" };
+        if(atoms[8].isNumber.not or: {
+            [0, 1].includesEqual(atoms[8].asInteger).not
+        }) { error = "invalid-note-accent" };
+        if(atoms[9].isNumber.not or: {
+            atoms[9].asInteger < 0 or: { atoms[9].asInteger > 10 }
+        }) { error = "invalid-logical-bus" };
+    };
+    if(error.isNil and: { action == "noteOff" }) {
+        if(atoms[1].isNumber.not or: {
+            atoms[1].asFloat < 0 or: { atoms[1].asFloat > 1 }
+        }) { error = "invalid-release-velocity" };
+    };
+    if(error.isNil and: { action == "voiceSet" }) {
+        if(atoms[2].isNumber.not) { error = "invalid-voice-value" };
+    };
+    if(error.isNil and: { action == "drumHit" }) {
+        if(atoms[2].isNumber.not or: {
+            atoms[2].asInteger < 0 or: { atoms[2].asInteger > 127 }
+        }) { error = "invalid-drum-key" };
+        if(atoms[3].isNumber.not or: {
+            atoms[3].asFloat < 0 or: { atoms[3].asFloat > 1 }
+        }) { error = "invalid-drum-velocity" };
+        if(atoms[4].isNumber.not or: {
+            atoms[4].asInteger < 0 or: { atoms[4].asInteger > 10 }
+        }) { error = "invalid-logical-bus" };
+    };
+    error
+};
+
 ~omniAck = { |transactionId, stage, generation, effectiveBeat, code|
     if(~omniReplyAddress.notNil) {
         ~omniReply.value(
@@ -160,14 +230,18 @@
     var rejected = nil;
     transaction[\records].do { |record|
         if(record[\type] == \definition) {
-            definitions[record[\id]] = (
-                id: record[\id],
-                revision: record[\revision],
-                kind: record[\kind],
-                period: record[\period],
-                eventCount: record[\eventCount],
-                events: List.new
-            );
+            if(definitions[record[\id]].notNil) {
+                rejected = "duplicate-definition-id";
+            } {
+                definitions[record[\id]] = (
+                    id: record[\id],
+                    revision: record[\revision],
+                    kind: record[\kind],
+                    period: record[\period],
+                    eventCount: record[\eventCount],
+                    events: List.new
+                );
+            };
             if(["root", "finite"].includesEqual(record[\kind]).not) {
                 rejected = "invalid-definition-kind";
             };
@@ -196,6 +270,13 @@
                 ].includesEqual(record[\action]).not) {
                     rejected = "invalid-event-action";
                 };
+                if(~omniEventValidationError.value(
+                    record[\action], record[\atoms]
+                ).notNil) {
+                    rejected = ~omniEventValidationError.value(
+                        record[\action], record[\atoms]
+                    );
+                };
             };
         };
     };
@@ -212,8 +293,22 @@
         };
         definition[\events].do { |event|
             if(event[\action] == "launch") {
-                if(definitions[event[\atoms][0].asString].isNil) {
+                var target = definitions[event[\atoms][0].asString];
+                if(target.isNil) {
                     rejected = "launch-references-missing-definition";
+                } {
+                    if(definition[\kind] != "root") {
+                        rejected = "finite-definition-cannot-launch";
+                    };
+                    if(target[\kind] != "finite") {
+                        rejected = "launch-target-must-be-finite";
+                    };
+                };
+            };
+            if(["rootStop", "rootStart"].includesEqual(event[\action])) {
+                var target = definitions[event[\atoms][0].asString];
+                if(target.isNil or: { target[\kind] != "root" }) {
+                    rejected = "root-control-target-must-be-root";
                 };
             };
         };
