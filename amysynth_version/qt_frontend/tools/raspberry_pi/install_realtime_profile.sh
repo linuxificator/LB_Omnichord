@@ -69,7 +69,6 @@ user_unit_root="$target_home/.config/systemd/user"
 
 required_files=(
     rt_pi_config.py
-    lb-omnichord-performance.service
     pipewire-service-limits.conf
     pipewire-lb-realtime.conf
     pipewire-pulse-lb-realtime.conf
@@ -86,9 +85,6 @@ install -m 755 \
     "$source_root/rt_pi_config.py" \
     "$source_root/install_realtime_profile.sh" \
     "$install_root/"
-install -m 644 \
-    "$source_root/lb-omnichord-performance.service" \
-    "$unit_root/"
 install -d -o "$target_user" -g "$target_group" -m 755 \
     "$pipewire_config_root/pipewire.conf.d" \
     "$pipewire_config_root/pipewire-pulse.conf.d" \
@@ -127,11 +123,19 @@ systemctl disable --now "lb-omnichord-rt-policy@$target_user.service" \
 rm -f -- "$unit_root/lb-omnichord-rt-policy@.service"
 rm -f -- "$install_root/rt_pi_runtime.py"
 
-python3 "$install_root/rt_pi_config.py" apply --profile audio-split
-python3 "$install_root/rt_pi_config.py" set-governor performance
-systemctl daemon-reload
-systemctl enable --now lb-omnichord-performance.service
+# Releases before this profile forced the performance governor persistently.
+# Return frequency scaling to Raspberry Pi OS's normal ondemand policy and
+# remove that superseded service. CPU isolation and targeted audio-thread
+# scheduling remain independent parts of the realtime profile.
+systemctl disable --now lb-omnichord-performance.service \
+    >/dev/null 2>&1 || true
+rm -f -- "$unit_root/lb-omnichord-performance.service"
 
-echo "Realtime permission, PipeWire policy and the performance governor are configured for $target_user."
+python3 "$install_root/rt_pi_config.py" apply --profile audio-split
+python3 "$install_root/rt_pi_config.py" set-governor ondemand
+systemctl daemon-reload
+
+echo "Realtime permission and PipeWire policy are configured for $target_user."
+echo "CPU frequency scaling uses the Raspberry Pi OS ondemand default."
 echo "Reboot this Raspberry Pi so the boot profile and new login limit are active."
 echo "Rollback instructions: $install_root/rt_pi_config.py rollback --snapshot PATH"

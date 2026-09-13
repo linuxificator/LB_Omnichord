@@ -33,6 +33,7 @@ AMY_AUDIO_CPUS = frozenset({3})
 REQUIRED_RTPRIO = 80
 AMY_AUDIO_PRIORITY = 70
 PIPEWIRE_PRIORITIES = {"pipewire": 80, "pipewire-pulse": 75}
+EXPECTED_CPU_GOVERNOR = "ondemand"
 REALTIME_ASSET_PATTERN = (
     "LB_Omnichord.RYYYYMMDDHHMMSS.Pi4-Pi5-realtime-setup.sh"
 )
@@ -108,9 +109,9 @@ def evaluate_realtime(facts: RealtimeFacts) -> RealtimeStatus:
     if not EXPECTED_ISOLATED_CPUS <= isolated:
         missing.append("CPU 2-3 isolation")
     if not facts.governors or any(
-        governor != "performance" for governor in facts.governors
+        governor != EXPECTED_CPU_GOVERNOR for governor in facts.governors
     ):
-        missing.append("performance CPU governor")
+        missing.append("Raspberry Pi OS ondemand CPU governor")
     if facts.rtprio_limit < REQUIRED_RTPRIO:
         missing.append(f"user realtime-priority limit of at least {REQUIRED_RTPRIO}")
     if not facts.runtime_policy_active:

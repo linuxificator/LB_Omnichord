@@ -1,6 +1,6 @@
 # Dedicated Raspberry Pi realtime audio setup
 
-Status: physically validated on Raspberry Pi 4; Raspberry Pi 5 measurements pending
+Status: physically validated on Raspberry Pi 4; Pi 5 governor/core validation in progress
 Validated AppImage: `R20260909161844`
 Validated GitHub run: `34375905899`
 Validated kernel: Raspberry Pi `6.18.34+rpt-rpi-v8`, `PREEMPT`
@@ -13,11 +13,11 @@ AMY or LB Omnichord and does not weaken the wire/socket process boundary.
 
 Every GitHub release includes a self-contained installer named
 `LB_Omnichord.RYYYYMMDDHHMMSS.Pi4-Pi5-realtime-setup.sh`. It embeds the exact
-versioned helper and systemd governor unit described below, applies the
+versioned helper described below, applies the
 reversible `audio-split` boot profile, grants the selected desktop user a
 standard PAM realtime-priority limit, and requests a reboot. The application
 warning points to this asset when boot arguments, CPU 2-3 isolation, the
-governor, the user's realtime permission or the read-back runtime policy for
+normal `ondemand` governor, the user's realtime permission or the read-back runtime policy for
 the exact AMY child is missing.
 The same installer source is committed as
 `qt_frontend/tools/raspberry_pi/install_realtime_profile.sh`; the release asset
@@ -30,12 +30,16 @@ remain documented for inspection and rollback.
 
 ## Why this layout
 
-The governor made the largest single improvement. Putting AMY and both
-PipeWire stages together on one isolated core was worse because every audio
-period forced them to queue serially. With the split profile, a physical 120 Hz
-strum test produced 0.011 ms p99 AMY wake latency and no audio error-counter
-increments. See [`realtime_research.md`](realtime_research.md) for the complete
-controls, rejected layout and capacity table.
+Holding the CPU at its maximum clock made the largest single improvement in an
+early, unrestricted Pi 4 comparison, but it also keeps idle power and heat
+unnecessarily high. The delivered profile therefore retains Raspberry Pi OS's
+normal `ondemand` frequency scaling. Deadline protection comes from separating
+AMY and PipeWire: putting them together on one isolated core was worse because
+every audio period forced them to queue serially. With the split profile, a
+physical 120 Hz strum test produced 0.011 ms p99 AMY wake latency and no audio
+error-counter increments. See
+[`realtime_research.md`](realtime_research.md) for the complete controls,
+rejected layout and capacity table.
 
 Do not apply FIFO to the full frontend or AMY process. Only the callback and
 two PipeWire data loops are bounded audio threads; making arbitrary workers
@@ -100,7 +104,8 @@ python3 tools/raspberry_pi/rt_pi_config.py verify --profile audio-split
 ```
 
 Expected: isolated CPUs `2-3` and active boot arguments. Verification reports
-the governor separately because it is a runtime setting.
+the governor separately because it is a runtime setting; the expected value is
+Raspberry Pi OS's normal `ondemand` policy.
 
 ### Realtime permission and native service ownership
 
@@ -110,9 +115,11 @@ The installer writes one standard PAM limit for the selected user:
 USER - rtprio 80
 ```
 
-It also enables the small performance-governor service. A reboot creates a new
-login session with that limit and activates the boot arguments. Confirm the
-permission after reconnecting:
+It explicitly removes the superseded performance-governor service from earlier
+releases and restores `ondemand` immediately. Raspberry Pi OS then owns normal
+frequency scaling; no LB Omnichord governor service remains. A reboot creates
+a new login session with the realtime limit and activates the boot arguments.
+Confirm the permission after reconnecting:
 
 ```sh
 ulimit -r
@@ -153,7 +160,8 @@ python3 code/raspberry_pi_realtime.py inspect --service-pid "$OMNICHORD_AMY_SERV
 ```
 
 The normal visible startup dialog is the aggregate check. It disappears only
-when boot isolation, governor, `rtprio`, exact AMY callback, frontend and both
+when boot isolation, the `ondemand` governor, `rtprio`, exact AMY callback,
+frontend and both
 PipeWire loop policies all match. Serial/ESP32 mode deliberately bypasses this
 host-AMY policy and warning.
 
@@ -219,7 +227,9 @@ does not emulate their policy or lifecycle.
 
 ## Rollback
 
-First disable the persistent governor and remove the optional user limit:
+Remove the optional user limit and PipeWire policy. The first two commands are
+safe cleanup for machines that installed an older profile with a persistent
+performance-governor service:
 
 ```sh
 sudo systemctl disable --now lb-omnichord-performance.service

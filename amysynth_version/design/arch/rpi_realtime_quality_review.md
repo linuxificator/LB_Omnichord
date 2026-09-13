@@ -2,7 +2,7 @@
 
 Status: current focused review
 Owner: platform integration and application architecture
-Last verified: 2026-09-09
+Last verified: 2026-09-13
 
 ## Scope
 
@@ -26,7 +26,8 @@ The final design uses existing authorities:
 - the existing launcher confines itself and its exact AMY child, identifies
   the active child worker once, and applies CPU3/FIFO70 only to that thread;
 - the frontend reads the resulting AMY, frontend and PipeWire policies back;
-- boot isolation and the performance governor remain reversible host policy.
+- boot isolation remains reversible host policy, while CPU-frequency scaling
+  remains at Raspberry Pi OS's normal `ondemand` default.
 
 There is no watcher daemon, registration socket, AMY name matching, repeated
 process scan, custom lifecycle token or test-only production endpoint.
@@ -57,6 +58,10 @@ process scan, custom lifecycle token or test-only production endpoint.
 11. Packaged host-tool execution no longer inherits AppImage/PyInstaller's
     private `LD_LIBRARY_PATH` or `LD_PRELOAD`. The adapter invokes canonical
     `/usr/bin/systemctl` while preserving the actual user-session environment.
+12. CPU frequency scaling is no longer held at maximum by a custom systemd
+    service. The installer removes that earlier service, restores `ondemand`
+    immediately and the startup contract accepts the default while still
+    requiring and reading back the isolated-core audio policy.
 
 ## Test evidence
 

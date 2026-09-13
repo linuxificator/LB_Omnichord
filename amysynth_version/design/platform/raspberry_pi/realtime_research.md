@@ -1,6 +1,6 @@
 # Raspberry Pi realtime audio research
 
-Status: Pi 4 complete; Pi 5 pending physical availability
+Status: Pi 4 measurement complete; Pi 5 default-governor validation in progress
 Branch: `research/rt_pi`
 Measurement baseline: `R20260909T010905`
 Current packaged acceptance: `R20260909161844` (GitHub run `34375905899`)
@@ -170,11 +170,13 @@ therefore deliberately not installed. The measured stock Pi kernel plus
 
 ## Conclusion
 
-The recommended dedicated Pi 4 profile is `audio-split`: performance governor,
-CPUs 2-3 isolated from normal scheduling, IRQ default affinity on CPUs 0-1,
-PipeWire data loops on CPU 2 at FIFO 80/75, and only the detected AMY callback
-on CPU 3 at FIFO 70. The application and all its logic remain portable. The
-profile is a reversible host-integration choice documented in
+The measured Pi 4 latency layout is `audio-split`: CPUs 2-3 isolated from
+normal scheduling, IRQ default affinity on CPUs 0-1, PipeWire data loops on
+CPU 2 at FIFO 80/75, and only the detected AMY callback on CPU 3 at FIFO 70.
+The original experiment held the shared clock at maximum, but the delivered
+profile now leaves frequency scaling at Raspberry Pi OS's normal `ondemand`
+default to avoid unnecessary idle power and heat. The application and all its
+logic remain portable. The profile is a reversible host-integration choice documented in
 [`realtime_howto.md`](realtime_howto.md), not an application default.
 
 On 2026-09-09 a clean reboot physically verified the simplified production
