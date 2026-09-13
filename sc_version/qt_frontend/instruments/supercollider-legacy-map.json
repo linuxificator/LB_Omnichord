@@ -124,7 +124,7 @@
     "juno_125": "sc.sclork.defaultB",
     "juno_127": "sc.sclork.defaultB",
     "physical_strings": "sc.sclork.pluck",
-    "tb303": "sc.sclork.acidOto3091"
+    "tb303": "sc.omni.acid303"
   },
   "policy": "musical-family replacement; original AMY selection remains in preset data",
   "schema_revision": 1

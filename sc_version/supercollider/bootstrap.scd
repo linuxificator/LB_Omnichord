@@ -80,6 +80,30 @@ thisProcess.openUDPPort(languagePort);
     };
 };
 
+~omniSetHandle = { |handle, parameter, value|
+    var record = ~omniVoices[handle.asString];
+    var name = parameter.asString;
+    if(record.notNil) {
+        if(name == "frequency_hz") {
+            if(record[\acid] == true) {
+                record[\sourceNode].set(
+                    \slideEnabled, 1,
+                    \freqTargetHz, value
+                );
+            } {
+                record[\sourceNode].set(\freq, value);
+            };
+        };
+        if(name == "accent") { record[\sourceNode].set(\t_accent, 1) };
+        if(name == "gain") {
+            (record[\outputNode] ? record[\sourceNode]).set(\gain, value)
+        };
+        if(name == "brightness") {
+            record[\sourceNode].set(\brightness, value)
+        };
+    };
+};
+
 ~omniReleaseOwner = { |owner|
     var handles = List.new;
     ~omniVoices.keysValuesDo { |handle, record|
@@ -244,6 +268,7 @@ s.waitForBoot({
     }).add;
 
     (scriptDirectory +/+ "sclork_loader.scd").load;
+    (scriptDirectory +/+ "acid_voices.scd").load;
 
     s.sync;
 
@@ -276,9 +301,38 @@ s.waitForBoot({
         |owner, handle, program, revision, logicalKey, frequency,
          velocity, logicalBus, extraArgs|
         var nativeName = ~omniSclorkProgramName.value(program);
+        var acidName = ~omniAcidProgramName.value(program);
         var preparedArgs = ~omniPreparedArgs.value(program, revision)
             ++ (extraArgs ? []);
+        var accentValue = 0;
+        extraArgs.pairsDo { |name, value|
+            if(name.asString == "accent") { accentValue = value };
+        };
         ~omniReleaseHandle.value(handle);
+        if(acidName.notNil) {
+            var sourceNode = Synth.tail(~omniSourceGroup, acidName, [
+                    \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
+                    \freqTargetHz, frequency,
+                    \velocity, velocity,
+                    \pitchBendBus, ~omniBendBus.index,
+                    \t_accent, accentValue
+                ] ++ ~omniAcidArgs.value(program, revision));
+            var record = (
+                sourceNode: sourceNode,
+                outputNode: nil,
+                releaseMode: \gated,
+                acid: true,
+                owner: owner.asString,
+                logicalKey: logicalKey.asInteger,
+                program: program.asString
+            );
+            ~omniVoices[handle] = record;
+            sourceNode.onFree {
+                if(~omniVoices[handle] === record) {
+                    ~omniVoices.removeAt(handle);
+                };
+            };
+        } {
         if(nativeName.notNil and: {
             SynthDescLib.global.at(nativeName).notNil
         }) {
@@ -318,6 +372,7 @@ s.waitForBoot({
                 } {
                     \natural
                 },
+                acid: false,
                 owner: owner.asString,
                 logicalKey: logicalKey.asInteger,
                 program: program.asString,
@@ -338,19 +393,27 @@ s.waitForBoot({
                 if(record[\cleaned].not) { outputNode.set(\gate, 0) };
             };
         } {
-            ~omniVoices[handle] = (
-                sourceNode: Synth.tail(~omniSourceGroup, \omniVoice, [
+            var sourceNode = Synth.tail(~omniSourceGroup, \omniVoice, [
                 \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
                 \freq, frequency,
                 \velocity, velocity,
                 \bendBus, ~omniBendBus.index
-                ] ++ ~omniGenericArgs.value(program, revision)
-                    ++ (extraArgs ? [])),
+                ] ++ ~omniGenericArgs.value(program, revision));
+            var record = (
+                sourceNode: sourceNode,
                 outputNode: nil,
+                acid: false,
                 owner: owner.asString,
                 logicalKey: logicalKey.asInteger,
                 program: program.asString
             );
+            ~omniVoices[handle] = record;
+            sourceNode.onFree {
+                if(~omniVoices[handle] === record) {
+                    ~omniVoices.removeAt(handle);
+                };
+            };
+        };
         };
     };
 
@@ -396,20 +459,11 @@ OSCdef(\omniNoteOff, { |message|
 
 OSCdef(\omniVoiceSet, { |message|
     if(~omniReady and: { ~omniSessionValid.value(message) }) {
-        var record = ~omniVoices[message[3].asString];
-        var parameter = message[4].asString;
-        var value = message[5].asFloat;
-        if(record.notNil) {
-            if(parameter == "frequency_hz") {
-                record[\sourceNode].set(\freq, value)
-            };
-            if(parameter == "gain") {
-                (record[\outputNode] ? record[\sourceNode]).set(\gain, value)
-            };
-            if(parameter == "brightness") {
-                record[\sourceNode].set(\brightness, value)
-            };
-        };
+        ~omniSetHandle.value(
+            message[3].asString,
+            message[4].asString,
+            message[5].asFloat
+        );
     };
 }, '/omni/v1/voice/set', recvPort: languagePort);
 

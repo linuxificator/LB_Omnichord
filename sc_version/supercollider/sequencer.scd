@@ -50,15 +50,21 @@
             var handle = executionId ++ "/" ++ atoms[0].asString;
             ~omniSpawnVoice.value(
                 atoms[1], handle, atoms[2], atoms[3], atoms[4],
-                atoms[5], atoms[6], atoms[9], []
+                atoms[5], atoms[6], atoms[9], [
+                    \articulation, atoms[7],
+                    \accent, atoms[8]
+                ]
             );
         };
         if(action == "noteOff") {
             ~omniReleaseHandle.value(executionId ++ "/" ++ atoms[0].asString);
         };
         if(action == "voiceSet") {
-            var record = ~omniVoices[executionId ++ "/" ++ atoms[0].asString];
-            if(record.notNil) { record[\node].set(atoms[1].asString.asSymbol, atoms[2]) };
+            ~omniSetHandle.value(
+                executionId ++ "/" ++ atoms[0].asString,
+                atoms[1].asString,
+                atoms[2]
+            );
         };
         if(action == "drumHit") {
             var role = atoms[0].asString;

@@ -59,10 +59,63 @@ class MusicalSequencePlanTests(unittest.TestCase):
         self.assertEqual(root.period_ticks, 192)
         self.assertEqual(
             [event.kind for event in child.events],
-            ["noteOn", "voiceSet", "noteOff"],
+            ["noteOn", "voiceSet", "voiceSet", "noteOff"],
         )
         self.assertEqual(child.events[0].atoms[8], 1)
         self.assertEqual(child.events[1].atoms[1], "frequency_hz")
+        self.assertEqual(child.events[2].atoms[1], "accent")
+
+    def test_non_acid_bass_ignores_acid_articulation_flags(self) -> None:
+        plan = compile_bass_lane(
+            config={
+                "id": "test",
+                "length_beats": 4,
+                "bass_mode": "riff",
+                "bass_riff": {
+                    "id": "not-acid",
+                    "ppq": 96,
+                    "phrase_ticks": 384,
+                    "events": [
+                        {
+                            "tick": 0,
+                            "duration_ticks": 96,
+                            "note": 36,
+                            "velocity": 100,
+                            "accent": True,
+                            "slide_to_next": True,
+                        },
+                        {
+                            "tick": 48,
+                            "duration_ticks": 48,
+                            "note": 43,
+                            "velocity": 90,
+                            "accent": True,
+                            "slide_to_next": False,
+                        },
+                    ],
+                },
+            },
+            running=True,
+            bass_notes=(36.0,),
+            bass_gate_beats=0.3,
+            program_id="sc.sclork.fmBass",
+            program_revision=1,
+            logical_bus=1,
+            generation=1,
+        )
+        child = plan.definitions[1]
+        self.assertEqual(
+            [event.kind for event in child.events],
+            ["noteOn", "noteOn", "noteOff", "noteOff"],
+        )
+        self.assertFalse(any(event.kind == "voiceSet" for event in child.events))
+        self.assertTrue(
+            all(
+                event.atoms[8] == 0
+                for event in child.events
+                if event.kind == "noteOn"
+            )
+        )
 
     def test_chord_arpeggio_owns_exact_note_handles_and_48_ppq_releases(self) -> None:
         plan = compile_chord_lane(

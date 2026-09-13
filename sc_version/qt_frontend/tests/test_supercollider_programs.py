@@ -43,10 +43,15 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
         self.assertEqual(checked_in, expected)
         mappings = load_legacy_program_map(path)
         programs = load_supercollider_programs(SC_ROOT / "sclork-programs.json")
-        available = {program.program_id for program in programs}
+        available = {program.program_id for program in programs} | {
+            "sc.omni.acid303",
+            "sc.omni.acidOto",
+            "sc.omni.acidMoog",
+            "sc.omni.acidWarsaw",
+        }
         self.assertEqual(len(mappings), 125)
         self.assertLessEqual(set(mappings.values()), available)
-        self.assertEqual(mappings["tb303"], "sc.sclork.acidOto3091")
+        self.assertEqual(mappings["tb303"], "sc.omni.acid303")
         self.assertEqual(mappings["physical_strings"], "sc.sclork.pluck")
 
     def test_native_names_have_human_readable_sc_labels(self) -> None:

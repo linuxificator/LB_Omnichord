@@ -18,6 +18,7 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
     (~omniClientSession.notNil) and: { message[1].asString == ~omniClientSession };
 };
 ~omniReleaseHandle = { |ignoredHandle| ignoredHandle };
+~omniSetHandle = { |handle, parameter, value| [handle, parameter, value] };
 ~omniPanic = { };
 ~omniSpawnVoice = { |owner, handle, program, revision, logicalKey,
     frequency, velocity, logicalBus, extraArgs|

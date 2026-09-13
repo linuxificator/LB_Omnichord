@@ -187,6 +187,7 @@ def compile_bass_lane(
         quantize_activity_velocity=False,
     )
     sources = bass_gesture_sources(source_events, period)
+    acid_program = program_id.startswith("sc.omni.acid")
     definitions: list[SequenceDefinition] = []
     launches: list[SequenceEvent] = []
     for gesture_index, source in enumerate(sources):
@@ -198,41 +199,49 @@ def compile_bass_lane(
         for note_index, note_event in enumerate(source):
             tick = int(note_event["tick"]) - start_tick
             note = float(note_event["note"])
-            accent = bool(note_event.get("accent", False)) and not previous_slides
-            if previous_slides:
+            accent = bool(note_event.get("accent", False)) if acid_program else False
+            handle = "voice" if acid_program else f"note/{note_index}"
+            if acid_program and previous_slides:
                 events.append(
-                    _event(tick, ordinal, "voiceSet", "voice", "frequency_hz", _frequency(note))
+                    _event(tick, ordinal, "voiceSet", handle, "frequency_hz", _frequency(note))
                 )
                 ordinal += 1
+                if accent:
+                    events.append(
+                        _event(tick, ordinal, "voiceSet", handle, "accent", 1.0)
+                    )
+                    ordinal += 1
             else:
                 events.append(
                     _event(
                         tick,
                         ordinal,
                         "noteOn",
-                        "voice",
+                        handle,
                         "rhythm/bass",
                         program_id,
                         int(program_revision),
                         max(0, min(127, int(round(note)))),
                         _frequency(note),
                         float(note_event["velocity"]),
-                        "accent" if accent else "ordinary",
+                        "acid-accent" if accent else "ordinary",
                         1 if accent else 0,
                         int(logical_bus),
                     )
                 )
                 ordinal += 1
-            slides = bool(note_event.get("slide_to_next", False))
+            slides = acid_program and bool(note_event.get("slide_to_next", False))
             end_tick = int(note_event["tick"]) + int(note_event["duration"])
             next_tick = (
                 int(source[note_index + 1]["tick"])
                 if note_index + 1 < len(source)
                 else None
             )
-            if not slides and (next_tick is None or end_tick <= next_tick):
+            if not slides and (
+                not acid_program or next_tick is None or end_tick <= next_tick
+            ):
                 events.append(
-                    _event(end_tick - start_tick, ordinal, "noteOff", "voice", 0.0)
+                    _event(end_tick - start_tick, ordinal, "noteOff", handle, 0.0)
                 )
                 ordinal += 1
             previous_slides = slides

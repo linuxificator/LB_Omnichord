@@ -83,7 +83,7 @@ def build_legacy_program_map(legacy_catalog: Path) -> dict[str, object]:
         for item in raw["synths"]
     }
     mappings["physical_strings"] = "sc.sclork.pluck"
-    mappings["tb303"] = "sc.sclork.acidOto3091"
+    mappings["tb303"] = "sc.omni.acid303"
     return {
         "schema_revision": 1,
         "policy": "musical-family replacement; original AMY selection remains in preset data",

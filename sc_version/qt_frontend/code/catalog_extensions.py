@@ -10,6 +10,12 @@ from supercollider_programs import display_name, load_supercollider_programs
 
 PHYSICAL_STRINGS_KEY = "physical_strings"
 TB303_KEY = "tb303"
+ACID_PROGRAMS = (
+    ("sc.omni.acid303", "SC Acid 303"),
+    ("sc.omni.acidOto", "SC Acid Oto"),
+    ("sc.omni.acidMoog", "SC Acid Moog"),
+    ("sc.omni.acidWarsaw", "SC Acid Warsaw"),
+)
 
 
 def _control(
@@ -37,6 +43,33 @@ def _control(
         decimals=decimals,
         unit=unit,
         scale=scale,
+    )
+
+
+def _acid_controls() -> tuple[app_core.SynthControl, ...]:
+    return (
+        _control("waveform", "WAVE", "extra", 0, 0, 1, 1, 0),
+        _control(
+            "filter_hz", "CUTOFF", "common", 400, 20, 10000, 10, 0,
+            unit="Hz", scale="log",
+        ),
+        _control(
+            "resonance", "RES", "common", 1.2, 0.51, 12, 0.1, 1,
+            unit="Q",
+        ),
+        _control(
+            "filter_env_octaves", "ENV MOD", "extra", 2, 0, 5, 0.1, 1,
+            unit="oct",
+        ),
+        _control(
+            "filter_decay_ms", "DECAY", "common", 250, 30, 3000, 10, 0,
+            unit="ms", scale="log",
+        ),
+        _control("accent_amount", "ACCENT", "extra", 0.35, 0, 1, 0.01, 2),
+        _control(
+            "portamento_ms", "SLIDE", "extra", 60, 0, 300, 5, 0,
+            unit="ms",
+        ),
     )
 
 
@@ -73,32 +106,7 @@ def load_synth_catalog(
             app_core.SynthDefinition(
                 key=TB303_KEY,
                 label="TB-303",
-                controls=(
-                    _control("waveform", "WAVE", "extra", 0, 0, 1, 1, 0),
-                    _control(
-                        "filter_hz", "CUTOFF", "common", 400, 20, 10000, 10, 0,
-                        unit="Hz", scale="log",
-                    ),
-                    _control(
-                        "resonance", "RES", "common", 1.2, 0.51, 12, 0.1, 1,
-                        unit="Q",
-                    ),
-                    _control(
-                        "filter_env_octaves", "ENV MOD", "extra", 2, 0, 5, 0.1, 1,
-                        unit="oct",
-                    ),
-                    _control(
-                        "filter_decay_ms", "DECAY", "common", 250, 30, 3000, 10, 0,
-                        unit="ms", scale="log",
-                    ),
-                    _control(
-                        "accent_amount", "ACCENT", "extra", 0.35, 0, 1, 0.01, 2,
-                    ),
-                    _control(
-                        "portamento_ms", "SLIDE", "extra", 60, 0, 300, 5, 0,
-                        unit="ms",
-                    ),
-                ),
+                controls=_acid_controls(),
             )
         )
     supercollider_root = path.parents[1].parent / "supercollider"
@@ -115,4 +123,14 @@ def load_synth_catalog(
                 )
             )
             known_keys.add(program.program_id)
+    for program_id, label in ACID_PROGRAMS:
+        if program_id not in known_keys:
+            synths.append(
+                app_core.SynthDefinition(
+                    key=program_id,
+                    label=label,
+                    controls=_acid_controls(),
+                )
+            )
+            known_keys.add(program_id)
     return synths, chord_default, strum_default, bass_default
