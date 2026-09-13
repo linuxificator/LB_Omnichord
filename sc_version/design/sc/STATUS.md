@@ -40,8 +40,8 @@ Target currently exercised: Linux x86_64
 - Full soft/mid/hard and low/mid/high sample audits, measured resident-set
   admission, latency/load tests and long live performance tests remain open.
 - Linux source behavior was exercised locally with SuperCollider 3.13.0. The
-  reproducible package target is 3.14.1 and must pass its GitHub build before
-  it is considered packaged evidence.
+  pinned 3.14.1 compiler, engine, frontend and package workflow passed on
+  commit `fc3b26e` in GitHub run `34790456369`.
 - Raspberry Pi, macOS, Windows, Android and ESP32-P4 are not SuperCollider
   edition targets. Their existing AMY artifacts remain separate and supported
   according to the AMY documentation.

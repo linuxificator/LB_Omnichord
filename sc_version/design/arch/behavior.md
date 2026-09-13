@@ -2,8 +2,8 @@
 
 Status: authoritative runtime behavior contract
 Owner: shared application behavior
-Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-01
+Applies to: `sc_version`
+Last verified: 2026-09-14
 
 ## Screen switching
 
@@ -19,9 +19,9 @@ note collection as touch/mouse input. It does not supply velocity and it does
 not disable or unlink direct screen strumming.
 
 Preview note lifetime is bounded by the selected row's four-voice allocation.
-Before another onset would require AMY voice stealing, the oldest preview note
-is explicitly released. The renewed tail timer releases only notes that remain
-active, so delayed note-offs cannot overflow AMY's forgotten-note pool.
+Before another onset would exceed the configured preview ownership limit, the
+oldest preview handle is explicitly released. The engine-owned renewed tail
+deadline releases only handles that remain active.
 
 ## Presets
 
@@ -36,6 +36,8 @@ OMNI and MIDI presets are separate. MIDI presets contain:
 
 Tuning coupling is runtime state and is never stored in presets.
 
-## AMY communication
+## Engine communication
 
-All musical actions are translated into AMY wire commands. Local and remote AMY execution must receive identical commands.
+All musical actions cross the typed SuperCollider protocol. Musical time and
+note lifetime remain in the headless engine, not in Qt/Python. The SC edition
+does not produce AMY wire commands or import AMY at runtime.

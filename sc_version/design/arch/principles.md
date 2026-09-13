@@ -1,92 +1,89 @@
-# Design Principles
+# SuperCollider edition design principles
 
 Status: authoritative baseline contract
+
 Owner: application architecture
-Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-09
 
-## Wire protocol boundary
+Applies to: `sc_version`
 
-The Qt application only produces AMY wire commands. It must never depend on whether AMY runs locally or on ESP32.
+Last verified: 2026-09-14
 
-The transport layer may be changed:
+## Engine boundary
 
-Qt -> application logic -> AMY wire commands -> transport -> AMY
+The Qt process does not synthesize audio, own the musical clock, or import an
+audio-engine implementation. It produces validated immutable plans and typed
+live actions. A versioned OSC adapter transports them to a separately
+supervised headless `sclang` process; `scsynth` is a child of that engine
+process.
 
-Local AMY execution and ESP32 serial execution must consume the same command stream.
+```text
+Qt -> application policy -> typed plan/action -> loopback OSC
+   -> sclang coordinator and clock -> scsynth audio graph
+```
 
-## Separation of responsibilities
+The internal protocol contains musical meaning, not AMY wire strings and not
+raw scsynth node IDs. The UI-facing semantic API remains stable while the
+engine adapter changes.
 
-OMNI performance and MIDI player functionality are separate subsystems. Shared behavior is limited to explicitly defined interfaces such as tuning and current chord preview.
+## Explicit ownership
 
-## No hidden state changes
+Python owns UI state, MIDI/OSC input, catalogue selection, presets and pure
+plan compilation. `sclang` owns sequence phase, quantization, immutable
+definition snapshots, execution state, note handles, musical gates and timed
+releases. `scsynth` owns audio nodes, buffers, buses and effects.
 
-Changing screens must not change musical state. UI navigation and audio state are independent.
+Manual chord, automatic chord, strum, bass, drum and MIDI voices have distinct
+owners even where they share an audio bus. A release addresses the original
+handle; pitch lookup and broad all-notes-off operations are not substitutes.
 
-## Hardware portability
+## No frontend musical timing
 
-Moving from host AMY to ESP32 AMY must not change musical behavior.
+Python never polls sequence phase, follows beats or schedules musical note
+events. UI timers may classify gestures and animate presentation. Seconds-
+based performance tails are delegated to the engine once they affect note
+lifetime. Beat-based work stays on one SuperCollider `TempoClock`.
 
-Desktop portability follows the same rule. Linux, macOS and native Windows may
-use different local socket framing and native audio backends, but the Qt
-frontend remains the same wire-only client. A platform-specific AMY Python
-extension is an implementation choice for a service, never a frontend
-dependency.
+## Behavioral preservation
 
-## Simplicity
+Screen changes do not change sound. OMNI and MIDI preset ownership remains
+separate. Running preset/rhythm changes preserve the established live state
+and transport continuity. Catalogue data is not rewritten merely to make an
+engine migration easier.
 
-New abstractions are added only when they reduce coupling or prevent regressions.
+Legacy AMY tests may remain as explicit characterization oracles during the
+migration. They do not authorize importing AMY into the SC production graph or
+shipping AMY in the SC package.
 
-Do not "headbang": do not keep extending and repairing a difficult custom
-mechanism when its complexity is evidence that the design direction is wrong.
-Stop, restate the actual requirement, and re-evaluate the operating system,
-framework and library mechanisms already intended to solve it. A custom
-protocol, daemon or state machine needs evidence that the standard mechanism
-cannot satisfy the requirement; sunk implementation effort is not evidence.
+## Platform scope
 
-## Native platform mechanisms first
+Platform-specific discovery, process and package behavior lives in named
+adapters. The current supported SC target is Linux x86_64. Do not infer SC
+support for Raspberry Pi, macOS, Windows, Android or ESP32-P4 from the AMY
+edition's support for those targets.
 
-On every platform, first identify and use the native, established mechanism.
-For Linux this includes mechanisms owned by the kernel or standard subsystem:
-PAM resource limits, systemd unit policy, PipeWire configuration, udev, D-Bus
-and normal freedesktop interfaces. Assume a general systems problem has an
-established solution until investigation shows otherwise. Preserve that
-solution's normal authority and lifecycle instead of copying it into
-application code.
+On Linux, use the distribution's audio-session mechanism. A PipeWire desktop
+uses its JACK compatibility wrapper; application code must not secretly start
+a competing raw JACK server.
 
-Other platforms may lack an equivalent. After verifying that absence, use the
-proven Linux ownership and lifecycle as a design reference, but express it
-through that platform's adapter rather than transplanting Linux APIs or
-branches into portable code. Platform-specific composition stays in adapters
-and packaging so the application itself remains identical everywhere.
+## Simplicity and native mechanisms
 
-## Extend existing AMY concepts first
+Use native SuperCollider concepts—`TempoClock`, server groups, buses,
+SynthDefs and immutable application records—before inventing parallel clocks,
+mixers or lifetime systems. Add an abstraction only when it reduces coupling,
+makes ownership explicit or prevents a demonstrated regression.
 
-AMY-side integration work must reuse existing AMY concepts, data structures,
-APIs and render paths wherever they can express the required behavior. A new
-parallel subsystem is justified only when the existing design demonstrably
-cannot provide the required semantics or realtime performance.
-
-In particular, routing and effect inputs should be expressed as variants of
-the existing bus summation model. Shared reverb inputs use one reusable
-weighted subset-mix operation; they must not grow a separate application-
-specific mixer architecture. Platform acceleration may replace the mix
-kernel, but not its portable semantics.
+Do not headbang: repeated repairs to a growing custom mechanism are evidence
+to revisit the design and established platform/framework solution, not a
+reason to add another compensating layer.
 
 ## Code-quality non-regression
 
-Bug fixes must preserve the architectural and code-quality improvements already
-recorded in this design tree. In particular, a platform-specific symptom does
-not justify platform-specific application behavior when the affected framework
-primitive is shared. Reproduce the behavior at the narrowest shared boundary,
-add a behavioral regression test, and fix that shared boundary without adding
-duplicate input policy, cross-layer state ownership or source-text assertions.
+Portable application logic contains no operating-system branches, packaging
+drivers, synthetic inputs or integration-test receivers. External-input and
+process tests use separate processes across production boundaries. Generic
+tests are shared; unavoidable platform capability setup is isolated in a
+named platform adapter.
 
-Production application modules must not contain integration/package test
-drivers, synthetic input generators, expected test outcomes or test-only
-status protocols. Unit tests may directly exercise narrow objects, but an
-integration or package sender/controller runs in a separate process and uses a
-normal production boundary. Cross-platform tests apply one portable semantic
-contract everywhere and isolate unavoidable native setup and capability
-expectations in named platform test adapters. The complete rules are owned by
-[`test_processes.md`](test_processes.md).
+Current executable tests, validated configuration and typed records outrank
+historical Git prose. Any intentional behavior change needs an executable
+contract and an updated owning design document.
