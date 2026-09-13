@@ -22,7 +22,7 @@ def complete_facts() -> realtime.RealtimeFacts:
         "Raspberry Pi 4 Model B Rev 1.1",
         "rootwait isolcpus=domain,managed_irq,2-3 irqaffinity=0-1 threadirqs",
         "2-3",
-        ("performance",),
+        ("ondemand",),
         80,
     )
 

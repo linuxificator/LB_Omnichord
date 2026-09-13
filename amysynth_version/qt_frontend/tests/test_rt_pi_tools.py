@@ -116,13 +116,14 @@ class RtPiConfigTests(unittest.TestCase):
                 "Raspberry Pi 5 Model B Rev 1.0",
                 "console=tty1 rootwait",
                 "",
-                ("ondemand",),
+                ("performance",),
                 0,
             )
         )
         self.assertTrue(status.applicable)
         self.assertFalse(status.complete)
         self.assertEqual(len(status.missing), 5)
+        self.assertIn("Raspberry Pi OS ondemand CPU governor", status.missing)
 
     def test_startup_status_accepts_the_measured_split_profile(self) -> None:
         status = realtime_status.evaluate_realtime(
@@ -131,7 +132,7 @@ class RtPiConfigTests(unittest.TestCase):
                 "rootwait isolcpus=domain,managed_irq,2-3 "
                 "irqaffinity=0-1 threadirqs",
                 "2-3",
-                ("performance", "performance"),
+                ("ondemand", "ondemand"),
                 80,
                 True,
             )
@@ -200,7 +201,15 @@ class RtPiConfigTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("apply --profile audio-split", installer)
-        self.assertIn("set-governor performance", installer)
+        self.assertIn("set-governor ondemand", installer)
+        self.assertIn(
+            "disable --now lb-omnichord-performance.service",
+            installer,
+        )
+        self.assertNotIn(
+            "lb-omnichord-performance.service",
+            {name for name, _mode in asset_builder.EMBEDDED_FILES},
+        )
         self.assertIn("rtprio 80", installer)
         self.assertIn("pipewire.service.d", installer)
         self.assertIn("pipewire.conf.d", installer)

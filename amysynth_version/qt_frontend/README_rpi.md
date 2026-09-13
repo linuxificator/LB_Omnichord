@@ -46,11 +46,13 @@ sudo reboot
 
 The installer accepts only Pi 4/5 hardware, verifies its embedded setup
 payload, preserves the original boot command line in a checksummed rollback
-snapshot, activates the performance governor, and installs the measured
-realtime-priority permission for the selected desktop user. Standard systemd
+snapshot, restores Raspberry Pi OS's normal `ondemand` CPU-frequency scaling,
+and installs the measured realtime-priority permission for the selected
+desktop user. Standard systemd
 drop-ins and PipeWire's own realtime module configure its audio loops. The
 existing AppImage or source wrapper configures only itself and its exact AMY
-child once at startup; no background watcher is installed. An
+child once at startup; AMY's callback still runs alone on reserved CPU 3 and
+no background watcher or persistent governor service is installed. An
 independent `.sha256` asset remains
 available for users who want to verify the downloaded script itself, but this
 optional security step is not required by the startup instructions. Both the

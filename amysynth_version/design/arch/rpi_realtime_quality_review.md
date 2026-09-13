@@ -2,7 +2,7 @@
 
 Status: current focused review
 Owner: platform integration and application architecture
-Last verified: 2026-09-09
+Last verified: 2026-09-13
 
 ## Scope
 
@@ -26,7 +26,8 @@ The final design uses existing authorities:
 - the existing launcher confines itself and its exact AMY child, identifies
   the active child worker once, and applies CPU3/FIFO70 only to that thread;
 - the frontend reads the resulting AMY, frontend and PipeWire policies back;
-- boot isolation and the performance governor remain reversible host policy.
+- boot isolation remains reversible host policy, while CPU-frequency scaling
+  remains at Raspberry Pi OS's normal `ondemand` default.
 
 There is no watcher daemon, registration socket, AMY name matching, repeated
 process scan, custom lifecycle token or test-only production endpoint.
@@ -57,6 +58,10 @@ process scan, custom lifecycle token or test-only production endpoint.
 11. Packaged host-tool execution no longer inherits AppImage/PyInstaller's
     private `LD_LIBRARY_PATH` or `LD_PRELOAD`. The adapter invokes canonical
     `/usr/bin/systemctl` while preserving the actual user-session environment.
+12. CPU frequency scaling is no longer held at maximum by a custom systemd
+    service. The installer removes that earlier service, restores `ondemand`
+    immediately and the startup contract accepts the default while still
+    requiring and reading back the isolated-core audio policy.
 
 ## Test evidence
 
@@ -77,6 +82,9 @@ process scan, custom lifecycle token or test-only production endpoint.
   board variants. Its checksum-verified Pi AppImage `R20260909161844` passed a
   physical post-reboot startup and an external 20-second 120 Hz touch sweep
   with no warning, overload, dropout, binding loop or throttling.
+- On a Pi 5 using `ondemand`, the revised policy selected exactly one packaged
+  AMY callback on CPU3/FIFO70, kept its other threads on CPUs 0-1, retained
+  both PipeWire loops on CPU2/FIFO80/75, and passed aggregate startup read-back.
 
 Every release remains gated by the normal unit/quality matrix. The aarch64
 package job also exercises package startup and the shared 120 Hz visual-cost
@@ -85,7 +93,8 @@ acceptance after its first release.
 
 ## Remaining non-blocking evidence
 
-- Repeat the physical measurements on a Pi 5 when hardware is available.
+- Repeat full maximum-capacity and 120 Hz physical measurements on the Pi 5;
+  the core placement and startup policy have already been validated there.
 - If a future AMY backend recreates its callback thread without restarting its
   service process, characterize that lifecycle before adding any reapplication
   mechanism. Current miniaudio service behavior keeps the callback stable, so
