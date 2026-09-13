@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import signal
 import sys
 from pathlib import Path
 
@@ -32,6 +33,8 @@ def main() -> int:
 
     app = QCoreApplication(sys.argv)
     app.setApplicationName("LB Omnichord headless integration test")
+    signal.signal(signal.SIGINT, lambda _signum, _frame: app.quit())
+    signal.signal(signal.SIGTERM, lambda _signum, _frame: app.quit())
     graph = compose_application_graph(
         args,
         dependencies,

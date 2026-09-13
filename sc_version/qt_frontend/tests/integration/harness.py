@@ -19,7 +19,18 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
-TEST_APP = Path(__file__).with_name("headless_app.py")
+# These inherited wire-level cases remain a characterization oracle for the
+# AMY release being replaced.  Running its unchanged composition root avoids
+# silently weakening assertions while SC-specific integration tests exercise
+# the new production boundary.
+TEST_APP = (
+    ROOT.parents[1]
+    / "amysynth_version"
+    / "qt_frontend"
+    / "tests"
+    / "integration"
+    / "headless_app.py"
+)
 sys.path.insert(0, str(ROOT / "code"))
 
 from shared_reverb import SHARED_REVERB_PROCESSOR_COUNT  # noqa: E402
