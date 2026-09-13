@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "design_contract", "rhythms"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "design_contract": {"type": "object", "required": ["ppq"]},
+    "rhythms": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "meter", "period_ticks", "period_bars", "levels"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "period_ticks": {"type": "integer", "minimum": 1},
+          "period_bars": {"type": "integer", "minimum": 1},
+          "levels": {"type": "array", "minItems": 5, "maxItems": 5}
+        }
+      }
+    }
+  }
+}

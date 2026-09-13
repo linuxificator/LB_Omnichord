@@ -1,0 +1,519 @@
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+import "physical_controls"
+
+Item {
+    id: root
+
+    required property var hostWindow
+    property bool tuningCoupled: true
+    property int activeMidiRow: 0
+    property var midiControlModel: []
+    property var inputTechModel: midiBackend.midiInputTechs
+
+    signal showOmniRequested()
+    signal toggleTuningCouplingRequested()
+
+    onVisibleChanged: {
+        if (visible) {
+            Qt.callLater(function() {
+                midiControlBar.publishCapacity()
+            })
+        }
+    }
+
+    Timer {
+        interval: 100
+        running: root.visible
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            midiBackend.setControlIndicatorCapacity(
+                midiControlBar.indicatorCapacity
+            )
+            root.midiControlModel = midiBackend
+                .commonControls(-1)
+                .slice(0, midiControlBar.indicatorCapacity)
+        }
+    }
+
+    readonly property var synthThemes: [
+        {
+            "panel": "#f4d8dc",
+            "border": "#c97b84",
+            "accent": "#b84957",
+            "text": "#45151b"
+        },
+        {
+            "panel": "#f6dfc8",
+            "border": "#c98a4f",
+            "accent": "#c46c27",
+            "text": "#4c280c"
+        },
+        {
+            "panel": "#f5edbd",
+            "border": "#c5ac49",
+            "accent": "#b18b13",
+            "text": "#413408"
+        },
+        {
+            "panel": "#dcefd8",
+            "border": "#83ad7d",
+            "accent": "#4a9251",
+            "text": "#153819"
+        },
+        {
+            "panel": "#dcecf7",
+            "border": "#8bb9d8",
+            "accent": "#2f7fb4",
+            "text": "#102f45"
+        },
+        {
+            "panel": "#e8dcf5",
+            "border": "#9270b6",
+            "accent": "#75479d",
+            "text": "#32194b"
+        }
+    ]
+
+    readonly property color activeStrumColor:
+        root.synthThemes[root.activeMidiRow].accent
+
+    Rectangle {
+        id: midiControlBar
+
+        readonly property int indicatorWidth: 74
+        readonly property int indicatorSpacing: 10
+        readonly property int horizontalPadding: 8
+        readonly property int indicatorCapacity: Math.max(
+            1,
+            Math.floor(
+                (width - 2 * horizontalPadding)
+                / (indicatorWidth + indicatorSpacing)
+            )
+        )
+
+        function publishCapacity() {
+            midiBackend.setControlIndicatorCapacity(indicatorCapacity)
+        }
+
+        onIndicatorCapacityChanged: {
+            if (root.visible) {
+                publishCapacity()
+            }
+        }
+
+        anchors.fill: parent
+        color: "#f4f0e6"
+    }
+
+    // Consume unused-space touches so no hidden Omnichord control underneath
+    // the MIDI screen can be activated through a transparent gap.
+    MouseArea {
+        anchors.fill: parent
+    }
+
+    Item {
+        id: midiTitle
+        x: 0
+        y: 0
+        width: root.width
+        height: root.hostWindow.sectionHeight
+        visible: root.hostWindow.titleHeight > 0
+
+        Text {
+            x: root.hostWindow.omniTitleX
+            y: 0
+            width: root.hostWindow.omniTitleWidth
+            height: parent.height
+            text: headerTitleText
+            color: "#493a38"
+            font.family: headerTitleFont
+            font.pixelSize:
+                Math.max(
+                    14,
+                    root.hostWindow.titleHeight * 0.62
+                )
+            font.weight: Font.Medium
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+            maximumLineCount: 1
+        }
+    }
+
+    ReverbPanel {
+        id: reverbPanel
+        x: 0
+        y: root.hostWindow.presetY
+        width: root.hostWindow.reverbPanelWidth
+        height: root.hostWindow.presetRowHeight
+        controller: midiBackend
+        midiControlRouter: midiBackend
+        controlScreen: "midi"
+    }
+
+    MidiUtilitySection {
+        x: root.hostWindow.contentX
+        y: root.hostWindow.utilityY
+        width:
+            root.hostWindow.volumeX
+            + root.hostWindow.volumeWidth
+            - root.hostWindow.contentX
+        height:
+            root.hostWindow.sectionHeight
+            + root.hostWindow.sectionGap
+            + root.hostWindow.presetRowHeight
+
+        controller: midiBackend
+        integrationController: performanceBackend
+        tuningModeModel: tuningModeNames
+        fullScreen:
+            root.hostWindow.visibility
+            === Window.FullScreen
+        leftExtension: root.hostWindow.leftRailWidth
+        tuningCoupled: root.tuningCoupled
+        tuningRowHeight: root.hostWindow.sectionHeight
+        presetRowY:
+            root.hostWindow.sectionHeight
+            + root.hostWindow.sectionGap
+        presetRowHeight: root.hostWindow.presetRowHeight
+        utilityRightEdge:
+            reverbPanel.width
+            - root.hostWindow.contentX
+        presetX:
+            reverbPanel.width
+            + root.hostWindow.sectionGap
+            - root.hostWindow.contentX
+
+        onToggleFullscreenRequested:
+            root.hostWindow.toggleFullscreenMode()
+
+        onToggleTuningCouplingRequested:
+            root.toggleTuningCouplingRequested()
+    }
+
+    PresetResetButton {
+        x: (root.hostWindow.leftRailWidth - width) / 2
+        y: root.hostWindow.utilityY + 7
+        width: 42
+        height: 42
+        text: "UP"
+        panelColor: "#efb05c"
+        borderColor: "#a75d0a"
+        textColor: "#492606"
+        onPressedChanged: {
+            if (pressed) backend.beginPitchBend(1)
+            else backend.endPitchBend()
+        }
+    }
+
+    PresetResetButton {
+        x: (root.hostWindow.leftRailWidth - width) / 2
+        y:
+            root.hostWindow.utilityY
+            + root.hostWindow.sectionHeight
+            - height
+            - 7
+        width: 42
+        height: 42
+        text: "DWN"
+        panelColor: "#efb05c"
+        borderColor: "#a75d0a"
+        textColor: "#492606"
+        onPressedChanged: {
+            if (pressed) backend.beginPitchBend(-1)
+            else backend.endPitchBend()
+        }
+    }
+
+    Repeater {
+        model: root.synthThemes
+
+        delegate: MidiSynthSection {
+            id: midiSynthRow
+            required property var modelData
+            required property int index
+
+            x: 0
+            y:
+                root.hostWindow.rhythmY
+                + midiSynthRow.index
+                * (
+                    root.hostWindow.sectionHeight
+                    + root.hostWindow.sectionGap
+                )
+            width:
+                root.hostWindow.volumeX
+                + root.hostWindow.volumeWidth
+            height: root.hostWindow.sectionHeight
+
+            controller: midiBackend
+            rowIndex: midiSynthRow.index
+            synthModel: midiBackend.synthNames
+            leftRailWidth: root.hostWindow.leftRailWidth
+            contentX: root.hostWindow.contentX
+            volumeX: root.hostWindow.volumeX
+            volumeWidth: root.hostWindow.volumeWidth
+            wheelWidth: root.hostWindow.wheelWidth
+
+            panelColor: midiSynthRow.modelData.panel
+            borderColor: midiSynthRow.modelData.border
+            accentColor: midiSynthRow.modelData.accent
+            textColor: midiSynthRow.modelData.text
+
+            onInteracted: (rowIndex) =>
+                root.activeMidiRow = rowIndex
+        }
+    }
+
+    RainbowModeButton {
+        id: omniButton
+        x: 0
+        y:
+            root.hostWindow.chordRowsY
+            + 3
+            * (
+                root.hostWindow.rowHeight
+                + root.hostWindow.rowSpacing
+            )
+        width:
+            root.hostWindow.contentX
+            + 2 * root.hostWindow.rowIndent
+            - root.hostWindow.controlSpacing
+            + omniButton.extensionWidth
+        height: root.hostWindow.rowHeight
+        text: "OMNI"
+        midiControlRouter: midiBackend
+        bindingLocationScreen: "omni"
+        onClicked: {
+            midiBackend.previewEnd()
+            root.showOmniRequested()
+        }
+    }
+
+    Rectangle {
+        id: midiCcPanel
+        x:
+            omniButton.x
+            + omniButton.width
+            + root.hostWindow.controlSpacing
+        y:
+            root.hostWindow.chordRowsY
+            + 3 * (root.hostWindow.rowHeight + root.hostWindow.rowSpacing)
+        width: Math.max(
+            0,
+            root.hostWindow.volumeX
+            + root.hostWindow.volumeWidth
+            - x
+        )
+        height: root.hostWindow.rowHeight
+        radius: 12
+        color: "#c8c8c4"
+        border.color: "#777772"
+        clip: true
+
+        Row {
+            id: midiControlRow
+            anchors.left: parent.left
+            anchors.leftMargin: midiControlBar.horizontalPadding
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: midiControlBar.indicatorSpacing
+
+            Repeater {
+                id: midiControlRepeater
+                model: root.midiControlModel
+
+                delegate: Button {
+                    id: midiControlIndicator
+                    required property var modelData
+                    width: midiControlBar.indicatorWidth
+                    height: 68
+                    enabled: !midiControlIndicator.modelData.evicting
+                    padding: 0
+                    background: Item {}
+                    contentItem: Item {}
+
+                    Rectangle {
+                        id: controlLed
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 0
+                        width: 10
+                        height: 10
+                        radius: 5
+                        color: {
+                            if (midiControlIndicator.modelData.evicting)
+                                return "#9b3030"
+                            if (midiControlIndicator.modelData.state === "learn")
+                                return "#f22b2b"
+                            if (midiControlIndicator.modelData.state === "bound")
+                                return "#35b85a"
+                            if (midiControlIndicator.modelData.state === "blue")
+                                return "#3186d7"
+                            return "#a5a5a0"
+                        }
+
+                        SequentialAnimation on opacity {
+                            running:
+                                midiControlIndicator.modelData.state === "learn"
+                                && !midiControlIndicator.modelData.evicting
+                            loops: Animation.Infinite
+                            NumberAnimation { from: 1.0; to: 0.2; duration: 240 }
+                            NumberAnimation { from: 0.2; to: 1.0; duration: 240 }
+                        }
+                    }
+
+                    Item {
+                        id: hardwareControl
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 9
+                        width: 52
+                        height: 52
+                        readonly property bool pitchBend:
+                            midiControlIndicator.modelData.displayType === "pitch_bend"
+                        readonly property bool noteButton:
+                            midiControlIndicator.modelData.displayType === "note_button"
+                            || midiControlIndicator.modelData.displayType === "button"
+
+                        PhysicalRotary {
+                            visible: !hardwareControl.noteButton
+                            anchors.centerIn: parent
+                            width: 52
+                            height: 52
+                            family:
+                                midiControlIndicator.modelData.displayProtocol === "osc" ? 1 : 6
+                            encoder: hardwareControl.pitchBend
+                            from: 0
+                            to: 127
+                            value: Number(midiControlIndicator.modelData.displayValue)
+                            physicalInteractive: false
+                            opacity: midiControlIndicator.modelData.evicting ? 0.55 : 1.0
+                        }
+
+                        PhysicalPushButton {
+                            visible: hardwareControl.noteButton
+                            anchors.centerIn: parent
+                            width: 58
+                            height: 42
+                            family:
+                                midiControlIndicator.modelData.displayProtocol === "osc" ? 1 : 6
+                            forcedDown:
+                                midiControlIndicator.modelData.buttonDown
+                                && !midiControlIndicator.modelData.evicting
+                        }
+                    }
+
+                    Text {
+                        anchors.bottom: parent.bottom
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: parent.width
+                        text: midiControlIndicator.modelData.displayLabel
+                        color: "#292927"
+                        font.pixelSize: 11
+                        horizontalAlignment: Text.AlignHCenter
+                        elide: Text.ElideMiddle
+                    }
+
+                    SequentialAnimation on opacity {
+                        running: Boolean(midiControlIndicator.modelData.evicting)
+                        loops: 2
+                        NumberAnimation { from: 1.0; to: 0.2; duration: 100 }
+                        NumberAnimation { from: 0.2; to: 1.0; duration: 100 }
+                    }
+
+                    onClicked: {
+                        midiBackend.clickControlIndicator(
+                            midiControlIndicator.modelData.channel,
+                            midiControlIndicator.modelData.controller
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    Item {
+        id: midiInputTechPanel
+
+        readonly property int panelY:
+            root.hostWindow.rhythmY
+            + 6 * root.hostWindow.sectionHeight
+            + 5 * root.hostWindow.sectionGap
+        readonly property int panelBottom:
+            root.hostWindow.chordRowsY
+            + 3 * (
+                root.hostWindow.rowHeight
+                + root.hostWindow.rowSpacing
+            )
+
+        x: root.hostWindow.contentX
+        y: panelY
+        width:
+            Math.max(
+                0,
+                midiCcPanel.x
+                + midiCcPanel.width
+                - root.hostWindow.contentX
+            )
+        height: Math.max(0, panelBottom - panelY)
+        visible:
+            height >= 24
+            && root.inputTechModel.length > 0
+
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 18
+
+            Repeater {
+                model: root.inputTechModel
+
+                delegate: InputTechnologyIndicator {
+                    id: inputTechnologyIndicator
+                    required property var modelData
+                    technology: inputTechnologyIndicator.modelData
+                }
+            }
+        }
+    }
+
+    MidiStrumPad {
+        x: root.hostWindow.strumX
+        y: 0
+        width: root.hostWindow.strumWidth
+        height: root.hostWindow.totalControlHeight
+        controller: performanceBackend
+        rowIndex: root.activeMidiRow
+        tuningCoupled: root.tuningCoupled
+        padColor: root.activeStrumColor
+    }
+
+    MidiChannelButton {
+        id: chordInputChannelButton
+        objectName: "chordInputChannelButton"
+        x:
+            root.hostWindow.volumeX
+            + root.hostWindow.volumeWidth
+            - width
+        y:
+            root.hostWindow.utilityY
+            + (root.hostWindow.sectionHeight - height) / 2
+        z: 2000
+        channel: {
+            midiBackend.stateVersion
+            return midiBackend.chordInputChannel
+        }
+        panelColor: "#ffffff"
+        pressedPanelColor: "#dddddd"
+        borderColor: "#000000"
+        textColor: "#000000"
+        ToolTip.visible: hovered
+        ToolTip.text: "OMNI chord input channel"
+
+        onClicked:
+            midiBackend.cycleChordInputChannel()
+    }
+}

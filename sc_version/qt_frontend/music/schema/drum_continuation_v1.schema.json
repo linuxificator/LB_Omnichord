@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "fills"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "fills": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["fill_id", "continue_roles"],
+        "properties": {
+          "fill_id": {"type": "string", "minLength": 1},
+          "continue_roles": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}

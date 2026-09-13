@@ -1,0 +1,57 @@
+{
+  "chord_rows": [
+    {
+      "chord": "major",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "minor",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "major7",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "minor7",
+      "octave": "O3",
+      "inversion": 0
+    }
+  ],
+  "synths": {
+    "chord": "juno_004",
+    "strum": "juno_028",
+    "bass": "dx7_143"
+  },
+  "volumes": {
+    "chord": 0.5,
+    "strum": 0.5,
+    "bass": 0.5,
+    "percussion": 0.5
+  },
+  "transport": {
+    "rhythm_running": false,
+    "bass_running": true
+  },
+  "rhythm": {
+    "selected": "waltz",
+    "bass_voicing_shift": 0,
+    "bass_riff_selector": 1,
+    "chord_arpeggio_enabled": false,
+    "chord_arpeggio_rate": 1,
+    "chord_arpeggio_direction": "up"
+  },
+  "window": {
+    "start_fullscreen": false,
+    "scale_to_fit": true
+  },
+  "effects": {
+    "reverb_level": 0.0,
+    "reverb_liveness": 0.5,
+    "reverb_damping": 0.5,
+    "reverb_drums": false
+  }
+}

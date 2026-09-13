@@ -1,0 +1,487 @@
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Window
+
+Item {
+    id: root
+
+    required property var controller
+    required property var integrationController
+    required property var tuningModeModel
+    required property bool fullScreen
+    property int leftExtension: 0
+    property bool tuningCoupled: true
+    property int tuningRowHeight: height
+    property int presetRowY: 0
+    property int presetRowHeight: height
+    property int utilityRightEdge: width
+    signal toggleFullscreenRequested()
+    signal toggleTuningCouplingRequested()
+
+    readonly property int wheelWidth: 150
+    readonly property int tuningX: 231
+    readonly property int tuningWidth: 52
+    readonly property int utilityGap: 8
+    readonly property int masterWidth: tuningWidth
+    readonly property int panicWidth: 76
+    readonly property int escapeWidth: 72
+
+    readonly property int escapeX:
+        utilityRightEdge - escapeWidth
+    readonly property int panicX:
+        escapeX - utilityGap - panicWidth
+    readonly property int masterX:
+        panicX - utilityGap - masterWidth
+    property int presetX:
+        escapeX + escapeWidth + utilityGap
+
+    function synchronizeTuningWheel() {
+        if (!tuningWheel.initialized) {
+            return
+        }
+        if (tuningWheel.currentIndex !== root.controller.tuningModeIndex) {
+            tuningWheel.syncing = true
+            tuningWheel.currentIndex = root.controller.tuningModeIndex
+            Qt.callLater(function() {
+                tuningWheel.syncing = false
+            })
+        }
+    }
+
+    function midiButtonHandled(target) {
+        const learned = root.controller.activateControlTarget(target)
+        if (learned)
+            return true
+        return root.controller.midiButtonTargetBlocked(target)
+    }
+
+    onTuningCoupledChanged:
+        root.synchronizeTuningWheel()
+
+    Connections {
+        target: root.controller
+
+        function onTuningChanged() {
+            root.synchronizeTuningWheel()
+        }
+    }
+
+    SectionBackground {
+        y: 0
+        leftExtension: root.leftExtension
+        contentWidth: root.tuningX + root.tuningWidth
+        frameHeight: root.tuningRowHeight
+    }
+
+    TuningLinkButton {
+        x: root.wheelWidth + 7
+        y: 8
+        width: root.tuningX - root.wheelWidth - 14
+        height: root.tuningRowHeight - 16
+        coupled: root.tuningCoupled
+        onClicked: {
+            if (root.tuningCoupled) {
+                root.controller.setTuningCoupled(false)
+                root.toggleTuningCouplingRequested()
+            } else {
+                if (root.integrationController.coupleTuningFromMidi())
+                    root.toggleTuningCouplingRequested()
+            }
+        }
+    }
+
+    Frame {
+        id: tuningWheelFrame
+        x: 0
+        y: 0
+        width: root.wheelWidth
+        height: root.tuningRowHeight
+        padding: 0
+
+        background: Rectangle {
+            radius: 10
+            color: "#e99d43"
+            border.color: "#a65c0a"
+            border.width: 1
+        }
+
+        Tumbler {
+            id: tuningWheel
+            anchors.fill: parent
+            anchors.margins: 3
+            model: root.tuningModeModel
+            visibleItemCount: 3
+            wrap: true
+
+            property bool initialized: false
+            property bool syncing: false
+
+            Component.onCompleted: {
+                syncing = true
+                currentIndex = root.controller.tuningModeIndex
+                Qt.callLater(function() {
+                    tuningWheel.syncing = false
+                    tuningWheel.initialized = true
+                })
+            }
+
+            delegate: Item {
+                id: tuningItem
+                required property var modelData
+                required property int index
+                width: tuningWheel.width
+                height: tuningWheel.height / tuningWheel.visibleItemCount
+
+                Text {
+                    anchors.centerIn: parent
+                    width: parent.width - 10
+                    text: tuningItem.modelData
+                    color: "#482507"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize:
+                        Math.abs(Tumbler.displacement) < 0.5 ? 19 : 15
+                    font.bold:
+                        Math.abs(Tumbler.displacement) < 0.5
+                    opacity:
+                        0.34
+                        + Math.max(
+                            0,
+                            1 - Math.abs(Tumbler.displacement)
+                        ) * 0.66
+                }
+
+                TapHandler {
+                    gesturePolicy: TapHandler.DragThreshold
+                    onTapped: tuningWheel.currentIndex = tuningItem.index
+                }
+            }
+
+            onCurrentIndexChanged: {
+                if (initialized && !syncing && currentIndex >= 0) {
+                    root.controller.setTuningModeIndex(currentIndex)
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height / 2 - 16
+            width: parent.width - 12
+            height: 32
+            radius: 7
+            color: "transparent"
+            border.color: "#844400"
+            border.width: 2
+        }
+    }
+
+    TapNumber {
+        x: root.tuningX
+        y: 0
+        width: root.tuningWidth
+        height: root.tuningRowHeight
+        currentValue: root.controller.tuningReference
+        fromValue: 415
+        toValue: 466
+        stepValue: 1
+        panelColor: "#efb05c"
+        panelBorderColor: "#a75d0a"
+        fillColor: "#cc6f0c"
+        textColor: "#492606"
+        midiControlRouter: root.controller
+        midiTarget: ({
+            "screen": "midi",
+            "kind": "tuning_reference"
+        })
+
+        onEdited: (value) => root.controller.setTuningReference(value)
+    }
+
+    TapNumber {
+        x: root.masterX
+        y: 0
+        width: root.masterWidth
+        height: root.tuningRowHeight
+        currentValue: Math.round(root.controller.masterVolume * 100)
+        fromValue: 0
+        toValue: 100
+        stepValue: 1
+        panelColor: "#b58a63"
+        panelBorderColor: "#6d492c"
+        fillColor: "#704323"
+        textColor: "#2d190d"
+        centerButtonEnabled: true
+        centerText: root.controller.masterMuted ? "UMT" : "MUT"
+        centerPanelColor:
+            root.controller.masterMuted ? "#111111" : "#ffffff"
+        centerPanelTextColor:
+            root.controller.masterMuted ? "#ffffff" : "#111111"
+        centerPanelBorderColor: "#6d492c"
+        midiControlRouter: root.controller
+        midiTarget: ({
+            "screen": "midi",
+            "kind": "master_volume"
+        })
+        centerMidiTarget: ({
+            "screen": "midi",
+            "kind": "button",
+            "action": "master_mute"
+        })
+
+        onEdited: (value) => root.controller.setMasterVolume(value / 100)
+        onCenterClicked: root.controller.toggleMasterMuted()
+    }
+
+    Button {
+        id: panicButton
+        x: root.panicX
+        y: 8
+        width: root.panicWidth
+        height: root.tuningRowHeight - 16
+        text: "PNC!"
+        font.pixelSize: 18
+        font.bold: true
+        property var midiTarget: ({
+            "screen": "omni",
+            "kind": "button",
+            "action": "panic"
+        })
+
+        contentItem: Text {
+            text: panicButton.text
+            color: "#ffffff"
+            font: panicButton.font
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        background: Rectangle {
+            radius: 9
+            color: panicButton.pressed ? "#bd0000" : "#f11616"
+            border.color: "#850000"
+            border.width: 2
+        }
+
+        MidiButtonLed {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: 4
+            z: 2
+            midiControlRouter: root.controller
+            midiTarget: panicButton.midiTarget
+        }
+
+        onClicked: {
+            if (!root.midiButtonHandled(panicButton.midiTarget)) {
+                root.integrationController.panic()
+            }
+        }
+    }
+
+    Button {
+        id: escapeButton
+        x: root.escapeX
+        y: 8
+        width: root.escapeWidth
+        height: root.tuningRowHeight - 16
+        text: root.fullScreen ? "ESC" : "FSC"
+        font.pixelSize: 17
+        font.bold: true
+
+        contentItem: Text {
+            text: escapeButton.text
+            color: "#6b1f1f"
+            font: escapeButton.font
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        background: Rectangle {
+            radius: 9
+            color: escapeButton.pressed ? "#df9292" : "#f3c0c0"
+            border.color: "#bd7474"
+            border.width: 2
+        }
+
+        onClicked: root.toggleFullscreenRequested()
+    }
+
+    Rectangle {
+        id: presetPanel
+        x: root.presetX
+        y: root.presetRowY
+        width: parent.width - x
+        height: root.presetRowHeight
+        radius: 12
+        color: "#e8dcf5"
+        border.color: "#9270b6"
+        border.width: 1
+
+        Button {
+            id: storeButton
+            x: 8
+            anchors.verticalCenter: parent.verticalCenter
+            width: 48
+            height: 48
+            text: "STR"
+            font.pixelSize: 18
+            font.bold: true
+            property var midiTarget: ({
+                "screen": "midi",
+                "kind": "button",
+                "action": "store_preset"
+            })
+
+            contentItem: Text {
+                text: storeButton.text
+                color: "#ffffff"
+                font: storeButton.font
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            background: Rectangle {
+                radius: width / 2
+                color: storeButton.pressed ? "#522476" : "#6f3599"
+                border.color: "#3f195e"
+                border.width: 2
+            }
+
+            MidiButtonLed {
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: 4
+                z: 2
+                midiControlRouter: root.controller
+                midiTarget: storeButton.midiTarget
+            }
+
+            onClicked: {
+                if (!root.midiButtonHandled(storeButton.midiTarget)) {
+                    root.controller.storeSelectedPreset()
+                }
+            }
+        }
+
+        Row {
+            id: presetButtons
+            x: storeButton.x + storeButton.width + 6
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 6
+
+            Repeater {
+                model: root.controller.presetCount
+
+                delegate: Button {
+                    id: presetButton
+                    required property int index
+
+                    property int presetNumber: index + 1
+                    property var midiTarget: ({
+                        "screen": "midi",
+                        "kind": "button",
+                        "action": "select_preset",
+                        "preset": presetNumber
+                    })
+                    property bool selected:
+                        root.controller.selectedPreset === presetNumber
+                    property bool storeFlash: false
+
+                    width: 48
+                    height: 48
+                    padding: 0
+                    leftInset: 0
+                    rightInset: 0
+                    topInset: 0
+                    bottomInset: 0
+                    scale: 1.0
+                    text: "M" + presetNumber
+                    font.pixelSize: 12
+                    font.bold: true
+
+                    contentItem: Text {
+                        text: presetButton.text
+                        color: presetButton.selected ? "#ffffff" : "#4c286d"
+                        font: presetButton.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    background: Rectangle {
+                        x: 0
+                        y: 0
+                        width: presetButton.width
+                        height: presetButton.height
+                        radius: Math.min(width, height) / 2
+                        color:
+                            presetButton.storeFlash
+                            ? "#d78cff"
+                            : (
+                                presetButton.pressed
+                                ? "#70408e"
+                                : (
+                                    presetButton.selected
+                                    ? "#8c50b9"
+                                    : "#d1b9e6"
+                                )
+                            )
+                        border.color:
+                            presetButton.storeFlash
+                            ? "#ffffff"
+                            : (
+                                presetButton.selected
+                                ? "#ffffff"
+                                : "#8e6bab"
+                            )
+                        border.width: 1
+                    }
+
+                    MidiBindingLocationLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 4
+                        width: 7
+                        height: 7
+                        radius: width / 2
+                        z: 2
+                        midiControlRouter: root.controller
+                        targetScreen: "midi"
+                        targetPreset: presetButton.presetNumber
+                        locationEnabled: !presetButton.selected
+                    }
+
+                    MidiButtonLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 14
+                        z: 2
+                        midiControlRouter: root.controller
+                        midiTarget: presetButton.midiTarget
+                    }
+
+                    Timer {
+                        id: storeFlashTimer
+                        interval: 520
+                        repeat: false
+                        onTriggered: presetButton.storeFlash = false
+                    }
+
+                    Connections {
+                        target: root.controller
+                        function onPresetStored(presetNumber) {
+                            if (presetNumber === presetButton.presetNumber) {
+                                presetButton.storeFlash = true
+                                storeFlashTimer.restart()
+                            }
+                        }
+                    }
+
+                    onClicked: {
+                        if (!root.midiButtonHandled(presetButton.midiTarget)) {
+                            root.controller.selectPreset(presetNumber)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,10 @@
+[run]
+branch = true
+parallel = true
+patch = subprocess
+relative_files = true
+source = code
+
+[report]
+show_missing = true
+skip_covered = true
