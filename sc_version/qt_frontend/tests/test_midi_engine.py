@@ -18,7 +18,7 @@ from midi_player import (  # noqa: E402
     LEGACY_FACTORY_MIDI_CHANNELS,
     MIDI_PRESET_COUNT,
     MIDI_ROW_COUNT,
-    MidiAmyEngine,
+    MidiEngine,
     MidiPlayerBackend,
     _migrated_factory_channel_defaults,
 )
@@ -38,32 +38,10 @@ from midi_levels import (  # noqa: E402
     midi_pitched_synth_level,
     normalized_midi_velocity,
 )
+from engine_protocol import NoteOff, NoteOn  # noqa: E402
 from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
 from resolved_config import resolve_amy_config_data  # noqa: E402
 from synth_state import SynthState  # noqa: E402
-
-
-class _RecordingWriter:
-    def __init__(self, events: list[tuple[str, object]]) -> None:
-        self.events = events
-
-    def delay(self, seconds: float) -> None:
-        self.events.append(("delay", seconds))
-
-
-class _ManualScheduler:
-    def __init__(self) -> None:
-        self.calls: list[tuple[float, object, str | None]] = []
-
-    def schedule(
-        self,
-        delay_seconds: float,
-        callback: object,
-        *,
-        replace_key: str | None = None,
-    ) -> int:
-        self.calls.append((delay_seconds, callback, replace_key))
-        return len(self.calls)
 
 
 class _Client:
@@ -73,8 +51,6 @@ class _Client:
         instrument_levels: dict[str, float] | None = None,
     ) -> None:
         self.events: list[tuple[str, object]] = []
-        self.writer = _RecordingWriter(self.events)
-        self.application_scheduler = _ManualScheduler()
         config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
         config["performance"]["synth_alloc_guard_ms"] = 12.0
         if instrument_levels is not None:
@@ -84,24 +60,57 @@ class _Client:
             source_path=ROOT / "config" / "amy_config.json",
             source_kind="external",
         )
-        self.patch_map = {"dx7_215": 215}
-
-    def _wire(self, command: str) -> None:
-        self.events.append(("wire", command))
 
     @staticmethod
-    def _f(value: float) -> str:
-        return f"{float(value):.9g}"
+    def note_to_frequency(note: float) -> float:
+        return 440.0 * (2.0 ** ((float(note) - 69.0) / 12.0))
 
-    @staticmethod
-    def _patch_compatibility_commands(
-        patch: int,
-        synth: int,
-    ) -> list[str]:
-        return [f"compat-{patch}-{synth}"]
+    def configure_part(
+        self,
+        owner: str,
+        program_id: str,
+        revision: int,
+        logical_bus: int,
+        parameters: dict[str, float],
+    ) -> None:
+        self.events.append(
+            (
+                "configure",
+                (owner, program_id, revision, logical_bus, dict(parameters)),
+            )
+        )
 
+    def set_logical_bus_level(self, logical_bus: int, level: float) -> None:
+        self.events.append(("bus_level", (logical_bus, level)))
 
-class MidiAmyEngineTests(unittest.TestCase):
+    def set_room(
+        self,
+        room_index: int,
+        level: float,
+        liveness: float,
+        damping: float,
+    ) -> None:
+        self.events.append(("room", (room_index, level, liveness, damping)))
+
+    def set_room_send(self, logical_bus: int, level: float) -> None:
+        self.events.append(("room_send", (logical_bus, level)))
+
+    def note_on(self, event: NoteOn) -> None:
+        self.events.append(("note_on", event))
+
+    def note_off(self, event: NoteOff) -> None:
+        self.events.append(("note_off", event))
+
+    def release_owner(self, owner: str) -> None:
+        self.events.append(("release_owner", owner))
+
+    def gesture_note(self, **event: object) -> None:
+        self.events.append(("gesture_note", event))
+
+    def drum_hit(self, **event: object) -> None:
+        self.events.append(("drum_hit", event))
+
+class MidiEngineTests(unittest.TestCase):
     def test_external_strum_position_crosses_each_new_note_once(self) -> None:
         backend = app_core.InstrumentBackend.__new__(app_core.InstrumentBackend)
         backend._external_strum_last_index = None
@@ -190,16 +199,16 @@ class MidiAmyEngineTests(unittest.TestCase):
 
     def test_reported_controller_notes_and_duplicate_note_60_all_emit_hits(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
 
         notes = (48, 50, 51, 53, 55, 56, 58, 60, 60, 62, 63, 65, 67, 68, 70, 72)
         for note in notes:
             engine.drum_hit(note, 60, MIDI_DRUM_REFERENCE_ROW_VOLUME)
 
-        commands = [value for kind, value in client.events if kind == "wire"]
-        self.assertEqual(len(commands), len(notes))
-        self.assertEqual(sum("p5n65" in command for command in commands), 2)
+        hits = [value for kind, value in client.events if kind == "drum_hit"]
+        self.assertEqual(len(hits), len(notes))
+        self.assertEqual(sum(hit["logical_key"] == 65 for hit in hits), 2)
 
     def test_midi_velocity_60_matches_equal_velocity_omni_reference(self) -> None:
         gain = 5.0
@@ -253,10 +262,15 @@ class MidiAmyEngineTests(unittest.TestCase):
 
     def test_pcm_drum_synth_ignores_note_offs_without_tracking_them(self) -> None:
         client = _Client()
-        MidiAmyEngine(client)
+        MidiEngine(client)
 
-        commands = [value for kind, value in client.events if kind == "wire"]
-        self.assertIn("i11iv8in1iy10if2Z", commands)
+        self.assertIn(
+            (
+                "configure",
+                ("midi/drums", "sample.gm.percussion", 1, 10, {}),
+            ),
+            client.events,
+        )
 
     def test_shipped_midi_profile_is_auto_and_resolves_per_package(self) -> None:
         config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
@@ -728,15 +742,15 @@ class MidiAmyEngineTests(unittest.TestCase):
 
     def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
         client = _Client(instrument_levels={"dx7_215": 0.4})
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
         engine.configure_row(0, "dx7_215", {}, 0.5)
         expected = midi_pitched_synth_level(0.5, 0.4)
-        self.assertIn(("wire", f"i5iV{expected:.9g}Z"), client.events)
+        self.assertIn(("bus_level", (4, expected)), client.events)
 
     def test_every_factory_pitched_row_uses_the_same_reference_policy(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         reference_velocity = normalized_midi_velocity(
             MIDI_PITCHED_REFERENCE_VELOCITY,
         )
@@ -791,26 +805,29 @@ class MidiAmyEngineTests(unittest.TestCase):
 
     def test_pitched_midi_keeps_standard_velocity_in_note_command(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
 
         engine.note_on(0, 2, 60, 60.0, MIDI_PITCHED_REFERENCE_VELOCITY)
 
-        commands = [value for kind, value in client.events if kind == "wire"]
-        self.assertEqual(commands, ["n60l0.472440945i5Z"])
+        notes = [value for kind, value in client.events if kind == "note_on"]
+        self.assertEqual(len(notes), 1)
+        self.assertEqual(notes[0].owner, "midi/row/0")
+        self.assertEqual(notes[0].logical_key, 60)
+        self.assertAlmostEqual(notes[0].velocity, normalized_midi_velocity(60))
 
     def test_effective_pitched_level_is_not_clipped_at_unity(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
 
         engine.set_row_volume(0, 1.25)
 
-        self.assertEqual(client.events, [("wire", "i5iV1.25Z")])
+        self.assertEqual(client.events, [("bus_level", (4, 1.25))])
 
-    def test_rom_patch_waits_before_parameters_and_routing(self) -> None:
+    def test_program_configuration_crosses_as_one_semantic_operation(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
 
         engine.configure_row(
@@ -822,127 +839,113 @@ class MidiAmyEngineTests(unittest.TestCase):
         self.assertEqual(
             client.events,
             [
-                ("wire", "K215i5iv4iy4Z"),
-                ("delay", 0.012),
-                ("wire", "compat-215-5"),
-                ("wire", "v0o7i5Z"),
-                ("wire", "i5iy4Z"),
                 (
-                    "wire",
-                    f"i5iV{midi_pitched_synth_level(0.28):.9g}Z",
+                    "configure",
+                    ("midi/row/0", "dx7_215", 1, 4, {"algorithm": 7.0}),
                 ),
-                ("wire", "y4h0Z"),
-                ("wire", "y4hS1,1Z"),
-                ("wire", "y4V1Z"),
+                (
+                    "bus_level",
+                    (4, midi_pitched_synth_level(0.28)),
+                ),
+                ("room_send", (4, 1.0)),
             ],
         )
 
     def test_master_volume_is_scoped_to_all_midi_buses(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
 
         engine.set_master_volume(0.35)
 
         self.assertEqual(
-            [value for kind, value in client.events if kind == "wire"],
-            [f"y{bus}V0.35Z" for bus in range(4, 11)],
+            client.events,
+            [("bus_level", (bus, 0.35)) for bus in range(4, 11)],
         )
 
         client.events.clear()
         engine.configure_row(0, "dx7_215", {}, 0.5)
-        self.assertIn(("wire", "y4V0.35Z"), client.events)
+        self.assertIn(
+            (
+                "bus_level",
+                (4, 0.35 * midi_pitched_synth_level(0.5)),
+            ),
+            client.events,
+        )
 
     def test_only_reconfiguration_silences_an_existing_synth(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
 
         engine.configure_row(5, "dx7_215", {}, 0.5)
-        first_commands = [value for kind, value in client.events if kind == "wire"]
-        self.assertNotIn("l0i10Z", first_commands)
+        self.assertNotIn(("release_owner", "midi/row/5"), client.events)
 
         client.events.clear()
         engine.configure_row(5, "dx7_215", {}, 0.5)
-        second_commands = [value for kind, value in client.events if kind == "wire"]
-        self.assertEqual(second_commands[0], "l0i10Z")
+        self.assertEqual(
+            client.events[:2],
+            [
+                ("release_owner", "midi/row/5"),
+                ("release_owner", "midi/preview/5"),
+            ],
+        )
 
     def test_unallocated_drum_row_is_not_sent_a_note_off(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
 
         engine.silence_row(5)
 
         self.assertEqual(client.events, [])
 
-    def test_strum_preview_releases_before_exceeding_voice_count(self) -> None:
+    def test_strum_preview_delegates_tail_and_voice_limit_to_engine(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
         client.events.clear()
 
         for note in (60.0, 64.0, 67.0, 71.0, 72.0):
             engine.preview_note(0, note)
 
-        commands = [value for kind, value in client.events if kind == "wire"]
-        fifth_on = commands.index("n72l0.826771654i5Z")
-        self.assertEqual(commands[fifth_on - 1], "n60l0i5Z")
-        self.assertEqual(
-            engine._preview_active_notes[0],
-            [64.0, 67.0, 71.0, 72.0],
-        )
-        self.assertEqual(
-            [call[2] for call in client.application_scheduler.calls],
-            ["midi-preview-tail-0"] * 5,
-        )
+        gestures = [value for kind, value in client.events if kind == "gesture_note"]
+        self.assertEqual(len(gestures), 5)
+        self.assertTrue(all(item["owner"] == "midi/preview/0" for item in gestures))
+        self.assertTrue(all(item["voice_limit"] == engine.voices for item in gestures))
+        self.assertEqual([item["note"] for item in gestures], [60, 64, 67, 71, 72])
 
     def test_every_midi_instrument_has_an_isolated_effect_bus(self) -> None:
         client = _Client()
-        engine = MidiAmyEngine(client)
+        engine = MidiEngine(client)
 
         self.assertEqual(engine.row_buses, (4, 5, 6, 7, 8, 9))
         self.assertEqual(engine.drum_bus, 10)
 
         client.events.clear()
         engine.configure_row(2, "dx7_215", {}, 0.5)
-        self.assertIn(("wire", "K215i7iv4iy6Z"), client.events)
-        self.assertIn(("wire", "i7iy6Z"), client.events)
+        self.assertIn(
+            ("configure", ("midi/row/2", "dx7_215", 1, 6, {})),
+            client.events,
+        )
 
         client.events.clear()
         engine.set_reverb(0.4, 0.6, 0.7, False)
-        self.assertIn(("wire", "hR1,0.4,0.6,0.7Z"), client.events)
-        reverb_commands = [
-            value for kind, value in client.events if kind == "wire" and str(value).startswith("y")
-        ]
+        self.assertIn(("room", (1, 0.4, 0.6, 0.7)), client.events)
+        reverb_commands = [value for kind, value in client.events if kind == "room_send"]
         self.assertEqual(
             reverb_commands,
-            [
-                "y4h0Z",
-                "y4hS1,1Z",
-                "y5h0Z",
-                "y5hS1,1Z",
-                "y6h0Z",
-                "y6hS1,1Z",
-                "y7h0Z",
-                "y7hS1,1Z",
-                "y8h0Z",
-                "y8hS1,1Z",
-                "y9h0Z",
-                "y9hS1,1Z",
-                "y10h0Z",
-                "y10hS1,0Z",
-            ],
+            [(bus, 1.0) for bus in range(4, 10)] + [(10, 0.0)],
         )
 
         client.events.clear()
         engine.set_reverb(0.5, 0.6, 0.7, False)
-        self.assertEqual(client.events, [("wire", "hR1,0.5,0.6,0.7Z")])
+        self.assertEqual(client.events, [("room", (1, 0.5, 0.6, 0.7))])
 
         client.events.clear()
         engine.set_reverb(0.5, 0.6, 0.7, True)
         self.assertEqual(
             client.events,
-            [("wire", "y10hS1,1Z")],
+            [("room_send", (10, 1.0))],
         )
 
     def test_native_defaults_are_not_resent_by_midi_state(self) -> None:

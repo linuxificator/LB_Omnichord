@@ -167,7 +167,7 @@ class SuperColliderClient:
         value = float(note)
         if not math.isfinite(value):
             raise ValueError("note must be finite")
-        return 440.0 * (2.0 ** ((value - 69.0) / 12.0))
+        return float(440.0 * (2.0 ** ((value - 69.0) / 12.0)))
 
     def note_on(self, event: NoteOn) -> None:
         self._send_raw(
