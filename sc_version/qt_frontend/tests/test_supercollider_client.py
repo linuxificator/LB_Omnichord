@@ -151,6 +151,48 @@ class SuperColliderClientTests(unittest.TestCase):
         self.assertIn("/omni/v1/panic", addresses)
         self.assertIn("/omni/v1/shutdown", addresses)
 
+    def test_global_pitch_bend_crosses_the_typed_engine_boundary(self) -> None:
+        address_names = (
+            "chord_amp",
+            "strum_amp",
+            "bass_amp",
+            "percussion_amp",
+            "master_volume",
+            "reverb",
+            "chord_synth",
+            "strum_synth",
+            "bass_synth",
+            "manual_chord",
+            "chord_state",
+            "strum_note",
+            "bass_running",
+            "rhythm_config",
+            "rhythm_chord_enabled",
+            "pitch_bend",
+            "rhythm_running",
+            "panic",
+        )
+        addresses = {name: f"/test/{name}" for name in address_names}
+        client = SuperColliderClient(
+            config=None,
+            addresses=addresses,
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+
+        client.send_message(addresses["pitch_bend"], -0.125)
+        client.close()
+
+        bends = [
+            arguments
+            for address, arguments in self.fake.messages
+            if address == "/omni/v1/global/pitch-bend"
+        ]
+        self.assertEqual(len(bends), 1)
+        self.assertEqual(bends[0][0], client.session)
+        self.assertAlmostEqual(float(bends[0][2]), -0.125)
+
     def test_lane_transaction_is_indexed_and_acknowledged(self) -> None:
         from engine_protocol import SequenceDefinition, SequenceEvent
         from musical_sequence_plan import LanePlan

@@ -36,6 +36,13 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertEqual(config["config_revision"], 1)
         self.assertEqual(config["protocol_version"], 1)
 
+    def test_global_bend_reaches_bus_voices_and_native_sclork_voices(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        self.assertIn("~omniSetPitchBend =", bootstrap)
+        self.assertIn("~omniBendBus.set(ratio)", bootstrap)
+        self.assertIn("record[\\baseFrequency] * ratio", bootstrap)
+        self.assertIn("frequency * (2 ** ~omniPitchBendOctaves)", bootstrap)
+
 
 if __name__ == "__main__":
     unittest.main()

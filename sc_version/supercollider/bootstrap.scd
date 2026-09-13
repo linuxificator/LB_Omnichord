@@ -30,12 +30,30 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 ~omniReplyAddress = nil;
 ~omniDrumOrdinal = 0;
 ~omniDrumProgram = "sample.vsco.gm-styleperc";
+~omniPitchBendOctaves = 0.0;
 
 thisProcess.openUDPPort(languagePort);
 (scriptDirectory +/+ "protocol_runtime.scd").load;
 
 ~omniReply = { |address, path ... args|
     NetAddr(address.ip, address.port).sendMsg(path, *args);
+};
+
+~omniSetPitchBend = { |octaves|
+    var ratio;
+    ~omniPitchBendOctaves = octaves.asFloat;
+    ratio = 2 ** ~omniPitchBendOctaves;
+    if(~omniBendBus.notNil) { ~omniBendBus.set(ratio) };
+    ~omniVoices.values.do { |record|
+        if(record[\nativeName].notNil and: {
+            record[\baseFrequency].notNil
+        }) {
+            record[\sourceNode].set(
+                \freq,
+                record[\baseFrequency] * ratio
+            );
+        };
+    };
 };
 
 ~omniSessionValid = { |message|
@@ -55,6 +73,7 @@ thisProcess.openUDPPort(languagePort);
     if(~omniInvalidateWake.notNil) { ~omniInvalidateWake.value };
     if(~omniResetSampleSession.notNil) { ~omniResetSampleSession.value };
     ~omniPrograms.clear;
+    ~omniSetPitchBend.value(0.0);
 };
 
 ~omniProgramKey = { |program, revision|
@@ -108,6 +127,7 @@ thisProcess.openUDPPort(languagePort);
     var name = parameter.asString;
     if(record.notNil) {
         if(name == "frequency_hz") {
+            record[\baseFrequency] = value;
             if(record[\acid] == true) {
                 record[\sourceNode].set(
                     \slideEnabled, 1,
@@ -117,7 +137,10 @@ thisProcess.openUDPPort(languagePort);
             if(record[\sample] == true) {
                 ~omniRetuneSampleHandle.value(record, value);
             } {
-                record[\sourceNode].set(\freq, value);
+                record[\sourceNode].set(
+                    \freq,
+                    value * (2 ** ~omniPitchBendOctaves)
+                );
             };
             };
         };
@@ -347,7 +370,7 @@ s.waitForBoot({
                 ~omniSclorkArgs.value(
                     nativeName,
                     voiceBus.index,
-                    frequency,
+                    frequency * (2 ** ~omniPitchBendOctaves),
                     preparedArgs
                 )
             );
@@ -361,6 +384,8 @@ s.waitForBoot({
                 sourceNode: sourceNode,
                 outputNode: outputNode,
                 voiceBus: voiceBus,
+                nativeName: nativeName,
+                baseFrequency: frequency,
                 releaseMode: if(~omniSynthHasControl.value(nativeName, \gate)) {
                     \gated
                 } {
@@ -564,14 +589,14 @@ OSCdef(\omniRoomSend, { |message|
 
 OSCdef(\omniBend, { |message|
     if(~omniCommandValid.value(message)) {
-        ~omniBendBus.set(2 ** message[3].asFloat);
+        ~omniSetPitchBend.value(message[3]);
     };
 }, '/omni/v1/global/pitch-bend', recvPort: languagePort);
 
 OSCdef(\omniPanicMessage, { |message|
     if(~omniCommandValid.value(message)) {
         ~omniPanic.value;
-        ~omniBendBus.set(1.0);
+        ~omniSetPitchBend.value(0.0);
     };
 }, '/omni/v1/panic', recvPort: languagePort);
 )
