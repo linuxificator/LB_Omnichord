@@ -66,6 +66,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
     "sc-audio": (
         SC_ROOT / "tests" / "acid_voice_test.scd",
+        TESTS / "integration" / "test_supercollider_nrt.py",
     ),
     "sc-banks": (
         SC_ROOT / "tests" / "sample_loader_test.scd",
