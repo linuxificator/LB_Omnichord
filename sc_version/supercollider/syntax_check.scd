@@ -10,12 +10,16 @@ var files = [
     "adapters/pulseRisset.scd",
     "adapters/pluck.scd",
     "adapters/sawSynth.scd",
+    "adapters/sosBell.scd",
+    "adapters/kik3.scd",
+    "adapters/kickBlocks.scd",
     "adapters/waveguideFlute.scd",
     "tests/acid_voice_test.scd",
     "tests/coordinator_service.scd",
     "tests/sample_loader_test.scd",
     "tests/sclork_loader_test.scd",
-    "tests/sclork_compile_audit.scd"
+    "tests/sclork_compile_audit.scd",
+    "tests/sclork_nrt_render.scd"
 ];
 var failed = false;
 files.do { |name|

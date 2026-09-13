@@ -1,4 +1,4 @@
-# Resume point: SCLOrk non-realtime audio audit
+# SCLOrk non-realtime audio audit
 
 Status recorded on 2026-09-14 on branch `version/supercollider`.
 
@@ -14,9 +14,9 @@ Status recorded on 2026-09-14 on branch `version/supercollider`.
 - All previously committed SuperCollider compiler, sequencer, protocol, sample
   ownership and migration tests are pushed through commit `98a62cd`.
 
-## Work in progress
+## Implemented audit
 
-Three uncommitted files add an `sc-audio` non-realtime render audit:
+The `sc-audio` suite contains a non-realtime render audit:
 
 - `sc_version/supercollider/tests/sclork_nrt_render.scd`
 - `sc_version/qt_frontend/tests/integration/test_supercollider_nrt.py`
@@ -31,26 +31,24 @@ The first run exposed three silent programs. This was traced to the test using
 The test now writes `.scsyndef` files and uses `/d_loadDir`, which is the normal
 SuperCollider solution for large definitions.
 
-The second run passed that loading failure but exceeded the current 180-second
-timeout. The score contains 109 sequential 0.75-second segments and includes
-very expensive definitions such as the 100-oscillator `superSaw`. No live
-audio device was opened.
+The audit renders deterministic batches of twelve programs. This avoids making
+the entire catalog share one timeout and attributes failures to a small range.
+All 109 programs now produce finite, non-silent audio without opening a live
+audio device.
 
-## Exact continuation
+The audit also found three upstream definitions with symbolic SynthDef-control
+defaults. They compile in `sclang`, but cannot be serialized for `scsynth`.
+Small owned adapters retain their behavior while representing those defaults
+as numeric envelope curves:
 
-1. Make the NRT audit shardable with environment variables for start/count, or
-   have the Python test render deterministic batches in separate processes.
-   Keep one report entry per all 109 catalog programs.
-2. Keep `.scsyndef` file loading; do not return to `/d_recv`.
-3. Run the shards headless outside the sandbox. Never boot a live SC server on
-   this workstation until `pipewire-jack`/`pw-jack` is installed.
-4. Investigate only programs that remain silent after correct file loading.
-5. Commit and push the audit only after all 109 programs are represented and
-   the suite either passes or reports an explicit, justified unsupported item.
+- `sosBell`: `curve = \lin` becomes the equivalent numeric `curve = 0`.
+- `kickBlocks`: `t2curve = \lin` becomes `t2curve = 0`.
+- `kik3`: `sweepCurve = \exp` becomes a server-adjustable numeric exponential
+  curve default of `-4`.
 
-Recommended first implementation: groups of 10-20 programs, with each NRT
-score starting at time zero. This avoids one pathological definition consuming
-the timeout for the whole catalog and makes failures attributable.
+The generated report records RMS, peak, silence and clipping observations per
+program. Silence is a blocking failure. Peak/clipping values are measurements,
+not yet a claim that all programs have been perceptually loudness-normalized.
 
 ## Local prerequisite still missing
 

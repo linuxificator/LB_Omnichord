@@ -4,10 +4,14 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
 var output = "OMNICHORD_SC_NRT_OUTPUT".getenv ?
     (Platform.defaultTempDir +/+ "lb-omnichord-sclork-audit.wav");
 var oscFile = output ++ ".osc";
-var defDirectory = output.dirname +/+ "sclork-defs";
+var defDirectory = output ++ ".defs";
 var catalog = (directory +/+ "sclork-programs.json").parseJSONFile;
 var jsonAt = { |object, key| object[key.asString] ? object[key.asSymbol] };
-var programs = jsonAt.value(catalog, "programs");
+var allPrograms = jsonAt.value(catalog, "programs");
+var startIndex = ("OMNICHORD_SC_NRT_START".getenv ? "0").asInteger;
+var requestedCount = ("OMNICHORD_SC_NRT_COUNT".getenv ? allPrograms.size.asString).asInteger;
+var endIndex = (startIndex + requestedCount - 1).min(allPrograms.size - 1);
+var programs;
 var score = List.new;
 var options = ServerOptions.new;
 var segmentSeconds = 0.75;
@@ -15,6 +19,13 @@ var noteSeconds = 0.42;
 var endSeconds;
 
 (directory +/+ "sclork_loader.scd").load;
+if((startIndex < 0) or: { startIndex >= allPrograms.size }) {
+    Error("invalid SCLOrk NRT start index: " ++ startIndex).throw;
+};
+if(requestedCount <= 0) {
+    Error("invalid SCLOrk NRT count: " ++ requestedCount).throw;
+};
+programs = allPrograms.copyRange(startIndex, endIndex);
 File.mkdir(defDirectory);
 programs.do { |program|
     var name = jsonAt.value(program, "native_name").asSymbol;
@@ -26,7 +37,7 @@ programs.do { |program, index|
     var name = jsonAt.value(program, "native_name").asSymbol;
     var nodeId = 1000 + index;
     var start = 0.05 + (index * segmentSeconds);
-    var frequency = [110.0, 440.0, 880.0][index % 3];
+    var frequency = [110.0, 440.0, 880.0][(startIndex + index) % 3];
     var args = ~omniSclorkArgs.value(name, 0, frequency, []);
     score.add([start, [\s_new, name, nodeId, 0, 0] ++ args]);
     if(~omniSynthHasControl.value(name, \gate)) {
@@ -53,7 +64,10 @@ Score.recordNRT(
     options: options,
     duration: endSeconds,
     action: {
-        ("LB_OMNICHORD_SCLORK_NRT_OK output=" ++ output).postln;
+        (
+            "LB_OMNICHORD_SCLORK_NRT_OK output=" ++ output
+            ++ " start=" ++ startIndex ++ " count=" ++ programs.size
+        ).postln;
         0.exit;
     }
 );
