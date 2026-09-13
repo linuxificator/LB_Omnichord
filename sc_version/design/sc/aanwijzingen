@@ -6,3 +6,4 @@ De huidige sc_version directory is initieel een kopie van de amy version.
 Werk in de branch version/supercollider
 De sample lib staat ook in ~/sample_lib/VSCO-2-CE-1.1.0/ lokaal uitgepakt
 Hou je aan de bestaande archtitectuur en code richtlijnen, de omnichord mag ook bij de supercollider sequencer niet zelf dingen moeten timen, geef het aan als dat niet kan, ga het niet toch implementeren.
+In de README krijgen de amy versie en de supercollider versie een eiegen screenshot.
