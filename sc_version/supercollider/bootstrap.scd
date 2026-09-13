@@ -93,7 +93,11 @@ thisProcess.openUDPPort(languagePort);
                     \freqTargetHz, value
                 );
             } {
+            if(record[\sample] == true) {
+                ~omniRetuneSampleHandle.value(record, value);
+            } {
                 record[\sourceNode].set(\freq, value);
+            };
             };
         };
         if(name == "accent") { record[\sourceNode].set(\t_accent, 1) };
@@ -322,7 +326,7 @@ s.waitForBoot({
         }) {
             ~omniSpawnSampleVoice.value(
                 owner, handle, sampleName, revision, logicalKey,
-                velocity, logicalBus
+                frequency, velocity, logicalBus
             );
         } {
         if(acidName.notNil) {
@@ -443,6 +447,7 @@ s.waitForBoot({
                 ~omniDrumSampleProgram,
                 1,
                 ~omniMapDrumKey.value(role, note).clip(0, 127),
+                note.asFloat.midicps,
                 velocity,
                 logicalBus
             );

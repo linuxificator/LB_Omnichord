@@ -24,6 +24,20 @@ if(selection.isEmpty) {
     failed = true;
     "VSCO_REGION_SELECTION_FAILED".postln;
 };
+if((~omniSamplePlaybackRate.value(440, 69, 0) - 1).abs > 0.000001) {
+    failed = true;
+    "VSCO_EQUAL_TEMPERAMENT_RATE_FAILED".postln;
+};
+if((~omniSamplePlaybackRate.value(442, 69, 0) - (442 / 440)).abs
+    > 0.000001) {
+    failed = true;
+    "VSCO_FRACTIONAL_TUNING_RATE_FAILED".postln;
+};
+if((~omniSamplePlaybackRate.value(440, 69, 100) - (2 ** (1 / 12))).abs
+    > 0.000001) {
+    failed = true;
+    "VSCO_SFZ_TUNE_RATE_FAILED".postln;
+};
 if(failed) { 1.exit } {
     "VSCO_SAMPLE_LOADER_TEST_OK".postln;
     0.exit

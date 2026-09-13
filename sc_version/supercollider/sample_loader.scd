@@ -160,6 +160,11 @@ regions.do { |record|
     selected
 };
 
+~omniSamplePlaybackRate = { |frequencyHz, keyCenter, tuneCents|
+    (frequencyHz.asFloat / keyCenter.asFloat.midicps)
+        * (2 ** (tuneCents.asFloat / 1200))
+};
+
 SynthDef(\omniSampleMono, {
     |out=0, buffer=0, rate=1, velocity=0.7, gain=1, gainDb=0,
      attack=0.001, release=0.2, gate=1, pan=0, pitchBendBus=0|
@@ -201,11 +206,13 @@ SynthDef(\omniSampleStereo, {
 }).add;
 
 ~omniSpawnSampleVoice = {
-    |owner, handle, program, revision, logicalKey, velocity, logicalBus|
+    |owner, handle, program, revision, logicalKey, frequencyHz,
+        velocity, logicalBus|
     var selected = ~omniSelectSampleRegions.value(program, logicalKey, velocity);
     if(selected.notEmpty) {
         var group = Group.tail(~omniSourceGroup);
         var remaining = selected.size;
+        var sampleNodes = List.new;
         var record = (
             sourceNode: group,
             outputNode: nil,
@@ -214,7 +221,8 @@ SynthDef(\omniSampleStereo, {
             acid: false,
             owner: owner.asString,
             logicalKey: logicalKey.asInteger,
-            program: program.asString
+            program: program.asString,
+            sampleNodes: sampleNodes
         );
         ~omniVoices[handle] = record;
         selected.do { |region|
@@ -231,7 +239,9 @@ SynthDef(\omniSampleStereo, {
                 [
                     \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
                     \buffer, buffer.bufnum,
-                    \rate, 2 ** ((logicalKey - center + (tune / 100)) / 12),
+                    \rate, ~omniSamplePlaybackRate.value(
+                        frequencyHz, center, tune
+                    ),
                     \velocity, velocity,
                     \gainDb, jsonAt.value(region, "gain_db").asFloat,
                     \attack, jsonAt.value(envelope, "attack_sec").asFloat,
@@ -239,6 +249,7 @@ SynthDef(\omniSampleStereo, {
                     \pitchBendBus, ~omniBendBus.index
                 ]
             );
+            sampleNodes.add((node: node, center: center, tune: tune));
             node.onFree {
                 remaining = remaining - 1;
                 if(remaining <= 0) {
@@ -253,6 +264,17 @@ SynthDef(\omniSampleStereo, {
     } {
         false
     }
+};
+
+~omniRetuneSampleHandle = { |record, frequencyHz|
+    record[\sampleNodes].do { |sampleNode|
+        sampleNode[\node].set(
+            \rate,
+            ~omniSamplePlaybackRate.value(
+                frequencyHz, sampleNode[\center], sampleNode[\tune]
+            )
+        );
+    };
 };
 
 ("LB_OMNICHORD_VSCO_INDEX_LOADED programs=" ++ programs.size
