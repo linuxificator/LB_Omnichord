@@ -15,7 +15,9 @@ from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
 
 from config_loader import ResolvedAmyConfig
+from drum_patterns import load_drum_pattern_catalog
 from engine_protocol import NoteOff, NoteOn, PROTOCOL_VERSION, VoiceSet
+from musical_sequence_plan import LanePlan, compile_chord_lane, compile_drum_lane
 from supercollider_config import (
     SuperColliderRuntimeConfig,
     load_supercollider_config,
@@ -41,6 +43,7 @@ class SuperColliderClient:
         *,
         resolved_config: ResolvedAmyConfig | None = None,
         runtime_config_path: Path,
+        asset_root: Path | None = None,
         **_transport_arguments: Any,
     ) -> None:
         if resolved_config is None:
@@ -56,6 +59,8 @@ class SuperColliderClient:
         self._message_id = 0
         self._message_lock = threading.Lock()
         self._ready = threading.Event()
+        self._ack_condition = threading.Condition()
+        self._acknowledgements: dict[int, tuple[str, int, float, str]] = {}
         self._closed = False
 
         dispatcher = Dispatcher()
@@ -100,6 +105,13 @@ class SuperColliderClient:
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
         self.bass_running = True
+        self._lane_generations = {"drums": 0, "bass": 0, "chords": 0}
+        self._transaction_id = 0
+        self._drum_catalog = load_drum_pattern_catalog(
+            (Path(asset_root) if asset_root is not None else runtime_config_path.parent.parent)
+            / "music"
+            / "drums"
+        )
 
         try:
             self._await_ready()
@@ -124,9 +136,18 @@ class SuperColliderClient:
         self._ready.set()
 
     def _accept_ack(self, _address: str, *arguments: Any) -> None:
-        # ACK state is expanded with definition transactions in M2/M3.  The
-        # receiver exists now so protocol additions do not alter ownership.
-        _ = arguments
+        if len(arguments) != 6 or str(arguments[0]) != self.session:
+            return
+        transaction_id = int(arguments[1])
+        acknowledgement = (
+            str(arguments[2]),
+            int(arguments[3]),
+            float(arguments[4]),
+            str(arguments[5]),
+        )
+        with self._ack_condition:
+            self._acknowledgements[transaction_id] = acknowledgement
+            self._ack_condition.notify_all()
 
     def _await_ready(self) -> None:
         deadline = time.monotonic() + self.runtime_config.language.startup_timeout_seconds
@@ -161,6 +182,93 @@ class SuperColliderClient:
         with self._message_lock:
             self._message_id += 1
             return self._message_id
+
+    def _next_transaction_id(self) -> int:
+        with self._message_lock:
+            self._transaction_id += 1
+            return self._transaction_id
+
+    @staticmethod
+    def _transaction_records(
+        plan: LanePlan,
+        transaction_id: int,
+    ) -> list[tuple[str, list[Any]]]:
+        records: list[tuple[str, list[Any]]] = []
+        packet_index = 0
+        for definition in plan.definitions:
+            records.append(
+                (
+                    "/omni/v1/tx/def",
+                    [
+                        transaction_id,
+                        packet_index,
+                        definition.definition_id,
+                        definition.revision,
+                        definition.kind,
+                        definition.period_ticks,
+                        len(definition.events),
+                    ],
+                )
+            )
+            packet_index += 1
+            for event in definition.events:
+                records.append(
+                    (
+                        "/omni/v1/tx/event",
+                        [
+                            transaction_id,
+                            packet_index,
+                            definition.definition_id,
+                            event.tick,
+                            event.ordinal,
+                            event.kind,
+                            *event.atoms,
+                        ],
+                    )
+                )
+                packet_index += 1
+        return records
+
+    def publish_lane(self, plan: LanePlan) -> tuple[str, int, float, str]:
+        """Reliably stage and atomically publish one immutable lane revision."""
+
+        transaction_id = self._next_transaction_id()
+        records = self._transaction_records(plan, transaction_id)
+        begin = (
+            "/omni/v1/tx/begin",
+            [
+                transaction_id,
+                plan.lane,
+                plan.generation,
+                len(records),
+                "replace",
+                plan.alignment_ticks,
+            ],
+        )
+        messages = [begin, *records, ("/omni/v1/tx/commit", [transaction_id])]
+        for _attempt in range(3):
+            for address, arguments in messages:
+                self._send_raw(address, [self.session, *arguments])
+            deadline = time.monotonic() + 0.1
+            with self._ack_condition:
+                while transaction_id not in self._acknowledgements:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    self._ack_condition.wait(remaining)
+                acknowledgement = self._acknowledgements.get(transaction_id)
+            if acknowledgement is None:
+                continue
+            if acknowledgement[0] == "rejected":
+                raise SuperColliderUnavailable(
+                    f"SuperCollider rejected {plan.lane} generation "
+                    f"{plan.generation}: {acknowledgement[3]}"
+                )
+            return acknowledgement
+        raise SuperColliderUnavailable(
+            f"SuperCollider did not acknowledge {plan.lane} generation "
+            f"{plan.generation} after three delivery attempts"
+        )
 
     @staticmethod
     def note_to_frequency(note: float) -> float:
@@ -436,6 +544,40 @@ class SuperColliderClient:
         self.chord_notes = [float(note) for note in payload.get("notes", [])]
         self.bass_notes = [float(note) for note in payload.get("bass_notes", [])]
         self.rhythm_chord_enabled = bool(payload.get("rhythm_chord_enabled", False))
+        self._publish_chord_lane()
+
+    def _next_lane_generation(self, lane: str) -> int:
+        self._lane_generations[lane] += 1
+        return self._lane_generations[lane]
+
+    def _publish_chord_lane(self) -> None:
+        generation = self._next_lane_generation("chords")
+        rhythm = self.resolved_config.rhythm
+        self.publish_lane(
+            compile_chord_lane(
+                config=self.rhythm_config,
+                enabled=self.rhythm_chord_enabled,
+                chord_notes=self.chord_notes,
+                max_chord_notes=rhythm.max_rhythm_chord_notes,
+                chord_gate_beats=rhythm.chord_gate_beats,
+                program_id=self._selected_program["chord"],
+                program_revision=self._program_revision["chord"],
+                logical_bus=self._role_bus("chord"),
+                generation=generation,
+            )
+        )
+
+    def _publish_drum_lane(self) -> None:
+        generation = self._next_lane_generation("drums")
+        self.publish_lane(
+            compile_drum_lane(
+                config=self.rhythm_config,
+                catalog=self._drum_catalog,
+                kit=self.resolved_config.drums.kit,
+                logical_bus=self._role_bus("drums"),
+                generation=generation,
+            )
+        )
 
     def _strum_note(self, note: float) -> None:
         self._strum_ordinal += 1
@@ -505,8 +647,11 @@ class SuperColliderClient:
             if not isinstance(payload, dict):
                 raise ValueError("rhythm config payload must be an object")
             self.rhythm_config = payload
+            self._publish_drum_lane()
+            self._publish_chord_lane()
         elif address == a["rhythm_chord_enabled"]:
             self.rhythm_chord_enabled = bool(int(value))
+            self._publish_chord_lane()
         elif address == a["pitch_bend"]:
             self._send_raw(
                 "/omni/v1/global/pitch-bend",
@@ -514,6 +659,9 @@ class SuperColliderClient:
             )
         elif address == a["rhythm_running"]:
             self.rhythm_running = bool(int(value))
+            if self.rhythm_running:
+                self._publish_drum_lane()
+                self._publish_chord_lane()
             self._send_raw(
                 "/omni/v1/transport",
                 [

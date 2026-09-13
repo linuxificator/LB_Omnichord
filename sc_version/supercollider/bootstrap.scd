@@ -12,8 +12,11 @@ var blockSize = ("OMNICHORD_SC_BLOCK_SIZE".getenv ? "64").asInteger;
 var maxNodes = ("OMNICHORD_SC_MAX_NODES".getenv ? "4096").asInteger;
 var memKiB = ("OMNICHORD_SC_MEM_KIB".getenv ? "262144").asInteger;
 var protocolVersion = 1;
+var validateOnly = ("OMNICHORD_SC_VALIDATE_ONLY".getenv ? "0").asInteger == 1;
+var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 
 ~omniReady = false;
+~omniLanguagePort = languagePort;
 ~omniClientSession = nil;
 ~omniEngineSession = ("sc-" ++ UniqueID.next.asString);
 ~omniVoices = IdentityDictionary.new;
@@ -25,6 +28,7 @@ var protocolVersion = 1;
 ~omniClock = TempoClock.new(108 / 60);
 ~omniTransportEpoch = 0;
 ~omniTransportRunning = false;
+~omniReplyAddress = nil;
 
 thisProcess.openUDPPort(languagePort);
 
@@ -80,6 +84,7 @@ OSCdef(\omniHello, { |message, time, address|
     var replyPort = message[3].asInteger;
     ~omniClientSession = message[1].asString;
     if(replyPort > 0) { address = NetAddr(address.ip, replyPort) };
+    ~omniReplyAddress = address;
     if(requested != protocolVersion) {
         ~omniReply.value(
             address,
@@ -136,29 +141,12 @@ OSCdef(\omniProgramValue, { |message|
     };
 }, '/omni/v1/program/value', recvPort: languagePort);
 
-OSCdef(\omniTransport, { |message|
-    if(~omniSessionValid.value(message)) {
-        var action = message[3].asString;
-        var tempo = message[4].asFloat.max(1) / 60;
-        ~omniClock.tempo = tempo;
-        if(action == "start") {
-            ~omniTransportEpoch = ~omniTransportEpoch + 1;
-            ~omniClock.clear;
-            ~omniClock.beats = 0;
-            ~omniTransportRunning = true;
-        };
-        if(action == "stop") {
-            ~omniClock.clear;
-            ~omniTransportRunning = false;
-            ~omniPanic.value;
-        };
-        if(action == "panic") {
-            ~omniClock.clear;
-            ~omniTransportRunning = false;
-            ~omniPanic.value;
-        };
-    };
-}, '/omni/v1/transport', recvPort: languagePort);
+(scriptDirectory +/+ "sequencer.scd").load;
+
+if(validateOnly) {
+    "LB_OMNICHORD_SC_SYNTAX_OK".postln;
+    0.exit;
+};
 
 s = Server.local;
 s.options.sampleRate = sampleRate;
@@ -255,6 +243,31 @@ s.waitForBoot({
         ])
     });
 
+    ~omniSpawnVoice = {
+        |owner, handle, program, revision, logicalKey, frequency,
+         velocity, logicalBus, extraArgs|
+        ~omniReleaseHandle.value(handle);
+        ~omniVoices[handle] = (
+            node: Synth.tail(~omniSourceGroup, \omniVoice, [
+                \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
+                \freq, frequency,
+                \velocity, velocity,
+                \bendBus, ~omniBendBus.index
+            ] ++ ~omniProgramArgs.value(program, revision) ++ (extraArgs ? [])),
+            owner: owner.asString,
+            logicalKey: logicalKey.asInteger,
+            program: program.asString
+        );
+    };
+
+    ~omniSpawnDrum = { |note, velocity, logicalBus|
+        Synth.tail(~omniSourceGroup, \omniDrum, [
+            \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
+            \note, note,
+            \velocity, velocity
+        ]);
+    };
+
     ~omniReady = true;
     ("LB_OMNICHORD_SC_READY port=" ++ languagePort).postln;
 }, {
@@ -271,19 +284,11 @@ OSCdef(\omniNoteOn, { |message|
         var frequency = message[8].asFloat;
         var velocity = message[9].asFloat;
         var logicalBus = message[10].asInteger.clip(0, 10);
-        var programArgs = ~omniProgramArgs.value(message[5], message[6]);
         if(~omniMessageIds.includes(messageId).not) {
             ~omniMessageIds.add(messageId);
-            ~omniReleaseHandle.value(handle);
-            ~omniVoices[handle] = (
-                node: Synth.tail(~omniSourceGroup, \omniVoice, [
-                    \out, ~omniLogicalBuses[logicalBus].index,
-                    \freq, frequency,
-                    \velocity, velocity,
-                    \bendBus, ~omniBendBus.index
-                ] ++ programArgs),
-                owner: owner,
-                logicalKey: logicalKey
+            ~omniSpawnVoice.value(
+                owner, handle, message[5], message[6], logicalKey,
+                frequency, velocity, logicalBus, []
             );
         };
     };
@@ -337,17 +342,9 @@ OSCdef(\omniGestureNote, { |message|
         while { state[\handles].size >= voiceLimit } {
             ~omniReleaseHandle.value(state[\handles].removeAt(0));
         };
-        ~omniReleaseHandle.value(handle);
-        ~omniVoices[handle] = (
-            node: Synth.tail(~omniSourceGroup, \omniVoice, [
-                \out, ~omniLogicalBuses[logicalBus].index,
-                \freq, frequency,
-                \velocity, velocity,
-                \bendBus, ~omniBendBus.index
-            ]),
-            owner: owner,
-            logicalKey: logicalKey,
-            program: program
+        ~omniSpawnVoice.value(
+            owner, handle, program, 1, logicalKey, frequency,
+            velocity, logicalBus, []
         );
         state[\handles].add(handle);
         state[\token] = state[\token] + 1;
@@ -366,11 +363,11 @@ OSCdef(\omniGestureNote, { |message|
 OSCdef(\omniDrumHit, { |message|
     if(~omniReady and: { ~omniSessionValid.value(message) }) {
         var logicalBus = message[6].asInteger.clip(0, 10);
-        Synth.tail(~omniSourceGroup, \omniDrum, [
-            \out, ~omniLogicalBuses[logicalBus].index,
-            \note, message[4].asInteger,
-            \velocity, message[5].asFloat
-        ]);
+        ~omniSpawnDrum.value(
+            message[4].asInteger,
+            message[5].asFloat,
+            logicalBus
+        );
     };
 }, '/omni/v1/drum/hit', recvPort: languagePort);
 

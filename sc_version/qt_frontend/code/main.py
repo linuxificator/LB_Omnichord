@@ -69,6 +69,7 @@ def production_dependencies(
     sc_client = partial(
         SuperColliderClient,
         runtime_config_path=paths.config / "supercollider.json",
+        asset_root=paths.root,
     )
     return ApplicationDependencies(
         paths=paths,
