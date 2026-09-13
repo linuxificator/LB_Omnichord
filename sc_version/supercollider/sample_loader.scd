@@ -85,6 +85,19 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
     };
 };
 
+~omniResetSampleSession = {
+    var keep = ~omniDrumSampleProgram ++ "@1";
+    ~omniSampleStates.keys.asArray.do { |stateKey|
+        if(stateKey != keep) {
+            var fields = stateKey.split($@);
+            ~omniReleaseSampleProgram.value(
+                fields[0], fields[1].asInteger
+            );
+        };
+    };
+    ~omniSampleRoundRobin.clear;
+};
+
 files.do { |record|
     ~omniSampleFiles[jsonAt.value(record, "id").asString] = record;
 };

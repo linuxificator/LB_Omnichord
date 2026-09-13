@@ -742,7 +742,11 @@ OSCdef(\omniTxCommit, { |message|
 }, '/omni/v1/tx/commit', recvPort: ~omniLanguagePort);
 
 OSCdef(\omniTransport, { |message|
-    if(~omniSessionValid.value(message)) {
+    if(~omniSessionValid.value(message) and: {
+        ~omniAcceptMessageId.isNil or: {
+            ~omniAcceptMessageId.value(message[2])
+        }
+    }) {
         var action = message[3].asString;
         ~omniClock.tempo = message[4].asFloat.max(1) / 60;
         if(action == "start" and: { ~omniTransportRunning.not }) {

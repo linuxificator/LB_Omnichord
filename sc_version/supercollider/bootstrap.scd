@@ -21,7 +21,6 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 ~omniEngineSession = ("sc-" ++ UniqueID.next.asString);
 ~omniVoices = Dictionary.new;
 ~omniGestures = Dictionary.new;
-~omniMessageIds = IdentitySet.new;
 ~omniPrograms = Dictionary.new;
 ~omniBusLevels = Array.fill(11, 1.0);
 ~omniRoomLevels = [0.0, 0.0];
@@ -33,6 +32,7 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 ~omniDrumProgram = "sample.vsco.gm-styleperc";
 
 thisProcess.openUDPPort(languagePort);
+(scriptDirectory +/+ "protocol_runtime.scd").load;
 
 ~omniReply = { |address, path ... args|
     NetAddr(address.ip, address.port).sendMsg(path, *args);
@@ -40,6 +40,21 @@ thisProcess.openUDPPort(languagePort);
 
 ~omniSessionValid = { |message|
     (~omniClientSession.notNil) and: { message[1].asString == ~omniClientSession };
+};
+
+~omniResetClientSession = {
+    ~omniClock.clear;
+    ~omniTransportRunning = false;
+    ~omniPanic.value;
+    ~omniMessageIds.clear;
+    ~omniMessageIdOrder.clear;
+    if(~omniTransactions.notNil) { ~omniTransactions.clear };
+    if(~omniTransactionResults.notNil) { ~omniTransactionResults.clear };
+    if(~omniTransactionResultOrder.notNil) { ~omniTransactionResultOrder.clear };
+    if(~omniPendingActivations.notNil) { ~omniPendingActivations.clear };
+    if(~omniInvalidateWake.notNil) { ~omniInvalidateWake.value };
+    if(~omniResetSampleSession.notNil) { ~omniResetSampleSession.value };
+    ~omniPrograms.clear;
 };
 
 ~omniProgramKey = { |program, revision|
@@ -134,7 +149,13 @@ thisProcess.openUDPPort(languagePort);
 OSCdef(\omniHello, { |message, time, address|
     var requested = message[2].asInteger;
     var replyPort = message[3].asInteger;
-    ~omniClientSession = message[1].asString;
+    var incomingSession = message[1].asString;
+    if(~omniClientSession.notNil and: {
+        ~omniClientSession != incomingSession
+    }) {
+        ~omniResetClientSession.value;
+    };
+    ~omniClientSession = incomingSession;
     if(replyPort > 0) { address = NetAddr(address.ip, replyPort) };
     ~omniReplyAddress = address;
     if(requested != protocolVersion) {
@@ -159,7 +180,9 @@ OSCdef(\omniHello, { |message, time, address|
 }, '/omni/v1/hello', recvPort: languagePort);
 
 OSCdef(\omniShutdown, { |message|
-    if(~omniSessionValid.value(message)) {
+    if(~omniSessionValid.value(message) and: {
+        ~omniAcceptMessageId.value(message[2])
+    }) {
         ~omniPanic.value;
         s.quit;
         SystemClock.sched(0.2, { 0.exit; nil });
@@ -167,19 +190,21 @@ OSCdef(\omniShutdown, { |message|
 }, '/omni/v1/shutdown', recvPort: languagePort);
 
 OSCdef(\omniProgramPrepare, { |message|
-    if(~omniSessionValid.value(message)) {
+    if(~omniCommandValid.value(message)) {
         var owner = message[3].asString;
         var program = message[4].asString;
         var revision = message[5].asInteger;
         var logicalBus = message[6].asInteger.clip(0, 10);
         var key = ~omniProgramKey.value(program, revision);
-        ~omniPrograms[key] = (
-            owner: owner,
-            program: program,
-            revision: revision,
-            logicalBus: logicalBus,
-            values: Dictionary.new
-        );
+        if(~omniPrograms[key].isNil) {
+            ~omniPrograms[key] = (
+                owner: owner,
+                program: program,
+                revision: revision,
+                logicalBus: logicalBus,
+                values: Dictionary.new
+            );
+        };
         if(~omniPrepareSampleProgram.notNil) {
             ~omniPrepareSampleProgram.value(program, revision);
         };
@@ -187,7 +212,7 @@ OSCdef(\omniProgramPrepare, { |message|
 }, '/omni/v1/program/prepare', recvPort: languagePort);
 
 OSCdef(\omniProgramValue, { |message|
-    if(~omniSessionValid.value(message)) {
+    if(~omniCommandValid.value(message)) {
         var key = ~omniProgramKey.value(message[4], message[5]);
         var record = ~omniPrograms[key];
         if(record.notNil) {
@@ -197,7 +222,7 @@ OSCdef(\omniProgramValue, { |message|
 }, '/omni/v1/program/value', recvPort: languagePort);
 
 OSCdef(\omniProgramRelease, { |message|
-    if(~omniSessionValid.value(message)) {
+    if(~omniCommandValid.value(message)) {
         var program = message[3].asString;
         var revision = message[4].asInteger;
         ~omniPrograms.removeAt(~omniProgramKey.value(program, revision));
@@ -487,32 +512,28 @@ s.waitForBoot({
 });
 
 OSCdef(\omniNoteOn, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
-        var messageId = message[2].asInteger;
+    if(~omniCommandValid.value(message)) {
         var owner = message[3].asString;
         var handle = message[4].asString;
         var logicalKey = message[7].asInteger;
         var frequency = message[8].asFloat;
         var velocity = message[9].asFloat;
         var logicalBus = message[10].asInteger.clip(0, 10);
-        if(~omniMessageIds.includes(messageId).not) {
-            ~omniMessageIds.add(messageId);
-            ~omniSpawnVoice.value(
-                owner, handle, message[5], message[6], logicalKey,
-                frequency, velocity, logicalBus, []
-            );
-        };
+        ~omniSpawnVoice.value(
+            owner, handle, message[5], message[6], logicalKey,
+            frequency, velocity, logicalBus, []
+        );
     };
 }, '/omni/v1/note/on', recvPort: languagePort);
 
 OSCdef(\omniNoteOff, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         ~omniReleaseHandle.value(message[4].asString);
     };
 }, '/omni/v1/note/off', recvPort: languagePort);
 
 OSCdef(\omniVoiceSet, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         ~omniSetHandle.value(
             message[3].asString,
             message[4].asString,
@@ -522,13 +543,13 @@ OSCdef(\omniVoiceSet, { |message|
 }, '/omni/v1/voice/set', recvPort: languagePort);
 
 OSCdef(\omniOwnerRelease, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         ~omniReleaseOwner.value(message[3].asString);
     };
 }, '/omni/v1/owner/release', recvPort: languagePort);
 
 OSCdef(\omniGestureNote, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         var owner = message[3].asString;
         var handle = message[4].asString;
         var program = message[5].asString;
@@ -569,7 +590,7 @@ OSCdef(\omniGestureNote, { |message|
 }, '/omni/v1/gesture/note', recvPort: languagePort);
 
 OSCdef(\omniDrumHit, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         var logicalBus = message[6].asInteger.clip(0, 10);
         ~omniSpawnDrum.value(
             "external_percussion",
@@ -582,7 +603,7 @@ OSCdef(\omniDrumHit, { |message|
 }, '/omni/v1/drum/hit', recvPort: languagePort);
 
 OSCdef(\omniBusLevel, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         var logicalBus = message[3].asInteger.clip(0, 10);
         var level = message[4].asFloat.max(0);
         ~omniBusLevels[logicalBus] = level;
@@ -591,7 +612,7 @@ OSCdef(\omniBusLevel, { |message|
 }, '/omni/v1/mixer/bus-level', recvPort: languagePort);
 
 OSCdef(\omniRoomSet, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         var roomIndex = message[3].asInteger.clip(0, 1);
         ~omniRoomLevels[roomIndex] = message[4].asFloat.max(0);
         ~omniRooms[roomIndex].set(
@@ -603,20 +624,20 @@ OSCdef(\omniRoomSet, { |message|
 }, '/omni/v1/mixer/room', recvPort: languagePort);
 
 OSCdef(\omniRoomSend, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         var logicalBus = message[3].asInteger.clip(0, 10);
         ~omniBusStrips[logicalBus].set(\roomSend, message[4].asFloat.max(0));
     };
 }, '/omni/v1/mixer/room-send', recvPort: languagePort);
 
 OSCdef(\omniBend, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         ~omniBendBus.set(2 ** message[3].asFloat);
     };
 }, '/omni/v1/global/pitch-bend', recvPort: languagePort);
 
 OSCdef(\omniPanicMessage, { |message|
-    if(~omniReady and: { ~omniSessionValid.value(message) }) {
+    if(~omniCommandValid.value(message)) {
         ~omniPanic.value;
         ~omniBendBus.set(1.0);
     };

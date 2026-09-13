@@ -23,6 +23,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             "sclork_loader.scd",
             "acid_voices.scd",
             "sample_loader.scd",
+            "protocol_runtime.scd",
             "sclork-programs.json",
             "vsco-manifest.json",
             "drum-key-map.json",
