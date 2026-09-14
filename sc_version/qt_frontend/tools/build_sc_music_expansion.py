@@ -440,6 +440,7 @@ def build(
     preset_destination: Path | None = None,
 ) -> None:
     data = bundle / "data"
+    evidence = bundle / "evidence"
     source_names = (*SOURCE_FILES, *PRESET_FILES)
     missing = [name for name in source_names if not (data / name).is_file()]
     if missing:
@@ -463,14 +464,30 @@ def build(
         output = preset_destination / Path(relative_name).name
         _write_pretty(output, _canonical_preset(source))
         preset_outputs[output.name] = _digest(output)
+    validation = _read(evidence / "validation_report.json")
+    if validation.get("status") != "PASS":
+        raise ValueError("music expansion validation report does not pass")
     manifest = {
         "schema_version": 1,
         "source_bundle": "LB_SC_Music_Expansion",
         "sources": {name: _digest(data / name) for name in source_names},
         "evidence_sources": {
             "sample_measurements.json": _digest(
-                bundle / "evidence" / "sample_measurements.json"
-            )
+                evidence / "sample_measurements.json"
+            ),
+            "validation_report.json": _digest(evidence / "validation_report.json"),
+        },
+        "validation_summary": {
+            "status": validation["status"],
+            "counts": validation["counts"],
+            "max_groove_pad_events": validation["max_groove_pad_events"],
+            "max_fill_foreground_events": validation["max_fill_foreground_events"],
+            "max_combined_fill_window_pad_events_all_levels": validation[
+                "max_combined_fill_window_pad_events_all_levels"
+            ],
+            "explicit_right_foot_fill_exceptions": validation[
+                "explicit_right_foot_fill_exceptions"
+            ],
         },
         "outputs": {name: _digest(destination / name) for name in sorted(outputs)},
         "preset_outputs": preset_outputs,

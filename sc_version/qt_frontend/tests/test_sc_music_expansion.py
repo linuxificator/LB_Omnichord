@@ -32,6 +32,25 @@ class ScMusicExpansionTests(unittest.TestCase):
 
     def test_generated_authorities_match_their_recorded_hashes(self) -> None:
         manifest = json.loads((CATALOG_ROOT / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(
+            set(manifest["evidence_sources"]),
+            {"sample_measurements.json", "validation_report.json"},
+        )
+        validation = manifest["validation_summary"]
+        self.assertEqual(validation["status"], "PASS")
+        self.assertEqual(validation["counts"]["kit_rhythm_contexts"], 810)
+        self.assertEqual(validation["counts"]["fill_variants"], 4050)
+        self.assertEqual(validation["max_groove_pad_events"], 57)
+        self.assertEqual(validation["max_fill_foreground_events"], 40)
+        self.assertEqual(
+            validation["max_combined_fill_window_pad_events_all_levels"],
+            84,
+        )
+        self.assertLessEqual(
+            validation["max_combined_fill_window_pad_events_all_levels"],
+            96,
+        )
+        self.assertEqual(validation["explicit_right_foot_fill_exceptions"], 10)
         for name, expected in manifest["outputs"].items():
             with self.subTest(name=name):
                 self.assertEqual(
