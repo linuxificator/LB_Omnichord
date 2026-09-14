@@ -47,6 +47,7 @@ from supercollider_platform_adapter import pipewire_jack_prefix  # noqa: E402
 
 FATAL_LOG_TEXT = (
     "FAILURE IN SERVER",
+    "Binding loop detected",
     "No more buffer numbers",
     "Traceback (most recent call last)",
     "server 'localhost' disconnected",
@@ -366,7 +367,19 @@ def log_has_failure(path: Path) -> str | None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cycles", type=int, default=0, help="0 runs indefinitely")
+    parser.add_argument(
+        "--start-cycle",
+        type=int,
+        default=0,
+        help="catalogue rotation cycle used first (diagnostic reproduction)",
+    )
     parser.add_argument("--chunk-seconds", type=float, default=60.0)
+    parser.add_argument(
+        "--startup-idle-seconds",
+        type=float,
+        default=0.0,
+        help="leave the real frontend and engine idle before driving actions",
+    )
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument(
         "--gui",
@@ -448,11 +461,34 @@ def main() -> int:
         api = ApiClient(api_port)
         wait_for(api.health, 20, "frontend control process")
 
+        idle_deadline = time.monotonic() + max(0.0, args.startup_idle_seconds)
+        while time.monotonic() < idle_deadline:
+            for process, label in (
+                (sc_process, "SuperCollider"),
+                (frontend_process, "frontend"),
+            ):
+                if process.poll() is not None:
+                    raise RuntimeError(f"{label} exited with {process.returncode}")
+            for path, label in (
+                (sc_log, "SuperCollider"),
+                (frontend_log, "frontend"),
+            ):
+                failure = log_has_failure(path)
+                if failure is not None:
+                    raise RuntimeError(f"{label} log contains {failure!r}")
+            time.sleep(min(0.1, max(0.0, idle_deadline - time.monotonic())))
+        if args.startup_idle_seconds > 0:
+            print(
+                f"SC_ENDURANCE_IDLE_COMPLETE seconds={args.startup_idle_seconds:.1f}",
+                flush=True,
+            )
+
         audio_monitor = AudioMonitor(artifact_dir, args.chunk_seconds)
         audio_monitor.start()
-        cycle = 0
+        cycle = max(0, args.start_cycle)
+        completed_cycles = 0
         action_count = 0
-        while args.cycles == 0 or cycle < args.cycles:
+        while args.cycles == 0 or completed_cycles < args.cycles:
             for action in action_cycle(
                 cycle,
                 synths,
@@ -484,12 +520,14 @@ def main() -> int:
                     )
                 time.sleep(action.dwell)
             cycle += 1
+            completed_cycles += 1
             with (artifact_dir / "progress.json").open("w", encoding="utf-8") as target:
                 json.dump(
                     {
                         "started_utc": stamp,
                         "elapsed_seconds": round(time.monotonic() - started, 3),
-                        "cycles": cycle,
+                        "cycles": completed_cycles,
+                        "next_cycle": cycle,
                         "actions": action_count,
                         "audio_windows": audio_monitor.window_count,
                     },

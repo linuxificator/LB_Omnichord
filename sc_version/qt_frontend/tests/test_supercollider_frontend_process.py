@@ -199,6 +199,23 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
                     time.sleep(0.02)
                 else:
                     self.fail("manual chord note-offs did not reach SC")
+
+                # Exercise the production MIDI Tumbler while QML is loaded.
+                # Browser changes used to recreate the Python list model from
+                # a broad stateVersion binding.  Rapid changes then made the
+                # Tumbler and its currentIndex binding feed back into one
+                # another, producing a QML binding loop.
+                for index in range(24):
+                    changed = request_json(
+                        api_port,
+                        "POST",
+                        "/action",
+                        {
+                            "action": "setMidiSynthIndex",
+                            "args": [index % 5, index],
+                        },
+                    )
+                    self.assertTrue(changed.get("ok"), changed)
             finally:
                 app_stdout, app_stderr = stop_process(application)
                 engine_stdout, engine_stderr = stop_process(engine)
@@ -206,6 +223,7 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
             self.assertEqual(application.returncode, 0, app_stdout + app_stderr)
             self.assertEqual(engine.returncode, 0, engine_stdout + engine_stderr)
             self.assertIn("TEST_QML_READY=1", app_stdout + app_stderr)
+            self.assertNotIn("Binding loop detected", app_stdout + app_stderr)
 
 
 if __name__ == "__main__":

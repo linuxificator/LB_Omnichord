@@ -27,10 +27,11 @@ Item {
         root.controller.stateVersion
         return root.controller.synthBrowserIndex(root.rowIndex)
     }
-    readonly property var browserModel: {
-        root.controller.stateVersion
-        return root.controller.synthBrowserNames(root.rowIndex)
-    }
+    // Keep the wheel's model stable while unrelated row state changes.  A
+    // freshly converted Python list on every stateVersion update makes the
+    // Tumbler rebuild itself while it is synchronizing currentIndex, which can
+    // create a QML binding loop under rapid program changes.
+    property var browserModel: root.controller.synthBrowserNames(root.rowIndex)
     readonly property var sampleColumns: {
         root.controller.stateVersion
         return root.controller.sampleChoiceColumns(root.rowIndex)
@@ -56,6 +57,19 @@ Item {
     onBrowserIndexChanged: Qt.callLater(root.synchronizeWheel)
 
     function markInteraction() { root.interacted(root.rowIndex) }
+    function refreshBrowserModel() {
+        const next = root.controller.synthBrowserNames(root.rowIndex)
+        if (next.length !== root.browserModel.length) {
+            root.browserModel = next
+            return
+        }
+        for (let index = 0; index < next.length; ++index) {
+            if (next[index] !== root.browserModel[index]) {
+                root.browserModel = next
+                return
+            }
+        }
+    }
     function synchronizeWheel() {
         if (!synthWheel.initialized) return
         const wanted = root.controller.synthBrowserIndex(root.rowIndex)
@@ -144,9 +158,15 @@ Item {
             }
             Connections {
                 target: root.controller
-                function onStateChanged() { Qt.callLater(root.synchronizeWheel) }
+                function onStateChanged() {
+                    root.refreshBrowserModel()
+                    Qt.callLater(root.synchronizeWheel)
+                }
                 function onDrumKitChanged() {
-                    if (root.drumRow) Qt.callLater(root.synchronizeWheel)
+                    if (root.drumRow) {
+                        root.refreshBrowserModel()
+                        Qt.callLater(root.synchronizeWheel)
+                    }
                 }
             }
             delegate: Item {

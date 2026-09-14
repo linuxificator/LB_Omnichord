@@ -57,10 +57,10 @@ Target currently exercised: Linux x86_64
   activity changes do not restart the beat clock.
 - The complete mix crosses one private master stage with a 0.95 safety limiter.
   Upper-register filter adapters keep four pinned source definitions finite at
-  the full strum boundary, and naturally ended sample nodes are never targeted
-  by later release or retune messages. Native SCLOrk voices use owned node
-  groups, so wrapper cleanup cannot race a naturally ended source into a
-  duplicate server free.
+  the full strum boundary. Sample voices map stable lifetime control buses, so
+  later release or retune never targets a naturally ended region node. Native
+  SCLOrk voices use owned node groups, so wrapper cleanup cannot race a
+  naturally ended source into a duplicate server free.
 - Legacy AMY patch keys are accepted only as preset-migration aliases. They do
   not appear in the SC instrument browser and all outgoing program selections
   use canonical `sc.*` or `sample.*` identities.
@@ -93,6 +93,11 @@ Target currently exercised: Linux x86_64
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see
   [`SAMPLE_BANKS.md`](SAMPLE_BANKS.md).
+- Production-QML endurance is distinct from the controller graph: the real
+  `Main.qml` is rendered and captured in a separate process, QML binding loops
+  are fatal, and browser-model regression tests exercise rapid program changes.
+  A repeatable idle phase also distinguishes startup/test-driver cost from
+  steady-state `sclang` CPU usage.
 - The source compiler now safely expands the macro/include structure used by
   the next banks while preserving region provenance. Their audible opcode
   normalization and playback semantics remain explicitly incomplete. Its

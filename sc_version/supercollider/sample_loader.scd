@@ -461,23 +461,18 @@ regions.do { |record|
         * (2 ** (tuneCents.asFloat / 1200))
 };
 
-~omniForEachLiveSampleNode = { |record, function|
-    record[\sampleNodes].do { |sampleNode|
-        if(sampleNode[\alive]) { function.value(sampleNode) };
-    };
-};
-
 SynthDef(\omniSampleMono, {
     |out=0, buffer=0, rate=1, velocity=0.7, gain=1, gainDb=0,
-     attack=0.001, release=0.2, gate=1, pan=0, pitchBendBus=0|
+     attack=0.001, release=0.2, gate=1, gateControl=1, rateScale=1,
+     pan=0, pitchBendBus=0|
     var bend = In.kr(pitchBendBus, 1).max(0.01);
     var playback = PlayBuf.ar(
-        1, buffer, BufRateScale.kr(buffer) * rate * bend,
+        1, buffer, BufRateScale.kr(buffer) * rate * rateScale * bend,
         doneAction: Done.freeSelf
     );
     var envelope = EnvGen.kr(
         Env.asr(attack.max(0.001), 1, release.max(0.005)),
-        gate,
+        gate * gateControl,
         doneAction: Done.freeSelf
     );
     Out.ar(
@@ -489,15 +484,16 @@ SynthDef(\omniSampleMono, {
 
 SynthDef(\omniSampleStereo, {
     |out=0, buffer=0, rate=1, velocity=0.7, gain=1, gainDb=0,
-     attack=0.001, release=0.2, gate=1, pan=0, pitchBendBus=0|
+     attack=0.001, release=0.2, gate=1, gateControl=1, rateScale=1,
+     pan=0, pitchBendBus=0|
     var bend = In.kr(pitchBendBus, 1).max(0.01);
     var playback = PlayBuf.ar(
-        2, buffer, BufRateScale.kr(buffer) * rate * bend,
+        2, buffer, BufRateScale.kr(buffer) * rate * rateScale * bend,
         doneAction: Done.freeSelf
     );
     var envelope = EnvGen.kr(
         Env.asr(attack.max(0.001), 1, release.max(0.005)),
-        gate,
+        gate * gateControl,
         doneAction: Done.freeSelf
     );
     Out.ar(
@@ -515,6 +511,8 @@ SynthDef(\omniSampleStereo, {
     );
     if(selected.notEmpty) {
         var group = Group.tail(~omniSourceGroup);
+        var gateBus = Bus.control(s, 1);
+        var rateScaleBus = Bus.control(s, 1);
         var remaining = selected.size;
         var sampleNodes = List.new;
         var lifetimeSampleIds = if(oneShot) {
@@ -533,14 +531,21 @@ SynthDef(\omniSampleStereo, {
             program: program.asString,
             logicalBus: logicalBus.clip(0, 10),
             frequencyHz: frequencyHz.asFloat,
+            initialFrequencyHz: frequencyHz.asFloat,
             velocity: velocity.asFloat.clip(0, 1),
             physicalReleased: false,
             finalized: false,
             oneShot: oneShot,
             lifetimeSampleIds: lifetimeSampleIds,
             sampleLifetimePinned: lifetimeSampleIds.notEmpty,
-            sampleNodes: sampleNodes
+            sampleNodes: sampleNodes,
+            gateBus: gateBus,
+            gateBusAlive: true,
+            rateScaleBus: rateScaleBus,
+            rateScaleBusAlive: true
         );
+        gateBus.set(1);
+        rateScaleBus.set(1);
         ~omniPinSampleIds.value(lifetimeSampleIds);
         ~omniVoices[handle] = record;
         selected.do { |region|
@@ -576,6 +581,7 @@ SynthDef(\omniSampleStereo, {
                 alive: true
             );
             sampleNodes.add(sampleNode);
+            node.map(\gateControl, gateBus, \rateScale, rateScaleBus);
             node.onFree {
                 sampleNode[\alive] = false;
                 ~omniSampleVoiceRefs[sampleId] = (
@@ -584,6 +590,10 @@ SynthDef(\omniSampleStereo, {
                 remaining = remaining - 1;
                 if(remaining <= 0) {
                     group.free;
+                    record[\gateBusAlive] = false;
+                    record[\rateScaleBusAlive] = false;
+                    gateBus.free;
+                    rateScaleBus.free;
                     if((record[\oneShot] == true) or: {
                         record[\finalized] == true
                     }) {
@@ -604,14 +614,18 @@ SynthDef(\omniSampleStereo, {
 };
 
 ~omniRetuneSampleHandle = { |record, frequencyHz|
-    ~omniForEachLiveSampleNode.value(record, { |sampleNode|
-        sampleNode[\node].set(
-            \rate,
-            ~omniSamplePlaybackRate.value(
-                frequencyHz, sampleNode[\center], sampleNode[\tune]
-            )
-        );
-    });
+    record[\frequencyHz] = frequencyHz.asFloat;
+    if(record[\rateScaleBusAlive]) {
+        record[\rateScaleBus].set(
+            frequencyHz.asFloat / record[\initialFrequencyHz].max(0.001)
+        )
+    };
+};
+
+~omniGateSampleHandle = { |record|
+    if(record[\gateBusAlive]) {
+        record[\gateBus].set(0)
+    };
 };
 
 ("LB_OMNICHORD_VSCO_INDEX_LOADED programs=" ++ programs.size

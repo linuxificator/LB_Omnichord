@@ -42,10 +42,11 @@ Item {
         const revision = root.selectedIndex
         return root.controller.synthKind(root.role)
     }
-    readonly property var browserModel: {
-        const revision = root.selectedIndex
-        return root.controller.synthBrowserNames(root.role)
-    }
+    // The catalogue changes only when the synth/sample kind changes.  Keep
+    // the list stable across ordinary selection changes so resetting the
+    // Tumbler model cannot feed its temporary currentIndex back into the
+    // backend selection.
+    property var browserModel: root.controller.synthBrowserNames(root.role)
     readonly property int browserIndex: {
         const revision = root.selectedIndex
         return root.controller.synthBrowserIndex(root.role)
@@ -78,6 +79,20 @@ Item {
 
     function setBrowserIndex(index) {
         root.controller.setSynthBrowserIndex(root.role, index)
+    }
+
+    function refreshBrowserModel() {
+        const next = root.controller.synthBrowserNames(root.role)
+        if (next.length !== root.browserModel.length) {
+            root.browserModel = next
+            return
+        }
+        for (let index = 0; index < next.length; ++index) {
+            if (next[index] !== root.browserModel[index]) {
+                root.browserModel = next
+                return
+            }
+        }
     }
 
     function setControl(key, value) {
@@ -164,18 +179,21 @@ Item {
 
                 function onChordSynthStateChanged() {
                     if (root.role === "chord") {
+                        root.refreshBrowserModel()
                         Qt.callLater(root.synchronizeWheel)
                     }
                 }
 
                 function onStrumSynthStateChanged() {
                     if (root.role === "strum") {
+                        root.refreshBrowserModel()
                         Qt.callLater(root.synchronizeWheel)
                     }
                 }
 
                 function onBassSynthStateChanged() {
                     if (root.role === "bass") {
+                        root.refreshBrowserModel()
                         Qt.callLater(root.synchronizeWheel)
                     }
                 }

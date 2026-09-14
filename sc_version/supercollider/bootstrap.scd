@@ -87,9 +87,7 @@ thisProcess.openUDPPort(languagePort);
             if(~omniReleaseSampleLifetime.notNil) {
                 ~omniReleaseSampleLifetime.value(record);
             };
-            ~omniForEachLiveSampleNode.value(record, { |sampleNode|
-                sampleNode[\node].set(\gate, 0)
-            });
+            ~omniGateSampleHandle.value(record);
         } {
         if(record[\outputNode].notNil) {
             record[\releaseRequested] = true;
@@ -280,6 +278,9 @@ if("OMNICHORD_SC_PLUGIN_PATH".getenv.notNil) {
 };
 
 s.waitForBoot({
+    if(("OMNICHORD_SC_TRACE_SERVER_OSC".getenv ? "0").asInteger == 1) {
+        s.dumpOSC(1);
+    };
     (scriptDirectory +/+ "core_synthdefs.scd").load;
 
     (scriptDirectory +/+ "sclork_loader.scd").load;

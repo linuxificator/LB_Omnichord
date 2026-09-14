@@ -47,9 +47,12 @@ upstream mix controls and prevents the sound device from doing uncontrolled
 integer clipping.
 
 Rapid PCM program replacement then exposed `/n_set Node ... not found`: a
-sample could naturally end before its owner handle was released. Region nodes
-carry an explicit live flag updated by `/n_end`, and release/retune iterates
-only live regions. The sample-loader test freezes that rule.
+sample region could naturally end in the server after the language had checked
+its live flag but before a later gate or retune message arrived. A sample voice
+now owns stable gate and pitch-rate control buses for its complete lifetime;
+all region nodes map those controls and release/retune addresses only the
+buses, never an ephemeral node ID. The buses are reclaimed only after every
+region has ended. Package-contract and live catalogue tests freeze that rule.
 
 The first multi-cycle run exposed two further lifetime boundaries. Dense bass
 activity produced provenance text longer than the typed protocol's 192-byte
@@ -110,6 +113,13 @@ ordinary SC frontend process regression also loads this same production QML
 scene and validates an actual PNG, so a controller-only graph cannot
 accidentally be mistaken for GUI coverage.
 
+That production-QML pass exposed model-reset feedback loops in both the MIDI
+and OMNI instrument Tumblers. Their catalogue models now remain stable across
+ordinary selection and parameter changes and are replaced only when their
+contents actually differ. `Binding loop detected` is a fatal endurance marker,
+and the separate frontend-process regression performs rapid browser changes
+through the public API before checking the QML log.
+
 The 2026-09-14 finite release qualification completed all four catalogue
 cycles: 3,254 public actions in 351.294 seconds and twelve independently
 captured audio windows. It reported no server failure, persistent clipping or
@@ -117,3 +127,12 @@ dropout. Except for the initial startup window (394 ms), the longest measured
 silence was 31 ms and then 21 ms. The runner now establishes explicit running
 state at cycle boundaries; blind toggles previously manufactured a 4.9-second
 silent interval and are covered by an idempotence regression test.
+
+An additional post-fix production-QML cycle completed 823 public actions in
+95.643 seconds with three clean audio windows, real 1920x850 captures of both
+screens and no QML binding loop. A controlled 20-second idle measurement of
+the same real process topology averaged 0.05% CPU for `sclang`, 0.75% for
+`scsynth` and 0.40% for the offscreen Qt frontend. The high cumulative CPU seen
+during startup and aggressive catalogue cycling is therefore not an idle
+`sclang` busy loop. The endurance runner's `--startup-idle-seconds` option
+makes this boundary repeatable.

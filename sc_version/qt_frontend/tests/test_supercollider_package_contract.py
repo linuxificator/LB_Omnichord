@@ -118,6 +118,20 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("voiceGroup.free", bootstrap)
         self.assertNotIn("sourceNode.free", bootstrap)
 
+    def test_sample_release_and_retune_use_stable_control_buses(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        samples = (SC_ROOT / "sample_loader.scd").read_text(encoding="utf-8")
+        self.assertIn("~omniGateSampleHandle.value(record)", bootstrap)
+        self.assertIn("var gateBus = Bus.control(s, 1)", samples)
+        self.assertIn("var rateScaleBus = Bus.control(s, 1)", samples)
+        self.assertIn(
+            "node.map(\\gateControl, gateBus, \\rateScale, rateScaleBus)",
+            samples,
+        )
+        self.assertIn("record[\\gateBus].set(0)", samples)
+        self.assertIn("record[\\rateScaleBus].set(", samples)
+        self.assertNotIn("sampleNode[\\node].set(", samples)
+
     def test_sample_buffer_capacity_is_configured_before_server_boot(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
         assignment = bootstrap.index("s.options.numBuffers = maxBuffers")
