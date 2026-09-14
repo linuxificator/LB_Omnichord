@@ -287,13 +287,30 @@ regions.do { |record|
     var articulation = alias[\articulation];
     var midiVelocity = (velocity.clip(0, 1) * 127).round.asInteger;
     var random = 1.0.rand;
-    var selected = ~omniSampleRegions[sourceProgramId].select { |region|
-        (logicalKey >= jsonAt.value(region, "key_lo").asInteger)
-        and: { logicalKey <= jsonAt.value(region, "key_hi").asInteger }
-        and: { midiVelocity >= jsonAt.value(region, "velocity_lo").asInteger }
+    var candidates = ~omniSampleRegions[sourceProgramId].select { |region|
+        (midiVelocity >= jsonAt.value(region, "velocity_lo").asInteger)
         and: { midiVelocity <= jsonAt.value(region, "velocity_hi").asInteger }
         and: { jsonAt.value(region, "articulation_id").asString == articulation }
         and: { jsonAt.value(region, "trigger").asString == trigger.asString }
+    };
+    var nearestDistance = candidates.collect { |region|
+        var low = jsonAt.value(region, "key_lo").asInteger;
+        var high = jsonAt.value(region, "key_hi").asInteger;
+        if(logicalKey < low) {
+            low - logicalKey
+        } {
+            if(logicalKey > high) { logicalKey - high } { 0 }
+        }
+    }.minItem;
+    var selected = candidates.select { |region|
+        var low = jsonAt.value(region, "key_lo").asInteger;
+        var high = jsonAt.value(region, "key_hi").asInteger;
+        var distance = if(logicalKey < low) {
+            low - logicalKey
+        } {
+            if(logicalKey > high) { logicalKey - high } { 0 }
+        };
+        (distance == nearestDistance)
         and: { random >= jsonAt.value(region, "random_lo").asFloat }
         and: { random < jsonAt.value(region, "random_hi").asFloat }
     };
@@ -327,15 +344,32 @@ regions.do { |record|
     if(alias.isNil) {
         []
     } {
-        ~omniSampleRegions[alias[\sourceProgramId]].select { |region|
+        var candidates = ~omniSampleRegions[alias[\sourceProgramId]].select { |region|
             var trigger = jsonAt.value(region, "trigger").asString;
-            (logicalKey >= jsonAt.value(region, "key_lo").asInteger)
-            and: { logicalKey <= jsonAt.value(region, "key_hi").asInteger }
-            and: {
+            (
                 jsonAt.value(region, "articulation_id").asString
                     == alias[\articulation]
-            }
+            )
             and: { (trigger == "release") or: { trigger == "release_key" } }
+        };
+        var nearestDistance = candidates.collect { |region|
+            var low = jsonAt.value(region, "key_lo").asInteger;
+            var high = jsonAt.value(region, "key_hi").asInteger;
+            if(logicalKey < low) {
+                low - logicalKey
+            } {
+                if(logicalKey > high) { logicalKey - high } { 0 }
+            }
+        }.minItem;
+        candidates.select { |region|
+            var low = jsonAt.value(region, "key_lo").asInteger;
+            var high = jsonAt.value(region, "key_hi").asInteger;
+            var distance = if(logicalKey < low) {
+                low - logicalKey
+            } {
+                if(logicalKey > high) { logicalKey - high } { 0 }
+            };
+            distance == nearestDistance
         }.collect { |region|
             jsonAt.value(region, "sample_id").asString
         }.asSet.asArray

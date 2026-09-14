@@ -11,8 +11,10 @@ CODE = FRONTEND / "code"
 sys.path.insert(0, str(CODE))
 
 import main as omnichord  # noqa: E402
+import app_core  # noqa: E402
 from amy_serial import AmySerialClient  # noqa: E402
 from synth_state import SynthState  # noqa: E402
+from supercollider_programs import load_legacy_program_map  # noqa: E402
 
 
 class InstrumentDefaultTests(unittest.TestCase):
@@ -23,7 +25,7 @@ class InstrumentDefaultTests(unittest.TestCase):
             cls.default_chord,
             cls.default_strum,
             cls.default_bass,
-        ) = omnichord.load_synth_catalog(FRONTEND / "instruments" / "synths.json")
+        ) = app_core.load_synth_catalog(FRONTEND / "instruments" / "synths.json")
         cls.by_key = {synth.key: synth for synth in cls.synths}
         cls.index_by_key = {synth.key: index for index, synth in enumerate(cls.synths)}
 
@@ -62,25 +64,7 @@ class InstrumentDefaultTests(unittest.TestCase):
         return client
 
     def test_every_slider_has_explicit_physical_range(self) -> None:
-        self.assertEqual(len(self.synths), 334)
-        self.assertEqual(
-            len([synth for synth in self.synths if synth.key.startswith("sc.sclork.")]),
-            109,
-        )
-        self.assertIn("sc.omni.acid303", self.by_key)
-        self.assertIn("sc.omni.acidMoog", self.by_key)
-        self.assertEqual(
-            len([synth for synth in self.synths if synth.key.startswith("sample.vsco.")]),
-            96,
-        )
-        self.assertIn("physical_strings", self.by_key)
-        physical = self.by_key["physical_strings"]
-        self.assertEqual(physical.label, "Ph. Strings")
-        decay = self.control(physical, "ks_feedback")
-        self.assertEqual(decay.label, "DECAY")
-        self.assertEqual(decay.group, "extra")
-        self.assertGreaterEqual(decay.minimum, 0.90)
-        self.assertGreater(decay.maximum, 0.99)
+        self.assertEqual(len(self.synths), 123)
 
         for synth in self.synths:
             for control in synth.controls:
@@ -118,23 +102,6 @@ class InstrumentDefaultTests(unittest.TestCase):
         self.assertTrue(dx7_attacks)
         self.assertLessEqual(max(dx7_attacks.values()), 40.0)
         self.assertEqual(dx7_attacks["dx7_202"], 40.0)
-
-        tb303 = self.by_key["tb303"]
-        self.assertEqual(tb303.label, "TB-303")
-        self.assertEqual(
-            tuple(control.key for control in tb303.controls),
-            (
-                "waveform",
-                "filter_hz",
-                "resonance",
-                "filter_env_octaves",
-                "filter_decay_ms",
-                "accent_amount",
-                "portamento_ms",
-            ),
-        )
-        self.assertEqual(self.control_default(tb303, "filter_hz"), 400.0)
-        self.assertEqual(self.control_default(tb303, "portamento_ms"), 60.0)
 
     def test_four_edited_instruments_are_all_serialized_sparse(self) -> None:
         state = SynthState(self.synths, 0)
@@ -341,6 +308,63 @@ class InstrumentDefaultTests(unittest.TestCase):
             [("wire", "l0i4Z"), ("configure", "chord")],
         )
 
+
+class SuperColliderInstrumentCatalogueTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        (
+            cls.synths,
+            cls.default_chord,
+            cls.default_strum,
+            cls.default_bass,
+        ) = omnichord.load_synth_catalog(FRONTEND / "instruments" / "synths.json")
+        cls.legacy_map = load_legacy_program_map(
+            FRONTEND / "instruments" / "supercollider-legacy-map.json"
+        )
+
+    def test_browser_contains_only_native_sc_and_sample_programs(self) -> None:
+        self.assertEqual(len(self.synths), 175)
+        self.assertTrue(
+            all(
+                synth.key.startswith(("sc.", "sample."))
+                for synth in self.synths
+            )
+        )
+        self.assertFalse(
+            any(
+                synth.key.startswith(("juno_", "dx7_", "physical_", "tb303"))
+                for synth in self.synths
+            )
+        )
+        self.assertNotIn("sample.vsco.gm-styleperc", {synth.key for synth in self.synths})
+
+    def test_defaults_are_canonical_sc_programs(self) -> None:
+        keys = tuple(
+            self.synths[index].key
+            for index in (
+                self.default_chord,
+                self.default_strum,
+                self.default_bass,
+            )
+        )
+        self.assertEqual(
+            keys,
+            (
+                "sc.sclork.prophet5pwmStrings",
+                "sc.sclork.pluck",
+                "sc.sclork.fmBass",
+            ),
+        )
+
+    def test_legacy_selection_is_imported_but_emitted_as_canonical_sc(self) -> None:
+        legacy_key = "juno_007"
+        state = SynthState(self.synths, self.default_chord)
+        state.load_preset({"selected": legacy_key})
+
+        self.assertEqual(
+            state.transport_payload()["name"],
+            self.legacy_map[legacy_key],
+        )
 
 if __name__ == "__main__":
     unittest.main()

@@ -45,7 +45,8 @@ SynthDef(\omniDrum, { |out=0, note=36, velocity=0.7, gain=1|
 }).add;
 
 SynthDef(\omniVoiceOutput, {
-    |in=0, out=0, velocity=0.7, gain=1, pan=0, gate=1, release=0.22|
+    |in=0, out=0, velocity=0.7, gain=1, calibration=1,
+     pan=0, gate=1, release=0.22|
     var input = In.ar(in, 2);
     var envelope = EnvGen.kr(
         Env.asr(0.003, 1, release.max(0.005)),
@@ -53,7 +54,10 @@ SynthDef(\omniVoiceOutput, {
         doneAction: Done.freeSelf
     );
     var signal = Balance2.ar(input[0], input[1], pan);
-    Out.ar(out, signal * envelope * velocity.clip(0, 1) * gain);
+    Out.ar(
+        out,
+        signal * envelope * velocity.clip(0, 1) * gain * calibration
+    );
 }).add;
 
 SynthDef(\omniBusStrip, {

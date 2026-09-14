@@ -23,6 +23,7 @@ class SuperColliderConfigTests(unittest.TestCase):
         self.assertEqual(config.protocol_version, 1)
         self.assertEqual(config.language.host, "127.0.0.1")
         self.assertEqual(config.server.sample_rate, 48000)
+        self.assertEqual(config.server.max_buffers, 8192)
 
     def test_non_loopback_control_listener_is_rejected(self) -> None:
         source = FRONTEND_DIR / "config" / "supercollider.json"
@@ -32,6 +33,16 @@ class SuperColliderConfigTests(unittest.TestCase):
             path = Path(directory) / "supercollider.json"
             path.write_text(json.dumps(data), encoding="utf-8")
             with self.assertRaisesRegex(SuperColliderConfigError, "loopback"):
+                load_supercollider_config(path)
+
+    def test_too_small_buffer_table_is_rejected(self) -> None:
+        source = FRONTEND_DIR / "config" / "supercollider.json"
+        data = json.loads(source.read_text(encoding="utf-8"))
+        data["server"]["max_buffers"] = 512
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "supercollider.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(SuperColliderConfigError, "max_buffers"):
                 load_supercollider_config(path)
 
 

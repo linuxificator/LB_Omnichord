@@ -48,9 +48,9 @@ load_intonation_table = app_core.load_intonation_table
 
 
 def load_synth_catalog(path: Path) -> tuple[list[Any], int, int, int]:
-    """Load the public catalogue including non-ROM synth programs."""
+    """Load only canonical SuperCollider and sample programs for this edition."""
 
-    return load_extended_synth_catalog(app_core.load_synth_catalog, path)
+    return load_extended_synth_catalog(path)
 
 
 def parse_arguments(arguments: Sequence[str] | None = None) -> Namespace:

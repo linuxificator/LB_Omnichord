@@ -134,6 +134,7 @@ class SuperColliderSupervisor:
                 "OMNICHORD_SC_SAMPLE_RATE": str(server.sample_rate),
                 "OMNICHORD_SC_BLOCK_SIZE": str(server.block_size),
                 "OMNICHORD_SC_MAX_NODES": str(server.max_nodes),
+                "OMNICHORD_SC_MAX_BUFFERS": str(server.max_buffers),
                 "OMNICHORD_SC_MEM_KIB": str(server.realtime_memory_kib),
                 "OMNICHORD_SC_VSCO_ROOT": str(samples.vsco_root),
                 "OMNICHORD_SC_SAMPLE_RAM_MIB": str(samples.ram_budget_mib),

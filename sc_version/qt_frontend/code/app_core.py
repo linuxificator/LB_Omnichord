@@ -245,6 +245,7 @@ class SynthDefinition:
     key: str
     label: str
     controls: tuple[SynthControl, ...]
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -733,6 +734,9 @@ def load_synth_catalog(
                 key=str(raw_synth["key"]),
                 label=str(raw_synth["label"]),
                 controls=controls,
+                aliases=tuple(
+                    str(alias) for alias in raw_synth.get("aliases", ())
+                ),
             )
         )
 

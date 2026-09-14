@@ -20,10 +20,17 @@ class SynthState:
         self._definitions = tuple(definitions)
         if not self._definitions:
             raise ValueError("SynthState requires at least one definition")
-        self._key_to_index = {
-            str(definition.key): index
-            for index, definition in enumerate(self._definitions)
-        }
+        self._key_to_index: dict[str, int] = {}
+        for index, definition in enumerate(self._definitions):
+            identities = (str(definition.key), *(
+                str(alias) for alias in getattr(definition, "aliases", ())
+            ))
+            for identity in identities:
+                previous = self._key_to_index.setdefault(identity, index)
+                if previous != index:
+                    raise ValueError(
+                        f"instrument identity {identity!r} belongs to multiple programs"
+                    )
         self._default_selected_index = self._validate_index(selected_index)
         self._selected_index = self._default_selected_index
         self._values_by_synth = self._default_values()

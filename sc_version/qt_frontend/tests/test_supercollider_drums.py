@@ -59,14 +59,44 @@ class SuperColliderDrumMappingTests(unittest.TestCase):
                     f"{role} -> GM key {sample_key} lacks velocity coverage",
                 )
 
-    def test_roles_map_to_expected_gm_instrument_families(self) -> None:
+    def test_roles_map_to_matching_vsco_instrument_families(self) -> None:
         roles = self.mapping["role_keys"]
         self.assertEqual(roles["low_primary"], 36)
         self.assertEqual(roles["backbeat_primary"], 38)
-        self.assertEqual(roles["timekeeper_primary"], 42)
-        self.assertEqual(roles["tonal_low"], 41)
+        self.assertEqual(roles["timekeeper_primary"], 54)
+        self.assertEqual(roles["timekeeper_open"], 51)
+        self.assertEqual(roles["tonal_low"], 77)
+        self.assertEqual(roles["tonal_high"], 76)
         self.assertEqual(roles["section_accent"], 49)
-        self.assertEqual(roles["hand_low"], 64)
+        self.assertEqual(roles["hand_low"], 65)
+
+    def test_role_keys_do_not_claim_gong_scrapes_as_hihats(self) -> None:
+        files = {item["id"]: item for item in self.manifest["files"]}
+        program = self.mapping["program_id"]
+        regions = [
+            region
+            for region in self.manifest["regions"]
+            if region["program_id"] == program
+        ]
+        expected_fragments = {
+            "low_primary": "BDrum",
+            "backbeat_primary": "Snare",
+            "timekeeper_primary": "Tamb",
+            "timekeeper_open": "susCymb",
+            "timeline_primary": "Cowbell",
+            "tonal_low": "LogDrumLo",
+            "tonal_high": "LogDrumHi",
+        }
+        for role, fragment in expected_fragments.items():
+            key = self.mapping["role_keys"][role]
+            names = {
+                files[region["sample_id"]]["relative_path"]
+                for region in regions
+                if region["key_lo"] <= key <= region["key_hi"]
+            }
+            with self.subTest(role=role):
+                self.assertTrue(any(fragment in name for name in names), names)
+                self.assertFalse(any("gong" in name.casefold() for name in names))
 
 
 if __name__ == "__main__":

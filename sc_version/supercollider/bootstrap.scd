@@ -10,6 +10,7 @@ var languagePort = ("OMNICHORD_SC_PORT".getenv ? "57140").asInteger;
 var sampleRate = ("OMNICHORD_SC_SAMPLE_RATE".getenv ? "48000").asInteger;
 var blockSize = ("OMNICHORD_SC_BLOCK_SIZE".getenv ? "64").asInteger;
 var maxNodes = ("OMNICHORD_SC_MAX_NODES".getenv ? "4096").asInteger;
+var maxBuffers = ("OMNICHORD_SC_MAX_BUFFERS".getenv ? "8192").asInteger;
 var memKiB = ("OMNICHORD_SC_MEM_KIB".getenv ? "262144").asInteger;
 var protocolVersion = 1;
 var validateOnly = ("OMNICHORD_SC_VALIDATE_ONLY".getenv ? "0").asInteger == 1;
@@ -249,6 +250,7 @@ s = Server.local;
 s.options.sampleRate = sampleRate;
 s.options.blockSize = blockSize;
 s.options.maxNodes = maxNodes;
+s.options.numBuffers = maxBuffers;
 s.options.memSize = memKiB;
 s.options.numInputBusChannels = 0;
 s.options.numOutputBusChannels = 2;
@@ -367,6 +369,7 @@ s.waitForBoot({
                 \in, voiceBus.index,
                 \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
                 \velocity, velocity,
+                \calibration, ~omniSclorkPlaybackGain.value(program),
                 \release, outputRelease.max(0.005)
             ]);
             record = (
@@ -384,13 +387,20 @@ s.waitForBoot({
                 owner: owner.asString,
                 logicalKey: logicalKey.asInteger,
                 program: program.asString,
+                sourceAlive: true,
                 cleaned: false
             );
             ~omniVoices[handle] = record;
             outputNode.onFree {
                 if(record[\cleaned].not) {
                     record[\cleaned] = true;
-                    sourceNode.free;
+                    if(record[\sourceAlive]) {
+                        // A number of SCLOrk voices end themselves. Mark the
+                        // local lifetime first so their delayed /n_end cannot
+                        // race this cleanup into a second /n_free.
+                        record[\sourceAlive] = false;
+                        sourceNode.free;
+                    };
                     voiceBus.free;
                     if(~omniVoices[handle] === record) {
                         ~omniVoices.removeAt(handle);
@@ -398,6 +408,7 @@ s.waitForBoot({
                 };
             };
             sourceNode.onFree {
+                record[\sourceAlive] = false;
                 if(record[\cleaned].not) { outputNode.set(\gate, 0) };
             };
         } {

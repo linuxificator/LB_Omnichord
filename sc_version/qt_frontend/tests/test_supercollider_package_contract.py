@@ -106,6 +106,12 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("record[\\baseFrequency] * ratio", bootstrap)
         self.assertIn("frequency * (2 ** ~omniPitchBendOctaves)", bootstrap)
 
+    def test_sample_buffer_capacity_is_configured_before_server_boot(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        assignment = bootstrap.index("s.options.numBuffers = maxBuffers")
+        boot = bootstrap.index("s.waitForBoot")
+        self.assertLess(assignment, boot)
+
 
 if __name__ == "__main__":
     unittest.main()

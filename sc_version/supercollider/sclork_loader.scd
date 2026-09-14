@@ -4,6 +4,8 @@ var directory = thisProcess.nowExecutingPath.dirname;
 var sourceRoot = directory +/+ "vendor/SCLOrkSynths/SynthDefs";
 var adapterRoot = directory +/+ "adapters";
 var sourceFiles = List.new;
+var playbackProfile = (directory +/+ "sclork-playback.json").parseJSONFile;
+var playbackPrograms = playbackProfile["programs"] ? playbackProfile[\programs];
 
 PathName(sourceRoot).folders.do { |folder|
     folder.files.do { |file|
@@ -25,6 +27,17 @@ PathName(adapterRoot).files
     } {
         nil
     }
+};
+
+~omniSclorkPlaybackGain = { |program|
+    var record = playbackPrograms[program.asString]
+        ? playbackPrograms[program.asSymbol];
+    var gain = if(record.isNil) {
+        1.0
+    } {
+        record["gain"] ? record[\gain] ? 1.0
+    };
+    gain.asFloat
 };
 
 ~omniSynthHasControl = { |name, control|

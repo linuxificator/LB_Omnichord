@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 
@@ -99,6 +100,49 @@ def load_legacy_program_map(path: Path) -> dict[str, str]:
     if not isinstance(mappings, dict) or not mappings:
         raise ValueError(f"{path} has no program mappings")
     return {str(key): str(value) for key, value in mappings.items()}
+
+
+def load_sclork_playback_profile(path: Path) -> tuple[dict[str, float], dict[str, str]]:
+    """Load reviewed browser admission and output calibration metadata."""
+
+    source = Path(path)
+    raw = json.loads(source.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or raw.get("schema_revision") != 1:
+        raise ValueError(f"{source} is not a supported SCLOrk playback profile")
+    programs = raw.get("programs")
+    excluded = raw.get("excluded")
+    if not isinstance(programs, dict) or not isinstance(excluded, dict):
+        raise ValueError(f"{source} has incomplete playback metadata")
+    gains = {
+        str(program_id): float(record["gain"])
+        for program_id, record in programs.items()
+        if isinstance(record, dict)
+    }
+    reasons = {
+        str(program_id): str(record["reason"])
+        for program_id, record in excluded.items()
+        if isinstance(record, dict)
+    }
+    if len(gains) != len(programs) or len(reasons) != len(excluded):
+        raise ValueError(f"{source} contains malformed playback records")
+    overlap = gains.keys() & reasons.keys()
+    if overlap:
+        raise ValueError(
+            f"{source} both includes and excludes: {', '.join(sorted(overlap))}"
+        )
+    maximum = raw.get("method", {}).get("max_gain")
+    if not isinstance(maximum, (int, float)) or not math.isfinite(float(maximum)):
+        raise ValueError(f"{source} has no finite max_gain")
+    invalid = [
+        program_id
+        for program_id, gain in gains.items()
+        if not math.isfinite(gain) or gain <= 0 or gain > float(maximum)
+    ]
+    if invalid:
+        raise ValueError(
+            f"{source} has invalid playback gain for: {', '.join(sorted(invalid))}"
+        )
+    return gains, reasons
 
 
 def _controls(source: str) -> tuple[str, ...]:

@@ -48,6 +48,28 @@ if(selection.isEmpty) {
     "VSCO_REGION_SELECTION_FAILED".postln;
 };
 selection = ~omniSelectSampleRegions.value(
+    "sample.vsco.fluteexpvib", 24, 0.5
+);
+if(selection.isEmpty or: {
+    selection.any { |region|
+        (region["key_lo"] ? region[\key_lo]).asInteger != 60
+    }
+}) {
+    failed = true;
+    "VSCO_BELOW_RANGE_NEAREST_REGION_FAILED".postln;
+};
+selection = ~omniSelectSampleRegions.value(
+    "sample.vsco.fluteexpvib", 120, 0.5
+);
+if(selection.isEmpty or: {
+    selection.any { |region|
+        (region["key_hi"] ? region[\key_hi]).asInteger != 96
+    }
+}) {
+    failed = true;
+    "VSCO_ABOVE_RANGE_NEAREST_REGION_FAILED".postln;
+};
+selection = ~omniSelectSampleRegions.value(
     "sample.vsco.flute-ks.art.d-2-staccato", 72, 0.5
 );
 if(selection.isEmpty or: {

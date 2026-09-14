@@ -94,6 +94,7 @@ class SuperColliderClient:
             "bass": self._resolve_program(resolved_config.synth_defaults.bass),
         }
         self._program_revision = {"chord": 1, "strum": 1, "bass": 1}
+        self._configured_roles: set[str] = set()
         self._program_counter = 1
         self._program_params: dict[str, dict[str, float]] = {
             "chord": {},
@@ -197,6 +198,7 @@ class SuperColliderClient:
         role, parameters = pending
         if status == "error":
             self._program_errors[role] = detail
+            self._configured_roles.discard(role)
             self._pending_programs.pop((program_id, revision), None)
             self._release_program(program_id, revision)
             return
@@ -601,7 +603,11 @@ class SuperColliderClient:
         else:
             name = self._resolve_program(str(value))
             parameters = {}
-        if name == self._selected_program[role] and parameters == self._program_params[role]:
+        if (
+            role in self._configured_roles
+            and name == self._selected_program[role]
+            and parameters == self._program_params[role]
+        ):
             return
         revision = self.allocate_program_revision()
         logical_bus = self._role_bus("chord" if role == "chord" else role)
@@ -631,6 +637,7 @@ class SuperColliderClient:
                 logical_bus,
                 parameters,
             )
+        self._configured_roles.add(role)
         if not sample_program:
             self._activate_program(role, name, revision, parameters)
 

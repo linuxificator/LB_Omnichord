@@ -16,9 +16,14 @@ var score = List.new;
 var options = ServerOptions.new;
 var segmentSeconds = 0.75;
 var noteSeconds = 0.42;
+var requestedFrequency = "OMNICHORD_SC_NRT_FREQUENCY".getenv;
+var rawOutput = ("OMNICHORD_SC_NRT_RAW".getenv ? "0").asInteger == 1;
 var endSeconds;
 
 (directory +/+ "sclork_loader.scd").load;
+SynthDef(\omniSclorkAuditOutput, { |in=16, out=0, calibration=1|
+    Out.ar(out, In.ar(in, 2) * calibration);
+}).add;
 if((startIndex < 0) or: { startIndex >= allPrograms.size }) {
     Error("invalid SCLOrk NRT start index: " ++ startIndex).throw;
 };
@@ -32,18 +37,35 @@ programs.do { |program|
     var description = SynthDescLib.global.at(name);
     description.def.writeDefFile(defDirectory);
 };
+SynthDescLib.global.at(\omniSclorkAuditOutput).def.writeDefFile(defDirectory);
 score.add([0.0, [\d_loadDir, defDirectory]]);
 programs.do { |program, index|
     var name = jsonAt.value(program, "native_name").asSymbol;
+    var programId = jsonAt.value(program, "program_id").asString;
     var nodeId = 1000 + index;
+    var outputNodeId = 2000 + index;
     var start = 0.05 + (index * segmentSeconds);
-    var frequency = [110.0, 440.0, 880.0][(startIndex + index) % 3];
-    var args = ~omniSclorkArgs.value(name, 0, frequency, []);
+    var frequency = if(requestedFrequency.isNil) {
+        [110.0, 440.0, 880.0][(startIndex + index) % 3]
+    } {
+        requestedFrequency.asFloat
+    };
+    var args = ~omniSclorkArgs.value(name, 16, frequency, []);
     score.add([start, [\s_new, name, nodeId, 0, 0] ++ args]);
+    score.add([start + 0.001, [
+        \s_new, \omniSclorkAuditOutput, outputNodeId, 1, 0,
+        \in, 16, \out, 0,
+        \calibration, if(rawOutput) {
+            1.0
+        } {
+            ~omniSclorkPlaybackGain.value(programId)
+        }
+    ]]);
     if(~omniSynthHasControl.value(name, \gate)) {
         score.add([start + noteSeconds, [\n_set, nodeId, \gate, 0]]);
     };
     score.add([start + 0.68, [\n_free, nodeId]]);
+    score.add([start + 0.70, [\n_free, outputNodeId]]);
 };
 endSeconds = 0.1 + (programs.size * segmentSeconds);
 score.add([endSeconds, [\c_set, 0, 0]]);
@@ -60,7 +82,7 @@ Score.recordNRT(
     output,
     sampleRate: 48000,
     headerFormat: "WAV",
-    sampleFormat: "int16",
+    sampleFormat: "float",
     options: options,
     duration: endSeconds,
     action: {

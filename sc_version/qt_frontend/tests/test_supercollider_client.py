@@ -92,6 +92,7 @@ class SuperColliderClientTests(unittest.TestCase):
                         "block_size": 64,
                         "latency_seconds": 0.02,
                         "max_nodes": 4096,
+                        "max_buffers": 8192,
                         "realtime_memory_kib": 262144,
                     },
                     "samples": {

@@ -37,6 +37,16 @@ if(~omniSclorkArgs.value(\everythingRhodes, 0, 440, []).includesEqual(\amp)) {
     failed = true;
     "SCLORK_LOADER_OVERRODE_NATIVE_AMP_FAILED".postln;
 };
+if((~omniSclorkPlaybackGain.value("sc.sclork.everythingRhodes") - 0.003854).abs
+    > 0.000001) {
+    failed = true;
+    "SCLORK_LOADER_HOT_PROGRAM_CALIBRATION_FAILED".postln;
+};
+if((~omniSclorkPlaybackGain.value("sc.sclork.glockenspiel") - 16).abs
+    > 0.000001) {
+    failed = true;
+    "SCLORK_LOADER_QUIET_PROGRAM_CALIBRATION_FAILED".postln;
+};
 if(failed) { 1.exit } {
     "SCLORK_LOADER_TEST_OK".postln;
     0.exit

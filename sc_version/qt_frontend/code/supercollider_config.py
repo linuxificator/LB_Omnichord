@@ -26,6 +26,7 @@ class SuperColliderServerConfig:
     block_size: int
     latency_seconds: float
     max_nodes: int
+    max_buffers: int
     realtime_memory_kib: int
 
 
@@ -138,6 +139,11 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
     max_nodes = _integer(server, "max_nodes", "$.server")
     if not 256 <= max_nodes <= 1_000_000:
         raise SuperColliderConfigError("$.server.max_nodes: expected 256..1000000")
+    max_buffers = _integer(server, "max_buffers", "$.server")
+    if not 1024 <= max_buffers <= 1_000_000:
+        raise SuperColliderConfigError(
+            "$.server.max_buffers: expected 1024..1000000"
+        )
     realtime_memory = _integer(
         server, "realtime_memory_kib", "$.server"
     )
@@ -170,6 +176,7 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
             block_size=block_size,
             latency_seconds=latency,
             max_nodes=max_nodes,
+            max_buffers=max_buffers,
             realtime_memory_kib=realtime_memory,
         ),
         samples=SuperColliderSampleConfig(
@@ -192,6 +199,7 @@ def _cli() -> int:
             "server.sample_rate",
             "server.block_size",
             "server.max_nodes",
+            "server.max_buffers",
             "server.realtime_memory_kib",
             "samples.vsco_root",
             "samples.ram_budget_mib",

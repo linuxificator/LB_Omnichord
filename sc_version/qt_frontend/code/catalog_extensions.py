@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 from pathlib import Path
-from collections.abc import Callable, Sequence
-from typing import Any
+from collections import defaultdict
 
 import app_core
 from sample_programs import load_vsco_programs
-from supercollider_programs import display_name, load_supercollider_programs
+from supercollider_programs import (
+    display_name,
+    load_legacy_program_map,
+    load_sclork_playback_profile,
+    load_supercollider_programs,
+)
 
 
-PHYSICAL_STRINGS_KEY = "physical_strings"
-TB303_KEY = "tb303"
+DEFAULT_PROGRAMS = (
+    "sc.sclork.prophet5pwmStrings",
+    "sc.sclork.pluck",
+    "sc.sclork.fmBass",
+)
 ACID_PROGRAMS = (
     ("sc.omni.acid303", "SC Acid 303"),
     ("sc.omni.acidOto", "SC Acid Oto"),
@@ -74,56 +81,43 @@ def _acid_controls() -> tuple[app_core.SynthControl, ...]:
     )
 
 
-def load_synth_catalog(
-    original_loader: Callable[[Path], tuple[Sequence[Any], int, int, int]],
-    path: Path,
-) -> tuple[list[Any], int, int, int]:
-    synths, chord_default, strum_default, bass_default = original_loader(path)
-    synths = list(synths)
-    if not any(synth.key == PHYSICAL_STRINGS_KEY for synth in synths):
-        synths.append(
-            app_core.SynthDefinition(
-                key=PHYSICAL_STRINGS_KEY,
-                label="Ph. Strings",
-                controls=(
-                    app_core.SynthControl(
-                        key="ks_feedback",
-                        label="DECAY",
-                        group="extra",
-                        default=0.985,
-                        native_default=0.985,
-                        minimum=0.90,
-                        maximum=0.999,
-                        step=0.001,
-                        decimals=3,
-                        unit="",
-                        scale="linear",
-                    ),
-                ),
-            )
-        )
-    if not any(synth.key == TB303_KEY for synth in synths):
-        synths.append(
-            app_core.SynthDefinition(
-                key=TB303_KEY,
-                label="TB-303",
-                controls=_acid_controls(),
-            )
-        )
+def load_synth_catalog(path: Path) -> tuple[list[app_core.SynthDefinition], int, int, int]:
+    """Build the SC edition's browser without loading the AMY patch catalogue.
+
+    Legacy keys are data-migration aliases only. They never become visible
+    choices and every emitted selection is a canonical SC/sample program ID.
+    Raw drum SynthDefs remain compiled and audited, but are not pitched
+    instruments in the shared OMNI/MIDI browser.
+    """
+
+    instrument_root = path.parent
     supercollider_root = path.parents[1].parent / "supercollider"
-    known_keys = {synth.key for synth in synths}
+    legacy_map = load_legacy_program_map(
+        instrument_root / "supercollider-legacy-map.json"
+    )
+    playback_gains, _excluded = load_sclork_playback_profile(
+        supercollider_root / "sclork-playback.json"
+    )
+    aliases_by_program: dict[str, list[str]] = defaultdict(list)
+    for alias, program_id in legacy_map.items():
+        aliases_by_program[program_id].append(alias)
+
+    synths: list[app_core.SynthDefinition] = []
+    known_keys: set[str] = set()
     for program in load_supercollider_programs(
         supercollider_root / "sclork-programs.json"
     ):
-        if program.program_id not in known_keys:
-            synths.append(
-                app_core.SynthDefinition(
-                    key=program.program_id,
-                    label=display_name(program.native_name),
-                    controls=(),
-                )
+        if program.program_id not in playback_gains:
+            continue
+        synths.append(
+            app_core.SynthDefinition(
+                key=program.program_id,
+                label=display_name(program.native_name),
+                controls=(),
+                aliases=tuple(sorted(aliases_by_program[program.program_id])),
             )
-            known_keys.add(program.program_id)
+        )
+        known_keys.add(program.program_id)
     for program_id, label in ACID_PROGRAMS:
         if program_id not in known_keys:
             synths.append(
@@ -131,6 +125,7 @@ def load_synth_catalog(
                     key=program_id,
                     label=label,
                     controls=_acid_controls(),
+                    aliases=tuple(sorted(aliases_by_program[program_id])),
                 )
             )
             known_keys.add(program_id)
@@ -138,6 +133,8 @@ def load_synth_catalog(
         supercollider_root / "vsco-manifest.json"
     ):
         if sample_program.program_id not in known_keys:
+            if sample_program.program_id == "sample.vsco.gm-styleperc":
+                continue
             synths.append(
                 app_core.SynthDefinition(
                     key=sample_program.program_id,
@@ -146,4 +143,13 @@ def load_synth_catalog(
                 )
             )
             known_keys.add(sample_program.program_id)
-    return synths, chord_default, strum_default, bass_default
+    missing_defaults = [key for key in DEFAULT_PROGRAMS if key not in known_keys]
+    if missing_defaults:
+        raise ValueError(
+            "SC instrument catalogue misses defaults: " + ", ".join(missing_defaults)
+        )
+    defaults = tuple(
+        next(index for index, synth in enumerate(synths) if synth.key == key)
+        for key in DEFAULT_PROGRAMS
+    )
+    return synths, defaults[0], defaults[1], defaults[2]

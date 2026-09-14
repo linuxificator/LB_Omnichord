@@ -160,7 +160,17 @@ def load_application_resources(
         paths.music / "intonation_jv.json"
     )
 
-    by_key = {str(synth.key): index for index, synth in enumerate(synths)}
+    by_key: dict[str, int] = {}
+    for index, synth in enumerate(synths):
+        identities = (str(synth.key), *(
+            str(alias) for alias in getattr(synth, "aliases", ())
+        ))
+        for identity in identities:
+            previous = by_key.setdefault(identity, index)
+            if previous != index:
+                raise ValueError(
+                    f"instrument identity {identity!r} belongs to multiple programs"
+                )
 
     def selected(role: str, fallback: int) -> int:
         key = str(cast(dict[str, Any], defaults.get("synths", {})).get(role, ""))

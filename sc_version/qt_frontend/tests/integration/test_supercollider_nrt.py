@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from array import array
 import json
 import math
 import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 import unittest
-import wave
+
+import numpy
+import soundfile
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -69,34 +69,29 @@ class SuperColliderNonRealtimeTests(unittest.TestCase):
                 self.assertTrue(output.is_file(), completed.stdout)
                 self.assertNotIn("SynthDef not found", completed.stdout)
                 self.assertNotIn("makeSynthMsgWithTags: buffer overflow", completed.stdout)
-                with wave.open(str(output), "rb") as rendered:
-                    self.assertEqual(rendered.getframerate(), SAMPLE_RATE)
-                    self.assertEqual(rendered.getnchannels(), 2)
-                    self.assertEqual(rendered.getsampwidth(), 2)
-                    frames = rendered.readframes(rendered.getnframes())
+                frames, sample_rate = soundfile.read(
+                    output,
+                    dtype="float64",
+                    always_2d=True,
+                )
+                self.assertEqual(sample_rate, SAMPLE_RATE)
+                self.assertEqual(frames.shape[1], 2)
 
-                segment_bytes = round(SEGMENT_SECONDS * SAMPLE_RATE) * 4
+                segment_frames = round(SEGMENT_SECONDS * SAMPLE_RATE)
                 for index, program in enumerate(batch):
-                    start = index * segment_bytes
-                    segment = frames[start : start + segment_bytes]
-                    samples = array("h")
-                    samples.frombytes(segment)
-                    if sys.byteorder != "little":
-                        samples.byteswap()
-                    rms = math.sqrt(
-                        sum(sample * sample for sample in samples) / len(samples)
-                    ) / 32767.0
-                    peak = max(abs(sample) for sample in samples) / 32767.0
+                    start = index * segment_frames
+                    segment = frames[start : start + segment_frames]
+                    rms = math.sqrt(float(numpy.mean(numpy.square(segment))))
+                    peak = float(numpy.max(numpy.abs(segment)))
                     report.append(
                         {
                             "program_id": program["program_id"],
                             "native_name": program["native_name"],
                             "rms": round(rms, 8),
                             "peak": round(peak, 8),
-                            "silent": rms < 1e-6,
-                            "clipped": math.isclose(
-                                peak, 1.0, abs_tol=1 / 32767
-                            ),
+                            "finite": math.isfinite(rms) and math.isfinite(peak),
+                            "silent": math.isfinite(rms) and rms < 1e-6,
+                            "clipped": math.isfinite(peak) and peak >= 1.0,
                         }
                     )
             self.assertEqual(len(report), len(catalog))
@@ -105,12 +100,31 @@ class SuperColliderNonRealtimeTests(unittest.TestCase):
                 json.dumps({"schema_version": 1, "programs": report}, indent=2) + "\n",
                 encoding="utf-8",
             )
-            silent = [item["program_id"] for item in report if item["silent"]]
+            profile = json.loads(
+                (SC_ROOT / "sclork-playback.json").read_text(encoding="utf-8")
+            )
+            browser_programs = set(profile["programs"])
+            visible = [
+                item for item in report if item["program_id"] in browser_programs
+            ]
+            silent = [item["program_id"] for item in visible if item["silent"]]
             self.assertEqual(
                 silent,
                 [],
                 f"silent programs: {silent}; see {report_path}\n"
                 + "\n".join(render_logs),
+            )
+            invalid = [item["program_id"] for item in visible if not item["finite"]]
+            self.assertEqual(invalid, [], f"non-finite browser programs: {invalid}")
+            clipped = [item["program_id"] for item in visible if item["clipped"]]
+            self.assertEqual(clipped, [], f"clipped browser programs: {clipped}")
+            too_quiet = [
+                item["program_id"] for item in visible if float(item["rms"]) < 0.002
+            ]
+            self.assertEqual(
+                too_quiet,
+                [],
+                f"inaudibly quiet browser programs: {too_quiet}",
             )
 
 

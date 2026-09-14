@@ -34,6 +34,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
         TESTS / "test_supercollider_frontend_process.py",
         TESTS / "test_supercollider_process.py",
         TESTS / "test_supercollider_programs.py",
+        TESTS / "test_sclork_playback_profile.py",
         TESTS / "test_supercollider_release_evidence.py",
         TESTS / "test_supercollider_sources.py",
     ),
