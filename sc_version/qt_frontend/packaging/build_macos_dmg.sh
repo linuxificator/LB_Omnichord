@@ -71,6 +71,7 @@ plutil -insert NSBonjourServices -json '["_osc._udp"]' \
     "$app_bundle/Contents/Info.plist"
 plutil -lint "$app_bundle/Contents/Info.plist"
 codesign --force --deep --sign - "$app_bundle"
+"$app_bundle/Contents/MacOS/LB_Omnichord_SC" --verify-package
 hdiutil create -volname "LB Omnichord SC" -fs HFS+ -format UDZO \
     -srcfolder "$app_bundle" "$output"
 python "$frontend_dir/packaging/package_audit.py" \

@@ -11,8 +11,8 @@ This tree began as a behavior-preserving copy of the AMY design tree. The
 contracts remain authoritative for UI, music, external controls, configuration
 quality and tests. Where an AMY transport or engine detail conflicts with the
 SuperCollider design, the documents in [`sc/`](sc/) and executable SC tests
-supersede it for this edition only. The AMY implementation remains unchanged
-and independently releasable.
+supersede it for this edition only. The AMY and Sonic Pi implementations are
+retained as historical source archives and are not active release targets.
 
 ## Categories
 
@@ -48,6 +48,8 @@ For every SuperCollider edition task, first read:
    instrument selection, sample grouping or program controls
 10. [`sc/TO_FIX_VERIFICATION.md`](sc/TO_FIX_VERIFICATION.md) for the completed
     SC usability follow-up and its executable evidence
+11. [`sc/BUILD_AND_RELEASE.md`](sc/BUILD_AND_RELEASE.md) for active platform,
+    sample-installation and release workflow contracts
 
 Then read the category README and owning contracts for every subsystem being
 changed. If `../../CODEX_HANDOFF.md` exists, read it for operational state; it

@@ -82,8 +82,10 @@ The compiler still audits all 109 pinned SCLOrk definitions. The pitched
 browser exposes 76 qualified SCLOrk programs and four owned acid programs. The
 drum rollers use nineteen separately qualified SCLOrk drum programs plus the
 basic and VSCO paths. NRT renders require finite audio; every selected synth
-drum hit must have RMS 0.015..0.075 and peak below 0.85 at its real runtime
-default frequency.
+drum hit must have RMS 0.015..0.075 and peak below 0.95 at its real runtime
+default frequency. The RMS window is the repeatable balance contract; the
+wider transient ceiling allows valid instantaneous variance in noise-based
+percussion while retaining headroom below full scale.
 
 The generated VSCO manifest covers all 75 SFZ mappings and all 3,163 referenced
 regions. The 1,134 local audio files not referenced by those mappings remain

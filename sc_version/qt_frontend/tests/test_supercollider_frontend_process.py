@@ -11,7 +11,7 @@ import tempfile
 import time
 import unittest
 from urllib.error import URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,17 +44,25 @@ def request_json(
         method=method,
         headers={"Content-Type": "application/json"},
     )
-    with urlopen(request, timeout=2) as response:
+    # The control process is an explicit loopback boundary. CI host proxy
+    # variables must never route this request outside the machine.
+    with build_opener(ProxyHandler({})).open(request, timeout=2) as response:
         return json.loads(response.read())
 
 
 def stop_process(process: subprocess.Popen[str]) -> tuple[str, str]:
     if process.poll() is None:
-        os.killpg(process.pid, signal.SIGTERM)
+        if hasattr(os, "killpg"):
+            os.killpg(process.pid, signal.SIGTERM)
+        else:
+            process.terminate()
     try:
         return process.communicate(timeout=4)
     except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
+        if hasattr(os, "killpg"):
+            os.killpg(process.pid, signal.SIGKILL)
+        else:
+            process.kill()
         return process.communicate(timeout=2)
 
 
