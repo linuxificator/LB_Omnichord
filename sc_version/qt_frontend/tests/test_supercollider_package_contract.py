@@ -144,7 +144,11 @@ class SuperColliderPackageContractTests(unittest.TestCase):
                 patch("sc_appimage_entry.sys.executable", str(executable)),
                 patch.dict(os.environ, {}, clear=True),
             ):
-                self.assertEqual(packaged_runtime_root(), runtime)
+                # Windows may canonicalize an 8.3 temp-directory spelling and
+                # macOS maps /var to /private/var. Compare canonical paths.
+                self.assertEqual(
+                    packaged_runtime_root().resolve(), runtime.resolve()
+                )
 
     def test_raspberry_pi_sc_package_uses_host_cxx_runtime(self) -> None:
         builder = (ROOT / "packaging" / "build_sc_appimage.sh").read_text(
