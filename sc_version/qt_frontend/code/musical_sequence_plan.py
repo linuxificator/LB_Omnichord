@@ -4,11 +4,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
 import math
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 from drum_patterns import DrumPatternCatalog
 from engine_protocol import PPQ, SequenceDefinition, SequenceEvent
 from bass_sequence_source import bass_gesture_sources, scaled_bass_source
+from bass_voice_capabilities import capability_for
 from sc_music_catalog import ScMusicCatalog
 
 
@@ -130,6 +131,7 @@ def compile_chord_lane(
                     velocity,
                     "ordinary",
                     0,
+                    0.0,
                     int(logical_bus),
                 )
             )
@@ -195,28 +197,64 @@ def compile_bass_lane(
         ppq=PPQ,
         quantize_activity_velocity=False,
     )
-    sources = bass_gesture_sources(source_events, period)
-    acid_program = program_id.startswith("sc.omni.acid")
+    capability = capability_for(program_id)
+    effective_events: list[dict[str, Any]] = []
+    for source in source_events:
+        event = dict(source)
+        link = str(event.get("link_to_next", "none"))
+        supported = capability.supports(link)
+        event["slide_to_next"] = supported
+        if not supported and link != "none":
+            event["duration"] = int(event.get("fallback_duration", event["duration"]))
+            event["link_to_next"] = "none"
+        effective_events.append(event)
+    sources = bass_gesture_sources(tuple(effective_events), period)
+    expressive_program = capability.lifetime == "gated"
+    owned_accent = capability.accent_path == "owned_accent_trigger"
     source_identity = _compact_source_identity("bass", identity)
     definitions: list[SequenceDefinition] = []
     launches: list[SequenceEvent] = []
-    for gesture_index, source in enumerate(sources):
+    for gesture_index, gesture in enumerate(sources):
         child_id = f"bass/gesture/{gesture_index}"
-        start_tick = int(source[0]["tick"])
+        start_tick = int(gesture[0]["tick"])
         events: list[SequenceEvent] = []
         ordinal = 0
         previous_slides = False
-        for note_index, note_event in enumerate(source):
+        previous_glide_ms = 0.0
+        for note_index, note_event in enumerate(gesture):
             tick = int(note_event["tick"]) - start_tick
             note = float(note_event["note"])
-            accent = bool(note_event.get("accent", False)) if acid_program else False
-            handle = "voice" if acid_program else f"note/{note_index}"
-            if acid_program and previous_slides:
+            accent = bool(note_event.get("accent", False))
+            handle = "voice" if expressive_program else f"note/{note_index}"
+            if expressive_program and previous_slides:
+                if previous_glide_ms > 0.0:
+                    events.append(
+                        _event(
+                            tick,
+                            ordinal,
+                            "voiceSet",
+                            handle,
+                            "glide_time_ms",
+                            previous_glide_ms,
+                        )
+                    )
+                    ordinal += 1
                 events.append(
                     _event(tick, ordinal, "voiceSet", handle, "frequency_hz", _frequency(note))
                 )
                 ordinal += 1
-                if accent:
+                if accent and owned_accent:
+                    events.append(
+                        _event(
+                            tick,
+                            ordinal,
+                            "voiceSet",
+                            handle,
+                            "accent_amount",
+                            float(note_event.get("accent_amount", 0.0)),
+                        )
+                    )
+                    ordinal += 1
                     events.append(
                         _event(tick, ordinal, "voiceSet", handle, "accent", 1.0)
                     )
@@ -234,27 +272,29 @@ def compile_bass_lane(
                         max(0, min(127, int(round(note)))),
                         _frequency(note),
                         float(note_event["velocity"]),
-                        "acid-accent" if accent else "ordinary",
-                        1 if accent else 0,
+                        "accent" if accent else "ordinary",
+                        1 if accent and owned_accent else 0,
+                        float(note_event.get("accent_amount", 0.0)),
                         int(logical_bus),
                     )
                 )
                 ordinal += 1
-            slides = acid_program and bool(note_event.get("slide_to_next", False))
+            slides = expressive_program and bool(note_event.get("slide_to_next", False))
             end_tick = int(note_event["tick"]) + int(note_event["duration"])
             next_tick = (
-                int(source[note_index + 1]["tick"])
-                if note_index + 1 < len(source)
+                int(gesture[note_index + 1]["tick"])
+                if note_index + 1 < len(gesture)
                 else None
             )
             if not slides and (
-                not acid_program or next_tick is None or end_tick <= next_tick
+                not expressive_program or next_tick is None or end_tick <= next_tick
             ):
                 events.append(
                     _event(end_tick - start_tick, ordinal, "noteOff", handle, 0.0)
                 )
                 ordinal += 1
             previous_slides = slides
+            previous_glide_ms = float(note_event.get("glide_time_ms", 0.0))
         definitions.append(
             SequenceDefinition(
                 definition_id=child_id,
@@ -554,13 +594,16 @@ def compile_drum_lane(
     if isinstance(catalog, ScMusicCatalog):
         if program_resolver is None:
             raise ValueError("SC drum catalogue requires a program resolver")
+        sc_program_resolver = cast(
+            Callable[[str, str], tuple[str, str, float]], program_resolver
+        )
         return _compile_sc_drum_lane(
             config=config,
             catalog=catalog,
             kit=kit,
             logical_bus=logical_bus,
             generation=generation,
-            program_resolver=program_resolver,
+            program_resolver=sc_program_resolver,
         )
     rhythm = catalog.rhythm(str(config.get("id", "")))
     level_index = max(0, min(4, int(config.get("percussion_activity", 1)) - 1))

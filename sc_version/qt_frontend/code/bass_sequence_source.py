@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
 
 BASS_ACTIVITY_VELOCITY_GAIN = 1.4
@@ -42,6 +42,34 @@ def scaled_bass_source(
                 ),
                 "accent": bool(event.get("accent", False)),
                 "slide_to_next": bool(event.get("slide_to_next", False)),
+                "link_to_next": str(
+                    event.get(
+                        "link_to_next",
+                        "legato_glide" if bool(event.get("slide_to_next", False)) else "none",
+                    )
+                ),
+                "accent_amount": max(
+                    0.0,
+                    min(
+                        1.0,
+                        float(
+                            event.get(
+                                "accent_amount",
+                                1.0 if bool(event.get("accent", False)) else 0.0,
+                            )
+                        ),
+                    ),
+                ),
+                "gate_policy": str(event.get("gate_policy", "authored_detached")),
+                "glide_time_ms": max(0.0, float(event.get("glide_time_ms", 0.0))),
+                "fallback_duration": max(
+                    1,
+                    round(
+                        float(event.get("fallback_duration_ticks", event.get("duration_ticks", 1)))
+                        * ppq
+                        / source_ppq
+                    ),
+                ),
             }
             for event in source_events
             if isinstance(event, Mapping)
@@ -76,9 +104,19 @@ def scaled_bass_source(
                 "velocity": velocity,
                 "accent": bool(event.get("accent", False)),
                 "slide_to_next": False,
+                "link_to_next": "none",
+                "accent_amount": 1.0 if bool(event.get("accent", False)) else 0.0,
+                "gate_policy": "authored_detached",
+                "glide_time_ms": 0.0,
+                "fallback_duration": gate,
             }
         )
-    events = tuple(sorted(events_list, key=lambda event: int(event["tick"])))
+    events = tuple(
+        sorted(
+            events_list,
+            key=lambda event: int(cast(int | float | str, event["tick"])),
+        )
+    )
     timing = tuple((event["tick"], event["duration"]) for event in events)
     return (
         period,

@@ -24,7 +24,7 @@
         "gateBegin" -> 4,
         "rootStop" -> 1,
         "rootStart" -> 1,
-        "noteOn" -> 10,
+        "noteOn" -> 11,
         "noteOff" -> 2,
         "voiceSet" -> 3,
         "drumHit" -> 7
@@ -63,7 +63,10 @@
             [0, 1].includesEqual(atoms[8].asInteger).not
         }) { error = "invalid-note-accent" };
         if(atoms[9].isNumber.not or: {
-            atoms[9].asInteger < 0 or: { atoms[9].asInteger > 10 }
+            atoms[9].asFloat < 0 or: { atoms[9].asFloat > 1 }
+        }) { error = "invalid-note-accent-amount" };
+        if(atoms[10].isNumber.not or: {
+            atoms[10].asInteger < 0 or: { atoms[10].asInteger > 10 }
         }) { error = "invalid-logical-bus" };
     };
     if(error.isNil and: { action == "noteOff" }) {
@@ -330,8 +333,9 @@
         if(suppressed.not) {
             ~omniSpawnVoice.value(
                 atoms[1], executionId ++ "/" ++ atoms[0].asString,
-                atoms[2], atoms[3], atoms[4], atoms[5], atoms[6], atoms[9],
-                [\articulation, atoms[7], \accent, atoms[8]]
+                atoms[2], atoms[3], atoms[4], atoms[5], atoms[6], atoms[10],
+                [\articulation, atoms[7], \accent, atoms[8],
+                    \accentAmount, atoms[9]]
             );
         };
     };

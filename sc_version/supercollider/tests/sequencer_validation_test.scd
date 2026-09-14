@@ -32,7 +32,7 @@ if(~omniEventValidationError.value(
 };
 if(~omniEventValidationError.value(
     "noteOn", ["voice", "owner", "program", 1, 60, 261.6, 0.8,
-        "ordinary", 0, 11]
+        "ordinary", 0, 0.0, 11]
 ).asString != "invalid-logical-bus") {
     Error("out-of-range note bus was accepted").throw;
 };

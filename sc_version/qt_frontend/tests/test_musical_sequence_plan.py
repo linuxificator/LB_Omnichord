@@ -59,11 +59,12 @@ class MusicalSequencePlanTests(unittest.TestCase):
         self.assertEqual(root.period_ticks, 192)
         self.assertEqual(
             [event.kind for event in child.events],
-            ["noteOn", "voiceSet", "voiceSet", "noteOff"],
+            ["noteOn", "voiceSet", "voiceSet", "voiceSet", "noteOff"],
         )
         self.assertEqual(child.events[0].atoms[8], 1)
         self.assertEqual(child.events[1].atoms[1], "frequency_hz")
-        self.assertEqual(child.events[2].atoms[1], "accent")
+        self.assertEqual(child.events[2].atoms[1], "accent_amount")
+        self.assertEqual(child.events[3].atoms[1], "accent")
 
     def test_non_acid_bass_ignores_acid_articulation_flags(self) -> None:
         plan = compile_bass_lane(

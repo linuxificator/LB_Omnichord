@@ -14,7 +14,7 @@ from application_composition import (
     ClientFactory,
     FrontendPaths,
 )
-from bass_riffs import load_bass_riff_catalog
+from bass_riffs import load_bass_riff_catalog as _load_bass_riff_catalog
 from catalog_extensions import load_synth_catalog as load_extended_synth_catalog
 from catalog_extensions import resolve_supercollider_asset_root
 from config_loader import (
@@ -46,6 +46,21 @@ load_defaults = app_core.load_defaults
 load_chords = app_core.load_chords
 load_rhythm_catalog = app_core.load_rhythm_catalog
 load_intonation_table = app_core.load_intonation_table
+
+
+def load_bass_riff_catalog(
+    path: Path,
+    *,
+    rhythm_ids: Sequence[str],
+    chord_suffixes: Sequence[str],
+) -> Any:
+    """Use the SC articulation catalogue while retaining the shared loader API."""
+
+    return _load_bass_riff_catalog(
+        path.parent / "sc_expansion" / "omnichord_bass_riffs_v2.json",
+        rhythm_ids=rhythm_ids,
+        chord_suffixes=chord_suffixes,
+    )
 
 
 def load_synth_catalog(

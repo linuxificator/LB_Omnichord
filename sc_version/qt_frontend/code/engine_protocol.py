@@ -56,7 +56,7 @@ def _atoms(kind: EventKind, values: tuple[str | int | float, ...]) -> None:
         "gateBegin": 4,
         "rootStop": 1,
         "rootStart": 1,
-        "noteOn": 10,
+        "noteOn": 11,
         "noteOff": 2,
         "voiceSet": 3,
         "drumHit": 7,
@@ -98,7 +98,10 @@ def _atoms(kind: EventKind, values: tuple[str | int | float, ...]) -> None:
         accent = _integer("note accent", values[8])
         if accent not in (0, 1):
             raise ProtocolValidationError("note accent must be 0 or 1")
-        logical_bus = _integer("logical bus", values[9])
+        accent_amount = _number("note accent amount", values[9])
+        if not 0 <= accent_amount <= 1:
+            raise ProtocolValidationError("note accent amount must be in 0..1")
+        logical_bus = _integer("logical bus", values[10])
         if not 0 <= logical_bus <= 10:
             raise ProtocolValidationError("logical bus must be in 0..10")
         return

@@ -138,6 +138,29 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
             };
             };
         };
+        if(name == "glide_time_ms" and: { record[\sourceAlive] ? true }) {
+            var seconds = value.asFloat.max(0) / 1000;
+            if(record[\acid] == true) {
+                record[\sourceNode].set(\slideSeconds, seconds);
+            } {
+                switch(record[\program].asString,
+                    "sc.sclork.bassWarsaw", {
+                        record[\sourceNode].set(\slideTime, seconds)
+                    },
+                    "sc.sclork.moogBass", {
+                        record[\sourceNode].set(\lagamount, seconds)
+                    },
+                    "sc.sclork.acidOto3091", {
+                        record[\sourceNode].set(\lagTime, seconds)
+                    }
+                );
+            };
+        };
+        if(name == "accent_amount" and: {
+            record[\acid] == true and: { record[\sourceAlive] ? true }
+        }) {
+            record[\sourceNode].set(\accentAmount, value.asFloat.clip(0, 1));
+        };
         if(name == "accent" and: { record[\voiceGroup].notNil }) {
             record[\voiceGroup].set(\t_accent, 1)
         } {

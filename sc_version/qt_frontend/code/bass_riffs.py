@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Collection
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypedDict
 
 from catalog_schema import read_versioned_catalog
 
@@ -24,6 +25,25 @@ class BassRiffEvent:
     velocity: int
     accent: bool
     slide_to_next: bool
+    link_to_next: str
+    accent_amount: float
+    gate_policy: str
+    glide_time_ms: float
+    fallback_duration_ticks: int
+
+
+class TransposedBassRiffEvent(TypedDict):
+    tick: int
+    duration_ticks: int
+    note: int
+    velocity: int
+    accent: bool
+    slide_to_next: bool
+    link_to_next: str
+    accent_amount: float
+    gate_policy: str
+    glide_time_ms: float
+    fallback_duration_ticks: int
 
 
 @dataclass(frozen=True)
@@ -197,9 +217,16 @@ def load_bass_riff_catalog(
     rhythm_ids: Collection[str],
     chord_suffixes: Collection[str],
 ) -> BassRiffCatalog:
+    revision_probe = json.loads(path.read_text(encoding="utf-8"))
+    schema_version = int(revision_probe.get("schema_version", 0))
+    schema_name = (
+        "bass_riffs_v2.schema.json"
+        if schema_version == 2
+        else "bass_riffs_v1.schema.json"
+    )
     raw = read_versioned_catalog(
         path,
-        "bass_riffs_v1.schema.json",
+        schema_name,
         schema_directory=path.parent / "schema",
     )
 
@@ -305,6 +332,22 @@ def load_bass_riff_catalog(
             velocity = _required_int(event.get("velocity"), "event.velocity")
             accent = event.get("accent")
             slide_to_next = event.get("slide_to_next")
+            explicit_link = "link_to_next" in event
+            link_to_next = str(
+                event.get(
+                    "link_to_next",
+                    "legato_glide" if slide_to_next is True else "none",
+                )
+            )
+            accent_amount = float(event.get("accent_amount", 1.0 if accent else 0.0))
+            gate_policy = str(event.get("gate_policy", "authored_detached"))
+            glide_time_ms = float(event.get("glide_time_ms", 0.0))
+            fallback = event.get("fallback")
+            fallback_duration = (
+                int(fallback.get("duration_ticks", duration))
+                if isinstance(fallback, dict)
+                else duration
+            )
             if tick < 0 or tick >= phrase_ticks or tick < previous_tick:
                 raise ValueError(f"bass riff {riff_id!r} has an invalid event tick")
             if duration <= 0:
@@ -317,6 +360,24 @@ def load_bass_riff_catalog(
                 raise ValueError(
                     f"bass riff {riff_id!r} has an invalid slide_to_next flag"
                 )
+            if link_to_next not in ("none", "tie", "legato_glide"):
+                raise ValueError(f"bass riff {riff_id!r} has an invalid link")
+            if not 0.0 <= accent_amount <= 1.0:
+                raise ValueError(f"bass riff {riff_id!r} has invalid accent amount")
+            if glide_time_ms < 0.0 or fallback_duration <= 0:
+                raise ValueError(f"bass riff {riff_id!r} has invalid link fallback")
+            if link_to_next != "none" and explicit_link:
+                target_index = _required_int(
+                    event.get("link_target_index"), "event.link_target_index"
+                )
+                cycle_offset = _required_int(
+                    event.get("link_target_cycle_offset"),
+                    "event.link_target_cycle_offset",
+                )
+                if not 0 <= target_index < len(timing.get("events", ())):
+                    raise ValueError(f"bass riff {riff_id!r} has invalid link target")
+                if cycle_offset not in (0, 1):
+                    raise ValueError(f"bass riff {riff_id!r} has invalid link cycle")
             previous_tick = tick
             events.append(
                 BassRiffEvent(
@@ -326,6 +387,11 @@ def load_bass_riff_catalog(
                     velocity=velocity,
                     accent=accent,
                     slide_to_next=slide_to_next,
+                    link_to_next=link_to_next,
+                    accent_amount=accent_amount,
+                    gate_policy=gate_policy,
+                    glide_time_ms=glide_time_ms,
+                    fallback_duration_ticks=fallback_duration,
                 )
             )
 
@@ -353,7 +419,7 @@ def load_bass_riff_catalog(
 def transpose_riff_events(
     riff: BassRiffDefinition,
     root_semitone: int,
-) -> tuple[dict[str, int | bool], ...]:
+) -> tuple[TransposedBassRiffEvent, ...]:
     root = int(root_semitone) % 12
     return tuple(
         {
@@ -363,6 +429,11 @@ def transpose_riff_events(
             "velocity": event.velocity,
             "accent": event.accent,
             "slide_to_next": event.slide_to_next,
+            "link_to_next": event.link_to_next,
+            "accent_amount": event.accent_amount,
+            "gate_policy": event.gate_policy,
+            "glide_time_ms": event.glide_time_ms,
+            "fallback_duration_ticks": event.fallback_duration_ticks,
         }
         for event in riff.events
     )
