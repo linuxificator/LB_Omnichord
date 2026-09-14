@@ -18,6 +18,24 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 SC_ROOT = ROOT.parent / "supercollider"
 
+# These contracts exclusively describe the archived AMY/Android/ESP32 package
+# and release pipeline.  They remain in the copied history as useful oracles,
+# but are not tests of the active SuperCollider product.
+ARCHIVED_EDITION_UNIT_TESTS = {
+    "test_android_packaging.py",
+    "test_android_runtime.py",
+    "test_package_evidence.py",
+    "test_package_size_policy.py",
+    "test_packaging.py",
+    "test_program_architecture.py",
+    "test_raspberry_pi_realtime.py",
+    "test_release_inputs.py",
+    "test_release_sbom.py",
+    "test_release_screenshots.py",
+    "test_rt_pi_tools.py",
+    "test_static_contracts.py",
+}
+
 SUITES: dict[str, tuple[Path, ...]] = {
     "quality": (
         TESTS / "run_quality.py",
@@ -25,7 +43,11 @@ SUITES: dict[str, tuple[Path, ...]] = {
     # Every top-level test_*.py file is a dependency-free/unit contract. Auto
     # discovery prevents a new unit test from silently being omitted locally
     # and in CI, as happened with the MIDI engine and socket tests.
-    "unit": tuple(sorted(TESTS.glob("test_*.py"))),
+    "unit": tuple(
+        path
+        for path in sorted(TESTS.glob("test_*.py"))
+        if path.name not in ARCHIVED_EDITION_UNIT_TESTS
+    ),
     "sc-frontend": (
         TESTS / "test_engine_protocol.py",
         TESTS / "test_musical_sequence_plan.py",

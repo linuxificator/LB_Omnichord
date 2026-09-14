@@ -153,29 +153,17 @@ class DependencyDeclarationTests(unittest.TestCase):
             distribution = record["distribution"].casefold().replace("_", "-")
             self.assertIn(distribution, resolved[owner], dependency)
 
-    def test_workflows_consume_declared_groups_and_shared_amy_pin(self) -> None:
-        regression = (
-            REPOSITORY / ".github" / "workflows" / "amy-regression.yml"
-        ).read_text(encoding="utf-8")
+    def test_active_workflow_consumes_declared_sc_dependency_groups(self) -> None:
         release = (
-            REPOSITORY / ".github" / "workflows" / "desktop-release.yml"
+            REPOSITORY / ".github" / "workflows" / "supercollider-release.yml"
         ).read_text(encoding="utf-8")
-        esp32 = (
-            REPOSITORY / ".github" / "workflows" / "esp32p4-build.yml"
-        ).read_text(encoding="utf-8")
-        self.assertIn("requirements-test.txt", regression)
+        self.assertIn("requirements-test.txt", release)
+        self.assertIn("requirements-source.txt", release)
         self.assertIn("requirements-build.txt", release)
-        self.assertIn("requirements-android-host.txt", release)
         self.assertNotIn("pyinstaller==6.22.2", release.casefold())
-        self.assertNotIn("cython==0.29.36", release.casefold())
-
-        amy = self.manifest["component_exceptions"]["lb_amy"]
-        release_inputs = FRONTEND / amy["release_inputs"]
-        self.assertTrue(release_inputs.is_file())
-        for workflow in (regression, release, esp32):
-            self.assertIn("packaging/release_inputs.py", workflow)
-            self.assertNotIn("AMY_RELEASE_BRANCH:", workflow)
-            self.assertNotRegex(workflow, r"AMY_(?:COMMIT|REF): [0-9a-f]{40}")
+        self.assertNotIn("requirements-android-host.txt", release)
+        self.assertNotIn("packaging/release_inputs.py", release)
+        self.assertNotIn("AMY_RELEASE_BRANCH:", release)
 
 
 if __name__ == "__main__":

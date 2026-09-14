@@ -72,7 +72,10 @@ jobs:
         run: |
           echo "${RUNNER_TEMP}/supercollider-runtime/bin" >> "$GITHUB_PATH"
           export PATH="${RUNNER_TEMP}/supercollider-runtime/bin:${PATH}"
-          python tests/run_tests.py --suite quality
+          if [[ "${{ matrix.constraints }}" == "desktop-current.txt" ]]; then
+            python tests/run_tests.py --suite quality
+          fi
+          python tests/run_tests.py --suite unit
           python tests/run_tests.py --suite portable-input-processes
           python tests/run_tests.py --suite desktop-network-discovery
           python tests/run_tests.py --suite sc-frontend
@@ -100,7 +103,7 @@ jobs:
           curl -L --fail --silent --show-error "https://github.com/supercollider/supercollider/releases/download/Version-${SC_VERSION}/SuperCollider-${SC_VERSION}-macOS-universal.dmg" -o "$RUNNER_TEMP/SuperCollider.dmg"
           echo "$SC_MAC_SHA256  $RUNNER_TEMP/SuperCollider.dmg" | shasum -a 256 -c
           hdiutil attach -nobrowse "$RUNNER_TEMP/SuperCollider.dmg" -mountpoint "$RUNNER_TEMP/sc-mount"
-          runtime_app="$(find "$RUNNER_TEMP/sc-mount" -maxdepth 3 -name SuperCollider.app -type d -print -quit)"
+          runtime_app="$(find "$RUNNER_TEMP/sc-mount" -maxdepth 3 -name SuperCollider.app -type d -print 2>/dev/null | head -n 1)"
           test -n "$runtime_app"
           echo "$runtime_app/Contents/MacOS" >> "$GITHUB_PATH"
           echo "$runtime_app/Contents/Resources" >> "$GITHUB_PATH"
@@ -253,7 +256,7 @@ jobs:
           curl -L --fail --silent --show-error "https://github.com/supercollider/supercollider/releases/download/Version-${SC_VERSION}/SuperCollider-${SC_VERSION}-macOS-universal.dmg" -o "$RUNNER_TEMP/SuperCollider.dmg"
           echo "$SC_MAC_SHA256  $RUNNER_TEMP/SuperCollider.dmg" | shasum -a 256 -c
           hdiutil attach -nobrowse "$RUNNER_TEMP/SuperCollider.dmg" -mountpoint "$RUNNER_TEMP/sc-mount"
-          runtime_app="$(find "$RUNNER_TEMP/sc-mount" -maxdepth 3 -name SuperCollider.app -type d -print -quit)"
+          runtime_app="$(find "$RUNNER_TEMP/sc-mount" -maxdepth 3 -name SuperCollider.app -type d -print 2>/dev/null | head -n 1)"
           test -n "$runtime_app"
           echo "OMNICHORD_SC_RUNTIME_APP=$runtime_app" >> "$GITHUB_ENV"
       - name: Build macOS DMG

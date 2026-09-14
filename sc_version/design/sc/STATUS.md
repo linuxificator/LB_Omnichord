@@ -78,11 +78,11 @@ x86_64
   failures, duplicate `/n_free` requests or buffer-number exhaustion.
 - MIDI and OSC integration tests keep the sender, frontend and engine receiver
   in separate processes.
-- The independent SC workflow runs the complete dependency-free frontend unit
-  suite and portable MIDI/OSC process contracts in addition to the SC compiler,
-  coordinator, NRT audio, bank and package suites. This keeps inherited UI and
-  control behavior in the same regression gate without invoking AMY-native
-  audio suites as if they exercised the SC engine.
+- The independent SC workflow runs the active dependency-free frontend unit
+  and portable MIDI/OSC process contracts in addition to the SC compiler,
+  coordinator, NRT audio, bank and package suites. AMY/Android/ESP32-only
+  packaging contracts remain identifiable historical oracles and are excluded
+  rather than presented as evidence for the SC product.
 - Sequencer tests cover immutable running snapshots, overlapping finite
   executions, root/child lifetime separation, exact release ownership,
   overlapping half-open gates, same-boundary replacement coalescing,
