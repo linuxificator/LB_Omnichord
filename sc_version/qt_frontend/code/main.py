@@ -15,6 +15,8 @@ from application_composition import (
     FrontendPaths,
 )
 from bass_riffs import load_bass_riff_catalog as _load_bass_riff_catalog
+from sc_bass_articulation import load_sc_bass_articulation
+from sc_music_catalog import load_sc_music_catalog
 from catalog_extensions import load_synth_catalog as load_extended_synth_catalog
 from catalog_extensions import resolve_supercollider_asset_root
 from config_loader import (
@@ -102,6 +104,16 @@ def production_dependencies(
         runtime_config_path=runtime_config_path,
         asset_root=paths.root,
     )
+    sc_music_root = paths.music / "sc_expansion"
+    backend = partial(
+        InstrumentBackend,
+        bass_articulation=load_sc_bass_articulation(
+            sc_music_root / "sc_bass_contexts_v1.json"
+        ),
+        sc_drum_catalog=load_sc_music_catalog(
+            sc_music_root / "sc_kit_grooves_v1.json"
+        ),
+    )
     return ApplicationDependencies(
         paths=paths,
         load_resolved_config=load_resolved_amy_config,
@@ -126,7 +138,7 @@ def production_dependencies(
         private_files_dir=qt_private_files_dir,
         resolve_package_runtime=resolve_package_runtime,
         display_diagnostics=display_diagnostic_lines,
-        backend=cast(BackendFactory, InstrumentBackend),
+        backend=cast(BackendFactory, backend),
         engine_label="SuperCollider",
     )
 

@@ -22,6 +22,7 @@ class BassRiffEvent:
     tick: int
     duration_ticks: int
     pitch_offset: int
+    role: str
     velocity: int
     accent: bool
     slide_to_next: bool
@@ -30,12 +31,15 @@ class BassRiffEvent:
     gate_policy: str
     glide_time_ms: float
     fallback_duration_ticks: int
+    link_target_index: int
+    link_target_cycle_offset: int
 
 
 class TransposedBassRiffEvent(TypedDict):
     tick: int
     duration_ticks: int
     note: int
+    role: str
     velocity: int
     accent: bool
     slide_to_next: bool
@@ -44,6 +48,8 @@ class TransposedBassRiffEvent(TypedDict):
     gate_policy: str
     glide_time_ms: float
     fallback_duration_ticks: int
+    link_target_index: int
+    link_target_cycle_offset: int
 
 
 @dataclass(frozen=True)
@@ -318,7 +324,8 @@ def load_bass_riff_catalog(
 
         events: list[BassRiffEvent] = []
         previous_tick = -1
-        for event in _required_list(timing.get("events"), "timing.events"):
+        timing_events = _required_list(timing.get("events"), "timing.events")
+        for event_index, event in enumerate(timing_events):
             if not isinstance(event, dict):
                 raise ValueError(f"bass riff {riff_id!r} has a non-object event")
             tick = _required_int(event.get("tick"), "event.tick")
@@ -329,6 +336,7 @@ def load_bass_riff_catalog(
                 event.get("pitch_offset_semitones_from_C2"),
                 "event.pitch_offset_semitones_from_C2",
             )
+            role = str(event.get("role", ""))
             velocity = _required_int(event.get("velocity"), "event.velocity")
             accent = event.get("accent")
             slide_to_next = event.get("slide_to_next")
@@ -348,10 +356,14 @@ def load_bass_riff_catalog(
                 if isinstance(fallback, dict)
                 else duration
             )
+            target_index = -1
+            cycle_offset = 0
             if tick < 0 or tick >= phrase_ticks or tick < previous_tick:
                 raise ValueError(f"bass riff {riff_id!r} has an invalid event tick")
             if duration <= 0:
                 raise ValueError(f"bass riff {riff_id!r} has a non-positive duration")
+            if not role:
+                raise ValueError(f"bass riff {riff_id!r} has an empty event role")
             if not 0 <= velocity <= 127:
                 raise ValueError(f"bass riff {riff_id!r} has an invalid velocity")
             if not isinstance(accent, bool):
@@ -374,16 +386,41 @@ def load_bass_riff_catalog(
                     event.get("link_target_cycle_offset"),
                     "event.link_target_cycle_offset",
                 )
-                if not 0 <= target_index < len(timing.get("events", ())):
+                if not 0 <= target_index < len(timing_events):
                     raise ValueError(f"bass riff {riff_id!r} has invalid link target")
                 if cycle_offset not in (0, 1):
                     raise ValueError(f"bass riff {riff_id!r} has invalid link cycle")
+            elif link_to_next != "none":
+                target_index = (event_index + 1) % len(timing_events)
+                cycle_offset = 1 if target_index == 0 else 0
+            if link_to_next != "none":
+                expected_target = (event_index + 1) % len(timing_events)
+                expected_cycle = 1 if expected_target == 0 else 0
+                if target_index != expected_target or cycle_offset != expected_cycle:
+                    raise ValueError(
+                        f"bass riff {riff_id!r} link must target its next onset"
+                    )
+                target = timing_events[target_index]
+                if not isinstance(target, dict):
+                    raise ValueError(f"bass riff {riff_id!r} has an invalid link target")
+                target_tick = _required_int(target.get("tick"), "event.tick")
+                target_tick += cycle_offset * phrase_ticks
+                if duration != target_tick - tick:
+                    raise ValueError(
+                        f"bass riff {riff_id!r} link gate must reach its target onset"
+                    )
+                if link_to_next == "tie" and pitch_offset != _required_int(
+                    target.get("pitch_offset_semitones_from_C2"),
+                    "event.pitch_offset_semitones_from_C2",
+                ):
+                    raise ValueError(f"bass riff {riff_id!r} tie changes pitch")
             previous_tick = tick
             events.append(
                 BassRiffEvent(
                     tick=tick,
                     duration_ticks=duration,
                     pitch_offset=pitch_offset,
+                    role=role,
                     velocity=velocity,
                     accent=accent,
                     slide_to_next=slide_to_next,
@@ -392,7 +429,14 @@ def load_bass_riff_catalog(
                     gate_policy=gate_policy,
                     glide_time_ms=glide_time_ms,
                     fallback_duration_ticks=fallback_duration,
+                    link_target_index=target_index,
+                    link_target_cycle_offset=cycle_offset,
                 )
+            )
+
+        if events and all(event.link_to_next != "none" for event in events):
+            raise ValueError(
+                f"bass riff {riff_id!r} is a closed link cycle without a release"
             )
 
         riffs.append(
@@ -426,6 +470,7 @@ def transpose_riff_events(
             "tick": event.tick,
             "duration_ticks": event.duration_ticks,
             "note": riff.normalized_anchor_midi + event.pitch_offset + root,
+            "role": event.role,
             "velocity": event.velocity,
             "accent": event.accent,
             "slide_to_next": event.slide_to_next,
@@ -434,6 +479,8 @@ def transpose_riff_events(
             "gate_policy": event.gate_policy,
             "glide_time_ms": event.glide_time_ms,
             "fallback_duration_ticks": event.fallback_duration_ticks,
+            "link_target_index": event.link_target_index,
+            "link_target_cycle_offset": event.link_target_cycle_offset,
         }
         for event in riff.events
     )

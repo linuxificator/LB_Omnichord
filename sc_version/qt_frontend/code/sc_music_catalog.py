@@ -14,6 +14,7 @@ class ScDrumEvent:
     role: str
     slot: str
     velocity: int
+    semantic_roles: frozenset[str]
 
     @property
     def gate_key(self) -> str:
@@ -41,6 +42,7 @@ class ScDrumFill:
     events: tuple[ScDrumEvent, ...]
     gain: float
     continuation_keys: frozenset[str]
+    continuation_levels: tuple[tuple[ScDrumEvent, ...], ...]
 
 
 class ScMusicCatalog:
@@ -104,13 +106,16 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
         raise ValueError("SC kit-groove catalogue must use 96 PPQ")
     roles_raw = raw.get("roles")
     slots_raw = raw.get("slots")
+    semantic_sets_raw = raw.get("semantic_role_sets")
     sequences_raw = raw.get("event_sequences")
     if not all(
-        isinstance(value, list) for value in (roles_raw, slots_raw, sequences_raw)
+        isinstance(value, list)
+        for value in (roles_raw, slots_raw, semantic_sets_raw, sequences_raw)
     ):
         raise ValueError("SC kit-groove dictionaries must be arrays")
     roles = cast(list[Any], roles_raw)
     slots = cast(list[Any], slots_raw)
+    semantic_sets = cast(list[Any], semantic_sets_raw)
     sequences = cast(list[Any], sequences_raw)
 
     decoded: list[tuple[ScDrumEvent, ...]] = []
@@ -120,9 +125,9 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
         events: list[ScDrumEvent] = []
         previous = -1
         for atom in sequence:
-            if not isinstance(atom, list) or len(atom) != 4:
+            if not isinstance(atom, list) or len(atom) != 5:
                 raise ValueError(f"event sequence {sequence_index} has invalid atoms")
-            tick, role_index, velocity, slot_index = map(int, atom)
+            tick, role_index, velocity, slot_index, semantic_index = map(int, atom)
             if tick < previous or tick < 0:
                 raise ValueError(f"event sequence {sequence_index} is not ordered")
             if tick % 2:
@@ -134,11 +139,20 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
             try:
                 role = str(roles[role_index])
                 slot = str(slots[slot_index])
+                semantic_raw = semantic_sets[semantic_index]
             except IndexError as exc:
                 raise ValueError(
                     f"event sequence {sequence_index} references an unknown dictionary item"
                 ) from exc
-            events.append(ScDrumEvent(tick, role, slot, velocity))
+            if not isinstance(semantic_raw, list):
+                raise ValueError("SC drum semantic role set must be an array")
+            try:
+                semantic_roles = frozenset(str(roles[int(index)]) for index in semantic_raw)
+            except IndexError as exc:
+                raise ValueError("SC drum event references an unknown semantic role") from exc
+            if not semantic_roles or role not in semantic_roles:
+                raise ValueError("SC drum event primary role must be semantic")
+            events.append(ScDrumEvent(tick, role, slot, velocity, semantic_roles))
             previous = tick
         decoded.append(tuple(events))
 
@@ -195,6 +209,11 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
             for value in row.get("continuation_keys", ())
             if isinstance(value, list) and len(value) == 2
         )
+        continuation_levels = tuple(
+            event_sequence(index) for index in row.get("continuation_levels", ())
+        )
+        if len(continuation_levels) != 5:
+            raise ValueError(f"fill {row.get('variant_id')!r} needs five continuations")
         fills.append(
             ScDrumFill(
                 str(row["variant_id"]),
@@ -207,6 +226,7 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
                 fill_events,
                 gain,
                 continuation,
+                continuation_levels,
             )
         )
     return ScMusicCatalog(

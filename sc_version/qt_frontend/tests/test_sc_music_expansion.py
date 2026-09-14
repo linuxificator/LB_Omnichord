@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "code"))
 from sc_drum_kits import DRUM_KITS, resolve_hit  # noqa: E402
 from catalog_extensions import load_synth_catalog  # noqa: E402
 from sc_music_catalog import load_sc_music_catalog  # noqa: E402
+from musical_sequence_plan import compile_drum_lane  # noqa: E402
 
 
 class ScMusicExpansionTests(unittest.TestCase):
@@ -56,6 +57,83 @@ class ScMusicExpansionTests(unittest.TestCase):
                     self.assertEqual(len(arrangement.levels), 5)
                     self.assertEqual([fill.slot_level for fill in fills], [1, 2, 3, 4, 5])
                     self.assertTrue(all(fill.events for fill in fills))
+
+    def test_every_activity_and_fill_compiles_with_exact_continuation(self) -> None:
+        for kit in DRUM_KITS:
+            for rhythm_id in self.rhythm_ids:
+                arrangement = self.catalog.arrangement(kit.kit_id, rhythm_id)
+                fills = self.catalog.fills(kit.kit_id, rhythm_id)
+                denominator = int(arrangement.meter.split("/", 1)[1])
+                beat_ticks = 96 if denominator == 4 else 48
+                for activity in range(1, 6):
+                    plan = compile_drum_lane(
+                        config={
+                            "id": rhythm_id,
+                            "percussion_activity": activity,
+                            "fill_order": [0, 1, 2, 3, 4],
+                            "fill_density_bars": 2,
+                        },
+                        catalog=self.catalog,
+                        kit=kit.kit_id,
+                        logical_bus=1,
+                        generation=1,
+                        program_resolver=lambda _kit, slot: ("test", slot, 1.0),
+                    )
+                    definitions = {
+                        definition.definition_id: definition
+                        for definition in plan.definitions
+                    }
+                    root = arrangement.levels[activity - 1]
+                    for fill in fills:
+                        for start_beat in fill.allowed_start_beats:
+                            start = (start_beat - 1) * beat_ticks
+                            finite = definitions[
+                                f"drums/fill/{fill.slot_level}/{start_beat}"
+                            ]
+                            gated = {
+                                str(event.atoms[0])
+                                for event in finite.events
+                                if event.kind == "gateBegin"
+                            }
+                            actual = {
+                                (
+                                    (event.tick - start) % arrangement.period_ticks,
+                                    event.slot,
+                                ): event.velocity / 127.0
+                                for event in root
+                                if (event.tick - start) % arrangement.period_ticks
+                                < fill.duration_ticks
+                                and event.gate_key not in gated
+                            }
+                            for event in finite.events:
+                                if event.kind == "drumHit":
+                                    actual[(event.tick * 2, str(event.atoms[4]))] = float(
+                                        event.atoms[6]
+                                    )
+                            expected = {
+                                (
+                                    (event.tick - start) % arrangement.period_ticks,
+                                    event.slot,
+                                ): event.velocity / 127.0
+                                for event in fill.continuation_levels[activity - 1]
+                                if (event.tick - start) % arrangement.period_ticks
+                                < fill.duration_ticks
+                            }
+                            for event in fill.events:
+                                key = (event.tick, event.slot)
+                                expected[key] = max(
+                                    expected.get(key, 0.0),
+                                    event.velocity / 127.0 * fill.gain,
+                                )
+                            with self.subTest(
+                                kit=kit.kit_id,
+                                rhythm=rhythm_id,
+                                activity=activity,
+                                fill=fill.slot_level,
+                            ):
+                                self.assertEqual(actual.keys(), expected.keys())
+                                for key, level in expected.items():
+                                    self.assertAlmostEqual(actual[key], level)
 
     def test_every_drum_sample_is_in_the_pinned_vsco_manifest(self) -> None:
         kit_data = json.loads(

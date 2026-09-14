@@ -12,6 +12,9 @@ from bass_riffs import (
     clamp_bass_riff_rank,
     transpose_riff_events,
 )
+from sc_bass_articulation import ScBassArticulationResolver
+from sc_music_catalog import ScMusicCatalog
+from sc_drum_kits import DRUM_KITS
 from performance_logic import (
     clamp_bass_voicing_shift,
     roll_bass_voicing,
@@ -56,6 +59,16 @@ class InstrumentBackend(app_core.InstrumentBackend):
     )
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._bass_articulation = kwargs.pop("bass_articulation", None)
+        self._sc_drum_catalog = kwargs.pop("sc_drum_catalog", None)
+        if self._bass_articulation is not None and not isinstance(
+            self._bass_articulation, ScBassArticulationResolver
+        ):
+            raise TypeError("bass_articulation must be an SC bass resolver")
+        if self._sc_drum_catalog is not None and not isinstance(
+            self._sc_drum_catalog, ScMusicCatalog
+        ):
+            raise TypeError("sc_drum_catalog must be an SC music catalogue")
         self._chord_gate_state = CHORD_GATE_OFF
         self._bass_voicing_shift = 0
         self._bass_riff_selector = 1
@@ -275,6 +288,16 @@ class InstrumentBackend(app_core.InstrumentBackend):
         riff = self._bass_riffs.by_id(self._active_bass_riff_id)
         if riff is None or self._active_root_semitone < 0:
             return None
+        if self._bass_articulation is not None and self._sc_drum_catalog is not None:
+            rhythm = self._selected_rhythm()
+            rhythm_index = self._rhythm.selected_index
+            riff = self._bass_articulation.resolve(
+                riff,
+                kit_id=DRUM_KITS[self._drum_kit_index].kit_id,
+                rhythm_id=rhythm.key,
+                percussion_activity=self._rhythm.busyness_by_rhythm[rhythm_index],
+                drum_catalog=self._sc_drum_catalog,
+            )
         events = transpose_riff_events(riff, self._active_root_semitone)
         return {
             "id": riff.riff_id,

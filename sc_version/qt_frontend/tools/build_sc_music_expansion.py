@@ -22,6 +22,7 @@ SOURCE_FILES = (
     "drum_arrangements.json",
     "drum_fill_variants.json",
     "bass_riffs_revised.json",
+    "bass_contexts.json",
     "bass_voice_capabilities.json",
     "preset_index.json",
     "sc_drumkit_profiles.json",
@@ -31,6 +32,23 @@ PROGRAM_CANONICALIZATION = {
     "sample.vsco.contrabasssusnv": "sample.vsco.contrabass-ks",
     "sample.vsco.contrabasspizz": "sample.vsco.contrabass-ks.art.e6-pizzicato",
     "sample.vsco.flutesusnv": "sample.vsco.flute-ks",
+}
+RHYTHM_FAMILIES = {
+    rhythm_id: family
+    for family, rhythm_ids in {
+        "pop": ("pop_8", "pop_16", "slow_ballad", "rock", "punk", "metal", "straight_blues", "rnb", "soul"),
+        "swing": ("shuffle", "twelve_eight_blues", "jazz_shuffle", "soul_shuffle", "six_eight_ballad", "gospel_6_8"),
+        "jazz": ("jazz_swing", "jazz_waltz"),
+        "funk": ("funk", "jazz_funk", "seven_four_funk"),
+        "country": ("country_train", "country_waltz", "waltz"),
+        "march": ("polka", "march"),
+        "four_floor": ("disco", "house", "techno", "trance"),
+        "breaks": ("garage_2step", "breakbeat", "drum_and_bass", "dubstep", "hip_hop", "boom_bap", "trap"),
+        "latin": ("bossa", "samba", "salsa", "cha_cha", "mambo", "merengue", "cumbia", "bolero", "tango", "son_clave_3_2", "rumba_clave_3_2", "afro_cuban_6_8", "calypso_soca"),
+        "reggae": ("reggae",),
+        "odd": ("five_four", "seven_eight", "nine_eight", "eleven_eight"),
+    }.items()
+    for rhythm_id in rhythm_ids
 }
 
 
@@ -46,6 +64,14 @@ def _write(path: Path, value: object) -> None:
     path.write_text(
         json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
         + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_pretty(path: Path, value: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -90,8 +116,27 @@ class _EventPool:
         self.slots = slots
         self._role_index = {value: index for index, value in enumerate(roles)}
         self._slot_index = {value: index for index, value in enumerate(slots)}
+        self.semantic_role_sets: list[list[int]] = []
+        self._semantic_indexes: dict[tuple[int, ...], int] = {}
         self.sequences: list[list[list[int]]] = []
-        self._indexes: dict[tuple[tuple[int, int, int, int], ...], int] = {}
+        self._indexes: dict[tuple[tuple[int, int, int, int, int], ...], int] = {}
+
+    def _semantic_index(self, event: dict[str, Any]) -> int:
+        roles = tuple(
+            sorted(
+                {
+                    self._role_index[str(value)]
+                    for value in event.get("roles", (event["role"],))
+                }
+            )
+        )
+        existing = self._semantic_indexes.get(roles)
+        if existing is not None:
+            return existing
+        index = len(self.semantic_role_sets)
+        self._semantic_indexes[roles] = index
+        self.semantic_role_sets.append(list(roles))
+        return index
 
     def add(self, events: list[dict[str, Any]]) -> int:
         compact = tuple(
@@ -100,6 +145,7 @@ class _EventPool:
                 self._role_index[str(event["role"])],
                 int(event["velocity"]),
                 self._slot_index[str(event["slot"])],
+                self._semantic_index(event),
             )
             for event in events
         )
@@ -121,7 +167,15 @@ def _compact_grooves(data: Path) -> dict[str, Any]:
             all_events.extend(level["events"])
     for fill in fills["variants"]:
         all_events.extend(fill["events"])
-    roles = sorted({str(event["role"]) for event in all_events})
+        for level in fill["performance"]["continuation_by_activity"]:
+            all_events.extend(level["events"])
+    roles = sorted(
+        {
+            str(role)
+            for event in all_events
+            for role in event.get("roles", (event["role"],))
+        }
+    )
     slots = sorted({str(event["slot"]) for event in all_events})
     pool = _EventPool(roles, slots)
 
@@ -170,6 +224,10 @@ def _compact_grooves(data: Path) -> dict[str, Any]:
                 "duration_ticks": int(item["duration_ticks"]),
                 "allowed_start_beats": item["allowed_start_beats"],
                 "sequence": pool.add(item["events"]),
+                "continuation_levels": [
+                    pool.add(level["events"])
+                    for level in performance["continuation_by_activity"]
+                ],
                 "gain": float(item["gain"]),
                 "continuation_keys": [list(value) for value in continuation_keys],
             }
@@ -191,6 +249,7 @@ def _compact_grooves(data: Path) -> dict[str, Any]:
         "ppq": int(arrangements["ppq"]),
         "roles": roles,
         "slots": slots,
+        "semantic_role_sets": pool.semantic_role_sets,
         "event_sequences": pool.sequences,
         "arrangements": compact_arrangements,
         "fills": compact_fills,
@@ -209,10 +268,21 @@ def _compact_bass(data: Path) -> dict[str, Any]:
     result = {key: source[key] for key in keep_top}
     result["riffs"] = []
     for riff in source["riffs"]:
+        timing = dict(riff["source_timing"])
+        timing["events"] = [
+            {
+                **event,
+                "link_to_next": "none",
+                "gate_policy": "authored_detached",
+                "accent_amount": 0.65 if bool(event["accent"]) else 0.0,
+            }
+            for event in timing["events"]
+        ]
         result["riffs"].append(
             {
-                key: riff[key]
-                for key in (
+                **{
+                    key: riff[key]
+                    for key in (
                     "index",
                     "riff_id",
                     "name",
@@ -223,11 +293,81 @@ def _compact_bass(data: Path) -> dict[str, Any]:
                     "compatible_rhythms",
                     "activity_rank",
                     "selection_weight",
-                    "timing",
-                )
+                    )
+                },
+                "timing": timing,
             }
         )
     return result
+
+
+def _compact_bass_contexts(data: Path) -> dict[str, Any]:
+    source = _read(data / "bass_contexts.json")
+    examples = {
+        str(row["context_id"]): row for row in source["resolved_examples"]
+    }
+    contexts = []
+    seen: set[tuple[str, str]] = set()
+    for row in source["contexts"]:
+        key = (str(row["kit_id"]), str(row["rhythm_id"]))
+        if key in seen:
+            raise ValueError(f"duplicate bass context {key!r}")
+        seen.add(key)
+        try:
+            family = RHYTHM_FAMILIES[key[1]]
+        except KeyError as exc:
+            raise ValueError(f"unknown bass rhythm family for {key[1]!r}") from exc
+        contexts.append(
+            {
+                "kit_id": key[0],
+                "rhythm_id": key[1],
+                "profile": str(row["profile"]),
+                "family": family,
+                "reference": {
+                    "riff_id": str(examples[str(row["context_id"])]["riff_id"]),
+                    "percussion_activity": int(
+                        examples[str(row["context_id"])]["percussion_activity"]
+                    ),
+                    "events_sha256": hashlib.sha256(
+                        json.dumps(
+                            [
+                                _bass_event_projection(event)
+                                for event in examples[str(row["context_id"])]["events"]
+                            ],
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest(),
+                },
+            }
+        )
+    if len(contexts) != 810:
+        raise ValueError(f"expected 810 bass contexts, got {len(contexts)}")
+    return {"schema_version": 1, "contexts": contexts}
+
+
+def _bass_event_projection(event: dict[str, Any]) -> dict[str, Any]:
+    fallback = event.get("fallback")
+    return {
+        "tick": int(event["tick"]),
+        "duration_ticks": int(event["duration_ticks"]),
+        "pitch_offset": int(event["pitch_offset_semitones_from_C2"]),
+        "role": str(event["role"]),
+        "velocity": int(event["velocity"]),
+        "accent": bool(event["accent"]),
+        "slide_to_next": bool(event["slide_to_next"]),
+        "link_to_next": str(event["link_to_next"]),
+        "accent_amount": float(event["accent_amount"]),
+        "gate_policy": str(event["gate_policy"]),
+        "glide_time_ms": float(event.get("glide_time_ms", 0.0)),
+        "fallback_duration_ticks": int(
+            fallback.get("duration_ticks", event["duration_ticks"])
+            if isinstance(fallback, dict)
+            else event["duration_ticks"]
+        ),
+        "link_target_index": int(event.get("link_target_index", -1)),
+        "link_target_cycle_offset": int(event.get("link_target_cycle_offset", 0)),
+    }
 
 
 def _canonical_program(program_id: object) -> str:
@@ -265,6 +405,7 @@ def build(
         "sc_pcm_drumkits_v1.json": _compact_kit_catalogue(data),
         "sc_kit_grooves_v1.json": _compact_grooves(data),
         "omnichord_bass_riffs_v2.json": _compact_bass(data),
+        "sc_bass_contexts_v1.json": _compact_bass_contexts(data),
         "bass_voice_capabilities_v1.json": _read(data / "bass_voice_capabilities.json"),
         "sc_factory_presets_v1.json": _compact_preset_index(data),
         "sc_native_drumkits_v1.json": _read(data / "sc_drumkit_profiles.json"),
@@ -277,7 +418,7 @@ def build(
     for relative_name in PRESET_FILES:
         source = data / relative_name
         output = preset_destination / Path(relative_name).name
-        _write(output, _canonical_preset(source))
+        _write_pretty(output, _canonical_preset(source))
         preset_outputs[output.name] = _digest(output)
     manifest = {
         "schema_version": 1,

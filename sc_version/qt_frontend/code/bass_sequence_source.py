@@ -36,6 +36,7 @@ def scaled_bass_source(
                     round(float(event.get("duration_ticks", 1)) * ppq / source_ppq),
                 ),
                 "note": float(event.get("note", 36.0)),
+                "role": str(event.get("role", "chord_tone")),
                 "velocity": max(
                     0.0,
                     min(1.0, float(event.get("velocity", 0)) / 127.0),
@@ -70,6 +71,10 @@ def scaled_bass_source(
                         / source_ppq
                     ),
                 ),
+                "link_target_index": int(event.get("link_target_index", -1)),
+                "link_target_cycle_offset": int(
+                    event.get("link_target_cycle_offset", 0)
+                ),
             }
             for event in source_events
             if isinstance(event, Mapping)
@@ -101,6 +106,7 @@ def scaled_bass_source(
                 "note": float(
                     bass_notes[int(event.get("degree", 0)) % len(bass_notes)]
                 ),
+                "role": "activity_note",
                 "velocity": velocity,
                 "accent": bool(event.get("accent", False)),
                 "slide_to_next": False,
@@ -109,6 +115,8 @@ def scaled_bass_source(
                 "gate_policy": "authored_detached",
                 "glide_time_ms": 0.0,
                 "fallback_duration": gate,
+                "link_target_index": -1,
+                "link_target_cycle_offset": 0,
             }
         )
     events = tuple(

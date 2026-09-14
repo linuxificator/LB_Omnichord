@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+from dataclasses import asdict
 from pathlib import Path
 import sys
 import unittest
@@ -13,6 +15,8 @@ from app_core import load_chords, load_rhythm_catalog  # noqa: E402
 from bass_riffs import load_bass_riff_catalog  # noqa: E402
 from bass_voice_capabilities import CAPABILITIES, capability_for  # noqa: E402
 from musical_sequence_plan import compile_bass_lane  # noqa: E402
+from sc_bass_articulation import load_sc_bass_articulation  # noqa: E402
+from sc_music_catalog import load_sc_music_catalog  # noqa: E402
 
 
 class ScBassExpansionTests(unittest.TestCase):
@@ -25,6 +29,13 @@ class ScBassExpansionTests(unittest.TestCase):
             rhythm_ids=[item.key for item in rhythms],
             chord_suffixes=[item.suffix for item in chords],
         )
+        cls.context_path = (
+            ROOT / "music" / "sc_expansion" / "sc_bass_contexts_v1.json"
+        )
+        cls.articulation = load_sc_bass_articulation(cls.context_path)
+        cls.drums = load_sc_music_catalog(
+            ROOT / "music" / "sc_expansion" / "sc_kit_grooves_v1.json"
+        )
 
     def test_revised_catalogue_preserves_every_original_onset_and_pitch(self) -> None:
         original = json.loads(
@@ -36,11 +47,66 @@ class ScBassExpansionTests(unittest.TestCase):
         for row in original["riffs"]:
             revised = by_id[str(row["riff_id"])]
             expected = [
-                (event["tick"], event["pitch_offset_semitones_from_C2"])
+                (
+                    event["tick"],
+                    event["duration_ticks"],
+                    event["pitch_offset_semitones_from_C2"],
+                    event["role"],
+                    event["velocity"],
+                    event["accent"],
+                    event["slide_to_next"],
+                )
                 for event in row["timing"]["events"]
             ]
-            actual = [(event.tick, event.pitch_offset) for event in revised.events]
+            actual = [
+                (
+                    event.tick,
+                    event.duration_ticks,
+                    event.pitch_offset,
+                    event.role,
+                    event.velocity,
+                    event.accent,
+                    event.slide_to_next,
+                )
+                for event in revised.events
+            ]
             self.assertEqual(actual, expected, revised.riff_id)
+
+    def test_all_contexts_match_reviewed_reference_resolutions(self) -> None:
+        raw = json.loads(self.context_path.read_text(encoding="utf-8"))
+        self.assertEqual(self.articulation.context_count, 810)
+        self.assertEqual(len(raw["contexts"]), 810)
+        for context in raw["contexts"]:
+            reference = context["reference"]
+            riff = self.catalog.by_id(reference["riff_id"])
+            self.assertIsNotNone(riff)
+            assert riff is not None
+            original = tuple(riff.events)
+            resolved = self.articulation.resolve(
+                riff,
+                kit_id=context["kit_id"],
+                rhythm_id=context["rhythm_id"],
+                percussion_activity=reference["percussion_activity"],
+                drum_catalog=self.drums,
+            )
+            payload = json.dumps(
+                [asdict(event) for event in resolved.events],
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            with self.subTest(context=(context["kit_id"], context["rhythm_id"])):
+                self.assertEqual(hashlib.sha256(payload).hexdigest(), reference["events_sha256"])
+                self.assertEqual(riff.events, original)
+                self.assertEqual(
+                    resolved,
+                    self.articulation.resolve(
+                        riff,
+                        kit_id=context["kit_id"],
+                        rhythm_id=context["rhythm_id"],
+                        percussion_activity=reference["percussion_activity"],
+                        drum_catalog=self.drums,
+                    ),
+                )
 
     def test_capabilities_are_explicit_and_unknown_programs_detach(self) -> None:
         self.assertGreaterEqual(len(CAPABILITIES), 20)
@@ -50,7 +116,12 @@ class ScBassExpansionTests(unittest.TestCase):
         self.assertFalse(capability_for("unknown").supports("legato_glide"))
 
     @staticmethod
-    def _plan(program: str):
+    def _plan(
+        program: str,
+        *,
+        link: str = "legato_glide",
+        second_note: int = 43,
+    ):
         return compile_bass_lane(
             config={
                 "id": "test",
@@ -69,13 +140,13 @@ class ScBassExpansionTests(unittest.TestCase):
                             "accent": False,
                             "accent_amount": 0.0,
                             "slide_to_next": False,
-                            "link_to_next": "legato_glide",
+                            "link_to_next": link,
                             "glide_time_ms": 70,
                         },
                         {
                             "tick": 96,
                             "duration_ticks": 48,
-                            "note": 43,
+                            "note": second_note,
                             "velocity": 104,
                             "accent": True,
                             "accent_amount": 0.6,
@@ -100,6 +171,15 @@ class ScBassExpansionTests(unittest.TestCase):
         controls = [event.atoms[1] for event in child.events if event.kind == "voiceSet"]
         self.assertEqual(len(attacks), 1)
         self.assertEqual(controls, ["glide_time_ms", "frequency_hz"])
+
+    def test_same_pitch_tie_reuses_gate_without_pitch_or_attack_event(self) -> None:
+        child = self._plan(
+            "sc.sclork.bassWarsaw", link="tie", second_note=36
+        ).definitions[1]
+        self.assertEqual(
+            [event.kind for event in child.events],
+            ["noteOn", "noteOff"],
+        )
 
     def test_incapable_voice_uses_detached_fallback_and_retriggers(self) -> None:
         children = self._plan("sc.sclork.fmBass").definitions[1:]

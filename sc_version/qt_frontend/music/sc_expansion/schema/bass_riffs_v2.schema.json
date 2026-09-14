@@ -37,8 +37,9 @@
                 "minItems": 1,
                 "items": {
                   "type": "object",
-                  "required": ["tick", "duration_ticks", "pitch_offset_semitones_from_C2", "velocity", "accent", "slide_to_next", "link_to_next", "gate_policy", "accent_amount"],
+                  "required": ["tick", "duration_ticks", "pitch_offset_semitones_from_C2", "role", "velocity", "accent", "slide_to_next", "link_to_next", "gate_policy", "accent_amount"],
                   "properties": {
+                    "role": {"type": "string", "minLength": 1},
                     "tick": {"type": "integer", "minimum": 0},
                     "duration_ticks": {"type": "integer", "minimum": 1},
                     "pitch_offset_semitones_from_C2": {"type": "integer"},

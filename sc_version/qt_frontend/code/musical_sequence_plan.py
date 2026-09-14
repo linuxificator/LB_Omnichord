@@ -219,15 +219,15 @@ def compile_bass_lane(
         start_tick = int(gesture[0]["tick"])
         events: list[SequenceEvent] = []
         ordinal = 0
-        previous_slides = False
+        previous_link = "none"
         previous_glide_ms = 0.0
         for note_index, note_event in enumerate(gesture):
             tick = int(note_event["tick"]) - start_tick
             note = float(note_event["note"])
             accent = bool(note_event.get("accent", False))
             handle = "voice" if expressive_program else f"note/{note_index}"
-            if expressive_program and previous_slides:
-                if previous_glide_ms > 0.0:
+            if expressive_program and previous_link != "none":
+                if previous_link == "legato_glide" and previous_glide_ms > 0.0:
                     events.append(
                         _event(
                             tick,
@@ -239,10 +239,18 @@ def compile_bass_lane(
                         )
                     )
                     ordinal += 1
-                events.append(
-                    _event(tick, ordinal, "voiceSet", handle, "frequency_hz", _frequency(note))
-                )
-                ordinal += 1
+                if previous_link == "legato_glide":
+                    events.append(
+                        _event(
+                            tick,
+                            ordinal,
+                            "voiceSet",
+                            handle,
+                            "frequency_hz",
+                            _frequency(note),
+                        )
+                    )
+                    ordinal += 1
                 if accent and owned_accent:
                     events.append(
                         _event(
@@ -293,7 +301,9 @@ def compile_bass_lane(
                     _event(end_tick - start_tick, ordinal, "noteOff", handle, 0.0)
                 )
                 ordinal += 1
-            previous_slides = slides
+            previous_link = (
+                str(note_event.get("link_to_next", "none")) if slides else "none"
+            )
             previous_glide_ms = float(note_event.get("glide_time_ms", 0.0))
         definitions.append(
             SequenceDefinition(
@@ -491,54 +501,35 @@ def _compile_sc_drum_lane(
             )
         )
 
+    beat_ticks_96, bar_ticks_96 = _meter_ticks(arrangement.meter)
     for fill in fills:
-        fill_events: list[SequenceEvent] = []
-        ordinal = 0
-        duration = fill.duration_ticks // 2
-        for gate_key in gate_keys:
-            if gate_key not in fill.continuation_keys:
-                fill_events.append(
-                    _event(
-                        0,
-                        ordinal,
-                        "gateBegin",
-                        gate_key,
-                        f"{fill.variant_id}/{gate_key}",
-                        duration,
-                        "drumHit",
-                    )
-                )
-                ordinal += 1
-        for hit in fill.events:
-            fill_events.append(
-                _event(
-                    hit.tick // 2,
-                    ordinal,
-                    "drumHit",
-                    *_sc_drum_atoms(
-                        kit=kit,
-                        gate_key=hit.gate_key,
-                        role=hit.role,
-                        slot=hit.slot,
-                        velocity=hit.velocity,
-                        logical_bus=logical_bus,
-                        gain=fill.gain,
-                        program_resolver=program_resolver,
+        continuation = fill.continuation_levels[level_index]
+        for start_beat in fill.allowed_start_beats:
+            start_tick = (start_beat - 1) * beat_ticks_96
+            fill_events = _compile_sc_fill_window(
+                fill=fill,
+                root_events=root_events,
+                continuation=continuation,
+                start_tick=start_tick,
+                period_ticks=arrangement.period_ticks,
+                kit=kit,
+                logical_bus=logical_bus,
+                program_resolver=program_resolver,
+            )
+            definitions.append(
+                SequenceDefinition(
+                    definition_id=f"drums/fill/{fill.slot_level}/{start_beat}",
+                    revision=generation,
+                    kind="finite",
+                    lane="drums",
+                    period_ticks=0,
+                    events=fill_events,
+                    source_identity=(
+                        f"{catalog.digest}:{fill.variant_id}:start-{start_beat}:"
+                        f"activity-{level_index + 1}"
                     ),
                 )
             )
-            ordinal += 1
-        definitions.append(
-            SequenceDefinition(
-                definition_id=f"drums/fill/{fill.slot_level}",
-                revision=generation,
-                kind="finite",
-                lane="drums",
-                period_ticks=0,
-                events=tuple(sorted(fill_events, key=lambda item: (item.tick, item.ordinal))),
-                source_identity=f"{catalog.digest}:{fill.variant_id}",
-            )
-        )
 
     raw_order = config.get("fill_order", ())
     order = tuple(
@@ -549,7 +540,6 @@ def _compile_sc_drum_lane(
         )
     ) if isinstance(raw_order, list) else ()
     occurrences = _fill_occurrences(order, fills)
-    beat_ticks_96, bar_ticks_96 = _meter_ticks(arrangement.meter)
     if occurrences:
         density = max(1, int(config.get("fill_density_bars", 8)))
         schedule_period = len(occurrences) * density * (bar_ticks_96 // 2)
@@ -559,7 +549,7 @@ def _compile_sc_drum_lane(
                 + (start_beat - 1) * (beat_ticks_96 // 2),
                 index,
                 "launch",
-                f"drums/fill/{fill.slot_level}",
+                f"drums/fill/{fill.slot_level}/{start_beat}",
             )
             for index, (fill, start_beat) in enumerate(occurrences)
         )
@@ -583,6 +573,103 @@ def _compile_sc_drum_lane(
             ),
         )
     return LanePlan("drums", generation, alignment, tuple(definitions))
+
+
+def _compile_sc_fill_window(
+    *,
+    fill: Any,
+    root_events: Sequence[Any],
+    continuation: Sequence[Any],
+    start_tick: int,
+    period_ticks: int,
+    kit: str,
+    logical_bus: int,
+    program_resolver: Callable[[str, str], tuple[str, str, float]],
+) -> tuple[SequenceEvent, ...]:
+    """Compile one fill while preserving its exact authored continuation."""
+
+    def relative(tick: int) -> int:
+        return (int(tick) - start_tick) % period_ticks
+
+    root_window = tuple(
+        event for event in root_events if relative(event.tick) < fill.duration_ticks
+    )
+    desired = tuple(
+        event for event in continuation if relative(event.tick) < fill.duration_ticks
+    )
+    root_by_sound = {
+        (event.tick, event.slot, event.velocity): event for event in root_window
+    }
+    if len(root_by_sound) != len(root_window):
+        raise ValueError(f"fill {fill.variant_id!r} has ambiguous root drum events")
+    desired_root: dict[str, list[Any]] = {}
+    for event in desired:
+        source = root_by_sound.get((event.tick, event.slot, event.velocity))
+        if source is None:
+            raise ValueError(
+                f"fill {fill.variant_id!r} continuation is not an unchanged root event"
+            )
+        desired_root.setdefault(source.gate_key, []).append(event)
+
+    foreground_slots = {(event.tick, event.slot) for event in fill.events}
+    gated: set[str] = set()
+    for gate_key in {event.gate_key for event in root_window}:
+        roots = tuple(event for event in root_window if event.gate_key == gate_key)
+        kept = tuple(desired_root.get(gate_key, ()))
+        if len(roots) != len(kept) or any(
+            (relative(event.tick), event.slot) in foreground_slots for event in roots
+        ):
+            gated.add(gate_key)
+
+    events: list[SequenceEvent] = []
+    ordinal = 0
+    duration = fill.duration_ticks // 2
+    for gate_key in sorted(gated):
+        events.append(
+            _event(
+                0,
+                ordinal,
+                "gateBegin",
+                gate_key,
+                f"{fill.variant_id}/{gate_key}",
+                duration,
+                "drumHit",
+            )
+        )
+        ordinal += 1
+
+    sounding: dict[tuple[int, str], tuple[Any, float]] = {}
+    for event in desired:
+        source = root_by_sound[(event.tick, event.slot, event.velocity)]
+        if source.gate_key in gated:
+            sounding[(relative(event.tick), event.slot)] = (event, 1.0)
+    for event in fill.events:
+        key = (event.tick, event.slot)
+        previous = sounding.get(key)
+        candidate_level = event.velocity * fill.gain
+        if previous is None or candidate_level >= previous[0].velocity * previous[1]:
+            sounding[key] = (event, fill.gain)
+
+    for (tick, _slot), (hit, gain) in sorted(sounding.items()):
+        events.append(
+            _event(
+                tick // 2,
+                ordinal,
+                "drumHit",
+                *_sc_drum_atoms(
+                    kit=kit,
+                    gate_key=hit.gate_key,
+                    role=hit.role,
+                    slot=hit.slot,
+                    velocity=hit.velocity,
+                    logical_bus=logical_bus,
+                    gain=gain,
+                    program_resolver=program_resolver,
+                ),
+            )
+        )
+        ordinal += 1
+    return tuple(sorted(events, key=lambda item: (item.tick, item.ordinal)))
 
 
 def compile_drum_lane(
