@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import shlex
 import shutil
 import signal
 import subprocess
@@ -85,11 +86,15 @@ def pipewire_jack_prefix(
     """Use the distribution's JACK compatibility layer on PipeWire Linux."""
 
     env = os.environ if environment is None else environment
-    if not shutil.which("systemctl"):
+    systemctl = shutil.which("systemctl")
+    if not systemctl:
         return ()
+    host_environment = dict(env)
+    host_environment.pop("LD_LIBRARY_PATH", None)
+    host_environment.pop("LD_PRELOAD", None)
     active = subprocess.run(
-        ["systemctl", "--user", "is-active", "--quiet", "pipewire.service"],
-        env=dict(env),
+        [systemctl, "--user", "is-active", "--quiet", "pipewire.service"],
+        env=host_environment,
         check=False,
     ).returncode == 0
     if not active:
@@ -103,6 +108,16 @@ def pipewire_jack_prefix(
         "PipeWire is active, but pw-jack is unavailable; install the "
         "distribution's PipeWire JACK compatibility package"
     )
+
+
+def server_program_command(path: Path, *, platform: str | None = None) -> str:
+    """Return the command string expected by SuperCollider's Server class."""
+
+    target = str(Path(path).resolve())
+    selected = sys.platform if platform is None else platform
+    if selected.startswith("win"):
+        return subprocess.list2cmdline([target])
+    return f"exec {shlex.quote(target)}"
 
 
 class SuperColliderSupervisor:
@@ -136,9 +151,9 @@ class SuperColliderSupervisor:
         )
         return path
 
-    def start(self) -> None:
-        if self.process is not None:
-            raise SuperColliderProcessError("SuperCollider is already started")
+    def _launch_context(
+        self, *, with_audio_wrapper: bool
+    ) -> tuple[list[str], dict[str, str]]:
         bootstrap = self.engine_root / "bootstrap.scd"
         if not bootstrap.is_file():
             raise SuperColliderProcessError(f"SC bootstrap is missing: {bootstrap}")
@@ -155,7 +170,9 @@ class SuperColliderSupervisor:
                 "OMNICHORD_SC_MEM_KIB": str(server.realtime_memory_kib),
                 "OMNICHORD_SC_VSCO_ROOT": str(samples.vsco_root),
                 "OMNICHORD_SC_SAMPLE_RAM_MIB": str(samples.ram_budget_mib),
-                "OMNICHORD_SC_SYNTH_PROGRAM": str(self.executables.scsynth),
+                "OMNICHORD_SC_SYNTH_PROGRAM": server_program_command(
+                    self.executables.scsynth
+                ),
             }
         )
         if self.executables.plugins is not None:
@@ -170,11 +187,42 @@ class SuperColliderSupervisor:
                 )
                 if part
             )
-        command = [*pipewire_jack_prefix(environment=env), str(self.executables.sclang)]
+        prefix = pipewire_jack_prefix(environment=env) if with_audio_wrapper else ()
+        command = [*prefix, str(self.executables.sclang)]
         language_config = self._language_config()
         if language_config is not None:
             command.extend(("-l", str(language_config)))
         command.extend(("-D", str(bootstrap)))
+        return command, env
+
+    def validate_bootstrap(self, timeout: float = 20.0) -> None:
+        """Execute the real bootstrap up to its no-audio validation boundary."""
+
+        command, env = self._launch_context(with_audio_wrapper=False)
+        env["OMNICHORD_SC_VALIDATE_ONLY"] = "1"
+        try:
+            result = subprocess.run(
+                command,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=timeout,
+            )
+        finally:
+            if self._temporary is not None:
+                self._temporary.cleanup()
+                self._temporary = None
+        output = result.stdout + result.stderr
+        if result.returncode != 0 or "LB_OMNICHORD_SC_SYNTAX_OK" not in output:
+            raise SuperColliderProcessError(
+                "SuperCollider bootstrap validation failed:\n" + output
+            )
+
+    def start(self) -> None:
+        if self.process is not None:
+            raise SuperColliderProcessError("SuperCollider is already started")
+        command, env = self._launch_context(with_audio_wrapper=True)
         self.process = subprocess.Popen(command, env=env, start_new_session=True)
 
     def stop(self, timeout: float = 4.0) -> None:

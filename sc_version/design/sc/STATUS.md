@@ -103,6 +103,10 @@ x86_64
 - Frozen package verification resolves both source and PyInstaller asset
   layouts through the production catalogue loader; a package cannot pass by
   checking directory names while its instrument metadata is unreachable.
+- Frozen package verification executes the packaged bootstrap with the pinned
+  SC class library before publication. The scsynth executable is configured
+  on `Server.program`, the API owned by SC 3.14, and host `systemctl` probes
+  are isolated from the package's private dynamic-library search path.
 - The bounded sample-source catalogue records all eleven pinned Git banks and
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see

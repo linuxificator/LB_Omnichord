@@ -101,6 +101,19 @@ class SuperColliderPackageContractTests(unittest.TestCase):
     def test_frozen_package_loads_its_production_instrument_catalogue(self) -> None:
         verify_application_assets(ROOT)
 
+    def test_frozen_package_executes_the_real_engine_bootstrap(self) -> None:
+        entry = (ROOT / "packaging" / "sc_appimage_entry.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(".validate_bootstrap()", entry)
+
+    def test_bootstrap_configures_the_server_executable_on_server_class(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        self.assertIn(
+            'Server.program = "OMNICHORD_SC_SYNTH_PROGRAM".getenv', bootstrap
+        )
+        self.assertNotIn("s.options.program", bootstrap)
+
     def test_sc_build_is_independent_and_release_is_explicit(self) -> None:
         workflow = (
             ROOT.parents[1] / ".github" / "workflows" / "supercollider-release.yml"

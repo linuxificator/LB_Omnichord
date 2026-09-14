@@ -33,6 +33,10 @@ Linux, Raspberry Pi, macOS and Windows, including configuration fields added
 within an already published revision. It then constructs the production
 dependency graph and loads the packaged instrument catalogue, catching layout
 differences between source trees and PyInstaller's `_internal` asset root.
+Finally it executes the packaged bootstrap through the packaged `sclang` up to
+the no-audio validation boundary. This checks the real class library,
+executable selection and SC API before a release can be published; checking
+only that `sclang -v` starts is not an adequate runtime test.
 
 ## Runtime and samples
 
