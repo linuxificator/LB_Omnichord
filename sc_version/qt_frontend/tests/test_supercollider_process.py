@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -158,7 +159,10 @@ class SuperColliderProcessTests(unittest.TestCase):
                 command = popen.call_args.args[0]
                 environment = popen.call_args.kwargs["env"]
                 language_config = Path(command[command.index("-l") + 1])
-                self.assertIn(str(class_library), language_config.read_text())
+                self.assertIn(
+                    json.dumps(str(class_library.resolve())),
+                    language_config.read_text(),
+                )
                 self.assertEqual(
                     environment["OMNICHORD_SC_SYNTH_PROGRAM"],
                     str((runtime / "bin" / "scsynth").resolve()),

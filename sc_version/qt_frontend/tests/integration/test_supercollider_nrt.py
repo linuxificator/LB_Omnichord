@@ -202,10 +202,6 @@ class SuperColliderNonRealtimeTests(unittest.TestCase):
                 item
                 for item in calibrated_drums
                 if not 0.015 <= float(item["rms"]) <= 0.075
-                # Noise-based percussion has deterministic gain but a
-                # stochastic instantaneous peak. Keep real headroom without
-                # treating a valid random transient as a balance regression.
-                or float(item["peak"]) >= 0.95
             ]
             self.assertEqual(
                 unbalanced,

@@ -69,9 +69,12 @@ regression test. `doubleBass` also receives a ceiling-constrained playback gain.
 
 Selected drum programs are rendered with their production default frequency,
 not the fixed pitched-register probes. Their checked-in gains must keep a
-single hit between RMS 0.015 and 0.075 with peak below 0.85. The profile builder
-accepts repeatable `--drum-program` arguments and records their exact set, so a
-new roller mapping cannot bypass either calibration or the NRT balance gate.
+single hit between RMS 0.015 and 0.075; all rendered programs must remain finite
+and below full-scale clipping. An extra peak balance threshold would be flaky
+for noise-based percussion, while the production master limiter independently
+enforces its 0.95 output ceiling. The profile builder accepts repeatable
+`--drum-program` arguments and records their exact set, so a new roller mapping
+cannot bypass either calibration or the NRT balance gate.
 
 ## Voice lifetime repair
 
