@@ -10,6 +10,7 @@ var triggerBase;
 var attackRegion;
 var releaseRegion;
 var releaseKeyRegion;
+var jsonAt = { |object, key| object[key.asString] ? object[key.asSymbol] };
 
 (directory +/+ "sample_loader.scd").load;
 if(~omniSampleBudgetBytes < 4294967296) {
@@ -34,6 +35,45 @@ if(~omniNativeDrumPads.size != 105) {
     failed = true;
     ("SC_NATIVE_DRUM_PAD_COUNT_FAILED "
         ++ ~omniNativeDrumPads.size).postln;
+};
+// Every explicit PCM pad must select the authored velocity layer at both
+// inclusive boundaries.  Use a unique owner so round robin state is also
+// proven to be independent per pad/layer rather than globally shared.
+~omniDrumKits.keysValuesDo { |programId, kit|
+    jsonAt.value(kit, "pads").keysValuesDo { |padId, pad|
+        var sampleSet = ~omniDrumSampleSets[
+            jsonAt.value(pad, "sample_set_id").asString
+        ];
+        jsonAt.value(sampleSet, "layers").do { |layer|
+            var ids = jsonAt.value(layer, "round_robin_sample_ids")
+                .collect { |value| value.asString }.asSet;
+            [
+                jsonAt.value(layer, "velocity_lo").asInteger,
+                jsonAt.value(layer, "velocity_hi").asInteger
+            ].do { |midiVelocity|
+                var selected = ~omniSelectDrumSample.value(
+                    "boundary/" ++ programId ++ "/" ++ padId,
+                    programId,
+                    padId,
+                    midiVelocity / 127
+                );
+                if(selected.isNil or: {
+                    ids.includes(selected[\sampleId].asString).not
+                }) {
+                    failed = true;
+                    ("SC_PCM_DRUM_VELOCITY_BOUNDARY_FAILED program="
+                        ++ programId ++ " pad=" ++ padId
+                        ++ " velocity=" ++ midiVelocity).postln;
+                };
+            };
+        };
+    };
+};
+if(~omniSelectDrumSample.value(
+    "missing", ~omniDrumKits.keys.asArray[0], "missing-pad", 0.5
+).notNil) {
+    failed = true;
+    "SC_PCM_UNKNOWN_PAD_FAILED".postln;
 };
 if(
     (~omniNativeDrumPads["sc-808/timekeeper_primary"]["program_id"]

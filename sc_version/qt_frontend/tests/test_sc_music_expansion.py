@@ -16,6 +16,7 @@ from sc_drum_kits import DRUM_KITS, resolve_hit  # noqa: E402
 from catalog_extensions import load_synth_catalog  # noqa: E402
 from sc_music_catalog import load_sc_music_catalog  # noqa: E402
 from musical_sequence_plan import compile_drum_lane  # noqa: E402
+from drum_patterns import load_drum_pattern_catalog  # noqa: E402
 
 
 class ScMusicExpansionTests(unittest.TestCase):
@@ -153,6 +154,68 @@ class ScMusicExpansionTests(unittest.TestCase):
         }
         self.assertEqual(len(sample_ids), 262)
         self.assertLessEqual(sample_ids, manifest_ids)
+
+    def test_pcm_velocity_layers_are_complete_and_every_role_resolves(self) -> None:
+        kit_data = json.loads(
+            (CATALOG_ROOT / "sc_pcm_drumkits_v1.json").read_text(encoding="utf-8")
+        )
+        expected_roles = {
+            event.role
+            for rhythm in load_drum_pattern_catalog(ROOT / "music" / "drums").rhythms.values()
+            for level in rhythm.levels
+            for event in level
+        } | {
+            event.role
+            for rhythm in load_drum_pattern_catalog(ROOT / "music" / "drums").rhythms.values()
+            for fill in rhythm.fills
+            for event in fill.events
+        }
+        sets = {
+            row["sample_set_id"]: row for row in kit_data["sample_sets"]
+        }
+        self.assertEqual(len(sets), 51)
+        for sample_set_id, sample_set in sets.items():
+            covered: list[int] = []
+            for layer in sample_set["layers"]:
+                self.assertTrue(layer["round_robin_sample_ids"], sample_set_id)
+                covered.extend(range(layer["velocity_lo"], layer["velocity_hi"] + 1))
+            self.assertEqual(covered, list(range(1, 128)), sample_set_id)
+        for kit in kit_data["kits"]:
+            defaults = kit["role_defaults"]
+            with self.subTest(kit=kit["kit_id"]):
+                self.assertEqual(set(defaults), expected_roles)
+                self.assertLessEqual(set(defaults.values()), set(kit["pads"]))
+                self.assertTrue(
+                    all(
+                        pad["sample_set_id"] in sets
+                        and pad["pitch_mode"] == "unpitched_fixed_rate"
+                        and pad["playback_rate"] == 1.0
+                        for pad in kit["pads"].values()
+                    )
+                )
+
+    def test_legacy_pcm_arrangements_preserve_the_original_patterns(self) -> None:
+        original = load_drum_pattern_catalog(ROOT / "music" / "drums")
+        for rhythm_id in self.rhythm_ids:
+            revised = self.catalog.arrangement("pcm-vsco", rhythm_id)
+            source = original.rhythm(rhythm_id)
+            self.assertEqual(revised.period_ticks, source.period_ticks)
+            for source_level, revised_level in zip(source.levels, revised.levels):
+                with self.subTest(rhythm=rhythm_id):
+                    self.assertEqual(
+                        [(event.tick, event.role, event.velocity) for event in source_level],
+                        [(event.tick, event.role, event.velocity) for event in revised_level],
+                    )
+
+    def test_reviewed_groove_budget_is_real_and_bounded(self) -> None:
+        counts = [
+            len(level)
+            for kit in DRUM_KITS
+            for rhythm_id in self.rhythm_ids
+            for level in self.catalog.arrangement(kit.kit_id, rhythm_id).levels
+        ]
+        self.assertEqual(max(counts), 57)
+        self.assertTrue(all(count <= 64 for count in counts))
 
     def test_explicit_pad_identity_is_not_encoded_as_a_gm_note(self) -> None:
         for kit in (item for item in DRUM_KITS if item.engine == "sample"):

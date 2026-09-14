@@ -108,6 +108,40 @@ class ScBassExpansionTests(unittest.TestCase):
                     ),
                 )
 
+    def test_every_context_and_rank_resolves_without_changing_harmony(self) -> None:
+        raw = json.loads(self.context_path.read_text(encoding="utf-8"))
+        for context in raw["contexts"]:
+            for rank in range(1, 6):
+                riff = self.catalog.choose(context["rhythm_id"], "major", rank)
+                self.assertIsNotNone(riff)
+                assert riff is not None
+                resolved = self.articulation.resolve(
+                    riff,
+                    kit_id=context["kit_id"],
+                    rhythm_id=context["rhythm_id"],
+                    percussion_activity=rank,
+                    drum_catalog=self.drums,
+                )
+                with self.subTest(
+                    kit=context["kit_id"], rhythm=context["rhythm_id"], rank=rank
+                ):
+                    self.assertEqual(
+                        [(event.tick, event.pitch_offset) for event in resolved.events],
+                        [(event.tick, event.pitch_offset) for event in riff.events],
+                    )
+                    for index, event in enumerate(resolved.events):
+                        next_event = resolved.events[(index + 1) % len(resolved.events)]
+                        gap = (next_event.tick - event.tick) % resolved.phrase_ticks
+                        gap = gap or resolved.phrase_ticks
+                        self.assertLessEqual(event.duration_ticks, gap)
+                        if event.link_to_next == "tie":
+                            self.assertEqual(event.pitch_offset, next_event.pitch_offset)
+                        if event.link_to_next != "none":
+                            self.assertEqual(
+                                event.link_target_index,
+                                (index + 1) % len(resolved.events),
+                            )
+
     def test_capabilities_are_explicit_and_unknown_programs_detach(self) -> None:
         self.assertGreaterEqual(len(CAPABILITIES), 20)
         self.assertTrue(capability_for("sc.omni.acid303").supports("legato_glide"))

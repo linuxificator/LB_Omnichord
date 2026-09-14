@@ -393,7 +393,7 @@ def load_bass_riff_catalog(
             elif link_to_next != "none":
                 target_index = (event_index + 1) % len(timing_events)
                 cycle_offset = 1 if target_index == 0 else 0
-            if link_to_next != "none":
+            if link_to_next != "none" and explicit_link:
                 expected_target = (event_index + 1) % len(timing_events)
                 expected_cycle = 1 if expected_target == 0 else 0
                 if target_index != expected_target or cycle_offset != expected_cycle:
@@ -434,7 +434,9 @@ def load_bass_riff_catalog(
                 )
             )
 
-        if events and all(event.link_to_next != "none" for event in events):
+        if schema_version >= 2 and events and all(
+            event.link_to_next != "none" for event in events
+        ):
             raise ValueError(
                 f"bass riff {riff_id!r} is a closed link cycle without a release"
             )
