@@ -132,6 +132,7 @@ class SuperColliderClient:
         self._drum_ordinal = 0
         self.chord_notes: list[float] = []
         self.bass_notes: list[float] = []
+        self.bass_riff: dict[str, Any] | None = None
         self.rhythm_config: dict[str, Any] | None = None
         self.rhythm_running = False
         self.rhythm_chord_enabled = False
@@ -821,6 +822,9 @@ class SuperColliderClient:
             raise ValueError("chord state payload must be an object")
         self.chord_notes = [float(note) for note in payload.get("notes", [])]
         self.bass_notes = [float(note) for note in payload.get("bass_notes", [])]
+        if "bass_riff" in payload:
+            bass_riff = payload.get("bass_riff")
+            self.bass_riff = dict(bass_riff) if isinstance(bass_riff, Mapping) else None
         self.rhythm_chord_enabled = bool(payload.get("rhythm_chord_enabled", False))
         self._publish_chord_lane()
         self._publish_bass_lane()
@@ -867,9 +871,14 @@ class SuperColliderClient:
 
     def _publish_bass_lane(self) -> None:
         generation = self._next_lane_generation("bass")
+        config = (
+            {**self.rhythm_config, "bass_riff": self.bass_riff}
+            if self.rhythm_config is not None
+            else None
+        )
         self.publish_lane(
             compile_bass_lane(
-                config=self.rhythm_config,
+                config=config,
                 running=self.bass_running,
                 bass_notes=self.bass_notes,
                 bass_gate_beats=self.resolved_config.rhythm.bass_gate_beats,
@@ -948,6 +957,8 @@ class SuperColliderClient:
             if not isinstance(payload, dict):
                 raise ValueError("rhythm config payload must be an object")
             self.rhythm_config = payload
+            bass_riff = payload.get("bass_riff")
+            self.bass_riff = dict(bass_riff) if isinstance(bass_riff, Mapping) else None
             self._publish_drum_lane()
             self._publish_chord_lane()
             self._publish_bass_lane()

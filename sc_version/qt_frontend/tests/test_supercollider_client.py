@@ -7,6 +7,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import Mock
 
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import BlockingOSCUDPServer
@@ -231,6 +232,62 @@ class SuperColliderClientTests(unittest.TestCase):
         self.assertEqual(len(bends), 1)
         self.assertEqual(bends[0][0], client.session)
         self.assertAlmostEqual(float(bends[0][2]), -0.125)
+
+    def test_first_chord_installs_previously_unresolved_bass_riff(self) -> None:
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+        client.rhythm_config = {
+            "id": "cha_cha_son_salsa",
+            "length_beats": 4,
+            "bass_mode": "riff",
+            "bass_riff": None,
+        }
+        client.bass_riff = None
+        published = Mock(return_value=("applied", 1, 0.0, "ok"))
+        client.publish_lane = published  # type: ignore[method-assign]
+
+        client._set_chord_state(
+            json.dumps(
+                {
+                    "notes": [53.0, 57.0, 60.0],
+                    "bass_notes": [41.0, 45.0, 48.0],
+                    "rhythm_chord_enabled": False,
+                    "bass_riff": {
+                        "id": "startup-riff",
+                        "ppq": 48,
+                        "phrase_ticks": 192,
+                        "events": [
+                            {
+                                "tick": 0,
+                                "duration_ticks": 24,
+                                "note": 41.0,
+                                "velocity": 96,
+                            }
+                        ],
+                    },
+                }
+            )
+        )
+        self.close_client(client)
+
+        bass_plan = next(
+            call.args[0]
+            for call in published.call_args_list
+            if call.args[0].lane == "bass"
+        )
+        self.assertEqual(bass_plan.definitions[0].definition_id, "bass/root")
+        self.assertTrue(
+            any(
+                event.kind == "noteOn"
+                for definition in bass_plan.definitions
+                for event in definition.events
+            )
+        )
 
     def test_program_revisions_and_parameters_are_part_scoped(self) -> None:
         client = SuperColliderClient(

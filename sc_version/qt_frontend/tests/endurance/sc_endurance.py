@@ -280,6 +280,19 @@ def vsco_drum_role_cycle() -> Iterator[Action]:
     yield Action("toggleRhythmFill", (4,), 3.0)
 
 
+def startup_bass_riff_cycle() -> Iterator[Action]:
+    """Reproduce P5 riff activation before the first chord exists."""
+
+    yield Action("selectPreset", (4,), 0.2)
+    yield Action("setRhythmBusyness", (2.0,))
+    yield Action("setRhythmBassActivity", (5.0,))
+    yield Action("setBassRiffSelector", (1.0,))
+    yield Action("ensureBassRunning", (True,))
+    yield Action("ensureRhythmRunning", (True,), 0.3)
+    yield Action("pressChord", (0, 5), 4.0)
+    yield Action("releaseChord", (0, 5), 0.3)
+
+
 class ApiClient:
     def __init__(self, port: int) -> None:
         self.port = port
@@ -441,9 +454,14 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--scenario",
-        choices=("broad", "pcm-chord-switch", "vsco-drum-roles"),
+        choices=(
+            "broad",
+            "pcm-chord-switch",
+            "vsco-drum-roles",
+            "startup-bass-riff",
+        ),
         default="broad",
-        help="run broad coverage or focused PCM chord-instrument handover",
+        help="run broad coverage or one focused playback regression",
     )
     return parser.parse_args()
 
@@ -552,6 +570,8 @@ def main() -> int:
                 actions = pcm_chord_switch_cycle(synths)
             elif args.scenario == "vsco-drum-roles":
                 actions = vsco_drum_role_cycle()
+            elif args.scenario == "startup-bass-riff":
+                actions = startup_bass_riff_cycle()
             else:
                 actions = action_cycle(
                     cycle,

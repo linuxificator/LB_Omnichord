@@ -17,6 +17,7 @@ from sc_endurance import (  # noqa: E402
     action_cycle,
     analyze_wave,
     pcm_chord_switch_cycle,
+    startup_bass_riff_cycle,
     vsco_drum_role_cycle,
 )
 
@@ -28,6 +29,23 @@ class _Synth:
 
 
 class SuperColliderEnduranceTests(unittest.TestCase):
+    def test_startup_bass_riff_scenario_needs_no_transport_restart(self) -> None:
+        actions = list(startup_bass_riff_cycle())
+        names = [action.name for action in actions]
+        self.assertEqual(names.count("ensureRhythmRunning"), 1)
+        self.assertLess(
+            names.index("ensureRhythmRunning"),
+            names.index("pressChord"),
+        )
+        self.assertEqual(
+            next(
+                action.args
+                for action in actions
+                if action.name == "setRhythmBassActivity"
+            ),
+            (5.0,),
+        )
+
     def test_vsco_drum_scenario_forces_selection_and_sustained_playback(self) -> None:
         actions = list(vsco_drum_role_cycle())
         selections = [

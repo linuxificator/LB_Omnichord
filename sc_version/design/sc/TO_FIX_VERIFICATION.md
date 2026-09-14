@@ -67,6 +67,18 @@ output wrapper. Cleanup frees that group instead of addressing a source node
 which may already have ended, while explicit alive/release state prevents late
 parameter or gate messages. The package contract freezes this ownership rule.
 
+An initial riff-mode startup exposed a separate state-publication boundary.
+Before any chord existed, the rhythm configuration correctly contained no
+resolved bass riff. The first chord then carried the newly resolved riff in
+the chord-state message, but the SC client refreshed only the bass pitches and
+ignored that riff revision. Restarting transport happened to republish it in a
+full rhythm configuration. The client now owns the current riff as independent
+semantic state, updates it from both full rhythm and chord-state messages, and
+uses it whenever it compiles the bass lane. A regression test begins with an
+empty riff, applies one chord-state update and proves that the resulting bass
+lane contains its root, finite gesture and note-on event without a transport
+restart. No frontend clock, phase query or delayed retry was introduced.
+
 A longer continuation then found the matching `/n_set` side of that race: an
 alive flag is necessarily delayed because `/n_end` travels from server to
 language, so it cannot make a later command to an ephemeral child node atomic.
