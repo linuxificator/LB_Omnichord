@@ -109,7 +109,11 @@ def verify_application_assets(root: Path) -> None:
 def verify_package(root: Path, runtime: Path) -> int:
     """Validate frozen assets and executables without opening an audio device."""
 
-    from supercollider_platform_adapter import locate_supercollider_runtime
+    from supercollider_config import load_supercollider_config
+    from supercollider_platform_adapter import (
+        SuperColliderSupervisor,
+        locate_supercollider_runtime,
+    )
 
     executables = locate_supercollider_runtime(runtime)
     environment = os.environ.copy()
@@ -137,9 +141,15 @@ def verify_package(root: Path, runtime: Path) -> int:
             )
     verify_config_migrations(root)
     verify_application_assets(root)
+    SuperColliderSupervisor(
+        engine_root=root / "supercollider",
+        config=load_supercollider_config(root / "config" / "supercollider.json"),
+        runtime_root=runtime,
+    ).validate_bootstrap()
     print(
         "LB_OMNICHORD_SC_PACKAGE_OK "
-        f"root={root} runtime={runtime} config_migrations=1,2 catalogue=loaded"
+        f"root={root} runtime={runtime} config_migrations=1,2 "
+        "catalogue=loaded bootstrap=validated"
     )
     return 0
 

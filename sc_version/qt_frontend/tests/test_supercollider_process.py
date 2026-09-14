@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shlex
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -17,6 +19,7 @@ from supercollider_platform_adapter import (  # noqa: E402
     SuperColliderSupervisor,
     locate_supercollider_runtime,
     pipewire_jack_prefix,
+    server_program_command,
 )
 
 
@@ -27,7 +30,7 @@ class SuperColliderProcessTests(unittest.TestCase):
             patch(
                 "supercollider_platform_adapter.subprocess.run",
                 return_value=active,
-            ),
+            ) as run,
             patch(
                 "supercollider_platform_adapter.shutil.which",
                 side_effect=lambda name: {
@@ -36,7 +39,34 @@ class SuperColliderProcessTests(unittest.TestCase):
                 }.get(name),
             ),
         ):
-            self.assertEqual(pipewire_jack_prefix(), ("/usr/bin/pw-jack",))
+            self.assertEqual(
+                pipewire_jack_prefix(
+                    environment={
+                        "PATH": "/usr/bin",
+                        "LD_LIBRARY_PATH": "/packaged/lib",
+                        "LD_PRELOAD": "/packaged/preload.so",
+                    }
+                ),
+                ("/usr/bin/pw-jack",),
+            )
+            environment = run.call_args.kwargs["env"]
+            self.assertEqual(environment, {"PATH": "/usr/bin"})
+            self.assertEqual(run.call_args.args[0][0], "/usr/bin/systemctl")
+
+    def test_server_program_command_is_shell_safe_on_each_platform(self) -> None:
+        path = Path("/tmp/SC Runtime/bin/scsynth")
+        self.assertEqual(
+            server_program_command(path, platform="linux"),
+            f"exec {shlex.quote(str(path.resolve()))}",
+        )
+        self.assertEqual(
+            server_program_command(path, platform="darwin"),
+            f"exec {shlex.quote(str(path.resolve()))}",
+        )
+        self.assertEqual(
+            server_program_command(path, platform="win32"),
+            subprocess.list2cmdline([str(path.resolve())]),
+        )
 
     def test_pipewire_without_jack_wrapper_is_rejected(self) -> None:
         active = Mock(returncode=0)
@@ -165,7 +195,7 @@ class SuperColliderProcessTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     environment["OMNICHORD_SC_SYNTH_PROGRAM"],
-                    str((runtime / "bin" / "scsynth").resolve()),
+                    server_program_command(runtime / "bin" / "scsynth"),
                 )
                 self.assertEqual(
                     environment["OMNICHORD_SC_PLUGIN_PATH"],

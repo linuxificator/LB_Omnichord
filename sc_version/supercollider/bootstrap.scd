@@ -32,7 +32,6 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 ~omniDrumProgram = "sample.vsco.gm-styleperc";
 ~omniPitchBendOctaves = 0.0;
 
-thisProcess.openUDPPort(languagePort);
 (scriptDirectory +/+ "protocol_runtime.scd").load;
 (scriptDirectory +/+ "program_registry.scd").load;
 
@@ -271,11 +270,16 @@ OSCdef(\omniProgramRelease, { |message|
 
 (scriptDirectory +/+ "sequencer.scd").load;
 
+if("OMNICHORD_SC_SYNTH_PROGRAM".getenv.notNil) {
+    Server.program = "OMNICHORD_SC_SYNTH_PROGRAM".getenv;
+};
+
 if(validateOnly) {
     "LB_OMNICHORD_SC_SYNTAX_OK".postln;
     0.exit;
 };
 
+thisProcess.openUDPPort(languagePort);
 s = Server.local;
 s.options.sampleRate = sampleRate;
 s.options.blockSize = blockSize;
@@ -285,9 +289,6 @@ s.options.memSize = memKiB;
 s.options.numInputBusChannels = 0;
 s.options.numOutputBusChannels = 2;
 s.options.bindAddress = "127.0.0.1";
-if("OMNICHORD_SC_SYNTH_PROGRAM".getenv.notNil) {
-    s.options.program = "OMNICHORD_SC_SYNTH_PROGRAM".getenv;
-};
 if("OMNICHORD_SC_PLUGIN_PATH".getenv.notNil) {
     s.options.ugenPluginsPath = "OMNICHORD_SC_PLUGIN_PATH".getenv;
 };
