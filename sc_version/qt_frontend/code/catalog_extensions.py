@@ -131,7 +131,25 @@ def _sclork_controls(program: SuperColliderProgram) -> tuple[app_core.SynthContr
     return tuple(extra[:4] + common + [replace(control, group="common") for control in overflow])
 
 
-def load_synth_catalog(path: Path) -> tuple[list[app_core.SynthDefinition], int, int, int]:
+def resolve_supercollider_asset_root(frontend_root: Path) -> Path:
+    """Resolve source and frozen layouts without depending on the platform."""
+
+    root = Path(frontend_root).resolve()
+    candidates = (root / "supercollider", root.parent / "supercollider")
+    for candidate in candidates:
+        if (candidate / "sclork-playback.json").is_file():
+            return candidate
+    raise FileNotFoundError(
+        "SuperCollider instrument assets are unavailable below or beside "
+        f"{root}"
+    )
+
+
+def load_synth_catalog(
+    path: Path,
+    *,
+    supercollider_root: Path | None = None,
+) -> tuple[list[app_core.SynthDefinition], int, int, int]:
     """Build the SC edition's browser without loading the AMY patch catalogue.
 
     Legacy keys are data-migration aliases only. They never become visible
@@ -141,7 +159,8 @@ def load_synth_catalog(path: Path) -> tuple[list[app_core.SynthDefinition], int,
     """
 
     instrument_root = path.parent
-    supercollider_root = path.parents[1].parent / "supercollider"
+    if supercollider_root is None:
+        supercollider_root = resolve_supercollider_asset_root(path.parent.parent)
     legacy_map = load_legacy_program_map(
         instrument_root / "supercollider-legacy-map.json"
     )

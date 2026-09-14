@@ -16,6 +16,7 @@ from application_composition import (
 )
 from bass_riffs import load_bass_riff_catalog
 from catalog_extensions import load_synth_catalog as load_extended_synth_catalog
+from catalog_extensions import resolve_supercollider_asset_root
 from config_loader import (
     load_amy_config as load_amy_config,
     load_resolved_amy_config,
@@ -47,10 +48,17 @@ load_rhythm_catalog = app_core.load_rhythm_catalog
 load_intonation_table = app_core.load_intonation_table
 
 
-def load_synth_catalog(path: Path) -> tuple[list[Any], int, int, int]:
+def load_synth_catalog(
+    path: Path,
+    *,
+    supercollider_root: Path | None = None,
+) -> tuple[list[Any], int, int, int]:
     """Load only canonical SuperCollider and sample programs for this edition."""
 
-    return load_extended_synth_catalog(path)
+    return load_extended_synth_catalog(
+        path,
+        supercollider_root=supercollider_root,
+    )
 
 
 def parse_arguments(arguments: Sequence[str] | None = None) -> Namespace:
@@ -67,6 +75,7 @@ def production_dependencies(
     """Construct the one production dependency graph without mutating modules."""
 
     paths = FrontendPaths.from_root(asset_root or FRONTEND_DIR)
+    supercollider_root = resolve_supercollider_asset_root(paths.root)
     runtime_config_path = Path(
         os.environ.get(
             "OMNICHORD_SC_CONFIG",
@@ -83,7 +92,10 @@ def production_dependencies(
         load_resolved_config=load_resolved_amy_config,
         load_defaults=app_core.load_defaults,
         load_chords=app_core.load_chords,
-        load_synth_catalog=load_synth_catalog,
+        load_synth_catalog=partial(
+            load_synth_catalog,
+            supercollider_root=supercollider_root,
+        ),
         load_rhythm_catalog=app_core.load_rhythm_catalog,
         load_bass_riffs=load_bass_riff_catalog,
         load_title_config=app_core.load_title_config,

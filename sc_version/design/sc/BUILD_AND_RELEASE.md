@@ -30,7 +30,9 @@ content audit and checksum, and publishes the complete set under one
 The frozen package self-check also migrates representative revision-1 and
 revision-2 user configurations. This guards the first-launch upgrade path on
 Linux, Raspberry Pi, macOS and Windows, including configuration fields added
-within an already published revision.
+within an already published revision. It then constructs the production
+dependency graph and loads the packaged instrument catalogue, catching layout
+differences between source trees and PyInstaller's `_internal` asset root.
 
 ## Runtime and samples
 
