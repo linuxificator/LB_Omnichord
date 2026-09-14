@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import array
 from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
 import struct
-import wave
+import sys
 from typing import Any
 
+import soundfile  # type: ignore[import-untyped]
 
-COMPILER_VERSION = 3
+
+COMPILER_VERSION = 4
 VSCO_SOURCE_PIN = "6dd651d55dde97fd4028699be9d4481f26917891"
 _HEADER = re.compile(r"<([A-Za-z]+)>")
 _OPCODE = re.compile(r"(?<!\S)([A-Za-z][A-Za-z0-9_]*)=")
@@ -302,30 +305,58 @@ def _relative_sample(root: Path, region: _SourceRegion) -> Path:
     return resolved
 
 
-def _audio_record(root: Path, path: Path) -> dict[str, Any]:
+def _decoded_pcm_digest(source: soundfile.SoundFile) -> str:
+    """Hash decoded PCM in one architecture-independent representation."""
+
     digest = hashlib.sha256()
-    pcm_digest = hashlib.sha256()
+    while chunk := source.buffer_read(65536, dtype="int32"):
+        if sys.byteorder == "big":
+            values = array.array("i")
+            values.frombytes(chunk)
+            values.byteswap()
+            chunk = values.tobytes()
+        digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _original_bit_depth(subtype: str, path: Path) -> int:
+    match = re.fullmatch(r"PCM_[SU]?(\d+)", subtype)
+    if match is None:
+        raise ValueError(f"{path}: unsupported sample encoding {subtype}")
+    return int(match.group(1))
+
+
+def _audio_record(root: Path, path: Path, *, bank_id: str = "vsco") -> dict[str, Any]:
+    digest = hashlib.sha256()
     with path.open("rb") as stream:
         while chunk := stream.read(1024 * 1024):
             digest.update(chunk)
-    with wave.open(str(path), "rb") as source:
-        channels = source.getnchannels()
-        sample_width = source.getsampwidth()
-        sample_rate = source.getframerate()
-        frames = source.getnframes()
-        while chunk := source.readframes(65536):
-            pcm_digest.update(chunk)
-    embedded_root_key, embedded_loops = _wav_sampler_metadata(path, frames)
+    try:
+        with soundfile.SoundFile(path) as source:
+            channels = source.channels
+            sample_rate = source.samplerate
+            frames = source.frames
+            bit_depth = _original_bit_depth(source.subtype, path)
+            pcm_digest = _decoded_pcm_digest(source)
+    except soundfile.SoundFileRuntimeError as exc:
+        raise ValueError(f"{path}: unsupported or invalid audio file: {exc}") from exc
+    embedded_root_key, embedded_loops = (
+        _wav_sampler_metadata(path, frames)
+        if path.suffix.casefold() == ".wav"
+        else (None, [])
+    )
     relative = path.relative_to(root).as_posix()
     record: dict[str, Any] = {
-        "id": "vsco-file-" + hashlib.sha256(relative.encode()).hexdigest()[:16],
+        "id": f"{_slug(bank_id)}-file-"
+        + hashlib.sha256(relative.encode()).hexdigest()[:16],
         "relative_path": relative,
         "sha256": digest.hexdigest(),
-        "pcm_sha256": pcm_digest.hexdigest(),
+        "pcm_sha256": pcm_digest,
+        "pcm_hash_encoding": "signed-int32-left-aligned-little-endian",
         "frames": frames,
         "sample_rate": sample_rate,
         "channels": channels,
-        "original_bit_depth": sample_width * 8,
+        "original_bit_depth": bit_depth,
         "decoded_bytes": frames * channels * 4,
     }
     if embedded_root_key is not None:

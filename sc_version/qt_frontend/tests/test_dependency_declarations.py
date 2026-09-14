@@ -46,7 +46,11 @@ class DependencyDeclarationTests(unittest.TestCase):
         # The SC edition owns Python tooling beside qt_frontend as well (for
         # example the sample-bank compiler and inventory tools).  Those are
         # repository modules, not undeclared PyPI dependencies.
-        first_party = {path.stem for path in REPOSITORY.rglob("*.py")}
+        first_party = {
+            path.stem
+            for path in REPOSITORY.rglob("*.py")
+            if not {"build", "dist", "deployment", ".venv"}.intersection(path.parts)
+        }
         imported: set[str] = set()
         for path in python_files:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))

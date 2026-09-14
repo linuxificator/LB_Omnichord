@@ -7,11 +7,14 @@ import tempfile
 import unittest
 import wave
 
+import soundfile
+
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 from sfz_manifest_compiler import (  # noqa: E402
+    _audio_record,
     _midi_note,
     compile_vsco_manifest,
     parse_sfz,
@@ -202,6 +205,47 @@ class SfzManifestCompilerTests(unittest.TestCase):
             ],
         )
         self.assertEqual(manifest["regions"][0]["loop"], {"mode": "none"})
+
+    def test_lossless_flac_metadata_and_canonical_pcm_hash_are_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            wav_path = root / "same.wav"
+            flac_path = root / "same.flac"
+            samples = struct.pack("<16h", *range(-8, 8))
+            with wave.open(str(wav_path), "wb") as output:
+                output.setnchannels(1)
+                output.setsampwidth(2)
+                output.setframerate(44100)
+                output.writeframes(samples)
+            soundfile.write(
+                flac_path,
+                [value / 32768 for value in range(-8, 8)],
+                44100,
+                subtype="PCM_16",
+            )
+
+            wav_record = _audio_record(root, wav_path, bank_id="fixture-bank")
+            flac_record = _audio_record(root, flac_path, bank_id="fixture-bank")
+
+        self.assertEqual(flac_record["frames"], 16)
+        self.assertEqual(flac_record["sample_rate"], 44100)
+        self.assertEqual(flac_record["channels"], 1)
+        self.assertEqual(flac_record["original_bit_depth"], 16)
+        self.assertEqual(flac_record["decoded_bytes"], 64)
+        self.assertEqual(
+            flac_record["pcm_hash_encoding"],
+            "signed-int32-left-aligned-little-endian",
+        )
+        self.assertEqual(wav_record["pcm_sha256"], flac_record["pcm_sha256"])
+        self.assertTrue(flac_record["id"].startswith("fixture-bank-file-"))
+
+    def test_float_audio_is_rejected_instead_of_misreporting_bit_depth(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "float.wav"
+            soundfile.write(path, [0.0, 0.25], 48000, subtype="FLOAT")
+            with self.assertRaisesRegex(ValueError, "unsupported sample encoding FLOAT"):
+                _audio_record(root, path)
 
 
 if __name__ == "__main__":

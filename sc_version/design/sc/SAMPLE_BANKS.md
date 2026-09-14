@@ -43,6 +43,14 @@ escaping the bank root. This is required by Salamander and the Karoryfer/drum
 banks; it is preprocessing support, not a claim that their much larger audible
 opcode surfaces have already been normalized.
 
+Audio inventory accepts the lossless PCM containers used by the selected
+banks, including WAV, AIFF and FLAC, through the maintained libsndfile-backed
+`soundfile` package. Decoded-content hashes use canonical signed 32-bit,
+left-aligned, little-endian PCM, so the same lossless recording can be detected
+across different containers without reducing source precision. Unsupported
+floating-point or compressed lossy encodings fail rather than acquiring a
+misleading `original_bit_depth` value.
+
 A source-tree metadata audit at the pinned commits found 183 VCSL mappings, 1
 Salamander mapping, 71 Black and Green, 64 Black and Blue, 39 Meatbass, 6 Emily
 Guitar, 48 Bear Sax, 13 WereSax, 419 Virtuosity Drums and 152 Swirly Drums

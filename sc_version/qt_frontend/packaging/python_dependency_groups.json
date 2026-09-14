@@ -45,6 +45,11 @@
       "owner": "test_quality",
       "used_by": ["pinned AMY source runtime", "native instrument-balance renderer"]
     },
+    "soundfile": {
+      "distribution": "soundfile",
+      "owner": "source_runtime",
+      "used_by": ["lossless SFZ-bank audio metadata and decoded-content hashing"]
+    },
     "amy": {
       "component_exception": "lb_amy",
       "used_by": ["local AMY service", "native tests"]
@@ -54,13 +59,7 @@
       "used_by": ["local AMY service", "native tests"]
     }
   },
-  "transitive_dependencies": {
-    "soundfile": {
-      "distribution": "soundfile",
-      "owner": "source_runtime",
-      "required_by": "pinned AMY Python distribution"
-    }
-  },
+  "transitive_dependencies": {},
   "invoked_python_tools": {
     "PyInstaller": {
       "distribution": "PyInstaller",

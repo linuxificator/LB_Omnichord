@@ -43,6 +43,7 @@ jobs:
             sc_version/qt_frontend/requirements.txt
             sc_version/qt_frontend/requirements-build.txt
             sc_version/qt_frontend/requirements-test.txt
+            sc_version/qt_frontend/requirements-source.txt
             sc_version/qt_frontend/packaging/constraints/desktop-current.txt
 
       - name: Create build names
@@ -62,7 +63,8 @@ jobs:
           python -m pip install \
             -c sc_version/qt_frontend/packaging/constraints/desktop-current.txt \
             -r sc_version/qt_frontend/requirements-build.txt \
-            -r sc_version/qt_frontend/requirements-test.txt
+            -r sc_version/qt_frontend/requirements-test.txt \
+            -r sc_version/qt_frontend/requirements-source.txt
 
       - name: Restore pinned headless SuperCollider runtime
         id: sc-runtime-cache

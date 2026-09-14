@@ -53,7 +53,9 @@ Target currently exercised: Linux x86_64
   [`SAMPLE_BANKS.md`](SAMPLE_BANKS.md).
 - The source compiler now safely expands the macro/include structure used by
   the next banks while preserving region provenance. Their audible opcode
-  normalization and playback semantics remain explicitly incomplete.
+  normalization and playback semantics remain explicitly incomplete. Its
+  audio inventory reads WAV, AIFF and FLAC and hashes decoded PCM in one
+  architecture-independent representation for cross-container deduplication.
 
 ## Not yet complete
 
