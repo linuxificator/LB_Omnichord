@@ -9,6 +9,7 @@ var rrB1;
 var triggerBase;
 var attackRegion;
 var releaseRegion;
+var releaseKeyRegion;
 
 (directory +/+ "sample_loader.scd").load;
 if(~omniSampleBudgetBytes < 4294967296) {
@@ -99,8 +100,12 @@ if((~omniSamplePlaybackRate.value(440, 69, 100) - (2 ** (1 / 12))).abs
 triggerBase = ~omniSampleRegions["sample.vsco.fluteexpvib"][0];
 attackRegion = triggerBase.copy;
 releaseRegion = triggerBase.copy;
+releaseKeyRegion = triggerBase.copy;
 attackRegion["trigger"] = "attack";
 releaseRegion["trigger"] = "release";
+releaseKeyRegion["trigger"] = "release_key";
+releaseRegion["sample_id"] = "release-a";
+releaseKeyRegion["sample_id"] = "release-b";
 ~omniSampleAliases["sample.trigger-test"] = (
     sourceProgramId: "sample.trigger-source",
     articulation: (
@@ -108,7 +113,7 @@ releaseRegion["trigger"] = "release";
     ).asString
 );
 ~omniSampleRegions["sample.trigger-source"] = List[
-    attackRegion, releaseRegion
+    attackRegion, releaseRegion, releaseKeyRegion
 ];
 if(~omniSelectSampleRegions.value(
     "sample.trigger-test",
@@ -119,6 +124,31 @@ if(~omniSelectSampleRegions.value(
     failed = true;
     "VSCO_ATTACK_TRIGGER_FILTER_FAILED".postln;
 };
+if(~omniSampleReleaseCandidateIds.value(
+    "sample.trigger-test",
+    (triggerBase["key_lo"] ? triggerBase[\key_lo]).asInteger
+).asSet != Set["release-a", "release-b"]) {
+    failed = true;
+    "VSCO_RELEASE_LIFETIME_CANDIDATES_FAILED".postln;
+};
+{
+    var savedVoiceRefs = ~omniSampleVoiceRefs;
+    var record = (
+        lifetimeSampleIds: ["release-a", "release-b"],
+        sampleLifetimePinned: true
+    );
+    ~omniSampleVoiceRefs = Dictionary.new;
+    ~omniPinSampleIds.value(record[\lifetimeSampleIds]);
+    ~omniReleaseSampleLifetime.value(record);
+    ~omniReleaseSampleLifetime.value(record);
+    if((~omniSampleVoiceRefs["release-a"] != 0) or: {
+        ~omniSampleVoiceRefs["release-b"] != 0
+    }) {
+        failed = true;
+        "VSCO_RELEASE_LIFETIME_UNPIN_IDEMPOTENCE_FAILED".postln;
+    };
+    ~omniSampleVoiceRefs = savedVoiceRefs;
+}.value;
 if(~omniSelectSampleRegions.value(
     "sample.trigger-test",
     (triggerBase["key_lo"] ? triggerBase[\key_lo]).asInteger,

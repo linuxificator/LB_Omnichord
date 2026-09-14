@@ -318,6 +318,49 @@ regions.do { |record|
     selected
 };
 
+// A held key may need a release recording after its program has been
+// superseded.  Pin every release candidate for that key and articulation at
+// attack time: release velocity and random/round-robin selection are not known
+// until key-up, so pinning only one speculative region would be incorrect.
+~omniSampleReleaseCandidateIds = { |program, logicalKey|
+    var alias = ~omniSampleAliases[program.asString];
+    if(alias.isNil) {
+        []
+    } {
+        ~omniSampleRegions[alias[\sourceProgramId]].select { |region|
+            var trigger = jsonAt.value(region, "trigger").asString;
+            (logicalKey >= jsonAt.value(region, "key_lo").asInteger)
+            and: { logicalKey <= jsonAt.value(region, "key_hi").asInteger }
+            and: {
+                jsonAt.value(region, "articulation_id").asString
+                    == alias[\articulation]
+            }
+            and: { (trigger == "release") or: { trigger == "release_key" } }
+        }.collect { |region|
+            jsonAt.value(region, "sample_id").asString
+        }.asSet.asArray
+    }
+};
+
+~omniPinSampleIds = { |sampleIds|
+    sampleIds.do { |sampleId|
+        ~omniSampleVoiceRefs[sampleId] =
+            (~omniSampleVoiceRefs[sampleId] ? 0) + 1;
+        ~omniTouchSample.value(sampleId);
+    };
+};
+
+~omniReleaseSampleLifetime = { |record|
+    if(record[\sampleLifetimePinned] == true) {
+        record[\lifetimeSampleIds].do { |sampleId|
+            ~omniSampleVoiceRefs[sampleId] = (
+                (~omniSampleVoiceRefs[sampleId] ? 0) - 1
+            ).max(0);
+        };
+        record[\sampleLifetimePinned] = false;
+    };
+};
+
 ~omniSpawnSampleRelease = { |record, trigger, releaseVelocity|
     var selectionVelocity = if(releaseVelocity > 0) {
         releaseVelocity
@@ -426,7 +469,7 @@ SynthDef(\omniSampleStereo, {
 
 ~omniSpawnSampleVoice = {
     |owner, handle, program, revision, logicalKey, frequencyHz,
-        velocity, logicalBus|
+        velocity, logicalBus, oneShot=false|
     var selected = ~omniSelectSampleRegions.value(
         program, logicalKey, velocity, owner
     );
@@ -434,6 +477,11 @@ SynthDef(\omniSampleStereo, {
         var group = Group.tail(~omniSourceGroup);
         var remaining = selected.size;
         var sampleNodes = List.new;
+        var lifetimeSampleIds = if(oneShot) {
+            []
+        } {
+            ~omniSampleReleaseCandidateIds.value(program, logicalKey)
+        };
         var record = (
             sourceNode: group,
             outputNode: nil,
@@ -447,8 +495,13 @@ SynthDef(\omniSampleStereo, {
             frequencyHz: frequencyHz.asFloat,
             velocity: velocity.asFloat.clip(0, 1),
             physicalReleased: false,
+            finalized: false,
+            oneShot: oneShot,
+            lifetimeSampleIds: lifetimeSampleIds,
+            sampleLifetimePinned: lifetimeSampleIds.notEmpty,
             sampleNodes: sampleNodes
         );
+        ~omniPinSampleIds.value(lifetimeSampleIds);
         ~omniVoices[handle] = record;
         selected.do { |region|
             var sampleId = jsonAt.value(region, "sample_id").asString;
@@ -487,7 +540,14 @@ SynthDef(\omniSampleStereo, {
                 remaining = remaining - 1;
                 if(remaining <= 0) {
                     group.free;
-                    if(~omniVoices[handle] === record) {
+                    if((record[\oneShot] == true) or: {
+                        record[\finalized] == true
+                    }) {
+                        ~omniReleaseSampleLifetime.value(record);
+                    };
+                    if(((record[\oneShot] == true) or: {
+                        record[\finalized] == true
+                    }) and: { ~omniVoices[handle] === record }) {
                         ~omniVoices.removeAt(handle);
                     };
                 };

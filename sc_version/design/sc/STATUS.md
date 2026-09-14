@@ -87,8 +87,13 @@ Target currently exercised: Linux x86_64
 - SFZ `trigger=release_key` and `trigger=release` regions are normalized as
   release layers rather than attacks. Physical key-up and final sustain-aware
   release are separate SC-owned hooks, preserve release velocity, and spawn
-  only the matching release-layer kind. The additional banks' duration curves,
-  pedal noises and source-specific release-gain opcodes remain incomplete.
+  only the matching release-layer kind. Every possible release recording for
+  a held key/articulation remains pinned even after a program change; its
+  release velocity and round-robin choice need not be guessed at note-on.
+  Naturally-ended pitched attacks retain their lightweight handle metadata
+  until key-up, while percussion one-shots clean up immediately. The
+  additional banks' duration curves, pedal noises and source-specific
+  release-gain opcodes remain incomplete.
 - Deterministic non-realtime tests render the production mono and stereo
   sample SynthDefs from synthetic fixtures, including gated release, without
   taking over the workstation's live audio session.

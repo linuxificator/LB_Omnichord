@@ -6,6 +6,7 @@
 ~omniFinalizeRelease = { |handle, releaseVelocity=0|
     var record = ~omniVoices[handle.asString];
     if(record.notNil and: { ~omniFinalRelease.notNil }) {
+        record[\finalized] = true;
         ~omniFinalRelease.value(record, releaseVelocity.asFloat.clip(0, 1));
     };
     ~omniReleaseHandle.value(handle);

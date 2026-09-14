@@ -81,6 +81,9 @@ thisProcess.openUDPPort(languagePort);
     ~omniSustainPending.removeAt(handle.asString);
     if(record.notNil) {
         if(record[\sample] == true) {
+            if(~omniReleaseSampleLifetime.notNil) {
+                ~omniReleaseSampleLifetime.value(record);
+            };
             record[\sampleNodes].do { |sampleNode|
                 sampleNode[\node].set(\gate, 0)
             };
@@ -434,7 +437,8 @@ s.waitForBoot({
                 ~omniMapDrumKey.value(role, note).clip(0, 127),
                 note.asFloat.midicps,
                 velocity,
-                logicalBus
+                logicalBus,
+                true
             );
         } {
             Synth.tail(~omniSourceGroup, \omniDrum, [
