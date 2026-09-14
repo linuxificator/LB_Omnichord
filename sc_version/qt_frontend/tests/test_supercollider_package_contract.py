@@ -263,6 +263,14 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("~omniDrumChokes[chokeKey][\\gateBus].set(0)", samples)
         self.assertNotIn("~omniDrumChokes[chokeKey].set(", samples)
 
+    def test_legacy_vsco_drum_key_uses_resolved_pad_not_gate_role(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        self.assertIn(
+            "var resolvedKey = ~omniMapDrumKey.value(padId, note)", bootstrap
+        )
+        self.assertIn("resolvedKey.midicps", bootstrap)
+        self.assertNotIn("~omniMapDrumKey.value(role, note)", bootstrap)
+
     def test_sample_release_and_retune_use_stable_control_buses(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
         samples = (SC_ROOT / "sample_loader.scd").read_text(encoding="utf-8")

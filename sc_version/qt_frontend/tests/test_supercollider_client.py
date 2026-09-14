@@ -341,6 +341,52 @@ class SuperColliderClientTests(unittest.TestCase):
         self.assertAlmostEqual(float(hits[0][7]), 0.5 * (10 ** (-2.068 / 20)))
         self.assertEqual(hits[0][8], 10)
 
+    def test_engine_ready_does_not_imply_legacy_vsco_program_ready(self) -> None:
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+
+        client.drum_hit(
+            owner="midi/drums",
+            logical_key=36,
+            velocity=0.5,
+            logical_bus=10,
+            kit_id="pcm-vsco",
+        )
+        self.assertTrue(self.fake.wait_for_messages("/omni/v1/program/prepare"))
+        self.assertFalse(
+            any(address == "/omni/v1/drum/hit" for address, _ in self.fake.messages)
+        )
+
+        sender = SimpleUDPClient("127.0.0.1", client.reply_port)
+        try:
+            sender.send_message(
+                "/omni/v1/program/status",
+                [
+                    client.session,
+                    "sample.vsco.gm-styleperc",
+                    1,
+                    "ready",
+                    "ready",
+                ],
+            )
+        finally:
+            sender._sock.close()
+        self.assertTrue(self.fake.wait_for_messages("/omni/v1/drum/hit"))
+        self.close_client(client)
+
+        hit = next(
+            arguments
+            for address, arguments in self.fake.messages
+            if address == "/omni/v1/drum/hit"
+        )
+        self.assertEqual(hit[3], "sample.vsco.gm-styleperc")
+        self.assertEqual(hit[5], "low_primary")
+
     def test_lane_transaction_is_indexed_and_acknowledged(self) -> None:
         from engine_protocol import SequenceDefinition, SequenceEvent
         from musical_sequence_plan import LanePlan

@@ -148,8 +148,6 @@ class SuperColliderClient:
 
         try:
             self._await_ready()
-            for program in kit_by_id(DEFAULT_DRUM_KIT_ID).sample_programs:
-                self._drum_program_status[program] = "ready"
         except BaseException:
             self._close_reply_server()
             raise

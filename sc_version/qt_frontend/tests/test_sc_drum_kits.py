@@ -66,6 +66,19 @@ class SuperColliderDrumKitTests(unittest.TestCase):
         self.assertEqual(program, "sc.sclork.sosHats")
         self.assertEqual(pad, "sc-808/timekeeper_primary")
 
+    def test_legacy_catalogue_slots_resolve_to_vsco_semantic_roles(self) -> None:
+        expected = {
+            "legacy/low_primary": "low_primary",
+            "legacy/backbeat_primary": "backbeat_primary",
+            "legacy/timekeeper_primary": "timekeeper_primary",
+        }
+        for slot, role in expected.items():
+            with self.subTest(slot=slot):
+                program, pad, gain = resolve_hit("pcm-vsco", slot)
+                self.assertEqual(program, "sample.vsco.gm-styleperc")
+                self.assertEqual(pad, role)
+                self.assertEqual(gain, 1.0)
+
     def test_general_midi_notes_map_to_musical_roles(self) -> None:
         self.assertEqual(midi_role(36), "low_primary")
         self.assertEqual(midi_role(38), "backbeat_primary")

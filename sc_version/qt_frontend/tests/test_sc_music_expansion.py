@@ -232,6 +232,35 @@ class ScMusicExpansionTests(unittest.TestCase):
                         [(event.tick, event.role, event.velocity) for event in revised_level],
                     )
 
+    def test_legacy_vsco_sequence_keeps_distinct_drum_roles(self) -> None:
+        plan = compile_drum_lane(
+            config={
+                "id": "pop_8",
+                "percussion_activity": 5,
+                "fill_order": [0, 1, 2, 3, 4],
+                "fill_density_bars": 2,
+            },
+            catalog=self.catalog,
+            kit="pcm-vsco",
+            logical_bus=1,
+            generation=1,
+            program_resolver=resolve_hit,
+        )
+        pads = {
+            str(event.atoms[4])
+            for definition in plan.definitions
+            if definition.kind == "root"
+            for event in definition.events
+            if event.kind == "drumHit"
+        }
+        expected = {"low_primary", "backbeat_primary", "timekeeper_primary"}
+        self.assertLessEqual(expected, pads)
+        self.assertFalse(any(pad.startswith("legacy/") for pad in pads))
+        role_keys = json.loads(
+            (SC_ROOT / "drum-key-map.json").read_text(encoding="utf-8")
+        )["role_keys"]
+        self.assertEqual(len({role_keys[role] for role in expected}), len(expected))
+
     def test_reviewed_groove_budget_is_real_and_bounded(self) -> None:
         counts = [
             len(level)

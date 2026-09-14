@@ -601,13 +601,16 @@ s.waitForBoot({
         if(requestedProgram.asString.beginsWith("sample.") and: {
             ~omniSampleReady.value(requestedProgram, revision)
         }) {
+            var resolvedKey = ~omniMapDrumKey.value(padId, note).clip(0, 127);
             ~omniSpawnSampleVoice.value(
                 owner,
                 "drum/" ++ ~omniDrumOrdinal,
                 requestedProgram,
                 revision,
-                ~omniMapDrumKey.value(role, note).clip(0, 127),
-                note.asFloat.midicps,
+                // The gate role controls sequencer suppression; padId is the
+                // resolved musical role used by the legacy VSCO key map.
+                resolvedKey,
+                resolvedKey.midicps,
                 velocity,
                 logicalBus,
                 true

@@ -167,6 +167,13 @@ def midi_role(note: int) -> str:
 
 def resolve_hit(kit_id: str, selector: str) -> tuple[str, str, float]:
     kit = kit_by_id(kit_id)
-    pad = kit.pad_for(str(selector))
+    requested = str(selector)
+    # The expanded catalogue namespaces inherited slots so their identities
+    # cannot collide with concrete kit pads.  VSCO's legacy program is keyed
+    # by semantic drum role, so remove only that catalogue namespace at this
+    # engine adapter boundary.  Direct MIDI roles already arrive unprefixed.
+    if kit.kit_id == _LEGACY_PCM_KIT.kit_id and requested.startswith("legacy/"):
+        requested = requested.removeprefix("legacy/")
+    pad = kit.pad_for(requested)
     profile_id = f"{kit.kit_id}/{pad}" if kit.engine == "native" else pad
     return kit.program_for(pad), profile_id, kit.gain

@@ -138,6 +138,21 @@ while playback rate still targets the requested note. The same rule applies to
 release layers. This makes a full strum audible without falsifying the bank's
 inventory.
 
+Engine readiness does not imply that an arbitrary sample drum program is
+ready. Every kit waits for the status of its own exact program before its lane
+is published. This matters for the legacy VSCO PCM kit: it contains 184 sample
+identities (about 281 MiB decoded), while the engine's startup prerequisite is
+the smaller Old Parlour kit. Treating the general engine handshake as readiness
+for VSCO previously sent its events through the emergency synth fallback.
+
+The expanded catalogue namespaces legacy slots as `legacy/<role>` for stable
+identity. Its engine adapter removes that namespace and sends the resolved
+semantic role to SuperCollider. SC maps that role once to a VSCO key and uses
+the same key for region selection and playback frequency. A real-process
+qualification of the public rhythm controls produced 42 legacy-kit hits from
+11 distinct buffers at their original playback rate, without server failure,
+dropout or clipping.
+
 The VSCO `GM-Style Percussion` source name does not imply General MIDI key
 semantics. Its key 42 is a gong scrape and key 46 is a gong hit, for example.
 The checked-in drum-role map is therefore based on the actual indexed sample

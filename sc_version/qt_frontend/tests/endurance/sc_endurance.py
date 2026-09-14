@@ -263,6 +263,23 @@ def pcm_chord_switch_cycle(synths: list[Any]) -> Iterator[Action]:
     yield Action("setChordArpeggioRate", (4.0,), 2.0)
 
 
+def vsco_drum_role_cycle() -> Iterator[Action]:
+    """Exercise the legacy VSCO kit through several semantic drum roles."""
+
+    yield Action("ensureRhythmRunning", (True,), 0.4)
+    # Select away first so the VSCO selection is never a state-dependent no-op.
+    yield Action("setDrumKitIndex", (1,), 0.2)
+    # The complete legacy percussion program is roughly 281 MiB decoded, so
+    # leave its asynchronous first-load enough time on ordinary storage.
+    yield Action("setDrumKitIndex", (0,), 15.0)
+    yield Action("setMasterVolume", (0.36,))
+    yield Action("setPercussionVolume", (0.50,))
+    yield Action("setRhythmIndex", (0,), 0.1)
+    yield Action("setRhythmBusyness", (5.0,), 0.1)
+    yield Action("ensureRhythmRunning", (True,), 5.0)
+    yield Action("toggleRhythmFill", (4,), 3.0)
+
+
 class ApiClient:
     def __init__(self, port: int) -> None:
         self.port = port
@@ -424,7 +441,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--scenario",
-        choices=("broad", "pcm-chord-switch"),
+        choices=("broad", "pcm-chord-switch", "vsco-drum-roles"),
         default="broad",
         help="run broad coverage or focused PCM chord-instrument handover",
     )
@@ -531,15 +548,16 @@ def main() -> int:
         completed_cycles = 0
         action_count = 0
         while args.cycles == 0 or completed_cycles < args.cycles:
-            actions = (
-                pcm_chord_switch_cycle(synths)
-                if args.scenario == "pcm-chord-switch"
-                else action_cycle(
+            if args.scenario == "pcm-chord-switch":
+                actions = pcm_chord_switch_cycle(synths)
+            elif args.scenario == "vsco-drum-roles":
+                actions = vsco_drum_role_cycle()
+            else:
+                actions = action_cycle(
                     cycle,
                     synths,
                     artifact_dir if args.gui else None,
                 )
-            )
             for action in actions:
                 for process, label in ((sc_process, "SuperCollider"), (frontend_process, "frontend")):
                     if process.poll() is not None:

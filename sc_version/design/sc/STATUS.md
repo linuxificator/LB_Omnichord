@@ -172,6 +172,11 @@ x86_64
 - Natural source/sample completion and later release or drum-choke requests no
   longer race on node identifiers. Stable control buses own those gates and
   are freed only from the corresponding node completion callback.
+- Sample-drum lane publication requires an explicit ready status for that
+  kit's program; the generic engine-ready handshake no longer guesses that the
+  legacy VSCO percussion bank is loaded. Namespaced legacy catalogue slots are
+  resolved to semantic roles before SC maps them to distinct VSCO keys at
+  original playback speed.
 - SFZ `trigger=release_key` and `trigger=release` regions are normalized as
   release layers rather than attacks. Physical key-up and final sustain-aware
   release are separate SC-owned hooks, preserve release velocity, and spawn

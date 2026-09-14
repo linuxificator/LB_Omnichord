@@ -13,7 +13,12 @@ ROOT = Path(__file__).resolve().parents[1]
 ENDURANCE = ROOT / "tests" / "endurance"
 sys.path.insert(0, str(ENDURANCE))
 
-from sc_endurance import action_cycle, analyze_wave, pcm_chord_switch_cycle  # noqa: E402
+from sc_endurance import (  # noqa: E402
+    action_cycle,
+    analyze_wave,
+    pcm_chord_switch_cycle,
+    vsco_drum_role_cycle,
+)
 
 
 class _Synth:
@@ -23,6 +28,23 @@ class _Synth:
 
 
 class SuperColliderEnduranceTests(unittest.TestCase):
+    def test_vsco_drum_scenario_forces_selection_and_sustained_playback(self) -> None:
+        actions = list(vsco_drum_role_cycle())
+        selections = [
+            action.args[0]
+            for action in actions
+            if action.name == "setDrumKitIndex"
+        ]
+        self.assertEqual(selections, [1, 0])
+        self.assertTrue(
+            any(
+                action.name == "ensureRhythmRunning"
+                and action.args == (True,)
+                and action.dwell >= 5.0
+                for action in actions
+            )
+        )
+
     def test_pcm_chord_switch_scenario_repeats_flute_during_arpeggio(self) -> None:
         keys = (
             "sample.vsco.uprightpiano",
