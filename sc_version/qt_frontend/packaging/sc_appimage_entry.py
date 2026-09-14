@@ -65,6 +65,19 @@ def verify_config_migrations(root: Path) -> None:
     shipped_path = root / "config" / "supercollider.json"
     shipped = json.loads(shipped_path.read_text(encoding="utf-8"))
     expected_buffers = shipped["server"]["max_buffers"]
+    with tempfile.TemporaryDirectory() as directory:
+        fresh_path, fresh = prepare_user_runtime_config(
+            shipped_path,
+            user_root=Path(directory) / "empty-user-root",
+            install_samples=False,
+        )
+        persisted = json.loads(fresh_path.read_text(encoding="utf-8"))
+        if (
+            type(persisted["server"]["max_buffers"]) is not int
+            or persisted["server"]["max_buffers"] != expected_buffers
+            or fresh.server.max_buffers != expected_buffers
+        ):
+            raise RuntimeError("packaged fresh-user config seeding failed")
     for revision in (1, 2, 3, 4):
         legacy = json.loads(json.dumps(shipped))
         legacy["config_revision"] = revision

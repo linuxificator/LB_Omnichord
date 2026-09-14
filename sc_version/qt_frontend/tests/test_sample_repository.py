@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -44,6 +46,37 @@ def commit_clone(path: Path) -> str:
 
 
 class SampleRepositoryTests(unittest.TestCase):
+    def test_cli_seeds_a_valid_config_in_a_completely_empty_home(self) -> None:
+        """Cover the exact first source-run boundary used by run_local.sh."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary) / "home"
+            home.mkdir()
+            environment = os.environ.copy()
+            environment.update(HOME=str(home), USERPROFILE=str(home))
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(FRONTEND / "code" / "sample_repository.py"),
+                    str(FRONTEND / "config" / "supercollider.json"),
+                    "--without-samples",
+                ],
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            target = home / ".omnichord" / "config" / "supercollider.json"
+            self.assertEqual(Path(result.stdout.strip()).resolve(), target.resolve())
+            persisted = json.loads(target.read_text(encoding="utf-8"))
+            self.assertIs(type(persisted["server"]["max_buffers"]), int)
+            self.assertEqual(persisted["server"]["max_buffers"], 8192)
+            self.assertEqual(persisted["config_revision"], 4)
+            self.assertEqual(persisted["protocol_version"], 2)
+
     def test_existing_non_repository_is_rejected_clearly(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaisesRegex(
