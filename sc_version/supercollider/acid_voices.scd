@@ -7,7 +7,8 @@
          envOctaves=2, filterDecaySeconds=0.25,
          slideSeconds=0.060, slideEnabled=0,
          t_attack=1, t_filter=1, t_accent=0, accentAmount=0.35,
-         pitchBendBus=0, attack=0.006, decay=0.1, sustain=1, release=0.18|
+         pitchBendBus=0, envAttack=0.006, envDecay=0.1,
+         envSustain=1, envRelease=0.18|
         var bend = In.kr(pitchBendBus, 1).max(0.01);
         var targetMidi = freqTargetHz.max(10).cpsmidi;
         var glidingMidi = VarLag.kr(targetMidi, slideSeconds.max(0.001));
@@ -31,10 +32,10 @@
         );
         var amplitude = EnvGen.kr(
             Env.adsr(
-                attack.max(0.001),
-                decay.max(0.001),
-                sustain.clip(0, 1),
-                release.max(0.01)
+                envAttack.max(0.001),
+                envDecay.max(0.001),
+                envSustain.clip(0, 1),
+                envRelease.max(0.01)
             ),
             gate,
             doneAction: Done.freeSelf
@@ -117,10 +118,10 @@
             "filter_decay_ms", { \filterDecaySeconds },
             "portamento_ms", { \slideSeconds },
             "accent_amount", { \accentAmount },
-            "attack_ms", { \attack },
-            "decay_ms", { \decay },
-            "sustain", { \sustain },
-            "release_ms", { \release },
+            "attack_ms", { \envAttack },
+            "decay_ms", { \envDecay },
+            "sustain", { \envSustain },
+            "release_ms", { \envRelease },
             { name.asSymbol }
         );
         var value = rawValue;
