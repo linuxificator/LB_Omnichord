@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+import hashlib
 import math
 from typing import Any, Callable
 
@@ -39,6 +40,13 @@ class LanePlan:
 
 def _frequency(note: float) -> float:
     return float(440.0 * (2.0 ** ((float(note) - 69.0) / 12.0)))
+
+
+def _compact_source_identity(category: str, value: object) -> str:
+    """Return stable bounded provenance for one immutable definition."""
+
+    digest = hashlib.sha256(repr(value).encode("utf-8")).hexdigest()
+    return f"{category}:{digest}"
 
 
 def _event(
@@ -188,6 +196,7 @@ def compile_bass_lane(
     )
     sources = bass_gesture_sources(source_events, period)
     acid_program = program_id.startswith("sc.omni.acid")
+    source_identity = _compact_source_identity("bass", identity)
     definitions: list[SequenceDefinition] = []
     launches: list[SequenceEvent] = []
     for gesture_index, source in enumerate(sources):
@@ -253,7 +262,7 @@ def compile_bass_lane(
                 lane=lane,
                 period_ticks=0,
                 events=tuple(sorted(events, key=lambda item: (item.tick, item.ordinal))),
-                source_identity=f"{identity!r}:{gesture_index}",
+                source_identity=f"{source_identity}:{gesture_index}",
             )
         )
         launches.append(
@@ -269,7 +278,7 @@ def compile_bass_lane(
                 lane=lane,
                 period_ticks=period,
                 events=tuple(sorted(launches, key=lambda item: (item.tick, item.ordinal))),
-                source_identity=f"{identity!r}:root",
+                source_identity=f"{source_identity}:root",
             ),
         )
     return LanePlan(lane, generation, 1, tuple(definitions))

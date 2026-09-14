@@ -47,7 +47,9 @@ thisProcess.openUDPPort(languagePort);
     if(~omniBendBus.notNil) { ~omniBendBus.set(ratio) };
     ~omniVoices.values.do { |record|
         if(record[\nativeName].notNil and: {
-            record[\baseFrequency].notNil
+            record[\baseFrequency].notNil and: {
+                record[\sourceAlive] ? true
+            }
         }) {
             record[\sourceNode].set(
                 \freq,
@@ -90,12 +92,19 @@ thisProcess.openUDPPort(languagePort);
             });
         } {
         if(record[\outputNode].notNil) {
-            record[\outputNode].set(\gate, 0);
-            if(record[\releaseMode] == \gated) {
+            record[\releaseRequested] = true;
+            if(record[\outputAlive] ? true) {
+                record[\outputNode].set(\gate, 0)
+            };
+            if((record[\releaseMode] == \gated) and: {
+                record[\sourceAlive] ? true
+            }) {
                 record[\sourceNode].set(\gate, 0);
             };
         } {
-            record[\sourceNode].set(\gate, 0);
+            if(record[\sourceAlive] ? true) {
+                record[\sourceNode].set(\gate, 0)
+            };
         };
         };
     };
@@ -109,7 +118,9 @@ thisProcess.openUDPPort(languagePort);
     if(record.notNil) {
         if(name == "frequency_hz") {
             record[\baseFrequency] = value;
-            if(record[\acid] == true) {
+            if((record[\acid] == true) and: {
+                record[\sourceAlive] ? true
+            }) {
                 record[\sourceNode].set(
                     \slideEnabled, 1,
                     \freqTargetHz, value
@@ -118,18 +129,24 @@ thisProcess.openUDPPort(languagePort);
             if(record[\sample] == true) {
                 ~omniRetuneSampleHandle.value(record, value);
             } {
-                record[\sourceNode].set(
-                    \freq,
-                    value * (2 ** ~omniPitchBendOctaves)
-                );
+                if(record[\sourceAlive] ? true) {
+                    record[\sourceNode].set(
+                        \freq,
+                        value * (2 ** ~omniPitchBendOctaves)
+                    );
+                };
             };
             };
         };
-        if(name == "accent") { record[\sourceNode].set(\t_accent, 1) };
+        if(name == "accent" and: { record[\sourceAlive] ? true }) {
+            record[\sourceNode].set(\t_accent, 1)
+        };
         if(name == "gain") {
-            (record[\outputNode] ? record[\sourceNode]).set(\gain, value)
+            if(record[\outputAlive] ? (record[\sourceAlive] ? true)) {
+                (record[\outputNode] ? record[\sourceNode]).set(\gain, value)
+            }
         };
-        if(name == "brightness") {
+        if(name == "brightness" and: { record[\sourceAlive] ? true }) {
             record[\sourceNode].set(\brightness, value)
         };
     };
@@ -338,10 +355,12 @@ s.waitForBoot({
                 acid: true,
                 owner: owner.asString,
                 logicalKey: logicalKey.asInteger,
-                program: program.asString
+                program: program.asString,
+                sourceAlive: true
             );
             ~omniVoices[handle] = record;
             sourceNode.onFree {
+                record[\sourceAlive] = false;
                 if(~omniVoices[handle] === record) {
                     ~omniVoices.removeAt(handle);
                 };
@@ -351,6 +370,7 @@ s.waitForBoot({
             SynthDescLib.global.at(nativeName).notNil
         }) {
             var voiceBus = Bus.audio(s, 2);
+            var voiceGroup = Group.tail(~omniSourceGroup);
             var outputRelease = 0.22;
             var sourceNode;
             var outputNode;
@@ -362,7 +382,7 @@ s.waitForBoot({
                 };
             };
             sourceNode = Synth.tail(
-                ~omniSourceGroup,
+                voiceGroup,
                 nativeName,
                 ~omniSclorkArgs.value(
                     nativeName,
@@ -383,6 +403,7 @@ s.waitForBoot({
             record = (
                 sourceNode: sourceNode,
                 outputNode: outputNode,
+                voiceGroup: voiceGroup,
                 voiceBus: voiceBus,
                 nativeName: nativeName,
                 baseFrequency: frequency,
@@ -396,19 +417,19 @@ s.waitForBoot({
                 logicalKey: logicalKey.asInteger,
                 program: program.asString,
                 sourceAlive: true,
+                outputAlive: true,
+                releaseRequested: false,
                 cleaned: false
             );
             ~omniVoices[handle] = record;
             outputNode.onFree {
+                record[\outputAlive] = false;
                 if(record[\cleaned].not) {
                     record[\cleaned] = true;
-                    if(record[\sourceAlive]) {
-                        // A number of SCLOrk voices end themselves. Mark the
-                        // local lifetime first so their delayed /n_end cannot
-                        // race this cleanup into a second /n_free.
-                        record[\sourceAlive] = false;
-                        sourceNode.free;
-                    };
+                    // The group remains valid whether its native source ended
+                    // naturally or is still running. Releasing that owned
+                    // container avoids racing /n_end with a second /n_free.
+                    voiceGroup.free;
                     voiceBus.free;
                     if(~omniVoices[handle] === record) {
                         ~omniVoices.removeAt(handle);
@@ -417,7 +438,14 @@ s.waitForBoot({
             };
             sourceNode.onFree {
                 record[\sourceAlive] = false;
-                if(record[\cleaned].not) { outputNode.set(\gate, 0) };
+                if(record[\cleaned].not and: {
+                    record[\releaseRequested].not and: {
+                        record[\outputAlive]
+                    }
+                }) {
+                    record[\releaseRequested] = true;
+                    outputNode.set(\gate, 0);
+                };
             };
         } {
             var sourceNode = Synth.tail(~omniSourceGroup, \omniVoice, [
@@ -432,10 +460,12 @@ s.waitForBoot({
                 acid: false,
                 owner: owner.asString,
                 logicalKey: logicalKey.asInteger,
-                program: program.asString
+                program: program.asString,
+                sourceAlive: true
             );
             ~omniVoices[handle] = record;
             sourceNode.onFree {
+                record[\sourceAlive] = false;
                 if(~omniVoices[handle] === record) {
                     ~omniVoices.removeAt(handle);
                 };

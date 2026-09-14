@@ -129,9 +129,9 @@ def action_cycle(cycle: int, synths: list[Any]) -> Iterator[Action]:
     yield Action("setStrumVolume", (0.40,))
     yield Action("setBassVolume", (0.43,))
     yield Action("setPercussionVolume", (0.42,))
-    yield Action("toggleRhythm", dwell=0.2)
-    yield Action("toggleBassRunning", dwell=0.2)
-    yield Action("toggleChordArpeggio", dwell=0.2)
+    yield Action("ensureRhythmRunning", (True,), 0.2)
+    yield Action("ensureBassRunning", (True,), 0.2)
+    yield Action("ensureChordArpeggioRunning", (True,), 0.2)
 
     for rhythm in range(18):
         yield Action("setRhythmIndex", (rhythm,), 0.16)
@@ -157,6 +157,15 @@ def action_cycle(cycle: int, synths: list[Any]) -> Iterator[Action]:
             yield Action("setReverbRoom", (0.25 + 0.1 * (rhythm % 6),))
             yield Action("setReverbDamping", (0.15 + 0.1 * (rhythm % 7),))
             yield Action("toggleReverbDrums")
+        if rhythm == 9:
+            # Cover the actual toggle actions while keeping the deliberately
+            # silent interval shorter than the dropout qualification window.
+            yield Action("toggleRhythm", dwell=0.15)
+            yield Action("toggleRhythm", dwell=0.15)
+            yield Action("toggleBassRunning", dwell=0.15)
+            yield Action("toggleBassRunning", dwell=0.15)
+            yield Action("toggleChordArpeggio", dwell=0.15)
+            yield Action("toggleChordArpeggio", dwell=0.15)
 
     # Each cycle covers a rotating quarter of both catalogues for every OMNI
     # role and every pitched MIDI row. Four cycles exercise the full catalogue.
@@ -198,9 +207,9 @@ def action_cycle(cycle: int, synths: list[Any]) -> Iterator[Action]:
 
     yield Action("panic", dwell=0.3)
     # Restore sustained activity before the next capture/cycle.
-    yield Action("toggleRhythm", dwell=0.2)
-    yield Action("toggleBassRunning", dwell=0.2)
-    yield Action("toggleChordArpeggio", dwell=0.2)
+    yield Action("ensureRhythmRunning", (True,), 0.2)
+    yield Action("ensureBassRunning", (True,), 0.2)
+    yield Action("ensureChordArpeggioRunning", (True,), 0.2)
 
 
 class ApiClient:

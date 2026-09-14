@@ -51,6 +51,19 @@ sample could naturally end before its owner handle was released. Region nodes
 carry an explicit live flag updated by `/n_end`, and release/retune iterates
 only live regions. The sample-loader test freezes that rule.
 
+The first multi-cycle run exposed two further lifetime boundaries. Dense bass
+activity produced provenance text longer than the typed protocol's 192-byte
+identity limit. Bass definitions now use a deterministic SHA-256 identity;
+this metadata does not cross the OSC wire or alter musical behavior. A
+32-event regression fixture proves identities remain stable and bounded.
+
+Rapid native-program replacement also raced a naturally completed SCLOrk
+source against wrapper cleanup, producing duplicate `/n_free` requests. Each
+native voice now owns one persistent node group containing its source and
+output wrapper. Cleanup frees that group instead of addressing a source node
+which may already have ended, while explicit alive/release state prevents late
+parameter or gate messages. The package contract freezes this ownership rule.
+
 ## Coverage and balance boundary
 
 The compiler still audits all 109 pinned SCLOrk definitions. The pitched
@@ -90,3 +103,11 @@ processes, drives only public controller actions, records action/progress logs,
 and rejects server errors, prolonged silence, dropouts and hard clipping. Four
 cycles rotate through the complete synth and PCM catalogues for every OMNI role
 and every pitched MIDI row; zero cycles means it continues until interrupted.
+
+The 2026-09-14 finite release qualification completed all four catalogue
+cycles: 3,254 public actions in 351.294 seconds and twelve independently
+captured audio windows. It reported no server failure, persistent clipping or
+dropout. Except for the initial startup window (394 ms), the longest measured
+silence was 31 ms and then 21 ms. The runner now establishes explicit running
+state at cycle boundaries; blind toggles previously manufactured a 4.9-second
+silent interval and are covered by an idempotence regression test.

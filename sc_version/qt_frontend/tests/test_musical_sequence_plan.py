@@ -117,6 +117,42 @@ class MusicalSequencePlanTests(unittest.TestCase):
             )
         )
 
+    def test_dense_bass_activity_has_bounded_stable_source_identity(self) -> None:
+        config = {
+            "id": "dense-source-identity",
+            "length_beats": 16,
+            "bass_mode": "activity",
+            "bass_activity": 4,
+            "bass_events": [
+                {"time": index * 0.5, "degree": index, "amp": 0.7}
+                for index in range(32)
+            ],
+        }
+        arguments = dict(
+            config=config,
+            running=True,
+            bass_notes=(36.0, 40.0, 43.0, 47.0, 50.0),
+            bass_gate_beats=0.3,
+            program_id="sc.sclork.fmBass",
+            program_revision=1,
+            logical_bus=1,
+            generation=1,
+        )
+
+        first = compile_bass_lane(**arguments)
+        second = compile_bass_lane(**arguments)
+
+        identities = [item.source_identity for item in first.definitions]
+        self.assertEqual(
+            identities,
+            [item.source_identity for item in second.definitions],
+        )
+        self.assertTrue(identities)
+        self.assertTrue(all(identity.startswith("bass:") for identity in identities))
+        self.assertTrue(
+            all(1 <= len(identity.encode("utf-8")) <= 192 for identity in identities)
+        )
+
     def test_chord_arpeggio_owns_exact_note_handles_and_48_ppq_releases(self) -> None:
         plan = compile_chord_lane(
             config={

@@ -38,6 +38,8 @@ class SuperColliderEnduranceTests(unittest.TestCase):
                 "setMidiSynthIndex", "injectMidiNote", "injectMidiPitchBend",
                 "injectOscControl", "setDrumKitIndex", "setMidiDrumKitIndex",
                 "panic",
+                "ensureRhythmRunning", "ensureBassRunning",
+                "ensureChordArpeggioRunning",
             }.issubset(names)
         )
         self.assertEqual(

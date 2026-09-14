@@ -71,6 +71,25 @@ class BackendControlSurfaceTests(unittest.TestCase):
         midi.selectSampleChoice.assert_called_once_with(2, 91)
         midi.toggleSustain.assert_called_once_with(2)
 
+    def test_endurance_state_helpers_are_idempotent_public_actions(self) -> None:
+        backend = SimpleNamespace(
+            rhythmRunning=False,
+            bassRunning=True,
+            chordArpeggioEnabled=False,
+            toggleRhythm=Mock(),
+            toggleBassRunning=Mock(),
+            toggleChordArpeggio=Mock(),
+        )
+        adapter = BackendControlSurface(backend)
+
+        adapter.ensureRhythmRunning(True)
+        adapter.ensureBassRunning(True)
+        adapter.ensureChordArpeggioRunning(True)
+
+        backend.toggleRhythm.assert_called_once_with()
+        backend.toggleBassRunning.assert_not_called()
+        backend.toggleChordArpeggio.assert_called_once_with()
+
 
 if __name__ == "__main__":
     unittest.main()

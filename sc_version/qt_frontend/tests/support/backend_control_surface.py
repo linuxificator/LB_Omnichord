@@ -68,6 +68,18 @@ class BackendControlSurface:
     def toggleMidiSustain(self, row: int) -> None:
         self._backend.midiPlayer.toggleSustain(row)
 
+    def ensureRhythmRunning(self, enabled: bool) -> None:
+        if bool(self._backend.rhythmRunning) != bool(enabled):
+            self._backend.toggleRhythm()
+
+    def ensureBassRunning(self, enabled: bool) -> None:
+        if bool(self._backend.bassRunning) != bool(enabled):
+            self._backend.toggleBassRunning()
+
+    def ensureChordArpeggioRunning(self, enabled: bool) -> None:
+        if bool(self._backend.chordArpeggioEnabled) != bool(enabled):
+            self._backend.toggleChordArpeggio()
+
     def requestAmyDiagnostics(self, kind: str = "load") -> None:
         """Queue one bounded firmware diagnostic request on the real sink.
 

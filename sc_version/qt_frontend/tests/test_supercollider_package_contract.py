@@ -106,6 +106,18 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("record[\\baseFrequency] * ratio", bootstrap)
         self.assertIn("frequency * (2 ** ~omniPitchBendOctaves)", bootstrap)
 
+    def test_natural_voice_lifetime_guards_server_node_updates(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        self.assertIn("record[\\sourceAlive] ? true", bootstrap)
+        self.assertIn("record[\\outputAlive] ? true", bootstrap)
+        self.assertIn("record[\\releaseRequested] = true", bootstrap)
+        self.assertIn("record[\\releaseRequested].not", bootstrap)
+        self.assertIn("record[\\outputAlive] = false", bootstrap)
+        self.assertIn("var voiceGroup = Group.tail(~omniSourceGroup)", bootstrap)
+        self.assertIn("voiceGroup: voiceGroup", bootstrap)
+        self.assertIn("voiceGroup.free", bootstrap)
+        self.assertNotIn("sourceNode.free", bootstrap)
+
     def test_sample_buffer_capacity_is_configured_before_server_boot(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
         assignment = bootstrap.index("s.options.numBuffers = maxBuffers")

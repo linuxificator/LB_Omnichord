@@ -58,7 +58,9 @@ Target currently exercised: Linux x86_64
 - The complete mix crosses one private master stage with a 0.95 safety limiter.
   Upper-register filter adapters keep four pinned source definitions finite at
   the full strum boundary, and naturally ended sample nodes are never targeted
-  by later release or retune messages.
+  by later release or retune messages. Native SCLOrk voices use owned node
+  groups, so wrapper cleanup cannot race a naturally ended source into a
+  duplicate server free.
 - Legacy AMY patch keys are accepted only as preset-migration aliases. They do
   not appear in the SC instrument browser and all outgoing program selections
   use canonical `sc.*` or `sample.*` identities.
@@ -141,8 +143,10 @@ Target currently exercised: Linux x86_64
   [`PLAYBACK_QUALIFICATION.md`](PLAYBACK_QUALIFICATION.md).
 - Full soft/mid/hard and low/mid/high sample audits and measured resident-set
   admission remain open. A separate-process live endurance qualification now
-  covers interaction, engine logs and physical PipeWire output continuously;
-  extended human listening remains appropriate.
+  covers interaction, engine logs and physical PipeWire output continuously.
+  Its four-cycle release baseline exercised 3,254 public actions across the
+  complete current SYN/PCM catalogue without server, clipping or dropout
+  failure; extended human listening remains appropriate.
 - Linux source behavior was exercised locally with SuperCollider 3.13.0. The
   pinned 3.14.1 compiler, engine, frontend and package workflow passed on
   commit `fc3b26e` in GitHub run `34790456369`.
