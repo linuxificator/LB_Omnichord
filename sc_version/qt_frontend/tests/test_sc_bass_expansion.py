@@ -206,6 +206,33 @@ class ScBassExpansionTests(unittest.TestCase):
         self.assertEqual(len(attacks), 1)
         self.assertEqual(controls, ["glide_time_ms", "frequency_hz"])
 
+    def test_owned_accent_is_applied_at_the_slide_destination(self) -> None:
+        child = self._plan("sc.omni.acid303").definitions[1]
+        attacks = [event for event in child.events if event.kind == "noteOn"]
+        destination = [
+            event
+            for event in child.events
+            if event.tick == 48 and event.kind == "voiceSet"
+        ]
+        self.assertEqual(len(attacks), 1)
+        self.assertEqual(
+            [event.atoms[1] for event in destination],
+            [
+                "glide_time_ms",
+                "frequency_hz",
+                "accent_amount",
+                "accent",
+            ],
+        )
+        self.assertEqual(float(destination[0].atoms[2]), 70.0)
+        self.assertGreater(float(destination[1].atoms[2]), 0.0)
+        self.assertEqual(float(destination[2].atoms[2]), 0.6)
+        self.assertEqual(float(destination[3].atoms[2]), 1.0)
+        self.assertEqual(
+            [event.kind for event in child.events].count("noteOff"),
+            1,
+        )
+
     def test_same_pitch_tie_reuses_gate_without_pitch_or_attack_event(self) -> None:
         child = self._plan(
             "sc.sclork.bassWarsaw", link="tie", second_note=36

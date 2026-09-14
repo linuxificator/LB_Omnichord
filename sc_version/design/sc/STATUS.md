@@ -51,7 +51,8 @@ x86_64
   alias/range vocabulary; engine names and ineffective native parameters are
   not exposed as UI promises. See [`INSTRUMENT_BROWSER.md`](INSTRUMENT_BROWSER.md).
 - The five pitched MIDI rows now use that same `SYN`/`PCM` catalogue and
-  parameter surface. Both percussion locations expose six explicit drum kits.
+  parameter surface. Both percussion locations expose fifteen explicit drum
+  kits: the legacy PCM kit, five native SC kits and nine expanded PCM kits.
   Reverb controls name the native SC model (`WET`, `ROOM`, `DAMP`) and no
   longer promise AMY-only ranges or terminology.
 - Manual strum no longer has a frontend voice-stealing limit: every attack has
@@ -95,11 +96,12 @@ x86_64
   SuperCollider 3.14.1 runtime and no AMY runtime.
 - First launch uses bundled Dulwich rather than a system Git executable to
   install `linuxificator/VSCO-2-CE` at `~/VSCO-2-CE`. The user config stores an
-  alternate location, but startup verifies its Git origin before admitting it.
-- SuperCollider configuration revision 2 repairs the historically missing
-  `server.max_buffers` field from the shipped profile. Every frozen package
-  self-check exercises both a revision-1 upgrade and an already migrated
-  revision-2 document missing that field before an audio process is opened.
+  alternate location, but startup verifies both its Git origin and exact
+  pinned commit before admitting it.
+- SuperCollider configuration revision 4 and protocol revision 2 include the
+  explicit sample commit and per-event drum duration cap. Every frozen package
+  self-check exercises additive migration from all earlier revisions before an
+  audio process is opened.
 - Frozen package verification resolves both source and PyInstaller asset
   layouts through the production catalogue loader; a package cannot pass by
   checking directory names while its instrument metadata is unreachable.
@@ -123,6 +125,18 @@ x86_64
   normalization and playback semantics remain explicitly incomplete. Its
   audio inventory reads WAV, AIFF and FLAC and hashes decoded PCM in one
   architecture-independent representation for cross-container deduplication.
+
+## Expanded music data
+
+- Fifteen kits each have 54 exact rhythm arrangements and five activity
+  levels: 810 arrangements in total. Their 4,050 finite fills preserve exact
+  role-and-slot continuation under selective gates.
+- The neutral 1,664-riff bass catalogue resolves against all 810 kit/rhythm
+  contexts. Explicit voice capabilities choose gated tie/glide/accent behavior
+  or a conservative detached fallback without moving timing into Qt.
+- Eighteen complete factory preset snapshots select the expanded data while
+  preserving user-owned preset files. The detailed contract and evidence are
+  in [`MUSIC_EXPANSION.md`](MUSIC_EXPANSION.md).
 
 ## Not yet complete
 

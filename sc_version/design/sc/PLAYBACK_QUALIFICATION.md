@@ -32,8 +32,10 @@ compilable graph as a safe musical instrument.
 Nineteen reviewed drum definitions used by the selectable synth drum kits are
 also present in the playback profile. Category membership, not profile
 membership, keeps them out of the pitched browser. Both the yellow OMNI rhythm
-row and purple MIDI percussion row offer the same six explicit kits: VSCO PCM,
-SC basic, SC 808, SC Electro, SC Oto 309 and SC SOS.
+row and purple MIDI percussion row offer the same fifteen explicit kits: the
+legacy VSCO PCM kit, five native SC kits and nine reviewed PCM expansion kits.
+Their musical-data contract is in
+[`MUSIC_EXPANSION.md`](MUSIC_EXPANSION.md).
 
 ## SCLOrk measurement and gain staging
 
@@ -103,8 +105,9 @@ or bass attacks target an unprepared revision.
 
 ## Samples and percussion
 
-The VSCO manifest has 3,163 regions, so `scsynth` receives 8,192 buffer-number
-slots before boot. Buffer identifiers and decoded sample memory are separate
+The pitched VSCO manifest has 3,163 regions and the PCM drum expansion adds 262
+verified sample identities, so `scsynth` receives 8,192 buffer-number slots
+before boot. Buffer identifiers and decoded sample memory are separate
 resources: the existing byte-budgeted cache still owns admission and eviction.
 
 VSCO instruments do not all cover the full keyboard. If a requested note lies

@@ -2,7 +2,12 @@
 
 Status: authoritative category index
 Owner: musical application policy
-Last verified: 2026-09-08
+Last verified: 2026-09-14
+
+The active SuperCollider music-expansion contract is
+[`../sc/MUSIC_EXPANSION.md`](../sc/MUSIC_EXPANSION.md). It supersedes AMY engine
+details in the older shared documents below while preserving their musical and
+UI behavior contracts.
 
 - `presets.md`: preset ownership and persistence.
 - `rhythm.md`: transport, tempo, fills and activity behavior.

@@ -50,6 +50,8 @@ For every SuperCollider edition task, first read:
     SC usability follow-up and its executable evidence
 11. [`sc/BUILD_AND_RELEASE.md`](sc/BUILD_AND_RELEASE.md) for active platform,
     sample-installation and release workflow contracts
+12. [`sc/MUSIC_EXPANSION.md`](sc/MUSIC_EXPANSION.md) when changing drum kits,
+    rhythms, fills, bass articulation or factory preset defaults
 
 Then read the category README and owning contracts for every subsystem being
 changed. If `../../CODEX_HANDOFF.md` exists, read it for operational state; it
