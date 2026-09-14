@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "code"))
 from sfz_manifest_compiler import (  # noqa: E402
     _audio_record,
     _midi_note,
+    audit_sfz_opcodes,
     compile_vsco_manifest,
     parse_sfz,
     preprocess_sfz,
@@ -134,6 +135,32 @@ class SfzManifestCompilerTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "undefined SFZ macro"):
                 preprocess_sfz(first, root=root)
+
+    def test_opcode_audit_reports_unsupported_behavior_without_accepting_it(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            include = root / "regions.inc"
+            include.write_text(
+                "<region> sample=one.wav key=60 cutoff=1200\n",
+                encoding="utf-8",
+            )
+            mapping = root / "program.sfz"
+            mapping.write_text(
+                '#include "regions.inc"\n',
+                encoding="utf-8",
+            )
+
+            report = audit_sfz_opcodes((mapping,), root=root)
+
+        self.assertFalse(report["complete"])
+        self.assertEqual(report["unsupported_opcodes"], ["cutoff"])
+        records = {item["opcode"]: item for item in report["opcodes"]}
+        self.assertEqual(records["key"]["classification"], "implemented-runtime")
+        self.assertEqual(records["sample"]["occurrence_count"], 1)
+        self.assertEqual(
+            records["cutoff"]["locations"],
+            [{"source_file": "regions.inc", "line": 1}],
+        )
 
     def test_complete_vsco_shape_with_synthetic_bank(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -21,6 +21,7 @@ _NOTE = re.compile(r"^([a-gA-G])([#b]?)(-?[0-9]+)$")
 _DEFINE = re.compile(r"^\s*#define\s+(\$[A-Za-z0-9_]+)\s+(.+?)\s*$")
 _INCLUDE = re.compile(r'#include\s+"([^"]+)"')
 _MACRO = re.compile(r"\$[A-Za-z0-9_]+")
+_AUDIT_LOCATION_LIMIT = 16
 _KNOWN_OPCODES = {
     "ampeg_attack",
     "ampeg_dynamic",
@@ -45,6 +46,15 @@ _KNOWN_OPCODES = {
     "sw_lokey",
     "tune",
     "volume",
+}
+_OPCODE_CLASSIFICATION = {
+    "default_path": "compile-time-metadata",
+    "group_label": "implemented-runtime",
+    "sw_label": "compile-time-metadata",
+    **{
+        opcode: "implemented-runtime"
+        for opcode in _KNOWN_OPCODES - {"default_path", "group_label", "sw_label"}
+    },
 }
 
 
@@ -281,6 +291,59 @@ def parse_sfz(path: Path, *, root: Path | None = None) -> tuple[_SourceRegion, .
     if not regions:
         raise ValueError(f"{path} contains no regions")
     return tuple(regions)
+
+
+def audit_sfz_opcodes(
+    paths: tuple[Path, ...],
+    *,
+    root: Path,
+) -> dict[str, Any]:
+    """Inventory the complete preprocessed opcode surface without accepting it."""
+
+    source_root = root.resolve()
+    occurrences: dict[str, list[dict[str, Any]]] = {}
+    for path in sorted(path.resolve() for path in paths):
+        for expanded in preprocess_sfz(path, root=source_root):
+            line = expanded.text.strip()
+            header = _HEADER.search(line)
+            if header is not None:
+                line = line[header.end() :].strip()
+            for opcode, _value in _opcodes(line):
+                try:
+                    source_file = expanded.source.relative_to(source_root).as_posix()
+                except ValueError:
+                    raise ValueError(
+                        f"opcode source escapes bank root: {expanded.source}"
+                    ) from None
+                occurrences.setdefault(opcode, []).append(
+                    {"source_file": source_file, "line": expanded.line}
+                )
+
+    records = [
+        {
+            "opcode": opcode,
+            "classification": _OPCODE_CLASSIFICATION.get(
+                opcode, "unsupported-error"
+            ),
+            "occurrence_count": len(locations),
+            "locations": locations[:_AUDIT_LOCATION_LIMIT],
+            "locations_truncated": len(locations) > _AUDIT_LOCATION_LIMIT,
+        }
+        for opcode, locations in sorted(occurrences.items())
+    ]
+    unsupported = [
+        record["opcode"]
+        for record in records
+        if record["classification"] == "unsupported-error"
+    ]
+    return {
+        "schema_revision": 1,
+        "compiler_version": COMPILER_VERSION,
+        "mapping_count": len(paths),
+        "complete": not unsupported,
+        "unsupported_opcodes": unsupported,
+        "opcodes": records,
+    }
 
 
 def _relative_sample(root: Path, region: _SourceRegion) -> Path:

@@ -32,6 +32,11 @@ The current playable bank is VSCO 2 CE. Its normalized manifest covers all 75
 source SFZ mappings, all 3,168 audio files and all 3,163 mapped regions. The
 remaining 1,134 source recordings are visible as `unmapped-source-audio`; that
 is evidence of incomplete curation, not permission to silently omit them. The
+checked-in [`vsco-opcode-coverage.json`](../../supercollider/vsco-opcode-coverage.json)
+accounts for every preprocessed opcode in all 75 mappings and currently has no
+unsupported entry. The audit records exact occurrence counts and a bounded set
+of source locations, so its diagnostic value does not scale into a second copy
+of every region. The
 other selected banks and Iowa inventory remain migration backlog and must not
 be represented as installed or playable until their own generated asset locks,
 normalized manifests and audio acceptance evidence exist.
