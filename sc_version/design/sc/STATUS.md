@@ -51,6 +51,9 @@ Target currently exercised: Linux x86_64
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see
   [`SAMPLE_BANKS.md`](SAMPLE_BANKS.md).
+- The source compiler now safely expands the macro/include structure used by
+  the next banks while preserving region provenance. Their audible opcode
+  normalization and playback semantics remain explicitly incomplete.
 
 ## Not yet complete
 

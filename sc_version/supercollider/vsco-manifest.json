@@ -7,7 +7,7 @@
     "source_pin": "6dd651d55dde97fd4028699be9d4481f26917891",
     "source_verification": "expected-pin; local extracted tree inventoried by hashes"
   },
-  "compiler_version": 2,
+  "compiler_version": 3,
   "coverage": [
     {
       "disposition": "mapped-region",

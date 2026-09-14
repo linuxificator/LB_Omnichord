@@ -35,3 +35,18 @@ is evidence of incomplete curation, not permission to silently omit them. The
 other selected banks and Iowa inventory remain migration backlog and must not
 be represented as installed or playable until their own generated asset locks,
 normalized manifests and audio acceptance evidence exist.
+
+The offline SFZ compiler expands standard `#define` and inline or whole-line
+`#include` directives before parsing, retains the originating file and line for
+every region, and rejects undefined/recursive macros, include cycles and paths
+escaping the bank root. This is required by Salamander and the Karoryfer/drum
+banks; it is preprocessing support, not a claim that their much larger audible
+opcode surfaces have already been normalized.
+
+A source-tree metadata audit at the pinned commits found 183 VCSL mappings, 1
+Salamander mapping, 71 Black and Green, 64 Black and Blue, 39 Meatbass, 6 Emily
+Guitar, 48 Bear Sax, 13 WereSax, 419 Virtuosity Drums and 152 Swirly Drums
+mappings. The guitar, bass, sax and drum mappings use extensive CC modulation,
+release/choke, loop and include semantics beyond the current VSCO runtime.
+Unsupported audible opcodes must remain explicit compiler failures rather than
+being silently discarded to inflate a nominal instrument count.

@@ -15,6 +15,7 @@ from sfz_manifest_compiler import (  # noqa: E402
     _midi_note,
     compile_vsco_manifest,
     parse_sfz,
+    preprocess_sfz,
 )
 
 
@@ -85,6 +86,51 @@ class SfzManifestCompilerTests(unittest.TestCase):
             path.write_text("<region> sample=one.wav mystery=1\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "unsupported opcode mystery"):
                 parse_sfz(path)
+
+    def test_inline_includes_and_macros_expand_with_source_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data = root / "Data"
+            data.mkdir()
+            (data / "velocity.inc").write_text(
+                "#define $VEL 96\n#define $SAMPLE tone.wav\n",
+                encoding="utf-8",
+            )
+            regions = data / "regions.inc"
+            regions.write_text(
+                "<region> sample=$SAMPLE key=60 hivel=$VEL\n",
+                encoding="utf-8",
+            )
+            mapping = root / "program.sfz"
+            mapping.write_text(
+                '<group> #include "Data/velocity.inc" lovel=1 '
+                '#include "Data/regions.inc"\n',
+                encoding="utf-8",
+            )
+
+            parsed = parse_sfz(mapping, root=root)
+
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].source, regions)
+        self.assertEqual(parsed[0].values["sample"], "tone.wav")
+        self.assertEqual(parsed[0].values["lovel"], "1")
+        self.assertEqual(parsed[0].values["hivel"], "96")
+
+    def test_include_cycle_and_undefined_macro_are_explicit_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = root / "first.sfz"
+            second = root / "second.inc"
+            first.write_text('#include "second.inc"\n', encoding="utf-8")
+            second.write_text('#include "first.sfz"\n', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "include cycle"):
+                preprocess_sfz(first, root=root)
+
+            first.write_text(
+                "<region> sample=$MISSING.wav key=60\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "undefined SFZ macro"):
+                preprocess_sfz(first, root=root)
 
     def test_complete_vsco_shape_with_synthetic_bank(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

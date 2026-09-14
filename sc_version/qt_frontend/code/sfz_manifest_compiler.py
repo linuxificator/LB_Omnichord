@@ -10,11 +10,14 @@ import wave
 from typing import Any
 
 
-COMPILER_VERSION = 2
+COMPILER_VERSION = 3
 VSCO_SOURCE_PIN = "6dd651d55dde97fd4028699be9d4481f26917891"
 _HEADER = re.compile(r"<([A-Za-z]+)>")
 _OPCODE = re.compile(r"(?<!\S)([A-Za-z][A-Za-z0-9_]*)=")
 _NOTE = re.compile(r"^([a-gA-G])([#b]?)(-?[0-9]+)$")
+_DEFINE = re.compile(r"^\s*#define\s+(\$[A-Za-z0-9_]+)\s+(.+?)\s*$")
+_INCLUDE = re.compile(r'#include\s+"([^"]+)"')
+_MACRO = re.compile(r"\$[A-Za-z0-9_]+")
 _KNOWN_OPCODES = {
     "ampeg_attack",
     "ampeg_dynamic",
@@ -24,6 +27,7 @@ _KNOWN_OPCODES = {
     "hikey",
     "hirand",
     "hivel",
+    "key",
     "lokey",
     "lorand",
     "lovel",
@@ -46,6 +50,13 @@ class _SourceRegion:
     source: Path
     line: int
     values: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class _ExpandedLine:
+    source: Path
+    line: int
+    text: str
 
 
 def _slug(value: str) -> str:
@@ -94,7 +105,120 @@ def _opcodes(line: str) -> tuple[tuple[str, str], ...]:
     )
 
 
-def parse_sfz(path: Path) -> tuple[_SourceRegion, ...]:
+def _replace_macros(
+    text: str,
+    macros: dict[str, str],
+    *,
+    source: Path,
+    line: int,
+) -> str:
+    result = text
+    for _ in range(32):
+        names = set(_MACRO.findall(result))
+        if not names:
+            return result
+        missing = sorted(name for name in names if name not in macros)
+        if missing:
+            raise ValueError(
+                f"{source}:{line}: undefined SFZ macro {missing[0]}"
+            )
+        replaced = _MACRO.sub(lambda match: macros[match.group(0)], result)
+        if replaced == result:
+            break
+        result = replaced
+    raise ValueError(f"{source}:{line}: recursive SFZ macro expansion")
+
+
+def preprocess_sfz(path: Path, *, root: Path | None = None) -> tuple[_ExpandedLine, ...]:
+    """Expand standard SFZ defines/includes while retaining source locations."""
+
+    source_root = (root or path.parent).resolve()
+    macros: dict[str, str] = {}
+    active: list[Path] = []
+
+    def resolve_include(current: Path, value: str, line: int) -> Path:
+        portable = PurePosixPath(value.replace("\\", "/"))
+        candidates = (
+            current.parent.joinpath(*portable.parts).resolve(),
+            source_root.joinpath(*portable.parts).resolve(),
+        )
+        for candidate in candidates:
+            try:
+                candidate.relative_to(source_root)
+            except ValueError:
+                continue
+            if candidate.is_file():
+                return candidate
+        raise ValueError(f"{current}:{line}: missing or unsafe include {value!r}")
+
+    def expand_file(current: Path) -> list[_ExpandedLine]:
+        resolved = current.resolve()
+        try:
+            resolved.relative_to(source_root)
+        except ValueError:
+            raise ValueError(f"SFZ source escapes bank root: {resolved}") from None
+        if resolved in active:
+            cycle = " -> ".join(str(item) for item in (*active, resolved))
+            raise ValueError(f"SFZ include cycle: {cycle}")
+        active.append(resolved)
+        output: list[_ExpandedLine] = []
+        try:
+            lines = resolved.read_text(encoding="utf-8-sig").splitlines()
+            for line_number, raw_line in enumerate(lines, start=1):
+                line = raw_line.split("//", 1)[0]
+                definition = _DEFINE.fullmatch(line)
+                if definition is not None:
+                    macros[definition.group(1)] = _replace_macros(
+                        definition.group(2),
+                        macros,
+                        source=resolved,
+                        line=line_number,
+                    )
+                    continue
+                pending = line
+                while include := _INCLUDE.search(pending):
+                    prefix = pending[: include.start()]
+                    include_name = _replace_macros(
+                        include.group(1),
+                        macros,
+                        source=resolved,
+                        line=line_number,
+                    )
+                    included = expand_file(
+                        resolve_include(resolved, include_name, line_number)
+                    )
+                    if included:
+                        expanded_prefix = _replace_macros(
+                            prefix,
+                            macros,
+                            source=resolved,
+                            line=line_number,
+                        )
+                        if expanded_prefix.strip():
+                            output.append(
+                                _ExpandedLine(resolved, line_number, expanded_prefix)
+                            )
+                        output.extend(included)
+                    else:
+                        pending = prefix + pending[include.end() :]
+                        continue
+                    pending = pending[include.end() :]
+                expanded = _replace_macros(
+                    pending,
+                    macros,
+                    source=resolved,
+                    line=line_number,
+                )
+                if expanded.strip():
+                    output.append(_ExpandedLine(resolved, line_number, expanded))
+        finally:
+            active.pop()
+        return output
+
+    return tuple(expand_file(path))
+
+
+def parse_sfz(path: Path, *, root: Path | None = None) -> tuple[_SourceRegion, ...]:
     """Resolve control/global/master/group inheritance into complete regions."""
 
     scopes: dict[str, dict[str, str]] = {
@@ -107,17 +231,18 @@ def parse_sfz(path: Path) -> tuple[_SourceRegion, ...]:
     regions: list[_SourceRegion] = []
     region_values: dict[str, str] | None = None
     region_line = 0
+    region_source = path
 
     def finish_region() -> None:
         nonlocal region_values
         if region_values is not None:
-            regions.append(_SourceRegion(path, region_line, region_values))
+            regions.append(_SourceRegion(region_source, region_line, region_values))
             region_values = None
 
-    for line_number, raw_line in enumerate(
-        path.read_text(encoding="utf-8-sig").splitlines(), start=1
-    ):
-        line = raw_line.split("//", 1)[0].strip()
+    for expanded in preprocess_sfz(path, root=root):
+        line_number = expanded.line
+        source_path = expanded.source
+        line = expanded.text.strip()
         if not line:
             continue
         header = _HEADER.search(line)
@@ -125,11 +250,12 @@ def parse_sfz(path: Path) -> tuple[_SourceRegion, ...]:
             finish_region()
             current = header.group(1).casefold()
             if current not in (*scopes, "region"):
-                raise ValueError(f"{path}:{line_number}: unsupported <{current}>")
+                raise ValueError(f"{source_path}:{line_number}: unsupported <{current}>")
             if current in ("master", "group"):
                 scopes[current] = {}
             if current == "region":
                 region_line = line_number
+                region_source = source_path
                 region_values = {
                     **scopes["control"],
                     **scopes["global"],
@@ -139,9 +265,9 @@ def parse_sfz(path: Path) -> tuple[_SourceRegion, ...]:
             line = line[header.end() :].strip()
         for key, value in _opcodes(line):
             if key not in _KNOWN_OPCODES:
-                raise ValueError(f"{path}:{line_number}: unsupported opcode {key}")
+                raise ValueError(f"{source_path}:{line_number}: unsupported opcode {key}")
             if not value:
-                raise ValueError(f"{path}:{line_number}: empty opcode {key}")
+                raise ValueError(f"{source_path}:{line_number}: empty opcode {key}")
             if current == "region":
                 if region_values is None:
                     raise AssertionError("region scope is not initialized")
@@ -275,15 +401,19 @@ def _region_record(
     file_id: str,
 ) -> dict[str, Any]:
     values = source.values
-    key_center = _midi_note(values.get("pitch_keycenter"), 60)
+    key_center = _midi_note(
+        values.get("pitch_keycenter", values.get("key")), 60
+    )
+    key_lo = _midi_note(values.get("lokey", values.get("key")), key_center)
+    key_hi = _midi_note(values.get("hikey", values.get("key")), key_center)
     articulation = values.get("sw_label", "default")
     return {
         "id": f"{program_id}.region-{ordinal}",
         "program_id": program_id,
         "articulation_id": _slug(articulation) or "default",
         "sample_id": file_id,
-        "key_lo": _midi_note(values.get("lokey"), key_center),
-        "key_hi": _midi_note(values.get("hikey"), key_center),
+        "key_lo": key_lo,
+        "key_hi": key_hi,
         "key_center": key_center,
         "tune_cents": _number(values.get("tune"), 0.0),
         "pitch_keytrack": 100,
