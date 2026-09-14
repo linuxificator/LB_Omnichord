@@ -55,7 +55,7 @@ def stop_process(process: subprocess.Popen[str]) -> tuple[str, str]:
         if hasattr(os, "killpg"):
             os.killpg(process.pid, signal.SIGTERM)
         else:
-            process.terminate()
+            process.send_signal(signal.CTRL_BREAK_EVENT)
     try:
         return process.communicate(timeout=4)
     except subprocess.TimeoutExpired:
@@ -97,7 +97,10 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                start_new_session=True,
+                start_new_session=os.name != "nt",
+                creationflags=(
+                    subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+                ),
             )
             engine_deadline = time.monotonic() + 3
             while not engine_ready.exists() and time.monotonic() < engine_deadline:
@@ -129,7 +132,10 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                start_new_session=True,
+                start_new_session=os.name != "nt",
+                creationflags=(
+                    subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+                ),
             )
             try:
                 healthy = False

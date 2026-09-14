@@ -112,6 +112,8 @@ def main() -> int:
     app.setApplicationName("LB Omnichord headless integration test")
     signal.signal(signal.SIGINT, lambda _signum, _frame: app.quit())
     signal.signal(signal.SIGTERM, lambda _signum, _frame: app.quit())
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, lambda _signum, _frame: app.quit())
     graph = compose_application_graph(
         args,
         dependencies,

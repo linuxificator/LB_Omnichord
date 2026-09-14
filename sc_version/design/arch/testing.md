@@ -70,10 +70,14 @@ remain explicit in `../sc/STATUS.md` and the procedure is recorded in
 
 ## GitHub workflow
 
-`.github/workflows/supercollider-release.yml` tests the same frontend, protocol
-and engine contracts on Linux x86_64, Raspberry Pi aarch64, macOS arm64 and
-Windows x86_64. Release jobs construct two AppImages, a DMG and a ZIP, and
-verify the bundled runtime without opening audio. The VSCO bank is identified
+`.github/workflows/supercollider-release.yml` tests the same portable frontend,
+protocol, process-boundary and runtime-layout contracts on Linux x86_64,
+Raspberry Pi aarch64, macOS arm64 and Windows x86_64. The complete SC language,
+sequencer and NRT audio suites run on both Linux architectures; macOS and
+Windows additionally verify the official engine executables without repeatedly
+recompiling the SC class library in each test process. Release jobs construct
+two AppImages, a DMG and a ZIP and verify each bundled runtime without opening
+audio. The VSCO bank is identified
 as an external asset rather than falsely listed as package content. Linux
 runtime caches are keyed by architecture, version and build inputs.
 

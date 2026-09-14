@@ -83,6 +83,8 @@ def main() -> int:
 
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
+    if hasattr(signal, "SIGBREAK"):
+        signal.signal(signal.SIGBREAK, stop)
     if args.ready_file is not None:
         args.ready_file.parent.mkdir(parents=True, exist_ok=True)
         args.ready_file.touch()

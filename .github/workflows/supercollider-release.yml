@@ -111,14 +111,11 @@ jobs:
       - name: Run macOS portable and engine contracts
         working-directory: sc_version/qt_frontend
         run: |
+          sclang -v | grep -F "$SC_VERSION"
+          scsynth -v | grep -F "$SC_VERSION"
           python tests/run_tests.py --suite portable-input-processes
           python tests/run_tests.py --suite desktop-network-discovery
-          python tests/run_tests.py --suite sc-frontend
-          python tests/run_tests.py --suite sc-compiler
-          python tests/run_tests.py --suite sc-sequencer
-          python tests/run_tests.py --suite sc-audio
-          python tests/run_tests.py --suite sc-banks
-          python tests/run_tests.py --suite sc-packaged
+          python tests/run_tests.py --suite sc-desktop-portable
 
   test-windows:
     runs-on: windows-2025
@@ -147,14 +144,11 @@ jobs:
       - name: Run Windows portable and engine contracts
         working-directory: sc_version/qt_frontend
         run: |
+          sclang -v | Select-String -SimpleMatch $env:SC_VERSION
+          scsynth -v | Select-String -SimpleMatch $env:SC_VERSION
           python tests/run_tests.py --suite portable-input-processes
           python tests/run_tests.py --suite desktop-network-discovery
-          python tests/run_tests.py --suite sc-frontend
-          python tests/run_tests.py --suite sc-compiler
-          python tests/run_tests.py --suite sc-sequencer
-          python tests/run_tests.py --suite sc-audio
-          python tests/run_tests.py --suite sc-banks
-          python tests/run_tests.py --suite sc-packaged
+          python tests/run_tests.py --suite sc-desktop-portable
 
   release-metadata:
     if: github.event_name == 'workflow_dispatch' && inputs.release

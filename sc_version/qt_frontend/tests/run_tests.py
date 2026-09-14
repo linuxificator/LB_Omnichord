@@ -66,6 +66,17 @@ SUITES: dict[str, tuple[Path, ...]] = {
     "desktop-network-discovery": (
         TESTS / "contracts" / "test_osc_discovery_processes.py",
     ),
+    "sc-desktop-portable": (
+        TESTS / "test_engine_protocol.py",
+        TESTS / "test_musical_sequence_plan.py",
+        TESTS / "test_sample_repository.py",
+        TESTS / "test_supercollider_client.py",
+        TESTS / "test_supercollider_config.py",
+        TESTS / "test_supercollider_frontend_process.py",
+        TESTS / "test_supercollider_package_contract.py",
+        TESTS / "test_supercollider_process.py",
+        TESTS / "test_supercollider_programs.py",
+    ),
     "platform-input-linux": (
         TESTS / "platform" / "linux" / "test_midi_input.py",
     ),
@@ -125,6 +136,7 @@ ALL_ORDER = (
     "unit",
     "portable-input-processes",
     "desktop-network-discovery",
+    "sc-desktop-portable",
     "platform-input-linux",
     "frontend",
     "serial",
