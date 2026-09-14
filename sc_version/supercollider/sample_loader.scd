@@ -269,7 +269,7 @@ regions.do { |record|
     state.notNil and: { state[\status] == \ready }
 };
 
-~omniSelectSampleRegions = { |program, logicalKey, velocity|
+~omniSelectSampleRegions = { |program, logicalKey, velocity, owner="default"|
     var alias = ~omniSampleAliases[program.asString];
     var sourceProgramId = alias[\sourceProgramId];
     var articulation = alias[\articulation];
@@ -282,13 +282,19 @@ regions.do { |record|
         and: { midiVelocity <= jsonAt.value(region, "velocity_hi").asInteger }
         and: { jsonAt.value(region, "articulation_id").asString == articulation }
         and: { random >= jsonAt.value(region, "random_lo").asFloat }
-        and: { random <= jsonAt.value(region, "random_hi").asFloat }
+        and: { random < jsonAt.value(region, "random_hi").asFloat }
     };
     var rrLength = selected.collect { |region|
-        jsonAt.value(region, "rr_length") ? 0
+        var value = jsonAt.value(region, "rr_length");
+        if(value.isNil) { 0 } { value.asInteger }
     }.maxItem ? 0;
     if(rrLength > 0) {
-        var counterKey = program.asString ++ "/" ++ logicalKey.asString;
+        var first = selected[0];
+        var counterKey = owner.asString ++ "/" ++ program.asString
+            ++ "/" ++ logicalKey.asString ++ "/" ++ articulation
+            ++ "/" ++ jsonAt.value(first, "velocity_lo").asString
+            ++ "-" ++ jsonAt.value(first, "velocity_hi").asString
+            ++ "/" ++ rrLength.asString;
         var position = ((~omniSampleRoundRobin[counterKey] ? 0) % rrLength) + 1;
         ~omniSampleRoundRobin[counterKey] = position;
         selected = selected.select { |region|
@@ -347,7 +353,9 @@ SynthDef(\omniSampleStereo, {
 ~omniSpawnSampleVoice = {
     |owner, handle, program, revision, logicalKey, frequencyHz,
         velocity, logicalBus|
-    var selected = ~omniSelectSampleRegions.value(program, logicalKey, velocity);
+    var selected = ~omniSelectSampleRegions.value(
+        program, logicalKey, velocity, owner
+    );
     if(selected.notEmpty) {
         var group = Group.tail(~omniSourceGroup);
         var remaining = selected.size;

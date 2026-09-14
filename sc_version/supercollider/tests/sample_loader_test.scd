@@ -3,6 +3,9 @@
 var directory = thisProcess.nowExecutingPath.dirname.dirname;
 var failed = false;
 var selection;
+var rrA1;
+var rrA2;
+var rrB1;
 
 (directory +/+ "sample_loader.scd").load;
 if(~omniSampleBudgetBytes < 4294967296) {
@@ -51,6 +54,30 @@ if(selection.isEmpty or: {
 }) {
     failed = true;
     "VSCO_EXPLICIT_ARTICULATION_SELECTION_FAILED".postln;
+};
+rrA1 = ~omniSelectSampleRegions.value(
+    "sample.vsco.gm-styleperc", 36, 0.5, "part-a"
+);
+rrA2 = ~omniSelectSampleRegions.value(
+    "sample.vsco.gm-styleperc", 36, 0.5, "part-a"
+);
+rrB1 = ~omniSelectSampleRegions.value(
+    "sample.vsco.gm-styleperc", 36, 0.5, "part-b"
+);
+if(
+    rrA1.size != 1 or: { rrA2.size != 1 } or: { rrB1.size != 1 }
+    or: {
+        (rrA1[0]["rr_position"] ? rrA1[0][\rr_position]).asInteger != 1
+    }
+    or: {
+        (rrA2[0]["rr_position"] ? rrA2[0][\rr_position]).asInteger != 2
+    }
+    or: {
+        (rrB1[0]["rr_position"] ? rrB1[0][\rr_position]).asInteger != 1
+    }
+) {
+    failed = true;
+    "VSCO_OWNER_SCOPED_ROUND_ROBIN_FAILED".postln;
 };
 if((~omniSamplePlaybackRate.value(440, 69, 0) - 1).abs > 0.000001) {
     failed = true;
