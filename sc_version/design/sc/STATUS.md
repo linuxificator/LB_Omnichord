@@ -23,7 +23,9 @@ Target currently exercised: Linux x86_64
 - Prepared program parameters are keyed by musical owner as well as stable
   program identity and session-wide revision. Selecting the same instrument
   on independent MIDI, manual, bass or automatic-chord parts therefore cannot
-  leak one part's controls into another.
+  leak one part's controls into another. Manual strum and MIDI preview gesture
+  messages carry that exact revision too; they no longer fall back to revision
+  1 and lose the selected program's prepared controls.
 - The four native acid voices support the current conservative TB-303
   articulation contract.
 - All 109 pinned SCLOrkSynths definitions compile and participate in the

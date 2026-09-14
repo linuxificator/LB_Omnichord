@@ -523,6 +523,7 @@ class SuperColliderClient:
         owner: str,
         handle: str,
         program_id: str,
+        program_revision: int,
         logical_key: int,
         note: float,
         velocity: float,
@@ -544,6 +545,7 @@ class SuperColliderClient:
                 int(logical_bus),
                 max(0.01, float(tail_seconds)),
                 max(1, int(voice_limit)),
+                max(1, int(program_revision)),
             ],
         )
 
@@ -769,6 +771,7 @@ class SuperColliderClient:
             owner="omni/strum",
             handle=f"strum/{self._strum_ordinal}",
             program_id=self._selected_program["strum"],
+            program_revision=self._program_revision["strum"],
             logical_key=max(0, min(127, int(round(note)))),
             note=note,
             velocity=0.9,

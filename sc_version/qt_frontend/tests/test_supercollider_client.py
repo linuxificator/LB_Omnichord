@@ -230,6 +230,31 @@ class SuperColliderClientTests(unittest.TestCase):
             ],
         )
 
+    def test_strum_gesture_carries_the_selected_program_revision(self) -> None:
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+        client._set_program(
+            "strum", {"name": "sc.omni.acid303", "params": ["gain", 0.4]}
+        )
+        revision = client._program_revision["strum"]
+
+        client._strum_note(64.25)
+        client.close()
+
+        gestures = [
+            arguments
+            for address, arguments in self.fake.messages
+            if address == "/omni/v1/gesture/note"
+        ]
+        self.assertEqual(len(gestures), 1)
+        self.assertEqual(gestures[0][4], "sc.omni.acid303")
+        self.assertEqual(int(gestures[0][11]), revision)
+
     def test_lane_transaction_is_indexed_and_acknowledged(self) -> None:
         from engine_protocol import SequenceDefinition, SequenceEvent
         from musical_sequence_plan import LanePlan

@@ -998,6 +998,7 @@ class MidiEngineTests(unittest.TestCase):
         self.assertEqual(len(gestures), 5)
         self.assertTrue(all(item["owner"] == "midi/preview/0" for item in gestures))
         self.assertTrue(all(item["voice_limit"] == engine.voices for item in gestures))
+        self.assertTrue(all(item["program_revision"] == 1 for item in gestures))
         self.assertEqual([item["note"] for item in gestures], [60, 64, 67, 71, 72])
 
     def test_every_midi_instrument_has_an_isolated_effect_bus(self) -> None:

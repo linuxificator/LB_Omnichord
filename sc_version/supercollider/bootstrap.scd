@@ -534,6 +534,7 @@ OSCdef(\omniGestureNote, { |message|
         var logicalBus = message[9].asInteger.clip(0, 10);
         var tailSeconds = message[10].asFloat.max(0.01);
         var voiceLimit = message[11].asInteger.max(1);
+        var programRevision = message[12].asInteger.max(1);
         var state = ~omniGestures[owner] ? (handles: List.new, token: 0);
         var duplicate = state[\handles].detect { |oldHandle|
             var old = ~omniVoices[oldHandle];
@@ -547,7 +548,7 @@ OSCdef(\omniGestureNote, { |message|
             ~omniReleaseHandle.value(state[\handles].removeAt(0));
         };
         ~omniSpawnVoice.value(
-            owner, handle, program, 1, logicalKey, frequency,
+            owner, handle, program, programRevision, logicalKey, frequency,
             velocity, logicalBus, []
         );
         state[\handles].add(handle);

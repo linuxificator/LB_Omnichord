@@ -303,6 +303,7 @@ class MidiEngine:
             owner=self._preview_owner(row),
             handle=f"{self._preview_owner(row)}/{self._preview_ordinals[row]}",
             program_id=self._programs[row],
+            program_revision=max(1, self._program_revisions[row]),
             logical_key=max(0, min(127, int(round(note)))),
             note=note,
             velocity=level,
