@@ -29,6 +29,11 @@ Target currently exercised: Linux x86_64
   program to load before the engine announces readiness.
 - MIDI and OSC integration tests keep the sender, frontend and engine receiver
   in separate processes.
+- The independent SC workflow runs the complete dependency-free frontend unit
+  suite and portable MIDI/OSC process contracts in addition to the SC compiler,
+  coordinator, NRT audio, bank and package suites. This keeps inherited UI and
+  control behavior in the same regression gate without invoking AMY-native
+  audio suites as if they exercised the SC engine.
 - Sequencer tests cover immutable running snapshots, overlapping finite
   executions, root/child lifetime separation, exact release ownership,
   overlapping half-open gates, same-boundary replacement coalescing,

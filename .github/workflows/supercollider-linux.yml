@@ -88,6 +88,9 @@ jobs:
       - name: Test frontend and engine with the pinned runtime
         run: |
           python sc_version/qt_frontend/tests/run_tests.py --suite quality
+          python sc_version/qt_frontend/tests/run_tests.py --suite unit
+          python sc_version/qt_frontend/tests/run_tests.py --suite portable-input-processes
+          python sc_version/qt_frontend/tests/run_tests.py --suite desktop-network-discovery
           python sc_version/qt_frontend/tests/run_tests.py --suite sc-frontend
           python sc_version/qt_frontend/tests/run_tests.py --suite sc-compiler
           python sc_version/qt_frontend/tests/run_tests.py --suite sc-sequencer
