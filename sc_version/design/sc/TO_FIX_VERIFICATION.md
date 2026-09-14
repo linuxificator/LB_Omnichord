@@ -103,6 +103,12 @@ processes, drives only public controller actions, records action/progress logs,
 and rejects server errors, prolonged silence, dropouts and hard clipping. Four
 cycles rotate through the complete synth and PCM catalogues for every OMNI role
 and every pitched MIDI row; zero cycles means it continues until interrupted.
+Its `--gui` mode additionally loads the production `Main.qml` scene through
+Qt's offscreen platform and captures both screens after every cycle. Captures
+must have the expected dimensions and non-degenerate colour content. The
+ordinary SC frontend process regression also loads this same production QML
+scene and validates an actual PNG, so a controller-only graph cannot
+accidentally be mistaken for GUI coverage.
 
 The 2026-09-14 finite release qualification completed all four catalogue
 cycles: 3,254 public actions in 351.294 seconds and twelve independently

@@ -108,6 +108,10 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
                 HOME=str(temp),
                 OMNICHORD_SC_CONFIG=str(runtime_path),
                 OMNICHORD_TEST_API_PORT=str(api_port),
+                OMNICHORD_TEST_LOAD_QML="1",
+                QT_QPA_PLATFORM="offscreen",
+                QT_QUICK_BACKEND="software",
+                QSG_INFO="0",
                 PYTHONUNBUFFERED="1",
             )
             application = subprocess.Popen(
@@ -142,6 +146,22 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
                         + engine_stdout
                         + engine_stderr
                     )
+
+                frame = temp / "frontend.png"
+                captured = request_json(
+                    api_port,
+                    "POST",
+                    "/action",
+                    {"action": "captureGui", "args": [str(frame)]},
+                )
+                self.assertTrue(captured.get("ok"), captured)
+                result = captured.get("result")
+                self.assertIsInstance(result, dict)
+                assert isinstance(result, dict)
+                self.assertGreaterEqual(int(result["width"]), 640)
+                self.assertGreaterEqual(int(result["height"]), 360)
+                self.assertGreaterEqual(int(result["sampled_colours"]), 8)
+                self.assertTrue(frame.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
 
                 checkpoint = len(messages(engine_log))
                 pressed = request_json(
@@ -185,6 +205,7 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
 
             self.assertEqual(application.returncode, 0, app_stdout + app_stderr)
             self.assertEqual(engine.returncode, 0, engine_stdout + engine_stderr)
+            self.assertIn("TEST_QML_READY=1", app_stdout + app_stderr)
 
 
 if __name__ == "__main__":

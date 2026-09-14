@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Drive the real SC edition indefinitely through its public Qt surface.
 
-The driver, headless frontend, sclang/scsynth and PipeWire recorder are
-separate processes.  No synthetic-input endpoint is added to production code.
-Use Ctrl-C for a clean stop; a zero ``--cycles`` value means run forever.
+The driver, frontend, sclang/scsynth and PipeWire recorder are separate
+processes. No synthetic-input endpoint is added to production code. With
+``--gui`` the frontend also loads and continuously captures the production QML
+scene through Qt's offscreen platform. Use Ctrl-C for a clean stop; a zero
+``--cycles`` value means run forever.
 """
 
 from __future__ import annotations
@@ -117,7 +119,11 @@ def analyze_wave(path: Path, *, silence_threshold: int = 2) -> AudioWindow:
     )
 
 
-def action_cycle(cycle: int, synths: list[Any]) -> Iterator[Action]:
+def action_cycle(
+    cycle: int,
+    synths: list[Any],
+    gui_artifact_dir: Path | None = None,
+) -> Iterator[Action]:
     """Yield broad deterministic interaction coverage without musical timing."""
 
     synth_indexes = [index for index, synth in enumerate(synths) if synth.kind == "synth"]
@@ -132,6 +138,14 @@ def action_cycle(cycle: int, synths: list[Any]) -> Iterator[Action]:
     yield Action("ensureRhythmRunning", (True,), 0.2)
     yield Action("ensureBassRunning", (True,), 0.2)
     yield Action("ensureChordArpeggioRunning", (True,), 0.2)
+    if gui_artifact_dir is not None:
+        for midi_screen, name in ((False, "omni"), (True, "midi")):
+            yield Action("setGuiScreen", (midi_screen,), 0.25)
+            yield Action(
+                "captureGui",
+                (str(gui_artifact_dir / f"gui-{name}-cycle-{cycle:05d}.png"),),
+                0.1,
+            )
 
     for rhythm in range(18):
         yield Action("setRhythmIndex", (rhythm,), 0.16)
@@ -354,6 +368,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cycles", type=int, default=0, help="0 runs indefinitely")
     parser.add_argument("--chunk-seconds", type=float, default=60.0)
     parser.add_argument("--artifact-dir", type=Path)
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="load and capture the real production QML scene offscreen",
+    )
     return parser.parse_args()
 
 
@@ -412,6 +431,15 @@ def main() -> int:
                 "PYTHONUNBUFFERED": "1",
             }
         )
+        if args.gui:
+            frontend_environment.update(
+                {
+                    "OMNICHORD_TEST_LOAD_QML": "1",
+                    "QT_QPA_PLATFORM": "offscreen",
+                    "QT_QUICK_BACKEND": "software",
+                    "QSG_INFO": "0",
+                }
+            )
         frontend_process = subprocess.Popen(
             [sys.executable, str(HEADLESS_APP), "--debug-file", str(debug_log)],
             cwd=ROOT, env=frontend_environment, stdout=frontend_stream,
@@ -425,7 +453,11 @@ def main() -> int:
         cycle = 0
         action_count = 0
         while args.cycles == 0 or cycle < args.cycles:
-            for action in action_cycle(cycle, synths):
+            for action in action_cycle(
+                cycle,
+                synths,
+                artifact_dir if args.gui else None,
+            ):
                 for process, label in ((sc_process, "SuperCollider"), (frontend_process, "frontend")):
                     if process.poll() is not None:
                         raise RuntimeError(f"{label} exited with {process.returncode}")

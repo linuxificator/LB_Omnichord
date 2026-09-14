@@ -956,6 +956,11 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 - `capture_screenshots.py` runs the production QML scene offscreen with an
   isolated temporary home and writes `screenshots/omni.png` and
   `screenshots/midi.png`.
+- The SC frontend process regression loads that production QML scene in its
+  separately launched frontend process and rejects a blank or undersized
+  frame. `tests/endurance/sc_endurance.py --gui` repeats OMNI and MIDI captures
+  while the real engine, interaction driver and PipeWire recorder remain
+  separate processes.
 - The OMNI frame shows an active C-minor strum-note guide. The MIDI frame is
   staged through the public simulation inputs and shows MIDI and OSC rotaries
   plus a released pushbutton for each protocol in the grey lower bar.

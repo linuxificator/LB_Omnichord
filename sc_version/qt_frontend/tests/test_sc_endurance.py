@@ -66,6 +66,19 @@ class SuperColliderEnduranceTests(unittest.TestCase):
         self.assertEqual(metrics.clipped_fraction, 0)
         self.assertLess(metrics.longest_silent_seconds, 0.01)
 
+    def test_gui_cycle_captures_both_production_screens(self) -> None:
+        actions = list(
+            action_cycle(
+                0,
+                [_Synth("synth"), _Synth("sample")],
+                Path("/tmp/gui-endurance-contract"),
+            )
+        )
+        captures = [item for item in actions if item.name == "captureGui"]
+        self.assertEqual(len(captures), 2)
+        self.assertTrue(any("gui-omni" in str(item.args[0]) for item in captures))
+        self.assertTrue(any("gui-midi" in str(item.args[0]) for item in captures))
+
 
 if __name__ == "__main__":
     unittest.main()
