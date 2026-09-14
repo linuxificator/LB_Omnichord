@@ -93,6 +93,19 @@ def verify_config_migrations(root: Path) -> None:
                 )
 
 
+def verify_application_assets(root: Path) -> None:
+    """Load the frozen production catalogue without starting Qt or audio."""
+
+    import main
+
+    dependencies = main.production_dependencies(asset_root=root)
+    synths, chord, strum, bass = dependencies.load_synth_catalog(
+        dependencies.paths.instruments / "synths.json"
+    )
+    if not synths or min(chord, strum, bass) < 0:
+        raise RuntimeError("packaged SuperCollider instrument catalogue is invalid")
+
+
 def verify_package(root: Path, runtime: Path) -> int:
     """Validate frozen assets and executables without opening an audio device."""
 
@@ -123,9 +136,10 @@ def verify_package(root: Path, runtime: Path) -> int:
                 f"{result.stdout}{result.stderr}"
             )
     verify_config_migrations(root)
+    verify_application_assets(root)
     print(
         "LB_OMNICHORD_SC_PACKAGE_OK "
-        f"root={root} runtime={runtime} config_migrations=1,2"
+        f"root={root} runtime={runtime} config_migrations=1,2 catalogue=loaded"
     )
     return 0
 

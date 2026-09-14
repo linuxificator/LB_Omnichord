@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT / "packaging"))
 
 from sc_appimage_entry import (  # noqa: E402
     packaged_runtime_root,
+    verify_application_assets,
     verify_config_migrations,
 )
 
@@ -96,6 +97,9 @@ class SuperColliderPackageContractTests(unittest.TestCase):
 
     def test_frozen_package_verifies_all_supported_config_migrations(self) -> None:
         verify_config_migrations(ROOT)
+
+    def test_frozen_package_loads_its_production_instrument_catalogue(self) -> None:
+        verify_application_assets(ROOT)
 
     def test_sc_build_is_independent_and_release_is_explicit(self) -> None:
         workflow = (

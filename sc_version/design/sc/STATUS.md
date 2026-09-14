@@ -100,6 +100,9 @@ x86_64
   `server.max_buffers` field from the shipped profile. Every frozen package
   self-check exercises both a revision-1 upgrade and an already migrated
   revision-2 document missing that field before an audio process is opened.
+- Frozen package verification resolves both source and PyInstaller asset
+  layouts through the production catalogue loader; a package cannot pass by
+  checking directory names while its instrument metadata is unreachable.
 - The bounded sample-source catalogue records all eleven pinned Git banks and
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see
