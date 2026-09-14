@@ -20,7 +20,7 @@ explicit without branching musical policy.
 group. Source startup is performed by `run_local.sh`; the frozen entry owns the
 same lifecycle for its bundled runtime. Both launch `sclang -D bootstrap.scd`.
 The bootstrap selects the exact packaged `scsynth` and plugin directory, boots
-the server, creates the audio graph, loads the initial GM percussion sample
+the server, creates the audio graph, loads the dedicated VSCO percussion sample
 program and only then announces readiness.
 
 The current process graph is:
@@ -75,9 +75,12 @@ off the audio path, becomes selectable only after a ready status, and stays
 alive while program or voice references exist. Admission uses an explicit RAM
 budget and reports failure without partially replacing the old program.
 
-The SC tree contains three native acid voices, adapters for the pinned 109
-SCLOrk definitions and a manifest-driven VSCO sampler. The implementation
-status document lists sound-bank semantics that are not yet complete.
+The SC tree contains four native acid voices, adapters for the pinned 109
+SCLOrk definitions and a manifest-driven VSCO sampler. Compilable source
+inventory and user-selectable pitched instruments are deliberately separate:
+raw drum definitions and numerically unsafe definitions stay auditable without
+appearing in the pitched browser. The implementation status document lists
+sound-bank semantics that are not yet complete.
 
 ## Configuration and packaging
 

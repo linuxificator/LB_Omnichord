@@ -44,7 +44,7 @@ JACK system.
 
 Configuration is read from `qt_frontend/config/supercollider.json`. The VSCO
 root may use `~`; the application validates the configuration and waits for
-the initial GM percussion sample program before reporting the engine ready.
+the dedicated VSCO percussion sample program before reporting the engine ready.
 
 ## Tests and packages
 

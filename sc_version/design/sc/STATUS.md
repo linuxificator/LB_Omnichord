@@ -28,14 +28,30 @@ Target currently exercised: Linux x86_64
   1 and lose the selected program's prepared controls.
 - The four native acid voices support the current conservative TB-303
   articulation contract.
-- All 109 pinned SCLOrkSynths definitions compile and participate in the
-  program catalogue; the automated NRT audit renders one representative note
-  from each definition.
+- All 109 pinned SCLOrkSynths definitions compile and remain in the auditable
+  source inventory. The pitched browser admits 76 measured definitions; 31
+  raw drum definitions remain available to the dedicated drum path and two
+  numerically unstable definitions are explicitly excluded from playback.
+  The automated float NRT audit exercises the browser voices at MIDI A2, A4
+  and A5 with bounded per-program output calibration.
 - The generated VSCO manifest contains all 75 source mappings and 3,163 sample
   regions. Their complete keyswitch articulation set is exposed as 96 stable,
-  directly selectable program identities, so playable notes are never stolen
-  for frontend keyswitches. Startup requires the initial GM percussion sample
-  program to load before the engine announces readiness.
+  directly selectable program identities. The dedicated percussion identity
+  is kept out of the pitched browser, leaving 95 visible VSCO articulations, so
+  playable notes are never stolen for frontend keyswitches. Startup requires
+  that percussion program to load before the engine announces readiness.
+- Legacy AMY patch keys are accepted only as preset-migration aliases. They do
+  not appear in the SC instrument browser and all outgoing program selections
+  use canonical `sc.*` or `sample.*` identities.
+- `scsynth` starts with 8,192 buffer identifiers. This is intentionally above
+  the 3,163-region VSCO inventory, while decoded sample RAM remains governed by
+  the separate bounded cache.
+- A sample request outside an articulation's recorded key range selects the
+  nearest valid source region and then tunes it to the requested note. Strum
+  therefore remains complete without inventing missing recordings.
+- Live startup plus attacks/releases across all 76 admitted SCLOrk voices,
+  percussion roles and out-of-range VSCO notes completed without server
+  failures, duplicate `/n_free` requests or buffer-number exhaustion.
 - MIDI and OSC integration tests keep the sender, frontend and engine receiver
   in separate processes.
 - The independent SC workflow runs the complete dependency-free frontend unit
@@ -99,10 +115,11 @@ Target currently exercised: Linux x86_64
 - Deterministic non-realtime tests render the production mono and stereo
   sample SynthDefs from synthetic fixtures, including gated release, without
   taking over the workstation's live audio session.
-- Compiling and rendering every SCLOrk definition proves loadability and basic
-  signal production, not musical calibration across registers, dynamics and
-  long performances. Some definitions clip under the generic audit stimulus
-  and need program-specific review.
+- Fixed-register qualification proves bounded signal production, browser
+  admission and technical gain staging. It does not prove subjective musical
+  usefulness across every dynamic, polyphonic texture and long performance.
+  The exact method and remaining listening work are in
+  [`PLAYBACK_QUALIFICATION.md`](PLAYBACK_QUALIFICATION.md).
 - Full soft/mid/hard and low/mid/high sample audits, measured resident-set
   admission, latency/load tests and long live performance tests remain open.
 - Linux source behavior was exercised locally with SuperCollider 3.13.0. The

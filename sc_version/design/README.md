@@ -42,6 +42,8 @@ For every SuperCollider edition task, first read:
 5. [`arch/testing.md`](arch/testing.md)
 6. [`sc/CODEX_HANDOVER_SUPERCOLLIDER_MIGRATION.md`](sc/CODEX_HANDOVER_SUPERCOLLIDER_MIGRATION.md)
 7. [`sc/STATUS.md`](sc/STATUS.md)
+8. [`sc/PLAYBACK_QUALIFICATION.md`](sc/PLAYBACK_QUALIFICATION.md) when changing
+   instruments, samples, drums, gain staging or voice lifetimes
 
 Then read the category README and owning contracts for every subsystem being
 changed. If `../../CODEX_HANDOFF.md` exists, read it for operational state; it

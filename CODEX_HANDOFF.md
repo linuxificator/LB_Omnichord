@@ -11,7 +11,14 @@ Updated: 2026-09-14
 - Pinned inputs are SuperCollider 3.14.1 and SCLOrkSynths commit
   `6730c745971aa45c95d9b4cddfb4d5ca342774b3`. VSCO 2 CE is a separate local
   CC0 bank at `~/sample_lib/VSCO-2-CE-1.1.0` by default.
-- The complete local matrix passed at commit `515d8bc`, including all 109
+- The current working tree separates the 109-definition SCLOrk source inventory
+  from its 76 measured pitched-browser voices, removes AMY patch names from the
+  SC catalogue, calibrates three fixed registers with float NRT renders, and
+  keeps raw drums plus two unstable definitions out of that browser. The live
+  engine exercised every admitted SCLOrk voice, VSCO range fallback and all
+  percussion roles without `/n_free` or buffer-allocation failures. See
+  `sc_version/design/sc/PLAYBACK_QUALIFICATION.md`.
+- The prior complete local matrix passed at commit `515d8bc`, including all 109
   SCLOrk non-realtime renders and the native sample-player render. GitHub run
   `34794953001` passed the independent SC test/package workflow with pinned
   SuperCollider 3.14.1 and produced the verified `package-SC-Linux-x86_64`

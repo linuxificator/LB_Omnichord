@@ -22,7 +22,7 @@ percentage as a quality substitute.
 | `sc-compiler` | syntax/core definitions and all pinned SCLOrk source/adapters compile |
 | `sc-sequencer` | receiver validation, immutable snapshots, root/finite lifetime, gate overlap, aligned replacement coalescing, same-beat ordering, external-versus-nested boundary rules, tempo-domain releases, stale-wake rejection and a real separate `sclang` transaction process |
 | `sc-audio` | acid definitions and NRT render audit of every SCLOrk program |
-| `sc-banks` | SFZ compiler, complete VSCO manifest shape, loader, owner-scoped RR, GM percussion mapping and deterministic NRT mono/stereo sample playback |
+| `sc-banks` | SFZ compiler, complete VSCO manifest shape, loader, owner-scoped RR, semantically reviewed VSCO percussion mapping and deterministic NRT mono/stereo sample playback |
 | `sc-packaged` | independent workflow/runtime/package/release contract |
 | `platform-input-linux` | a separate controller process drives the real SC frontend through Linux MIDI input and a separate fake engine |
 
@@ -59,11 +59,14 @@ the package build has no AMY runtime dependency.
 ## Audio evidence
 
 Compiler success is necessary but does not prove a useful instrument. NRT
-tests render without taking a desktop audio device and verify finite,
-non-silent output. They are deterministic smoke evidence, not a substitute for
-program-specific register/dynamic calibration, tail behavior, long live runs
-or physical latency/load acceptance. Those limitations remain explicit in
-`../sc/STATUS.md`.
+tests render without taking a desktop audio device. The SCLOrk audit measures
+three fixed registers with 32-bit float output, regenerates a bounded playback
+profile and verifies that every browser-admitted voice remains finite,
+non-silent and below full scale at each register. This is deterministic
+qualification evidence, not a substitute for subjective timbre review, tail
+behavior, long live runs or physical latency/load acceptance. Those limitations
+remain explicit in `../sc/STATUS.md` and the procedure is recorded in
+`../sc/PLAYBACK_QUALIFICATION.md`.
 
 ## GitHub workflow
 
