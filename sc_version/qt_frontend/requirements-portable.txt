@@ -2,3 +2,5 @@
 pyserial==3.5
 fastjsonschema==2.22.2
 python-osc==1.10.2
+dulwich==1.2.14
+urllib3==2.7.0

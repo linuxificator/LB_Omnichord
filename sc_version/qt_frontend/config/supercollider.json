@@ -1,5 +1,5 @@
 {
-  "config_revision": 1,
+  "config_revision": 2,
   "protocol_version": 1,
   "language": {
     "host": "127.0.0.1",
@@ -16,7 +16,8 @@
     "realtime_memory_kib": 262144
   },
   "samples": {
-    "vsco_root": "~/sample_lib/VSCO-2-CE-1.1.0",
+    "vsco_root": "~/VSCO-2-CE",
+    "repository": "https://github.com/linuxificator/VSCO-2-CE.git",
     "ram_budget_mib": 4096
   }
 }

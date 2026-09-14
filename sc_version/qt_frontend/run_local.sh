@@ -4,7 +4,7 @@ set -euo pipefail
 frontend_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd -- "$frontend_dir/../.." && pwd)"
 sc_dir="$frontend_dir/../supercollider"
-sc_config="$frontend_dir/config/supercollider.json"
+shipped_sc_config="$frontend_dir/config/supercollider.json"
 
 if [[ -n "${OMNICHORD_VENV:-}" ]]; then
     venv_dir="$OMNICHORD_VENV"
@@ -37,6 +37,14 @@ if ! "$venv_python" -m pip install \
 fi
 
 "$venv_python" -m pip check
+
+# Source runs use the same per-user configuration and sample-repository
+# preparation as frozen packages. The Python implementation bundles cleanly
+# and never assumes a system Git executable.
+sc_config="$(
+    "$venv_python" "$frontend_dir/code/sample_repository.py" "$shipped_sc_config"
+)"
+export OMNICHORD_SC_CONFIG="$sc_config"
 
 if ! command -v sclang >/dev/null 2>&1; then
     echo "SuperCollider language runtime (sclang) is not installed." >&2

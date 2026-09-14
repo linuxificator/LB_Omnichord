@@ -74,11 +74,14 @@ class DependencyDeclarationTests(unittest.TestCase):
         }
         self.assertEqual(
             resolved["portable"],
-            {"pyserial", "fastjsonschema", "python-osc"},
+            {"pyserial", "fastjsonschema", "python-osc", "dulwich", "urllib3"},
         )
         self.assertEqual(
             resolved["runtime"],
-            {"pyside6", "pyserial", "fastjsonschema", "python-osc", "zeroconf"},
+            {
+                "pyside6", "pyserial", "fastjsonschema", "python-osc",
+                "zeroconf", "dulwich", "urllib3",
+            },
         )
         self.assertEqual(
             resolved["source_runtime"],
@@ -88,6 +91,8 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "fastjsonschema",
                 "python-osc",
                 "zeroconf",
+                "dulwich",
+                "urllib3",
                 "numpy",
                 "soundfile",
             },
@@ -100,6 +105,8 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "fastjsonschema",
                 "python-osc",
                 "zeroconf",
+                "dulwich",
+                "urllib3",
                 "pyinstaller",
             },
         )
@@ -111,6 +118,8 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "fastjsonschema",
                 "python-osc",
                 "zeroconf",
+                "dulwich",
+                "urllib3",
                 "numpy",
                 "ruff",
                 "mypy",
@@ -120,7 +129,10 @@ class DependencyDeclarationTests(unittest.TestCase):
         )
         self.assertEqual(
             resolved["android_host"],
-            {"pyside6", "pyserial", "fastjsonschema", "python-osc", "cython"},
+            {
+                "pyside6", "pyserial", "fastjsonschema", "python-osc",
+                "dulwich", "urllib3", "cython",
+            },
         )
 
         for import_root, record in self.manifest["direct_imports"].items():

@@ -14,10 +14,16 @@
   },
   "sample_assets": {
     "bundled": false,
+    "repository": "https://github.com/linuxificator/VSCO-2-CE.git",
     "vsco_2_ce_license": "CC0-1.0",
     "manifest": "../../supercollider/vsco-manifest.json",
     "source_catalog": "../../supercollider/sample-bank-sources.json"
   },
-  "supported_packages": ["Linux-x86_64"],
-  "unsupported_engine_targets": ["Android", "ESP32-P4", "macOS", "Windows"]
+  "supported_packages": [
+    "Linux-x86_64",
+    "RaspberryPi-aarch64",
+    "macOS-universal",
+    "Windows-x86_64"
+  ],
+  "unsupported_engine_targets": ["Android", "ESP32-P4"]
 }

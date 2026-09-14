@@ -76,13 +76,14 @@ def main_entry() -> int:
     runtime = packaged_runtime_root()
     if sys.argv[1:] == ["--verify-package"]:
         return verify_package(root, runtime)
-    os.environ["OMNICHORD_SC_CONFIG"] = str(root / "config" / "supercollider.json")
-
     import main
-    from supercollider_config import load_supercollider_config
+    from sample_repository import prepare_user_runtime_config
     from supercollider_platform_adapter import SuperColliderSupervisor
 
-    config = load_supercollider_config(root / "config" / "supercollider.json")
+    config_path, config = prepare_user_runtime_config(
+        root / "config" / "supercollider.json"
+    )
+    os.environ["OMNICHORD_SC_CONFIG"] = str(config_path)
     with SuperColliderSupervisor(
         engine_root=root / "supercollider",
         config=config,

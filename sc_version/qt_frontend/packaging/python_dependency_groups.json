@@ -40,6 +40,11 @@
       "owner": "runtime",
       "used_by": ["desktop OSC DNS-SD service advertisement"]
     },
+    "dulwich": {
+      "distribution": "dulwich",
+      "owner": "runtime",
+      "used_by": ["self-contained VSCO sample repository clone and validation"]
+    },
     "numpy": {
       "distribution": "numpy",
       "owner": "test_quality",
@@ -59,7 +64,12 @@
       "used_by": ["local AMY service", "native tests"]
     }
   },
-  "transitive_dependencies": {},
+  "transitive_dependencies": {
+    "urllib3": {
+      "distribution": "urllib3",
+      "owner": "portable"
+    }
+  },
   "invoked_python_tools": {
     "PyInstaller": {
       "distribution": "PyInstaller",

@@ -33,6 +33,7 @@ class SuperColliderServerConfig:
 @dataclass(frozen=True, slots=True)
 class SuperColliderSampleConfig:
     vsco_root: Path
+    repository: str
     ram_budget_mib: int
 
 
@@ -78,9 +79,9 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
         raise SuperColliderConfigError("$: expected object")
 
     revision = _integer(raw, "config_revision", "$")
-    if revision != 1:
+    if revision != 2:
         raise SuperColliderConfigError(
-            f"$.config_revision: unsupported revision {revision}; expected 1"
+            f"$.config_revision: unsupported revision {revision}; expected 2"
         )
     protocol_version = _integer(raw, "protocol_version", "$")
     if protocol_version != 1:
@@ -156,6 +157,9 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
     vsco_root = samples.get("vsco_root")
     if not isinstance(vsco_root, str) or not vsco_root.strip():
         raise SuperColliderConfigError("$.samples.vsco_root: expected path string")
+    repository = samples.get("repository")
+    if not isinstance(repository, str) or not repository.strip():
+        raise SuperColliderConfigError("$.samples.repository: expected URL string")
     ram_budget = _integer(samples, "ram_budget_mib", "$.samples")
     if not 64 <= ram_budget <= 1_048_576:
         raise SuperColliderConfigError(
@@ -181,6 +185,7 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
         ),
         samples=SuperColliderSampleConfig(
             vsco_root=Path(vsco_root).expanduser(),
+            repository=repository,
             ram_budget_mib=ram_budget,
         ),
     )
@@ -202,6 +207,7 @@ def _cli() -> int:
             "server.max_buffers",
             "server.realtime_memory_kib",
             "samples.vsco_root",
+            "samples.repository",
             "samples.ram_budget_mib",
         ),
     )
