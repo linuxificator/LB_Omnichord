@@ -253,7 +253,6 @@ Item {
 
             controller: midiBackend
             rowIndex: midiSynthRow.index
-            synthModel: midiBackend.synthNames
             leftRailWidth: root.hostWindow.leftRailWidth
             contentX: root.hostWindow.contentX
             volumeX: root.hostWindow.volumeX

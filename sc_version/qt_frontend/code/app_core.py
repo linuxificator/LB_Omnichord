@@ -63,6 +63,7 @@ from performance_qml_adapter import PerformanceQmlAdapter
 from runtime_paths import production_frontend_asset_root
 from screenshot_state import populate_screenshot_input_controls, save_png_screenshot
 from synth_state import SynthState
+from sc_drum_kits import DEFAULT_DRUM_KIT_ID, DRUM_KITS
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
 
 
@@ -176,7 +177,9 @@ DEFAULT_TUNING_REFERENCE = 440
 UI_PITCH_BEND_LIMIT_OCTAVES = 1.0 / 12.0
 UI_PITCH_BEND_STEP_OCTAVES = 1.0 / 300.0
 MIDI_PITCH_BEND_RANGE_OCTAVES = 1.0 / 6.0
-REVERB_LEVEL_MAX = 3.0
+# FreeVerb's wet return is normalized.  The SC edition exposes its native
+# wet/room/damping surface and does not inherit AMY's boosted return range.
+REVERB_LEVEL_MAX = 1.0
 
 PRESET_COUNT = 18
 PRESET_DIRECTORY = OMNI_PRESET_DIR
@@ -843,6 +846,7 @@ class InstrumentBackend(QObject):
 
     rhythmStateChanged = Signal()
     rhythmControlsChanged = Signal()
+    drumKitChanged = Signal()
 
     # PySide 6.7 on aarch64 cannot safely expose signals appended after slots
     # inherited by the performance subclass. Its domain-specific signals stay
@@ -1051,6 +1055,13 @@ class InstrumentBackend(QObject):
         # Rhythm transport is live session state, never startup/preset state.
         self._rhythm_running = False
         self._running_tempo: float | None = None
+        default_drum_kit = str(defaults.get("rhythm", {}).get(
+            "drum_kit", DEFAULT_DRUM_KIT_ID
+        ))
+        self._drum_kit_index = next(
+            (index for index, kit in enumerate(DRUM_KITS) if kit.kit_id == default_drum_kit),
+            0,
+        )
 
         # Tempo nudge: 1 BPM every 100 ms = 10 BPM/s. A quick tap keeps
         # running to a 20 BPM total change; a held button keeps going.
@@ -1234,6 +1245,11 @@ class InstrumentBackend(QObject):
     def reverbLiveness(self) -> float:
         return self._reverb_liveness
 
+    @Property(float, notify=reverbLivenessChanged)
+    def reverbRoom(self) -> float:
+        """Native FreeVerb room-size control exposed to QML."""
+        return self._reverb_liveness
+
     @Property(float, notify=reverbDampingChanged)
     def reverbDamping(self) -> float:
         return self._reverb_damping
@@ -1368,6 +1384,23 @@ class InstrumentBackend(QObject):
     @Property(list, constant=True)
     def rhythmFillDensityLabels(self) -> list[str]:
         return [f"/{bars}" for bars in FILL_DENSITY_BARS]
+
+    @Property(list, constant=True)
+    def drumKitNames(self) -> list[str]:
+        return [kit.label for kit in DRUM_KITS]
+
+    @Property(int, notify=drumKitChanged)
+    def selectedDrumKitIndex(self) -> int:
+        return self._drum_kit_index
+
+    @Slot(int)
+    def setDrumKitIndex(self, index: int) -> None:
+        selected = int(index)
+        if not 0 <= selected < len(DRUM_KITS) or selected == self._drum_kit_index:
+            return
+        self._drum_kit_index = selected
+        self.drumKitChanged.emit()
+        self._send_rhythm_config()
 
     def _effective_chord_activity(self) -> int:
         if self._chord_activity_hold_override:
@@ -1549,6 +1582,10 @@ class InstrumentBackend(QObject):
         self._reverb_liveness = clamped
         self.reverbLivenessChanged.emit()
         self._send_reverb_state()
+
+    @Slot(float)
+    def setReverbRoom(self, value: float) -> None:
+        self.setReverbLiveness(value)
 
     @Slot(float)
     def setReverbDamping(self, value: float) -> None:
@@ -1991,6 +2028,7 @@ class InstrumentBackend(QObject):
             },
             "rhythm": {
                 "selected": (self._selected_rhythm().key),
+                "drum_kit": DRUM_KITS[self._drum_kit_index].kit_id,
                 "settings": rhythm_settings,
             },
             "tuning": {
@@ -2216,6 +2254,13 @@ class InstrumentBackend(QObject):
         rhythm_key_to_index = {rhythm.key: index for index, rhythm in enumerate(self._rhythms)}
         default_rhythm_key = str(self._defaults["rhythm"]["selected"])
         self._rhythm.selected_index = rhythm_key_to_index[default_rhythm_key]
+        default_drum_kit = str(self._defaults["rhythm"].get(
+            "drum_kit", DEFAULT_DRUM_KIT_ID
+        ))
+        self._drum_kit_index = next(
+            (index for index, kit in enumerate(DRUM_KITS) if kit.kit_id == default_drum_kit),
+            0,
+        )
         self._rhythm.tempo_by_rhythm = [rhythm.tempo_default for rhythm in self._rhythms]
         self._rhythm.busyness_by_rhythm = [
             max(1, min(5, rhythm.default_busyness + 1)) for rhythm in self._rhythms
@@ -2374,6 +2419,15 @@ class InstrumentBackend(QObject):
         self._reverb_drums = plan.effects.drums
         self._bass_running = plan.bass_running
         self._rhythm.selected_index = plan.selected_rhythm_index
+        raw_rhythm = data.get("rhythm", {})
+        selected_drum_kit = (
+            str(raw_rhythm.get("drum_kit", DEFAULT_DRUM_KIT_ID))
+            if isinstance(raw_rhythm, dict) else DEFAULT_DRUM_KIT_ID
+        )
+        self._drum_kit_index = next(
+            (index for index, kit in enumerate(DRUM_KITS) if kit.kit_id == selected_drum_kit),
+            0,
+        )
         for index, setting in enumerate(plan.rhythm_settings):
             self._rhythm.tempo_by_rhythm[index] = setting.tempo
             self._rhythm.busyness_by_rhythm[index] = setting.percussion_activity
@@ -2402,6 +2456,7 @@ class InstrumentBackend(QObject):
         self.reverbLivenessChanged.emit()
         self.reverbDampingChanged.emit()
         self.reverbDrumsIncludedChanged.emit()
+        self.drumKitChanged.emit()
         self.strumModeChanged.emit()
         self.bassRunningChanged.emit()
 
@@ -3618,6 +3673,7 @@ class InstrumentBackend(QObject):
             "fill_density_bars": FILL_DENSITY_BARS[
                 self._rhythm.fill_density_index_by_rhythm[index]
             ],
+            "drum_kit": DRUM_KITS[self._drum_kit_index].kit_id,
             "chord_events": (
                 [copy.deepcopy(event) for event in rhythm.chord_levels[chord_source]]
                 if chord_source is not None

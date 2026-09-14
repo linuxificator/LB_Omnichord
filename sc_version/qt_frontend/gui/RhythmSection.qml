@@ -23,6 +23,15 @@ Item {
         }
     }
 
+    function synchronizeKitWheel() {
+        if (!kitWheel.initialized) return
+        if (kitWheel.currentIndex !== controller.selectedDrumKitIndex) {
+            kitWheel.syncingFromBackend = true
+            kitWheel.currentIndex = controller.selectedDrumKitIndex
+            Qt.callLater(function() { kitWheel.syncingFromBackend = false })
+        }
+    }
+
     function midiButtonHandled(target) {
         const learned = root.midiControlRouter.activateControlTarget(target)
         if (learned)
@@ -83,9 +92,84 @@ Item {
         }
     }
 
+    Frame {
+        id: kitFrame
+        x: wheelFrame.width + 7
+        y: 0
+        width: 140
+        height: parent.height
+        padding: 0
+        background: Rectangle {
+            radius: 10
+            color: root.wheelColor
+            border.color: root.wheelBorderColor
+            border.width: 1
+        }
+        Tumbler {
+            id: kitWheel
+            objectName: "omniDrumKitWheel"
+            anchors.fill: parent
+            anchors.margins: 3
+            model: root.controller.drumKitNames
+            visibleItemCount: 3
+            wrap: true
+            property bool initialized: false
+            property bool syncingFromBackend: false
+            Component.onCompleted: {
+                syncingFromBackend = true
+                currentIndex = root.controller.selectedDrumKitIndex
+                Qt.callLater(function() {
+                    kitWheel.syncingFromBackend = false
+                    kitWheel.initialized = true
+                })
+            }
+            Connections {
+                target: root.controller
+                function onDrumKitChanged() { root.synchronizeKitWheel() }
+            }
+            delegate: Item {
+                id: kitItem
+                required property var modelData
+                required property int index
+                width: kitWheel.width
+                height: kitWheel.height / kitWheel.visibleItemCount
+                Text {
+                    anchors.centerIn: parent
+                    width: parent.width - 10
+                    text: kitItem.modelData
+                    color: root.wheelTextColor
+                    elide: Text.ElideRight
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: Math.abs(Tumbler.displacement) < 0.5 ? 16 : 13
+                    font.bold: Math.abs(Tumbler.displacement) < 0.5
+                    opacity: 0.32 + Math.max(0, 1 - Math.abs(Tumbler.displacement)) * 0.68
+                }
+                TapHandler {
+                    gesturePolicy: TapHandler.DragThreshold
+                    onTapped: kitWheel.currentIndex = kitItem.index
+                }
+            }
+            onCurrentIndexChanged: {
+                if (initialized && !syncingFromBackend && currentIndex >= 0)
+                    root.controller.setDrumKitIndex(currentIndex)
+            }
+        }
+        Rectangle {
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: parent.height / 2 - 16
+            width: parent.width - 12
+            height: 32
+            radius: 7
+            color: "transparent"
+            border.color: root.selectionColor
+            border.width: 2
+        }
+    }
+
     Button {
         id: runButton
-        x: wheelFrame.width + 7; y: (parent.height - height) / 2; width: 62; height: 62
+        x: kitFrame.x + kitFrame.width + 7; y: (parent.height - height) / 2; width: 62; height: 62
         property var midiTarget: ({
             "screen": "omni",
             "kind": "button",

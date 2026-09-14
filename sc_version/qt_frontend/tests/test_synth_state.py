@@ -181,6 +181,18 @@ class SynthStateTests(unittest.TestCase):
         )
         self.assertTrue(state.select_browser_index(0) is False)
 
+    def test_one_variant_keeps_header_when_it_has_multiple_playing_styles(self) -> None:
+        definitions = (
+            browser_definition("synth.a", "A"),
+            browser_definition("timpani.hit", "Timpani", kind="sample", family="Timpani", variant="Standard", articulation="Hit"),
+            browser_definition("timpani.roll", "Timpani", kind="sample", family="Timpani", variant="Standard", articulation="Roll"),
+        )
+        state = SynthState(definitions, 1)
+        column = state.sample_choice_columns()[0]
+        self.assertTrue(column["showVariant"])
+        self.assertFalse(column["variantSelectable"])
+        self.assertEqual([item["label"] for item in column["choices"]], ["Hit", "Roll"])
+
 
 if __name__ == "__main__":
     unittest.main()

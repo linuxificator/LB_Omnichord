@@ -94,6 +94,10 @@ class SynthState:
     def selected_kind(self) -> str:
         return self._kind(self.selected_definition)
 
+    @property
+    def selected_browser_group(self) -> str:
+        return self._browser_group(self.selected_definition)
+
     def browser_names(self) -> list[str]:
         if self.selected_kind == "sample":
             return list(dict.fromkeys(
@@ -167,7 +171,16 @@ class SynthState:
         return [
             {
                 "label": variant,
-                "showVariant": len(variants) > 1,
+                # Keep a labelled, inert upper-row button when one variant
+                # exposes multiple playing styles.  It makes the hierarchy
+                # explicit without pretending that the label is a choice.
+                "showVariant": len(variants) > 1 or sum(
+                    1
+                    for _, definition in definitions
+                    if str(getattr(definition, "variant_label", "") or "Standard")
+                    == variant
+                ) > 1,
+                "variantSelectable": len(variants) > 1,
                 "selected": any(
                     index == self._selected_index
                     for index, definition in definitions

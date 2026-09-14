@@ -34,6 +34,7 @@ from musical_state import TuningSnapshot, tune_note
 from gm_percussion import midi_drum_amplitude, resolve_gm_percussion
 from midi_levels import midi_pitched_synth_level, normalized_midi_velocity
 from synth_state import SynthState
+from sc_drum_kits import DEFAULT_DRUM_KIT_ID, DRUM_KITS
 from user_data import MIDI_PRESET_DIR
 
 
@@ -122,6 +123,7 @@ class MidiEngine:
         self._program_revisions = [0] * MIDI_ROW_COUNT
         self._row_levels = [1.0] * MIDI_ROW_COUNT
         self._preview_ordinals = [0] * MIDI_ROW_COUNT
+        self.drum_kit_id = DEFAULT_DRUM_KIT_ID
         self.master_volume = 1.0
         self.reverb = {
             "level": 0.0,
@@ -192,6 +194,9 @@ class MidiEngine:
         else:
             self._sustain_rows.discard(row)
         self.client.set_owner_sustain(self._row_owner(row), bool(enabled))
+
+    def sustain_enabled(self, row: int) -> bool:
+        return int(row) in self._sustain_rows
 
     def configure_row(
         self,
@@ -312,7 +317,6 @@ class MidiEngine:
                 0.01,
                 self.client.resolved_config.performance.strum_tail_ms / 1000.0,
             ),
-            voice_limit=self.voices,
         )
 
     def close(self) -> None:
@@ -338,6 +342,7 @@ class MidiEngine:
             logical_key=int(hit.note),
             velocity=amp,
             logical_bus=self.drum_bus,
+            kit_id=self.drum_kit_id,
         )
 
     def all_notes_off(self) -> None:
@@ -369,6 +374,7 @@ class MidiPlayerBackend(QObject):
     reverbLivenessChanged = Signal()
     reverbDampingChanged = Signal()
     reverbDrumsIncludedChanged = Signal()
+    drumKitChanged = Signal()
     masterVolumeChanged = Signal()
     masterMutedChanged = Signal()
     bindingStateChanged = Signal()
@@ -410,6 +416,7 @@ class MidiPlayerBackend(QObject):
         self._reverb_liveness = 0.5
         self._reverb_damping = 0.5
         self._reverb_drums = False
+        self._drum_kit_index = 0
         # MIDI master output is live state and is not replaced by presets.
         self._master_volume = 1.0
         self._master_muted = False
@@ -507,6 +514,56 @@ class MidiPlayerBackend(QObject):
     def synthNames(self) -> list[str]:
         return [definition.label for definition in self.definitions]
 
+    @Slot(int, result=str)
+    def synthKind(self, row: int) -> str:
+        if not self._valid_row(row) or self._is_drum(row):
+            return "drum"
+        return self._runtime(row).selected_kind
+
+    @Slot(int, result=list)
+    def synthBrowserNames(self, row: int) -> list[str]:
+        if not self._valid_row(row):
+            return []
+        if self._is_drum(row):
+            return [kit.label for kit in DRUM_KITS]
+        return self._runtime(row).browser_names()
+
+    @Slot(int, result=int)
+    def synthBrowserIndex(self, row: int) -> int:
+        if not self._valid_row(row):
+            return 0
+        if self._is_drum(row):
+            return self._drum_kit_index
+        return self._runtime(row).browser_index()
+
+    @Slot(int, result=list)
+    def sampleChoiceColumns(self, row: int) -> list[dict[str, Any]]:
+        if not self._valid_row(row) or self._is_drum(row):
+            return []
+        return self._runtime(row).sample_choice_columns()
+
+    @Slot(int, result=bool)
+    def sampleSustainAvailable(self, row: int) -> bool:
+        if not self._valid_row(row) or self._is_drum(row):
+            return False
+        runtime = self._runtime(row)
+        return (
+            runtime.selected_kind == "sample"
+            and runtime.selected_browser_group == "Piano"
+        )
+
+    @Slot(int, result=bool)
+    def sustainEnabled(self, row: int) -> bool:
+        return self._valid_row(row) and self.engine.sustain_enabled(int(row))
+
+    @Slot(int)
+    def toggleSustain(self, row: int) -> None:
+        if not self.sampleSustainAvailable(row):
+            return
+        selected = int(row)
+        self.engine.set_sustain(selected, not self.engine.sustain_enabled(selected))
+        self._emit_state()
+
     @Property(int, constant=True)
     def presetCount(self) -> int:
         return MIDI_PRESET_COUNT
@@ -535,6 +592,10 @@ class MidiPlayerBackend(QObject):
     def reverbLiveness(self) -> float:
         return self._reverb_liveness
 
+    @Property(float, notify=reverbLivenessChanged)
+    def reverbRoom(self) -> float:
+        return self._reverb_liveness
+
     @Property(float, notify=reverbDampingChanged)
     def reverbDamping(self) -> float:
         return self._reverb_damping
@@ -542,6 +603,24 @@ class MidiPlayerBackend(QObject):
     @Property(bool, notify=reverbDrumsIncludedChanged)
     def reverbDrumsIncluded(self) -> bool:
         return self._reverb_drums
+
+    @Property(list, constant=True)
+    def drumKitNames(self) -> list[str]:
+        return [kit.label for kit in DRUM_KITS]
+
+    @Property(int, notify=drumKitChanged)
+    def selectedDrumKitIndex(self) -> int:
+        return self._drum_kit_index
+
+    @Slot(int)
+    def setDrumKitIndex(self, index: int) -> None:
+        selected = int(index)
+        if not 0 <= selected < len(DRUM_KITS) or selected == self._drum_kit_index:
+            return
+        self._drum_kit_index = selected
+        self.engine.drum_kit_id = DRUM_KITS[selected].kit_id
+        self.drumKitChanged.emit()
+        self._emit_state()
 
     @Property(float, notify=masterVolumeChanged)
     def masterVolume(self) -> float:
@@ -1706,7 +1785,10 @@ class MidiPlayerBackend(QObject):
         return self._runtime(row).control_model("extra")
 
     def _is_drum(self, row: int) -> bool:
-        return self._runtime(row).selected_definition.key == MIDI_DRUM_KEY
+        # The lower purple row is the dedicated percussion input.  Its role
+        # does not silently change when an old MIDI preset contains a former
+        # pitched-program selection at this position.
+        return int(row) == MIDI_ROW_COUNT - 1
 
     def _configure_row(self, row: int) -> None:
         if self._is_drum(row):
@@ -1734,6 +1816,31 @@ class MidiPlayerBackend(QObject):
         if self._runtime(row).select(synth_index):
             self._configure_row(int(row))
             self._emit_state()
+
+    @Slot(int)
+    def toggleSynthKind(self, row: int) -> None:
+        if not self._valid_row(row) or self._is_drum(row):
+            return
+        runtime = self._runtime(row)
+        requested = "sample" if runtime.selected_kind == "synth" else "synth"
+        if runtime.select_kind(requested):
+            self._configure_row(int(row))
+            self._emit_state()
+
+    @Slot(int, int)
+    def setSynthBrowserIndex(self, row: int, browser_index: int) -> None:
+        if not self._valid_row(row):
+            return
+        if self._is_drum(row):
+            self.setDrumKitIndex(browser_index)
+            return
+        if self._runtime(row).select_browser_index(browser_index):
+            self._configure_row(int(row))
+            self._emit_state()
+
+    @Slot(int, int)
+    def selectSampleChoice(self, row: int, synth_index: int) -> None:
+        self.setSynthIndex(row, synth_index)
 
     @Slot(int, str, float)
     def setControl(self, row: int, key: str, value: float) -> None:
@@ -1861,6 +1968,7 @@ class MidiPlayerBackend(QObject):
             )
         return {
             "version": 1,
+            "drum_kit": DRUM_KITS[self._drum_kit_index].kit_id,
             "rows": rows,
             "tuning": {
                 "mode": app_core.TUNING_MODE_NAMES[self._tuning_mode_index],
@@ -1882,6 +1990,13 @@ class MidiPlayerBackend(QObject):
         }
         if not isinstance(rows, list) or len(rows) != MIDI_ROW_COUNT:
             raise ValueError("MIDI preset must contain six rows")
+
+        selected_drum_kit = str(data.get("drum_kit", DEFAULT_DRUM_KIT_ID))
+        self._drum_kit_index = next(
+            (index for index, kit in enumerate(DRUM_KITS) if kit.kit_id == selected_drum_kit),
+            0,
+        )
+        self.engine.drum_kit_id = DRUM_KITS[self._drum_kit_index].kit_id
 
         for index, row_data in enumerate(rows):
             if not isinstance(row_data, dict):
@@ -1969,6 +2084,7 @@ class MidiPlayerBackend(QObject):
             self._emit_state()
             self.tuningChanged.emit()
             self._emit_reverb()
+            self.drumKitChanged.emit()
             self.presetChanged.emit()
 
     @Slot(int)
@@ -2023,6 +2139,20 @@ class MidiPlayerBackend(QObject):
             0.0,
             min(1.0, float(stored.get("volume", 0.5))),
         )
+        if self._is_drum(row):
+            selected_kit = str(
+                self._preset_reference.get("drum_kit", DEFAULT_DRUM_KIT_ID)
+            )
+            self._drum_kit_index = next(
+                (
+                    index
+                    for index, kit in enumerate(DRUM_KITS)
+                    if kit.kit_id == selected_kit
+                ),
+                0,
+            )
+            self.engine.drum_kit_id = DRUM_KITS[self._drum_kit_index].kit_id
+            self.drumKitChanged.emit()
         self.restore_control_values(protected)
         self._configure_row(row)
         self._emit_state()
@@ -2275,6 +2405,10 @@ class MidiPlayerBackend(QObject):
         self._reverb_liveness = value
         self.reverbLivenessChanged.emit()
         self._apply_reverb()
+
+    @Slot(float)
+    def setReverbRoom(self, value: float) -> None:
+        self.setReverbLiveness(value)
 
     @Slot(float)
     def setReverbDamping(self, value: float) -> None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import math
-from typing import Any
+from typing import Any, Callable
 
 from drum_patterns import DrumPatternCatalog
 from engine_protocol import PPQ, SequenceDefinition, SequenceEvent
@@ -309,9 +309,11 @@ def _drum_atoms(
     fill: bool = False,
     fill_id: str | None = None,
     fill_gain: float = 1.0,
+    program_resolver: Callable[[str, str], tuple[str, float]] | None = None,
 ) -> tuple[str | int | float, ...]:
+    source_kit = "general_midi" if program_resolver is not None else kit
     sound = catalog.resolve(
-        kit,
+        source_kit,
         rhythm_id,
         role,
         fill=fill,
@@ -320,11 +322,20 @@ def _drum_atoms(
     level = max(0.0, min(1.0, float(velocity) / 127.0))
     if fill:
         level *= max(0.0, float(fill_gain))
-    program = (
-        f"sample.{kit}.preset-{sound.preset}"
-        if sound.preset is not None
-        else f"sample.{kit}.patch-{sound.synth_patch}"
-    )
+    # Integration balancing may raise sparse fills above unity.  The engine
+    # protocol deliberately has one normalized velocity domain, so saturate
+    # only after every authored and derived gain has been applied.
+    level = max(0.0, min(1.0, level))
+    if program_resolver is None:
+        program = (
+            f"sample.{kit}.preset-{sound.preset}"
+            if sound.preset is not None
+            else f"sample.{kit}.patch-{sound.synth_patch}"
+        )
+    else:
+        program, kit_gain = program_resolver(kit, role)
+        level *= max(0.0, float(kit_gain))
+        level = max(0.0, min(1.0, level))
     return (
         role,
         program,
@@ -341,6 +352,7 @@ def compile_drum_lane(
     kit: str,
     logical_bus: int,
     generation: int,
+    program_resolver: Callable[[str, str], tuple[str, float]] | None = None,
 ) -> LanePlan:
     """Compile periodic activity, finite fills and deterministic fill launches."""
 
@@ -365,6 +377,7 @@ def compile_drum_lane(
                     role=role,
                     velocity=event.velocity,
                     logical_bus=logical_bus,
+                    program_resolver=program_resolver,
                 ),
             )
             for ordinal, event in enumerate(
@@ -419,6 +432,7 @@ def compile_drum_lane(
                         fill=True,
                         fill_id=fill.fill_id,
                         fill_gain=fill.output_gain,
+                        program_resolver=program_resolver,
                     ),
                 )
             )

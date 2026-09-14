@@ -23,6 +23,8 @@ var newChild;
 var activationDefinitions = Dictionary.new;
 var revisions;
 var queued;
+var phaseRoot;
+var phaseExecution;
 
 ~omniLanguagePort = 57149;
 ~omniClientSession = "snapshot-test";
@@ -66,6 +68,33 @@ revisions = ~omniExecutions.values.collect {
 }.sort;
 if(revisions != [1, 2]) {
     Error("running finite execution did not retain its snapshot").throw;
+};
+
+// A live lane replacement must join the transport's established phase.  It
+// must not restart event zero merely because the controls changed mid-cycle.
+phaseRoot = (
+    id: "phase/root", revision: 1, kind: "root", lane: "phase",
+    period: 192, eventCount: 4,
+    events: [0, 48, 96, 144].collect { |tick|
+        (type: \event, definitionId: "phase/root", tick: tick,
+            ordinal: tick, action: "noteOff", atoms: ["voice", 0.0])
+    }
+);
+~omniStartRootAtTransportPhase.value(phaseRoot, "phase", 1, 1.25);
+phaseExecution = ~omniExecutions.values.detect { |execution|
+    execution[\definition][\id] == "phase/root"
+};
+if(phaseExecution.isNil) {
+    Error("phase-preserving root was not started").throw;
+};
+if(phaseExecution[\baseBeat] != 0) {
+    Error("phase-preserving root lost the transport cycle anchor").throw;
+};
+if(phaseExecution[\nextIndex] != 2) {
+    Error("mid-cycle replacement restarted instead of selecting the next event").throw;
+};
+if(~omniExecutionDueBeat.value(phaseExecution) != 2) {
+    Error("mid-cycle replacement scheduled the wrong next beat").throw;
 };
 
 ~omniPendingActivations.clear;

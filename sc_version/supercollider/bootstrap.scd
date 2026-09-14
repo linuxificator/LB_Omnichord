@@ -361,7 +361,9 @@ s.waitForBoot({
                 ~omniSclorkArgs.value(
                     nativeName,
                     voiceBus.index,
-                    frequency * (2 ** ~omniPitchBendOctaves),
+                    if(frequency.isNil) { nil } {
+                        frequency * (2 ** ~omniPitchBendOctaves)
+                    },
                     preparedArgs
                 )
             );
@@ -439,7 +441,9 @@ s.waitForBoot({
 
     ~omniSpawnDrum = { |role, requestedProgram, note, velocity, logicalBus|
         ~omniDrumOrdinal = ~omniDrumOrdinal + 1;
-        if(~omniSampleReady.value(~omniDrumSampleProgram, 1)) {
+        if(requestedProgram.asString.beginsWith("sample.") and: {
+            ~omniSampleReady.value(~omniDrumSampleProgram, 1)
+        }) {
             ~omniSpawnSampleVoice.value(
                 "omni/drums",
                 "drum/" ++ ~omniDrumOrdinal,
@@ -452,11 +456,18 @@ s.waitForBoot({
                 true
             );
         } {
+        if(requestedProgram.asString.beginsWith("sc.sclork.")) {
+            ~omniSpawnVoice.value(
+                "omni/drums", "drum/" ++ ~omniDrumOrdinal,
+                requestedProgram, 1, note, nil, velocity, logicalBus, []
+            );
+        } {
             Synth.tail(~omniSourceGroup, \omniDrum, [
                 \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
                 \note, note,
                 \velocity, velocity
             ]);
+        };
         };
     };
 
@@ -544,32 +555,22 @@ OSCdef(\omniGestureNote, { |message|
         var velocity = message[8].asFloat;
         var logicalBus = message[9].asInteger.clip(0, 10);
         var tailSeconds = message[10].asFloat.max(0.01);
-        var voiceLimit = message[11].asInteger.max(1);
-        var programRevision = message[12].asInteger.max(1);
-        var state = ~omniGestures[owner] ? (handles: List.new, token: 0);
-        var duplicate = state[\handles].detect { |oldHandle|
-            var old = ~omniVoices[oldHandle];
-            old.notNil and: { old[\logicalKey] == logicalKey }
-        };
-        if(duplicate.notNil) {
-            state[\handles].remove(duplicate);
-            ~omniReleaseHandle.value(duplicate);
-        };
-        while { state[\handles].size >= voiceLimit } {
-            ~omniReleaseHandle.value(state[\handles].removeAt(0));
-        };
+        var programRevision = message[11].asInteger.max(1);
+        var state = ~omniGestures[owner] ? (handles: Set.new);
         ~omniSpawnVoice.value(
             owner, handle, program, programRevision, logicalKey, frequency,
             velocity, logicalBus, []
         );
         state[\handles].add(handle);
-        state[\token] = state[\token] + 1;
         ~omniGestures[owner] = state;
         SystemClock.sched(tailSeconds, {
             var current = ~omniGestures[owner];
-            if(current.notNil and: { current[\token] == state[\token] }) {
-                current[\handles].do(~omniReleaseHandle);
-                current[\handles].clear;
+            if(current.notNil and: { current[\handles].includes(handle) }) {
+                current[\handles].remove(handle);
+                ~omniReleaseHandle.value(handle);
+                if(current[\handles].isEmpty) {
+                    ~omniGestures.removeAt(owner);
+                };
             };
             nil
         });
@@ -578,12 +579,10 @@ OSCdef(\omniGestureNote, { |message|
 
 OSCdef(\omniDrumHit, { |message|
     if(~omniCommandValid.value(message)) {
-        var logicalBus = message[6].asInteger.clip(0, 10);
+        var logicalBus = message[7].asInteger.clip(0, 10);
         ~omniSpawnDrum.value(
-            "external_percussion",
-            ~omniDrumProgram,
-            message[4].asInteger,
-            message[5].asFloat,
+            "external_percussion", message[4].asString,
+            message[5].asInteger, message[6].asFloat,
             logicalBus
         );
     };

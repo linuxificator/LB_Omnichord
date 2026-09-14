@@ -254,7 +254,39 @@ class SuperColliderClientTests(unittest.TestCase):
         ]
         self.assertEqual(len(gestures), 1)
         self.assertEqual(gestures[0][4], "sc.omni.acid303")
-        self.assertEqual(int(gestures[0][11]), revision)
+        self.assertEqual(int(gestures[0][10]), revision)
+        self.assertEqual(len(gestures[0]), 11)
+
+    def test_direct_drum_hit_selects_requested_kit_before_crossing_boundary(self) -> None:
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+
+        client.drum_hit(
+            owner="midi/drums",
+            logical_key=36,
+            velocity=0.5,
+            logical_bus=10,
+            kit_id="sc-808",
+        )
+        client.close()
+
+        hits = [
+            arguments
+            for address, arguments in self.fake.messages
+            if address == "/omni/v1/drum/hit"
+        ]
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(len(hits[0]), 7)
+        self.assertEqual(hits[0][2], "midi/drums")
+        self.assertEqual(hits[0][3], "sc.sclork.kick808")
+        self.assertEqual(hits[0][4], 36)
+        self.assertAlmostEqual(float(hits[0][5]), 0.31)
+        self.assertEqual(hits[0][6], 10)
 
     def test_lane_transaction_is_indexed_and_acknowledged(self) -> None:
         from engine_protocol import SequenceDefinition, SequenceEvent

@@ -460,13 +460,15 @@ Item {
                     font.bold: sampleColumn.modelData.selected
                     background: Rectangle {
                         radius: 8
-                        color: sampleColumn.modelData.selected ? "#d39a43" : "#e9d7b5"
-                        border.color: "#865d20"
+                        color: sampleColumn.modelData.selected
+                            ? root.commonFillColor : root.commonTrackColor
+                        border.color: root.commonBorderColor
                         border.width: sampleColumn.modelData.selected ? 2 : 1
                     }
                     onClicked: {
                         const choices = sampleColumn.modelData.choices
-                        if (choices.length > 0)
+                        if (sampleColumn.modelData.variantSelectable
+                                && choices.length > 0)
                             root.controller.selectSampleChoice(
                                 root.role, choices[0].synthIndex
                             )
@@ -495,8 +497,8 @@ Item {
                             background: Rectangle {
                                 radius: 8
                                 color: articulationButton.modelData.selected
-                                    ? "#d39a43" : "#efe3cc"
-                                border.color: "#865d20"
+                                    ? root.extraFillColor : root.extraTrackColor
+                                border.color: root.extraBorderColor
                                 border.width: articulationButton.modelData.selected ? 2 : 1
                             }
                             onClicked: root.controller.selectSampleChoice(

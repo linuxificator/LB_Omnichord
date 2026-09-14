@@ -238,6 +238,31 @@ class MusicalSequencePlanTests(unittest.TestCase):
         self.assertTrue(any(event.kind == "gateBegin" for event in fill.events))
         self.assertTrue(any(event.kind == "drumHit" for event in fill.events))
 
+    def test_drum_resolver_applies_program_and_clamps_final_velocity(self) -> None:
+        catalog = load_drum_pattern_catalog(ROOT / "music" / "drums")
+        plan = compile_drum_lane(
+            config={
+                "id": "funk",
+                "percussion_activity": 5,
+                "fill_order": [2],
+                "fill_density_bars": 1,
+            },
+            catalog=catalog,
+            kit="loud-test-kit",
+            logical_bus=2,
+            generation=4,
+            program_resolver=lambda _kit, role: (f"sc.test.{role}", 2.5),
+        )
+        hits = [
+            event
+            for definition in plan.definitions
+            for event in definition.events
+            if event.kind == "drumHit"
+        ]
+        self.assertTrue(hits)
+        self.assertTrue(all(str(event.atoms[1]).startswith("sc.test.") for event in hits))
+        self.assertTrue(all(0.0 <= float(event.atoms[3]) <= 1.0 for event in hits))
+
 
 if __name__ == "__main__":
     unittest.main()

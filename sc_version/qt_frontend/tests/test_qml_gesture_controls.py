@@ -1357,13 +1357,13 @@ Window {
     QtObject {
         id: controller
         property real reverbLevel: 0.2
-        property real reverbLiveness: 0.2
+        property real reverbRoom: 0.2
         property real reverbDamping: 0.2
-        property bool reverbDrums: false
+        property bool reverbDrumsIncluded: false
         function setReverbLevel(value) { reverbLevel = value }
-        function setReverbLiveness(value) { reverbLiveness = value }
+        function setReverbRoom(value) { reverbRoom = value }
         function setReverbDamping(value) { reverbDamping = value }
-        function setReverbDrums(value) { reverbDrums = value }
+        function setReverbDrumsIncluded(value) { reverbDrumsIncluded = value }
     }
 
     QtObject {
@@ -1412,7 +1412,7 @@ Window {
             if child.metaObject().indexOfProperty("reverbLevel") >= 0
         ]
         self.assertEqual(len(controllers), 1)
-        self.assertGreater(float(controllers[0].property("reverbLevel")), 0.8)
+        self.assertGreater(float(controllers[0].property("reverbLevel")), 0.6)
         window.deleteLater()
         component.deleteLater()
         engine.deleteLater()

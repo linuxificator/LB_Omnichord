@@ -28,6 +28,7 @@ from supercollider_config import (
     load_supercollider_config,
 )
 from supercollider_programs import load_legacy_program_map
+from sc_drum_kits import DEFAULT_DRUM_KIT_ID, midi_role, resolve_program
 
 
 class SuperColliderUnavailable(RuntimeError):
@@ -132,6 +133,7 @@ class SuperColliderClient:
             / "music"
             / "drums"
         )
+        self._drum_kit = DEFAULT_DRUM_KIT_ID
 
         try:
             self._await_ready()
@@ -531,7 +533,6 @@ class SuperColliderClient:
         velocity: float,
         logical_bus: int,
         tail_seconds: float,
-        voice_limit: int,
     ) -> None:
         self._send_raw(
             "/omni/v1/gesture/note",
@@ -546,7 +547,6 @@ class SuperColliderClient:
                 max(0.0, min(1.0, float(velocity))),
                 int(logical_bus),
                 max(0.01, float(tail_seconds)),
-                max(1, int(voice_limit)),
                 max(1, int(program_revision)),
             ],
         )
@@ -558,15 +558,20 @@ class SuperColliderClient:
         logical_key: int,
         velocity: float,
         logical_bus: int,
+        kit_id: str | None = None,
     ) -> None:
+        program, gain = resolve_program(
+            str(kit_id or self._drum_kit), midi_role(logical_key)
+        )
         self._send_raw(
             "/omni/v1/drum/hit",
             [
                 self.session,
                 self._next_message_id(),
                 str(owner),
+                program,
                 int(logical_key),
-                max(0.0, min(1.0, float(velocity))),
+                max(0.0, min(1.0, float(velocity) * gain)),
                 int(logical_bus),
             ],
         )
@@ -750,9 +755,13 @@ class SuperColliderClient:
             compile_drum_lane(
                 config=self.rhythm_config,
                 catalog=self._drum_catalog,
-                kit=self.resolved_config.drums.kit,
+                kit=(
+                    str(self.rhythm_config.get("drum_kit", self._drum_kit))
+                    if self.rhythm_config else self._drum_kit
+                ),
                 logical_bus=self._role_bus("drums"),
                 generation=generation,
+                program_resolver=resolve_program,
             )
         )
 
@@ -773,7 +782,6 @@ class SuperColliderClient:
 
     def _strum_note(self, note: float) -> None:
         self._strum_ordinal += 1
-        voices = self.resolved_config.capacities.voices.strum
         self.gesture_note(
             owner="omni/strum",
             handle=f"strum/{self._strum_ordinal}",
@@ -787,7 +795,6 @@ class SuperColliderClient:
                 0.01,
                 self.resolved_config.performance.strum_tail_ms / 1000.0,
             ),
-            voice_limit=voices,
         )
 
     def send_message(self, address: str, value: Any) -> None:

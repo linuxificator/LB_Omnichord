@@ -205,6 +205,36 @@
     executionId
 };
 
+~omniStartRootAtTransportPhase = { |definition, lane, generation, activationBeat|
+    var period = definition[\period].asInteger.max(1);
+    var activationTick = (activationBeat * 48).round.asInteger;
+    var cycle = (activationTick / period).floor.asInteger;
+    var phaseTick = activationTick - (cycle * period);
+    var nextIndex = definition[\events].detectIndex { |event|
+        event[\tick] >= phaseTick
+    };
+    var executionId;
+    if(nextIndex.isNil) {
+        cycle = cycle + 1;
+        nextIndex = 0;
+    };
+    if(definition[\events].notEmpty) {
+        ~omniExecutionOrdinal = ~omniExecutionOrdinal + 1;
+        executionId = "root/" ++ lane ++ "/" ++ ~omniExecutionOrdinal;
+        ~omniExecutions[executionId] = (
+            id: executionId,
+            definition: definition,
+            lane: lane.asString,
+            generation: generation.asInteger,
+            root: true,
+            baseBeat: (cycle * period) / 48,
+            nextIndex: nextIndex,
+            creationOrdinal: ~omniExecutionOrdinal
+        );
+    };
+    executionId
+};
+
 ~omniStartFinite = { |definitionId, parentExecution, startBeat|
     var definition = ~omniDefinitions[definitionId.asString];
     var finiteCount = ~omniExecutions.values.select {
@@ -421,7 +451,9 @@
         definitionIds.do { |definitionId|
             var definition = ~omniDefinitions[definitionId];
             if(definition.notNil and: { definition[\kind] == "root" }) {
-                ~omniStartRoot.value(definition, lane, generation, effectiveBeat);
+                ~omniStartRootAtTransportPhase.value(
+                    definition, lane, generation, effectiveBeat
+                );
             };
         };
         ~omniArmWake.value;

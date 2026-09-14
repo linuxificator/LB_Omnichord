@@ -43,10 +43,10 @@ Item {
         LabeledSlider {
             width: root.controlSliderWidth
             height: parent.height
-            label: "LEV"
+            label: "WET"
             currentValue: root.controller.reverbLevel
             fromValue: 0
-            toValue: 3
+            toValue: 1
             stepValue: 0.01
             decimals: 2
             textColor: "#6b3048"
@@ -65,8 +65,8 @@ Item {
         LabeledSlider {
             width: root.controlSliderWidth
             height: parent.height
-            label: "LIVE"
-            currentValue: root.controller.reverbLiveness
+            label: "ROOM"
+            currentValue: root.controller.reverbRoom
             fromValue: 0
             toValue: 1
             stepValue: 0.01
@@ -81,7 +81,7 @@ Item {
                 "screen": root.controlScreen,
                 "kind": "reverb_liveness"
             })
-            onEdited: (value) => root.controller.setReverbLiveness(value)
+            onEdited: (value) => root.controller.setReverbRoom(value)
         }
 
         LabeledSlider {

@@ -38,6 +38,7 @@
   },
   "rhythm": {
     "selected": "waltz",
+    "drum_kit": "pcm-vsco",
     "bass_voicing_shift": 0,
     "bass_riff_selector": 1,
     "chord_arpeggio_enabled": false,

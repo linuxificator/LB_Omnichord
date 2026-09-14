@@ -71,7 +71,7 @@ PathName(adapterRoot).files
         "pulse_width" -> [\width, \pw]
     ];
     args.add(\out); args.add(outputBus);
-    if(~omniSynthHasControl.value(name, \freq)) {
+    if(frequency.notNil and: { ~omniSynthHasControl.value(name, \freq) }) {
         args.add(\freq); args.add(frequency);
     };
     if(~omniSynthHasControl.value(name, \pan)) {

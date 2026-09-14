@@ -986,7 +986,7 @@ class MidiEngineTests(unittest.TestCase):
 
         self.assertEqual(client.events, [])
 
-    def test_strum_preview_delegates_tail_and_voice_limit_to_engine(self) -> None:
+    def test_strum_preview_delegates_tail_without_frontend_voice_stealing(self) -> None:
         client = _Client()
         engine = MidiEngine(client)
         client.events.clear()
@@ -997,7 +997,7 @@ class MidiEngineTests(unittest.TestCase):
         gestures = [value for kind, value in client.events if kind == "gesture_note"]
         self.assertEqual(len(gestures), 5)
         self.assertTrue(all(item["owner"] == "midi/preview/0" for item in gestures))
-        self.assertTrue(all(item["voice_limit"] == engine.voices for item in gestures))
+        self.assertTrue(all("voice_limit" not in item for item in gestures))
         self.assertTrue(all(item["program_revision"] == 1 for item in gestures))
         self.assertEqual([item["note"] for item in gestures], [60, 64, 67, 71, 72])
 
