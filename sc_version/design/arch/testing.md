@@ -20,7 +20,7 @@ percentage as a quality substitute.
 | `quality` | compile/JSON/Markdown guards, QML warning ratchet, Ruff and strict-new-module mypy |
 | `sc-frontend` | typed protocol, pure plan compiler, client, config, program catalogue, runtime ownership and separate frontend/fake-engine process |
 | `sc-compiler` | syntax/core definitions and all pinned SCLOrk source/adapters compile |
-| `sc-sequencer` | receiver validation, immutable snapshots, root/finite lifetime, gate overlap, aligned replacement coalescing, same-beat ordering and a real separate `sclang` transaction process |
+| `sc-sequencer` | receiver validation, immutable snapshots, root/finite lifetime, gate overlap, aligned replacement coalescing, same-beat ordering, external-versus-nested boundary rules, tempo-domain releases, stale-wake rejection and a real separate `sclang` transaction process |
 | `sc-audio` | acid definitions and NRT render audit of every SCLOrk program |
 | `sc-banks` | SFZ compiler, complete VSCO manifest shape, loader and GM percussion mapping |
 | `sc-packaged` | independent workflow/runtime/package/release contract |

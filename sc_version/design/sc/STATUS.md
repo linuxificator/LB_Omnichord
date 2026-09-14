@@ -28,7 +28,9 @@ Target currently exercised: Linux x86_64
   in separate processes.
 - Sequencer tests cover immutable running snapshots, overlapping finite
   executions, root/child lifetime separation, exact release ownership,
-  overlapping half-open gates and same-boundary replacement coalescing.
+  overlapping half-open gates, same-boundary replacement coalescing,
+  external-versus-nested timing boundaries, tempo-domain releases, stale
+  callbacks and every 1--4 note/beat direction of a seven-note arpeggio.
 - A separate GitHub workflow builds pinned headless SuperCollider 3.14.1 and a
   Linux x86_64 AppImage. Publication requires an explicit `release=true`
   manual dispatch and uses an independent `-SC` release tag. Its artifact

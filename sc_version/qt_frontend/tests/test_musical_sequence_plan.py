@@ -146,6 +146,60 @@ class MusicalSequencePlanTests(unittest.TestCase):
             ["note/0", "note/1", "note/2"],
         )
 
+    def test_seven_note_arpeggios_preserve_every_rate_direction_and_overlap(self) -> None:
+        notes = (48.0, 52.0, 55.0, 59.0, 62.0, 65.0, 69.0)
+        for rate in range(1, 5):
+            for direction in ("up", "down"):
+                with self.subTest(rate=rate, direction=direction):
+                    plan = compile_chord_lane(
+                        config={
+                            "id": "overlapping-seven",
+                            "length_beats": 1,
+                            "chord_events": [
+                                {"time": 0, "amp": 0.8},
+                                {"time": 0.5, "amp": 0.8},
+                            ],
+                            "chord_arpeggio": {
+                                "enabled": True,
+                                "notes_per_beat": rate,
+                                "direction": direction,
+                            },
+                        },
+                        enabled=True,
+                        chord_notes=notes,
+                        max_chord_notes=7,
+                        chord_gate_beats=0.72,
+                        program_id="test.program",
+                        program_revision=1,
+                        logical_bus=3,
+                        generation=1,
+                    )
+                    root, child = plan.definitions
+                    step = max(1, round(48 / rate))
+                    attacks = [
+                        event for event in child.events if event.kind == "noteOn"
+                    ]
+                    self.assertEqual(
+                        [event.tick for event in attacks],
+                        [index * step for index in range(7)],
+                    )
+                    expected_notes = notes if direction == "up" else notes[::-1]
+                    self.assertEqual(
+                        [event.atoms[4] for event in attacks],
+                        [round(note) for note in expected_notes],
+                    )
+                    self.assertEqual(
+                        [event.tick for event in root.events], [0, 24]
+                    )
+                    self.assertEqual(
+                        [event.atoms[0] for event in root.events],
+                        [child.definition_id, child.definition_id],
+                    )
+                    self.assertGreater(
+                        max(event.tick for event in child.events),
+                        root.events[1].tick,
+                    )
+
     def test_drum_timing_uses_floor_conversion_and_fills_are_finite(self) -> None:
         catalog = load_drum_pattern_catalog(ROOT / "music" / "drums")
         config = {
