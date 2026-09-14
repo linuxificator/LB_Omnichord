@@ -130,3 +130,12 @@ paths, while packages install that same pinned repository on first launch.
 Automated evidence establishes identity, routing, bounded output and lifetime
 behavior; subjective musical balance still requires listening on physical
 audio hardware.
+
+A production-QML source pass on Linux exercised 836 public actions, selected
+all fifteen drum kits in both percussion locations, changed every rhythm and
+ran simultaneous rhythm, bass and arpeggio playback. A subsequent four-cycle
+pass exercised 3,306 actions and the complete SYN/PCM catalogue. Its twelve
+independently captured PipeWire windows remained non-silent, reported no
+clipped samples and had no gap longer than 0.60 seconds. The owned `sclang`,
+`scsynth` and frontend processes shut down cleanly with no server failure or
+buffer exhaustion.
