@@ -70,6 +70,22 @@ class _FakeSuperCollider:
         self.server.server_close()
         self.thread.join(timeout=1.0)
 
+    def wait_for_messages(
+        self,
+        address: str,
+        *,
+        count: int = 1,
+        timeout: float = 1.0,
+    ) -> bool:
+        """Wait until the separate fake engine has received the UDP packets."""
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if sum(item[0] == address for item in self.messages) >= count:
+                return True
+            time.sleep(0.005)
+        return sum(item[0] == address for item in self.messages) >= count
+
 
 class SuperColliderClientTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -274,6 +290,7 @@ class SuperColliderClientTests(unittest.TestCase):
             logical_bus=10,
             kit_id="sc-808",
         )
+        self.assertTrue(self.fake.wait_for_messages("/omni/v1/drum/hit"))
         client.close()
 
         hits = [
