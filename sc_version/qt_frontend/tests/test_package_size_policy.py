@@ -137,6 +137,62 @@ class PackageSizePolicyTests(unittest.TestCase):
                 "Qt6Quick3D",
             )
 
+    def test_audit_can_exempt_only_a_separately_owned_runtime_subtree(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            app = root / "LB_Omnichord.app"
+            third_party = (
+                app
+                / "Contents"
+                / "Resources"
+                / "sc-runtime"
+                / "SuperCollider.app"
+                / "Contents"
+                / "Frameworks"
+                / "QtWebEngineCore.framework"
+                / "QtWebEngineCore"
+            )
+            frontend = (
+                app
+                / "Contents"
+                / "Frameworks"
+                / "QtWebEngineCore.framework"
+                / "QtWebEngineCore"
+            )
+            for path in (third_party, frontend):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"runtime")
+            package = root / "test.dmg"
+            package.write_bytes(b"image")
+            report = root / "report.json"
+
+            with self.assertRaisesRegex(ValueError, "forbidden runtime content"):
+                audit(
+                    platform="macOS-arm64",
+                    output=report,
+                    package=package,
+                    tree=app,
+                    max_package_bytes=10_000,
+                    forbidden_runtime_exempt_prefixes=(
+                        "Contents/Resources/sc-runtime",
+                    ),
+                )
+
+            evidence = json.loads(report.read_text(encoding="utf-8"))
+            self.assertEqual(
+                evidence["forbidden_runtime_matches"],
+                [
+                    {
+                        "fragment": "QtWebEngine",
+                        "path": (
+                            "Contents/Frameworks/QtWebEngineCore.framework/"
+                            "QtWebEngineCore"
+                        ),
+                    }
+                ],
+            )
+            self.assertGreaterEqual(evidence["member_bytes"], 2 * len(b"runtime"))
+
     def test_raspberry_pi_audit_rejects_a_bundled_cxx_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

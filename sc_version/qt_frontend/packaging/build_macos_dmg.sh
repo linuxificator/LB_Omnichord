@@ -76,5 +76,6 @@ hdiutil create -volname "LB Omnichord SC" -fs HFS+ -format UDZO \
     -srcfolder "$app_bundle" "$output"
 python "$frontend_dir/packaging/package_audit.py" \
     --platform macOS-arm64 --tree "$app_bundle" --package "$output" \
+    --forbidden-runtime-exempt-prefix "Contents/Resources/sc-runtime" \
     --max-package-bytes 600000000 --output "$package_audit"
 printf '%s\n' "$output"
