@@ -4,8 +4,8 @@
     "InstrumentBackend": {
       "property_count": 59,
       "property_sha256": "19cbc3039d760a8ce9a0fe1ee83e09c01d048467c36a31fa8df00190717a5c2e",
-      "method_count": 137,
-      "method_sha256": "6175e04dde91fff0cc1c6f5dab9eff3833e9656f56ccce1f93cc59d3c22f0f92"
+      "method_count": 145,
+      "method_sha256": "79cd0132c5c77cf382bc4e7cb6c37ec687699099d7b3923d6458e41f0b5841df"
     },
     "MidiPlayerBackend": {
       "property_count": 19,

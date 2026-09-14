@@ -6,7 +6,8 @@ import math
 # Absolute application safety limits. Catalogue entries may narrow these
 # ranges, never widen them. Values are in the units shown by the UI.
 CONTROL_LIMITS: dict[str, tuple[float, float]] = {
-    "filter_hz": (20.0, 10000.0),
+    "filter_hz": (20.0, 20000.0),
+    "filter_rq": (0.001, 1.0),
     "resonance": (0.51, 12.0),
     "lfo_hz": (0.1, 20.0),
     "vibrato_depth": (0.0, 0.05),
@@ -17,7 +18,7 @@ CONTROL_LIMITS: dict[str, tuple[float, float]] = {
     "attack_ms": (0.0, 3000.0),
     "decay_ms": (0.0, 10000.0),
     "sustain": (0.0, 1.0),
-    "release_ms": (0.0, 10000.0),
+    "release_ms": (0.0, 15000.0),
     "algorithm": (1.0, 32.0),
     # DX7 operator feedback uses AMY's normalized 0..0.5 range.
     "feedback": (0.0, 0.5),

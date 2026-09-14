@@ -47,20 +47,28 @@ PathName(adapterRoot).files
     }
 };
 
+~omniFirstSynthControl = { |name, candidates|
+    candidates.detect { |candidate|
+        ~omniSynthHasControl.value(name, candidate)
+    }
+};
+
 ~omniSclorkArgs = {
     |name, outputBus, frequency, preparedArgs|
     var args = List.new;
-    var mappings = IdentityDictionary[
-        "attack" -> \att,
-        "attack_ms" -> \att,
-        "decay" -> \dec,
-        "decay_ms" -> \dec,
-        "sustain" -> \sus,
-        "release" -> \rel,
-        "release_ms" -> \rel,
-        "filter_hz" -> \cutoff,
-        "resonance" -> \rq,
-        "portamento_ms" -> \lagTime
+    var mappings = Dictionary[
+        "attack" -> [\att, \attack, \atk],
+        "attack_ms" -> [\att, \attack, \atk],
+        "decay" -> [\dec, \decay],
+        "decay_ms" -> [\dec, \decay],
+        "sustain" -> [\sus, \sustain],
+        "release" -> [\rel, \release],
+        "release_ms" -> [\rel, \release],
+        "filter_hz" -> [\cutoff],
+        "filter_rq" -> [\rq],
+        "resonance" -> [\rq],
+        "portamento_ms" -> [\lagTime, \slideTime, \glide, \freqLag, \lagamount],
+        "pulse_width" -> [\width, \pw]
     ];
     args.add(\out); args.add(outputBus);
     if(~omniSynthHasControl.value(name, \freq)) {
@@ -73,13 +81,14 @@ PathName(adapterRoot).files
         args.add(\gate); args.add(1.0);
     };
     preparedArgs.pairsDo { |key, rawValue|
-        var target = mappings[key.asString] ? key.asSymbol;
+        var candidates = mappings[key.asString] ? [key.asSymbol];
+        var target = ~omniFirstSynthControl.value(name, candidates);
         var value = rawValue;
         if(["attack_ms", "decay_ms", "release_ms", "portamento_ms"]
             .includesEqual(key.asString)) {
             value = rawValue / 1000;
         };
-        if(~omniSynthHasControl.value(name, target)) {
+        if(target.notNil) {
             args.add(target); args.add(value);
         };
     };

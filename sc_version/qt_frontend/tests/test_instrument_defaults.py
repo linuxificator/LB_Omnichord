@@ -323,7 +323,11 @@ class SuperColliderInstrumentCatalogueTests(unittest.TestCase):
         )
 
     def test_browser_contains_only_native_sc_and_sample_programs(self) -> None:
-        self.assertEqual(len(self.synths), 175)
+        # The compact browser retains every pitched source while collapsing
+        # duplicate standalone/key-switch views into named articulations.
+        self.assertEqual(len(self.synths), 146)
+        self.assertEqual(sum(synth.kind == "synth" for synth in self.synths), 80)
+        self.assertEqual(sum(synth.kind == "sample" for synth in self.synths), 66)
         self.assertTrue(
             all(
                 synth.key.startswith(("sc.", "sample."))

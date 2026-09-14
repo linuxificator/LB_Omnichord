@@ -3,6 +3,21 @@
   "programs": [
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "curve": -4.0,
+        "dec": 0.5,
+        "filterRange": 6.0,
+        "freq": 440.0,
+        "gate": 1.0,
+        "lagTime": 0.12,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.5,
+        "sus": 0.1,
+        "width": 0.51
+      },
       "controls": [
         "out",
         "gate",
@@ -29,6 +44,17 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "filterRange": 6.0,
+        "freq": 440.0,
+        "lagTime": 0.12,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.5,
+        "width": 0.51
+      },
       "controls": [
         "out",
         "freq",
@@ -51,6 +77,21 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.01,
+        "cutoff": 1100.0,
+        "dec": 0.3,
+        "detune": 1.005,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.1,
+        "slideTime": 0.17,
+        "sus": 0.4,
+        "width": 0.15
+      },
       "controls": [
         "out",
         "freq",
@@ -77,6 +118,22 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "dec": 0.1,
+        "depth": 0.2,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rate": 6.0,
+        "regen": -3.0,
+        "rel": 0.5,
+        "rq": 0.5,
+        "sus": 0.7,
+        "sweep": 16.0
+      },
       "controls": [
         "out",
         "pan",
@@ -104,6 +161,21 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.01,
+        "crv": -30.0,
+        "freq": 440.0,
+        "freqDev": 2.0,
+        "op1mul": 0.1,
+        "op2mul": 0.1,
+        "op3mul": 0.1,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0,
+        "sprd": 0.5,
+        "vel": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -130,6 +202,20 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.0005,
+        "attFraction": 0.05,
+        "crv": -3.0,
+        "freq": 150.0,
+        "modIndex": 500.0,
+        "modRatio": 1.51,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0,
+        "relFraction": 0.7,
+        "subAmp": 0.75
+      },
       "controls": [
         "out",
         "pan",
@@ -155,6 +241,19 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.0,
+        "curve": -5.0,
+        "dec": 0.1,
+        "freq": 0.0,
+        "gate": 1.0,
+        "harmonic": 14.015,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.01,
+        "sus": 0.8
+      },
       "controls": [
         "out",
         "freq",
@@ -179,6 +278,21 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 1.0,
+        "filtermax": 5000.0,
+        "filtermin": 250.0,
+        "freq": 100.0,
+        "impulseAtt": 0.5,
+        "impulseDec": 0.5,
+        "impulseHold": 1.0,
+        "impulseSus": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.5,
+        "rq": 0.35,
+        "thresh": 0.4
+      },
       "controls": [
         "out",
         "pan",
@@ -205,6 +319,20 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "cutoff": 1000.0,
+        "dec": 0.3,
+        "freq": 440.0,
+        "gain": 2.0,
+        "gate": 1.0,
+        "lagamount": 0.01,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.2,
+        "sus": 0.9
+      },
       "controls": [
         "out",
         "pan",
@@ -230,6 +358,14 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.0,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0
+      },
       "controls": [
         "out",
         "freq",
@@ -249,6 +385,19 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.0,
+        "bendMultiple": 0.25,
+        "bendTime": 0.075,
+        "freq": 75.0,
+        "impulseStartFreq": 800.0,
+        "impulseStopFreq": 120.0,
+        "onFraction": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0
+      },
       "controls": [
         "out",
         "amp",
@@ -273,6 +422,15 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.001,
+        "curve": -8.0,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.15
+      },
       "controls": [
         "out",
         "amp",
@@ -293,6 +451,15 @@
     },
     {
       "category": "bass",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.001,
+        "curve": 8.0,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0
+      },
       "controls": [
         "out",
         "amp",
@@ -313,6 +480,14 @@
     },
     {
       "category": "bells",
+      "control_defaults": {
+        "amp": 0.01,
+        "att": 0.001,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 6.0
+      },
       "controls": [
         "freq",
         "amp",
@@ -332,6 +507,13 @@
     },
     {
       "category": "bells",
+      "control_defaults": {
+        "amp": 0.5,
+        "decayScale": 1.0,
+        "freq": 2434.0,
+        "lag": 10.0,
+        "singSwitch": 0.0
+      },
       "controls": [
         "out",
         "singSwitch",
@@ -351,6 +533,13 @@
     },
     {
       "category": "bells",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "freq": 440.0,
+        "pan": 0.0,
+        "rel": 11.0
+      },
       "controls": [
         "freq",
         "att",
@@ -369,6 +558,14 @@
     },
     {
       "category": "bells",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.005,
+        "freq": 400.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 2.0
+      },
       "controls": [
         "out",
         "pan",
@@ -388,6 +585,26 @@
     },
     {
       "category": "bells",
+      "control_defaults": {
+        "amp": 0.1,
+        "freq": 440.0,
+        "humAmp": 0.5,
+        "humAtt": 0.5,
+        "humDec": 0.5,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 2.0,
+        "ringAmp": 1.0,
+        "ringRel": 0.9,
+        "strikeAmp": 1.0,
+        "strikeDec": 0.01,
+        "strikeDepth": 0.028,
+        "strikeHarmonic": 8.0,
+        "strikeRel": 0.04,
+        "wobbleDepth": 0.6,
+        "wobbleMax": 1.8,
+        "wobbleMin": 1.0
+      },
       "controls": [
         "freq",
         "out",
@@ -421,6 +638,14 @@
     },
     {
       "category": "bells",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.005,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 9.0
+      },
       "controls": [
         "freq",
         "amp",
@@ -440,6 +665,14 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.75
+      },
       "controls": [
         "out",
         "pan",
@@ -459,6 +692,16 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.02,
+        "curve": -4.0,
+        "fadeFreq": 4000.0,
+        "mix": 0.6,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.2
+      },
       "controls": [
         "out",
         "amp",
@@ -480,6 +723,22 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "blend": 0.7,
+        "curve": -4.0,
+        "decay": 0.15,
+        "maxDelay": 0.05,
+        "minDelay": 0.025,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.25,
+        "reverb": 0.1,
+        "rq": 0.4,
+        "size": 0.25,
+        "spreadRate": 75.0
+      },
       "controls": [
         "out",
         "amp",
@@ -507,6 +766,10 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "out": 0.0
+      },
       "controls": [
         "out",
         "amp",
@@ -522,6 +785,18 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.002,
+        "dec": 0.25,
+        "decLevel": 0.4,
+        "freqMultiplier": 4.09,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.05,
+        "reverb": 0.33,
+        "size": 0.5
+      },
       "controls": [
         "out",
         "pan",
@@ -545,6 +820,21 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.001,
+        "curve": -4.0,
+        "hiAtt": 1.0,
+        "hiRel": 3.0,
+        "hidriverMax": 10001.0,
+        "hidriverMin": 1.0,
+        "loAtt": 0.5,
+        "lodriverMax": 20000.0,
+        "lodriverMin": 10.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.5
+      },
       "controls": [
         "out",
         "pan",
@@ -571,6 +861,16 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "crv": -6.0,
+        "looprate": 10000.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.25,
+        "timbre": 0.0
+      },
       "controls": [
         "out",
         "pan",
@@ -592,6 +892,13 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.01,
+        "ffreq": 6000.0,
+        "out": 0.0,
+        "rel": 0.2
+      },
       "controls": [
         "out",
         "amp",
@@ -610,6 +917,15 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.3,
+        "att": 0.001,
+        "curve": -8.0,
+        "filterFreq": 4010.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.3
+      },
       "controls": [
         "out",
         "pan",
@@ -630,6 +946,14 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.3,
+        "att": 0.01,
+        "glissf": 0.9,
+        "out": 0.0,
+        "rel": 0.45,
+        "sinFreq": 60.0
+      },
       "controls": [
         "out",
         "amp",
@@ -649,6 +973,16 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.001,
+        "dist": 0.5,
+        "freq1": 240.0,
+        "freq2": 60.0,
+        "out": 0.0,
+        "rel": 1.0,
+        "ringTime": 10.0
+      },
       "controls": [
         "out",
         "freq1",
@@ -670,6 +1004,46 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.4,
+        "cfreq": 6100.0,
+        "crq": 1.0,
+        "curve": -4.0,
+        "h1amp": 1.0,
+        "h1att": 0.001,
+        "h1curve": -4.0,
+        "h1del": 0.001,
+        "h1freq": 100.0,
+        "h1glide": 0.01,
+        "h1harmonic": 8.0,
+        "h1rel": 0.02,
+        "h1rq": 0.6,
+        "h2amp": 0.5,
+        "h2att": 0.003,
+        "h2curve": -4.0,
+        "h2del": 0.0,
+        "h2freq": 1320.0,
+        "h2glide": 0.0,
+        "h2harmonic": 1.0,
+        "h2rel": 0.03,
+        "out": 0.0,
+        "pan": 2.0,
+        "t1amp": 1.0,
+        "t1att": 0.0005,
+        "t1curve": -4.0,
+        "t1del": 0.0,
+        "t1freq": 400.0,
+        "t1glide": 0.01,
+        "t1harmonic": 2.0,
+        "t1rel": 0.01,
+        "t2amp": 1.0,
+        "t2att": 0.0001,
+        "t2del": 0.005,
+        "t2freq": 50.0,
+        "t2glide": 0.01,
+        "t2harmonic": 3.44,
+        "t2rel": 0.3
+      },
       "controls": [
         "out",
         "pan",
@@ -723,6 +1097,13 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 1.0,
+        "decay": 0.25,
+        "freq": 40.0,
+        "out": 0.0,
+        "pan": 0.0
+      },
       "controls": [
         "out",
         "pan",
@@ -741,6 +1122,14 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "curve": -20.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.5
+      },
       "controls": [
         "out",
         "amp",
@@ -760,6 +1149,12 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.3,
+        "att": 0.005,
+        "out": 0.0,
+        "pan": 0.0
+      },
       "controls": [
         "out",
         "pan",
@@ -777,6 +1172,18 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.005,
+        "curve": -4.0,
+        "filterHarmonic": 1.5,
+        "noiseAmp": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "preamp": 1.25,
+        "pulseAmp": 0.5,
+        "rel": 0.29
+      },
       "controls": [
         "out",
         "amp",
@@ -800,6 +1207,19 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.01,
+        "dec": 0.1,
+        "decaylevel": 0.8,
+        "envCurve": -4.0,
+        "freq": 66.0,
+        "harmonic": 6.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.3,
+        "sweeptime": 0.08
+      },
       "controls": [
         "amp",
         "out",
@@ -826,6 +1246,15 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.01,
+        "curve": -6.0,
+        "dec": 0.3,
+        "freq": 2000.0,
+        "pan": 0.0,
+        "rq": 3.0
+      },
       "controls": [
         "amp",
         "freq",
@@ -846,6 +1275,34 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "bodyamp": 2.0,
+        "bodyatt": 0.04,
+        "bodyrel": 0.2,
+        "clickamp": 1.0,
+        "clickatt": 0.001,
+        "clickrel": 0.001,
+        "clicksus": 0.01,
+        "curve": -4.0,
+        "freq": 160.0,
+        "hipass": 300.0,
+        "lopass": 8000.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "preamp": 1.4,
+        "rattleamp": 0.7,
+        "rattleatt": 0.05,
+        "rattlefreq": 4000.0,
+        "rattlehold": 0.01,
+        "rattlepeak": 3.0,
+        "rattlerel": 0.2,
+        "rq": 0.5,
+        "sweepamp": 1.0,
+        "sweepatt": 0.001,
+        "sweeprel": 0.02,
+        "sweepstart": 3000.0
+      },
       "controls": [
         "out",
         "pan",
@@ -885,6 +1342,25 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.003,
+        "curve": -4.0,
+        "db": -3.0,
+        "decay": 0.06,
+        "echohz1": 33.333,
+        "echohz2": 33.156,
+        "freq": 100.0,
+        "mix": 0.23,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.00035,
+        "rq": 0.1,
+        "rs": 0.5,
+        "shelfFreq": 7000.0,
+        "size": 0.15,
+        "tone": 0.4
+      },
       "controls": [
         "out",
         "amp",
@@ -915,6 +1391,14 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.75
+      },
       "controls": [
         "out",
         "pan",
@@ -934,6 +1418,14 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "ffreq": 2000.0,
+        "out": 0.0,
+        "rel": 0.2,
+        "sinfreq": 180.0
+      },
       "controls": [
         "out",
         "amp",
@@ -953,6 +1445,20 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.0005,
+        "curve": -2.0,
+        "freq": 185.0,
+        "lpFreq": 7040.0,
+        "noiseAmp": 0.2,
+        "noiseRel": 0.4,
+        "nyquist": 500.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "toneAmp": 0.25,
+        "toneRel": 0.075
+      },
       "controls": [
         "out",
         "pan",
@@ -978,6 +1484,18 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.4,
+        "att": 0.001,
+        "curve": -4.0,
+        "noisefreq": 810.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "popfreq": 160.0,
+        "rel": 0.15,
+        "rq": 1.6,
+        "sweep": 0.01
+      },
       "controls": [
         "out",
         "pan",
@@ -1001,6 +1519,25 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.05,
+        "blend": 0.333,
+        "curve": -4.0,
+        "dec": 0.03,
+        "filterHarmonic": 1.2,
+        "freq": 139.0,
+        "noiseBottom": 200.0,
+        "noisePeak": 6900.0,
+        "noiseRatio": 0.4,
+        "oscsAmp": 1.0,
+        "oscsHarmonic": 1.6,
+        "out": 0.0,
+        "pan": 0.0,
+        "preamp": 1.2,
+        "rel": 0.1,
+        "rq": 0.6
+      },
       "controls": [
         "out",
         "amp",
@@ -1031,6 +1568,21 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.0005,
+        "curve": -4.0,
+        "noiseamp": 0.2,
+        "noisebottom": 523.0,
+        "noiserel": 0.2,
+        "noisetop": 7040.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "toneamp": 0.5,
+        "tonehi": 330.0,
+        "tonelo": 185.0,
+        "tonerel": 0.075
+      },
       "controls": [
         "out",
         "amp",
@@ -1057,6 +1609,24 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.8,
+        "bodyAmp": 1.0,
+        "bodyAtt": 0.005,
+        "bodyRel": 0.1,
+        "bodyStart": 9000.0,
+        "curve": -4.0,
+        "freq": 6000.0,
+        "initAmp": 1.0,
+        "initAtt": 0.005,
+        "initEnd": 9000.0,
+        "initRel": 0.1,
+        "initStart": 15000.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rootIndex": 238.5,
+        "rq": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1086,6 +1656,26 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 1.0,
+        "beaterAmp": 0.02,
+        "beaterAtt": 0.01,
+        "beaterFreq": 500.0,
+        "beaterHarmonic": 12.0,
+        "beaterSweep": 0.03,
+        "curve": -4.0,
+        "drumAmp": 1.0,
+        "drumAtt": 0.005,
+        "drumFilter": 1000.0,
+        "drumFreq": 50.0,
+        "drumHarmonic": 2.0,
+        "drumRel": 0.4,
+        "drumSweep": 0.02,
+        "modFreq": 5.0,
+        "modIndex": 6.5,
+        "out": 0.0,
+        "pan": 0.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1117,6 +1707,23 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.8,
+        "att": 0.005,
+        "curve": -4.0,
+        "drumModeAmp": 0.25,
+        "ffreq": 2000.0,
+        "freq": 405.0,
+        "modHarmonic": 0.452,
+        "nyquist": 1700.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.1,
+        "rq": 0.1,
+        "snareAmp": 40.0,
+        "snareRez": 1000.0,
+        "timbreIndex": 0.385
+      },
       "controls": [
         "out",
         "pan",
@@ -1145,6 +1752,17 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.005,
+        "drumModeAmp": 0.25,
+        "drumRel": 0.4,
+        "freq": 250.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "stickRel": 0.01,
+        "timbreIndex": 0.77
+      },
       "controls": [
         "out",
         "pan",
@@ -1167,6 +1785,23 @@
     },
     {
       "category": "drums",
+      "control_defaults": {
+        "amp": 0.6,
+        "ampSlope": 3.0,
+        "att": 0.001,
+        "dec": 0.01,
+        "decCoef": 0.175,
+        "followAtt": 0.005,
+        "followRel": 0.075,
+        "freq": 180.0,
+        "headAmp": 0.5,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.2,
+        "snareGate": 0.6,
+        "snaresAmp": 0.65,
+        "thresh": 0.25
+      },
       "controls": [
         "out",
         "freq",
@@ -1195,6 +1830,25 @@
     },
     {
       "category": "guitar",
+      "control_defaults": {
+        "amp": 0.1,
+        "coef": 0.75,
+        "crv": -3.0,
+        "freq": 220.0,
+        "muteSus": 0.5,
+        "openStringFreq": 110.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "pickPos": 0.5,
+        "pickupHPF": 250.0,
+        "pickupHPFrq": 0.8,
+        "pickupPos": 0.17,
+        "pickupResfreq": 8000.0,
+        "pickupResrq": 0.5,
+        "postDistLPF": 2000.0,
+        "preDistHPF": 600.0,
+        "rel": 4.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1225,6 +1879,22 @@
     },
     {
       "category": "guitar",
+      "control_defaults": {
+        "amp": 0.3,
+        "dampCoef": 0.0002,
+        "decayCoef": 0.125,
+        "freq": 440.0,
+        "muteSus": 5.5,
+        "openFreq": 82.5,
+        "out": 0.0,
+        "pan": 0.0,
+        "pickPos": 0.414,
+        "pickupPos": 0.17,
+        "pickupWidth": 0.75,
+        "rel": 5.0,
+        "resFreq": 4000.0,
+        "rq": 0.5
+      },
       "controls": [
         "out",
         "pan",
@@ -1252,6 +1922,12 @@
     },
     {
       "category": "guitar",
+      "control_defaults": {
+        "amp": 0.1,
+        "coef": 0.1,
+        "decay": 5.0,
+        "freq": 440.0
+      },
       "controls": [
         "amp",
         "freq",
@@ -1269,6 +1945,19 @@
     },
     {
       "category": "keyboards",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "freq": 440.0,
+        "gate": 1.0,
+        "inputLevel": 0.2,
+        "lfoSpeed": 4.8,
+        "mix": 0.2,
+        "modIndex": 0.2,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0
+      },
       "controls": [
         "out",
         "freq",
@@ -1293,6 +1982,22 @@
     },
     {
       "category": "keyboards",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "fmHarmonic": 30.0,
+        "freq": 440.0,
+        "gate": 1.0,
+        "inputLevel": 0.2,
+        "lfoBottom": 0.15,
+        "lfoDepth": 0.75,
+        "lfoSpeed": 2.4,
+        "mix": 0.2,
+        "modIndex": 2.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0
+      },
       "controls": [
         "out",
         "freq",
@@ -1320,6 +2025,15 @@
     },
     {
       "category": "keyboards",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0,
+        "tone": 0.25
+      },
       "controls": [
         "out",
         "freq",
@@ -1340,6 +2054,26 @@
     },
     {
       "category": "keyboards",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.75,
+        "cutoff": 200.0,
+        "dec": 0.5,
+        "dtune": 0.002,
+        "fatt": 0.75,
+        "fdec": 0.5,
+        "frel": 1.0,
+        "freq": 440.0,
+        "fsus": 0.8,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "ratio": 0.8,
+        "rel": 1.0,
+        "sus": 0.8,
+        "vibdepth": 0.015,
+        "vibspeed": 4.0
+      },
       "controls": [
         "freq",
         "amp",
@@ -1371,6 +2105,19 @@
     },
     {
       "category": "keyboards",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "beatingsRatio": 1.0009,
+        "filterMax": 5000.0,
+        "filterMin": 4000.0,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.3,
+        "sawWidth": 0.3
+      },
       "controls": [
         "out",
         "freq",
@@ -1395,6 +2142,17 @@
     },
     {
       "category": "keyboards",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "filterRange": 2000.0,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 3.0,
+        "rq": 0.5,
+        "width": 0.2
+      },
       "controls": [
         "out",
         "freq",
@@ -1418,6 +2176,11 @@
     },
     {
       "category": "keyboards",
+      "control_defaults": {
+        "amp": 0.1,
+        "freq": 440.0,
+        "out": 0.0
+      },
       "controls": [
         "out",
         "freq",
@@ -1434,6 +2197,15 @@
     },
     {
       "category": "keyboards",
+      "control_defaults": {
+        "amp": 0.1,
+        "coef": 0.1,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 5.0,
+        "trig": 1.0
+      },
       "controls": [
         "out",
         "amp",
@@ -1454,6 +2226,15 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "curve": -4.0,
+        "dec": 1.0,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0
+      },
       "controls": [
         "freq",
         "amp",
@@ -1474,6 +2255,14 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "freq": 25.0,
+        "numharm": 10.0,
+        "out": 0.0,
+        "rel": 1.0
+      },
       "controls": [
         "out",
         "freq",
@@ -1493,6 +2282,25 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.01,
+        "chaosDownEnd": 0.0,
+        "chaosDownStart": 0.0,
+        "chaosDownTime": 1.0,
+        "chaosUpEnd": 0.5,
+        "chaosUpStart": 0.0,
+        "chaosUpTime": 1.0,
+        "curve": -4.0,
+        "cutoff": 20000.0,
+        "freq": 40.0,
+        "gate": 1.0,
+        "hashRate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "reHashesPerCycle": 1.0,
+        "rel": 1.5
+      },
       "controls": [
         "out",
         "pan",
@@ -1523,6 +2331,16 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.001,
+        "crv": -2.0,
+        "freq": 160.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "preamp": 1.0,
+        "rel": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1544,6 +2362,22 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "bitdepth": 16.0,
+        "crv": -2.0,
+        "dec": 0.1,
+        "filterswitch": 0.0,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "preamp": 1.0,
+        "rel": 1.0,
+        "samplerate": 10000.0,
+        "sus": 0.9
+      },
       "controls": [
         "out",
         "pan",
@@ -1571,6 +2405,12 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.1,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1588,6 +2428,22 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.05,
+        "blend": 0.0,
+        "crv": -2.0,
+        "dec": 0.1,
+        "focus": 0.0,
+        "freq": 160.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "preamp": 15.0,
+        "rel": 0.7,
+        "select": 2.0,
+        "sus": 0.6
+      },
       "controls": [
         "out",
         "pan",
@@ -1615,6 +2471,23 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.1,
+        "ampSlope": 3.0,
+        "att": 0.0,
+        "dec": 1.0,
+        "decCoef": 0.25,
+        "expRatio": 2.0,
+        "filterfreq": 4000.0,
+        "freq": 1000.0,
+        "mix": 0.1,
+        "out": 0.0,
+        "pan": 0.0,
+        "position": 0.1,
+        "rel": 3.0,
+        "size": 0.6,
+        "thresh": 0.75
+      },
       "controls": [
         "out",
         "freq",
@@ -1643,6 +2516,11 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.2,
+        "freq": 440.0,
+        "out": 0.0
+      },
       "controls": [
         "out",
         "freq",
@@ -1659,6 +2537,24 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 1.0,
+        "crv": -4.0,
+        "dec": 3.0,
+        "drylevel": 1.5,
+        "fmdepth": 1.5,
+        "freq": 440.0,
+        "gate": 1.0,
+        "maxfreq": 16000.0,
+        "minfreq": 100.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rate": 1.0,
+        "rel": 1.5,
+        "rq": 0.5,
+        "sus": 0.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1688,6 +2584,16 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.2,
+        "att": 0.001,
+        "curve": -4.0,
+        "dur": 1.0,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rate": 4.0
+      },
       "controls": [
         "freq",
         "amp",
@@ -1709,6 +2615,16 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.001,
+        "crv": -2.0,
+        "freq": 160.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "preamp": 20.0,
+        "rel": 0.7
+      },
       "controls": [
         "out",
         "pan",
@@ -1730,6 +2646,21 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.05,
+        "curve": -4.0,
+        "freq": 220.0,
+        "gate": 1.0,
+        "kAmp": 0.05,
+        "lag": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.1,
+        "vibDepth": 0.04,
+        "vibSpeed": 6.0,
+        "vowel": 0.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1756,6 +2687,26 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.05,
+        "att": 0.005,
+        "crv": -6.0,
+        "freq": 330.0,
+        "gateSwitch": 1.0,
+        "gateThresh": 0.5,
+        "method": 0.0,
+        "noiseDepth": 0.05,
+        "out": 0.0,
+        "pan": 0.0,
+        "pw": 0.5,
+        "pwmDepth": 0.15,
+        "pwmRate": 12.0,
+        "rel": 3.5,
+        "resAtt": 0.5,
+        "resFreqL": 500.0,
+        "resFreqR": 5000.0,
+        "resStartFreq": 2000.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1787,6 +2738,20 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.01,
+        "cutoff": 100.0,
+        "dec": 0.1,
+        "freq": 440.0,
+        "gate": 1.0,
+        "lforate": 10.0,
+        "lfowidth": 0.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.5,
+        "sus": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1812,6 +2777,15 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "att": 0.01,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "sus": 1.0,
+        "t_trig": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1832,6 +2806,21 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.2,
+        "att": 0.001,
+        "freq": 440.0,
+        "gate": 1.0,
+        "mainsDepth": 0.1,
+        "mainsHz": 50.0,
+        "noiseAmp": 0.06,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.5,
+        "sus": 1.0,
+        "vdepth": 0.005,
+        "vrate": 2.0
+      },
       "controls": [
         "amp",
         "freq",
@@ -1858,6 +2847,19 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "cutoff": 100.0,
+        "dec": 0.0,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0,
+        "rq": 0.1,
+        "sus": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1882,6 +2884,17 @@
     },
     {
       "category": "misc",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "cutoff": 100.0,
+        "dec": 0.0,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "rq": 0.1,
+        "sus": 1.0
+      },
       "controls": [
         "out",
         "freq",
@@ -1904,6 +2917,20 @@
     },
     {
       "category": "organ",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "cutoff": 100.0,
+        "dec": 0.5,
+        "freq": 440.0,
+        "gate": 1.0,
+        "lforate": 10.0,
+        "lfowidth": 0.01,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.5,
+        "sus": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -1929,6 +2956,26 @@
     },
     {
       "category": "organ",
+      "control_defaults": {
+        "amDepth": 0.05,
+        "amRate": 5.0,
+        "amp": 0.3,
+        "att": 0.3,
+        "fFreq": 2442.0,
+        "fHarmonic": 0.82,
+        "freq": 440.0,
+        "gate": 1.0,
+        "hiFreq": 1200.0,
+        "hirs": 1.0,
+        "nyquist": 18000.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "pwmDepth": 0.1,
+        "pwmRate": 0.06,
+        "ranDepth": 0.04,
+        "rel": 0.3,
+        "rq": 0.3
+      },
       "controls": [
         "out",
         "pan",
@@ -1960,6 +3007,26 @@
     },
     {
       "category": "organ",
+      "control_defaults": {
+        "amp": 0.7,
+        "att": 0.001,
+        "bass": 1.0,
+        "blockFlute": 1.0,
+        "crv": -4.0,
+        "freq": 440.0,
+        "fundamental": 1.0,
+        "gate": 1.0,
+        "larigot": 1.0,
+        "nazard": 1.0,
+        "oct": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "quint": 1.0,
+        "rel": 0.01,
+        "sifflute": 1.0,
+        "tierce": 1.0,
+        "vrate": 3.0
+      },
       "controls": [
         "out",
         "freq",
@@ -1991,6 +3058,30 @@
     },
     {
       "category": "organ",
+      "control_defaults": {
+        "amp": 0.7,
+        "att": 0.001,
+        "bass": 1.0,
+        "blockFlute": 1.0,
+        "curve": -4.0,
+        "freq": 440.0,
+        "fundamental": 1.0,
+        "gate": 1.0,
+        "larigot": 1.0,
+        "nazard": 1.0,
+        "oct": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "quint": 1.0,
+        "rel": 0.01,
+        "sifflute": 1.0,
+        "tierce": 1.0,
+        "vdelay": 0.1,
+        "vdepth": 0.008,
+        "vonset": 0.0,
+        "vrate": 3.0,
+        "vrateVariation": 0.1
+      },
       "controls": [
         "out",
         "freq",
@@ -2026,6 +3117,19 @@
     },
     {
       "category": "organ",
+      "control_defaults": {
+        "amp": 0.45,
+        "att": 0.001,
+        "filterHarmonic": 5.04,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.1,
+        "rq": 1.0,
+        "vibHarmonic": 1.017,
+        "vibRate": 6.0
+      },
       "controls": [
         "out",
         "pan",
@@ -2050,6 +3154,23 @@
     },
     {
       "category": "organ",
+      "control_defaults": {
+        "amp": 0.45,
+        "att": 0.001,
+        "filterHarmonic": 5.04,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.1,
+        "rq": 1.0,
+        "vdelay": 0.1,
+        "vdepth": 0.02,
+        "vdepthVariation": 0.1,
+        "vonset": 0.0,
+        "vrate": 6.0,
+        "vrateVariation": 0.1
+      },
       "controls": [
         "out",
         "pan",
@@ -2078,6 +3199,24 @@
     },
     {
       "category": "organ",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.0,
+        "cutoff": 5000.0,
+        "dec": 0.0,
+        "freq": 440.0,
+        "gate": 1.0,
+        "lfodepth": 0.006,
+        "lforate": 4.85,
+        "out": 0.0,
+        "pan": 0.0,
+        "pardb": 3.0,
+        "parfreq": 500.0,
+        "parrq": 1.0,
+        "rel": 0.1,
+        "rq": 0.25,
+        "sus": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -2107,6 +3246,23 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.4,
+        "dec": 0.5,
+        "freq": 880.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0,
+        "reverbMix": 0.5,
+        "roomSize": 1.0,
+        "sus": 0.8,
+        "tremoloDepth": 0.5,
+        "tremoloRate": 5.0,
+        "vibratoDepth": 0.015,
+        "vibratoRate": 4.0
+      },
       "controls": [
         "out",
         "pan",
@@ -2135,6 +3291,28 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 0.1,
+        "arpatt": 0.7,
+        "arpmix": 0.35,
+        "arprate": 10.0,
+        "arprel": 0.6,
+        "att": 0.3,
+        "chorusdepth": 0.015,
+        "chorusrate": 0.5,
+        "crv": 0.0,
+        "cutoff": 8000.0,
+        "decay": 2.0,
+        "delayt": 0.25,
+        "div": 0.25,
+        "freq": 220.0,
+        "gate": 1.0,
+        "glide": 0.15,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 1.0,
+        "rq": 0.75
+      },
       "controls": [
         "out",
         "amp",
@@ -2168,6 +3346,29 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 2.0,
+        "crv": 0.0,
+        "dec": 1.0,
+        "delAtt": 1.0,
+        "delDec": 2.0,
+        "delPeak": 0.0,
+        "delStartStop": 0.55,
+        "delSus": 0.25,
+        "fbAtt": 3.0,
+        "fbDec": 2.0,
+        "fbPeak": 0.8,
+        "fbRel": 5.0,
+        "fbStartStop": 0.0,
+        "fbSus": 0.67,
+        "freq": 75.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 4.0,
+        "sus": 1.0
+      },
       "controls": [
         "out",
         "amp",
@@ -2202,6 +3403,29 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 1.5,
+        "crv": 0.0,
+        "dec": 0.1,
+        "del": 0.1,
+        "filterLo": 1500.0,
+        "fmAtt": 1.0,
+        "fmDec": 0.5,
+        "fmPeak": 5.0,
+        "fmRel": 1.0,
+        "fmStartStop": 0.0,
+        "fmSus": 2.0,
+        "freq": 100.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "polFlip": 1.0,
+        "rel": 1.75,
+        "rq": 0.9,
+        "sus": 1.0,
+        "thresh": 0.0075
+      },
       "controls": [
         "out",
         "amp",
@@ -2236,6 +3460,23 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 0.15,
+        "att": 3.0,
+        "crv": 0.0,
+        "damp": 0.5,
+        "dec": 1.0,
+        "freq": 100.0,
+        "gate": 1.0,
+        "notes": 6.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 5.0,
+        "reverbMix": 0.75,
+        "roomSize": 0.9,
+        "sampleRate": 20.0,
+        "sus": 1.0
+      },
       "controls": [
         "out",
         "amp",
@@ -2264,6 +3505,24 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "crv": -2.0,
+        "filterDelay1": 0.00025,
+        "freq": 1000.0,
+        "hold": 0.25,
+        "lfoADepth": 0.25,
+        "lfoARate": 5.0,
+        "lfoBDepth": 0.5,
+        "lfoBRate": 2.7,
+        "out": 0.0,
+        "pSwitch": 0.0,
+        "pan": 0.0,
+        "phaseACenter": 0.35,
+        "phaseBCenter": 0.5,
+        "rel": 2.0
+      },
       "controls": [
         "out",
         "freq",
@@ -2293,6 +3552,24 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.25,
+        "balance": 0.5,
+        "crv": 0.0,
+        "filterHi": 2000.0,
+        "filterLo": 100.0,
+        "freq": 100.0,
+        "gate": 1.0,
+        "lfoDepth": 0.015,
+        "lfoFreq": 0.1,
+        "midPreamp": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 3.0,
+        "rq": 0.3,
+        "sidePreamp": 2.0
+      },
       "controls": [
         "out",
         "amp",
@@ -2322,6 +3599,14 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.1,
+        "freq": 440.0,
+        "hifreq": 3000.0,
+        "lofreq": 1000.0,
+        "rel": 2.0
+      },
       "controls": [
         "freq",
         "amp",
@@ -2341,6 +3626,29 @@
     },
     {
       "category": "pads",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.1,
+        "crv": 0.0,
+        "dec": 0.2,
+        "detuneFade": 0.25,
+        "detuneRatio": 1.025,
+        "fAtt": 3.0,
+        "fDec": 3.0,
+        "fSus": 0.8,
+        "filterHi": 8000.0,
+        "filterLo": 80.0,
+        "freq": 40.0,
+        "gate": 1.0,
+        "numberOscs": 100.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "preamp": 2.0,
+        "rel": 5.0,
+        "rq": 0.8,
+        "spread": 1.0,
+        "sus": 0.9
+      },
       "controls": [
         "out",
         "pan",
@@ -2375,6 +3683,18 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 1.0,
+        "ampSlope": 3.0,
+        "att": 0.001,
+        "dec": 0.01,
+        "decCoef": 0.15,
+        "freq": 140.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "position": 0.5,
+        "rel": 1.0
+      },
       "controls": [
         "out",
         "freq",
@@ -2398,6 +3718,20 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 0.5,
+        "att": 0.0025,
+        "crv": 0.0,
+        "dec": 0.0025,
+        "decCoef": 0.225,
+        "freq": 170.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "position": 0.8,
+        "rel": 5.0,
+        "thumpAmp": 0.5,
+        "thumpDec": 0.2
+      },
       "controls": [
         "out",
         "pan",
@@ -2423,6 +3757,16 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "crv": -8.0,
+        "freq": 440.0,
+        "mix": 0.1,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 3.0
+      },
       "controls": [
         "out",
         "freq",
@@ -2444,6 +3788,15 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 0.4,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rq": 0.02,
+        "rs": 0.81,
+        "shelffreq": 220.0
+      },
       "controls": [
         "freq",
         "out",
@@ -2464,6 +3817,18 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 0.5,
+        "crv": 0.0,
+        "decCoef": 0.31,
+        "freq": 3000.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "ratio": 1.0,
+        "rel": 2.0,
+        "xpos": 0.5,
+        "ypos": 0.5
+      },
       "controls": [
         "out",
         "freq",
@@ -2487,6 +3852,17 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.001,
+        "dec": 0.1,
+        "decCoef": 2.0,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "position": 0.414,
+        "rel": 0.5
+      },
       "controls": [
         "out",
         "freq",
@@ -2509,6 +3885,17 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 0.8,
+        "att": 0.0,
+        "curve": -6.0,
+        "freq": 261.0,
+        "modLo": 5.25,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 2.0,
+        "tone": 3.0
+      },
       "controls": [
         "out",
         "freq",
@@ -2531,6 +3918,15 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 0.1,
+        "att": 0.01,
+        "curve": -6.0,
+        "dec": 1.5,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0
+      },
       "controls": [
         "freq",
         "amp",
@@ -2551,6 +3947,14 @@
     },
     {
       "category": "percussion",
+      "control_defaults": {
+        "amp": 0.01,
+        "att": 0.001,
+        "freq": 440.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 2.0
+      },
       "controls": [
         "freq",
         "amp",
@@ -2570,6 +3974,20 @@
     },
     {
       "category": "strings",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.01,
+        "cutoff": 12000.0,
+        "dec": 0.5,
+        "freq": 440.0,
+        "gate": 1.0,
+        "lforate": 10.0,
+        "lfowidth": 0.5,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.0,
+        "sus": 1.0
+      },
       "controls": [
         "out",
         "pan",
@@ -2595,6 +4013,21 @@
     },
     {
       "category": "strings",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.001,
+        "combHarmonic": 4.0,
+        "dec": 0.1,
+        "freq": 440.0,
+        "freqLag": 0.2,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "rel": 0.3,
+        "rq": 0.001,
+        "sawHarmonic": 1.5,
+        "sus": 0.75
+      },
       "controls": [
         "out",
         "freq",
@@ -2621,6 +4054,27 @@
     },
     {
       "category": "strings",
+      "control_defaults": {
+        "amp": 1.0,
+        "att": 0.1,
+        "bridgeFreq": 2500.0,
+        "dec": 0.1,
+        "freq": 440.0,
+        "gate": 1.0,
+        "out": 0.0,
+        "pan": 0.0,
+        "pwmMax": 0.8,
+        "pwmMin": 0.7,
+        "pwmRate": 5.0,
+        "pwmVarRate": 2.0,
+        "rel": 0.1,
+        "sus": 0.5,
+        "vAtt": 0.15,
+        "vDepth": 0.02,
+        "vDepthVar": 0.05,
+        "vRate": 4.6,
+        "vRateVar": 0.25
+      },
       "controls": [
         "freq",
         "gate",
@@ -2653,6 +4107,16 @@
     },
     {
       "category": "winds",
+      "control_defaults": {
+        "dur": 1.0,
+        "freq": 440.0,
+        "gate": 1.0,
+        "ibreath": 0.09,
+        "ifeedbk1": 0.4,
+        "ifeedbk2": 0.4,
+        "ipress": 0.9,
+        "scl": 0.2
+      },
       "controls": [
         "scl",
         "freq",

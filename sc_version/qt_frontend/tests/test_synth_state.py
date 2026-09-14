@@ -46,6 +46,26 @@ def definition(key: str, cutoff: float, resonance: float):
     )
 
 
+def browser_definition(
+    key: str,
+    label: str,
+    *,
+    kind: str = "synth",
+    family: str = "",
+    variant: str = "",
+    articulation: str = "",
+):
+    return SimpleNamespace(
+        key=key,
+        label=label,
+        controls=(),
+        kind=kind,
+        browser_group=family,
+        variant_label=variant,
+        articulation_label=articulation,
+    )
+
+
 class SynthStateTests(unittest.TestCase):
     def setUp(self) -> None:
         self.definitions = (
@@ -125,6 +145,41 @@ class SynthStateTests(unittest.TestCase):
         target.copy_from(source)
         self.assertEqual(target.selected_index, 1)
         self.assertEqual(target.transport_payload(), source.transport_payload())
+
+    def test_browser_switches_kinds_without_losing_the_last_selection(self) -> None:
+        definitions = (
+            browser_definition("synth.a", "A"),
+            browser_definition("synth.b", "B"),
+            browser_definition("sample.violin.sus", "Violin", kind="sample", family="Violin", variant="Ensemble", articulation="Sustain"),
+            browser_definition("sample.violin.pizz", "Violin", kind="sample", family="Violin", variant="Ensemble", articulation="Pizzicato"),
+            browser_definition("sample.piano", "Piano", kind="sample", family="Piano", variant="Upright", articulation="Normal"),
+        )
+        state = SynthState(definitions, 1)
+        self.assertEqual(state.browser_names(), ["A", "B"])
+        self.assertTrue(state.select_kind("sample"))
+        self.assertEqual(state.browser_names(), ["Violin", "Piano"])
+        self.assertTrue(state.select(3))
+        self.assertTrue(state.select_kind("synth"))
+        self.assertEqual(state.selected_definition.key, "synth.b")
+        self.assertTrue(state.select_kind("sample"))
+        self.assertEqual(state.selected_definition.key, "sample.violin.pizz")
+
+    def test_sample_browser_exposes_variants_and_articulations(self) -> None:
+        definitions = (
+            browser_definition("synth.a", "A"),
+            browser_definition("organ.loud.manual", "Organ", kind="sample", family="Organ", variant="Loud", articulation="Manual"),
+            browser_definition("organ.loud.pedal", "Organ", kind="sample", family="Organ", variant="Loud", articulation="Pedal"),
+            browser_definition("organ.quiet.manual", "Organ", kind="sample", family="Organ", variant="Quiet", articulation="Manual"),
+        )
+        state = SynthState(definitions, 1)
+        columns = state.sample_choice_columns()
+        self.assertEqual([item["label"] for item in columns], ["Loud", "Quiet"])
+        self.assertTrue(all(item["showVariant"] for item in columns))
+        self.assertEqual(
+            [choice["label"] for choice in columns[0]["choices"]],
+            ["Manual", "Pedal"],
+        )
+        self.assertTrue(state.select_browser_index(0) is False)
 
 
 if __name__ == "__main__":

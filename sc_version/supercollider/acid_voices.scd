@@ -7,7 +7,7 @@
          envOctaves=2, filterDecaySeconds=0.25,
          slideSeconds=0.060, slideEnabled=0,
          t_attack=1, t_filter=1, t_accent=0, accentAmount=0.35,
-         pitchBendBus=0, release=0.18|
+         pitchBendBus=0, attack=0.006, decay=0.1, sustain=1, release=0.18|
         var bend = In.kr(pitchBendBus, 1).max(0.01);
         var targetMidi = freqTargetHz.max(10).cpsmidi;
         var glidingMidi = VarLag.kr(targetMidi, slideSeconds.max(0.001));
@@ -30,7 +30,12 @@
             Trig1.kr(t_attack, ControlDur.ir), 0.001, 0.025
         );
         var amplitude = EnvGen.kr(
-            Env.asr(0.006, 1, release.max(0.01)),
+            Env.adsr(
+                attack.max(0.001),
+                decay.max(0.001),
+                sustain.clip(0, 1),
+                release.max(0.01)
+            ),
             gate,
             doneAction: Done.freeSelf
         );
@@ -112,10 +117,17 @@
             "filter_decay_ms", { \filterDecaySeconds },
             "portamento_ms", { \slideSeconds },
             "accent_amount", { \accentAmount },
+            "attack_ms", { \attack },
+            "decay_ms", { \decay },
+            "sustain", { \sustain },
+            "release_ms", { \release },
             { name.asSymbol }
         );
         var value = rawValue;
-        if(["filter_decay_ms", "portamento_ms"].includesEqual(name.asString)) {
+        if([
+            "filter_decay_ms", "portamento_ms", "attack_ms",
+            "decay_ms", "release_ms"
+        ].includesEqual(name.asString)) {
             value = rawValue / 1000;
         };
         if(name.asString == "resonance") {

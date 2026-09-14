@@ -17,6 +17,8 @@ from supercollider_programs import (  # noqa: E402
     build_sclork_catalog,
     load_supercollider_programs,
 )
+from catalog_extensions import load_synth_catalog  # noqa: E402
+from vsco_browser import load_vsco_browser  # noqa: E402
 
 
 class SuperColliderProgramCatalogTests(unittest.TestCase):
@@ -55,7 +57,32 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
         self.assertEqual(mappings["physical_strings"], "sc.sclork.pluck")
 
     def test_native_names_have_human_readable_sc_labels(self) -> None:
-        self.assertEqual(display_name("organTonewheel1"), "SC Organ Tonewheel 1")
+        self.assertEqual(display_name("organTonewheel1"), "Organ Tonewheel 1")
+
+    def test_sc_browser_has_reviewed_controls_and_no_backend_prefixes(self) -> None:
+        synths, *_ = load_synth_catalog(ROOT / "instruments" / "synths.json")
+        self.assertEqual(sum(item.kind == "synth" for item in synths), 80)
+        self.assertEqual(sum(item.kind == "sample" for item in synths), 66)
+        self.assertTrue(all(not item.label.startswith(("SC ", "VSCO ")) for item in synths))
+        warsaw = next(item for item in synths if item.key == "sc.sclork.bassWarsaw")
+        self.assertEqual(
+            [control.key for control in warsaw.controls if control.group == "common"][:4],
+            ["attack_ms", "decay_ms", "sustain", "release_ms"],
+        )
+        self.assertIn("portamento_ms", {control.key for control in warsaw.controls})
+
+    def test_vsco_browser_covers_all_pitched_sources_in_musical_groups(self) -> None:
+        choices = load_vsco_browser(SC_ROOT / "vsco-manifest.json")
+        self.assertEqual(len(choices), 66)
+        self.assertEqual(len({choice.family for choice in choices}), 22)
+        organ = [choice for choice in choices if choice.family == "Organ"]
+        self.assertEqual({choice.variant for choice in organ}, {"Loud", "Quiet"})
+        self.assertEqual({choice.articulation for choice in organ}, {"Manual", "Pedal"})
+        trumpet = [choice for choice in choices if choice.family == "Trumpet"]
+        self.assertEqual(
+            {choice.variant for choice in trumpet},
+            {"Open", "Harmon mute", "Straight mute"},
+        )
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ class SuperColliderProgram:
     native_name: str
     category: str
     controls: tuple[str, ...]
+    control_defaults: tuple[tuple[str, float], ...]
     pitch_support: bool
     release_mode: str
 
@@ -33,7 +34,7 @@ def display_name(native_name: str) -> str:
     words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", native_name)
     words = re.sub(r"(?<=[A-Za-z])(?=[0-9])", " ", words)
     words = words.replace("_", " ")
-    return "SC " + " ".join(word.capitalize() for word in words.split())
+    return " ".join(word.capitalize() for word in words.split())
 
 
 def _legacy_replacement(label: str) -> str:
@@ -153,6 +154,26 @@ def _controls(source: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(_IDENTIFIER.findall(match.group(1))))
 
 
+_NUMERIC_DEFAULT = re.compile(
+    r"\b([A-Za-z][A-Za-z0-9_]*)\s*=\s*\(?\s*"
+    r"([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)\s*\)?"
+    r"(?=\s*[,;|])"
+)
+
+
+def _control_defaults(source: str) -> dict[str, float]:
+    """Read only scalar numeric defaults from a SynthDef argument block."""
+
+    code = _LINE_COMMENT.sub("", _BLOCK_COMMENT.sub("", source))
+    match = _ARG_BLOCK.search(code) or _PIPE_BLOCK.search(code)
+    if match is None:
+        return {}
+    return {
+        str(name): float(value)
+        for name, value in _NUMERIC_DEFAULT.findall(match.group(1))
+    }
+
+
 def build_sclork_catalog(source_root: Path) -> dict[str, object]:
     """Derive immutable runtime metadata from the pinned SynthDef sources."""
 
@@ -164,6 +185,7 @@ def build_sclork_catalog(source_root: Path) -> dict[str, object]:
             raise ValueError(f"{path} contains no SynthDef declaration")
         native_name = match.group(1)
         controls = _controls(source)
+        defaults = _control_defaults(source)
         entries.append(
             {
                 "program_id": f"sc.sclork.{native_name}",
@@ -172,6 +194,9 @@ def build_sclork_catalog(source_root: Path) -> dict[str, object]:
                 "source_path": path.relative_to(source_root.parent.parent).as_posix(),
                 "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                 "controls": list(controls),
+                "control_defaults": {
+                    key: defaults[key] for key in controls if key in defaults
+                },
                 "pitch_support": "freq" in controls,
                 "release_mode": "gated" if "gate" in controls else "natural",
                 "routing_adapter_required": not any(
@@ -205,16 +230,29 @@ def load_supercollider_programs(path: Path) -> tuple[SuperColliderProgram, ...]:
         if not isinstance(item, dict):
             raise ValueError(f"{source} program {index} is not an object")
         controls = item.get("controls")
+        defaults = item.get("control_defaults")
         if not isinstance(controls, list) or not all(
             isinstance(value, str) for value in controls
         ):
             raise ValueError(f"{source} program {index} has invalid controls")
+        if not isinstance(defaults, dict) or not all(
+            isinstance(key, str)
+            and isinstance(value, (int, float))
+            and math.isfinite(float(value))
+            for key, value in defaults.items()
+        ):
+            raise ValueError(f"{source} program {index} has invalid control defaults")
+        if not set(defaults).issubset(controls):
+            raise ValueError(f"{source} program {index} defaults unknown controls")
         programs.append(
             SuperColliderProgram(
                 program_id=str(item["program_id"]),
                 native_name=str(item["native_name"]),
                 category=str(item["category"]),
                 controls=tuple(controls),
+                control_defaults=tuple(
+                    (str(key), float(value)) for key, value in defaults.items()
+                ),
                 pitch_support=bool(item["pitch_support"]),
                 release_mode=str(item["release_mode"]),
             )

@@ -610,7 +610,12 @@ class StaticContractTests(unittest.TestCase):
         self.assertNotIn('text: "STR"', qml)
         self.assertNotIn('text: "CHD"', qml)
         self.assertNotIn('text: "ROWS"', qml)
-        self.assertGreaterEqual(qml.count('text: "RST"'), 4)
+        self.assertEqual(qml.count("InstrumentModeReset {"), 3)
+        mode_reset = (ROOT / "gui" / "InstrumentModeReset.qml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('text: "RST"', mode_reset)
+        self.assertIn('root.mode === "sample" ? "PCM" : "SYN"', mode_reset)
 
     def test_chord_gate_and_grouped_row_roll_controls_are_present(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")

@@ -549,35 +549,36 @@ ApplicationWindow {
                 noteModel: backend.strumNoteNames
             }
 
-            PresetResetButton {
+            InstrumentModeReset {
                 x: (window.leftRailWidth - width) / 2
                 y: window.bassSynthY + (window.sectionHeight - height) / 2
-                width: 50
-                height: 50
-                text: "RST"
+                controller: backend
+                role: "bass"
+                stateIndex: backend.selectedBassSynthIndex
                 panelColor: "#d0d0cc"
                 borderColor: "#7b7b76"
-                onClicked: backend.resetBassToPreset()
             }
 
-            PresetResetButton {
+            InstrumentModeReset {
                 x: (window.leftRailWidth - width) / 2
                 y: window.strumSynthY + (window.sectionHeight - height) / 2
-                text: "RST"
+                controller: backend
+                role: "strum"
+                stateIndex: backend.selectedStrumSynthIndex
                 panelColor: "#b9def3"
                 borderColor: "#589bc6"
                 textColor: "#12344d"
-                onClicked: backend.resetStrumToPreset()
             }
 
-            PresetResetButton {
+            InstrumentModeReset {
                 x: (window.leftRailWidth - width) / 2
                 y: window.chordSynthY + (window.sectionHeight - height) / 2
-                text: "RST"
+                controller: backend
+                role: "chord"
+                stateIndex: backend.selectedChordSynthIndex
                 panelColor: "#c7ddc5"
                 borderColor: "#649068"
                 textColor: "#1d4023"
-                onClicked: backend.resetChordSynthToPreset()
             }
 
             RhythmSection {
@@ -606,7 +607,6 @@ ApplicationWindow {
 
                 controller: backend
                 midiControlRouter: midiBackend
-                synthModel: synthNames
                 role: "bass"
 
                 wheelColor: "#a6a6a3"
@@ -639,7 +639,6 @@ ApplicationWindow {
 
                 controller: backend
                 midiControlRouter: midiBackend
-                synthModel: synthNames
                 role: "strum"
 
                 wheelColor: "#5d9fd0"
@@ -672,7 +671,6 @@ ApplicationWindow {
 
                 controller: backend
                 midiControlRouter: midiBackend
-                synthModel: synthNames
                 role: "chord"
 
                 wheelColor: "#78a57c"

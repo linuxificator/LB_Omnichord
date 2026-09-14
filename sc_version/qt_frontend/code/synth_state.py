@@ -34,6 +34,9 @@ class SynthState:
         self._default_selected_index = self._validate_index(selected_index)
         self._selected_index = self._default_selected_index
         self._values_by_synth = self._default_values()
+        self._last_by_kind: dict[str, int] = {}
+        self._last_by_browser_group: dict[tuple[str, str], int] = {}
+        self._remember_selection(self._selected_index)
 
     def _validate_index(self, index: int) -> int:
         value = int(index)
@@ -73,10 +76,121 @@ class SynthState:
     def selected_values(self) -> dict[str, float]:
         return self._values_by_synth[self._selected_index]
 
+    @staticmethod
+    def _kind(definition: Any) -> str:
+        return str(getattr(definition, "kind", "synth"))
+
+    @staticmethod
+    def _browser_group(definition: Any) -> str:
+        return str(getattr(definition, "browser_group", "") or definition.label)
+
+    def _remember_selection(self, index: int) -> None:
+        definition = self._definitions[index]
+        kind = self._kind(definition)
+        self._last_by_kind[kind] = index
+        self._last_by_browser_group[(kind, self._browser_group(definition))] = index
+
+    @property
+    def selected_kind(self) -> str:
+        return self._kind(self.selected_definition)
+
+    def browser_names(self) -> list[str]:
+        if self.selected_kind == "sample":
+            return list(dict.fromkeys(
+                self._browser_group(definition)
+                for definition in self._definitions
+                if self._kind(definition) == "sample"
+            ))
+        return [
+            str(definition.label)
+            for definition in self._definitions
+            if self._kind(definition) == self.selected_kind
+        ]
+
+    def browser_index(self) -> int:
+        if self.selected_kind == "sample":
+            return self.browser_names().index(self._browser_group(self.selected_definition))
+        indexes = [
+            index for index, definition in enumerate(self._definitions)
+            if self._kind(definition) == self.selected_kind
+        ]
+        return indexes.index(self._selected_index)
+
+    def select_kind(self, kind: str) -> bool:
+        requested = str(kind)
+        if requested == self.selected_kind:
+            return False
+        candidates = [
+            index for index, definition in enumerate(self._definitions)
+            if self._kind(definition) == requested
+        ]
+        if not candidates:
+            return False
+        self._selected_index = self._last_by_kind.get(requested, candidates[0])
+        self._remember_selection(self._selected_index)
+        return True
+
+    def select_browser_index(self, browser_index: int) -> bool:
+        try:
+            item = self.browser_names()[int(browser_index)]
+        except (IndexError, ValueError):
+            return False
+        if self.selected_kind == "sample":
+            candidates = [
+                index for index, definition in enumerate(self._definitions)
+                if self._kind(definition) == "sample"
+                and self._browser_group(definition) == item
+            ]
+            index = self._last_by_browser_group.get(("sample", item), candidates[0])
+        else:
+            candidates = [
+                index for index, definition in enumerate(self._definitions)
+                if self._kind(definition) == self.selected_kind
+            ]
+            index = candidates[int(browser_index)]
+        return self.select(index)
+
+    def sample_choice_columns(self) -> list[dict[str, Any]]:
+        if self.selected_kind != "sample":
+            return []
+        group = self._browser_group(self.selected_definition)
+        definitions = [
+            (index, definition)
+            for index, definition in enumerate(self._definitions)
+            if self._kind(definition) == "sample"
+            and self._browser_group(definition) == group
+        ]
+        variants = list(dict.fromkeys(
+            str(getattr(definition, "variant_label", "") or "Standard")
+            for _, definition in definitions
+        ))
+        return [
+            {
+                "label": variant,
+                "showVariant": len(variants) > 1,
+                "selected": any(
+                    index == self._selected_index
+                    for index, definition in definitions
+                    if str(getattr(definition, "variant_label", "") or "Standard") == variant
+                ),
+                "choices": [
+                    {
+                        "label": str(getattr(definition, "articulation_label", "") or "Normal"),
+                        "synthIndex": index,
+                        "selected": index == self._selected_index,
+                    }
+                    for index, definition in definitions
+                    if str(getattr(definition, "variant_label", "") or "Standard") == variant
+                ],
+            }
+            for variant in variants
+        ]
+
     def reset_to_defaults(self) -> None:
         """Restore catalogue values and this role's application synth choice."""
         self._selected_index = self._default_selected_index
         self._values_by_synth = self._default_values()
+        self._remember_selection(self._selected_index)
 
     def select(self, index: int) -> bool:
         try:
@@ -86,6 +200,7 @@ class SynthState:
         if value == self._selected_index:
             return False
         self._selected_index = value
+        self._remember_selection(value)
         return True
 
     def copy_from(self, other: "SynthState") -> None:
@@ -97,6 +212,7 @@ class SynthState:
         # application-default instrument for future sparse preset loads.
         self._selected_index = other._selected_index
         self._values_by_synth = copy.deepcopy(other._values_by_synth)
+        self._remember_selection(self._selected_index)
 
     def set_control(self, key: str, value: float) -> bool:
         return self.set_instrument_control(
@@ -198,6 +314,7 @@ class SynthState:
 
         self._selected_index = selected_index
         self._values_by_synth = values_by_synth
+        self._remember_selection(self._selected_index)
 
     def reset_selected_from_preset(self, data: dict[str, Any]) -> bool:
         """Restore the current instrument without changing instrument selection.

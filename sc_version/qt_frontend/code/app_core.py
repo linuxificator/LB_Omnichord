@@ -246,6 +246,11 @@ class SynthDefinition:
     label: str
     controls: tuple[SynthControl, ...]
     aliases: tuple[str, ...] = ()
+    kind: str = "synth"
+    browser_group: str = ""
+    variant_label: str = ""
+    articulation_label: str = ""
+    supports_riff_articulation: bool = False
 
 
 @dataclass(frozen=True)
@@ -1170,6 +1175,12 @@ class InstrumentBackend(QObject):
             return self._strum_synth
         return self._bass_synth
 
+    @staticmethod
+    def _qml_synth_role(role: str) -> SynthRole:
+        if role not in ("chord", "strum", "bass"):
+            raise ValueError(f"unknown synth role: {role!r}")
+        return cast(SynthRole, role)
+
     def _emit_state_changed(self) -> None:
         self._state_version += 1
         self.stateChanged.emit()
@@ -1258,6 +1269,32 @@ class InstrumentBackend(QObject):
     @Property(int, notify=bassSynthStateChanged)
     def selectedBassSynthIndex(self) -> int:
         return self._bass_synth.selected_index
+
+    @Slot(str, result=str)
+    def synthKind(self, role: str) -> str:
+        return self._runtime(self._qml_synth_role(role)).selected_kind
+
+    @Slot(str, result=list)
+    def synthBrowserNames(self, role: str) -> list[str]:
+        return self._runtime(self._qml_synth_role(role)).browser_names()
+
+    @Slot(str, result=int)
+    def synthBrowserIndex(self, role: str) -> int:
+        return self._runtime(self._qml_synth_role(role)).browser_index()
+
+    @Slot(str, result=list)
+    def sampleChoiceColumns(self, role: str) -> list[dict[str, Any]]:
+        return self._runtime(self._qml_synth_role(role)).sample_choice_columns()
+
+    @Slot(str, result=bool)
+    def synthSupportsRiffArticulation(self, role: str) -> bool:
+        return bool(
+            getattr(
+                self._runtime(self._qml_synth_role(role)).selected_definition,
+                "supports_riff_articulation",
+                False,
+            )
+        )
 
     @Property(list, notify=chordSynthControlsChanged)
     def chordCommonControls(self) -> list[dict[str, Any]]:
@@ -1573,6 +1610,35 @@ class InstrumentBackend(QObject):
     @Slot(int)
     def setBassSynthIndex(self, synth_index: int) -> None:
         self._set_synth_index("bass", synth_index)
+
+    @Slot(str)
+    def toggleSynthKind(self, role: str) -> None:
+        synth_role = self._qml_synth_role(role)
+        runtime = self._runtime(synth_role)
+        kind = "sample" if runtime.selected_kind == "synth" else "synth"
+        if not runtime.select_kind(kind):
+            return
+        self._emit_synth_change(synth_role, selection_changed=True)
+        self._send_synth_state(synth_role)
+
+    @Slot(str, int)
+    def setSynthBrowserIndex(self, role: str, browser_index: int) -> None:
+        synth_role = self._qml_synth_role(role)
+        runtime = self._runtime(synth_role)
+        if not runtime.select_browser_index(browser_index):
+            return
+        self._emit_synth_change(synth_role, selection_changed=True)
+        self._send_synth_state(synth_role)
+
+    @Slot(str, int)
+    def selectSampleChoice(self, role: str, synth_index: int) -> None:
+        try:
+            definition = self._synths[int(synth_index)]
+        except (IndexError, ValueError):
+            return
+        if getattr(definition, "kind", "synth") != "sample":
+            return
+        self._set_synth_index(self._qml_synth_role(role), synth_index)
 
     def _set_synth_index(
         self,

@@ -8,7 +8,6 @@ Item {
 
     required property var controller
     required property var midiControlRouter
-    required property var synthModel
 
     property string role: "chord"
     readonly property bool showTransport: role === "bass"
@@ -39,6 +38,23 @@ Item {
             : controller.selectedChordSynthIndex
         )
 
+    readonly property string synthKind: {
+        const revision = root.selectedIndex
+        return root.controller.synthKind(root.role)
+    }
+    readonly property var browserModel: {
+        const revision = root.selectedIndex
+        return root.controller.synthBrowserNames(root.role)
+    }
+    readonly property int browserIndex: {
+        const revision = root.selectedIndex
+        return root.controller.synthBrowserIndex(root.role)
+    }
+    readonly property var sampleColumns: {
+        const revision = root.selectedIndex
+        return root.controller.sampleChoiceColumns(root.role)
+    }
+
     readonly property var commonControls:
         role === "strum"
         ? controller.strumCommonControls
@@ -57,14 +73,8 @@ Item {
             : controller.chordExtraControls
         )
 
-    function setSynthIndex(index) {
-        if (root.role === "strum") {
-            root.controller.setStrumSynthIndex(index)
-        } else if (root.role === "bass") {
-            root.controller.setBassSynthIndex(index)
-        } else {
-            root.controller.setChordSynthIndex(index)
-        }
+    function setBrowserIndex(index) {
+        root.controller.setSynthBrowserIndex(root.role, index)
     }
 
     function setControl(key, value) {
@@ -93,11 +103,11 @@ Item {
 
         if (
             synthWheel.currentIndex
-            !== root.selectedIndex
+            !== root.browserIndex
         ) {
             synthWheel.syncingFromBackend = true
             synthWheel.currentIndex =
-                root.selectedIndex
+                root.browserIndex
 
             Qt.callLater(function() {
                 synthWheel.syncingFromBackend =
@@ -128,7 +138,7 @@ Item {
             anchors.fill: parent
             anchors.margins: 3
 
-            model: root.synthModel
+            model: root.browserModel
             visibleItemCount: 3
             wrap: true
 
@@ -137,7 +147,7 @@ Item {
 
             Component.onCompleted: {
                 syncingFromBackend = true
-                currentIndex = root.selectedIndex
+                currentIndex = root.browserIndex
 
                 Qt.callLater(function() {
                     synthWheel.syncingFromBackend =
@@ -229,7 +239,7 @@ Item {
                     && !syncingFromBackend
                     && currentIndex >= 0
                 ) {
-                    root.setSynthIndex(
+                    root.setBrowserIndex(
                         currentIndex
                     )
                 }
@@ -279,6 +289,20 @@ Item {
         onClicked: root.controller.toggleBassRunning()
     }
 
+    Rectangle {
+        visible: root.showTransport
+            && root.controller.synthSupportsRiffArticulation(root.role)
+        anchors.horizontalCenter: bassTransportButton.horizontalCenter
+        y: 5
+        width: 8
+        height: 8
+        radius: 4
+        color: "#ef8c22"
+        border.color: "#9a4e08"
+        border.width: 1
+        z: 4
+    }
+
     Column {
         x: root.showTransport ? bassTransportButton.x + bassTransportButton.width + 10 : wheelFrame.width + 6
         y: 0
@@ -287,6 +311,7 @@ Item {
         spacing: 8
 
         Item {
+            visible: root.synthKind !== "sample"
             width: parent.width
             height: (parent.height - 8) / 2
 
@@ -346,6 +371,7 @@ Item {
         }
 
         Item {
+            visible: root.synthKind !== "sample"
             width: parent.width
             height: (parent.height - 8) / 2
 
@@ -393,6 +419,90 @@ Item {
 
                         onEdited: (key, value) =>
                             root.setControl(key, value)
+                    }
+                }
+            }
+        }
+    }
+
+    Row {
+        id: sampleChoiceRow
+        visible: root.synthKind === "sample"
+        x: root.showTransport
+            ? bassTransportButton.x + bassTransportButton.width + 10
+            : wheelFrame.width + 6
+        y: 0
+        width: parent.width - x
+        height: parent.height
+        spacing: 8
+
+        Repeater {
+            id: sampleColumnRepeater
+            model: root.sampleColumns
+
+            delegate: Column {
+                id: sampleColumn
+                required property var modelData
+                width: (
+                    sampleChoiceRow.width
+                    - Math.max(0, sampleColumnRepeater.count - 1)
+                        * sampleChoiceRow.spacing
+                ) / Math.max(1, sampleColumnRepeater.count)
+                height: sampleChoiceRow.height
+                spacing: 8
+
+                Button {
+                    width: parent.width
+                    height: 48
+                    visible: sampleColumn.modelData.showVariant
+                    text: sampleColumn.modelData.label
+                    font.pixelSize: 12
+                    font.bold: sampleColumn.modelData.selected
+                    background: Rectangle {
+                        radius: 8
+                        color: sampleColumn.modelData.selected ? "#d39a43" : "#e9d7b5"
+                        border.color: "#865d20"
+                        border.width: sampleColumn.modelData.selected ? 2 : 1
+                    }
+                    onClicked: {
+                        const choices = sampleColumn.modelData.choices
+                        if (choices.length > 0)
+                            root.controller.selectSampleChoice(
+                                root.role, choices[0].synthIndex
+                            )
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    height: 48
+                    spacing: 4
+                    Repeater {
+                        id: articulationRepeater
+                        model: sampleColumn.modelData.choices.length > 1
+                            ? sampleColumn.modelData.choices : []
+                        delegate: Button {
+                            id: articulationButton
+                            required property var modelData
+                            width: (
+                                sampleColumn.width
+                                - Math.max(0, articulationRepeater.count - 1) * 4
+                            ) / Math.max(1, articulationRepeater.count)
+                            height: 48
+                            text: articulationButton.modelData.label
+                            font.pixelSize: 11
+                            font.bold: articulationButton.modelData.selected
+                            background: Rectangle {
+                                radius: 8
+                                color: articulationButton.modelData.selected
+                                    ? "#d39a43" : "#efe3cc"
+                                border.color: "#865d20"
+                                border.width: articulationButton.modelData.selected ? 2 : 1
+                            }
+                            onClicked: root.controller.selectSampleChoice(
+                                root.role, articulationButton.modelData.synthIndex
+                            )
+                        }
                     }
                 }
             }
