@@ -185,7 +185,13 @@ def build_sclork_catalog(source_root: Path) -> dict[str, object]:
     """Derive immutable runtime metadata from the pinned SynthDef sources."""
 
     entries: list[dict[str, object]] = []
-    for path in sorted(source_root.rglob("*.scd")):
+    # Path ordering is case-folded on Windows. Sort explicit POSIX strings so
+    # catalog entry order is identical on every build host.
+    paths = sorted(
+        source_root.rglob("*.scd"),
+        key=lambda path: path.relative_to(source_root).as_posix(),
+    )
+    for path in paths:
         source = path.read_text(encoding="utf-8")
         match = _SYNTHDEF.search(source)
         if match is None:
