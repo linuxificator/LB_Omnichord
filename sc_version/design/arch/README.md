@@ -2,20 +2,11 @@
 
 Status: authoritative category index
 Owner: application architecture
-Last verified: 2026-09-08
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
-Start with `principles.md`, `architecture.md`, `behavior.md` and `testing.md`.
-Use `configuration.md` for config/schema work and `test_processes.md` for the
-production/test process boundary.
-
-- `quality.md` records the current code-quality baseline and non-regression
-  rules after the completed T01-T25 and quality-cycle work.
-- `backlog.md` contains only work that remains relevant.
-- `dependencies.md` defines when external Python packages may be used.
-- `repository_hygiene.md` defines documentation and branch lifecycle.
-- `rpi_realtime_quality_review.md` records the focused architecture review of
-  the optional dedicated-Pi host profile.
-
-Completed task-by-task handovers were removed from the active tree after their
-lasting conclusions were consolidated here. Git history remains the audit
-trail.
+Read `principles.md`, `architecture.md`, `behavior.md` and `testing.md` first.
+Use `configuration.md` for config work and `test_processes.md` for process
+boundaries. `quality.md` records the current non-regression baseline;
+`dependencies.md`, `repository_hygiene.md` and `backlog.md` own their narrower
+policies.

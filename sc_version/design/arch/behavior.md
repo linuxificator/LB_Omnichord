@@ -1,43 +1,19 @@
-# Runtime Behavior
+# Runtime behavior
 
 Status: authoritative runtime behavior contract
 Owner: shared application behavior
 Applies to: `sc_version`
-Last verified: 2026-09-14
+Last verified: 2026-09-15
 
-## Screen switching
+Screen changes are visual only: sounding notes, rhythms and executions continue.
+OMNI and MIDI presets remain independent; tuning coupling is runtime state.
 
-Switching OMNI/MIDI is display-only. Existing notes, rhythms, drums, and sequences continue unchanged.
+The MIDI strum preview uses the selected MIDI row program and routing. An
+external control bound to OMNI strum drives the same OMNI semantic action as
+mouse/touch and does not disable direct strumming. Preview voices use bounded
+oldest-first ownership and engine-timed releases.
 
-## MIDI preview
-
-The MIDI strum is a preview instrument. It uses the selected MIDI row instrument and MIDI routing, not the Omnichord strum synth.
-
-An external control bound to the OMNI strum is different from the MIDI-screen
-preview: it supplies positions to the same OMNI strum instrument and musical
-note collection as touch/mouse input. It does not supply velocity and it does
-not disable or unlink direct screen strumming.
-
-Preview note lifetime is bounded by the selected row's four-voice allocation.
-Before another onset would exceed the configured preview ownership limit, the
-oldest preview handle is explicitly released. The engine-owned renewed tail
-deadline releases only handles that remain active.
-
-## Presets
-
-OMNI and MIDI presets are separate. MIDI presets contain:
-
-- instrument selection
-- parameters
-- volume
-- MIDI channel
-- MIDI-side reverb settings
-- MIDI tuning mode/reference
-
-Tuning coupling is runtime state and is never stored in presets.
-
-## Engine communication
-
-All musical actions cross the typed SuperCollider protocol. Musical time and
-note lifetime remain in the headless engine, not in Qt/Python. The SC edition
-does not produce AMY wire commands or import AMY at runtime.
+All musical actions cross the typed SC protocol. Python may animate UI and
+classify gestures but never schedules a note, gate or beat. Failed engine
+validation and unavailable capabilities are explicit; they do not silently
+select a different backend.

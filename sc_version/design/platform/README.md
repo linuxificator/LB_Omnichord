@@ -2,16 +2,13 @@
 
 Status: authoritative category index
 Owner: platform integration
-Last verified: 2026-09-08
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
-- [`linux/`](linux/README.md): native Linux process and MIDI boundaries.
-- [`raspberry_pi/`](raspberry_pi/README.md): source checkout, AppImage graphics
-  and serial/service modes.
-- [`windows/`](windows/README.md): native package and named-pipe boundary.
-- [`android/`](android/README.md): Qt package, app-private socket and Oboe service.
-- [`macos/`](macos/README.md): native arm64 package boundary.
-- [`packaging.md`](packaging.md): shared release, size and provenance rules.
+Supported packages are Linux x86_64 AppImage, Raspberry Pi aarch64 AppImage,
+macOS arm64 DMG and Windows x86_64 ZIP. They share the same Python/QML and typed
+SC protocol. Platform differences are limited to runtime discovery, native
+input capability, audio-session integration and package layout.
 
-Detailed executable instructions remain next to their implementation under
-`../../qt_frontend/` and `../../esp32p4/`; these platform pages state the
-cross-cutting contracts and route to those instructions.
+Android and ESP32-P4 are not SC targets. See `packaging.md` and
+[`../sc/BUILD_AND_RELEASE.md`](../sc/BUILD_AND_RELEASE.md).

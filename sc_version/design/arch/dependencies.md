@@ -2,23 +2,16 @@
 
 Status: authoritative dependency policy
 Owner: build and application architecture
-Last verified: 2026-09-08
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
-Use an established external Python package when it removes substantial,
-non-domain implementation and is already maintained across every required
-platform. Do not recreate a mature protocol, validation or packaging library.
+Use an established external package when it replaces substantial non-domain
+code and is actively maintained on every required platform. Assess adoption,
+maintenance, licence, security and supported Python/platform versions; do not
+trade a small local implementation for an obscure dependency.
 
-Adoption requires evidence of active maintenance, broad use, suitable licence,
-security posture, Python-version support and Linux/Raspberry Pi/macOS/Windows/
-Android availability. A small or dormant project is not acceptable merely
-because it saves initial code.
-
-Direct runtime dependencies are declared in requirements and the exact release
-inputs are recorded in `../../qt_frontend/packaging/release_inputs.json`.
-Current deliberate choices include pyserial, fastjsonschema, python-osc,
-zeroconf/ifaddr, PySide6 and PyInstaller. Requirements/configuration remain the
-authority; this document does not duplicate their versions.
-
-Every new dependency needs a dated assessment, tests at its owned boundary and
-an update to notices, release evidence and package-size policy where relevant.
-
+Requirements files and `qt_frontend/packaging/python_dependency_groups.json`
+are the authority. Current direct runtime dependencies cover PySide6,
+fastjsonschema, python-osc, Zeroconf, Dulwich and urllib3; source audio tools add
+NumPy and SoundFile, and builds add PyInstaller. A new dependency requires a
+dated assessment, boundary tests, notices and package audit updates.

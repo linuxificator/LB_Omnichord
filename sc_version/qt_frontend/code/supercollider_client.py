@@ -14,7 +14,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
 
-from config_loader import ResolvedAmyConfig
+from frontend_config import FrontendConfig
 from engine_protocol import NoteOff, NoteOn, PROTOCOL_VERSION, VoiceSet
 from musical_sequence_plan import (
     LanePlan,
@@ -49,17 +49,13 @@ class SuperColliderClient:
 
     def __init__(
         self,
-        config: dict[str, Any] | None,
         addresses: dict[str, str],
         *,
-        resolved_config: ResolvedAmyConfig | None = None,
+        frontend_config: FrontendConfig,
         runtime_config_path: Path,
         asset_root: Path | None = None,
-        **_transport_arguments: Any,
     ) -> None:
-        if resolved_config is None:
-            raise ValueError("resolved_config is required")
-        self.resolved_config = resolved_config
+        self.frontend_config = frontend_config
         self.runtime_config: SuperColliderRuntimeConfig = (
             load_supercollider_config(runtime_config_path)
         )
@@ -97,9 +93,9 @@ class SuperColliderClient:
             root / "instruments" / "supercollider-legacy-map.json"
         )
         self._selected_program = {
-            "chord": self._resolve_program(resolved_config.synth_defaults.chord),
-            "strum": self._resolve_program(resolved_config.synth_defaults.strum),
-            "bass": self._resolve_program(resolved_config.synth_defaults.bass),
+            "chord": self._resolve_program(frontend_config.program_defaults.chord),
+            "strum": self._resolve_program(frontend_config.program_defaults.strum),
+            "bass": self._resolve_program(frontend_config.program_defaults.bass),
         }
         self._program_revision = {"chord": 1, "strum": 1, "bass": 1}
         self._configured_roles: set[str] = set()
@@ -675,7 +671,7 @@ class SuperColliderClient:
         return all_ready
 
     def _role_bus(self, role: str) -> int:
-        return int(dict(self.resolved_config.layout.role_buses)[role])
+        return int(dict(self.frontend_config.layout.role_buses)[role])
 
     def _resolve_program(self, program_id: str) -> str:
         value = str(program_id)
@@ -835,13 +831,13 @@ class SuperColliderClient:
 
     def _publish_chord_lane(self) -> None:
         generation = self._next_lane_generation("chords")
-        rhythm = self.resolved_config.rhythm
+        rhythm = self.frontend_config.rhythm
         self.publish_lane(
             compile_chord_lane(
                 config=self.rhythm_config,
                 enabled=self.rhythm_chord_enabled,
                 chord_notes=self.chord_notes,
-                max_chord_notes=rhythm.max_rhythm_chord_notes,
+                max_chord_notes=rhythm.max_chord_notes,
                 chord_gate_beats=rhythm.chord_gate_beats,
                 program_id=self._selected_program["chord"],
                 program_revision=self._program_revision["chord"],
@@ -881,7 +877,7 @@ class SuperColliderClient:
                 config=config,
                 running=self.bass_running,
                 bass_notes=self.bass_notes,
-                bass_gate_beats=self.resolved_config.rhythm.bass_gate_beats,
+                bass_gate_beats=self.frontend_config.rhythm.bass_gate_beats,
                 program_id=self._selected_program["bass"],
                 program_revision=self._program_revision["bass"],
                 logical_bus=self._role_bus("bass"),
@@ -902,7 +898,7 @@ class SuperColliderClient:
             logical_bus=self._role_bus("strum"),
             tail_seconds=max(
                 0.01,
-                self.resolved_config.performance.strum_tail_ms / 1000.0,
+                self.frontend_config.performance.strum_tail_ms / 1000.0,
             ),
         )
 

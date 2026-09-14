@@ -29,7 +29,7 @@ class OscSourceDefinition:
 class MidiControlState:
     """Own external-control learn, binding, visibility and eviction state.
 
-    The class deliberately contains no Qt or AMY code.  It keeps the
+    The class deliberately contains no Qt or audio-engine code. It keeps the
     MIDI/OSC-source relationship separate from the visible indicator bar: a
     green binding may be evicted from the bar without losing its musical
     target, and later source activity can make it visible again.  The class

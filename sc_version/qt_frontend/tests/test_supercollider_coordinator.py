@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "code"))
 
 from engine_protocol import SequenceDefinition, SequenceEvent  # noqa: E402
 from musical_sequence_plan import LanePlan  # noqa: E402
-from resolved_config import resolve_amy_config_data  # noqa: E402
+from frontend_config import load_frontend_config  # noqa: E402
 from supercollider_client import SuperColliderClient  # noqa: E402
 
 
@@ -83,16 +83,11 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                     ),
                     encoding="utf-8",
                 )
-                raw = json.loads((ROOT / "config" / "amy_config.json").read_text())
-                resolved = resolve_amy_config_data(
-                    raw,
-                    source_path=ROOT / "config" / "amy_config.json",
-                    source_kind="shipped",
-                )
                 client = SuperColliderClient(
-                    config=None,
                     addresses={},
-                    resolved_config=resolved,
+                    frontend_config=load_frontend_config(
+                        ROOT / "config" / "frontend.json"
+                    ),
                     runtime_config_path=config_path,
                     asset_root=ROOT,
                 )

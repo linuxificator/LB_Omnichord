@@ -1,16 +1,16 @@
 # External controls
 
-Status: authoritative category index
+Status: authoritative category contract
 Owner: MIDI/OSC control integration
-Last verified: 2026-09-08
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
-- `midi.md`: MIDI input technologies, channel and note behavior.
-- `midi_control.md`: CC/button learn, binding, takeover and persistence.
-- `osc.md`: OSC UDP input, discovery and shared binding semantics.
+MIDI and OSC normalize into one external-control state machine and QML
+presentation while retaining separate protocol adapters. Learning, binding,
+takeover and unlink behavior call the same semantic setters as direct UI
+interaction. Note messages are never mistaken for controller buttons.
 
-MIDI and OSC share one external-control state machine and QML presentation but
-retain independent protocol adapters. Integration senders run outside the
-production application process.
-
-Optional device-side profiles that make third-party hardware emit these
-standard protocol messages live under [`../../controller_profiles/`](../../controller_profiles/README.md).
+Integration stimulus comes from a separate process. Native platform discovery
+is adapter-owned; unavailable CoreMIDI/WinMM capability is reported explicitly.
+Optional hardware profiles live under
+[`../../controller_profiles/`](../../controller_profiles/README.md).

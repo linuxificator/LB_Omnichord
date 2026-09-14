@@ -1,8 +1,9 @@
 # SuperCollider migration status
 
 Status: implementation status, not a completion claim
-
-Last verified: 2026-09-14
+Owner: SuperCollider edition integration
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
 Locally exercised target: Linux x86_64
 
@@ -15,7 +16,8 @@ x86_64
   typed, versioned loopback OSC protocol.
 - The production Python import closure is checked structurally and cannot
   reach the AMY transports, local AMY service, AMY compatibility adapter or
-  `c_amy`; those copied characterization modules are not a runtime fallback.
+  `c_amy`; those modules and their firmware/package trees are absent from the
+  SC edition rather than merely excluded at packaging time.
 - Python compiles immutable musical plans; one SC `TempoClock` owns execution,
   quantization, note releases, gates and snapshot lifetimes.
 - Session reset, panic, exact voice handles and global pitch bend are wired
@@ -81,9 +83,9 @@ x86_64
   in separate processes.
 - The independent SC workflow runs the active dependency-free frontend unit
   and portable MIDI/OSC process contracts in addition to the SC compiler,
-  coordinator, NRT audio, bank and package suites. AMY/Android/ESP32-only
-  packaging contracts remain identifiable historical oracles and are excluded
-  rather than presented as evidence for the SC product.
+  coordinator, NRT audio, bank and package suites. Old engine, Android and
+  ESP32 contracts are not copied into this test tree or presented as evidence
+  for the SC product.
 - Sequencer tests cover immutable running snapshots, overlapping finite
   executions, root/child lifetime separation, exact release ownership,
   overlapping half-open gates, same-boundary replacement coalescing,

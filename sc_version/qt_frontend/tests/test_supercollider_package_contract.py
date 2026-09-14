@@ -58,6 +58,25 @@ class SuperColliderPackageContractTests(unittest.TestCase):
 
         self.assertTrue(forbidden.isdisjoint(reached_modules))
 
+    def test_sc_source_tree_contains_no_amy_runtime_or_firmware_copy(self) -> None:
+        for module in (
+            "amy_serial.py",
+            "amy_transport.py",
+            "local_amy_service.py",
+            "program_amy.py",
+            "wire_frames.py",
+        ):
+            self.assertFalse((ROOT / "code" / module).exists(), module)
+        self.assertFalse((ROOT / "config" / "amy_config.json").exists())
+        self.assertFalse((ROOT.parent / "esp32p4" / "CMakeLists.txt").exists())
+        firmware_main = ROOT.parent / "esp32p4" / "main"
+        self.assertFalse(
+            any(path.is_file() for path in firmware_main.rglob("*"))
+            if firmware_main.exists()
+            else False
+        )
+        self.assertTrue((ROOT / "config" / "frontend.json").is_file())
+
     def test_source_launcher_owns_one_headless_engine_process_group(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
         self.assertIn('setsid "${sc_launcher[@]}" sclang -D', launcher)
@@ -165,7 +184,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             self.assertIn(platform, text)
         self.assertNotIn("Android-arm64.apk", text)
         self.assertNotIn("ESP32P4.zip", text)
-        self.assertIn("--exclude-module c_amy", builder)
+        self.assertNotIn("--exclude-module amy", builder)
+        self.assertNotIn("--exclude-module c_amy", builder)
         self.assertIn("--add-data \"$sc_dir:supercollider\"", builder)
         macos_builder = (ROOT / "packaging" / "build_macos_dmg.sh").read_text(
             encoding="utf-8"

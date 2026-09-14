@@ -21,7 +21,7 @@ from osc_discovery_platform_adapters import (  # noqa: E402
     production_osc_service_advertiser,
 )
 from osc_input import production_osc_input_port  # noqa: E402
-from resolved_config import OscInputConfig  # noqa: E402
+from frontend_config import OscInputConfig  # noqa: E402
 
 
 class _Listener(ServiceListener):

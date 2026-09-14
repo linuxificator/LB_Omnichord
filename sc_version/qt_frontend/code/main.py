@@ -19,10 +19,7 @@ from sc_bass_articulation import load_sc_bass_articulation
 from sc_music_catalog import load_sc_music_catalog
 from catalog_extensions import load_synth_catalog as load_extended_synth_catalog
 from catalog_extensions import resolve_supercollider_asset_root
-from config_loader import (
-    load_amy_config as load_amy_config,
-    load_resolved_amy_config,
-)
+from frontend_config import load_frontend_config
 from midi_integration import InstrumentBackend
 from midi_platform_adapters import production_midi_input_port
 from osc_input import production_osc_input_port
@@ -59,7 +56,7 @@ def load_bass_riff_catalog(
     """Use the SC articulation catalogue while retaining the shared loader API."""
 
     return _load_bass_riff_catalog(
-        path.parent / "sc_expansion" / "omnichord_bass_riffs_v2.json",
+        path,
         rhythm_ids=rhythm_ids,
         chord_suffixes=chord_suffixes,
     )
@@ -81,7 +78,7 @@ def load_synth_catalog(
 def parse_arguments(arguments: Sequence[str] | None = None) -> Namespace:
     return app_core.parse_arguments(
         arguments,
-        default_config_path=CONFIG_DIR / "amy_config.json",
+        default_config_path=CONFIG_DIR / "frontend.json",
     )
 
 
@@ -116,7 +113,7 @@ def production_dependencies(
     )
     return ApplicationDependencies(
         paths=paths,
-        load_resolved_config=load_resolved_amy_config,
+        load_frontend_config=load_frontend_config,
         load_defaults=app_core.load_defaults,
         load_chords=app_core.load_chords,
         load_synth_catalog=partial(
@@ -127,9 +124,7 @@ def production_dependencies(
         load_bass_riffs=load_bass_riff_catalog,
         load_title_config=app_core.load_title_config,
         load_intonation_table=app_core.load_intonation_table,
-        serial_client=cast(ClientFactory, sc_client),
-        socket_client=cast(ClientFactory, sc_client),
-        local_client=cast(ClientFactory, sc_client),
+        client_factory=cast(ClientFactory, sc_client),
         midi_input_port=production_midi_input_port,
         osc_input_port=partial(
             production_osc_input_port,
@@ -151,7 +146,7 @@ def main(
     dependencies = production_dependencies(asset_root=asset_root)
     args = app_core.parse_arguments(
         arguments,
-        default_config_path=dependencies.paths.config / "amy_config.json",
+        default_config_path=dependencies.paths.config / "frontend.json",
     )
     return app_core.run_application(args, dependencies)
 

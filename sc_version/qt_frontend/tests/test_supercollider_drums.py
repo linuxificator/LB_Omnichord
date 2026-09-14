@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SC_ROOT = ROOT.parent / "supercollider"
 sys.path.insert(0, str(ROOT / "code"))
 
-from drum_patterns import load_drum_pattern_catalog  # noqa: E402
+from sc_music_catalog import load_sc_music_catalog  # noqa: E402
 
 
 class SuperColliderDrumMappingTests(unittest.TestCase):
@@ -24,18 +24,10 @@ class SuperColliderDrumMappingTests(unittest.TestCase):
         )
 
     def test_every_drum_role_has_full_velocity_sample_coverage(self) -> None:
-        catalog = load_drum_pattern_catalog(ROOT / "music" / "drums")
-        roles = {
-            event.role
-            for rhythm in catalog.rhythms.values()
-            for level in rhythm.levels
-            for event in level
-        } | {
-            event.role
-            for rhythm in catalog.rhythms.values()
-            for fill in rhythm.fills
-            for event in fill.events
-        }
+        catalog = load_sc_music_catalog(
+            ROOT / "music" / "sc_expansion" / "sc_kit_grooves_v1.json"
+        )
+        roles = catalog.roles
 
         program = self.mapping["program_id"]
         role_keys = self.mapping["role_keys"]

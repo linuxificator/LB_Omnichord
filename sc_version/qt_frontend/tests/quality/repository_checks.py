@@ -65,12 +65,10 @@ def check_markdown_file(path: Path) -> None:
             raise QualityError(f"missing Markdown target: {path} -> {target}")
 
 
-def markdown_files(repository: Path) -> list[Path]:
+def markdown_files(repository: Path, frontend: Path) -> list[Path]:
     candidates = [repository / "README.md", repository / "CODEX_HANDOFF.md"]
-    candidates.extend((repository / "amysynth_version" / "design").rglob("*.md"))
-    candidates.extend(
-        (repository / "amysynth_version" / "qt_frontend").rglob("*.md")
-    )
+    candidates.extend((frontend.parent / "design").rglob("*.md"))
+    candidates.extend(frontend.rglob("*.md"))
     return sorted(
         path
         for path in set(candidates)
@@ -79,8 +77,8 @@ def markdown_files(repository: Path) -> list[Path]:
     )
 
 
-def check_markdown_links(repository: Path) -> None:
-    for path in markdown_files(repository):
+def check_markdown_links(repository: Path, frontend: Path) -> None:
+    for path in markdown_files(repository, frontend):
         check_markdown_file(path)
 
 
@@ -96,8 +94,8 @@ def check_document_status(repository: Path, relative_paths: list[str]) -> None:
                 raise QualityError(f"active document lacks {field} {relative}")
 
 
-def check_document_routes(repository: Path) -> None:
-    design = repository / "amysynth_version" / "design"
+def check_document_routes(frontend: Path) -> None:
+    design = frontend.parent / "design"
     route = design / "README.md"
     tokens = set(re.findall(r"`([^`\n]+\.md)`", route.read_text(encoding="utf-8")))
     for token in sorted(tokens):
@@ -138,7 +136,7 @@ def uses_direct_platform_access(tree: ast.AST) -> bool:
 
 
 def check_import_boundaries(code_dir: Path, policy: dict[str, Any]) -> None:
-    amy_allowed = set(policy["amy_import_allowlist"])
+    forbidden_engine_imports = set(policy["forbidden_engine_imports"])
     platform_allowed = {
         root: set(files)
         for root, files in policy["platform_import_allowlist"].items()
@@ -147,8 +145,11 @@ def check_import_boundaries(code_dir: Path, policy: dict[str, Any]) -> None:
     for path in sorted(code_dir.glob("*.py")):
         tree = parse_python(path)
         roots = imported_roots(tree)
-        if roots.intersection({"amy", "c_amy"}) and path.name not in amy_allowed:
-            raise QualityError(f"AMY engine import outside service adapter: {path}")
+        forbidden = roots.intersection(forbidden_engine_imports)
+        if forbidden:
+            raise QualityError(
+                f"forbidden engine import {sorted(forbidden)} in SC edition: {path}"
+            )
         for root, allowed_files in platform_allowed.items():
             if root in roots and path.name not in allowed_files:
                 raise QualityError(
@@ -196,11 +197,7 @@ def check_workflow_dependency_installs(workflows: list[Path]) -> None:
             if "pip install" not in line:
                 continue
             command = line.split("pip install", 1)[1].strip()
-            allowed = (
-                "-r " in command
-                or command in {"--upgrade pip", "/tmp/amy-lb"}
-                or command.endswith(" /tmp/amy-lb")
-            )
+            allowed = "-r " in command or command == "--upgrade pip"
             if not allowed:
                 raise QualityError(f"undeclared workflow pip install: {path}: {line}")
 
@@ -230,17 +227,14 @@ def load_policy(path: Path) -> dict[str, Any]:
 def run_repository_checks(repository: Path, frontend: Path, policy_path: Path) -> None:
     policy = load_policy(policy_path)
     check_shipped_json(frontend)
-    check_markdown_links(repository)
+    check_markdown_links(repository, frontend)
     check_document_status(repository, policy["active_documents"])
-    check_document_routes(repository)
+    check_document_routes(frontend)
     check_import_boundaries(frontend / "code", policy)
     check_declared_third_party_imports(
         frontend,
         frontend / "packaging" / "python_dependency_groups.json",
     )
-    check_workflow_dependency_installs(
-        sorted((repository / ".github" / "workflows").glob("*.yml"))
-    )
-    check_workflow_action_pins(
-        sorted((repository / ".github" / "workflows").glob("*.yml"))
-    )
+    workflows = [repository / ".github" / "workflows" / "supercollider-release.yml"]
+    check_workflow_dependency_installs(workflows)
+    check_workflow_action_pins(workflows)

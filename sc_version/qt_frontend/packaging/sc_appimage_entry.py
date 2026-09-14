@@ -118,11 +118,13 @@ def verify_config_migrations(root: Path) -> None:
 def verify_application_assets(root: Path) -> None:
     """Load the frozen production catalogue without starting Qt or audio."""
 
+    from frontend_config import load_frontend_config
     import main
 
+    load_frontend_config(root / "config" / "frontend.json", source_kind="shipped")
     dependencies = main.production_dependencies(asset_root=root)
     synths, chord, strum, bass = dependencies.load_synth_catalog(
-        dependencies.paths.instruments / "synths.json"
+        dependencies.paths.instruments / "supercollider-legacy-map.json"
     )
     if not synths or min(chord, strum, bass) < 0:
         raise RuntimeError("packaged SuperCollider instrument catalogue is invalid")
@@ -171,7 +173,7 @@ def verify_package(root: Path, runtime: Path) -> int:
     print(
         "LB_OMNICHORD_SC_PACKAGE_OK "
         f"root={root} runtime={runtime} config_migrations=1,2 "
-        "catalogue=loaded bootstrap=validated"
+        "frontend_config=loaded catalogue=loaded bootstrap=validated"
     )
     return 0
 

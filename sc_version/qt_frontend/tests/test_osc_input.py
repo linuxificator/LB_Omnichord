@@ -21,7 +21,7 @@ from osc_input import (  # noqa: E402
 )
 from midi_control import MidiControlState  # noqa: E402
 from midi_player import MidiPlayerBackend  # noqa: E402
-from resolved_config import OscInputConfig  # noqa: E402
+from frontend_config import OscInputConfig  # noqa: E402
 
 
 class RecordingAdvertiser:

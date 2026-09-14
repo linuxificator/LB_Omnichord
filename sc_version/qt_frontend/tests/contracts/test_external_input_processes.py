@@ -77,7 +77,7 @@ class ExternalInputProcessContracts(unittest.TestCase):
             root = Path(raw)
             port = _unused_udp_port()
             ready = root / "ready"
-            config = root / "amy_config.json"
+            config = root / "frontend.json"
             config.write_text(
                 json.dumps(
                     {

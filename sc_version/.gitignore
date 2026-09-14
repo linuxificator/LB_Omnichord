@@ -1,0 +1,3 @@
+# Existing checkouts may retain generated output from the retired firmware
+# copy. The SuperCollider edition neither builds nor packages this tree.
+esp32p4/

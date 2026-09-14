@@ -15,7 +15,7 @@ from osc_discovery import (
     OscServiceAdvertiser,
     null_osc_service_advertiser,
 )
-from resolved_config import OscInputConfig
+from frontend_config import OscInputConfig
 
 
 OscValueType = Literal["continuous", "button"]

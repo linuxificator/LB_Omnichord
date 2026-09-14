@@ -25,42 +25,26 @@ from midi_player import (  # noqa: E402
 )
 from midi_control import NOTE_BUTTON_OFFSET, PITCH_BEND_CONTROLLER  # noqa: E402
 from midi_control import MidiControlState  # noqa: E402
-from gm_percussion import (  # noqa: E402
-    GM_PERCUSSION_NAMES,
-    MIDI_DRUM_REFERENCE_ROW_VOLUME,
-    OMNI_REFERENCE_PERCUSSION_VOLUME,
-    midi_drum_amplitude,
-    resolve_gm_percussion,
-)
+from frontend_config import load_frontend_config  # noqa: E402
 from midi_levels import (  # noqa: E402
+    MIDI_DRUM_REFERENCE_ROW_VOLUME,
     MIDI_PITCHED_REFERENCE_ROW_VOLUME,
     MIDI_PITCHED_REFERENCE_VELOCITY,
     OMNI_REFERENCE_CHORD_NOTE_LEVEL,
+    OMNI_REFERENCE_PERCUSSION_VOLUME,
+    midi_drum_level,
     midi_pitched_synth_level,
     normalized_midi_velocity,
 )
 from engine_protocol import NoteOff, NoteOn  # noqa: E402
 from midi_platform_profile import resolve_midi_tech_profile  # noqa: E402
-from resolved_config import resolve_amy_config_data  # noqa: E402
 from synth_state import SynthState  # noqa: E402
 
 
 class _Client:
-    def __init__(
-        self,
-        *,
-        instrument_levels: dict[str, float] | None = None,
-    ) -> None:
+    def __init__(self) -> None:
         self.events: list[tuple[str, object]] = []
-        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
-        config["performance"]["synth_alloc_guard_ms"] = 12.0
-        if instrument_levels is not None:
-            config["instrument_levels"] = instrument_levels
-        self.resolved_config = resolve_amy_config_data(
-            config,
-            source_path=ROOT / "config" / "amy_config.json",
-            source_kind="external",
-        )
+        self.frontend_config = load_frontend_config(ROOT / "config" / "frontend.json")
         self._program_revision = 0
 
     def allocate_program_revision(self) -> int:
@@ -245,28 +229,6 @@ class MidiEngineTests(unittest.TestCase):
             _migrated_factory_channel_defaults(customized, factory)
         )
 
-    def test_all_general_midi_percussion_notes_resolve(self) -> None:
-        client = _Client()
-        drums = client.resolved_config.drums
-        configured = dict(drums.sample_map)
-        sounds = {
-            note: resolve_gm_percussion(
-                note,
-                kit=drums.kit,
-                configured_samples=configured,
-            )
-            for note in GM_PERCUSSION_NAMES
-        }
-
-        self.assertEqual(set(sounds), set(range(35, 82)))
-        self.assertTrue(all(sound is not None for sound in sounds.values()))
-        self.assertIsNone(
-            resolve_gm_percussion(34, kit=drums.kit, configured_samples=configured)
-        )
-        self.assertIsNone(
-            resolve_gm_percussion(82, kit=drums.kit, configured_samples=configured)
-        )
-
     def test_reported_controller_notes_and_duplicate_note_60_all_emit_hits(self) -> None:
         client = _Client()
         engine = MidiEngine(client)
@@ -278,27 +240,25 @@ class MidiEngineTests(unittest.TestCase):
 
         hits = [value for kind, value in client.events if kind == "drum_hit"]
         self.assertEqual(len(hits), len(notes))
-        self.assertEqual(sum(hit["logical_key"] == 65 for hit in hits), 2)
+        self.assertEqual(sum(hit["logical_key"] == 60 for hit in hits), 2)
 
     def test_midi_velocity_60_matches_equal_velocity_omni_reference(self) -> None:
-        gain = 5.0
-        midi = midi_drum_amplitude(
+        midi = midi_drum_level(
             60,
             MIDI_DRUM_REFERENCE_ROW_VOLUME,
-            gain,
         )
-        omni = (60.0 / 127.0) * gain * OMNI_REFERENCE_PERCUSSION_VOLUME
+        omni = (60.0 / 127.0) * 5.0 * OMNI_REFERENCE_PERCUSSION_VOLUME
 
         self.assertAlmostEqual(midi, omni)
         self.assertLess(
-            midi_drum_amplitude(30, MIDI_DRUM_REFERENCE_ROW_VOLUME, gain),
+            midi_drum_level(30, MIDI_DRUM_REFERENCE_ROW_VOLUME),
             midi,
         )
         self.assertGreater(
-            midi_drum_amplitude(120, MIDI_DRUM_REFERENCE_ROW_VOLUME, gain),
+            midi_drum_level(120, MIDI_DRUM_REFERENCE_ROW_VOLUME),
             midi,
         )
-        self.assertEqual(midi_drum_amplitude(60, 0.0, gain), 0.0)
+        self.assertEqual(midi_drum_level(60, 0.0), 0.0)
 
     def test_drum_row_uses_configured_channel_and_release_does_not_retrigger(self) -> None:
         class Engine:
@@ -343,7 +303,7 @@ class MidiEngineTests(unittest.TestCase):
         )
 
     def test_shipped_midi_profile_is_auto_and_resolves_per_package(self) -> None:
-        config = json.loads((ROOT / "config" / "amy_config.json").read_text(encoding="utf-8"))
+        config = json.loads((ROOT / "config" / "frontend.json").read_text(encoding="utf-8"))
         configured = config["midi_input"]["tech_profile"]
         self.assertEqual(configured, "auto")
 
@@ -351,7 +311,6 @@ class MidiEngineTests(unittest.TestCase):
             ("wayland", "linux", "linux"),
             ("cocoa", "darwin", "darwin"),
             ("windows", "win32", "win32"),
-            ("android", "android", "android"),
             ("offscreen", "freebsd14", "freebsd14"),
         )
         for qpa, runtime, expected in cases:
@@ -810,12 +769,12 @@ class MidiEngineTests(unittest.TestCase):
         self.assertEqual(state.status((1, 74)), "learn")
         self.assertEqual(state.learn_key, (1, 74))
 
-    def test_instrument_balance_multiplier_applies_to_midi_volume(self) -> None:
-        client = _Client(instrument_levels={"dx7_215": 0.4})
+    def test_program_identity_does_not_change_frontend_midi_volume(self) -> None:
+        client = _Client()
         engine = MidiEngine(client)
         client.events.clear()
         engine.configure_row(0, "dx7_215", {}, 0.5)
-        expected = midi_pitched_synth_level(0.5, 0.4)
+        expected = midi_pitched_synth_level(0.5)
         self.assertIn(("bus_level", (4, expected)), client.events)
 
     def test_every_factory_pitched_row_uses_the_same_reference_policy(self) -> None:
@@ -845,7 +804,6 @@ class MidiEngineTests(unittest.TestCase):
                     OMNI_REFERENCE_CHORD_NOTE_LEVEL
                     * stored_volume
                     / MIDI_PITCHED_REFERENCE_ROW_VOLUME
-                    * client.resolved_config.instrument_level(key)
                 )
                 self.assertAlmostEqual(actual, expected)
                 checked += 1

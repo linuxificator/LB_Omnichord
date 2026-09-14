@@ -2,32 +2,22 @@
 
 Status: active backlog; not implementation authorization
 Owner: application architecture
-Last verified: 2026-09-08
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
-## Technical work
+## Technical
 
-1. Surface transport failure/recovery state through one application boundary.
-2. Continue cohesive extraction from `InstrumentBackend`.
-3. Separate MIDI performance/note ownership from its Qt view model.
-4. Separate AMY runtime selection state from command submission.
-5. Tighten typed ports after those boundaries stabilize.
-6. Continue QML section/facade and accessibility work.
-7. Replace remaining implementation-location tests with semantic tests.
-8. Publish one structured platform-capability authority.
-9. Generate the Gamma9001 mapping deterministically from the pinned AMY input.
-10. Deepen captured dependency/toolchain hashes without claiming reproducible
-    builds until rebuild comparison proves it.
-11. Add maintained CoreMIDI, WinMM and Android MIDI adapters if product scope
-    requires them.
-12. Physically validate the ESP32-P4 v3 profile on revision-3 hardware.
-13. Capture physical ESP32-P4 output across the full instrument catalogue.
+1. Add maintained native CoreMIDI and WinMM input adapters; packages currently
+   expose those capabilities as unavailable rather than pretending support.
+2. Continue cohesive extraction from `InstrumentBackend` only where ownership
+   and regression tests justify it.
+3. Separate MIDI performance ownership from its Qt view model.
+4. Replace remaining implementation-location assertions with semantic tests.
+5. Decide and test live-parameter behavior for already sounding sample voices.
 
-## Product, evidence and governance decisions
+## Product/evidence
 
-- Decide live-parameter behavior for already sounding notes.
-- Decide voice priority when MIDI preview and external input fill one row.
-- Audit catalogue authorship/licence provenance; do not infer legal approval.
-- Decide compatibility/deprecation policy before removing public loaders.
-- Define distribution trust/key ownership before production signing.
-- Decide whether mutation testing provides enough value to add a dependency.
-
+- Continue subjective playback review across physical platform audio stacks.
+- Decide voice priority when preview and external input fill one MIDI row.
+- Complete distribution signing/trust decisions before claiming signed builds.
+- Audit new catalogue assets and licences before adding them.

@@ -68,7 +68,7 @@ class MidiBindingService:
             # Presets written before global bend was separated from static
             # tuning used Pitch Bend as a 415..466 Hz reference controller.
             # Preserve those user presets by migrating that exact declaration
-            # to the transient OMNI-owned AMY bend target on load.
+            # to the transient OMNI-owned engine bend target on load.
             if (
                 source_type == "pitch_bend"
                 and str(screen) == "omni"

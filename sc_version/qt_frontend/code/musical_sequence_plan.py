@@ -4,9 +4,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 import hashlib
 import math
-from typing import Any, Callable, cast
+from typing import Any, Callable
 
-from drum_patterns import DrumPatternCatalog
 from engine_protocol import PPQ, SequenceDefinition, SequenceEvent
 from bass_sequence_source import bass_gesture_sources, scaled_bass_source
 from bass_voice_capabilities import capability_for
@@ -77,7 +76,7 @@ def compile_chord_lane(
     logical_bus: int,
     generation: int,
 ) -> LanePlan:
-    """Compile accompaniment without AMY strings or a host-side clock."""
+    """Compile accompaniment without engine syntax or a host-side clock."""
 
     lane = "chords"
     if not config or not enabled or not chord_notes:
@@ -358,64 +357,6 @@ def _fill_occurrences(
         position = (position + 1) % len(order)
 
 
-def _drum_atoms(
-    *,
-    catalog: DrumPatternCatalog,
-    kit: str,
-    rhythm_id: str,
-    role: str,
-    velocity: int,
-    logical_bus: int,
-    fill: bool = False,
-    fill_id: str | None = None,
-    fill_gain: float = 1.0,
-    program_resolver: Callable[
-        [str, str], tuple[str, float] | tuple[str, str, float]
-    ] | None = None,
-) -> tuple[str | int | float, ...]:
-    source_kit = "general_midi" if program_resolver is not None else kit
-    sound = catalog.resolve(
-        source_kit,
-        rhythm_id,
-        role,
-        fill=fill,
-        fill_id=fill_id,
-    )
-    level = max(0.0, min(1.0, float(velocity) / 127.0))
-    if fill:
-        level *= max(0.0, float(fill_gain))
-    # Integration balancing may raise sparse fills above unity.  The engine
-    # protocol deliberately has one normalized velocity domain, so saturate
-    # only after every authored and derived gain has been applied.
-    level = max(0.0, min(1.0, level))
-    if program_resolver is None:
-        program = (
-            f"sample.{kit}.preset-{sound.preset}"
-            if sound.preset is not None
-            else f"sample.{kit}.patch-{sound.synth_patch}"
-        )
-    else:
-        resolved = program_resolver(kit, role)
-        if len(resolved) == 2:
-            program, kit_gain = resolved
-            pad = role
-        else:
-            program, pad, kit_gain = resolved
-        level *= max(0.0, float(kit_gain))
-        level = max(0.0, min(1.0, level))
-    return (
-        "rhythm/drums",
-        role,
-        program,
-        1,
-        pad if program_resolver is not None else role,
-        int(sound.note),
-        float(level),
-        int(logical_bus),
-        0,
-    )
-
-
 def _sc_drum_atoms(
     *,
     kit: str,
@@ -680,150 +621,22 @@ def _compile_sc_fill_window(
 def compile_drum_lane(
     *,
     config: Mapping[str, Any] | None,
-    catalog: DrumPatternCatalog | ScMusicCatalog,
+    catalog: ScMusicCatalog,
     kit: str,
     logical_bus: int,
     generation: int,
-    program_resolver: Callable[
-        [str, str], tuple[str, float] | tuple[str, str, float]
-    ] | None = None,
+    program_resolver: Callable[[str, str], tuple[str, str, float]],
 ) -> LanePlan:
     """Compile periodic activity, finite fills and deterministic fill launches."""
 
     lane = "drums"
     if not config:
         return LanePlan(lane, generation, 1, ())
-    if isinstance(catalog, ScMusicCatalog):
-        if program_resolver is None:
-            raise ValueError("SC drum catalogue requires a program resolver")
-        sc_program_resolver = cast(
-            Callable[[str, str], tuple[str, str, float]], program_resolver
-        )
-        return _compile_sc_drum_lane(
-            config=config,
-            catalog=catalog,
-            kit=kit,
-            logical_bus=logical_bus,
-            generation=generation,
-            program_resolver=sc_program_resolver,
-        )
-    rhythm = catalog.rhythm(str(config.get("id", "")))
-    level_index = max(0, min(4, int(config.get("percussion_activity", 1)) - 1))
-    roles = sorted({event.role for level in rhythm.levels for event in level})
-    length = rhythm.period_ticks // 2
-    definitions: list[SequenceDefinition] = []
-    for role in roles:
-        events = tuple(
-            _event(
-                event.tick // 2,
-                ordinal,
-                "drumHit",
-                *_drum_atoms(
-                    catalog=catalog,
-                    kit=kit,
-                    rhythm_id=rhythm.rhythm_id,
-                    role=role,
-                    velocity=event.velocity,
-                    logical_bus=logical_bus,
-                    program_resolver=program_resolver,
-                ),
-            )
-            for ordinal, event in enumerate(
-                item for item in rhythm.levels[level_index] if item.role == role
-            )
-        )
-        if events:
-            definitions.append(
-                SequenceDefinition(
-                    definition_id=f"drums/activity/{role}",
-                    revision=generation,
-                    kind="root",
-                    lane=lane,
-                    period_ticks=length,
-                    events=events,
-                    source_identity=f"{rhythm.rhythm_id}:level-{level_index + 1}:{role}",
-                )
-            )
-
-    raw_order = config.get("fill_order", ())
-    order = tuple(
-        dict.fromkeys(
-            int(index)
-            for index in raw_order
-            if 0 <= int(index) < len(rhythm.fills)
-        )
-    ) if isinstance(raw_order, list) else ()
-    occurrences = _fill_occurrences(order, rhythm.fills)
-    for fill in rhythm.fills:
-        fill_events: list[SequenceEvent] = []
-        ordinal = 0
-        duration = fill.duration_ticks // 2
-        for role in roles:
-            if role not in fill.continue_roles:
-                fill_events.append(
-                    _event(0, ordinal, "gateBegin", role, f"{fill.fill_id}/{role}", duration, "drumHit")
-                )
-                ordinal += 1
-        for hit in fill.events:
-            fill_events.append(
-                _event(
-                    hit.tick // 2,
-                    ordinal,
-                    "drumHit",
-                    *_drum_atoms(
-                        catalog=catalog,
-                        kit=kit,
-                        rhythm_id=rhythm.rhythm_id,
-                        role=hit.role,
-                        velocity=hit.velocity,
-                        logical_bus=logical_bus,
-                        fill=True,
-                        fill_id=fill.fill_id,
-                        fill_gain=fill.output_gain,
-                        program_resolver=program_resolver,
-                    ),
-                )
-            )
-            ordinal += 1
-        definitions.append(
-            SequenceDefinition(
-                definition_id=f"drums/fill/{fill.fill_id}",
-                revision=generation,
-                kind="finite",
-                lane=lane,
-                period_ticks=0,
-                events=tuple(sorted(fill_events, key=lambda item: (item.tick, item.ordinal))),
-                source_identity=fill.fill_id,
-            )
-        )
-
-    if occurrences:
-        bar_ticks = max(1, (rhythm.period_ticks // rhythm.period_bars) // 2)
-        density = max(1, int(config.get("fill_density_bars", 8)))
-        schedule_period = len(occurrences) * density * bar_ticks
-        schedule_events = tuple(
-            _event(
-                index * density * bar_ticks
-                + (start_beat - 1) * (fill.beat_unit_ticks // 2),
-                index,
-                "launch",
-                f"drums/fill/{fill.fill_id}",
-            )
-            for index, (fill, start_beat) in enumerate(occurrences)
-        )
-        definitions.append(
-            SequenceDefinition(
-                definition_id="drums/fill-schedule",
-                revision=generation,
-                kind="root",
-                lane=lane,
-                period_ticks=schedule_period,
-                events=schedule_events,
-                source_identity=f"{rhythm.rhythm_id}:fills:{','.join(map(str, order))}",
-            )
-        )
-        alignment = bar_ticks
-    else:
-        alignment = max(1, math.gcd(*(definition.period_ticks for definition in definitions if definition.kind == "root")))
-
-    return LanePlan(lane, generation, alignment, tuple(definitions))
+    return _compile_sc_drum_lane(
+        config=config,
+        catalog=catalog,
+        kit=kit,
+        logical_bus=logical_bus,
+        generation=generation,
+        program_resolver=program_resolver,
+    )

@@ -16,7 +16,6 @@ from sc_drum_kits import DRUM_KITS, resolve_hit  # noqa: E402
 from catalog_extensions import load_synth_catalog  # noqa: E402
 from sc_music_catalog import load_sc_music_catalog  # noqa: E402
 from musical_sequence_plan import compile_drum_lane  # noqa: E402
-from drum_patterns import load_drum_pattern_catalog  # noqa: E402
 
 
 class ScMusicExpansionTests(unittest.TestCase):
@@ -184,17 +183,7 @@ class ScMusicExpansionTests(unittest.TestCase):
         kit_data = json.loads(
             (CATALOG_ROOT / "sc_pcm_drumkits_v1.json").read_text(encoding="utf-8")
         )
-        expected_roles = {
-            event.role
-            for rhythm in load_drum_pattern_catalog(ROOT / "music" / "drums").rhythms.values()
-            for level in rhythm.levels
-            for event in level
-        } | {
-            event.role
-            for rhythm in load_drum_pattern_catalog(ROOT / "music" / "drums").rhythms.values()
-            for fill in rhythm.fills
-            for event in fill.events
-        }
+        expected_roles = self.catalog.roles
         sets = {
             row["sample_set_id"]: row for row in kit_data["sample_sets"]
         }
@@ -218,19 +207,6 @@ class ScMusicExpansionTests(unittest.TestCase):
                         for pad in kit["pads"].values()
                     )
                 )
-
-    def test_legacy_pcm_arrangements_preserve_the_original_patterns(self) -> None:
-        original = load_drum_pattern_catalog(ROOT / "music" / "drums")
-        for rhythm_id in self.rhythm_ids:
-            revised = self.catalog.arrangement("pcm-vsco", rhythm_id)
-            source = original.rhythm(rhythm_id)
-            self.assertEqual(revised.period_ticks, source.period_ticks)
-            for source_level, revised_level in zip(source.levels, revised.levels):
-                with self.subTest(rhythm=rhythm_id):
-                    self.assertEqual(
-                        [(event.tick, event.role, event.velocity) for event in source_level],
-                        [(event.tick, event.role, event.velocity) for event in revised_level],
-                    )
 
     def test_legacy_vsco_sequence_keeps_distinct_drum_roles(self) -> None:
         plan = compile_drum_lane(
@@ -310,7 +286,9 @@ class ScMusicExpansionTests(unittest.TestCase):
             self.assertFalse(pad.isdecimal())
 
     def test_factory_presets_use_exact_reviewed_sc_programs_and_kits(self) -> None:
-        synths, *_defaults = load_synth_catalog(ROOT / "instruments" / "synths.json")
+        synths, *_defaults = load_synth_catalog(
+            ROOT / "instruments" / "supercollider-legacy-map.json"
+        )
         programs = {synth.key for synth in synths}
         kits = {kit.kit_id for kit in DRUM_KITS}
         index = json.loads(

@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
 from engine_protocol import NoteOff, NoteOn, PROTOCOL_VERSION  # noqa: E402
-from resolved_config import resolve_amy_config_data  # noqa: E402
+from frontend_config import load_frontend_config  # noqa: E402
 from supercollider_client import SuperColliderClient  # noqa: E402
 
 
@@ -132,12 +132,7 @@ class SuperColliderClientTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-        raw = json.loads((ROOT / "config" / "amy_config.json").read_text())
-        self.resolved = resolve_amy_config_data(
-            raw,
-            source_path=ROOT / "config" / "amy_config.json",
-            source_kind="shipped",
-        )
+        self.frontend_config = load_frontend_config(ROOT / "config" / "frontend.json")
 
     def tearDown(self) -> None:
         self.fake.close()
@@ -152,9 +147,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_handshake_and_typed_note_lifecycle_cross_process_boundary(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -214,9 +208,8 @@ class SuperColliderClientTests(unittest.TestCase):
         )
         addresses = {name: f"/test/{name}" for name in address_names}
         client = SuperColliderClient(
-            config=None,
             addresses=addresses,
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -235,9 +228,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_first_chord_installs_previously_unresolved_bass_riff(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -291,9 +283,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_program_revisions_and_parameters_are_part_scoped(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -325,9 +316,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_strum_gesture_carries_the_selected_program_revision(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -351,9 +341,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_direct_drum_hit_selects_requested_kit_before_crossing_boundary(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -400,9 +389,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_engine_ready_does_not_imply_legacy_vsco_program_ready(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -449,9 +437,8 @@ class SuperColliderClientTests(unittest.TestCase):
         from musical_sequence_plan import LanePlan
 
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -514,9 +501,8 @@ class SuperColliderClientTests(unittest.TestCase):
         raw_config["language"]["port"] = self.fake.port
         self.config_path.write_text(json.dumps(raw_config), encoding="utf-8")
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -547,9 +533,8 @@ class SuperColliderClientTests(unittest.TestCase):
         raw_config["language"]["port"] = self.fake.port
         self.config_path.write_text(json.dumps(raw_config), encoding="utf-8")
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -574,9 +559,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_sample_program_activates_only_after_engine_ready_status(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -602,9 +586,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_direct_sample_note_waits_for_ready_and_obeys_early_note_off(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )
@@ -662,9 +645,8 @@ class SuperColliderClientTests(unittest.TestCase):
 
     def test_superseded_and_replaced_sample_revisions_are_released(self) -> None:
         client = SuperColliderClient(
-            config=None,
             addresses={},
-            resolved_config=self.resolved,
+            frontend_config=self.frontend_config,
             runtime_config_path=self.config_path,
             asset_root=ROOT,
         )

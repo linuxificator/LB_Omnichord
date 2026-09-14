@@ -12,7 +12,6 @@ sys.path.insert(0, str(ROOT / "code"))
 
 from supercollider_programs import (  # noqa: E402
     _logical_source_sha256,
-    build_legacy_program_map,
     display_name,
     load_legacy_program_map,
     build_sclork_catalog,
@@ -45,12 +44,8 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
         self.assertEqual({item.release_mode for item in programs}, {"gated", "natural"})
         self.assertTrue(all(item.controls for item in programs))
 
-    def test_legacy_program_mapping_is_explicit_and_reproducible(self) -> None:
-        legacy = ROOT / "instruments" / "synths.json"
-        expected = build_legacy_program_map(legacy)
+    def test_legacy_program_mapping_targets_available_sc_programs(self) -> None:
         path = ROOT / "instruments" / "supercollider-legacy-map.json"
-        checked_in = json.loads(path.read_text(encoding="utf-8"))
-        self.assertEqual(checked_in, expected)
         mappings = load_legacy_program_map(path)
         programs = load_supercollider_programs(SC_ROOT / "sclork-programs.json")
         available = {program.program_id for program in programs} | {
@@ -68,7 +63,9 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
         self.assertEqual(display_name("organTonewheel1"), "Organ Tonewheel 1")
 
     def test_sc_browser_has_reviewed_controls_and_no_backend_prefixes(self) -> None:
-        synths, *_ = load_synth_catalog(ROOT / "instruments" / "synths.json")
+        synths, *_ = load_synth_catalog(
+            ROOT / "instruments" / "supercollider-legacy-map.json"
+        )
         self.assertEqual(sum(item.kind == "synth" for item in synths), 80)
         self.assertEqual(sum(item.kind == "sample" for item in synths), 66)
         drum_programs = {

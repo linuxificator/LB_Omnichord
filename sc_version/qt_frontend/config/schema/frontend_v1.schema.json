@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://linuxificator.github.io/lb-omnichord/schema/frontend-v1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config_revision", "midi_input", "osc_input", "default_programs",
+    "midi", "rhythm", "performance", "logical_buses"
+  ],
+  "properties": {
+    "config_revision": {"const": 1},
+    "midi_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "tech_profile", "device_glob", "alsa_raw_globs", "oss_midi_globs"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "tech_profile": {"type": "string", "minLength": 1},
+        "device_glob": {"type": "string", "minLength": 1},
+        "alsa_raw_globs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "oss_midi_globs": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "osc_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "listen_address", "listen_port", "advertise", "service_name"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "listen_address": {"type": "string", "minLength": 1},
+        "listen_port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "advertise": {"type": "boolean"},
+        "service_name": {"type": "string", "minLength": 1, "maxLength": 63}
+      }
+    },
+    "default_programs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chord", "strum", "bass"],
+      "properties": {
+        "chord": {"type": "string", "minLength": 1},
+        "strum": {"type": "string", "minLength": 1},
+        "bass": {"type": "string", "minLength": 1}
+      }
+    },
+    "midi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["voices_per_row"],
+      "properties": {"voices_per_row": {"type": "integer", "minimum": 1, "maximum": 64}}
+    },
+    "rhythm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chord_gate_beats", "bass_gate_beats", "max_chord_notes"],
+      "properties": {
+        "chord_gate_beats": {"type": "number", "exclusiveMinimum": 0},
+        "bass_gate_beats": {"type": "number", "exclusiveMinimum": 0},
+        "max_chord_notes": {"type": "integer", "minimum": 1, "maximum": 16}
+      }
+    },
+    "performance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strum_tail_ms"],
+      "properties": {"strum_tail_ms": {"type": "number", "exclusiveMinimum": 0}}
+    },
+    "logical_buses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["drums", "bass", "strum", "chord", "midi_rows", "midi_drums"],
+      "properties": {
+        "drums": {"type": "integer", "minimum": 0},
+        "bass": {"type": "integer", "minimum": 0},
+        "strum": {"type": "integer", "minimum": 0},
+        "chord": {"type": "integer", "minimum": 0},
+        "midi_rows": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"type": "integer", "minimum": 0}},
+        "midi_drums": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

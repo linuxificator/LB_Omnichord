@@ -36,12 +36,12 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
             config_dir = temp / ".omnichord" / "config"
             config_dir.mkdir(parents=True)
             config = json.loads(
-                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+                (ROOT / "config" / "frontend.json").read_text(encoding="utf-8")
             )
             midi_master, midi_slave = pty.openpty()
             tty.setraw(midi_slave)
             config["midi_input"]["device_glob"] = os.ttyname(midi_slave)
-            config_dir.joinpath("amy_config.json").write_text(
+            config_dir.joinpath("frontend.json").write_text(
                 json.dumps(config), encoding="utf-8"
             )
             preset_dir = temp / ".omnichord" / "omni_presets"

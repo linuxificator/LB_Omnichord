@@ -90,6 +90,24 @@ class ScMusicCatalog:
         except KeyError as exc:
             raise ValueError(f"unknown SC kit/rhythm fills {key!r}") from exc
 
+    @property
+    def roles(self) -> frozenset[str]:
+        """Return the complete semantic role vocabulary used by this catalog."""
+
+        arrangement_roles = {
+            event.role
+            for arrangement in self._arrangements.values()
+            for level in arrangement.levels
+            for event in level
+        }
+        fill_roles = {
+            event.role
+            for fills in self._fills.values()
+            for fill in fills
+            for event in fill.events
+        }
+        return frozenset(arrangement_roles | fill_roles)
+
 
 def _require_int(value: object, name: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int):

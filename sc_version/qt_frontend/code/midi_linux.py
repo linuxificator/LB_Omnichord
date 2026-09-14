@@ -18,7 +18,7 @@ from midi_input import (
     MidiInputTechnologyStatus,
     OrderedMidiInputEmitter,
 )
-from resolved_config import MidiInputConfig
+from frontend_config import MidiInputConfig
 
 
 @dataclass(frozen=True, slots=True)

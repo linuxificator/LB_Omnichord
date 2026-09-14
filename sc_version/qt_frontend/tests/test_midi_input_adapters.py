@@ -33,11 +33,11 @@ from midi_player import (  # noqa: E402
     MidiPlayerBackend,
     _QueuedMidiInputEventRelay,
 )
-from resolved_config import load_resolved_amy_config  # noqa: E402
+from frontend_config import load_frontend_config  # noqa: E402
 
 
 def midi_config():
-    return load_resolved_amy_config(ROOT / "config" / "amy_config.json").midi_input
+    return load_frontend_config(ROOT / "config" / "frontend.json").midi_input
 
 
 class MidiInputAdapterTests(unittest.TestCase):
@@ -133,7 +133,6 @@ class MidiInputAdapterTests(unittest.TestCase):
             "linux": ("alsa_raw", "alsa_seq", "oss_midi"),
             "darwin": ("coremidi",),
             "win32": ("winmm",),
-            "android": ("android_midi",),
             "freebsd": (),
         }
         for profile, keys in expected.items():
@@ -147,7 +146,7 @@ class MidiInputAdapterTests(unittest.TestCase):
                 )
 
     def test_unavailable_adapters_share_lifecycle_and_status_contract(self) -> None:
-        for profile in ("darwin", "win32", "android", "freebsd"):
+        for profile in ("darwin", "win32", "freebsd"):
             with self.subTest(profile=profile):
                 port = create_midi_input_port(
                     lambda _event: self.fail("unsupported adapter emitted an event"),

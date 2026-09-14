@@ -24,7 +24,7 @@ from application_composition import (  # noqa: E402
     compose_application_graph,
     load_application_resources,
 )
-from config_loader import load_resolved_amy_config  # noqa: E402
+from frontend_config import load_frontend_config  # noqa: E402
 from runtime_platform_adapters import RuntimeOverrides  # noqa: E402
 
 
@@ -69,11 +69,7 @@ class FakeClient:
 
 def arguments(config: Path, **overrides: Any) -> Namespace:
     values: dict[str, Any] = {
-        "amy_config": config,
-        "serial_port": None,
-        "serial_baud": None,
-        "amy_socket": None,
-        "amy_local_name": None,
+        "frontend_config": config,
         "debug": False,
         "debug_file": None,
     }
@@ -107,7 +103,7 @@ class ApplicationCompositionTests(unittest.TestCase):
         unused = lambda _path: {}  # noqa: E731
         return ApplicationDependencies(
             paths=FrontendPaths.from_root(root),
-            load_resolved_config=load_resolved_amy_config,
+            load_frontend_config=load_frontend_config,
             load_defaults=unused,
             load_chords=lambda _path: (),
             load_synth_catalog=lambda _path: ([], 0, 0, 0),
@@ -115,16 +111,11 @@ class ApplicationCompositionTests(unittest.TestCase):
             load_bass_riffs=lambda *_args, **_kwargs: (),
             load_title_config=unused,
             load_intonation_table=lambda _path: (),
-            serial_client=client_factory("serial"),
-            socket_client=client_factory("socket"),
-            local_client=client_factory("local"),
+            client_factory=client_factory("supercollider"),
             midi_input_port=lambda _sink, _config: None,
             osc_input_port=lambda _sink, _config: None,
             private_files_dir=lambda: root / "private",
-            resolve_package_runtime=lambda **kwargs: RuntimeOverrides(
-                kwargs["amy_socket"],
-                kwargs["amy_local_name"],
-            ),
+            resolve_package_runtime=lambda **_kwargs: RuntimeOverrides(),
             display_diagnostics=lambda qpa: (f"QPA {qpa}",),
             backend=backend_factory,
         )
@@ -146,21 +137,21 @@ class ApplicationCompositionTests(unittest.TestCase):
             default_bass_synth_index=0,
         )
 
-    def test_same_graph_accepts_fake_ports_and_records_cli_provenance(self) -> None:
+    def test_graph_uses_user_frontend_config_and_one_engine_factory(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             config_dir = root / "config"
             config_dir.mkdir()
             shipped = json.loads(
-                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+                (ROOT / "config" / "frontend.json").read_text(encoding="utf-8")
             )
-            shipped_path = config_dir / "amy_config.json"
+            shipped_path = config_dir / "frontend.json"
             shipped_path.write_text(json.dumps(shipped), encoding="utf-8")
             user_dir = root / "user"
             user_dir.mkdir()
             user_config = copy.deepcopy(shipped)
-            user_config["serial"]["baud"] = 460_800
-            (user_dir / "amy_config.json").write_text(
+            user_config["midi"]["voices_per_row"] = 6
+            (user_dir / "frontend.json").write_text(
                 json.dumps(user_config), encoding="utf-8"
             )
             calls: list[tuple[str, dict[str, Any]]] = []
@@ -172,17 +163,13 @@ class ApplicationCompositionTests(unittest.TestCase):
             )
 
             graph = compose_application_graph(
-                arguments(
-                    shipped_path,
-                    serial_port="COM7",
-                    serial_baud=230_400,
-                ),
+                arguments(shipped_path),
                 dependencies,
                 self.resources(),
                 user_config_dir=user_dir,
             )
 
-        self.assertEqual([kind for kind, _kwargs in calls], ["serial"])
+        self.assertEqual([kind for kind, _kwargs in calls], ["supercollider"])
         self.assertIs(graph.client, backend_calls[0]["client"])
         self.assertIs(
             backend_calls[0]["midi_input_port_factory"],
@@ -192,19 +179,13 @@ class ApplicationCompositionTests(unittest.TestCase):
             backend_calls[0]["osc_input_port_factory"],
             dependencies.osc_input_port,
         )
-        self.assertEqual(graph.resolved_config.transport.serial_port, "COM7")
-        self.assertEqual(graph.resolved_config.transport.serial_baud, 230_400)
-        self.assertEqual(
-            graph.resolved_config.provenance.runtime_override_paths,
-            ("$.serial.port", "$.serial.baud"),
-        )
-        self.assertIsNone(calls[0][1]["config"])
+        self.assertEqual(graph.frontend_config.midi_voices_per_row, 6)
         self.assertIs(
-            calls[0][1]["resolved_config"],
-            graph.resolved_config,
+            calls[0][1]["frontend_config"],
+            graph.frontend_config,
         )
 
-    def test_transport_selection_constructs_only_the_selected_fake_port(self) -> None:
+    def test_graph_has_no_audio_transport_selection(self) -> None:
         calls: list[tuple[str, dict[str, Any]]] = []
         backend_calls: list[dict[str, Any]] = []
         dependencies = self.dependencies(
@@ -214,35 +195,21 @@ class ApplicationCompositionTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as directory:
             user_dir = Path(directory)
-            config = ROOT / "config" / "amy_config.json"
-            (user_dir / "amy_config.json").write_text(
+            config = ROOT / "config" / "frontend.json"
+            (user_dir / "frontend.json").write_text(
                 config.read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
-            for kwargs, expected, endpoint_key in (
-                ({"amy_socket": "~/amy.sock"}, "socket", "socket_path"),
-                ({"amy_local_name": "lb-amy"}, "local", "server_name"),
-            ):
-                with self.subTest(expected=expected):
-                    calls.clear()
-                    backend_calls.clear()
-                    graph = compose_application_graph(
-                        arguments(config, **kwargs),
-                        dependencies,
-                        self.resources(),
-                        user_config_dir=user_dir,
-                    )
-                    self.assertEqual(graph.client_selection.kind, expected)
-                    self.assertEqual([kind for kind, _data in calls], [expected])
-                    self.assertIn(endpoint_key, calls[0][1])
-
-            with self.assertRaisesRegex(ValueError, "select either"):
-                compose_application_graph(
-                    arguments(config, amy_socket="a", amy_local_name="b"),
-                    dependencies,
-                    self.resources(),
-                    user_config_dir=user_dir,
-                )
+            graph = compose_application_graph(
+                arguments(config),
+                dependencies,
+                self.resources(),
+                user_config_dir=user_dir,
+            )
+        self.assertEqual([kind for kind, _data in calls], ["supercollider"])
+        self.assertNotIn("socket_path", calls[0][1])
+        self.assertNotIn("server_name", calls[0][1])
+        self.assertIs(graph.client, backend_calls[0]["client"])
 
     def test_resource_loading_uses_injected_paths(self) -> None:
         calls: list[tuple[str, Path]] = []

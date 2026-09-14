@@ -476,7 +476,9 @@ def main() -> int:
     debug_log = artifact_dir / "frontend-debug.jsonl"
     action_log = artifact_dir / "actions.jsonl"
     config = load_supercollider_config(SC_CONFIG)
-    synths, _chord, _strum, _bass = load_synth_catalog(ROOT / "instruments" / "synths.json")
+    synths, _chord, _strum, _bass = load_synth_catalog(
+        ROOT / "instruments" / "supercollider-legacy-map.json"
+    )
     api_port = free_tcp_port()
     runtime_home = artifact_dir / "home"
     runtime_home.mkdir()

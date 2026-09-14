@@ -1,97 +1,53 @@
 # SuperCollider Qt frontend
 
 This is the Qt/PySide6 frontend for the independent LB Omnichord
-SuperCollider edition. It shares the established UI and music catalogues with
-the AMY edition, but its production composition root uses only typed
-SuperCollider services. Legacy AMY modules retained as characterization
-oracles are excluded from the SC package and are not imported by its runtime.
+SuperCollider edition. Production constructs one `SuperColliderClient`; it
+contains no AMY runtime, wire transport, serial selector or firmware path.
 
-## Process and timing boundary
+## Runtime boundary
 
-`code/main.py` composes the frontend, `supercollider_client.py` transports the
-versioned OSC protocol, and `supercollider_platform_adapter.py` owns one
-headless SC process group. `sclang` owns the `TempoClock`, immutable sequence
-definitions, execution state and voice handles; `scsynth` owns audio nodes,
-buses and effects. Python compiles complete immutable plans but never follows
-the beat or schedules note releases.
+`code/main.py` composes the application. `supercollider_client.py` transports
+the typed versioned OSC protocol. A supervised headless `sclang` owns musical
+time and voice lifetime; its `scsynth` child owns audio. Python publishes
+immutable plans and semantic live actions but never follows the beat.
 
-The Linux source launcher and frozen package both supervise SC separately from
-Qt. On a PipeWire desktop they use the distribution's `pw-jack` compatibility
-wrapper. They do not start a raw JACK server behind the user's back.
+`config/frontend.json` owns input and frontend policy.
+`config/supercollider.json` owns the SC runtime and sample configuration. The
+first launch creates private editable copies under `~/.omnichord/config` and
+installs the pinned VSCO 2 CE sample tree when required. An ordinary copied
+sample directory is valid when every manifest file matches; Git metadata is not
+required at runtime.
 
-## Source run
+## Run and test
 
-Requirements:
-
-- Python dependencies from `requirements.txt`;
-- `sclang` and `scsynth` (3.13 is source-compatible; packages pin 3.14.1);
-- the Linux distribution's PipeWire JACK compatibility tools when applicable;
-- enough free storage for the external VSCO 2 Community Edition repository.
-
-All 75 VSCO source mappings are catalogued. The PCM browser groups them into
-22 instrument families and 66 canonical pitched variant/articulation choices;
-equivalent standalone/key-switch views are merged without dropping recorded
-instruments or reserving playable MIDI notes for engine-side key-switch state.
-
-Run:
+On Linux, install SuperCollider and the distribution's PipeWire JACK
+compatibility package when PipeWire is active, then run:
 
 ```bash
 ./run_local.sh --windowed
 ```
 
-`OMNICHORD_SC_CONFIG` may point to another validated SC configuration. Engine
-host addresses remain loopback-only in the current trust model.
-
-The first source or packaged launch clones
-`https://github.com/linuxificator/VSCO-2-CE` to `~/VSCO-2-CE` with the bundled
-Dulwich client. It records the location in
-`~/.omnichord/config/supercollider.json`. A user may change that path or use an
-ordinary copied sample tree. Before using either form, the application checks
-all required audio files against the bundled content manifest and caches the
-validated inventory. Git is an acquisition mechanism, not a runtime
-requirement; a system `git` executable is never assumed.
-
-## Test suites
-
-The single runner is `tests/run_tests.py`:
+The checkout-local `.venv` is provisioned when needed. See
+[`INSTALL.md`](INSTALL.md) and list test suites with:
 
 ```bash
-python tests/run_tests.py --suite quality
-python tests/run_tests.py --suite sc-frontend
-python tests/run_tests.py --suite sc-compiler
-python tests/run_tests.py --suite sc-sequencer
-python tests/run_tests.py --suite sc-audio
-python tests/run_tests.py --suite sc-banks
-python tests/run_tests.py --suite sc-packaged
-python tests/run_tests.py --suite platform-input-linux
+python tests/run_tests.py --list
 ```
 
-SC compiler tests load every vendored SCLOrk definition. NRT tests render
-audio without opening a device. Process-boundary tests launch a separate fake
-SC service rather than placing test receivers in production application code.
-Inherited AMY wire tests explicitly launch the frozen AMY frontend as a
-behavioral oracle; they do not describe the SC production architecture.
-
-Reference UI captures live in `screenshots/`. A deterministic offscreen pair
-can be refreshed through a separately launched protocol-faithful test engine;
-neither AMY nor an audio device is involved:
+Compiler/NRT suites exercise real SuperCollider without taking the desktop
+audio device. Process tests keep MIDI/OSC senders, the frontend and fake/real
+engine in distinct processes. Deterministic UI captures use the same production
+QML and a separate protocol-faithful fake engine:
 
 ```bash
 python capture_screenshots.py
 ```
 
-## Packages and release
+## Packages
 
 The SC workflow tests Linux x86_64, Raspberry Pi aarch64, macOS arm64 and
-Windows x86_64. Release packages contain the Qt application, SuperCollider
-3.14.1 language/server runtime and class/plugin trees. They communicate through
-the native loopback OSC protocol described above; no substitute IPC layer is
-introduced.
-
-Publishing occurs only when the manually dispatched workflow receives
-`release=true`. An ordinary push or merge performs platform tests and creates
-no release. Linux packages use the host's normal audio-session integration
-(`pw-jack` on PipeWire); Raspberry Pi receives no scheduler, CPU-isolation or
-other machine-policy changes. The external VSCO sample library is deliberately
-not embedded. See [third-party notices](./THIRD_PARTY_NOTICES.md) and
-[current implementation status](../design/sc/STATUS.md).
+Windows x86_64. Packages include Qt/Python plus SC 3.14.1, but not external VSCO
+recordings. Publication happens only on manual `release=true`; ordinary pushes
+only test. See [`../design/sc/BUILD_AND_RELEASE.md`](../design/sc/BUILD_AND_RELEASE.md),
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and
+[`../design/sc/STATUS.md`](../design/sc/STATUS.md).

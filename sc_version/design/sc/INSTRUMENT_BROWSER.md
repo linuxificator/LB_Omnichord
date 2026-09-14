@@ -1,8 +1,9 @@
 # SuperCollider instrument browser and controls
 
 Status: authoritative implemented contract
-
-Last verified: 2026-09-14
+Owner: instrument catalogue and controls
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
 ## User contract
 

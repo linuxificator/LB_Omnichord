@@ -375,10 +375,9 @@ class SynthState:
     def transport_payload(self) -> dict[str, Any]:
         """Return the complete engine override state for the selected patch.
 
-        The UI always has explicit numeric values, but AMY's factory patch is
-        already the source of truth for controls whose application default is
-        identical to the native patch value. Omitting those values avoids
-        rewriting partial CtrlCoef lists such as the Juno VCF base frequency.
+        The UI always has explicit numeric values, but the native program is
+        already the source of truth when its application default is identical.
+        Omitting those values prevents unnecessary engine mutations.
         Application corrections and user/preset edits remain explicit.
         """
         arguments: list[str | float] = []

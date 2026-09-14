@@ -2,8 +2,6 @@
   "schema_version": 1,
   "quick_controls_style": "Basic",
   "package_size_budgets_bytes": {
-    "Android-arm64": 120000000,
-    "Android-x86_64": 120000000,
     "Linux-x86_64": 105000000,
     "RaspberryPi-aarch64": 110000000,
     "Windows-x86_64": 145000000,
@@ -22,15 +20,6 @@
     "PySide6.QtQml",
     "PySide6.QtQuick",
     "PySide6.QtQuickControls2"
-  ],
-  "android_load_order": [
-    "Core",
-    "Gui",
-    "Network",
-    "OpenGL",
-    "Qml",
-    "Quick",
-    "QuickControls2"
   ],
   "source_qml_imports": [
     "QtQuick",

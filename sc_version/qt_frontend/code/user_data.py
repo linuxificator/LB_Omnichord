@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 
-from config_migrations import CURRENT_CONFIG_REVISION, migrate_config_document
+from frontend_config import load_frontend_config
 from json_store import JsonStore
-from resolved_config import ConfigIssue, ConfigValidationError, resolve_amy_config_data
 
 
 USER_ROOT = Path.home() / ".omnichord"
@@ -13,53 +13,41 @@ MIDI_PRESET_DIR = USER_ROOT / "midi_presets"
 USER_CONFIG_DIR = USER_ROOT / "config"
 
 
-def _migrate_amy_config(source: Path, target: Path) -> None:
-    """Validate an explicit migration before atomically persisting it."""
+def _legacy_frontend_config(shipped: dict[str, object]) -> dict[str, object]:
+    """Import engine-neutral settings from the preceding edition's config."""
 
-    shipped = JsonStore(source).read()
-    if not isinstance(shipped, dict):
-        raise ConfigValidationError(
-            [ConfigIssue("$", "shipped config must contain a JSON object")]
-        )
-    shipped_migration = migrate_config_document(shipped)
-    if shipped_migration.source_revision != CURRENT_CONFIG_REVISION:
-        raise ConfigValidationError(
-            [
-                ConfigIssue(
-                    "$.config_revision",
-                    "shipped config must declare the current revision",
-                )
-            ]
-        )
-    shipped_resolved = resolve_amy_config_data(
-        shipped,
-        source_path=source,
-        source_kind="shipped",
-    )
-    if shipped_resolved.revision != CURRENT_CONFIG_REVISION:
-        raise ConfigValidationError(
-            [
-                ConfigIssue(
-                    "$.config_revision",
-                    "shipped configuration did not resolve to the current revision",
-                )
-            ]
-        )
-
-    store = JsonStore(target)
-    current = store.read()
-    if not isinstance(current, dict):
-        raise ConfigValidationError(
-            [ConfigIssue("$", "must contain a JSON object")]
-        )
-    migration = migrate_config_document(current)
-    resolve_amy_config_data(
-        migration.data,
-        source_path=target,
-        source_kind="user",
-    )
-    if migration.changed:
-        store.write(migration.data)
+    legacy_path = USER_CONFIG_DIR / "amy_config.json"
+    legacy = JsonStore(legacy_path).read() if legacy_path.is_file() else None
+    result = copy.deepcopy(shipped)
+    if not isinstance(legacy, dict):
+        return result
+    for name in ("midi_input", "osc_input"):
+        if isinstance(legacy.get(name), dict):
+            result[name] = copy.deepcopy(legacy[name])
+    # Program identifiers belong to their engine. Program selections migrate
+    # through the explicit preset alias map, never through frontend config.
+    midi = legacy.get("midi_player")
+    if isinstance(midi, dict) and isinstance(midi.get("voices_per_synth"), int):
+        result["midi"] = {"voices_per_row": midi["voices_per_synth"]}
+    rhythm = legacy.get("rhythm")
+    if isinstance(rhythm, dict):
+        destination = copy.deepcopy(result["rhythm"])
+        if isinstance(destination, dict):
+            for old_name, new_name in (
+                ("chord_gate_beats", "chord_gate_beats"),
+                ("bass_gate_beats", "bass_gate_beats"),
+                ("max_rhythm_chord_notes", "max_chord_notes"),
+            ):
+                if old_name in rhythm:
+                    destination[new_name] = rhythm[old_name]
+            result["rhythm"] = destination
+    performance = legacy.get("performance")
+    if isinstance(performance, dict) and "strum_tail_ms" in performance:
+        result["performance"] = {"strum_tail_ms": performance["strum_tail_ms"]}
+    buses = legacy.get("buses")
+    if isinstance(buses, dict):
+        result["logical_buses"] = copy.deepcopy(buses)
+    return result
 
 
 def migrate_user_layout() -> None:
@@ -96,7 +84,10 @@ def ensure_user_configs(shipped_config_dir: Path) -> Path:
     for source in Path(shipped_config_dir).glob("*.json"):
         target = USER_CONFIG_DIR / source.name
         if not target.exists():
-            JsonStore(target).write(JsonStore(source).read())
-        if source.name == "amy_config.json":
-            _migrate_amy_config(source, target)
+            shipped = JsonStore(source).read()
+            if source.name == "frontend.json" and isinstance(shipped, dict):
+                shipped = _legacy_frontend_config(shipped)
+            JsonStore(target).write(shipped)
+        if source.name == "frontend.json":
+            load_frontend_config(target, source_kind="user")
     return USER_CONFIG_DIR

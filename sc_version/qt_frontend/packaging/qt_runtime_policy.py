@@ -24,7 +24,6 @@ def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
         raise ValueError(f"unsupported Qt runtime manifest revision in {path}")
     for key in (
         "python_modules",
-        "android_load_order",
         "source_qml_imports",
         "qml_modules",
         "forbidden_runtime_fragments",
@@ -34,7 +33,7 @@ def load_manifest(path: Path = DEFAULT_MANIFEST) -> dict[str, Any]:
             isinstance(value, str) and value for value in values
         ):
             raise ValueError(f"{path}: {key} must be a non-empty string list")
-        if values != sorted(set(values)) and key != "android_load_order":
+        if values != sorted(set(values)):
             raise ValueError(f"{path}: {key} must be sorted and unique")
     if data.get("quick_controls_style") != "Basic":
         raise ValueError("LB Omnichord packages only the Basic controls style")

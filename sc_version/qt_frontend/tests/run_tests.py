@@ -18,24 +18,6 @@ ROOT = Path(__file__).resolve().parents[1]
 TESTS = ROOT / "tests"
 SC_ROOT = ROOT.parent / "supercollider"
 
-# These contracts exclusively describe the archived AMY/Android/ESP32 package
-# and release pipeline.  They remain in the copied history as useful oracles,
-# but are not tests of the active SuperCollider product.
-ARCHIVED_EDITION_UNIT_TESTS = {
-    "test_android_packaging.py",
-    "test_android_runtime.py",
-    "test_package_evidence.py",
-    "test_package_size_policy.py",
-    "test_packaging.py",
-    "test_program_architecture.py",
-    "test_raspberry_pi_realtime.py",
-    "test_release_inputs.py",
-    "test_release_sbom.py",
-    "test_release_screenshots.py",
-    "test_rt_pi_tools.py",
-    "test_static_contracts.py",
-}
-
 SUITES: dict[str, tuple[Path, ...]] = {
     "quality": (
         TESTS / "run_quality.py",
@@ -46,7 +28,6 @@ SUITES: dict[str, tuple[Path, ...]] = {
     "unit": tuple(
         path
         for path in sorted(TESTS.glob("test_*.py"))
-        if path.name not in ARCHIVED_EDITION_UNIT_TESTS
     ),
     "sc-frontend": (
         TESTS / "test_engine_protocol.py",
@@ -57,7 +38,6 @@ SUITES: dict[str, tuple[Path, ...]] = {
         TESTS / "test_supercollider_process.py",
         TESTS / "test_supercollider_programs.py",
         TESTS / "test_sclork_playback_profile.py",
-        TESTS / "test_supercollider_release_evidence.py",
         TESTS / "test_supercollider_sources.py",
     ),
     "portable-input-processes": (
@@ -79,24 +59,6 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
     "platform-input-linux": (
         TESTS / "platform" / "linux" / "test_midi_input.py",
-    ),
-    "frontend": (
-        TESTS / "integration" / "test_frontend.py",
-    ),
-    "serial": (
-        TESTS / "integration" / "test_serial.py",
-        TESTS / "integration" / "test_programs.py",
-    ),
-    "native-controls": (
-        TESTS / "integration" / "test_native_controls.py",
-        TESTS / "integration" / "test_native_instrument_balance.py",
-    ),
-    "native-rhythm": (
-        TESTS / "integration" / "test_native_rhythm.py",
-        TESTS / "integration" / "test_native_drum_balance.py",
-    ),
-    "presets": (
-        TESTS / "integration" / "test_presets.py",
     ),
     "sc-compiler": (
         SC_ROOT / "syntax_check.scd",
@@ -139,11 +101,6 @@ ALL_ORDER = (
     "desktop-network-discovery",
     "sc-desktop-portable",
     "platform-input-linux",
-    "frontend",
-    "serial",
-    "presets",
-    "native-controls",
-    "native-rhythm",
     "sc-compiler",
     "sc-sequencer",
     "sc-audio",
@@ -286,12 +243,6 @@ def _repository_commit() -> str:
     return completed.stdout.strip() if completed.returncode == 0 else "unknown"
 
 
-def _amy_commit() -> str:
-    manifest = ROOT / "packaging" / "release_inputs.json"
-    value = json.loads(manifest.read_text(encoding="utf-8"))
-    return str(value["amy"]["commit"])
-
-
 def _finalize_coverage(directory: Path) -> ScriptResult:
     env = os.environ.copy()
     env["COVERAGE_FILE"] = str(directory / ".coverage")
@@ -381,7 +332,6 @@ def main() -> int:
         "duration_seconds": round(time.monotonic() - started, 6),
         "status": "passed" if returncode == 0 else "failed",
         "repository_commit": _repository_commit(),
-        "amy_commit": _amy_commit(),
         "coverage_report": (
             str(coverage_directory / "coverage.json")
             if coverage_directory is not None

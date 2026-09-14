@@ -31,8 +31,11 @@ from osc_input import (
     OscInputPortFactory,
 )
 from musical_state import TuningSnapshot, tune_note
-from gm_percussion import midi_drum_amplitude, resolve_gm_percussion
-from midi_levels import midi_pitched_synth_level, normalized_midi_velocity
+from midi_levels import (
+    midi_drum_level,
+    midi_pitched_synth_level,
+    normalized_midi_velocity,
+)
 from synth_state import SynthState
 from sc_drum_kits import DEFAULT_DRUM_KIT_ID, DRUM_KITS
 from user_data import MIDI_PRESET_DIR
@@ -104,10 +107,10 @@ class MidiEngine:
 
     def __init__(self, client: Any) -> None:
         self.client = client
-        resolved = client.resolved_config
-        self.voices = resolved.capacities.voices.midi_per_synth
-        self.row_buses = resolved.layout.midi_row_buses
-        self.drum_bus = resolved.layout.midi_drum_bus
+        config = client.frontend_config
+        self.voices = config.midi_voices_per_row
+        self.row_buses = config.layout.midi_row_buses
+        self.drum_bus = config.layout.midi_drum_bus
         if (
             len(self.row_buses) != MIDI_ROW_COUNT
             or len(set(self.row_buses)) != MIDI_ROW_COUNT
@@ -144,10 +147,8 @@ class MidiEngine:
 
     def pitched_row_level(self, key: str, volume: float) -> float:
         """Resolve the row UI level to the calibrated engine gain."""
-        return midi_pitched_synth_level(
-            volume,
-            self.client.resolved_config.instrument_level(str(key)),
-        )
+        del key
+        return midi_pitched_synth_level(volume)
 
     def configure_drum_synth(self) -> None:
         if self._drum_configured:
@@ -315,7 +316,7 @@ class MidiEngine:
             logical_bus=self.row_buses[row],
             tail_seconds=max(
                 0.01,
-                self.client.resolved_config.performance.strum_tail_ms / 1000.0,
+                self.client.frontend_config.performance.strum_tail_ms / 1000.0,
             ),
         )
 
@@ -328,19 +329,13 @@ class MidiEngine:
         velocity: int,
         row_volume: float,
     ) -> None:
-        drums = self.client.resolved_config.drums
-        hit = resolve_gm_percussion(
-            midi_note,
-            kit=drums.kit,
-            configured_samples=dict(drums.sample_map),
-        )
-        if hit is None:
+        note = int(midi_note)
+        if not 0 <= note <= 127:
             return
-        amp = midi_drum_amplitude(velocity, row_volume, drums.velocity_gain)
         self.client.drum_hit(
             owner="midi/drums",
-            logical_key=int(hit.note),
-            velocity=amp,
+            logical_key=note,
+            velocity=midi_drum_level(velocity, row_volume),
             logical_bus=self.drum_bus,
             kit_id=self.drum_kit_id,
         )
@@ -364,7 +359,7 @@ class MidiEngine:
 
 @final
 class MidiPlayerBackend(QObject):
-    """MIDI-player state, shared control binding, inputs and AMY routing."""
+    """MIDI-player state, shared control binding and typed engine routing."""
 
     stateChanged = Signal()
     tuningChanged = Signal()
@@ -470,12 +465,12 @@ class MidiPlayerBackend(QObject):
 
         self._midi_input_port: MidiInputPort = midi_input_port_factory(
             self._midi_input_event_relay,
-            client.resolved_config.midi_input,
+            client.frontend_config.midi_input,
         )
         self._midi_input_port.start()
         self._osc_input_port: OscInputPort = osc_input_port_factory(
             self._osc_input_event_relay,
-            client.resolved_config.osc_input,
+            client.frontend_config.osc_input,
         )
         self._osc_input_port.start()
         self._refresh_input_techs()
@@ -664,7 +659,7 @@ class MidiPlayerBackend(QObject):
             status.presentation()
             for status in self._midi_input_port.status_snapshot(self._midi_input_activity_until)
         ]
-        osc_address = self.client.resolved_config.osc_input.listen_address
+        osc_address = self.client.frontend_config.osc_input.listen_address
         network_available = bool(
             osc_address is not None
             and qt_listener_network_available(osc_address)
