@@ -129,6 +129,11 @@ class ScBassExpansionTests(unittest.TestCase):
                         [(event.tick, event.pitch_offset) for event in resolved.events],
                         [(event.tick, event.pitch_offset) for event in riff.events],
                     )
+                    self.assertIn(
+                        "none",
+                        {event.link_to_next for event in resolved.events},
+                        "a bass phrase must retain a finite release boundary",
+                    )
                     for index, event in enumerate(resolved.events):
                         next_event = resolved.events[(index + 1) % len(resolved.events)]
                         gap = (next_event.tick - event.tick) % resolved.phrase_ticks
@@ -155,6 +160,8 @@ class ScBassExpansionTests(unittest.TestCase):
         *,
         link: str = "legato_glide",
         second_note: int = 43,
+        second_link: str = "none",
+        first_duration_ticks: int = 96,
     ):
         return compile_bass_lane(
             config={
@@ -167,7 +174,7 @@ class ScBassExpansionTests(unittest.TestCase):
                     "events": [
                         {
                             "tick": 0,
-                            "duration_ticks": 96,
+                            "duration_ticks": first_duration_ticks,
                             "fallback_duration_ticks": 40,
                             "note": 36,
                             "velocity": 88,
@@ -185,7 +192,7 @@ class ScBassExpansionTests(unittest.TestCase):
                             "accent": True,
                             "accent_amount": 0.6,
                             "slide_to_next": False,
-                            "link_to_next": "none",
+                            "link_to_next": second_link,
                         },
                     ],
                 },
@@ -241,6 +248,25 @@ class ScBassExpansionTests(unittest.TestCase):
             [event.kind for event in child.events],
             ["noteOn", "noteOff"],
         )
+
+    def test_a_real_pause_splits_owned_notes_into_separate_gestures(self) -> None:
+        plan = self._plan(
+            "sc.omni.acid303",
+            link="none",
+            first_duration_ticks=80,
+        )
+        children = plan.definitions[1:]
+        self.assertEqual(len(children), 2)
+        self.assertTrue(
+            all(
+                [event.kind for event in child.events] == ["noteOn", "noteOff"]
+                for child in children
+            )
+        )
+
+    def test_a_closed_wraparound_link_chain_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "silent handover"):
+            self._plan("sc.omni.acid303", second_link="legato_glide")
 
     def test_incapable_voice_uses_detached_fallback_and_retriggers(self) -> None:
         children = self._plan("sc.sclork.fmBass").definitions[1:]
