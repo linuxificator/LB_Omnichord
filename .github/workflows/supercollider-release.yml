@@ -57,7 +57,7 @@ jobs:
           python -m pip install -c "sc_version/qt_frontend/packaging/constraints/${{ matrix.constraints }}" -r sc_version/qt_frontend/requirements-build.txt -r sc_version/qt_frontend/requirements-test.txt -r sc_version/qt_frontend/requirements-source.txt
       - name: Restore pinned SuperCollider runtime
         id: runtime
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/supercollider-runtime
           key: sc-runtime-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.sh', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
@@ -196,7 +196,7 @@ jobs:
           python -m pip install -c "sc_version/qt_frontend/packaging/constraints/${{ matrix.constraints }}" -r sc_version/qt_frontend/requirements-build.txt
       - name: Restore pinned SuperCollider runtime
         id: runtime
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/supercollider-runtime
           key: sc-runtime-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.sh', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
