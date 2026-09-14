@@ -35,6 +35,10 @@ class SuperColliderUnavailable(RuntimeError):
     """The separately supervised language/audio service is not ready."""
 
 
+TRANSACTION_ACK_TIMEOUT_SECONDS = 0.5
+TRANSACTION_DELIVERY_ATTEMPTS = 3
+
+
 class SuperColliderClient:
     """Typed OSC adapter to a separately supervised headless SC service.
 
@@ -75,6 +79,9 @@ class SuperColliderClient:
         dispatcher.map("/omni/v1/ack", self._accept_ack)
         dispatcher.map("/omni/v1/program/status", self._accept_program_status)
         language = self.runtime_config.language
+        # Program-ready callbacks can synchronously publish a replacement lane
+        # and wait for its acknowledgement. They therefore need an independent
+        # reply handler while that callback is active.
         self._reply_server = ThreadingOSCUDPServer((language.host, 0), dispatcher)
         self.reply_port = int(self._reply_server.server_address[1])
         self._reply_thread = threading.Thread(
@@ -335,10 +342,10 @@ class SuperColliderClient:
             ],
         )
         messages = [begin, *records, ("/omni/v1/tx/commit", [transaction_id])]
-        for _attempt in range(3):
+        for _attempt in range(TRANSACTION_DELIVERY_ATTEMPTS):
             for address, arguments in messages:
                 self._send_raw(address, [self.session, *arguments])
-            deadline = time.monotonic() + 0.1
+            deadline = time.monotonic() + TRANSACTION_ACK_TIMEOUT_SECONDS
             with self._ack_condition:
                 while transaction_id not in self._acknowledgements:
                     remaining = deadline - time.monotonic()
@@ -353,14 +360,19 @@ class SuperColliderClient:
                     self._acknowledgements.pop(transaction_id, None)
                 continue
             if acknowledgement[0] == "rejected":
+                with self._ack_condition:
+                    self._acknowledgements.pop(transaction_id, None)
                 raise SuperColliderUnavailable(
                     f"SuperCollider rejected {plan.lane} generation "
                     f"{plan.generation}: {acknowledgement[3]}"
                 )
+            with self._ack_condition:
+                self._acknowledgements.pop(transaction_id, None)
             return acknowledgement
         raise SuperColliderUnavailable(
             f"SuperCollider did not acknowledge {plan.lane} generation "
-            f"{plan.generation} after three delivery attempts"
+            f"{plan.generation} after {TRANSACTION_DELIVERY_ATTEMPTS} "
+            "delivery attempts"
         )
 
     @staticmethod

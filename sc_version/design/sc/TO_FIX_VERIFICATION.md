@@ -155,3 +155,23 @@ The first unbounded continuation subsequently stopped after 154.7 seconds on
 one native-child `/n_set` race. This was a useful failure, not accepted release
 evidence; the persistent-group control change above is its regression fix and
 the clean-runtime counter is restarted after validation.
+
+A later production-QML continuation kept audio clean for 95 minutes and 51,519
+public actions, then exposed a control-plane latency boundary: a tuning change
+timed out while waiting for acknowledgement of chord generation 22,335. The
+client's former 100 ms acknowledgement window was too narrow for a temporarily
+busy language process and three immediate retransmissions could amplify that
+pause. Transactions now allow a bounded 500 ms per delivery attempt and remove
+completed acknowledgements from client state. A separate-process regression
+holds the language peer for 350 ms, proves that the first delivery succeeds,
+and proves that acknowledgement state is reclaimed. Reply callbacks remain
+concurrently dispatched because a program-ready callback can itself publish a
+lane and wait for the independent acknowledgement callback.
+
+The same release pass found that the documented SC screenshot helper still
+started the historical serial capture path and therefore waited forever for an
+SC service. It now launches a protocol-faithful SC test peer as a separate
+process, points the unmodified production frontend at that peer, and validates
+both generated PNG files in the frontend process suite. Current public images
+therefore exercise the SC edition's production QML without AMY or a serial
+transport.

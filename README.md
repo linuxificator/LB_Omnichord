@@ -56,7 +56,7 @@ supervised headless `sclang` and `scsynth` processes through a typed OSC
 boundary. It has its own tests, package workflow and explicitly requested
 `-SC` releases; it does not replace or alter the supported AMY edition.
 
-![LB Omnichord SuperCollider edition](./sc_version/qt_frontend/screenshots/omni-R20260913T004923.png)
+![LB Omnichord SuperCollider edition](./sc_version/qt_frontend/screenshots/omni-SC-20260914T175900.png)
 
 See [the SuperCollider edition overview](./sc_version/README.md) for its
 current Linux-only scope and known gaps.

@@ -955,7 +955,8 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 
 - `capture_screenshots.py` runs the production QML scene offscreen with an
   isolated temporary home and writes `screenshots/omni.png` and
-  `screenshots/midi.png`.
+  `screenshots/midi.png`. It launches the protocol-faithful SC test service as
+  a separate process; it never selects the archived AMY/serial backend.
 - The SC frontend process regression loads that production QML scene in its
   separately launched frontend process and rejects a blank or undersized
   frame. `tests/endurance/sc_endurance.py --gui` repeats OMNI and MIDI captures
@@ -971,9 +972,9 @@ The real-serial regression fixes A=440 Hz, selects C major, compares EQ with HAR
 - Before README assets are committed, the generated PNGs must load at the
   expected 1920x850 size and must have enough sampled color variation to reject
   a blank or obvious error screen.
-- The capture helper continuously drains the pseudo-serial endpoint, so the
-  complete startup wire stream cannot block its writer while large rhythm and
-  fill libraries are installed.
+- A process regression executes the complete helper and validates both PNGs,
+  so a stale AMY/serial capture path or a missing SC service cannot silently
+  leave the documented command hanging.
 - A successful `main` release captures the exact released commit. CI commits
   only `README.md` and the new release-tagged screenshot PNGs. That
   screenshot-only commit uses a human-readable `skip-rebuild` note plus

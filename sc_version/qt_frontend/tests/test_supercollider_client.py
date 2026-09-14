@@ -9,7 +9,7 @@ import time
 import unittest
 
 from pythonosc.dispatcher import Dispatcher
-from pythonosc.osc_server import ThreadingOSCUDPServer
+from pythonosc.osc_server import BlockingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
 
 
@@ -22,14 +22,22 @@ from supercollider_client import SuperColliderClient  # noqa: E402
 
 
 class _FakeSuperCollider:
-    def __init__(self, *, incomplete_once: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        incomplete_once: bool = False,
+        acknowledgement_delay_seconds: float = 0.0,
+    ) -> None:
         self.messages: list[tuple[str, tuple[object, ...]]] = []
         self.incomplete_once = incomplete_once
+        self.acknowledgement_delay_seconds = acknowledgement_delay_seconds
         self.commit_count = 0
         self.ready = threading.Event()
         dispatcher = Dispatcher()
         dispatcher.set_default_handler(self._accept)
-        self.server = ThreadingOSCUDPServer(("127.0.0.1", 0), dispatcher)
+        # A single receive loop preserves packet order and gives each test a
+        # deterministic boundary without changing the production UDP client.
+        self.server = BlockingOSCUDPServer(("127.0.0.1", 0), dispatcher)
         self.port = int(self.server.server_address[1])
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -48,6 +56,8 @@ class _FakeSuperCollider:
             self.ready.set()
         elif address == "/omni/v1/tx/commit":
             self.commit_count += 1
+            if self.acknowledgement_delay_seconds:
+                time.sleep(self.acknowledgement_delay_seconds)
             client = SimpleUDPClient("127.0.0.1", int(self.messages[0][1][2]))
             try:
                 incomplete = self.incomplete_once and self.commit_count == 1
@@ -131,6 +141,13 @@ class SuperColliderClientTests(unittest.TestCase):
         self.fake.close()
         self.temporary.cleanup()
 
+    def close_client(self, client: SuperColliderClient) -> None:
+        client.close()
+        self.assertTrue(
+            self.fake.wait_for_messages("/omni/v1/shutdown"),
+            "fake engine did not consume the client's shutdown boundary",
+        )
+
     def test_handshake_and_typed_note_lifecycle_cross_process_boundary(self) -> None:
         client = SuperColliderClient(
             config=None,
@@ -162,7 +179,7 @@ class SuperColliderClientTests(unittest.TestCase):
         client.note_off(NoteOff(owner="test", handle="test/60"))
         client.set_owner_sustain("test", True)
         client.set_owner_sustain("test", False)
-        client.close()
+        self.close_client(client)
 
         addresses = [address for address, _ in self.fake.messages]
         self.assertIn("/omni/v1/hello", addresses)
@@ -203,7 +220,7 @@ class SuperColliderClientTests(unittest.TestCase):
         )
 
         client.send_message(addresses["pitch_bend"], -0.125)
-        client.close()
+        self.close_client(client)
 
         bends = [
             arguments
@@ -231,7 +248,7 @@ class SuperColliderClientTests(unittest.TestCase):
             "bass", {"name": "sc.omni.acid303", "params": ["gain", 0.8]}
         )
         bass_revision = client._program_revision["bass"]
-        client.close()
+        self.close_client(client)
 
         self.assertNotEqual(chord_revision, bass_revision)
         prepares = [
@@ -262,7 +279,7 @@ class SuperColliderClientTests(unittest.TestCase):
         revision = client._program_revision["strum"]
 
         client._strum_note(64.25)
-        client.close()
+        self.close_client(client)
 
         gestures = [
             arguments
@@ -291,7 +308,7 @@ class SuperColliderClientTests(unittest.TestCase):
             kit_id="sc-808",
         )
         self.assertTrue(self.fake.wait_for_messages("/omni/v1/drum/hit"))
-        client.close()
+        self.close_client(client)
 
         hits = [
             arguments
@@ -344,9 +361,10 @@ class SuperColliderClientTests(unittest.TestCase):
                 ),
             )
         )
-        client.close()
+        self.close_client(client)
 
         self.assertEqual(acknowledgement, ("applied", 1, 0.0, "ok"))
+        self.assertEqual(client._acknowledgements, {})
         transaction = [
             (address, arguments)
             for address, arguments in self.fake.messages
@@ -393,9 +411,45 @@ class SuperColliderClientTests(unittest.TestCase):
                 ),
             )
         )
-        client.close()
+        self.close_client(client)
         self.assertEqual(acknowledgement, ("applied", 1, 0.0, "ok"))
         self.assertEqual(self.fake.commit_count, 2)
+        self.assertEqual(client._acknowledgements, {})
+
+    def test_lane_transaction_tolerates_a_busy_language_process(self) -> None:
+        from engine_protocol import SequenceDefinition
+        from musical_sequence_plan import LanePlan
+
+        self.fake.close()
+        self.fake = _FakeSuperCollider(acknowledgement_delay_seconds=0.35)
+        raw_config = json.loads(self.config_path.read_text(encoding="utf-8"))
+        raw_config["language"]["port"] = self.fake.port
+        self.config_path.write_text(json.dumps(raw_config), encoding="utf-8")
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+
+        acknowledgement = client.publish_lane(
+            LanePlan(
+                lane="delayed",
+                generation=1,
+                alignment_ticks=1,
+                definitions=(
+                    SequenceDefinition(
+                        "delayed/root", 1, "root", "delayed", 48, (), "fixture"
+                    ),
+                ),
+            )
+        )
+        self.close_client(client)
+
+        self.assertEqual(acknowledgement, ("applied", 1, 0.0, "ok"))
+        self.assertEqual(self.fake.commit_count, 1)
+        self.assertEqual(client._acknowledgements, {})
 
     def test_sample_program_activates_only_after_engine_ready_status(self) -> None:
         client = SuperColliderClient(
@@ -423,7 +477,7 @@ class SuperColliderClientTests(unittest.TestCase):
         while client._selected_program["strum"] != program and time.monotonic() < deadline:
             time.sleep(0.01)
         self.assertEqual(client._selected_program["strum"], program)
-        client.close()
+        self.close_client(client)
 
     def test_direct_sample_note_waits_for_ready_and_obeys_early_note_off(self) -> None:
         client = SuperColliderClient(
@@ -483,7 +537,7 @@ class SuperColliderClientTests(unittest.TestCase):
         ]
         self.assertEqual(len(note_ons), 1)
         self.assertEqual(note_ons[0][3], second.handle)
-        client.close()
+        self.close_client(client)
 
     def test_superseded_and_replaced_sample_revisions_are_released(self) -> None:
         client = SuperColliderClient(
@@ -524,7 +578,7 @@ class SuperColliderClientTests(unittest.TestCase):
         deadline = time.monotonic() + 1.0
         while client._selected_program["strum"] != third_key[0] and time.monotonic() < deadline:
             time.sleep(0.01)
-        client.close()
+        self.close_client(client)
 
         releases = [
             arguments
