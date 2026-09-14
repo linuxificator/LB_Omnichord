@@ -78,12 +78,16 @@ class SampleRepositoryTests(unittest.TestCase):
         old = json.loads(json.dumps(shipped))
         old["config_revision"] = 1
         old["samples"].pop("repository")
+        old["server"].pop("max_buffers")
         old["samples"]["vsco_root"] = "~/sample_lib/VSCO-2-CE-1.1.0"
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             shipped_path = root / "shipped.json"
-            shipped_path.write_text(json.dumps(old), encoding="utf-8")
+            shipped_path.write_text(json.dumps(shipped), encoding="utf-8")
             user_root = root / "home"
+            existing = user_root / "config" / "supercollider.json"
+            existing.parent.mkdir(parents=True)
+            existing.write_text(json.dumps(old), encoding="utf-8")
             target, config = prepare_user_runtime_config(
                 shipped_path,
                 user_root=user_root,
@@ -92,6 +96,7 @@ class SampleRepositoryTests(unittest.TestCase):
             persisted = json.loads(target.read_text(encoding="utf-8"))
             self.assertEqual(persisted["config_revision"], 2)
             self.assertEqual(persisted["samples"]["vsco_root"], "~/VSCO-2-CE")
+            self.assertEqual(persisted["server"]["max_buffers"], 8192)
             self.assertEqual(config.samples.repository, DEFAULT_REPOSITORY)
             self.assertEqual(
                 target,
@@ -104,11 +109,20 @@ class SampleRepositoryTests(unittest.TestCase):
         )
         data["config_revision"] = 1
         data["samples"].pop("repository")
+        data["server"].pop("max_buffers")
         data["samples"]["vsco_root"] = "/media/samples/VSCO-2-CE"
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             shipped = root / "shipped.json"
-            shipped.write_text(json.dumps(data), encoding="utf-8")
+            shipped.write_text(
+                (FRONTEND / "config" / "supercollider.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            existing = root / "user" / "config" / "supercollider.json"
+            existing.parent.mkdir(parents=True)
+            existing.write_text(json.dumps(data), encoding="utf-8")
             target, config = prepare_user_runtime_config(
                 shipped,
                 user_root=root / "user",
@@ -118,6 +132,36 @@ class SampleRepositoryTests(unittest.TestCase):
             self.assertIn(
                 "/media/samples/VSCO-2-CE", target.read_text(encoding="utf-8")
             )
+
+    def test_revision_two_missing_buffer_capacity_is_migrated(self) -> None:
+        data = json.loads(
+            (FRONTEND / "config" / "supercollider.json").read_text(encoding="utf-8")
+        )
+        data["config_revision"] = 2
+        data["server"].pop("max_buffers")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            shipped = root / "shipped.json"
+            shipped.write_text(
+                (FRONTEND / "config" / "supercollider.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            target = root / "user" / "config" / "supercollider.json"
+            target.parent.mkdir(parents=True)
+            target.write_text(json.dumps(data), encoding="utf-8")
+
+            migrated_path, config = prepare_user_runtime_config(
+                shipped,
+                user_root=root / "user",
+                install_samples=False,
+            )
+
+            persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["config_revision"], 2)
+            self.assertEqual(persisted["server"]["max_buffers"], 8192)
+            self.assertEqual(config.server.max_buffers, 8192)
 
 
 if __name__ == "__main__":

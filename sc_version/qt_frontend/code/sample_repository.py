@@ -14,12 +14,12 @@ from dulwich.repo import Repo
 
 from json_store import JsonStore
 from supercollider_config import (
+    CURRENT_CONFIG_REVISION,
     SuperColliderRuntimeConfig,
     load_supercollider_config,
 )
 
 
-CURRENT_CONFIG_REVISION = 2
 DEFAULT_REPOSITORY = "https://github.com/linuxificator/VSCO-2-CE.git"
 DEFAULT_SAMPLE_ROOT = "~/VSCO-2-CE"
 LEGACY_SAMPLE_ROOT = "~/sample_lib/VSCO-2-CE-1.1.0"
@@ -100,25 +100,42 @@ def ensure_sample_repository(path: Path, repository_url: str) -> Path:
     return destination
 
 
-def _migrate_config(data: object) -> tuple[dict[str, object], bool]:
+def _migrate_config(
+    data: object,
+    *,
+    default_max_buffers: int,
+) -> tuple[dict[str, object], bool]:
     if not isinstance(data, dict):
         raise SampleRepositoryError("SuperCollider config must contain an object")
     revision = data.get("config_revision")
-    if revision == CURRENT_CONFIG_REVISION:
-        return data, False
-    if revision != 1:
+    if revision not in (1, CURRENT_CONFIG_REVISION):
         raise SampleRepositoryError(
             f"unsupported SuperCollider config revision {revision!r}"
         )
     migrated = json.loads(json.dumps(data))
-    samples = migrated.get("samples")
-    if not isinstance(samples, dict):
-        raise SampleRepositoryError("SuperCollider config samples object is missing")
-    if samples.get("vsco_root") == LEGACY_SAMPLE_ROOT:
-        samples["vsco_root"] = DEFAULT_SAMPLE_ROOT
-    samples.setdefault("repository", DEFAULT_REPOSITORY)
-    migrated["config_revision"] = CURRENT_CONFIG_REVISION
-    return migrated, True
+    changed = False
+
+    if revision == 1:
+        samples = migrated.get("samples")
+        if not isinstance(samples, dict):
+            raise SampleRepositoryError("SuperCollider config samples object is missing")
+        if samples.get("vsco_root") == LEGACY_SAMPLE_ROOT:
+            samples["vsco_root"] = DEFAULT_SAMPLE_ROOT
+            changed = True
+        if "repository" not in samples:
+            samples["repository"] = DEFAULT_REPOSITORY
+            changed = True
+        migrated["config_revision"] = CURRENT_CONFIG_REVISION
+        changed = True
+
+    server = migrated.get("server")
+    if not isinstance(server, dict):
+        raise SampleRepositoryError("SuperCollider config server object is missing")
+    if "max_buffers" not in server:
+        server["max_buffers"] = default_max_buffers
+        changed = True
+
+    return migrated, changed
 
 
 def prepare_user_runtime_config(
@@ -132,11 +149,15 @@ def prepare_user_runtime_config(
     root = (user_root or (Path.home() / ".omnichord")).expanduser().resolve()
     target = root / "config" / "supercollider.json"
     target.parent.mkdir(parents=True, exist_ok=True)
+    shipped = load_supercollider_config(shipped_config)
     store = JsonStore(target)
     if not target.exists():
         source = JsonStore(shipped_config).read()
         store.write(source)
-    migrated, changed = _migrate_config(store.read())
+    migrated, changed = _migrate_config(
+        store.read(),
+        default_max_buffers=shipped.server.max_buffers,
+    )
     if changed:
         store.write(migrated)
     config = load_supercollider_config(target)

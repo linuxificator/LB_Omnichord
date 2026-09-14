@@ -96,6 +96,10 @@ x86_64
 - First launch uses bundled Dulwich rather than a system Git executable to
   install `linuxificator/VSCO-2-CE` at `~/VSCO-2-CE`. The user config stores an
   alternate location, but startup verifies its Git origin before admitting it.
+- SuperCollider configuration revision 2 repairs the historically missing
+  `server.max_buffers` field from the shipped profile. Every frozen package
+  self-check exercises both a revision-1 upgrade and an already migrated
+  revision-2 document missing that field before an audio process is opened.
 - The bounded sample-source catalogue records all eleven pinned Git banks and
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see

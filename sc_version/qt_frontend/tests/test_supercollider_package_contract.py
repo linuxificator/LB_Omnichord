@@ -15,7 +15,10 @@ SC_ROOT = ROOT.parent / "supercollider"
 sys.path.insert(0, str(ROOT / "code"))
 sys.path.insert(0, str(ROOT / "packaging"))
 
-from sc_appimage_entry import packaged_runtime_root  # noqa: E402
+from sc_appimage_entry import (  # noqa: E402
+    packaged_runtime_root,
+    verify_config_migrations,
+)
 
 
 class SuperColliderPackageContractTests(unittest.TestCase):
@@ -90,6 +93,9 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("supercollider.json", entry)
         self.assertNotIn("local_amy_service", entry)
         self.assertNotIn("--amy-service", entry)
+
+    def test_frozen_package_verifies_all_supported_config_migrations(self) -> None:
+        verify_config_migrations(ROOT)
 
     def test_sc_build_is_independent_and_release_is_explicit(self) -> None:
         workflow = (

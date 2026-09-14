@@ -27,6 +27,10 @@ The workflow verifies SuperCollider 3.14.1 archives by SHA-256, validates the
 runtime in each package without opening an audio device, records a package
 content audit and checksum, and publishes the complete set under one
 `R<UTC timestamp>-SC` tag. A partial platform failure prevents publication.
+The frozen package self-check also migrates representative revision-1 and
+revision-2 user configurations. This guards the first-launch upgrade path on
+Linux, Raspberry Pi, macOS and Windows, including configuration fields added
+within an already published revision.
 
 ## Runtime and samples
 
