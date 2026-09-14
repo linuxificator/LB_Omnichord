@@ -89,6 +89,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
         TESTS / "integration" / "test_supercollider_sample_nrt.py",
         TESTS / "test_sfz_manifest_compiler.py",
         TESTS / "test_sample_bank_sources.py",
+        TESTS / "test_salamander_opcode_audit.py",
         TESTS / "test_vsco_manifest.py",
         TESTS / "test_supercollider_drums.py",
     ),

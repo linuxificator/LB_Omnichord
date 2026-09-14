@@ -17,6 +17,8 @@ def main() -> int:
     )
     parser.add_argument("bank_root", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--bank-id")
+    parser.add_argument("--source-pin")
     arguments = parser.parse_args()
     root = arguments.bank_root.resolve()
     mappings = tuple(
@@ -24,7 +26,14 @@ def main() -> int:
     )
     if not mappings:
         parser.error(f"no SFZ mappings found below {root}")
-    report = audit_sfz_opcodes(mappings, root=root)
+    if bool(arguments.bank_id) != bool(arguments.source_pin):
+        parser.error("--bank-id and --source-pin must be supplied together")
+    report = audit_sfz_opcodes(
+        mappings,
+        root=root,
+        bank_id=arguments.bank_id,
+        source_pin=arguments.source_pin,
+    )
     write_manifest(report, arguments.output)
     return 0 if report["complete"] else 2
 

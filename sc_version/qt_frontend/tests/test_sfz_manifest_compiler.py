@@ -165,9 +165,16 @@ class SfzManifestCompilerTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            report = audit_sfz_opcodes((mapping,), root=root)
+            report = audit_sfz_opcodes(
+                (mapping,),
+                root=root,
+                bank_id="fixture-bank",
+                source_pin="a" * 40,
+            )
 
         self.assertFalse(report["complete"])
+        self.assertEqual(report["bank_id"], "fixture-bank")
+        self.assertEqual(report["source_pin"], "a" * 40)
         self.assertEqual(report["unsupported_opcodes"], ["cutoff"])
         records = {item["opcode"]: item for item in report["opcodes"]}
         self.assertEqual(records["key"]["classification"], "implemented-runtime")

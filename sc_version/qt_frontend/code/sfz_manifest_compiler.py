@@ -298,6 +298,8 @@ def audit_sfz_opcodes(
     paths: tuple[Path, ...],
     *,
     root: Path,
+    bank_id: str | None = None,
+    source_pin: str | None = None,
 ) -> dict[str, Any]:
     """Inventory the complete preprocessed opcode surface without accepting it."""
 
@@ -337,7 +339,7 @@ def audit_sfz_opcodes(
         for record in records
         if record["classification"] == "unsupported-error"
     ]
-    return {
+    report: dict[str, Any] = {
         "schema_revision": 1,
         "compiler_version": COMPILER_VERSION,
         "mapping_count": len(paths),
@@ -345,6 +347,11 @@ def audit_sfz_opcodes(
         "unsupported_opcodes": unsupported,
         "opcodes": records,
     }
+    if bank_id is not None:
+        report["bank_id"] = str(bank_id)
+    if source_pin is not None:
+        report["source_pin"] = str(source_pin)
+    return report
 
 
 def _relative_sample(root: Path, region: _SourceRegion) -> Path:

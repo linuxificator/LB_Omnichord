@@ -1,0 +1,1809 @@
+{
+  "bank_id": "salamander-grand-piano-v3",
+  "compiler_version": 5,
+  "complete": false,
+  "mapping_count": 1,
+  "opcodes": [
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 5,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 21,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 37,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 47,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 65,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/hammer.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 8,
+      "opcode": "amp_veltrack"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 60,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "amp_veltrack_curvecc99"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 59,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "amp_veltrack_oncc99"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 63,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "ampeg_attack_curvecc98"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 62,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "ampeg_attack_oncc98"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 29,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 30,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 31,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 32,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 33,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 34,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 35,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 29,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 30,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 31,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 32,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 33,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 34,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 35,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 29,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 30,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 224,
+      "opcode": "ampeg_release"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 61,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "ampeg_release_oncc72"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 56,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 86,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 107,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 3,
+      "opcode": "amplitude_curvecc7"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 95,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "amplitude_oncc20"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 100,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "amplitude_oncc21"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 111,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "amplitude_oncc22"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 55,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 85,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 106,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 3,
+      "opcode": "amplitude_oncc7"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 117,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "curve_index"
+    },
+    {
+      "classification": "compile-time-metadata",
+      "locations": [
+        {
+          "line": 31,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "default_path"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 2,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 65,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 2,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 4,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 4,
+      "opcode": "group"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 42,
+      "opcode": "group_label"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 14,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 24,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 2,
+      "opcode": "hicc64"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 4,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 19,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 1030,
+      "opcode": "hikey"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 15,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 25,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 26,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 4,
+      "opcode": "hirand"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 3,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 4,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/notes.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 34,
+      "opcode": "hivel"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 10,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 19,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 20,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 21,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 22,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 23,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 24,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 25,
+          "source_file": "Data/hammer.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 88,
+      "opcode": "key"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 34,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc10"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 36,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc20"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 37,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc21"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 38,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc22"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 35,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc64"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 33,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc7"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 39,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc72"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 40,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc98"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 41,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "label_cc99"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 94,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "locc20"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 99,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "locc21"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 110,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "locc22"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 13,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 23,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 2,
+      "opcode": "locc64"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 4,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 19,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 1030,
+      "opcode": "lokey"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 15,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 25,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 26,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 4,
+      "opcode": "lorand"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 3,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 4,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/notes.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 36,
+      "opcode": "lovel"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 1,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/notes.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 1,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 5,
+      "opcode": "master_label"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 64,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 90,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 2,
+      "opcode": "note_polyphony"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 65,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 91,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 3,
+      "opcode": "off_time"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 4,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 19,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 960,
+      "opcode": "offset_oncc98"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 12,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 22,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 2,
+      "opcode": "on_hicc64"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 11,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 21,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 2,
+      "opcode": "on_locc64"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 58,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 88,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 109,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 3,
+      "opcode": "pan_curvecc10"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 57,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 87,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 108,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 3,
+      "opcode": "pan_oncc10"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 4,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 19,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 1029,
+      "opcode": "pitch_keycenter"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 5,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "polyphony"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 4,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 19,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 1121,
+      "opcode": "region_label"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 5,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 21,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 37,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 47,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 65,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/hammer.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 8,
+      "opcode": "rt_decay"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 4,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 19,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 1121,
+      "opcode": "sample"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 43,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "set_cc7"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 44,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "set_hdcc10"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 45,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "set_hdcc20"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 46,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "set_hdcc21"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 47,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "set_hdcc22"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 48,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "set_hdcc72"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 49,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "set_hdcc98"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 50,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "set_hdcc99"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 68,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "sw_default"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 67,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "sw_hikey"
+    },
+    {
+      "classification": "compile-time-metadata",
+      "locations": [
+        {
+          "line": 72,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 78,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 2,
+      "opcode": "sw_label"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 71,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        },
+        {
+          "line": 77,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 2,
+      "opcode": "sw_last"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 66,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "sw_lokey"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 89,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "trigger"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 4,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 5,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 6,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 8,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 9,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 11,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 12,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 13,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 14,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 16,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 17,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 18,
+          "source_file": "Data/region.txt"
+        },
+        {
+          "line": 19,
+          "source_file": "Data/region.txt"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 960,
+      "opcode": "tune"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 118,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "v000"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 119,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "v001"
+    },
+    {
+      "classification": "unsupported-error",
+      "locations": [
+        {
+          "line": 120,
+          "source_file": "Salamander Grand Piano V3.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 1,
+      "opcode": "v127"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 5,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 15,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 21,
+          "source_file": "Data/str_res.txt"
+        },
+        {
+          "line": 7,
+          "source_file": "Data/hammer.txt"
+        },
+        {
+          "line": 10,
+          "source_file": "Data/pedal.txt"
+        },
+        {
+          "line": 20,
+          "source_file": "Data/pedal.txt"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 7,
+      "opcode": "volume"
+    }
+  ],
+  "schema_revision": 1,
+  "source_pin": "3382bf9496bba2486f5ab0de55a264d1dfc38404",
+  "unsupported_opcodes": [
+    "amp_veltrack",
+    "amp_veltrack_curvecc99",
+    "amp_veltrack_oncc99",
+    "ampeg_attack_curvecc98",
+    "ampeg_attack_oncc98",
+    "ampeg_release_oncc72",
+    "amplitude_curvecc7",
+    "amplitude_oncc20",
+    "amplitude_oncc21",
+    "amplitude_oncc22",
+    "amplitude_oncc7",
+    "curve_index",
+    "group",
+    "hicc64",
+    "label_cc10",
+    "label_cc20",
+    "label_cc21",
+    "label_cc22",
+    "label_cc64",
+    "label_cc7",
+    "label_cc72",
+    "label_cc98",
+    "label_cc99",
+    "locc20",
+    "locc21",
+    "locc22",
+    "locc64",
+    "master_label",
+    "note_polyphony",
+    "off_time",
+    "offset_oncc98",
+    "on_hicc64",
+    "on_locc64",
+    "pan_curvecc10",
+    "pan_oncc10",
+    "polyphony",
+    "region_label",
+    "rt_decay",
+    "set_cc7",
+    "set_hdcc10",
+    "set_hdcc20",
+    "set_hdcc21",
+    "set_hdcc22",
+    "set_hdcc72",
+    "set_hdcc98",
+    "set_hdcc99",
+    "v000",
+    "v001",
+    "v127"
+  ]
+}

@@ -41,6 +41,17 @@ other selected banks and Iowa inventory remain migration backlog and must not
 be represented as installed or playable until their own generated asset locks,
 normalized manifests and audio acceptance evidence exist.
 
+The checked-in
+[`salamander-opcode-coverage.json`](../../supercollider/salamander-opcode-coverage.json)
+is a deliberately failing capability inventory of the single mapping at the
+exact pinned Salamander revision. It finds 69 distinct opcodes, 49 of which
+still require explicit normalization or a reviewed metadata disposition. This
+artifact prevents a future importer from calling the piano complete after
+merely reading its note/velocity regions: controller curves, start offsets,
+release decay, sustain transitions, pedal noise and polyphony policy remain
+visible work. Audit reports carry their bank ID and source pin so an opcode
+count cannot be mistaken for evidence about a different checkout.
+
 The offline SFZ compiler expands standard `#define` and inline or whole-line
 `#include` directives before parsing, retains the originating file and line for
 every region, and rejects undefined/recursive macros, include cycles and paths
