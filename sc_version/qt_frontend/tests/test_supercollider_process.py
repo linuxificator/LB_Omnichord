@@ -189,6 +189,7 @@ class SuperColliderProcessTests(unittest.TestCase):
                 command = popen.call_args.args[0]
                 environment = popen.call_args.kwargs["env"]
                 language_config = Path(command[command.index("-l") + 1])
+                self.assertIn("-a", command)
                 self.assertIn(
                     json.dumps(str(class_library.resolve())),
                     language_config.read_text(),

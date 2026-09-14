@@ -107,6 +107,8 @@ x86_64
   SC class library before publication. The scsynth executable is configured
   on `Server.program`, the API owned by SC 3.14, and host `systemctl` probes
   are isolated from the package's private dynamic-library search path.
+  Bundled `sclang` uses SC's standalone mode and one explicit class tree, so
+  neither its former build prefix nor host extensions enter the engine.
 - The bounded sample-source catalogue records all eleven pinned Git banks and
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see

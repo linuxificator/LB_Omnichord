@@ -37,6 +37,9 @@ Finally it executes the packaged bootstrap through the packaged `sclang` up to
 the no-audio validation boundary. This checks the real class library,
 executable selection and SC API before a release can be published; checking
 only that `sclang -v` starts is not an adequate runtime test.
+Packaged `sclang` runs in its native standalone mode with one explicit private
+class-library tree. A remembered build prefix or a user's SC extensions can
+therefore neither duplicate nor alter the released engine.
 
 ## Runtime and samples
 
