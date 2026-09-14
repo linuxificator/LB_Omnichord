@@ -10,6 +10,9 @@ Target currently exercised: Linux x86_64
 
 - Qt and SuperCollider are separate supervised processes connected by a
   typed, versioned loopback OSC protocol.
+- The production Python import closure is checked structurally and cannot
+  reach the AMY transports, local AMY service, AMY compatibility adapter or
+  `c_amy`; those copied characterization modules are not a runtime fallback.
 - Python compiles immutable musical plans; one SC `TempoClock` owns execution,
   quantization, note releases, gates and snapshot lifetimes.
 - Session reset, panic, exact voice handles and global pitch bend are wired

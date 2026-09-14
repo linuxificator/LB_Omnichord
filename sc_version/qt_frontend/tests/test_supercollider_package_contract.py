@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 import unittest
@@ -10,6 +11,41 @@ SC_ROOT = ROOT.parent / "supercollider"
 
 
 class SuperColliderPackageContractTests(unittest.TestCase):
+    def test_production_import_graph_cannot_reach_an_amy_runtime(self) -> None:
+        code_root = ROOT / "code"
+        packaging_root = ROOT / "packaging"
+        forbidden = {
+            "amy_serial",
+            "amy_transport",
+            "c_amy",
+            "local_amy_service",
+            "program_amy",
+        }
+        pending = [code_root / "main.py", packaging_root / "sc_appimage_entry.py"]
+        visited: set[Path] = set()
+        reached_modules: set[str] = set()
+        while pending:
+            path = pending.pop()
+            if path in visited:
+                continue
+            visited.add(path)
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                modules: tuple[str, ...]
+                if isinstance(node, ast.Import):
+                    modules = tuple(alias.name.split(".", 1)[0] for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    modules = (node.module.split(".", 1)[0],)
+                else:
+                    continue
+                for module in modules:
+                    reached_modules.add(module)
+                    local = code_root / f"{module}.py"
+                    if local.is_file():
+                        pending.append(local)
+
+        self.assertTrue(forbidden.isdisjoint(reached_modules))
+
     def test_source_launcher_owns_one_headless_engine_process_group(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
         self.assertIn('setsid "${sc_launcher[@]}" sclang -D', launcher)
