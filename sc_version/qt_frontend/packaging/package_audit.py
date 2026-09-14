@@ -93,10 +93,18 @@ def policy_violations(
     members: Iterable[Member],
     forbidden_fragments: Iterable[str],
     forbidden_basenames: Iterable[str] = (),
+    exempt_prefixes: Iterable[str] = (),
 ) -> list[dict[str, str]]:
     violations: list[dict[str, str]] = []
     basenames = frozenset(forbidden_basenames)
+    prefixes = tuple(
+        prefix.replace("\\", "/").rstrip("/") + "/"
+        for prefix in exempt_prefixes
+    )
     for member in members:
+        normalized_path = member.path.replace("\\", "/")
+        if normalized_path.startswith(prefixes):
+            continue
         if Path(member.path).name in basenames:
             violations.append(
                 {"fragment": Path(member.path).name, "path": member.path}
@@ -127,6 +135,7 @@ def audit(
     tree: Path | None,
     max_package_bytes: int | None,
     manifest_path: Path = DEFAULT_MANIFEST,
+    forbidden_runtime_exempt_prefixes: Iterable[str] = (),
 ) -> dict[str, object]:
     manifest = load_manifest(manifest_path)
     members = content_members(package, tree)
@@ -134,6 +143,7 @@ def audit(
         members,
         manifest["forbidden_runtime_fragments"],
         manifest.get("platform_forbidden_runtime_basenames", {}).get(platform, ()),
+        forbidden_runtime_exempt_prefixes,
     )
     package_bytes = package.stat().st_size if package is not None else None
     configured_budget = manifest.get("package_size_budgets_bytes", {}).get(platform)
@@ -182,6 +192,15 @@ def main() -> int:
     parser.add_argument("--package", type=Path)
     parser.add_argument("--tree", type=Path)
     parser.add_argument("--max-package-bytes", type=int)
+    parser.add_argument(
+        "--forbidden-runtime-exempt-prefix",
+        action="append",
+        default=[],
+        help=(
+            "Exclude one separately owned runtime subtree from forbidden-name "
+            "matching; its bytes and inventory remain audited"
+        ),
+    )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     args = parser.parse_args()
     audit(
@@ -191,6 +210,7 @@ def main() -> int:
         tree=args.tree,
         max_package_bytes=args.max_package_bytes,
         manifest_path=args.manifest,
+        forbidden_runtime_exempt_prefixes=args.forbidden_runtime_exempt_prefix,
     )
     print(args.output)
     return 0

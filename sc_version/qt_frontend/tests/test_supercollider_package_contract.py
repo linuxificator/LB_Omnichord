@@ -114,6 +114,13 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertNotIn("ESP32P4.zip", text)
         self.assertIn("--exclude-module c_amy", builder)
         self.assertIn("--add-data \"$sc_dir:supercollider\"", builder)
+        macos_builder = (ROOT / "packaging" / "build_macos_dmg.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            '--forbidden-runtime-exempt-prefix "Contents/Resources/sc-runtime"',
+            macos_builder,
+        )
 
     def test_macos_frozen_entry_finds_runtime_in_contents_resources(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
