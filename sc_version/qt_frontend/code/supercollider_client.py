@@ -42,9 +42,8 @@ TRANSACTION_DELIVERY_ATTEMPTS = 3
 class SuperColliderClient:
     """Typed OSC adapter to a separately supervised headless SC service.
 
-    The public ``send_message`` method intentionally preserves the existing
-    UI-facing semantic addresses during the migration.  It does not parse or
-    produce AMY wire commands.  New MIDI code uses the typed methods directly.
+    The public ``send_message`` method preserves the stable UI-facing semantic
+    addresses. New code should use the typed methods directly.
     """
 
     def __init__(

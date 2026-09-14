@@ -22,8 +22,8 @@ def midi_pitched_synth_level(
     """Return the output gain which establishes the velocity-60 reference.
 
     A factory MIDI row at volume 0.30 and velocity 60 has the same dry output
-    gain as an OMNI chord note at level 0.50.  Row volume and per-instrument
-    remains a linear relative control. Program-specific gain calibration is
+    gain as an OMNI chord note at level 0.50. Row volume remains a linear
+    relative control. Program-specific gain calibration is
     owned by the SuperCollider catalogue rather than frontend configuration.
     """
     reference_velocity_level = MIDI_PITCHED_REFERENCE_VELOCITY / 127.0

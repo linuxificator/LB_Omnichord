@@ -184,10 +184,26 @@ def resolve_frontend_config(
     profile = str(midi_input["tech_profile"]).strip().casefold()
     osc_input = cast(dict[str, Any], data["osc_input"])
     issues: list[ConfigIssue] = []
-    try:
-        ipaddress.IPv4Address(str(osc_input["listen_address"]))
-    except ipaddress.AddressValueError:
-        issues.append(ConfigIssue("$.osc_input.listen_address", "must be a numeric IPv4 address"))
+    listen_address = osc_input.get("listen_address")
+    listen_port = osc_input.get("listen_port")
+    if (listen_address is None) != (listen_port is None):
+        missing = "listen_port" if listen_port is None else "listen_address"
+        issues.append(
+            ConfigIssue(
+                f"$.osc_input.{missing}",
+                "must be configured together with the OSC listen address/port",
+            )
+        )
+    elif listen_address is not None:
+        try:
+            ipaddress.IPv4Address(str(listen_address))
+        except ipaddress.AddressValueError:
+            issues.append(
+                ConfigIssue(
+                    "$.osc_input.listen_address",
+                    "must be a numeric IPv4 address",
+                )
+            )
     service_name = str(osc_input["service_name"])
     if service_name != service_name.strip() or any(ord(char) < 32 or ord(char) == 127 for char in service_name):
         issues.append(ConfigIssue("$.osc_input.service_name", "must not contain surrounding whitespace or control characters"))
@@ -218,10 +234,13 @@ def resolve_frontend_config(
         ),
         osc_input=OscInputConfig(
             enabled=bool(osc_input["enabled"]),
-            listen_address=str(osc_input["listen_address"]),
-            listen_port=int(osc_input["listen_port"]),
+            listen_address=(
+                str(listen_address) if listen_address is not None else None
+            ),
+            listen_port=int(listen_port) if listen_port is not None else None,
             advertise=bool(osc_input["advertise"]),
             service_name=service_name,
+            configured=listen_address is not None and listen_port is not None,
         ),
         program_defaults=ProgramDefaults(
             chord=str(defaults["chord"]),

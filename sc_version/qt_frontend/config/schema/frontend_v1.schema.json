@@ -24,7 +24,7 @@
     "osc_input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "listen_address", "listen_port", "advertise", "service_name"],
+      "required": ["enabled", "advertise", "service_name"],
       "properties": {
         "enabled": {"type": "boolean"},
         "listen_address": {"type": "string", "minLength": 1},

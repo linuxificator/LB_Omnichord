@@ -11,6 +11,9 @@ voice count, musical gate constants, strum tail and unique logical role IDs.
 startup errors. Python adds cross-field checks for numeric IPv4 addresses,
 service-name hygiene and unique role ownership. Consumers receive frozen typed
 records; they contain no serial endpoint, AMY capacity or firmware setting.
+The OSC listen address and port form one optional pair. Omitting both is the
+explicit unconfigured state and removes OSC from the technology row; supplying
+only one is invalid.
 
 On first SC launch, a user `frontend.json` is seeded atomically. If the prior
 edition's user config exists, only engine-neutral MIDI, OSC, voice-count,

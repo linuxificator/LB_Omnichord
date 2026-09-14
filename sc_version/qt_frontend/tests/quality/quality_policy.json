@@ -5,6 +5,7 @@
     "sc_version/design/arch/architecture.md",
     "sc_version/design/arch/behavior.md",
     "sc_version/design/arch/testing.md",
+    "sc_version/design/arch/sc_code_quality_review.md",
     "sc_version/design/sc/STATUS.md",
     "sc_version/design/sc/PLAYBACK_QUALIFICATION.md",
     "sc_version/design/sc/INSTRUMENT_BROWSER.md",

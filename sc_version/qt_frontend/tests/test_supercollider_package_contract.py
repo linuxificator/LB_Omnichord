@@ -69,6 +69,15 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             self.assertFalse((ROOT / "code" / module).exists(), module)
         self.assertFalse((ROOT / "config" / "amy_config.json").exists())
         self.assertFalse((ROOT.parent / "esp32p4" / "CMakeLists.txt").exists())
+        old_pi_tools = ROOT / "tools" / "raspberry_pi"
+        self.assertFalse(
+            any(
+                path.is_file() and path.suffix in {".py", ".sh", ".conf"}
+                for path in old_pi_tools.rglob("*")
+            )
+            if old_pi_tools.exists()
+            else False
+        )
         firmware_main = ROOT.parent / "esp32p4" / "main"
         self.assertFalse(
             any(path.is_file() for path in firmware_main.rglob("*"))

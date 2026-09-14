@@ -72,6 +72,33 @@ class FrontendConfigTests(unittest.TestCase):
             self.resolve(duplicate_bus)
         self.assertEqual(caught.exception.issues[0].path, "$.logical_buses")
 
+    def test_osc_listener_can_be_deliberately_unconfigured(self) -> None:
+        unconfigured = copy.deepcopy(self.shipped)
+        del unconfigured["osc_input"]["listen_address"]
+        del unconfigured["osc_input"]["listen_port"]
+
+        config = self.resolve(unconfigured)
+
+        self.assertFalse(config.osc_input.configured)
+        self.assertIsNone(config.osc_input.listen_address)
+        self.assertIsNone(config.osc_input.listen_port)
+
+    def test_osc_listener_address_and_port_are_an_atomic_pair(self) -> None:
+        missing_port = copy.deepcopy(self.shipped)
+        del missing_port["osc_input"]["listen_port"]
+        with self.assertRaises(FrontendConfigError) as caught:
+            self.resolve(missing_port)
+        self.assertEqual(caught.exception.issues[0].path, "$.osc_input.listen_port")
+
+        missing_address = copy.deepcopy(self.shipped)
+        del missing_address["osc_input"]["listen_address"]
+        with self.assertRaises(FrontendConfigError) as caught:
+            self.resolve(missing_address)
+        self.assertEqual(
+            caught.exception.issues[0].path,
+            "$.osc_input.listen_address",
+        )
+
     def test_first_start_imports_only_relevant_legacy_user_settings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             user_root = Path(directory) / ".omnichord"
