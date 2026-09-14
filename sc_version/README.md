@@ -11,7 +11,7 @@ Windows x86_64. Android is not yet a SuperCollider-edition target. The former
 AMY and Sonic Pi editions are retained as source archives, not released
 products.
 
-![SuperCollider edition OMNI screen](./qt_frontend/screenshots/omni-SC-20260914T174500.png)
+![SuperCollider edition OMNI screen](./qt_frontend/screenshots/omni-SC-20260914T175900.png)
 
 ## Architecture
 
