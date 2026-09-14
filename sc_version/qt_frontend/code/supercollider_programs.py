@@ -28,6 +28,13 @@ class SuperColliderProgram:
     release_mode: str
 
 
+def _logical_source_sha256(source: str) -> str:
+    """Hash source independently of the checkout platform's newline policy."""
+
+    normalized = source.replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def display_name(native_name: str) -> str:
     """Turn an upstream symbol into a compact, stable browser label."""
 
@@ -192,7 +199,7 @@ def build_sclork_catalog(source_root: Path) -> dict[str, object]:
                 "native_name": native_name,
                 "category": path.parent.name,
                 "source_path": path.relative_to(source_root.parent.parent).as_posix(),
-                "source_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "source_sha256": _logical_source_sha256(source),
                 "controls": list(controls),
                 "control_defaults": {
                     key: defaults[key] for key in controls if key in defaults

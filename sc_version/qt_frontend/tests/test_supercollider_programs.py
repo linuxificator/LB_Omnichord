@@ -11,6 +11,7 @@ SC_ROOT = ROOT.parent / "supercollider"
 sys.path.insert(0, str(ROOT / "code"))
 
 from supercollider_programs import (  # noqa: E402
+    _logical_source_sha256,
     build_legacy_program_map,
     display_name,
     load_legacy_program_map,
@@ -22,6 +23,13 @@ from vsco_browser import load_vsco_browser  # noqa: E402
 
 
 class SuperColliderProgramCatalogTests(unittest.TestCase):
+    def test_source_identity_is_independent_of_checkout_newlines(self) -> None:
+        source = "SynthDef(\\portable, { |out=0|\nOut.ar(out, Silent.ar)\n});\n"
+        self.assertEqual(
+            _logical_source_sha256(source),
+            _logical_source_sha256(source.replace("\n", "\r\n")),
+        )
+
     def test_checked_in_catalog_is_reproducible_from_pinned_sources(self) -> None:
         source_root = SC_ROOT / "vendor" / "SCLOrkSynths" / "SynthDefs"
         expected = build_sclork_catalog(source_root)
