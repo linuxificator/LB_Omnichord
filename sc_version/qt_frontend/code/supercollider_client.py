@@ -11,7 +11,7 @@ import uuid
 
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_message_builder import OscMessageBuilder
-from pythonosc.osc_server import ThreadingOSCUDPServer
+from pythonosc.osc_server import BlockingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
 
 from config_loader import ResolvedAmyConfig
@@ -33,6 +33,10 @@ from sc_drum_kits import DEFAULT_DRUM_KIT_ID, midi_role, resolve_program
 
 class SuperColliderUnavailable(RuntimeError):
     """The separately supervised language/audio service is not ready."""
+
+
+TRANSACTION_ACK_TIMEOUT_SECONDS = 0.5
+TRANSACTION_DELIVERY_ATTEMPTS = 3
 
 
 class SuperColliderClient:
@@ -75,7 +79,9 @@ class SuperColliderClient:
         dispatcher.map("/omni/v1/ack", self._accept_ack)
         dispatcher.map("/omni/v1/program/status", self._accept_program_status)
         language = self.runtime_config.language
-        self._reply_server = ThreadingOSCUDPServer((language.host, 0), dispatcher)
+        # Replies are tiny and ordered. A single receive loop avoids creating a
+        # fresh OS thread for every acknowledgement during long performances.
+        self._reply_server = BlockingOSCUDPServer((language.host, 0), dispatcher)
         self.reply_port = int(self._reply_server.server_address[1])
         self._reply_thread = threading.Thread(
             target=self._reply_server.serve_forever,
@@ -335,10 +341,10 @@ class SuperColliderClient:
             ],
         )
         messages = [begin, *records, ("/omni/v1/tx/commit", [transaction_id])]
-        for _attempt in range(3):
+        for _attempt in range(TRANSACTION_DELIVERY_ATTEMPTS):
             for address, arguments in messages:
                 self._send_raw(address, [self.session, *arguments])
-            deadline = time.monotonic() + 0.1
+            deadline = time.monotonic() + TRANSACTION_ACK_TIMEOUT_SECONDS
             with self._ack_condition:
                 while transaction_id not in self._acknowledgements:
                     remaining = deadline - time.monotonic()
@@ -353,14 +359,19 @@ class SuperColliderClient:
                     self._acknowledgements.pop(transaction_id, None)
                 continue
             if acknowledgement[0] == "rejected":
+                with self._ack_condition:
+                    self._acknowledgements.pop(transaction_id, None)
                 raise SuperColliderUnavailable(
                     f"SuperCollider rejected {plan.lane} generation "
                     f"{plan.generation}: {acknowledgement[3]}"
                 )
+            with self._ack_condition:
+                self._acknowledgements.pop(transaction_id, None)
             return acknowledgement
         raise SuperColliderUnavailable(
             f"SuperCollider did not acknowledge {plan.lane} generation "
-            f"{plan.generation} after three delivery attempts"
+            f"{plan.generation} after {TRANSACTION_DELIVERY_ATTEMPTS} "
+            "delivery attempts"
         )
 
     @staticmethod
