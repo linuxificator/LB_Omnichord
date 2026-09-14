@@ -45,9 +45,11 @@ host addresses remain loopback-only in the current trust model.
 The first source or packaged launch clones
 `https://github.com/linuxificator/VSCO-2-CE` to `~/VSCO-2-CE` with the bundled
 Dulwich client. It records the location in
-`~/.omnichord/config/supercollider.json`. A user may change that path, but the
-application verifies the clone's Git origin before using it. It never assumes
-that a system `git` executable is installed.
+`~/.omnichord/config/supercollider.json`. A user may change that path or use an
+ordinary copied sample tree. Before using either form, the application checks
+all required audio files against the bundled content manifest and caches the
+validated inventory. Git is an acquisition mechanism, not a runtime
+requirement; a system `git` executable is never assumed.
 
 ## Test suites
 

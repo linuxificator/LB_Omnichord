@@ -27,10 +27,11 @@ The workflow verifies SuperCollider 3.14.1 archives by SHA-256, validates the
 runtime in each package without opening an audio device, records a package
 content audit and checksum, and publishes the complete set under one
 `R<UTC timestamp>-SC` tag. A partial platform failure prevents publication.
-The frozen package self-check also migrates representative revision-1 and
-revision-2 user configurations. This guards the first-launch upgrade path on
-Linux, Raspberry Pi, macOS and Windows, including configuration fields added
-within an already published revision. It then constructs the production
+The frozen package self-check seeds a completely empty user directory and
+migrates every supported configuration revision. This guards clean first
+launch and the upgrade path on Linux, Raspberry Pi, macOS and Windows,
+including configuration fields added within an already published revision. It
+then constructs the production
 dependency graph and loads the packaged instrument catalogue, catching layout
 differences between source trees and PyInstaller's `_internal` asset root.
 Finally it executes the packaged bootstrap through the packaged `sclang` up to
@@ -51,9 +52,11 @@ package starts a competing raw JACK server.
 VSCO 2 CE recordings are separate CC0 assets and are not embedded. First
 launch uses the bundled Dulwich implementation to clone the verified
 `linuxificator/VSCO-2-CE` repository to `~/VSCO-2-CE`. The selected location is
-stored in `~/.omnichord/config/supercollider.json`; an alternative directory is
-accepted only if its Git origin identifies the required repository. No system
-Git executable is required.
+stored in `~/.omnichord/config/supercollider.json`. An existing checkout or
+ordinary copy is accepted when all required audio files match the bundled
+content manifest. A cached path, manifest and file-inventory identity avoids
+rehashing unchanged recordings on every launch. No system Git executable is
+required.
 
 The Raspberry Pi package does not install scheduler policy, isolate CPUs or
 change machine configuration.

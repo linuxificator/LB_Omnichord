@@ -58,11 +58,13 @@ group, fade time and duration cap are data, not frontend conditionals. Event
 duration caps are optional: zero means the sample profile owns its full
 duration, otherwise the shorter of profile duration and event cap is used.
 
-The external VSCO sample repository is pinned by both Git origin and exact
-commit `440300901dfe9275fd84e0b7763af1f8443ae62e`. A new installation checks
-out that commit. An existing checkout at another revision is rejected with a
-diagnostic rather than being changed destructively. This makes every PCM alias
-and byte measurement reproducible across source runs and packages.
+The external VSCO sample source is acquired from commit
+`440300901dfe9275fd84e0b7763af1f8443ae62e` of the configured repository. A
+new installation checks out that commit. Runtime admission does not require
+Git metadata: an existing checkout or ordinary copy is accepted only when all
+3,168 required audio files match the checked-in content manifest. This makes
+every PCM alias and byte measurement reproducible across source runs and
+packages without rejecting a byte-identical copied sample tree.
 
 ## Rhythm and fill behavior
 
@@ -124,9 +126,10 @@ boundary, owner-scoped round robin, source offsets and duration caps. The SC
 bank tests parse all runtime sample identities and render production sample
 SynthDefs from deterministic mono and stereo fixtures.
 
-CI cannot redistribute the external sample recordings. A real checkout is
-therefore verified locally for origin, exact commit and all referenced WAV
-paths, while packages install that same pinned repository on first launch.
+CI cannot redistribute the external sample recordings. The checked-in
+manifest records every referenced WAV path and SHA-256; a real sample tree is
+verified locally against it, while packages install the pinned source on first
+launch when no tree is present.
 Automated evidence establishes identity, routing, bounded output and lifetime
 behavior; subjective musical balance still requires listening on physical
 audio hardware.

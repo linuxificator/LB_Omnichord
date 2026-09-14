@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -27,7 +28,106 @@ LEGACY_SAMPLE_ROOT = "~/sample_lib/VSCO-2-CE-1.1.0"
 
 
 class SampleRepositoryError(RuntimeError):
-    """Raised before audio startup when the configured sample clone is unsafe."""
+    """Raised before audio startup when the configured sample tree is unsafe."""
+
+
+def _sample_manifest_for_config(shipped_config: Path) -> Path:
+    source = shipped_config.expanduser().resolve()
+    candidates = (
+        source.parents[1] / "supercollider" / "vsco-manifest.json",
+        source.parents[2] / "supercollider" / "vsco-manifest.json",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise SampleRepositoryError(
+        f"could not locate the VSCO content manifest beside {source}"
+    )
+
+
+def _sample_inventory(
+    root: Path, records: list[object]
+) -> tuple[str, list[tuple[Path, str]]]:
+    inventory = hashlib.sha256()
+    files: list[tuple[Path, str]] = []
+    for raw_record in records:
+        if not isinstance(raw_record, dict):
+            raise SampleRepositoryError("VSCO manifest contains an invalid file record")
+        relative = raw_record.get("relative_path")
+        expected_hash = raw_record.get("sha256")
+        if not isinstance(relative, str) or not isinstance(expected_hash, str):
+            raise SampleRepositoryError("VSCO manifest file identity is incomplete")
+        path = root / relative
+        try:
+            status = path.stat()
+        except OSError as exc:
+            raise SampleRepositoryError(
+                f"sample collection is incomplete; missing {relative} in {root}"
+            ) from exc
+        if not path.is_file():
+            raise SampleRepositoryError(
+                f"sample collection is incomplete; {relative} is not a file"
+            )
+        inventory.update(relative.encode("utf-8"))
+        inventory.update(b"\0")
+        inventory.update(str(status.st_size).encode("ascii"))
+        inventory.update(b"\0")
+        inventory.update(str(status.st_mtime_ns).encode("ascii"))
+        inventory.update(b"\0")
+        inventory.update(str(status.st_ctime_ns).encode("ascii"))
+        inventory.update(b"\n")
+        files.append((path, expected_hash))
+    return inventory.hexdigest(), files
+
+
+def validate_sample_tree(
+    path: Path,
+    manifest_path: Path,
+    *,
+    cache_path: Path | None = None,
+) -> Path:
+    """Validate either a clone or an ordinary copy by its audio contents."""
+
+    resolved = path.expanduser().resolve()
+    try:
+        manifest_bytes = manifest_path.read_bytes()
+        manifest = json.loads(manifest_bytes)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SampleRepositoryError(
+            f"could not read VSCO content manifest {manifest_path}: {exc}"
+        ) from exc
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
+        raise SampleRepositoryError("VSCO content manifest has no files array")
+
+    manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
+    inventory_hash, files = _sample_inventory(resolved, manifest["files"])
+    expected_cache = {
+        "schema_revision": 1,
+        "sample_root": str(resolved),
+        "manifest_sha256": manifest_hash,
+        "inventory_sha256": inventory_hash,
+        "file_count": len(files),
+    }
+    if cache_path is not None:
+        try:
+            if JsonStore(cache_path).read() == expected_cache:
+                return resolved
+        except (FileNotFoundError, OSError):
+            pass
+
+    for sample, expected_hash in files:
+        try:
+            with sample.open("rb") as handle:
+                actual_hash = hashlib.file_digest(handle, "sha256").hexdigest()
+        except OSError as exc:
+            raise SampleRepositoryError(f"could not read sample file {sample}: {exc}") from exc
+        if actual_hash != expected_hash:
+            raise SampleRepositoryError(
+                f"sample collection content differs from the supported set: {sample}"
+            )
+    if cache_path is not None:
+        JsonStore(cache_path).write(expected_cache)
+    return resolved
 
 
 def _repository_identity(value: str) -> tuple[str, str, str]:
@@ -95,9 +195,18 @@ def ensure_sample_repository(
     path: Path,
     repository_url: str,
     expected_commit: str = DEFAULT_SAMPLE_COMMIT,
+    *,
+    content_manifest: Path | None = None,
+    validation_cache: Path | None = None,
 ) -> Path:
     destination = path.expanduser().resolve()
     if destination.exists():
+        if content_manifest is not None:
+            return validate_sample_tree(
+                destination,
+                content_manifest,
+                cache_path=validation_cache,
+            )
         return validate_sample_repository(
             destination, repository_url, expected_commit
         )
@@ -117,6 +226,8 @@ def ensure_sample_repository(
         porcelain.clone(repository_url, str(checkout), checkout=True)
         porcelain.reset(checkout, "hard", expected_commit)
         validate_sample_repository(checkout, repository_url, expected_commit)
+        if content_manifest is not None:
+            validate_sample_tree(checkout, content_manifest)
         checkout.replace(destination)
     except BaseException as exc:
         raise SampleRepositoryError(
@@ -185,7 +296,7 @@ def prepare_user_runtime_config(
     user_root: Path | None = None,
     install_samples: bool = True,
 ) -> tuple[Path, SuperColliderRuntimeConfig]:
-    """Seed/migrate user config and ensure its external sample clone."""
+    """Seed/migrate user config and ensure its external sample collection."""
 
     root = (user_root or (Path.home() / ".omnichord")).expanduser().resolve()
     target = root / "config" / "supercollider.json"
@@ -208,6 +319,8 @@ def prepare_user_runtime_config(
             config.samples.vsco_root,
             config.samples.repository,
             config.samples.commit,
+            content_manifest=_sample_manifest_for_config(shipped_config),
+            validation_cache=root / "cache" / "vsco-validation.json",
         )
     return target, config
 

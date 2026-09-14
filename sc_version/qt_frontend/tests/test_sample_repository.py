@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -22,6 +23,7 @@ from sample_repository import (  # noqa: E402
     SampleRepositoryError,
     ensure_sample_repository,
     prepare_user_runtime_config,
+    validate_sample_tree,
     validate_sample_repository,
 )
 
@@ -46,6 +48,114 @@ def commit_clone(path: Path) -> str:
 
 
 class SampleRepositoryTests(unittest.TestCase):
+    def test_plain_sample_copy_is_validated_by_content_and_cached(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            samples = root / "ordinary-copy"
+            sample = samples / "Keys" / "fixture.wav"
+            sample.parent.mkdir(parents=True)
+            sample.write_bytes(b"sample audio")
+            manifest = root / "vsco-manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "relative_path": "Keys/fixture.wav",
+                                "sha256": hashlib.sha256(b"sample audio").hexdigest(),
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            cache = root / "cache" / "vsco-validation.json"
+
+            self.assertEqual(
+                validate_sample_tree(samples, manifest, cache_path=cache),
+                samples.resolve(),
+            )
+            self.assertTrue(cache.is_file())
+            with patch("sample_repository.hashlib.file_digest") as digest:
+                self.assertEqual(
+                    validate_sample_tree(samples, manifest, cache_path=cache),
+                    samples.resolve(),
+                )
+                digest.assert_not_called()
+
+    def test_plain_sample_copy_with_changed_content_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            samples = root / "ordinary-copy"
+            samples.mkdir()
+            sample = samples / "fixture.wav"
+            sample.write_bytes(b"unexpected audio")
+            manifest = root / "vsco-manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "relative_path": "fixture.wav",
+                                "sha256": hashlib.sha256(b"expected audio").hexdigest(),
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                SampleRepositoryError, "content differs from the supported set"
+            ):
+                validate_sample_tree(samples, manifest)
+
+    def test_runtime_preparation_accepts_an_ordinary_sample_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            frontend = root / "sc_version" / "qt_frontend"
+            shipped = frontend / "config" / "supercollider.json"
+            shipped.parent.mkdir(parents=True)
+            config = json.loads(
+                (FRONTEND / "config" / "supercollider.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            samples = root / "samples-copy"
+            samples.mkdir()
+            sample = samples / "fixture.wav"
+            sample.write_bytes(b"sample audio")
+            config["samples"]["vsco_root"] = str(samples)
+            shipped.write_text(json.dumps(config), encoding="utf-8")
+
+            manifest = root / "sc_version" / "supercollider" / "vsco-manifest.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "relative_path": "fixture.wav",
+                                "sha256": hashlib.sha256(b"sample audio").hexdigest(),
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            target, runtime = prepare_user_runtime_config(
+                shipped,
+                user_root=root / "empty-user-root",
+                install_samples=True,
+            )
+
+            self.assertEqual(runtime.samples.vsco_root, samples)
+            self.assertTrue(target.is_file())
+            self.assertTrue(
+                (root / "empty-user-root" / "cache" / "vsco-validation.json").is_file()
+            )
+
     def test_cli_seeds_a_valid_config_in_a_completely_empty_home(self) -> None:
         """Cover the exact first source-run boundary used by run_local.sh."""
 

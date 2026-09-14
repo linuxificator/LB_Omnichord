@@ -96,8 +96,9 @@ x86_64
   SuperCollider 3.14.1 runtime and no AMY runtime.
 - First launch uses bundled Dulwich rather than a system Git executable to
   install `linuxificator/VSCO-2-CE` at `~/VSCO-2-CE`. The user config stores an
-  alternate location, but startup verifies both its Git origin and exact
-  pinned commit before admitting it.
+  alternate location. Startup admits a checkout or ordinary copy based on all
+  required audio hashes in the bundled manifest; Git metadata is not a runtime
+  dependency. An unchanged validated inventory uses a user-local cache.
 - SuperCollider configuration revision 4 and protocol revision 2 include the
   explicit sample commit and per-event drum duration cap. Every frozen package
   self-check exercises additive migration from all earlier revisions before an
