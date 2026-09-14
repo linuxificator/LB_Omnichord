@@ -4,10 +4,25 @@ var directory = thisProcess.nowExecutingPath.dirname;
 var manifestPath = directory +/+ "vsco-manifest.json";
 var manifest = manifestPath.parseJSONFile;
 var drumMap = (directory +/+ "drum-key-map.json").parseJSONFile;
+var drumCatalogPath = "OMNICHORD_SC_DRUM_CATALOG".getenv;
+var packagedDrumCatalog = directory.dirname
+    +/+ "music/sc_expansion/sc_pcm_drumkits_v1.json";
+var sourceDrumCatalog = directory.dirname
+    +/+ "qt_frontend/music/sc_expansion/sc_pcm_drumkits_v1.json";
+var drumCatalog;
 var jsonAt = { |object, key| object[key.asString] ? object[key.asSymbol] };
 var files = jsonAt.value(manifest, "files");
 var programs = jsonAt.value(manifest, "programs");
 var regions = jsonAt.value(manifest, "regions");
+
+if(drumCatalogPath.isNil) {
+    drumCatalogPath = if(PathName(packagedDrumCatalog).isFile) {
+        packagedDrumCatalog
+    } {
+        sourceDrumCatalog
+    };
+};
+drumCatalog = drumCatalogPath.parseJSONFile;
 
 ~omniSampleRoot = "OMNICHORD_SC_VSCO_ROOT".getenv ? "";
 ~omniSampleBudgetBytes = (
@@ -25,8 +40,13 @@ var regions = jsonAt.value(manifest, "regions");
 ~omniSampleVoiceRefs = Dictionary.new;
 ~omniSampleLastUsed = Dictionary.new;
 ~omniSampleUseOrdinal = 0;
-~omniDrumSampleProgram = jsonAt.value(drumMap, "program_id").asString;
+~omniDrumSampleProgram = jsonAt.value(
+    jsonAt.value(drumCatalog, "kits")[0], "program_id"
+).asString;
 ~omniDrumRoleKeys = Dictionary.new;
+~omniDrumKits = Dictionary.new;
+~omniDrumSampleSets = Dictionary.new;
+~omniDrumChokes = Dictionary.new;
 
 jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
     ~omniDrumRoleKeys[role.asString] = key.asInteger;
@@ -106,6 +126,8 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
         };
     };
     ~omniSampleRoundRobin.clear;
+    ~omniDrumChokes.values.do { |node| node.set(\gate, 0) };
+    ~omniDrumChokes.clear;
 };
 
 files.do { |record|
@@ -139,6 +161,37 @@ regions.do { |record|
     ~omniSampleRegions[programId].add(record);
 };
 
+jsonAt.value(drumCatalog, "sample_sets").do { |record|
+    ~omniDrumSampleSets[
+        jsonAt.value(record, "sample_set_id").asString
+    ] = record;
+};
+jsonAt.value(drumCatalog, "kits").do { |record|
+    var programId = jsonAt.value(record, "program_id").asString;
+    var sampleIds = Set.new;
+    ~omniDrumKits[programId] = record;
+    jsonAt.value(record, "pads").keysValuesDo { |padId, pad|
+        var sampleSet = ~omniDrumSampleSets[
+            jsonAt.value(pad, "sample_set_id").asString
+        ];
+        jsonAt.value(sampleSet, "layers").do { |layer|
+            jsonAt.value(layer, "round_robin_sample_ids").do { |sampleId|
+                sampleIds.add(sampleId.asString);
+            };
+        };
+    };
+    ~omniSampleAliases[programId] = (
+        sourceProgramId: programId,
+        articulation: "drum-kit"
+    );
+    ~omniSampleRegions[programId] = sampleIds.asArray;
+};
+
+~omniDrumKitSampleIds = { |programId|
+    var value = ~omniSampleRegions[programId.asString];
+    if(~omniDrumKits[programId.asString].notNil) { value } { nil }
+};
+
 ~omniSampleProgramName = { |program|
     var text = program.asString;
     if(text.beginsWith("sample.vsco.") and: {
@@ -169,13 +222,20 @@ regions.do { |record|
         var stateKey = programId ++ "@" ++ revision.asInteger;
         var state = ~omniSampleStates[stateKey];
         if(state.isNil or: { state[\status] == \error }) {
-            var sampleIds = ~omniSampleRegions[sourceProgramId]
-                .select { |region|
-                    jsonAt.value(region, "articulation_id").asString
-                        == articulation
-                }
-                .collect { |region| jsonAt.value(region, "sample_id").asString }
-                .asSet.asArray;
+            var drumSampleIds = ~omniDrumKitSampleIds.value(sourceProgramId);
+            var sampleIds = if(drumSampleIds.notNil) {
+                drumSampleIds
+            } {
+                ~omniSampleRegions[sourceProgramId]
+                    .select { |region|
+                        jsonAt.value(region, "articulation_id").asString
+                            == articulation
+                    }
+                    .collect { |region|
+                        jsonAt.value(region, "sample_id").asString
+                    }
+                    .asSet.asArray
+            };
             var newSampleIds = sampleIds.select { |sampleId|
                 ~omniSampleBuffers[sampleId].isNil
             };
@@ -459,6 +519,150 @@ regions.do { |record|
 ~omniSamplePlaybackRate = { |frequencyHz, keyCenter, tuneCents|
     (frequencyHz.asFloat / keyCenter.asFloat.midicps)
         * (2 ** (tuneCents.asFloat / 1200))
+};
+
+~omniSelectDrumSample = { |owner, program, padId, velocity|
+    var kit = ~omniDrumKits[program.asString];
+    var pads = jsonAt.value(kit, "pads");
+    var pad = jsonAt.value(pads, padId.asString);
+    var sampleSet = if(pad.notNil) {
+        ~omniDrumSampleSets[jsonAt.value(pad, "sample_set_id").asString]
+    } { nil };
+    var midiVelocity = (velocity.clip(0, 1) * 127).round.asInteger.max(1);
+    var layer = if(sampleSet.notNil) {
+        jsonAt.value(sampleSet, "layers").detect { |candidate|
+            (midiVelocity >= jsonAt.value(candidate, "velocity_lo").asInteger)
+            and: {
+                midiVelocity <= jsonAt.value(candidate, "velocity_hi").asInteger
+            }
+        }
+    } { nil };
+    if(layer.isNil) {
+        nil
+    } {
+        var sampleIds = jsonAt.value(layer, "round_robin_sample_ids");
+        var counterKey = owner.asString ++ "/" ++ program.asString ++ "/"
+            ++ padId.asString ++ "/" ++ jsonAt.value(layer, "layer").asString;
+        var position = (~omniSampleRoundRobin[counterKey] ? 0) % sampleIds.size;
+        ~omniSampleRoundRobin[counterKey] = position + 1;
+        (
+            sampleId: sampleIds[position].asString,
+            pad: pad,
+            kit: kit
+        )
+    }
+};
+
+SynthDef(\omniDrumSampleMono, {
+    |out=0, buffer=0, velocity=0.7, gainDb=0, playbackRate=1,
+     maxDuration=1, fadeOut=0.02, highpass=0, lowpass=0,
+     pan=0, gate=1|
+    var fade = fadeOut.max(0.001).min(maxDuration.max(0.002) * 0.5);
+    var duration = maxDuration.max(fade + 0.001);
+    var playback = PlayBuf.ar(
+        1, buffer, BufRateScale.kr(buffer) * playbackRate,
+        doneAction: Done.freeSelf
+    );
+    var filtered = LPF.ar(
+        HPF.ar(playback, highpass.max(20)),
+        Select.kr(lowpass > 0, [20000, lowpass]).clip(20, 20000)
+    );
+    var lifetime = EnvGen.kr(
+        Env([1, 1, 0], [duration - fade, fade]),
+        doneAction: Done.freeSelf
+    );
+    var choke = EnvGen.kr(Env.asr(0.001, 1, fade), gate, doneAction: Done.freeSelf);
+    Out.ar(out, Pan2.ar(filtered, pan) * lifetime * choke
+        * velocity.clip(0, 1) * gainDb.dbamp);
+}).add;
+
+SynthDef(\omniDrumSampleStereo, {
+    |out=0, buffer=0, velocity=0.7, gainDb=0, playbackRate=1,
+     maxDuration=1, fadeOut=0.02, highpass=0, lowpass=0,
+     pan=0, gate=1|
+    var fade = fadeOut.max(0.001).min(maxDuration.max(0.002) * 0.5);
+    var duration = maxDuration.max(fade + 0.001);
+    var playback = PlayBuf.ar(
+        2, buffer, BufRateScale.kr(buffer) * playbackRate,
+        doneAction: Done.freeSelf
+    );
+    var filtered = LPF.ar(
+        HPF.ar(playback, highpass.max(20)),
+        Select.kr(lowpass > 0, [20000, lowpass]).clip(20, 20000)
+    );
+    var lifetime = EnvGen.kr(
+        Env([1, 1, 0], [duration - fade, fade]),
+        doneAction: Done.freeSelf
+    );
+    var choke = EnvGen.kr(Env.asr(0.001, 1, fade), gate, doneAction: Done.freeSelf);
+    Out.ar(out, Balance2.ar(filtered[0], filtered[1], pan) * lifetime * choke
+        * velocity.clip(0, 1) * gainDb.dbamp);
+}).add;
+
+~omniSpawnDrumSample = {
+    |owner, handle, program, revision, padId, velocity, logicalBus|
+    var selection;
+    if(~omniSampleReady.value(program, revision).not) {
+        false
+    } {
+        selection = ~omniSelectDrumSample.value(
+            owner, program, padId, velocity
+        );
+        if(selection.isNil) {
+            false
+        } {
+            var sampleId = selection[\sampleId];
+            var pad = selection[\pad];
+            var kit = selection[\kit];
+            var file = ~omniSampleFiles[sampleId];
+            var buffer = ~omniSampleBuffers[sampleId];
+            var channels = jsonAt.value(file, "channels").asInteger;
+            var chokeGroupValue = jsonAt.value(pad, "choke_group");
+            var chokeKey = if(chokeGroupValue.isNil) { nil } {
+                owner.asString ++ "/" ++ program.asString ++ "/"
+                    ++ chokeGroupValue.asString
+            };
+            var node;
+            if(chokeKey.notNil and: { ~omniDrumChokes[chokeKey].notNil }) {
+                ~omniDrumChokes[chokeKey].set(\gate, 0);
+            };
+            node = Synth.tail(
+                ~omniSourceGroup,
+                if(channels == 1) {
+                    \omniDrumSampleMono
+                } {
+                    \omniDrumSampleStereo
+                },
+                [
+                    \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
+                    \buffer, buffer.bufnum,
+                    \velocity, velocity,
+                    \gainDb, jsonAt.value(pad, "gain_db").asFloat
+                        + jsonAt.value(kit, "kit_gain_db").asFloat,
+                    \playbackRate, jsonAt.value(pad, "playback_rate").asFloat,
+                    \maxDuration,
+                        jsonAt.value(pad, "max_duration_ms").asFloat / 1000,
+                    \fadeOut, jsonAt.value(pad, "fade_out_ms").asFloat / 1000,
+                    \highpass, jsonAt.value(pad, "highpass_hz").asFloat,
+                    \lowpass, jsonAt.value(pad, "lowpass_hz").asFloat,
+                    \pan, jsonAt.value(pad, "pan").asFloat
+                ]
+            );
+            ~omniSampleVoiceRefs[sampleId] =
+                (~omniSampleVoiceRefs[sampleId] ? 0) + 1;
+            ~omniTouchSample.value(sampleId);
+            if(chokeKey.notNil) { ~omniDrumChokes[chokeKey] = node };
+            node.onFree {
+                ~omniSampleVoiceRefs[sampleId] = (
+                    (~omniSampleVoiceRefs[sampleId] ? 0) - 1
+                ).max(0);
+                if(chokeKey.notNil and: { ~omniDrumChokes[chokeKey] === node }) {
+                    ~omniDrumChokes.removeAt(chokeKey);
+                };
+            };
+            true
+        }
+    }
 };
 
 SynthDef(\omniSampleMono, {

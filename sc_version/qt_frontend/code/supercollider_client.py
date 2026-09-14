@@ -15,7 +15,6 @@ from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
 
 from config_loader import ResolvedAmyConfig
-from drum_patterns import load_drum_pattern_catalog
 from engine_protocol import NoteOff, NoteOn, PROTOCOL_VERSION, VoiceSet
 from musical_sequence_plan import (
     LanePlan,
@@ -28,7 +27,8 @@ from supercollider_config import (
     load_supercollider_config,
 )
 from supercollider_programs import load_legacy_program_map
-from sc_drum_kits import DEFAULT_DRUM_KIT_ID, midi_role, resolve_program
+from sc_drum_kits import DEFAULT_DRUM_KIT_ID, DRUM_KITS, kit_by_id, midi_role, resolve_hit
+from sc_music_catalog import load_sc_music_catalog
 
 
 class SuperColliderUnavailable(RuntimeError):
@@ -116,6 +116,9 @@ class SuperColliderClient:
         self._sample_state_lock = threading.Lock()
         self._sample_program_status: dict[tuple[str, int], str] = {}
         self._deferred_sample_notes: dict[str, NoteOn] = {}
+        self._drum_program_status: dict[str, str] = {}
+        self._requested_drum_programs: set[str] = set()
+        self._deferred_drum_hits: list[tuple[str, str, str, int, float, int]] = []
         self._role_levels = {
             "chord": 0.5,
             "strum": 0.5,
@@ -135,15 +138,17 @@ class SuperColliderClient:
         self.bass_running = True
         self._lane_generations = {"drums": 0, "bass": 0, "chords": 0}
         self._transaction_id = 0
-        self._drum_catalog = load_drum_pattern_catalog(
+        self._drum_catalog = load_sc_music_catalog(
             root
             / "music"
-            / "drums"
+            / "sc_expansion"
+            / "sc_kit_grooves_v1.json"
         )
         self._drum_kit = DEFAULT_DRUM_KIT_ID
 
         try:
             self._await_ready()
+            self._drum_program_status[kit_by_id(DEFAULT_DRUM_KIT_ID).program_id] = "ready"
         except BaseException:
             self._close_reply_server()
             raise
@@ -187,6 +192,7 @@ class SuperColliderClient:
         detail = str(arguments[4])
         program_key = (program_id, revision)
         deferred: list[NoteOn] = []
+        deferred_drums: list[tuple[str, str, str, int, float, int]] = []
         with self._sample_state_lock:
             self._sample_program_status[program_key] = status
             if status == "ready":
@@ -199,8 +205,29 @@ class SuperColliderClient:
                 for handle, event in tuple(self._deferred_sample_notes.items()):
                     if (event.program_id, event.program_revision) == program_key:
                         self._deferred_sample_notes.pop(handle, None)
+            if any(kit.program_id == program_id for kit in DRUM_KITS):
+                self._drum_program_status[program_id] = status
+                if status == "ready":
+                    deferred_drums = [
+                        item for item in self._deferred_drum_hits if item[1] == program_id
+                    ]
+                    self._deferred_drum_hits = [
+                        item for item in self._deferred_drum_hits if item[1] != program_id
+                    ]
+                elif status == "error":
+                    self._deferred_drum_hits = [
+                        item for item in self._deferred_drum_hits if item[1] != program_id
+                    ]
         for event in deferred:
             self._send_note_on(event)
+        for item in deferred_drums:
+            self._send_drum_hit(*item)
+        if status == "ready" and self.rhythm_config is not None:
+            selected_kit = kit_by_id(
+                str(self.rhythm_config.get("drum_kit", self._drum_kit))
+            )
+            if selected_kit.program_id == program_id:
+                self._publish_drum_lane()
         pending = self._pending_programs.get((program_id, revision))
         if pending is None:
             return
@@ -572,21 +599,72 @@ class SuperColliderClient:
         logical_bus: int,
         kit_id: str | None = None,
     ) -> None:
-        program, gain = resolve_program(
-            str(kit_id or self._drum_kit), midi_role(logical_key)
+        role = midi_role(logical_key)
+        program, pad, gain = resolve_hit(
+            str(kit_id or self._drum_kit), role
         )
+        hit = (
+            str(owner),
+            program,
+            pad,
+            int(logical_key),
+            max(0.0, min(1.0, float(velocity) * gain)),
+            int(logical_bus),
+        )
+        if not self._drum_program_ready(program):
+            with self._sample_state_lock:
+                self._deferred_drum_hits.append(hit)
+                if len(self._deferred_drum_hits) > 256:
+                    self._deferred_drum_hits.pop(0)
+            self._ensure_drum_kit(str(kit_id or self._drum_kit), logical_bus)
+            return
+        self._send_drum_hit(*hit)
+
+    def _send_drum_hit(
+        self,
+        owner: str,
+        program: str,
+        pad: str,
+        logical_key: int,
+        velocity: float,
+        logical_bus: int,
+    ) -> None:
         self._send_raw(
             "/omni/v1/drum/hit",
             [
                 self.session,
                 self._next_message_id(),
-                str(owner),
+                owner,
                 program,
-                int(logical_key),
-                max(0.0, min(1.0, float(velocity) * gain)),
-                int(logical_bus),
+                1,
+                pad,
+                logical_key,
+                velocity,
+                logical_bus,
             ],
         )
+
+    def _drum_program_ready(self, program: str) -> bool:
+        with self._sample_state_lock:
+            return self._drum_program_status.get(str(program)) == "ready"
+
+    def _ensure_drum_kit(self, kit_id: str, logical_bus: int) -> bool:
+        program = kit_by_id(kit_id).program_id
+        with self._sample_state_lock:
+            if self._drum_program_status.get(program) == "ready":
+                return True
+            if program in self._requested_drum_programs:
+                return False
+            self._requested_drum_programs.add(program)
+            self._drum_program_status[program] = "loading"
+        self.configure_part(
+            f"drum-kit/{kit_id}",
+            program,
+            1,
+            int(logical_bus),
+            {},
+        )
+        return False
 
     def _role_bus(self, role: str) -> int:
         return int(dict(self.resolved_config.layout.role_buses)[role])
@@ -762,18 +840,21 @@ class SuperColliderClient:
         )
 
     def _publish_drum_lane(self) -> None:
+        selected_kit = (
+            str(self.rhythm_config.get("drum_kit", self._drum_kit))
+            if self.rhythm_config else self._drum_kit
+        )
+        if not self._ensure_drum_kit(selected_kit, self._role_bus("drums")):
+            return
         generation = self._next_lane_generation("drums")
         self.publish_lane(
             compile_drum_lane(
                 config=self.rhythm_config,
                 catalog=self._drum_catalog,
-                kit=(
-                    str(self.rhythm_config.get("drum_kit", self._drum_kit))
-                    if self.rhythm_config else self._drum_kit
-                ),
+                kit=selected_kit,
                 logical_bus=self._role_bus("drums"),
                 generation=generation,
-                program_resolver=resolve_program,
+                program_resolver=resolve_hit,
             )
         )
 

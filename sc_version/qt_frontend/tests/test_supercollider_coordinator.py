@@ -215,6 +215,8 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                                         (
                                             "snare",
                                             "sample.vsco.gm-styleperc",
+                                            1,
+                                            "snare",
                                             38,
                                             0.8,
                                             0,

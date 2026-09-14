@@ -305,7 +305,7 @@ class SuperColliderClientTests(unittest.TestCase):
             logical_key=36,
             velocity=0.5,
             logical_bus=10,
-            kit_id="sc-808",
+            kit_id="pcm-old-parlour",
         )
         self.assertTrue(self.fake.wait_for_messages("/omni/v1/drum/hit"))
         self.close_client(client)
@@ -316,12 +316,14 @@ class SuperColliderClientTests(unittest.TestCase):
             if address == "/omni/v1/drum/hit"
         ]
         self.assertEqual(len(hits), 1)
-        self.assertEqual(len(hits[0]), 7)
+        self.assertEqual(len(hits[0]), 9)
         self.assertEqual(hits[0][2], "midi/drums")
-        self.assertEqual(hits[0][3], "sc.sclork.kick808")
-        self.assertEqual(hits[0][4], 36)
-        self.assertAlmostEqual(float(hits[0][5]), 0.5)
-        self.assertEqual(hits[0][6], 10)
+        self.assertEqual(hits[0][3], "sample.vsco.kit.old-parlour")
+        self.assertEqual(hits[0][4], 1)
+        self.assertEqual(hits[0][5], "kick")
+        self.assertEqual(hits[0][6], 36)
+        self.assertAlmostEqual(float(hits[0][7]), 0.5 * (10 ** (-2.068 / 20)))
+        self.assertEqual(hits[0][8], 10)
 
     def test_lane_transaction_is_indexed_and_acknowledged(self) -> None:
         from engine_protocol import SequenceDefinition, SequenceEvent

@@ -297,7 +297,7 @@ class MusicalSequencePlanTests(unittest.TestCase):
         ]
         self.assertTrue(hits)
         self.assertTrue(all(str(event.atoms[1]).startswith("sc.test.") for event in hits))
-        self.assertTrue(all(0.0 <= float(event.atoms[3]) <= 1.0 for event in hits))
+        self.assertTrue(all(0.0 <= float(event.atoms[5]) <= 1.0 for event in hits))
 
 
 if __name__ == "__main__":

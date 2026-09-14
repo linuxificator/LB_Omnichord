@@ -10,55 +10,50 @@ ROOT = Path(__file__).resolve().parents[1]
 SC_ROOT = ROOT.parent / "supercollider"
 sys.path.insert(0, str(ROOT / "code"))
 
-from drum_patterns import load_drum_pattern_catalog  # noqa: E402
+from sc_music_catalog import load_sc_music_catalog  # noqa: E402
 from sc_drum_kits import (  # noqa: E402
     DEFAULT_DRUM_KIT_ID,
     DRUM_KITS,
     kit_by_id,
     midi_role,
-    resolve_program,
+    resolve_hit,
 )
 
 
 class SuperColliderDrumKitTests(unittest.TestCase):
     def test_default_pcm_kit_and_ids_are_stable_and_unique(self) -> None:
-        self.assertEqual(DEFAULT_DRUM_KIT_ID, "pcm-vsco")
+        self.assertEqual(DEFAULT_DRUM_KIT_ID, "pcm-old-parlour")
+        self.assertEqual(len(DRUM_KITS), 9)
         self.assertEqual(len({kit.kit_id for kit in DRUM_KITS}), len(DRUM_KITS))
-        self.assertEqual(kit_by_id("unknown").kit_id, DEFAULT_DRUM_KIT_ID)
+        with self.assertRaisesRegex(ValueError, "unknown SC drum kit"):
+            kit_by_id("unknown")
 
     def test_every_rhythm_role_resolves_in_every_kit(self) -> None:
-        catalog = load_drum_pattern_catalog(ROOT / "music" / "drums")
+        catalog = load_sc_music_catalog(
+            ROOT / "music" / "sc_expansion" / "sc_kit_grooves_v1.json"
+        )
         roles = {
             event.role
-            for rhythm in catalog.rhythms.values()
-            for level in rhythm.levels
+            for kit in DRUM_KITS
+            for rhythm_id in json.loads(
+                (ROOT / "music" / "rhythms.json").read_text(encoding="utf-8")
+            )["rhythms"]
+            for level in catalog.arrangement(kit.kit_id, rhythm_id["id"]).levels
             for event in level
-        } | {
-            event.role
-            for rhythm in catalog.rhythms.values()
-            for fill in rhythm.fills
-            for event in fill.events
         }
         for kit in DRUM_KITS:
             for role in roles:
                 with self.subTest(kit=kit.kit_id, role=role):
-                    program, gain = resolve_program(kit.kit_id, role)
+                    program, pad, gain = resolve_hit(kit.kit_id, role)
                     self.assertTrue(program)
+                    self.assertTrue(pad)
                     self.assertGreater(gain, 0.0)
-                    self.assertLessEqual(gain, 1.0)
 
-    def test_synth_drum_programs_exist_in_pinned_sc_catalog(self) -> None:
-        raw = json.loads(
-            (SC_ROOT / "sclork-programs.json").read_text(encoding="utf-8")
+    def test_pcm_programs_and_pads_are_explicit(self) -> None:
+        self.assertTrue(
+            all(kit.program_id.startswith("sample.vsco.kit.") for kit in DRUM_KITS)
         )
-        known = {str(item["program_id"]) for item in raw["programs"]}
-        requested = {
-            program
-            for kit in DRUM_KITS
-            for _role, program in kit.programs
-            if program.startswith("sc.sclork.")
-        }
-        self.assertLessEqual(requested, known)
+        self.assertTrue(all(kit.role_defaults for kit in DRUM_KITS))
 
     def test_general_midi_notes_map_to_musical_roles(self) -> None:
         self.assertEqual(midi_role(36), "low_primary")

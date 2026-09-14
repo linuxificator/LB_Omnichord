@@ -59,7 +59,7 @@ def _atoms(kind: EventKind, values: tuple[str | int | float, ...]) -> None:
         "noteOn": 10,
         "noteOff": 2,
         "voiceSet": 3,
-        "drumHit": 5,
+        "drumHit": 7,
     }[kind]
     if len(values) != expected:
         raise ProtocolValidationError(
@@ -116,13 +116,16 @@ def _atoms(kind: EventKind, values: tuple[str | int | float, ...]) -> None:
     if kind == "drumHit":
         _identity("drum role", str(values[0]))
         _identity("drum program", str(values[1]))
-        logical_key = _integer("drum logical key", values[2])
+        if _integer("drum program revision", values[2]) <= 0:
+            raise ProtocolValidationError("drum program revision must be positive")
+        _identity("drum pad", str(values[3]))
+        logical_key = _integer("drum logical key", values[4])
         if not 0 <= logical_key <= 127:
             raise ProtocolValidationError("drum logical key must be in 0..127")
-        velocity = _number("drum velocity", values[3])
+        velocity = _number("drum velocity", values[5])
         if not 0 <= velocity <= 1:
             raise ProtocolValidationError("drum velocity must be in 0..1")
-        logical_bus = _integer("logical bus", values[4])
+        logical_bus = _integer("logical bus", values[6])
         if not 0 <= logical_bus <= 10:
             raise ProtocolValidationError("logical bus must be in 0..10")
 

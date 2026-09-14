@@ -29,7 +29,7 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 ~omniTransportRunning = false;
 ~omniReplyAddress = nil;
 ~omniDrumOrdinal = 0;
-~omniDrumProgram = "sample.vsco.gm-styleperc";
+~omniDrumProgram = "sample.vsco.kit.old-parlour";
 ~omniPitchBendOctaves = 0.0;
 
 (scriptDirectory +/+ "protocol_runtime.scd").load;
@@ -492,16 +492,28 @@ s.waitForBoot({
         };
     };
 
-    ~omniSpawnDrum = { |role, requestedProgram, note, velocity, logicalBus|
+    ~omniSpawnDrum = {
+        |role, requestedProgram, revision, padId, note, velocity, logicalBus|
         ~omniDrumOrdinal = ~omniDrumOrdinal + 1;
+        if(~omniDrumKits[requestedProgram.asString].notNil) {
+            ~omniSpawnDrumSample.value(
+                "omni/drums",
+                "drum/" ++ ~omniDrumOrdinal,
+                requestedProgram,
+                revision,
+                padId,
+                velocity,
+                logicalBus
+            );
+        } {
         if(requestedProgram.asString.beginsWith("sample.") and: {
-            ~omniSampleReady.value(~omniDrumSampleProgram, 1)
+            ~omniSampleReady.value(requestedProgram, revision)
         }) {
             ~omniSpawnSampleVoice.value(
                 "omni/drums",
                 "drum/" ++ ~omniDrumOrdinal,
-                ~omniDrumSampleProgram,
-                1,
+                requestedProgram,
+                revision,
                 ~omniMapDrumKey.value(role, note).clip(0, 127),
                 note.asFloat.midicps,
                 velocity,
@@ -520,6 +532,7 @@ s.waitForBoot({
                 \note, note,
                 \velocity, velocity
             ]);
+        };
         };
         };
     };
@@ -632,10 +645,11 @@ OSCdef(\omniGestureNote, { |message|
 
 OSCdef(\omniDrumHit, { |message|
     if(~omniCommandValid.value(message)) {
-        var logicalBus = message[7].asInteger.clip(0, 10);
+        var logicalBus = message[9].asInteger.clip(0, 10);
         ~omniSpawnDrum.value(
             "external_percussion", message[4].asString,
-            message[5].asInteger, message[6].asFloat,
+            message[5].asInteger, message[6].asString,
+            message[7].asInteger, message[8].asFloat,
             logicalBus
         );
     };

@@ -1,86 +1,74 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+from pathlib import Path
+from types import MappingProxyType
 
 
 @dataclass(frozen=True, slots=True)
 class DrumKit:
     kit_id: str
     label: str
-    programs: tuple[tuple[str, str], ...]
+    program_id: str
+    role_defaults: tuple[tuple[str, str], ...]
     gain: float = 1.0
 
-    def program_for(self, role: str) -> str:
-        mapping = dict(self.programs)
-        return mapping.get(role, mapping["*"])
+    def pad_for(self, role: str) -> str:
+        try:
+            return dict(self.role_defaults)[str(role)]
+        except KeyError as exc:
+            raise ValueError(
+                f"drum kit {self.kit_id!r} has no pad for role {role!r}"
+            ) from exc
 
 
-_KICK = frozenset({"low_primary", "low_secondary", "timekeeper_foot"})
-_SNARE = frozenset({"backbeat_primary", "backbeat_soft", "ghost_detail", "electronic_detail"})
-_HAT = frozenset({"timekeeper_primary", "timekeeper_open", "texture_shaker", "dry_click"})
-_TOM = frozenset({"tonal_low", "tonal_mid", "tonal_high", "timeline_primary"})
-_CLAP = frozenset({"hand_low", "hand_high", "hand_accent"})
+def _load_kits() -> tuple[DrumKit, ...]:
+    path = (
+        Path(__file__).resolve().parent.parent
+        / "music"
+        / "sc_expansion"
+        / "sc_pcm_drumkits_v1.json"
+    )
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+        raise ValueError("unsupported SC PCM drum-kit catalogue")
+    kits: list[DrumKit] = []
+    for row in raw.get("kits", ()):
+        if not isinstance(row, dict):
+            raise ValueError("SC PCM drum kit must be an object")
+        role_defaults = row.get("role_defaults")
+        if not isinstance(role_defaults, dict) or not role_defaults:
+            raise ValueError(f"drum kit {row.get('kit_id')!r} has no role defaults")
+        kits.append(
+            DrumKit(
+                kit_id=str(row["kit_id"]),
+                label=str(row["label"]),
+                program_id=str(row["program_id"]),
+                role_defaults=tuple(
+                    sorted(
+                        (str(role), str(pad))
+                        for role, pad in role_defaults.items()
+                    )
+                ),
+                gain=10.0 ** (float(row.get("kit_gain_db", 0.0)) / 20.0),
+            )
+        )
+    if len(kits) != 9 or len({kit.kit_id for kit in kits}) != len(kits):
+        raise ValueError("SC PCM catalogue must contain nine unique kits")
+    return tuple(kits)
 
 
-def _family(
-    kit_id: str,
-    label: str,
-    *,
-    kick: str,
-    snare: str,
-    hat: str,
-    tom: str,
-    clap: str,
-    cymbal: str,
-    gain: float,
-) -> DrumKit:
-    assignments: dict[str, str] = {"*": cymbal}
-    for roles, program in (
-        (_KICK, kick),
-        (_SNARE, snare),
-        (_HAT, hat),
-        (_TOM, tom),
-        (_CLAP, clap),
-    ):
-        assignments.update((role, program) for role in roles)
-    return DrumKit(kit_id, label, tuple(assignments.items()), gain)
-
-
-DRUM_KITS = (
-    DrumKit("pcm-vsco", "VSCO PCM", (("*", "sample.vsco.gm-styleperc"),), 1.0),
-    DrumKit("sc-basic", "SC Basic", (("*", "sc.omni.drum"),), 0.82),
-    _family(
-        "sc-808", "SC 808",
-        kick="sc.sclork.kick808", snare="sc.sclork.snare909",
-        hat="sc.sclork.sosHats", tom="sc.sclork.squareDrum",
-        clap="sc.sclork.clapGray", cymbal="sc.sclork.cymbal808", gain=1.0,
-    ),
-    _family(
-        "sc-electro", "SC Electro",
-        kick="sc.sclork.kick_electro", snare="sc.sclork.snareElectro",
-        hat="sc.sclork.hihatElectro", tom="sc.sclork.squareDrum",
-        clap="sc.sclork.clapElectro", cymbal="sc.sclork.cymbalicMCLD", gain=1.0,
-    ),
-    _family(
-        "sc-oto309", "SC Oto 309",
-        kick="sc.sclork.kick_oto309", snare="sc.sclork.snareOto309",
-        hat="sc.sclork.hihat1", tom="sc.sclork.squareDrum",
-        clap="sc.sclork.clapOto309", cymbal="sc.sclork.cymbal808", gain=1.0,
-    ),
-    _family(
-        "sc-sos", "SC SOS",
-        kick="sc.sclork.sosKick", snare="sc.sclork.sosSnare",
-        hat="sc.sclork.sosHats", tom="sc.sclork.sosTom",
-        clap="sc.sclork.oneclapThor", cymbal="sc.sclork.sosHats", gain=1.0,
-    ),
-)
-
+DRUM_KITS = _load_kits()
+_BY_ID = MappingProxyType({kit.kit_id: kit for kit in DRUM_KITS})
 DEFAULT_DRUM_KIT_ID = DRUM_KITS[0].kit_id
 
 
 def kit_by_id(kit_id: str) -> DrumKit:
-    requested = str(kit_id)
-    return next((kit for kit in DRUM_KITS if kit.kit_id == requested), DRUM_KITS[0])
+    try:
+        return _BY_ID[str(kit_id)]
+    except KeyError as exc:
+        raise ValueError(f"unknown SC drum kit {kit_id!r}") from exc
 
 
 def midi_role(note: int) -> str:
@@ -106,6 +94,6 @@ def midi_role(note: int) -> str:
     return "electronic_detail"
 
 
-def resolve_program(kit_id: str, role: str) -> tuple[str, float]:
+def resolve_hit(kit_id: str, role: str) -> tuple[str, str, float]:
     kit = kit_by_id(kit_id)
-    return kit.program_for(str(role)), kit.gain
+    return kit.program_id, kit.pad_for(str(role)), kit.gain
