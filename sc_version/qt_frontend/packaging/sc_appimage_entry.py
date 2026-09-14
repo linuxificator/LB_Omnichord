@@ -3,10 +3,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 
 ASSET_DIRECTORIES = ("config", "gui", "instruments", "music", "supercollider")
@@ -55,6 +57,42 @@ def packaged_runtime_root() -> Path:
     raise RuntimeError("packaged SuperCollider runtime is unavailable")
 
 
+def verify_config_migrations(root: Path) -> None:
+    """Exercise historic user configs through the frozen package boundary."""
+
+    from sample_repository import LEGACY_SAMPLE_ROOT, prepare_user_runtime_config
+
+    shipped_path = root / "config" / "supercollider.json"
+    shipped = json.loads(shipped_path.read_text(encoding="utf-8"))
+    expected_buffers = shipped["server"]["max_buffers"]
+    for revision in (1, 2):
+        legacy = json.loads(json.dumps(shipped))
+        legacy["config_revision"] = revision
+        legacy["server"].pop("max_buffers")
+        if revision == 1:
+            legacy["samples"].pop("repository")
+            legacy["samples"]["vsco_root"] = LEGACY_SAMPLE_ROOT
+        with tempfile.TemporaryDirectory() as directory:
+            user_root = Path(directory) / "user"
+            user_config = user_root / "config" / "supercollider.json"
+            user_config.parent.mkdir(parents=True)
+            user_config.write_text(json.dumps(legacy), encoding="utf-8")
+            migrated_path, migrated = prepare_user_runtime_config(
+                shipped_path,
+                user_root=user_root,
+                install_samples=False,
+            )
+            persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
+            if (
+                persisted["config_revision"] != shipped["config_revision"]
+                or persisted["server"]["max_buffers"] != expected_buffers
+                or migrated.server.max_buffers != expected_buffers
+            ):
+                raise RuntimeError(
+                    f"packaged config migration failed for revision {revision}"
+                )
+
+
 def verify_package(root: Path, runtime: Path) -> int:
     """Validate frozen assets and executables without opening an audio device."""
 
@@ -84,7 +122,11 @@ def verify_package(root: Path, runtime: Path) -> int:
                 f"packaged runtime check failed for {executable}: "
                 f"{result.stdout}{result.stderr}"
             )
-    print(f"LB_OMNICHORD_SC_PACKAGE_OK root={root} runtime={runtime}")
+    verify_config_migrations(root)
+    print(
+        "LB_OMNICHORD_SC_PACKAGE_OK "
+        f"root={root} runtime={runtime} config_migrations=1,2"
+    )
     return 0
 
 

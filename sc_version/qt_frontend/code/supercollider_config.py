@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import Any
 
 
+CURRENT_CONFIG_REVISION = 2
+
+
 class SuperColliderConfigError(ValueError):
     """Raised when the dedicated audio-engine configuration is invalid."""
 
@@ -79,9 +82,10 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
         raise SuperColliderConfigError("$: expected object")
 
     revision = _integer(raw, "config_revision", "$")
-    if revision != 2:
+    if revision != CURRENT_CONFIG_REVISION:
         raise SuperColliderConfigError(
-            f"$.config_revision: unsupported revision {revision}; expected 2"
+            "$.config_revision: unsupported revision "
+            f"{revision}; expected {CURRENT_CONFIG_REVISION}"
         )
     protocol_version = _integer(raw, "protocol_version", "$")
     if protocol_version != 1:
