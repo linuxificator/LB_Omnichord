@@ -2,4 +2,5 @@ Is voice stealing op de strum nog nodig bij supercollider?
 Keuze meerdere drumkits, inventariseer lijst
 verwijzen naar sample bank fork
 --no-esc optie met "preset knocking"
-windows + mac build, android JNI wrapping
+windows + mac build
+android build zonder grafische schil via NDK, CMake, levert twee aparte processen, waarbij de communicatie mogelijk weer via socket/JNI wrapper moet 
