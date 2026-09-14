@@ -4,3 +4,8 @@ verwijzen naar sample bank fork
 --no-esc optie met "preset knocking"
 windows + mac build
 android build zonder grafische schil via NDK, CMake, levert twee aparte processen, waarbij de communicatie mogelijk weer via socket/JNI wrapper moet 
+Heeft galm nog andere paramters
+De arpeggio's lijken niet te kloppen
+APG/LDR knop heeft hickup in sequencer
+Drums uit balans
+Instrument knoppen zijn niet in de kleur van de balk
