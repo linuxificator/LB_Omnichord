@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from socketserver import TCPServer
 from typing import Any
 
 from PySide6.QtCore import QObject, Signal, Slot
@@ -62,6 +63,16 @@ class _Bridge(QObject):
             }
         finally:
             req.done.set()
+
+
+class _LoopbackHTTPServer(ThreadingHTTPServer):
+    """HTTP test server that never performs host-name or reverse-DNS lookup."""
+
+    def server_bind(self) -> None:
+        TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = str(host)
+        self.server_port = int(port)
 
 
 class TestControlServer:
@@ -145,7 +156,7 @@ class TestControlServer:
             def log_message(self, _format: str, *_args: object) -> None:
                 return
 
-        self._server = ThreadingHTTPServer(("127.0.0.1", int(port)), Handler)
+        self._server = _LoopbackHTTPServer(("127.0.0.1", int(port)), Handler)
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             name="omnichord-test-api",
