@@ -72,11 +72,11 @@ class SuperColliderProcessTests(unittest.TestCase):
 
             runtime = locate_supercollider_runtime(root)
 
-            self.assertEqual(runtime.sclang, root / "bin" / "sclang")
-            self.assertEqual(runtime.scsynth, root / "bin" / "scsynth")
+            self.assertEqual(runtime.sclang, (root / "bin" / "sclang").resolve())
+            self.assertEqual(runtime.scsynth, (root / "bin" / "scsynth").resolve())
             self.assertEqual(
                 runtime.class_library,
-                root / "share" / "SuperCollider" / "SCClassLibrary",
+                (root / "share" / "SuperCollider" / "SCClassLibrary").resolve(),
             )
 
     def test_incomplete_bundled_runtime_is_rejected_before_launch(self) -> None:
@@ -101,8 +101,8 @@ class SuperColliderProcessTests(unittest.TestCase):
             for path in paths[2:]:
                 path.mkdir(parents=True)
             runtime = locate_supercollider_runtime(root)
-            self.assertEqual(runtime.sclang, paths[0])
-            self.assertEqual(runtime.scsynth, paths[1])
+            self.assertEqual(runtime.sclang, paths[0].resolve())
+            self.assertEqual(runtime.scsynth, paths[1].resolve())
 
     def test_official_windows_archive_layout_is_supported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -112,8 +112,8 @@ class SuperColliderProcessTests(unittest.TestCase):
             (root / "SCClassLibrary").mkdir()
             (root / "plugins").mkdir()
             runtime = locate_supercollider_runtime(root)
-            self.assertEqual(runtime.sclang, root / "sclang.exe")
-            self.assertEqual(runtime.scsynth, root / "scsynth.exe")
+            self.assertEqual(runtime.sclang, (root / "sclang.exe").resolve())
+            self.assertEqual(runtime.scsynth, (root / "scsynth.exe").resolve())
 
     def test_supervisor_uses_exact_server_plugins_and_private_class_path(
         self,
@@ -161,12 +161,15 @@ class SuperColliderProcessTests(unittest.TestCase):
                 self.assertIn(str(class_library), language_config.read_text())
                 self.assertEqual(
                     environment["OMNICHORD_SC_SYNTH_PROGRAM"],
-                    str(runtime / "bin" / "scsynth"),
+                    str((runtime / "bin" / "scsynth").resolve()),
                 )
                 self.assertEqual(
-                    environment["OMNICHORD_SC_PLUGIN_PATH"], str(plugins)
+                    environment["OMNICHORD_SC_PLUGIN_PATH"],
+                    str(plugins.resolve()),
                 )
-                self.assertEqual(command[-2:], ["-D", str(engine / "bootstrap.scd")])
+                self.assertEqual(
+                    command[-2:], ["-D", str((engine / "bootstrap.scd").resolve())]
+                )
                 supervisor.stop()
 
 
