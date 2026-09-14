@@ -782,6 +782,31 @@ class StaticContractTests(unittest.TestCase):
         midi_integration = (ROOT / "code" / "midi_integration.py").read_text(encoding="utf-8")
         self.assertIn("@Property(QObject, constant=True)", midi_integration)
 
+    def test_dynamic_instrument_rollers_resynchronize_after_model_replacement(self) -> None:
+        midi = (ROOT / "gui" / "MidiSynthSection.qml").read_text(encoding="utf-8")
+        omni = (ROOT / "gui" / "SynthSection.qml").read_text(encoding="utf-8")
+        rhythm = (ROOT / "gui" / "RhythmSection.qml").read_text(encoding="utf-8")
+        self.assertIn(
+            "onBrowserModelChanged: Qt.callLater(root.synchronizeWheel)",
+            midi,
+        )
+        self.assertIn(
+            "onBrowserIndexChanged: Qt.callLater(root.synchronizeWheel)",
+            midi,
+        )
+        self.assertIn(
+            "onDrumKitIndexChanged: Qt.callLater(root.synchronizeKitWheel)",
+            rhythm,
+        )
+        self.assertIn(
+            "onBrowserModelChanged: Qt.callLater(root.synchronizeWheel)",
+            omni,
+        )
+        self.assertIn(
+            "onBrowserIndexChanged: Qt.callLater(root.synchronizeWheel)",
+            omni,
+        )
+
     def test_utility_header_uses_two_aligned_visual_rows(self) -> None:
         main = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         midi = (ROOT / "gui" / "MidiScreen.qml").read_text(encoding="utf-8")

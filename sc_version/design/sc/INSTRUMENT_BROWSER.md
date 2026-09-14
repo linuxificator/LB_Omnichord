@@ -15,8 +15,10 @@ programs and travel through the same typed program-selection protocol.
 `SYN` shows the 76 qualified SCLOrk definitions plus four owned acid voices.
 Engine prefixes are not user-facing labels. `PCM` shows 22 recorded instrument
 families in the roller. The space to its right shows recorded variants in the
-upper row and articulations or playing styles in the lower row. A row with only
-one meaningful choice has no redundant button. Examples are loud/quiet organ
+upper row and articulations or playing styles in the lower row. A family with
+one source variant but several playing styles keeps the upper variant as an
+inert label; only the lower playing-style buttons are actions. A family with
+one variant and one playing style has no redundant buttons. Examples are loud/quiet organ
 with manual/pedal sets, open/Harmon-muted/straight-muted trumpet, and string
 sustain/tremolo/pizzicato/spiccato choices.
 
@@ -59,6 +61,12 @@ The owned acid voices implement ADSR, slide and accent directly. When an acid
 voice is selected for bass, a small orange LED above the bass transport shows
 that authored riff accent/slide events are meaningful. Other synths do not
 receive acid articulation merely because they expose a glide knob.
+
+The five pitched MIDI rows use this same browser, catalogue and parameter
+model. The percussion row instead exposes the dedicated drum-kit roller. A
+sample Piano row also exposes an owner-scoped `SUSTAIN ON/OFF` action. This is
+the same SC sustain lifetime used by MIDI CC64; it is not a fabricated pedal
+sample layer, because the two present Piano mappings contain no such layer.
 
 ## Ownership and evidence
 

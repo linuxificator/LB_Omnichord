@@ -9,7 +9,28 @@
     "target_rms": 0.05,
     "peak_ceiling": 0.65,
     "max_gain": 16.0,
-    "max_raw_peak": 64.0
+    "max_raw_peak": 64.0,
+    "drum_programs": [
+      "sc.sclork.clapElectro",
+      "sc.sclork.clapGray",
+      "sc.sclork.clapOto309",
+      "sc.sclork.cymbal808",
+      "sc.sclork.cymbalicMCLD",
+      "sc.sclork.hihat1",
+      "sc.sclork.hihatElectro",
+      "sc.sclork.kick808",
+      "sc.sclork.kick_electro",
+      "sc.sclork.kick_oto309",
+      "sc.sclork.oneclapThor",
+      "sc.sclork.snare909",
+      "sc.sclork.snareElectro",
+      "sc.sclork.snareOto309",
+      "sc.sclork.sosHats",
+      "sc.sclork.sosKick",
+      "sc.sclork.sosSnare",
+      "sc.sclork.sosTom",
+      "sc.sclork.squareDrum"
+    ]
   },
   "programs": {
     "sc.sclork.FMRhodes1": {
@@ -236,6 +257,63 @@
     },
     "sc.sclork.werkit2": {
       "gain": 7.617365
+    },
+    "sc.sclork.clapElectro": {
+      "gain": 3.06
+    },
+    "sc.sclork.clapGray": {
+      "gain": 11.96
+    },
+    "sc.sclork.clapOto309": {
+      "gain": 10.84
+    },
+    "sc.sclork.cymbal808": {
+      "gain": 16.0
+    },
+    "sc.sclork.cymbalicMCLD": {
+      "gain": 0.533
+    },
+    "sc.sclork.hihat1": {
+      "gain": 1.408
+    },
+    "sc.sclork.hihatElectro": {
+      "gain": 3.12
+    },
+    "sc.sclork.kick808": {
+      "gain": 0.267
+    },
+    "sc.sclork.kick_electro": {
+      "gain": 2.53
+    },
+    "sc.sclork.kick_oto309": {
+      "gain": 2.818
+    },
+    "sc.sclork.oneclapThor": {
+      "gain": 2.12
+    },
+    "sc.sclork.snare909": {
+      "gain": 1.386
+    },
+    "sc.sclork.snareElectro": {
+      "gain": 3.715
+    },
+    "sc.sclork.snareOto309": {
+      "gain": 3.038
+    },
+    "sc.sclork.sosHats": {
+      "gain": 0.36
+    },
+    "sc.sclork.sosKick": {
+      "gain": 0.384
+    },
+    "sc.sclork.sosSnare": {
+      "gain": 1.404
+    },
+    "sc.sclork.sosTom": {
+      "gain": 0.207
+    },
+    "sc.sclork.squareDrum": {
+      "gain": 0.92
     },
     "sc.sclork.xylophone": {
       "gain": 8.715053

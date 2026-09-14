@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT / "code"))
 
 import build_sclork_playback_profile  # noqa: E402
 from supercollider_programs import load_sclork_playback_profile  # noqa: E402
+from sc_drum_kits import DRUM_KITS  # noqa: E402
 
 
 class SclorkPlaybackProfileTests(unittest.TestCase):
@@ -35,7 +36,16 @@ class SclorkPlaybackProfileTests(unittest.TestCase):
         }
         included = set(self.profile["programs"])
         excluded = set(self.profile["excluded"])
-        self.assertEqual(included | excluded, candidates)
+        requested_drums = {
+            program
+            for kit in DRUM_KITS
+            for _role, program in kit.programs
+            if program.startswith("sc.sclork.")
+        }
+        profiled_drums = set(self.profile["method"]["drum_programs"])
+        self.assertEqual(profiled_drums, requested_drums)
+        self.assertEqual((included - profiled_drums) | excluded, candidates)
+        self.assertLessEqual(profiled_drums, included)
         self.assertFalse(included & excluded)
         self.assertEqual(
             excluded,

@@ -42,13 +42,18 @@ score.add([0.0, [\d_loadDir, defDirectory]]);
 programs.do { |program, index|
     var name = jsonAt.value(program, "native_name").asSymbol;
     var programId = jsonAt.value(program, "program_id").asString;
+    var category = jsonAt.value(program, "category").asString;
     var nodeId = 1000 + index;
     var outputNodeId = 2000 + index;
     var start = 0.05 + (index * segmentSeconds);
-    var frequency = if(requestedFrequency.isNil) {
-        [110.0, 440.0, 880.0][(startIndex + index) % 3]
+    var frequency = if(category == "drums") {
+        nil
     } {
-        requestedFrequency.asFloat
+        if(requestedFrequency.isNil) {
+            [110.0, 440.0, 880.0][(startIndex + index) % 3]
+        } {
+            requestedFrequency.asFloat
+        }
     };
     var args = ~omniSclorkArgs.value(name, 16, frequency, []);
     score.add([start, [\s_new, name, nodeId, 0, 0] ++ args]);

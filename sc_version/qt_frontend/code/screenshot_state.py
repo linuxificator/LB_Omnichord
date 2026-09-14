@@ -32,6 +32,22 @@ class ScreenshotImage(Protocol):
     def save(self, file_name: str) -> bool: ...
 
 
+class ScreenshotOmniBrowser(Protocol):
+    def synthKind(self, role: str) -> str: ...
+    def toggleSynthKind(self, role: str) -> None: ...
+    def synthBrowserNames(self, role: str) -> list[str]: ...
+    def setSynthBrowserIndex(self, role: str, index: int) -> None: ...
+    def setDrumKitIndex(self, index: int) -> None: ...
+
+
+class ScreenshotMidiBrowser(Protocol):
+    def synthKind(self, row: int) -> str: ...
+    def toggleSynthKind(self, row: int) -> None: ...
+    def synthBrowserNames(self, row: int) -> list[str]: ...
+    def setSynthBrowserIndex(self, row: int, index: int) -> None: ...
+    def setDrumKitIndex(self, index: int) -> None: ...
+
+
 def save_png_screenshot(image: ScreenshotImage, path: Path) -> bool:
     """Save a non-null image, letting Qt infer PNG from the file suffix."""
 
@@ -66,3 +82,33 @@ def populate_screenshot_input_controls(
     # OSC buttons use the same press/release presentation contract as MIDI.
     osc_injector.process_osc_control("/fill", 0, 1.0, "button")
     osc_injector.process_osc_control("/fill", 0, 0.0, "button")
+
+
+def populate_screenshot_instrument_browsers(
+    omni: ScreenshotOmniBrowser,
+    midi: ScreenshotMidiBrowser,
+) -> None:
+    """Select representative PCM families and independent drum kits.
+
+    This is used only by the explicit screenshot capture mode. Every state
+    change travels through the same public controller methods as live QML.
+    """
+
+    for role, family in (
+        ("chord", "Piano"),
+        ("strum", "Organ"),
+        ("bass", "Contrabass"),
+    ):
+        if omni.synthKind(role) != "sample":
+            omni.toggleSynthKind(role)
+        names = omni.synthBrowserNames(role)
+        omni.setSynthBrowserIndex(role, names.index(family))
+
+    for row, family in ((0, "Piano"), (1, "Organ"), (2, "Timpani")):
+        if midi.synthKind(row) != "sample":
+            midi.toggleSynthKind(row)
+        names = midi.synthBrowserNames(row)
+        midi.setSynthBrowserIndex(row, names.index(family))
+
+    omni.setDrumKitIndex(2)
+    midi.setDrumKitIndex(3)

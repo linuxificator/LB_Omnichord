@@ -63,6 +63,15 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
         synths, *_ = load_synth_catalog(ROOT / "instruments" / "synths.json")
         self.assertEqual(sum(item.kind == "synth" for item in synths), 80)
         self.assertEqual(sum(item.kind == "sample" for item in synths), 66)
+        drum_programs = {
+            item.program_id
+            for item in load_supercollider_programs(
+                SC_ROOT / "sclork-programs.json"
+            )
+            if item.category == "drums"
+        }
+        self.assertTrue(drum_programs)
+        self.assertTrue(all(item.key not in drum_programs for item in synths))
         self.assertTrue(all(not item.label.startswith(("SC ", "VSCO ")) for item in synths))
         warsaw = next(item for item in synths if item.key == "sc.sclork.bassWarsaw")
         self.assertEqual(

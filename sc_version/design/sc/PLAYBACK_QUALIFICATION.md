@@ -29,6 +29,12 @@ boundary:
 This separation keeps upstream material inspectable without presenting every
 compilable graph as a safe musical instrument.
 
+Nineteen reviewed drum definitions used by the selectable synth drum kits are
+also present in the playback profile. Category membership, not profile
+membership, keeps them out of the pitched browser. Both the yellow OMNI rhythm
+row and purple MIDI percussion row offer the same six explicit kits: VSCO PCM,
+SC basic, SC 808, SC Electro, SC Oto 309 and SC SOS.
+
 ## SCLOrk measurement and gain staging
 
 `tools/build_sclork_playback_profile.py` consumes raw 32-bit-float NRT reports
@@ -51,6 +57,12 @@ The `sc-audio` suite renders every source definition. For browser-admitted
 voices it rejects non-finite, silent, inaudibly quiet or full-scale-clipped
 output. The complete suite was additionally run with each of 110, 440 and
 880 Hz fixed across the catalogue.
+
+Selected drum programs are rendered with their production default frequency,
+not the fixed pitched-register probes. Their checked-in gains must keep a
+single hit between RMS 0.015 and 0.075 with peak below 0.85. The profile builder
+accepts repeatable `--drum-program` arguments and records their exact set, so a
+new roller mapping cannot bypass either calibration or the NRT balance gate.
 
 ## Voice lifetime repair
 
@@ -83,6 +95,12 @@ The checked-in drum-role map is therefore based on the actual indexed sample
 names: kick, snare, tambourine, suspended cymbal, cowbell, claves, log drums,
 congas and related sources. A semantic test prevents gong recordings from
 silently returning to timekeeper roles.
+
+All 75 SFZ mappings and 3,163 compiled regions are accounted for. The wider
+local VSCO checkout also contains 1,134 source audio files that are not
+referenced by those mappings, mostly archive/raw material. They are reported
+as `unmapped-source-audio`; the application does not invent undocumented key
+or articulation semantics merely to expose every file.
 
 ## Evidence and remaining limits
 

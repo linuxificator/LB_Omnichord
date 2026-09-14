@@ -61,7 +61,11 @@ from preset_plan import (
 )
 from performance_qml_adapter import PerformanceQmlAdapter
 from runtime_paths import production_frontend_asset_root
-from screenshot_state import populate_screenshot_input_controls, save_png_screenshot
+from screenshot_state import (
+    populate_screenshot_input_controls,
+    populate_screenshot_instrument_browsers,
+    save_png_screenshot,
+)
 from synth_state import SynthState
 from sc_drum_kits import DEFAULT_DRUM_KIT_ID, DRUM_KITS
 from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
@@ -3830,7 +3834,7 @@ def parse_arguments(
     default_config_path: Path | None = None,
 ) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=("Qt Quick Omnichord using native AMY commands over serial")
+        description=("Qt Quick Omnichord using its configured audio backend")
     )
     parser.add_argument(
         "--amy-config",
@@ -4213,6 +4217,7 @@ def run_application(
         # Stage representative controls through the normal input-processing
         # paths. The resulting bar contains MIDI and OSC rotaries and buttons.
         populate_screenshot_input_controls(backend.midiPlayer, backend.midiPlayer)
+        populate_screenshot_instrument_browsers(backend, backend.midiPlayer)
         # Select C minor from factory preset 1 so the OMNI capture also
         # demonstrates the active chord and its correctly spelled C/E-flat/G
         # strum-note guide.

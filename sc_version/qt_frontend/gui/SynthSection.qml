@@ -55,6 +55,9 @@ Item {
         return root.controller.sampleChoiceColumns(root.role)
     }
 
+    onBrowserModelChanged: Qt.callLater(root.synchronizeWheel)
+    onBrowserIndexChanged: Qt.callLater(root.synchronizeWheel)
+
     readonly property var commonControls:
         role === "strum"
         ? controller.strumCommonControls
@@ -161,19 +164,19 @@ Item {
 
                 function onChordSynthStateChanged() {
                     if (root.role === "chord") {
-                        root.synchronizeWheel()
+                        Qt.callLater(root.synchronizeWheel)
                     }
                 }
 
                 function onStrumSynthStateChanged() {
                     if (root.role === "strum") {
-                        root.synchronizeWheel()
+                        Qt.callLater(root.synchronizeWheel)
                     }
                 }
 
                 function onBassSynthStateChanged() {
                     if (root.role === "bass") {
-                        root.synchronizeWheel()
+                        Qt.callLater(root.synchronizeWheel)
                     }
                 }
 

@@ -52,6 +52,9 @@ Item {
         return root.controller.extraControls(root.rowIndex)
     }
 
+    onBrowserModelChanged: Qt.callLater(root.synchronizeWheel)
+    onBrowserIndexChanged: Qt.callLater(root.synchronizeWheel)
+
     function markInteraction() { root.interacted(root.rowIndex) }
     function synchronizeWheel() {
         if (!synthWheel.initialized) return
@@ -141,8 +144,10 @@ Item {
             }
             Connections {
                 target: root.controller
-                function onStateChanged() { root.synchronizeWheel() }
-                function onDrumKitChanged() { if (root.drumRow) root.synchronizeWheel() }
+                function onStateChanged() { Qt.callLater(root.synchronizeWheel) }
+                function onDrumKitChanged() {
+                    if (root.drumRow) Qt.callLater(root.synchronizeWheel)
+                }
             }
             delegate: Item {
                 id: synthItem
@@ -277,58 +282,62 @@ Item {
         }
     }
 
-    Row {
+    Item {
         id: sampleChoiceRow
         visible: !root.drumRow && root.synthKind === "sample"
         x: channelButton.x + channelButton.width + 10
         y: 0
         width: root.volumeX - x - 8
         height: parent.height
-        spacing: 8
-        Repeater {
-            id: sampleColumnRepeater
-            model: root.sampleColumns
-            delegate: Column {
-                id: sampleColumn
-                required property var modelData
-                width: (sampleChoiceRow.width - Math.max(0, sampleColumnRepeater.count - 1) * sampleChoiceRow.spacing) / Math.max(1, sampleColumnRepeater.count)
-                height: sampleChoiceRow.height; spacing: 8
-                Button {
-                    width: parent.width; height: 48
-                    visible: sampleColumn.modelData.showVariant
-                    text: sampleColumn.modelData.label
-                    font.pixelSize: 12; font.bold: sampleColumn.modelData.selected
-                    background: Rectangle {
-                        radius: 8
-                        color: sampleColumn.modelData.selected ? root.accentColor : Qt.lighter(root.panelColor, 1.08)
-                        border.color: root.borderColor
-                        border.width: sampleColumn.modelData.selected ? 2 : 1
+        Row {
+            id: choiceColumnsRow
+            anchors.fill: parent
+            spacing: 8
+            Repeater {
+                id: sampleColumnRepeater
+                model: root.sampleColumns
+                delegate: Column {
+                    id: sampleColumn
+                    required property var modelData
+                    width: (choiceColumnsRow.width - Math.max(0, sampleColumnRepeater.count - 1) * choiceColumnsRow.spacing) / Math.max(1, sampleColumnRepeater.count)
+                    height: choiceColumnsRow.height; spacing: 8
+                    Button {
+                        width: parent.width; height: 48
+                        visible: sampleColumn.modelData.showVariant
+                        text: sampleColumn.modelData.label
+                        font.pixelSize: 12; font.bold: sampleColumn.modelData.selected
+                        background: Rectangle {
+                            radius: 8
+                            color: sampleColumn.modelData.selected ? root.accentColor : Qt.lighter(root.panelColor, 1.08)
+                            border.color: root.borderColor
+                            border.width: sampleColumn.modelData.selected ? 2 : 1
+                        }
+                        onClicked: {
+                            const choices = sampleColumn.modelData.choices
+                            if (sampleColumn.modelData.variantSelectable && choices.length > 0)
+                                root.controller.selectSampleChoice(root.rowIndex, choices[0].synthIndex)
+                        }
                     }
-                    onClicked: {
-                        const choices = sampleColumn.modelData.choices
-                        if (sampleColumn.modelData.variantSelectable && choices.length > 0)
-                            root.controller.selectSampleChoice(root.rowIndex, choices[0].synthIndex)
-                    }
-                }
-                Row {
-                    width: parent.width; height: 48; spacing: 4
-                    Repeater {
-                        id: articulationRepeater
-                        model: sampleColumn.modelData.choices.length > 1 ? sampleColumn.modelData.choices : []
-                        delegate: Button {
-                            id: articulationButton
-                            required property var modelData
-                            width: (sampleColumn.width - Math.max(0, articulationRepeater.count - 1) * 4) / Math.max(1, articulationRepeater.count)
-                            height: 48
-                            text: articulationButton.modelData.label
-                            font.pixelSize: 11; font.bold: articulationButton.modelData.selected
-                            background: Rectangle {
-                                radius: 8
-                                color: articulationButton.modelData.selected ? root.accentColor : Qt.lighter(root.panelColor, 1.16)
-                                border.color: root.borderColor
-                                border.width: articulationButton.modelData.selected ? 2 : 1
+                    Row {
+                        width: parent.width; height: 48; spacing: 4
+                        Repeater {
+                            id: articulationRepeater
+                            model: sampleColumn.modelData.choices.length > 1 ? sampleColumn.modelData.choices : []
+                            delegate: Button {
+                                id: articulationButton
+                                required property var modelData
+                                width: (sampleColumn.width - Math.max(0, articulationRepeater.count - 1) * 4) / Math.max(1, articulationRepeater.count)
+                                height: 48
+                                text: articulationButton.modelData.label
+                                font.pixelSize: 11; font.bold: articulationButton.modelData.selected
+                                background: Rectangle {
+                                    radius: 8
+                                    color: articulationButton.modelData.selected ? root.accentColor : Qt.lighter(root.panelColor, 1.16)
+                                    border.color: root.borderColor
+                                    border.width: articulationButton.modelData.selected ? 2 : 1
+                                }
+                                onClicked: root.controller.selectSampleChoice(root.rowIndex, articulationButton.modelData.synthIndex)
                             }
-                            onClicked: root.controller.selectSampleChoice(root.rowIndex, articulationButton.modelData.synthIndex)
                         }
                     }
                 }

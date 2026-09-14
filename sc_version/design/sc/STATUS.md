@@ -31,7 +31,8 @@ Target currently exercised: Linux x86_64
   riff articulation support with the bass-row orange indicator.
 - All 109 pinned SCLOrkSynths definitions compile and remain in the auditable
   source inventory. The pitched browser admits 76 measured definitions; 31
-  raw drum definitions remain available to the dedicated drum path and two
+  raw drum definitions remain available to the dedicated drum path, nineteen
+  used drum programs have their own measured playback calibration, and two
   numerically unstable definitions are explicitly excluded from playback.
   The automated float NRT audit exercises the browser voices at MIDI A2, A4
   and A5 with bounded per-program output calibration.
@@ -46,6 +47,14 @@ Target currently exercised: Linux x86_64
   views. Synth controls come from checked-in source defaults and a reviewed
   alias/range vocabulary; engine names and ineffective native parameters are
   not exposed as UI promises. See [`INSTRUMENT_BROWSER.md`](INSTRUMENT_BROWSER.md).
+- The five pitched MIDI rows now use that same `SYN`/`PCM` catalogue and
+  parameter surface. Both percussion locations expose six explicit drum kits.
+  Reverb controls name the native SC model (`WET`, `ROOM`, `DAMP`) and no
+  longer promise AMY-only ranges or terminology.
+- Manual strum no longer has a frontend voice-stealing limit: every attack has
+  an exact independent handle and SC owns its release. Root sequence changes
+  are scheduled at the current transport phase, so riff, arpeggio, leader and
+  activity changes do not restart the beat clock.
 - Legacy AMY patch keys are accepted only as preset-migration aliases. They do
   not appear in the SC instrument browser and all outgoing program selections
   use canonical `sc.*` or `sample.*` identities.

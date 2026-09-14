@@ -13,6 +13,7 @@ Item {
     property color wheelBorderColor: "#8e7012"
     property color wheelTextColor: "#3e3006"
     property color selectionColor: "#80620b"
+    readonly property int drumKitIndex: root.controller.selectedDrumKitIndex
 
     function synchronizeWheel() {
         if (!rhythmWheel.initialized) return
@@ -25,12 +26,14 @@ Item {
 
     function synchronizeKitWheel() {
         if (!kitWheel.initialized) return
-        if (kitWheel.currentIndex !== controller.selectedDrumKitIndex) {
+        if (kitWheel.currentIndex !== root.drumKitIndex) {
             kitWheel.syncingFromBackend = true
-            kitWheel.currentIndex = controller.selectedDrumKitIndex
+            kitWheel.currentIndex = root.drumKitIndex
             Qt.callLater(function() { kitWheel.syncingFromBackend = false })
         }
     }
+
+    onDrumKitIndexChanged: Qt.callLater(root.synchronizeKitWheel)
 
     function midiButtonHandled(target) {
         const learned = root.midiControlRouter.activateControlTarget(target)
@@ -125,7 +128,9 @@ Item {
             }
             Connections {
                 target: root.controller
-                function onDrumKitChanged() { root.synchronizeKitWheel() }
+                function onDrumKitChanged() {
+                    Qt.callLater(root.synchronizeKitWheel)
+                }
             }
             delegate: Item {
                 id: kitItem

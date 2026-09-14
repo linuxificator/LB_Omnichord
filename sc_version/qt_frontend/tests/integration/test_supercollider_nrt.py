@@ -126,6 +126,27 @@ class SuperColliderNonRealtimeTests(unittest.TestCase):
                 [],
                 f"inaudibly quiet browser programs: {too_quiet}",
             )
+            categories = {
+                str(item["program_id"]): str(item["category"])
+                for item in catalog
+            }
+            calibrated_drums = [
+                item
+                for item in visible
+                if categories[str(item["program_id"])] == "drums"
+            ]
+            self.assertTrue(calibrated_drums)
+            unbalanced = [
+                item
+                for item in calibrated_drums
+                if not 0.015 <= float(item["rms"]) <= 0.075
+                or float(item["peak"]) >= 0.85
+            ]
+            self.assertEqual(
+                unbalanced,
+                [],
+                "drum-kit programs exceed the reviewed runtime balance window",
+            )
 
 
 if __name__ == "__main__":

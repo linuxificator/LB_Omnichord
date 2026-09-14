@@ -25,6 +25,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--peak-ceiling", type=float, default=0.65)
     parser.add_argument("--max-gain", type=float, default=16.0)
     parser.add_argument("--max-raw-peak", type=float, default=64.0)
+    parser.add_argument(
+        "--drum-program",
+        action="append",
+        default=[],
+        help=(
+            "drum program to calibrate from its SynthDef default pitch; "
+            "repeat for each drum-kit program"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -44,10 +53,22 @@ def main() -> int:
 
     programs: dict[str, dict[str, float]] = {}
     excluded: dict[str, dict[str, str]] = {}
+    drum_programs = {str(item) for item in args.drum_program}
+    known_programs = {str(item["program_id"]) for item in catalog}
+    unknown_drums = drum_programs - known_programs
+    if unknown_drums:
+        raise ValueError(
+            "unknown drum programs: " + ", ".join(sorted(unknown_drums))
+        )
     for program in catalog:
-        if not program["pitch_support"] or program["category"] == "drums":
-            continue
         program_id = str(program["program_id"])
+        is_requested_drum = (
+            program["category"] == "drums" and program_id in drum_programs
+        )
+        if not is_requested_drum and (
+            not program["pitch_support"] or program["category"] == "drums"
+        ):
+            continue
         measurements = [report[program_id] for report in reports.values()]
         rms = median(float(item["rms"]) for item in measurements)
         peak = max(float(item["peak"]) for item in measurements)
@@ -77,6 +98,7 @@ def main() -> int:
             "peak_ceiling": args.peak_ceiling,
             "max_gain": args.max_gain,
             "max_raw_peak": args.max_raw_peak,
+            "drum_programs": sorted(drum_programs),
         },
         "programs": dict(sorted(programs.items())),
         "excluded": dict(sorted(excluded.items())),

@@ -285,7 +285,7 @@ class SuperColliderClientTests(unittest.TestCase):
         self.assertEqual(hits[0][2], "midi/drums")
         self.assertEqual(hits[0][3], "sc.sclork.kick808")
         self.assertEqual(hits[0][4], 36)
-        self.assertAlmostEqual(float(hits[0][5]), 0.31)
+        self.assertAlmostEqual(float(hits[0][5]), 0.5)
         self.assertEqual(hits[0][6], 10)
 
     def test_lane_transaction_is_indexed_and_acknowledged(self) -> None:

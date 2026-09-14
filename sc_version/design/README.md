@@ -46,6 +46,8 @@ For every SuperCollider edition task, first read:
    instruments, samples, drums, gain staging or voice lifetimes
 9. [`sc/INSTRUMENT_BROWSER.md`](sc/INSTRUMENT_BROWSER.md) when changing
    instrument selection, sample grouping or program controls
+10. [`sc/TO_FIX_VERIFICATION.md`](sc/TO_FIX_VERIFICATION.md) for the completed
+    SC usability follow-up and its executable evidence
 
 Then read the category README and owning contracts for every subsystem being
 changed. If `../../CODEX_HANDOFF.md` exists, read it for operational state; it

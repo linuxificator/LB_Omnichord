@@ -157,7 +157,10 @@ def load_synth_catalog(path: Path) -> tuple[list[app_core.SynthDefinition], int,
     for program in load_supercollider_programs(
         supercollider_root / "sclork-programs.json"
     ):
-        if program.program_id not in playback_gains:
+        # Drum SynthDefs are available exclusively through the two drum-kit
+        # rollers. Their calibration belongs in the shared playback profile,
+        # but that must never make them leak into the pitched browser.
+        if program.category == "drums" or program.program_id not in playback_gains:
             continue
         synths.append(
             app_core.SynthDefinition(

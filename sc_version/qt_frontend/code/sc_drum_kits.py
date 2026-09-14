@@ -53,25 +53,25 @@ DRUM_KITS = (
         "sc-808", "SC 808",
         kick="sc.sclork.kick808", snare="sc.sclork.snare909",
         hat="sc.sclork.sosHats", tom="sc.sclork.squareDrum",
-        clap="sc.sclork.clapGray", cymbal="sc.sclork.cymbal808", gain=0.62,
+        clap="sc.sclork.clapGray", cymbal="sc.sclork.cymbal808", gain=1.0,
     ),
     _family(
         "sc-electro", "SC Electro",
         kick="sc.sclork.kick_electro", snare="sc.sclork.snareElectro",
         hat="sc.sclork.hihatElectro", tom="sc.sclork.squareDrum",
-        clap="sc.sclork.clapElectro", cymbal="sc.sclork.cymbalicMCLD", gain=0.62,
+        clap="sc.sclork.clapElectro", cymbal="sc.sclork.cymbalicMCLD", gain=1.0,
     ),
     _family(
         "sc-oto309", "SC Oto 309",
         kick="sc.sclork.kick_oto309", snare="sc.sclork.snareOto309",
         hat="sc.sclork.hihat1", tom="sc.sclork.squareDrum",
-        clap="sc.sclork.clapOto309", cymbal="sc.sclork.cymbal808", gain=0.62,
+        clap="sc.sclork.clapOto309", cymbal="sc.sclork.cymbal808", gain=1.0,
     ),
     _family(
         "sc-sos", "SC SOS",
         kick="sc.sclork.sosKick", snare="sc.sclork.sosSnare",
         hat="sc.sclork.sosHats", tom="sc.sclork.sosTom",
-        clap="sc.sclork.oneclapThor", cymbal="sc.sclork.sosHats", gain=0.58,
+        clap="sc.sclork.oneclapThor", cymbal="sc.sclork.sosHats", gain=1.0,
     ),
 )
 
