@@ -75,6 +75,16 @@ cp -a "$runtime_prefix" "$app_dir/usr/lib/LB_Omnichord/sc-runtime"
 python "$frontend_dir/packaging/bundle_sc_elf_dependencies.py" \
     "$app_dir/usr/lib/LB_Omnichord/sc-runtime"
 
+# Raspberry Pi OS must provide the C++ runtime used by its Mesa/V3D stack.
+# The SC edition contains a PyInstaller runtime and a separately bundled SC
+# runtime, so remove the Ubuntu-builder copy from both locations. This is the
+# same host-graphics compatibility rule as the regular Raspberry Pi AppImage.
+if [[ "$platform_name" == "RaspberryPi-aarch64" ]]; then
+    rm -f -- \
+        "$app_dir/usr/lib/LB_Omnichord/_internal/libstdc++.so.6" \
+        "$app_dir/usr/lib/LB_Omnichord/sc-runtime/lib/libstdc++.so.6"
+fi
+
 install -Dm755 /dev/stdin "$app_dir/AppRun" <<'EOF'
 #!/usr/bin/env bash
 set -e

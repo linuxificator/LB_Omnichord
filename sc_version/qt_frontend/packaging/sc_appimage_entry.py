@@ -32,7 +32,9 @@ def packaged_runtime_root() -> Path:
         return Path(configured).expanduser()
     executable = Path(sys.executable).resolve().parent
     candidates = (
-        executable.parent.parent / "Resources" / "sc-runtime" / "SuperCollider.app",
+        # PyInstaller's macOS executable lives in App.app/Contents/MacOS;
+        # bundled resources are its sibling Contents/Resources directory.
+        executable.parent / "Resources" / "sc-runtime" / "SuperCollider.app",
         executable / "sc-runtime" / "SuperCollider.app",
         executable.parent / "sc-runtime" / "SuperCollider.app",
         executable / "sc-runtime",

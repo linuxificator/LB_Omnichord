@@ -2,12 +2,20 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 from pathlib import Path
+import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SC_ROOT = ROOT.parent / "supercollider"
+sys.path.insert(0, str(ROOT / "code"))
+sys.path.insert(0, str(ROOT / "packaging"))
+
+from sc_appimage_entry import packaged_runtime_root  # noqa: E402
 
 
 class SuperColliderPackageContractTests(unittest.TestCase):
@@ -106,6 +114,51 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertNotIn("ESP32P4.zip", text)
         self.assertIn("--exclude-module c_amy", builder)
         self.assertIn("--add-data \"$sc_dir:supercollider\"", builder)
+
+    def test_macos_frozen_entry_finds_runtime_in_contents_resources(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory) / "LB_Omnichord_SC.app"
+            executable = bundle / "Contents" / "MacOS" / "LB_Omnichord_SC"
+            runtime = (
+                bundle
+                / "Contents"
+                / "Resources"
+                / "sc-runtime"
+                / "SuperCollider.app"
+            )
+            executable.parent.mkdir(parents=True)
+            executable.touch()
+            for path in (
+                runtime / "Contents" / "MacOS" / "sclang",
+                runtime / "Contents" / "Resources" / "scsynth",
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            for path in (
+                runtime / "Contents" / "Resources" / "SCClassLibrary",
+                runtime / "Contents" / "Resources" / "plugins",
+            ):
+                path.mkdir(parents=True)
+
+            with (
+                patch("sc_appimage_entry.sys.executable", str(executable)),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                self.assertEqual(packaged_runtime_root(), runtime)
+
+    def test_raspberry_pi_sc_package_uses_host_cxx_runtime(self) -> None:
+        builder = (ROOT / "packaging" / "build_sc_appimage.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('if [[ "$platform_name" == "RaspberryPi-aarch64" ]]', builder)
+        self.assertIn(
+            '"$app_dir/usr/lib/LB_Omnichord/_internal/libstdc++.so.6"',
+            builder,
+        )
+        self.assertIn(
+            '"$app_dir/usr/lib/LB_Omnichord/sc-runtime/lib/libstdc++.so.6"',
+            builder,
+        )
 
     def test_global_bend_reaches_bus_voices_and_native_sclork_voices(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
