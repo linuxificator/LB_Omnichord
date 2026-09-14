@@ -18,7 +18,9 @@ if(~omniSampleBudgetBytes < 4294967296) {
     ("VSCO_SAMPLE_BUDGET_OVERFLOW_FAILED "
         ++ ~omniSampleBudgetBytes).postln;
 };
-if(~omniSampleFiles.size != 3168) {
+// The 262 SC-drum aliases intentionally keep trimmed buffers separate from
+// legacy/melodic VSCO buffers, so the legacy 3,168 identities remain intact.
+if(~omniSampleFiles.size != 3430) {
     failed = true;
     ("VSCO_FILE_COUNT_FAILED " ++ ~omniSampleFiles.size).postln;
 };

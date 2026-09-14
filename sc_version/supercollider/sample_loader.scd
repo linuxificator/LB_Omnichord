@@ -149,6 +149,9 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
 files.do { |record|
     ~omniSampleFiles[jsonAt.value(record, "id").asString] = record;
 };
+jsonAt.value(drumCatalog, "sample_files").do { |record|
+    ~omniSampleFiles[jsonAt.value(record, "id").asString] = record;
+};
 programs.do { |record|
     var programId = jsonAt.value(record, "id").asString;
     var defaultArticulation = jsonAt.value(
@@ -319,7 +322,9 @@ jsonAt.value(nativeDrumCatalog, "kits").do { |kit|
                     var relative = jsonAt.value(file, "relative_path").asString;
                     ~omniSampleBuffers[sampleId] = Buffer.read(
                         s,
-                        ~omniSampleRoot +/+ relative
+                        ~omniSampleRoot +/+ relative,
+                        startFrame: (jsonAt.value(file, "start_frame") ? 0).asInteger,
+                        numFrames: -1
                     );
                     ~omniSampleBufferBytes = ~omniSampleBufferBytes
                         + jsonAt.value(file, "decoded_bytes").asInteger;

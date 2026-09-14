@@ -80,18 +80,60 @@ def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _compact_kit_catalogue(data: Path) -> dict[str, Any]:
+def _compact_kit_catalogue(bundle: Path) -> dict[str, Any]:
+    data = bundle / "data"
     kits = _read(data / "pcm_drumkits.json")
     sample_sets = _read(data / "pcm_sample_sets.json")
+    measurements = _read(bundle / "evidence" / "sample_measurements.json")
+    measured = {str(row["sample_id"]): row for row in measurements["samples"]}
+    selected = {
+        str(sample_id)
+        for sample_set in sample_sets["sample_sets"]
+        for layer in sample_set["layers"]
+        for sample_id in layer["round_robin_sample_ids"]
+    }
+    if set(measured) != selected:
+        raise ValueError("PCM drum measurements do not match selected samples")
+
+    def alias(sample_id: object) -> str:
+        return f"sc-drum-{sample_id}"
+
     return {
         "schema_version": 1,
         "source_commit": kits["source_commit"],
         "sample_repository": sample_sets["repository"],
         "sample_commit": sample_sets["commit"],
+        "sample_files": [
+            {
+                "id": alias(sample_id),
+                "source_sample_id": sample_id,
+                "relative_path": row["relative_path"],
+                "sha256": row["sha256"],
+                "sample_rate": int(row["sample_rate"]),
+                "channels": int(row["channels"]),
+                "frames": int(row["frames"]) - int(row["suggested_start_frame"]),
+                "start_frame": int(row["suggested_start_frame"]),
+                "decoded_bytes": (
+                    int(row["frames"]) - int(row["suggested_start_frame"])
+                )
+                * int(row["channels"])
+                * 4,
+            }
+            for sample_id, row in sorted(measured.items())
+        ],
         "sample_sets": [
             {
                 "sample_set_id": item["sample_set_id"],
-                "layers": item["layers"],
+                "layers": [
+                    {
+                        **layer,
+                        "round_robin_sample_ids": [
+                            alias(sample_id)
+                            for sample_id in layer["round_robin_sample_ids"]
+                        ],
+                    }
+                    for layer in item["layers"]
+                ],
             }
             for item in sample_sets["sample_sets"]
         ],
@@ -402,7 +444,7 @@ def build(
     if missing:
         raise FileNotFoundError(f"music bundle is missing {', '.join(missing)}")
     outputs = {
-        "sc_pcm_drumkits_v1.json": _compact_kit_catalogue(data),
+        "sc_pcm_drumkits_v1.json": _compact_kit_catalogue(bundle),
         "sc_kit_grooves_v1.json": _compact_grooves(data),
         "omnichord_bass_riffs_v2.json": _compact_bass(data),
         "sc_bass_contexts_v1.json": _compact_bass_contexts(data),
@@ -424,6 +466,11 @@ def build(
         "schema_version": 1,
         "source_bundle": "LB_SC_Music_Expansion",
         "sources": {name: _digest(data / name) for name in source_names},
+        "evidence_sources": {
+            "sample_measurements.json": _digest(
+                bundle / "evidence" / "sample_measurements.json"
+            )
+        },
         "outputs": {name: _digest(destination / name) for name in sorted(outputs)},
         "preset_outputs": preset_outputs,
     }

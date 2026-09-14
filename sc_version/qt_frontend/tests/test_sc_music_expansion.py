@@ -153,7 +153,13 @@ class ScMusicExpansionTests(unittest.TestCase):
             )["files"]
         }
         self.assertEqual(len(sample_ids), 262)
-        self.assertLessEqual(sample_ids, manifest_ids)
+        files = {row["id"]: row for row in kit_data["sample_files"]}
+        self.assertEqual(sample_ids, set(files))
+        self.assertLessEqual(
+            {row["source_sample_id"] for row in files.values()}, manifest_ids
+        )
+        self.assertTrue(all(row["start_frame"] >= 0 for row in files.values()))
+        self.assertTrue(any(row["start_frame"] > 0 for row in files.values()))
 
     def test_pcm_velocity_layers_are_complete_and_every_role_resolves(self) -> None:
         kit_data = json.loads(
