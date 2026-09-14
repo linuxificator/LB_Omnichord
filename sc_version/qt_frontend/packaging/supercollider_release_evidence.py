@@ -44,6 +44,7 @@ def create_release_evidence(
     release_stamp: str,
     source_commit: str,
     inputs: dict[str, Any],
+    inputs_root: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     created, release_tag = _release_instant(release_stamp)
     if re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
@@ -53,6 +54,16 @@ def create_release_evidence(
     supercollider = _object(inputs.get("supercollider"), "supercollider")
     sclork = _object(inputs.get("sclork_synths"), "sclork_synths")
     assets = _object(inputs.get("sample_assets"), "sample_assets")
+    asset_evidence = dict(assets)
+    if inputs_root is not None:
+        for field in ("manifest", "source_catalog"):
+            relative = asset_evidence.get(field)
+            if not isinstance(relative, str) or not relative:
+                raise ValueError(f"sample_assets.{field} must name an evidence file")
+            evidence_path = (inputs_root / relative).resolve()
+            if not evidence_path.is_file():
+                raise ValueError(f"sample asset evidence is missing: {evidence_path}")
+            asset_evidence[f"{field}_sha256"] = _digest(evidence_path)
     if supercollider.get("version") != "3.14.1":
         raise ValueError("SC release evidence requires pinned version 3.14.1")
     if int(sclork.get("definition_count", -1)) != 109:
@@ -78,7 +89,7 @@ def create_release_evidence(
             "supercollider": supercollider,
             "sclork_synths": sclork,
         },
-        "external_sample_assets": assets,
+        "external_sample_assets": asset_evidence,
     }
     app_id = "SPDXRef-Package-LB-Omnichord-SC-linux-x86-64"
     sc_id = "SPDXRef-Package-SuperCollider-3.14.1"
@@ -202,6 +213,7 @@ def main() -> int:
         release_stamp=args.release_stamp,
         source_commit=args.source_commit,
         inputs=inputs,
+        inputs_root=args.inputs.parent,
     )
     _write(args.manifest, manifest)
     _write(args.spdx, sbom)

@@ -30,6 +30,7 @@ class SuperColliderReleaseEvidenceTests(unittest.TestCase):
                 release_stamp="R20260914123456",
                 source_commit="a" * 40,
                 inputs=inputs,
+                inputs_root=PACKAGING,
             )
 
         digest = hashlib.sha256(b"tested-package").hexdigest()
@@ -37,6 +38,13 @@ class SuperColliderReleaseEvidenceTests(unittest.TestCase):
         self.assertEqual(manifest["release_tag"], "R20260914T123456-SC")
         self.assertEqual(manifest["package"]["sha256"], digest)
         self.assertFalse(manifest["external_sample_assets"]["bundled"])
+        self.assertEqual(
+            len(manifest["external_sample_assets"]["manifest_sha256"]), 64
+        )
+        self.assertEqual(
+            len(manifest["external_sample_assets"]["source_catalog_sha256"]),
+            64,
+        )
         self.assertEqual(sbom["spdxVersion"], "SPDX-2.3")
         self.assertEqual(len(sbom["documentDescribes"]), 1)
         app = next(

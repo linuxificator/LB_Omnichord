@@ -168,7 +168,11 @@ def check_declared_third_party_imports(frontend: Path, manifest_path: Path) -> N
         for path in frontend.rglob("*.py")
         if not {"build", "dist", "deployment", ".venv"}.intersection(path.parts)
     )
-    first_party = {path.stem for path in python_files}
+    first_party = {
+        path.stem
+        for path in frontend.parent.rglob("*.py")
+        if not {"build", "dist", "deployment", ".venv"}.intersection(path.parts)
+    }
     imported = set().union(*(imported_roots(parse_python(path)) for path in python_files))
     actual = imported - sys.stdlib_module_names - first_party
     if actual != declared:

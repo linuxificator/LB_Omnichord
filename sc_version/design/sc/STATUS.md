@@ -35,6 +35,10 @@ Target currently exercised: Linux x86_64
   Linux x86_64 AppImage. Publication requires an explicit `release=true`
   manual dispatch and uses an independent `-SC` release tag. Its artifact
   carries a checksum, exact release manifest and SPDX 2.3 evidence.
+- The bounded sample-source catalogue records all eleven pinned Git banks and
+  the separate Iowa discovery authority. The local inventory tool rejects LFS
+  placeholders and produces per-file asset locks; see
+  [`SAMPLE_BANKS.md`](SAMPLE_BANKS.md).
 
 ## Not yet complete
 

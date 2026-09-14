@@ -85,6 +85,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
     "sc-banks": (
         SC_ROOT / "tests" / "sample_loader_test.scd",
         TESTS / "test_sfz_manifest_compiler.py",
+        TESTS / "test_sample_bank_sources.py",
         TESTS / "test_vsco_manifest.py",
         TESTS / "test_supercollider_drums.py",
     ),
