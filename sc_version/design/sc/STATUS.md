@@ -69,6 +69,13 @@ Target currently exercised: Linux x86_64
   one language-interpreter turn. Concurrent program changes share pending
   buffers, cannot admit the same decoded bytes twice and cannot evict a buffer
   protected by the program currently being prepared.
+- Direct MIDI sample attacks arriving during asynchronous preparation are held
+  at the typed client boundary and emitted only after the engine reports the
+  exact program revision ready. A matching early note-off cancels the deferred
+  attack, preventing both dropped first notes and late ghost notes.
+- Reconfiguring a MIDI row releases its voices first and then releases its
+  superseded program revision, so the sample cache can reclaim recordings
+  without affecting another row's owner-scoped program state.
 - Deterministic non-realtime tests render the production mono and stereo
   sample SynthDefs from synthetic fixtures, including gated release, without
   taking over the workstation's live audio session.

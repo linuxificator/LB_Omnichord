@@ -109,6 +109,9 @@ class _Client:
     def release_owner(self, owner: str) -> None:
         self.events.append(("release_owner", owner))
 
+    def release_program(self, program_id: str, revision: int) -> None:
+        self.events.append(("release_program", (program_id, revision)))
+
     def gesture_note(self, **event: object) -> None:
         self.events.append(("gesture_note", event))
 
@@ -854,6 +857,22 @@ class MidiEngineTests(unittest.TestCase):
                 ),
                 ("room_send", (4, 1.0)),
             ],
+        )
+
+    def test_reconfiguring_row_releases_superseded_program_revision(self) -> None:
+        client = _Client()
+        engine = MidiEngine(client)
+        engine.configure_row(0, "dx7_215", {}, 0.28)
+        client.events.clear()
+
+        engine.configure_row(0, "dx7_216", {}, 0.28)
+
+        self.assertIn(("release_owner", "midi/row/0"), client.events)
+        self.assertIn(("release_owner", "midi/preview/0"), client.events)
+        self.assertIn(("release_program", ("dx7_215", 2)), client.events)
+        self.assertIn(
+            ("configure", ("midi/row/0", "dx7_216", 3, 4, {})),
+            client.events,
         )
 
     def test_master_volume_is_scoped_to_all_midi_buses(self) -> None:

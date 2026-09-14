@@ -187,6 +187,10 @@ class MidiEngine:
     ) -> None:
         bus = self.row_buses[row]
         self.silence_row(row)
+        previous_program = self._programs[row]
+        previous_revision = self._program_revisions[row]
+        if previous_revision > 0:
+            self.client.release_program(previous_program, previous_revision)
         self._programs[row] = str(key)
         self._program_revisions[row] = self.client.allocate_program_revision()
         self.client.configure_part(

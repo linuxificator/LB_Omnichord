@@ -104,6 +104,9 @@ class SuperColliderClient:
             tuple[str, int], tuple[str, dict[str, float]]
         ] = {}
         self._program_errors: dict[str, str] = {}
+        self._sample_state_lock = threading.Lock()
+        self._sample_program_status: dict[tuple[str, int], str] = {}
+        self._deferred_sample_notes: dict[str, NoteOn] = {}
         self._role_levels = {
             "chord": 0.5,
             "strum": 0.5,
@@ -172,6 +175,22 @@ class SuperColliderClient:
         revision = int(arguments[2])
         status = str(arguments[3])
         detail = str(arguments[4])
+        program_key = (program_id, revision)
+        deferred: list[NoteOn] = []
+        with self._sample_state_lock:
+            self._sample_program_status[program_key] = status
+            if status == "ready":
+                for handle, event in tuple(self._deferred_sample_notes.items()):
+                    if (event.program_id, event.program_revision) == program_key:
+                        pending_event = self._deferred_sample_notes.pop(handle, None)
+                        if pending_event is not None:
+                            deferred.append(pending_event)
+            elif status == "error":
+                for handle, event in tuple(self._deferred_sample_notes.items()):
+                    if (event.program_id, event.program_revision) == program_key:
+                        self._deferred_sample_notes.pop(handle, None)
+        for event in deferred:
+            self._send_note_on(event)
         pending = self._pending_programs.get((program_id, revision))
         if pending is None:
             return
@@ -187,6 +206,12 @@ class SuperColliderClient:
         self._activate_program(role, program_id, revision, parameters)
 
     def _release_program(self, program_id: str, revision: int) -> None:
+        program_key = (str(program_id), int(revision))
+        with self._sample_state_lock:
+            self._sample_program_status.pop(program_key, None)
+            for handle, event in tuple(self._deferred_sample_notes.items()):
+                if (event.program_id, event.program_revision) == program_key:
+                    self._deferred_sample_notes.pop(handle, None)
         self._send_raw(
             "/omni/v1/program/release",
             [
@@ -196,6 +221,11 @@ class SuperColliderClient:
                 int(revision),
             ],
         )
+
+    def release_program(self, program_id: str, revision: int) -> None:
+        """Release a superseded revision after its part has released voices."""
+
+        self._release_program(program_id, revision)
 
     def _await_ready(self) -> None:
         deadline = time.monotonic() + self.runtime_config.language.startup_timeout_seconds
@@ -336,7 +366,7 @@ class SuperColliderClient:
             raise ValueError("note must be finite")
         return float(440.0 * (2.0 ** ((value - 69.0) / 12.0)))
 
-    def note_on(self, event: NoteOn) -> None:
+    def _send_note_on(self, event: NoteOn) -> None:
         self._send_raw(
             "/omni/v1/note/on",
             [
@@ -353,7 +383,21 @@ class SuperColliderClient:
             ],
         )
 
+    def note_on(self, event: NoteOn) -> None:
+        if event.program_id.startswith("sample."):
+            with self._sample_state_lock:
+                status = self._sample_program_status.get(
+                    (event.program_id, event.program_revision)
+                )
+                if status != "ready":
+                    self._deferred_sample_notes[event.handle] = event
+                    return
+        self._send_note_on(event)
+
     def note_off(self, event: NoteOff) -> None:
+        with self._sample_state_lock:
+            if self._deferred_sample_notes.pop(event.handle, None) is not None:
+                return
         self._send_raw(
             "/omni/v1/note/off",
             [
@@ -391,6 +435,11 @@ class SuperColliderClient:
         logical_bus: int,
         parameters: Mapping[str, float],
     ) -> None:
+        if program_id.startswith("sample."):
+            with self._sample_state_lock:
+                self._sample_program_status.setdefault(
+                    (str(program_id), int(revision)), "loading"
+                )
         self._send_raw(
             "/omni/v1/program/prepare",
             [
@@ -581,14 +630,14 @@ class SuperColliderClient:
     ) -> None:
         previous_program = self._selected_program[role]
         previous_revision = self._program_revision[role]
-        self._selected_program[role] = program_id
-        self._program_revision[role] = revision
-        self._program_params[role] = dict(parameters)
-        self._program_errors.pop(role, None)
         if previous_program.startswith("sample.") and (
             previous_program != program_id or previous_revision != revision
         ):
             self._release_program(previous_program, previous_revision)
+        self._selected_program[role] = program_id
+        self._program_revision[role] = revision
+        self._program_params[role] = dict(parameters)
+        self._program_errors.pop(role, None)
         if role == "bass":
             self._publish_bass_lane()
         elif role == "chord":

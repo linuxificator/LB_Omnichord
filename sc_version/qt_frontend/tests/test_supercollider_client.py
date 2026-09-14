@@ -346,6 +346,66 @@ class SuperColliderClientTests(unittest.TestCase):
         self.assertEqual(client._selected_program["strum"], program)
         client.close()
 
+    def test_direct_sample_note_waits_for_ready_and_obeys_early_note_off(self) -> None:
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+        program = "sample.vsco.marimba"
+        revision = client.allocate_program_revision()
+        client.configure_part("midi/row/0", program, revision, 4, {})
+        first = NoteOn(
+            owner="midi/row/0",
+            handle="midi/row/0/60",
+            program_id=program,
+            program_revision=revision,
+            logical_key=60,
+            frequency_hz=261.625565,
+            velocity=0.7,
+            logical_bus=4,
+        )
+        client.note_on(first)
+        self.assertFalse(
+            any(address == "/omni/v1/note/on" for address, _ in self.fake.messages)
+        )
+        client.note_off(NoteOff(first.owner, first.handle))
+
+        second = NoteOn(
+            owner="midi/row/0",
+            handle="midi/row/0/64",
+            program_id=program,
+            program_revision=revision,
+            logical_key=64,
+            frequency_hz=329.627557,
+            velocity=0.7,
+            logical_bus=4,
+        )
+        client.note_on(second)
+        sender = SimpleUDPClient("127.0.0.1", client.reply_port)
+        try:
+            sender.send_message(
+                "/omni/v1/program/status",
+                [client.session, program, revision, "ready", "ready"],
+            )
+        finally:
+            sender._sock.close()
+        deadline = time.monotonic() + 1.0
+        while not any(
+            address == "/omni/v1/note/on" for address, _ in self.fake.messages
+        ) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        note_ons = [
+            arguments
+            for address, arguments in self.fake.messages
+            if address == "/omni/v1/note/on"
+        ]
+        self.assertEqual(len(note_ons), 1)
+        self.assertEqual(note_ons[0][3], second.handle)
+        client.close()
+
     def test_superseded_and_replaced_sample_revisions_are_released(self) -> None:
         client = SuperColliderClient(
             config=None,
