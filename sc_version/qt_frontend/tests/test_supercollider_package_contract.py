@@ -83,8 +83,38 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(config["config_revision"], 3)
+        self.assertEqual(config["config_revision"], 4)
         self.assertEqual(config["protocol_version"], 2)
+        self.assertEqual(
+            config["samples"]["commit"],
+            "440300901dfe9275fd84e0b7763af1f8443ae62e",
+        )
+        release_inputs = json.loads(
+            (ROOT / "packaging" / "supercollider_release_inputs.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        drum_catalogue = json.loads(
+            (ROOT / "music" / "sc_expansion" / "sc_pcm_drumkits_v1.json")
+            .read_text(encoding="utf-8")
+        )
+        repositories = {
+            config["samples"]["repository"],
+            release_inputs["sample_assets"]["repository"],
+            drum_catalogue["sample_repository"],
+        }
+        self.assertEqual(
+            {str(value).removesuffix(".git") for value in repositories},
+            {"https://github.com/linuxificator/VSCO-2-CE"},
+        )
+        self.assertEqual(
+            {
+                config["samples"]["commit"],
+                release_inputs["sample_assets"]["commit"],
+                drum_catalogue["sample_commit"],
+            },
+            {"440300901dfe9275fd84e0b7763af1f8443ae62e"},
+        )
 
     def test_frozen_entry_uses_sc_supervision_and_contains_no_amy_service(self) -> None:
         entry = (ROOT / "packaging" / "sc_appimage_entry.py").read_text(

@@ -65,11 +65,13 @@ def verify_config_migrations(root: Path) -> None:
     shipped_path = root / "config" / "supercollider.json"
     shipped = json.loads(shipped_path.read_text(encoding="utf-8"))
     expected_buffers = shipped["server"]["max_buffers"]
-    for revision in (1, 2, 3):
+    for revision in (1, 2, 3, 4):
         legacy = json.loads(json.dumps(shipped))
         legacy["config_revision"] = revision
         if revision < 3:
             legacy["protocol_version"] = 1
+        if revision < 4:
+            legacy["samples"].pop("commit")
         if revision < 2:
             legacy["server"].pop("max_buffers")
         if revision == 1:
@@ -89,7 +91,9 @@ def verify_config_migrations(root: Path) -> None:
             if (
                 persisted["config_revision"] != shipped["config_revision"]
                 or persisted["protocol_version"] != shipped["protocol_version"]
+                or persisted["samples"]["commit"] != shipped["samples"]["commit"]
                 or persisted["server"]["max_buffers"] != expected_buffers
+                or migrated.samples.commit != shipped["samples"]["commit"]
                 or migrated.protocol_version != shipped["protocol_version"]
                 or migrated.server.max_buffers != expected_buffers
             ):

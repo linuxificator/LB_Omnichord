@@ -16,6 +16,7 @@ sys.path.insert(0, str(FRONTEND / "code"))
 
 from sample_repository import (  # noqa: E402
     DEFAULT_REPOSITORY,
+    DEFAULT_SAMPLE_COMMIT,
     SampleRepositoryError,
     ensure_sample_repository,
     prepare_user_runtime_config,
@@ -28,6 +29,18 @@ def make_clone(path: Path, origin: str = DEFAULT_REPOSITORY) -> None:
     config = Repo(str(path)).get_config()
     config.set((b"remote", b"origin"), b"url", origin.encode())
     config.write_to_path()
+
+
+def commit_clone(path: Path) -> str:
+    marker = path / "fixture.wav"
+    marker.write_bytes(b"sample")
+    porcelain.add(str(path), paths=[marker.name])
+    return porcelain.commit(
+        str(path),
+        message=b"fixture",
+        author=b"Test <test@example.com>",
+        committer=b"Test <test@example.com>",
+    ).decode("ascii")
 
 
 class SampleRepositoryTests(unittest.TestCase):
@@ -45,16 +58,25 @@ class SampleRepositoryTests(unittest.TestCase):
             make_clone(root / "https")
             make_clone(root / "ssh", "git@github.com:linuxificator/VSCO-2-CE.git")
             make_clone(root / "wrong", "https://github.com/sgossner/VSCO-2-CE.git")
+            https_commit = commit_clone(root / "https")
+            ssh_commit = commit_clone(root / "ssh")
+            commit_clone(root / "wrong")
             self.assertEqual(
-                validate_sample_repository(root / "https", DEFAULT_REPOSITORY),
+                validate_sample_repository(
+                    root / "https", DEFAULT_REPOSITORY, https_commit
+                ),
                 (root / "https").resolve(),
             )
             self.assertEqual(
-                validate_sample_repository(root / "ssh", DEFAULT_REPOSITORY),
+                validate_sample_repository(root / "ssh", DEFAULT_REPOSITORY, ssh_commit),
                 (root / "ssh").resolve(),
             )
             with self.assertRaisesRegex(SampleRepositoryError, "wrong Git origin"):
                 validate_sample_repository(root / "wrong", DEFAULT_REPOSITORY)
+            with self.assertRaisesRegex(SampleRepositoryError, "wrong Git commit"):
+                validate_sample_repository(
+                    root / "https", DEFAULT_REPOSITORY, "0" * 40
+                )
 
     def test_missing_repository_is_cloned_to_final_path_atomically(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -63,10 +85,19 @@ class SampleRepositoryTests(unittest.TestCase):
             def fake_clone(url: str, target: str, **_arguments: object) -> None:
                 self.assertEqual(url, DEFAULT_REPOSITORY)
                 make_clone(Path(target), url)
-                (Path(target) / "fixture.wav").write_bytes(b"sample")
+                commit_clone(Path(target))
 
-            with patch("sample_repository.porcelain.clone", side_effect=fake_clone):
-                result = ensure_sample_repository(destination, DEFAULT_REPOSITORY)
+            with (
+                patch("sample_repository.porcelain.clone", side_effect=fake_clone),
+                patch("sample_repository.porcelain.reset"),
+                patch(
+                    "sample_repository.repository_commit",
+                    return_value=DEFAULT_SAMPLE_COMMIT,
+                ),
+            ):
+                result = ensure_sample_repository(
+                    destination, DEFAULT_REPOSITORY, DEFAULT_SAMPLE_COMMIT
+                )
             self.assertEqual(result, destination.resolve())
             self.assertEqual((destination / "fixture.wav").read_bytes(), b"sample")
             self.assertFalse(any(destination.parent.glob(".VSCO-2-CE.clone-*")))
@@ -78,6 +109,7 @@ class SampleRepositoryTests(unittest.TestCase):
         old = json.loads(json.dumps(shipped))
         old["config_revision"] = 1
         old["samples"].pop("repository")
+        old["samples"].pop("commit")
         old["server"].pop("max_buffers")
         old["samples"]["vsco_root"] = "~/sample_lib/VSCO-2-CE-1.1.0"
         with tempfile.TemporaryDirectory() as temporary:
@@ -94,8 +126,9 @@ class SampleRepositoryTests(unittest.TestCase):
                 install_samples=False,
             )
             persisted = json.loads(target.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 3)
+            self.assertEqual(persisted["config_revision"], 4)
             self.assertEqual(persisted["protocol_version"], 2)
+            self.assertEqual(persisted["samples"]["commit"], DEFAULT_SAMPLE_COMMIT)
             self.assertEqual(persisted["samples"]["vsco_root"], "~/VSCO-2-CE")
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
             self.assertEqual(config.samples.repository, DEFAULT_REPOSITORY)
@@ -110,6 +143,7 @@ class SampleRepositoryTests(unittest.TestCase):
         )
         data["config_revision"] = 1
         data["samples"].pop("repository")
+        data["samples"].pop("commit")
         data["server"].pop("max_buffers")
         data["samples"]["vsco_root"] = "/media/samples/VSCO-2-CE"
         with tempfile.TemporaryDirectory() as temporary:
@@ -140,6 +174,7 @@ class SampleRepositoryTests(unittest.TestCase):
         )
         data["config_revision"] = 2
         data["protocol_version"] = 1
+        data["samples"].pop("commit")
         data["server"].pop("max_buffers")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -161,8 +196,9 @@ class SampleRepositoryTests(unittest.TestCase):
             )
 
             persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 3)
+            self.assertEqual(persisted["config_revision"], 4)
             self.assertEqual(persisted["protocol_version"], 2)
+            self.assertEqual(persisted["samples"]["commit"], DEFAULT_SAMPLE_COMMIT)
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
             self.assertEqual(config.server.max_buffers, 8192)
 

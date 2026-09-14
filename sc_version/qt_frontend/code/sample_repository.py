@@ -21,6 +21,7 @@ from supercollider_config import (
 
 
 DEFAULT_REPOSITORY = "https://github.com/linuxificator/VSCO-2-CE.git"
+DEFAULT_SAMPLE_COMMIT = "440300901dfe9275fd84e0b7763af1f8443ae62e"
 DEFAULT_SAMPLE_ROOT = "~/VSCO-2-CE"
 LEGACY_SAMPLE_ROOT = "~/sample_lib/VSCO-2-CE-1.1.0"
 
@@ -60,7 +61,20 @@ def repository_origin(path: Path) -> str:
     return bytes(value).decode("utf-8", errors="strict")
 
 
-def validate_sample_repository(path: Path, expected_url: str) -> Path:
+def repository_commit(path: Path) -> str:
+    try:
+        return bytes(Repo(str(path)).head()).decode("ascii")
+    except (NotGitRepository, OSError, UnicodeDecodeError, ValueError) as exc:
+        raise SampleRepositoryError(
+            f"sample directory has no readable Git HEAD: {path}"
+        ) from exc
+
+
+def validate_sample_repository(
+    path: Path,
+    expected_url: str,
+    expected_commit: str = DEFAULT_SAMPLE_COMMIT,
+) -> Path:
     resolved = path.expanduser().resolve()
     actual_url = repository_origin(resolved)
     if _repository_identity(actual_url) != _repository_identity(expected_url):
@@ -68,13 +82,25 @@ def validate_sample_repository(path: Path, expected_url: str) -> Path:
             "configured sample directory has the wrong Git origin: "
             f"expected {expected_url}, found {actual_url} in {resolved}"
         )
+    actual_commit = repository_commit(resolved)
+    if actual_commit != str(expected_commit):
+        raise SampleRepositoryError(
+            "configured sample directory is at the wrong Git commit: "
+            f"expected {expected_commit}, found {actual_commit} in {resolved}"
+        )
     return resolved
 
 
-def ensure_sample_repository(path: Path, repository_url: str) -> Path:
+def ensure_sample_repository(
+    path: Path,
+    repository_url: str,
+    expected_commit: str = DEFAULT_SAMPLE_COMMIT,
+) -> Path:
     destination = path.expanduser().resolve()
     if destination.exists():
-        return validate_sample_repository(destination, repository_url)
+        return validate_sample_repository(
+            destination, repository_url, expected_commit
+        )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary_root = Path(
@@ -89,7 +115,8 @@ def ensure_sample_repository(path: Path, repository_url: str) -> Path:
     )
     try:
         porcelain.clone(repository_url, str(checkout), checkout=True)
-        validate_sample_repository(checkout, repository_url)
+        porcelain.reset(checkout, "hard", expected_commit)
+        validate_sample_repository(checkout, repository_url, expected_commit)
         checkout.replace(destination)
     except BaseException as exc:
         raise SampleRepositoryError(
@@ -104,6 +131,7 @@ def _migrate_config(
     data: object,
     *,
     default_max_buffers: int,
+    default_sample_commit: str,
 ) -> tuple[dict[str, object], bool]:
     if not isinstance(data, dict):
         raise SampleRepositoryError("SuperCollider config must contain an object")
@@ -136,6 +164,13 @@ def _migrate_config(
         server["max_buffers"] = default_max_buffers
         changed = True
 
+    samples = migrated.get("samples")
+    if not isinstance(samples, dict):
+        raise SampleRepositoryError("SuperCollider config samples object is missing")
+    if "commit" not in samples:
+        samples["commit"] = default_sample_commit
+        changed = True
+
     if revision < CURRENT_CONFIG_REVISION:
         migrated["protocol_version"] = 2
         migrated["config_revision"] = CURRENT_CONFIG_REVISION
@@ -163,12 +198,17 @@ def prepare_user_runtime_config(
     migrated, changed = _migrate_config(
         store.read(),
         default_max_buffers=shipped.server.max_buffers,
+        default_sample_commit=shipped.samples.commit,
     )
     if changed:
         store.write(migrated)
     config = load_supercollider_config(target)
     if install_samples:
-        ensure_sample_repository(config.samples.vsco_root, config.samples.repository)
+        ensure_sample_repository(
+            config.samples.vsco_root,
+            config.samples.repository,
+            config.samples.commit,
+        )
     return target, config
 
 

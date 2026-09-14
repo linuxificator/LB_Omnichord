@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 3
+CURRENT_CONFIG_REVISION = 4
 
 
 class SuperColliderConfigError(ValueError):
@@ -37,6 +37,7 @@ class SuperColliderServerConfig:
 class SuperColliderSampleConfig:
     vsco_root: Path
     repository: str
+    commit: str
     ram_budget_mib: int
 
 
@@ -164,6 +165,15 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
     repository = samples.get("repository")
     if not isinstance(repository, str) or not repository.strip():
         raise SuperColliderConfigError("$.samples.repository: expected URL string")
+    commit = samples.get("commit")
+    if (
+        not isinstance(commit, str)
+        or len(commit) != 40
+        or any(character not in "0123456789abcdef" for character in commit)
+    ):
+        raise SuperColliderConfigError(
+            "$.samples.commit: expected lowercase 40-character Git commit"
+        )
     ram_budget = _integer(samples, "ram_budget_mib", "$.samples")
     if not 64 <= ram_budget <= 1_048_576:
         raise SuperColliderConfigError(
@@ -190,6 +200,7 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
         samples=SuperColliderSampleConfig(
             vsco_root=Path(vsco_root).expanduser(),
             repository=repository,
+            commit=commit,
             ram_budget_mib=ram_budget,
         ),
     )
@@ -212,6 +223,7 @@ def _cli() -> int:
             "server.realtime_memory_kib",
             "samples.vsco_root",
             "samples.repository",
+            "samples.commit",
             "samples.ram_budget_mib",
         ),
     )

@@ -20,11 +20,15 @@ class SuperColliderConfigTests(unittest.TestCase):
         config = load_supercollider_config(
             FRONTEND_DIR / "config" / "supercollider.json"
         )
-        self.assertEqual(config.config_revision, 3)
+        self.assertEqual(config.config_revision, 4)
         self.assertEqual(config.protocol_version, 2)
         self.assertEqual(config.language.host, "127.0.0.1")
         self.assertEqual(config.server.sample_rate, 48000)
         self.assertEqual(config.server.max_buffers, 8192)
+        self.assertEqual(
+            config.samples.commit,
+            "440300901dfe9275fd84e0b7763af1f8443ae62e",
+        )
 
     def test_non_loopback_control_listener_is_rejected(self) -> None:
         source = FRONTEND_DIR / "config" / "supercollider.json"

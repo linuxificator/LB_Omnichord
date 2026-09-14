@@ -15,6 +15,7 @@
   "sample_assets": {
     "bundled": false,
     "repository": "https://github.com/linuxificator/VSCO-2-CE.git",
+    "commit": "440300901dfe9275fd84e0b7763af1f8443ae62e",
     "vsco_2_ce_license": "CC0-1.0",
     "manifest": "../../supercollider/vsco-manifest.json",
     "source_catalog": "../../supercollider/sample-bank-sources.json"

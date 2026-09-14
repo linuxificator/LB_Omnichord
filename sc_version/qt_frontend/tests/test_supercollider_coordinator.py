@@ -57,7 +57,7 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                 config_path.write_text(
                     json.dumps(
                         {
-                            "config_revision": 3,
+                            "config_revision": 4,
                             "protocol_version": 2,
                             "language": {
                                 "host": "127.0.0.1",
@@ -76,6 +76,7 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                             "samples": {
                                 "vsco_root": "/not-used",
                                 "repository": "https://github.com/linuxificator/VSCO-2-CE.git",
+                                "commit": "440300901dfe9275fd84e0b7763af1f8443ae62e",
                                 "ram_budget_mib": 4096,
                             },
                         }
