@@ -53,6 +53,10 @@ Target currently exercised: Linux x86_64
 - Sequential round-robin state advances only for admitted notes and is scoped
   by musical owner, program, key, articulation and velocity layer. OMNI drums
   and a MIDI row therefore cannot disturb each other's sample sequence.
+- Sample-program admission publishes and accounts asynchronous buffer reads in
+  one language-interpreter turn. Concurrent program changes share pending
+  buffers, cannot admit the same decoded bytes twice and cannot evict a buffer
+  protected by the program currently being prepared.
 - Deterministic non-realtime tests render the production mono and stereo
   sample SynthDefs from synthetic fixtures, including gated release, without
   taking over the workstation's live audio session.

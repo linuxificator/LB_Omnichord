@@ -41,7 +41,7 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
     ~omniSampleLastUsed[sampleId.asString] = ~omniSampleUseOrdinal;
 };
 
-~omniEvictSampleBytes = { |incomingBytes|
+~omniEvictSampleBytes = { |incomingBytes, protectedSampleIds|
     var needed = (
         ~omniSampleBufferBytes + incomingBytes - ~omniSampleBudgetBytes
     ).max(0);
@@ -52,6 +52,10 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
         candidates = ~omniSampleBuffers.keys.select { |sampleId|
             ((~omniSampleProgramRefs[sampleId] ? 0) <= 0) and: {
                 (~omniSampleVoiceRefs[sampleId] ? 0) <= 0
+            } and: {
+                protectedSampleIds.isNil or: {
+                    protectedSampleIds.includes(sampleId).not
+                }
             }
         }.asArray.sort { |left, right|
             (~omniSampleLastUsed[left] ? 0) < (~omniSampleLastUsed[right] ? 0)
@@ -172,7 +176,10 @@ regions.do { |record|
                 }
                 .collect { |region| jsonAt.value(region, "sample_id").asString }
                 .asSet.asArray;
-            var newBytes = sampleIds.sum { |sampleId|
+            var newSampleIds = sampleIds.select { |sampleId|
+                ~omniSampleBuffers[sampleId].isNil
+            };
+            var newBytes = newSampleIds.sum { |sampleId|
                 if(~omniSampleBuffers[sampleId].isNil) {
                     jsonAt.value(~omniSampleFiles[sampleId], "decoded_bytes").asInteger
                 } { 0 }
@@ -194,7 +201,7 @@ regions.do { |record|
                     "sample-file-missing"
                 );
             } {
-            if(~omniEvictSampleBytes.value(newBytes).not) {
+            if(~omniEvictSampleBytes.value(newBytes, sampleIds.asSet).not) {
                 ~omniSampleStates[stateKey] = (
                     status: \error,
                     detail: "program-combination-exceeds-memory-profile"
@@ -218,19 +225,23 @@ regions.do { |record|
                         (~omniSampleProgramRefs[sampleId] ? 0) + 1;
                     ~omniTouchSample.value(sampleId);
                 };
+                // Buffer.read returns a buffer identity immediately and does
+                // the file I/O asynchronously in scsynth.  Publish and account
+                // those identities in this interpreter turn, before yielding
+                // to AppClock.  A concurrent prepare can then share them and
+                // cannot independently admit the same bytes or overrun the
+                // configured budget.
+                newSampleIds.do { |sampleId|
+                    var file = ~omniSampleFiles[sampleId];
+                    var relative = jsonAt.value(file, "relative_path").asString;
+                    ~omniSampleBuffers[sampleId] = Buffer.read(
+                        s,
+                        ~omniSampleRoot +/+ relative
+                    );
+                    ~omniSampleBufferBytes = ~omniSampleBufferBytes
+                        + jsonAt.value(file, "decoded_bytes").asInteger;
+                };
                 Routine({
-                    sampleIds.do { |sampleId|
-                        if(~omniSampleBuffers[sampleId].isNil) {
-                            var file = ~omniSampleFiles[sampleId];
-                            var relative = jsonAt.value(file, "relative_path").asString;
-                            ~omniSampleBuffers[sampleId] = Buffer.read(
-                                s,
-                                ~omniSampleRoot +/+ relative
-                            );
-                            ~omniSampleBufferBytes = ~omniSampleBufferBytes
-                                + jsonAt.value(file, "decoded_bytes").asInteger;
-                        };
-                    };
                     s.sync;
                     if(state[\cancelled]) {
                         sampleIds.do { |sampleId|

@@ -97,6 +97,34 @@ if(~omniEvictSampleBytes.value(0).not) {
     failed = true;
     "VSCO_ZERO_PRESSURE_EVICTION_FAILED".postln;
 };
+// Admission must not evict a buffer required by the program currently being
+// prepared.  This is also the guard that makes shared-buffer preparation
+// atomic before asynchronous scsynth reads complete.
+{
+    var savedBuffers = ~omniSampleBuffers;
+    var savedBytes = ~omniSampleBufferBytes;
+    var savedBudget = ~omniSampleBudgetBytes;
+    var savedProgramRefs = ~omniSampleProgramRefs;
+    var savedVoiceRefs = ~omniSampleVoiceRefs;
+    ~omniSampleBuffers = Dictionary["protected" -> Object.new];
+    ~omniSampleBufferBytes = 80;
+    ~omniSampleBudgetBytes = 100;
+    ~omniSampleProgramRefs = Dictionary.new;
+    ~omniSampleVoiceRefs = Dictionary.new;
+    if(~omniEvictSampleBytes.value(30, Set["protected"])) {
+        failed = true;
+        "VSCO_PROTECTED_ADMISSION_FAILED".postln;
+    };
+    if(~omniSampleBuffers["protected"].isNil) {
+        failed = true;
+        "VSCO_PROTECTED_BUFFER_EVICTED".postln;
+    };
+    ~omniSampleBuffers = savedBuffers;
+    ~omniSampleBufferBytes = savedBytes;
+    ~omniSampleBudgetBytes = savedBudget;
+    ~omniSampleProgramRefs = savedProgramRefs;
+    ~omniSampleVoiceRefs = savedVoiceRefs;
+}.value;
 if(failed) { 1.exit } {
     "VSCO_SAMPLE_LOADER_TEST_OK".postln;
     0.exit
