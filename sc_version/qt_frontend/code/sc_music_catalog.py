@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 from types import MappingProxyType
+from typing import Any, cast
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,11 +102,16 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
     ppq = _require_int(raw.get("ppq"), "ppq")
     if ppq != 96:
         raise ValueError("SC kit-groove catalogue must use 96 PPQ")
-    roles = raw.get("roles")
-    slots = raw.get("slots")
-    sequences = raw.get("event_sequences")
-    if not all(isinstance(value, list) for value in (roles, slots, sequences)):
+    roles_raw = raw.get("roles")
+    slots_raw = raw.get("slots")
+    sequences_raw = raw.get("event_sequences")
+    if not all(
+        isinstance(value, list) for value in (roles_raw, slots_raw, sequences_raw)
+    ):
         raise ValueError("SC kit-groove dictionaries must be arrays")
+    roles = cast(list[Any], roles_raw)
+    slots = cast(list[Any], slots_raw)
+    sequences = cast(list[Any], sequences_raw)
 
     decoded: list[tuple[ScDrumEvent, ...]] = []
     for sequence_index, sequence in enumerate(sequences):
@@ -119,6 +125,10 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
             tick, role_index, velocity, slot_index = map(int, atom)
             if tick < previous or tick < 0:
                 raise ValueError(f"event sequence {sequence_index} is not ordered")
+            if tick % 2:
+                raise ValueError(
+                    f"event sequence {sequence_index} cannot convert exactly to 48 PPQ"
+                )
             if not 1 <= velocity <= 127:
                 raise ValueError(f"event sequence {sequence_index} has invalid velocity")
             try:
@@ -147,10 +157,10 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
         if len(levels) != 5:
             raise ValueError("SC arrangement must have five activity levels")
         period = _require_int(row.get("period_ticks"), "arrangement period_ticks")
-        if period <= 0 or any(
+        if period <= 0 or period % 2 or any(
             event.tick >= period for level in levels for event in level
         ):
-            raise ValueError("SC arrangement event falls outside its period")
+            raise ValueError("SC arrangement has an invalid 96 PPQ period or event")
         arrangements.append(
             ScDrumArrangement(
                 str(row["kit_id"]),
@@ -165,14 +175,20 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
     for row in raw.get("fills", ()):
         if not isinstance(row, dict):
             raise ValueError("SC fill must be an object")
-        events = event_sequence(row.get("sequence"))
+        fill_events = event_sequence(row.get("sequence"))
         duration = _require_int(row.get("duration_ticks"), "fill duration_ticks")
         starts = tuple(int(value) for value in row.get("allowed_start_beats", ()))
         level = _require_int(row.get("slot_level"), "fill slot_level")
         gain = float(row.get("gain", 0.0))
-        if duration <= 0 or not starts or not 1 <= level <= 5 or gain <= 0:
+        if (
+            duration <= 0
+            or duration % 2
+            or not starts
+            or not 1 <= level <= 5
+            or gain <= 0
+        ):
             raise ValueError(f"invalid fill {row.get('variant_id')!r}")
-        if any(event.tick >= duration for event in events):
+        if any(event.tick >= duration for event in fill_events):
             raise ValueError(f"fill {row.get('variant_id')!r} event is out of range")
         continuation = frozenset(
             f"{str(value[0])}/{str(value[1])}"
@@ -188,7 +204,7 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
                 level,
                 duration,
                 starts,
-                events,
+                fill_events,
                 gain,
                 continuation,
             )

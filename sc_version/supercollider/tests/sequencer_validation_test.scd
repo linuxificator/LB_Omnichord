@@ -37,7 +37,8 @@ if(~omniEventValidationError.value(
     Error("out-of-range note bus was accepted").throw;
 };
 if(~omniEventValidationError.value(
-    "drumHit", ["low_primary/kick", "program", 1, "kick", 36, 0.8, 0]
+    "drumHit", ["rhythm/drums", "low_primary/kick", "program", 1,
+        "kick", 36, 0.8, 0]
 ).notNil) {
     Error("valid drum payload was rejected").throw;
 };

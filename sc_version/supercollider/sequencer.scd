@@ -27,7 +27,7 @@
         "noteOn" -> 11,
         "noteOff" -> 2,
         "voiceSet" -> 3,
-        "drumHit" -> 7
+        "drumHit" -> 8
     ];
     var count = expected[action];
     var error = nil;
@@ -78,17 +78,17 @@
         if(atoms[2].isNumber.not) { error = "invalid-voice-value" };
     };
     if(error.isNil and: { action == "drumHit" }) {
-        if(atoms[2].isNumber.not or: { atoms[2].asInteger <= 0 }) {
+        if(atoms[3].isNumber.not or: { atoms[3].asInteger <= 0 }) {
             error = "invalid-drum-program-revision";
         };
-        if(atoms[4].isNumber.not or: {
-            atoms[4].asInteger < 0 or: { atoms[4].asInteger > 127 }
-        }) { error = "invalid-drum-key" };
         if(atoms[5].isNumber.not or: {
-            atoms[5].asFloat < 0 or: { atoms[5].asFloat > 1 }
-        }) { error = "invalid-drum-velocity" };
+            atoms[5].asInteger < 0 or: { atoms[5].asInteger > 127 }
+        }) { error = "invalid-drum-key" };
         if(atoms[6].isNumber.not or: {
-            atoms[6].asInteger < 0 or: { atoms[6].asInteger > 10 }
+            atoms[6].asFloat < 0 or: { atoms[6].asFloat > 1 }
+        }) { error = "invalid-drum-velocity" };
+        if(atoms[7].isNumber.not or: {
+            atoms[7].asInteger < 0 or: { atoms[7].asInteger > 10 }
         }) { error = "invalid-logical-bus" };
     };
     error
@@ -341,12 +341,12 @@
     };
     if(action == "drumHit") {
         suppressed = execution[\root] and: {
-            ~omniGateActive.value(atoms[0], "drumHit", logicalTick)
+            ~omniGateActive.value(atoms[1], "drumHit", logicalTick)
         };
         if(suppressed.not) {
             ~omniSpawnDrum.value(
                 atoms[0], atoms[1], atoms[2], atoms[3], atoms[4],
-                atoms[5], atoms[6]
+                atoms[5], atoms[6], atoms[7]
             );
         };
     };

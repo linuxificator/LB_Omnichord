@@ -148,7 +148,8 @@ class SuperColliderClient:
 
         try:
             self._await_ready()
-            self._drum_program_status[kit_by_id(DEFAULT_DRUM_KIT_ID).program_id] = "ready"
+            for program in kit_by_id(DEFAULT_DRUM_KIT_ID).sample_programs:
+                self._drum_program_status[program] = "ready"
         except BaseException:
             self._close_reply_server()
             raise
@@ -205,7 +206,7 @@ class SuperColliderClient:
                 for handle, event in tuple(self._deferred_sample_notes.items()):
                     if (event.program_id, event.program_revision) == program_key:
                         self._deferred_sample_notes.pop(handle, None)
-            if any(kit.program_id == program_id for kit in DRUM_KITS):
+            if any(program_id in kit.sample_programs for kit in DRUM_KITS):
                 self._drum_program_status[program_id] = status
                 if status == "ready":
                     deferred_drums = [
@@ -226,7 +227,7 @@ class SuperColliderClient:
             selected_kit = kit_by_id(
                 str(self.rhythm_config.get("drum_kit", self._drum_kit))
             )
-            if selected_kit.program_id == program_id:
+            if program_id in selected_kit.sample_programs:
                 self._publish_drum_lane()
         pending = self._pending_programs.get((program_id, revision))
         if pending is None:
@@ -645,26 +646,34 @@ class SuperColliderClient:
         )
 
     def _drum_program_ready(self, program: str) -> bool:
+        if not str(program).startswith("sample."):
+            return True
         with self._sample_state_lock:
             return self._drum_program_status.get(str(program)) == "ready"
 
     def _ensure_drum_kit(self, kit_id: str, logical_bus: int) -> bool:
-        program = kit_by_id(kit_id).program_id
-        with self._sample_state_lock:
-            if self._drum_program_status.get(program) == "ready":
-                return True
-            if program in self._requested_drum_programs:
-                return False
-            self._requested_drum_programs.add(program)
-            self._drum_program_status[program] = "loading"
-        self.configure_part(
-            f"drum-kit/{kit_id}",
-            program,
-            1,
-            int(logical_bus),
-            {},
-        )
-        return False
+        programs = kit_by_id(kit_id).sample_programs
+        if not programs:
+            return True
+        all_ready = True
+        for program in programs:
+            should_prepare = False
+            with self._sample_state_lock:
+                if self._drum_program_status.get(program) != "ready":
+                    all_ready = False
+                    if program not in self._requested_drum_programs:
+                        self._requested_drum_programs.add(program)
+                        self._drum_program_status[program] = "loading"
+                        should_prepare = True
+            if should_prepare:
+                self.configure_part(
+                    f"drum-kit/{kit_id}",
+                    program,
+                    1,
+                    int(logical_bus),
+                    {},
+                )
+        return all_ready
 
     def _role_bus(self, role: str) -> int:
         return int(dict(self.resolved_config.layout.role_buses)[role])

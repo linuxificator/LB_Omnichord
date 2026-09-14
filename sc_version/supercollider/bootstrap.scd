@@ -516,11 +516,71 @@ s.waitForBoot({
     };
 
     ~omniSpawnDrum = {
-        |role, requestedProgram, revision, padId, note, velocity, logicalBus|
+        |owner, role, requestedProgram, revision, padId, note, velocity,
+         logicalBus|
+        var nativePad = ~omniNativeDrumPads[padId.asString];
         ~omniDrumOrdinal = ~omniDrumOrdinal + 1;
+        if(nativePad.notNil) {
+            var valueAt = { |object, key|
+                object[key.asString] ? object[key.asSymbol]
+            };
+            var nativeProgram = valueAt.value(nativePad, "program_id").asString;
+            var nativeNote = valueAt.value(nativePad, "logical_note").asInteger;
+            var controls = valueAt.value(nativePad, "controls");
+            var chokeValue = valueAt.value(nativePad, "choke_group");
+            var chokeKey = if(chokeValue.isNil) { nil } {
+                owner.asString ++ "/" ++ padId.asString.split($/)[0]
+                    ++ "/" ++ chokeValue.asString
+            };
+            var handle = owner.asString ++ "/drum/" ++ ~omniDrumOrdinal;
+            var extraArgs = List.new;
+            var nativeVelocity = velocity * (
+                valueAt.value(nativePad, "gain_db").asFloat.dbamp
+            );
+            var maxDuration = (
+                valueAt.value(nativePad, "max_duration_ms").asFloat / 1000
+            ).max(0.005);
+            if(nativeProgram != requestedProgram.asString) {
+                ("LB_OMNICHORD_SC_DRUM_PROFILE_MISMATCH pad=" ++ padId
+                    ++ " requested=" ++ requestedProgram
+                    ++ " profile=" ++ nativeProgram).postln;
+            } {
+                controls.keysValuesDo { |name, value|
+                    extraArgs.add(name.asSymbol); extraArgs.add(value);
+                };
+                if(chokeKey.notNil and: {
+                    ~omniNativeDrumChokes[chokeKey].notNil
+                }) {
+                    ~omniReleaseHandle.value(~omniNativeDrumChokes[chokeKey]);
+                };
+                if(nativeProgram == "sc.omni.drum") {
+                    Synth.tail(~omniSourceGroup, \omniDrum, [
+                        \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
+                        \note, nativeNote,
+                        \velocity, nativeVelocity
+                    ]);
+                } {
+                    ~omniSpawnVoice.value(
+                        owner, handle, nativeProgram, revision, nativeNote,
+                        nativeNote.midicps, nativeVelocity, logicalBus,
+                        extraArgs.asArray
+                    );
+                    if(chokeKey.notNil) {
+                        ~omniNativeDrumChokes[chokeKey] = handle
+                    };
+                    SystemClock.sched(maxDuration, {
+                        ~omniReleaseHandle.value(handle);
+                        if(chokeKey.notNil and: {
+                            ~omniNativeDrumChokes[chokeKey] == handle
+                        }) { ~omniNativeDrumChokes.removeAt(chokeKey) };
+                        nil
+                    });
+                };
+            };
+        } {
         if(~omniDrumKits[requestedProgram.asString].notNil) {
             ~omniSpawnDrumSample.value(
-                "omni/drums",
+                owner,
                 "drum/" ++ ~omniDrumOrdinal,
                 requestedProgram,
                 revision,
@@ -533,7 +593,7 @@ s.waitForBoot({
             ~omniSampleReady.value(requestedProgram, revision)
         }) {
             ~omniSpawnSampleVoice.value(
-                "omni/drums",
+                owner,
                 "drum/" ++ ~omniDrumOrdinal,
                 requestedProgram,
                 revision,
@@ -546,7 +606,7 @@ s.waitForBoot({
         } {
         if(requestedProgram.asString.beginsWith("sc.sclork.")) {
             ~omniSpawnVoice.value(
-                "omni/drums", "drum/" ++ ~omniDrumOrdinal,
+                owner, "drum/" ++ ~omniDrumOrdinal,
                 requestedProgram, 1, note, nil, velocity, logicalBus, []
             );
         } {
@@ -555,6 +615,7 @@ s.waitForBoot({
                 \note, note,
                 \velocity, velocity
             ]);
+        };
         };
         };
         };
@@ -670,7 +731,7 @@ OSCdef(\omniDrumHit, { |message|
     if(~omniCommandValid.value(message)) {
         var logicalBus = message[9].asInteger.clip(0, 10);
         ~omniSpawnDrum.value(
-            "external_percussion", message[4].asString,
+            message[3].asString, "external_percussion", message[4].asString,
             message[5].asInteger, message[6].asString,
             message[7].asInteger, message[8].asFloat,
             logicalBus

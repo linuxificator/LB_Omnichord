@@ -394,6 +394,7 @@ def _drum_atoms(
         level *= max(0.0, float(kit_gain))
         level = max(0.0, min(1.0, level))
     return (
+        "rhythm/drums",
         role,
         program,
         1,
@@ -415,12 +416,21 @@ def _sc_drum_atoms(
     gain: float,
     program_resolver: Callable[[str, str], tuple[str, str, float]],
 ) -> tuple[str | int | float, ...]:
-    program, _default_pad, kit_gain = program_resolver(kit, role)
+    program, resolved_pad, kit_gain = program_resolver(kit, slot)
     level = max(
         0.0,
         min(1.0, (float(velocity) / 127.0) * max(0.0, gain) * kit_gain),
     )
-    return gate_key, program, 1, slot, 0, level, int(logical_bus)
+    return (
+        "rhythm/drums",
+        gate_key,
+        program,
+        1,
+        resolved_pad,
+        0,
+        level,
+        int(logical_bus),
+    )
 
 
 def _meter_ticks(meter: str) -> tuple[int, int]:

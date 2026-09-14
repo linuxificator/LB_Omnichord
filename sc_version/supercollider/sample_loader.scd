@@ -9,7 +9,12 @@ var packagedDrumCatalog = directory.dirname
     +/+ "music/sc_expansion/sc_pcm_drumkits_v1.json";
 var sourceDrumCatalog = directory.dirname
     +/+ "qt_frontend/music/sc_expansion/sc_pcm_drumkits_v1.json";
+var packagedNativeDrumCatalog = directory.dirname
+    +/+ "music/sc_expansion/sc_native_drumkits_v1.json";
+var sourceNativeDrumCatalog = directory.dirname
+    +/+ "qt_frontend/music/sc_expansion/sc_native_drumkits_v1.json";
 var drumCatalog;
+var nativeDrumCatalog;
 var jsonAt = { |object, key| object[key.asString] ? object[key.asSymbol] };
 var files = jsonAt.value(manifest, "files");
 var programs = jsonAt.value(manifest, "programs");
@@ -23,6 +28,11 @@ if(drumCatalogPath.isNil) {
     };
 };
 drumCatalog = drumCatalogPath.parseJSONFile;
+nativeDrumCatalog = if(PathName(packagedNativeDrumCatalog).isFile) {
+    packagedNativeDrumCatalog.parseJSONFile
+} {
+    sourceNativeDrumCatalog.parseJSONFile
+};
 
 ~omniSampleRoot = "OMNICHORD_SC_VSCO_ROOT".getenv ? "";
 ~omniSampleBudgetBytes = (
@@ -47,6 +57,8 @@ drumCatalog = drumCatalogPath.parseJSONFile;
 ~omniDrumKits = Dictionary.new;
 ~omniDrumSampleSets = Dictionary.new;
 ~omniDrumChokes = Dictionary.new;
+~omniNativeDrumPads = Dictionary.new;
+~omniNativeDrumChokes = Dictionary.new;
 
 jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
     ~omniDrumRoleKeys[role.asString] = key.asInteger;
@@ -128,6 +140,10 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
     ~omniSampleRoundRobin.clear;
     ~omniDrumChokes.values.do { |node| node.set(\gate, 0) };
     ~omniDrumChokes.clear;
+    ~omniNativeDrumChokes.values.do { |handle|
+        ~omniReleaseHandle.value(handle)
+    };
+    ~omniNativeDrumChokes.clear;
 };
 
 files.do { |record|
@@ -185,6 +201,13 @@ jsonAt.value(drumCatalog, "kits").do { |record|
         articulation: "drum-kit"
     );
     ~omniSampleRegions[programId] = sampleIds.asArray;
+};
+
+jsonAt.value(nativeDrumCatalog, "kits").do { |kit|
+    var kitId = jsonAt.value(kit, "kit_id").asString;
+    jsonAt.value(kit, "pads").keysValuesDo { |padId, pad|
+        ~omniNativeDrumPads[kitId ++ "/" ++ padId.asString] = pad;
+    };
 };
 
 ~omniDrumKitSampleIds = { |programId|

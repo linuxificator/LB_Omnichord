@@ -307,6 +307,21 @@ class SuperColliderClientTests(unittest.TestCase):
             logical_bus=10,
             kit_id="pcm-old-parlour",
         )
+        self.assertTrue(self.fake.wait_for_messages("/omni/v1/program/prepare"))
+        sender = SimpleUDPClient("127.0.0.1", client.reply_port)
+        try:
+            sender.send_message(
+                "/omni/v1/program/status",
+                [
+                    client.session,
+                    "sample.vsco.kit.old-parlour",
+                    1,
+                    "ready",
+                    "ready",
+                ],
+            )
+        finally:
+            sender._sock.close()
         self.assertTrue(self.fake.wait_for_messages("/omni/v1/drum/hit"))
         self.close_client(client)
 

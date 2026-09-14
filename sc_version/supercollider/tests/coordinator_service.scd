@@ -25,8 +25,9 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
     [owner, handle, program, revision, logicalKey, frequency,
         velocity, logicalBus, extraArgs]
 };
-~omniSpawnDrum = { |role, program, revision, pad, note, velocity, logicalBus|
-    [role, program, revision, pad, note, velocity, logicalBus]
+~omniSpawnDrum = {
+    |owner, role, program, revision, pad, note, velocity, logicalBus|
+    [owner, role, program, revision, pad, note, velocity, logicalBus]
 };
 ~omniTraceSequenceEvent = {
     |logicalTick, executionId, definitionId, revision, eventOrdinal,

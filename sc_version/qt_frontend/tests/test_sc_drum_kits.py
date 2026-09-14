@@ -22,8 +22,8 @@ from sc_drum_kits import (  # noqa: E402
 
 class SuperColliderDrumKitTests(unittest.TestCase):
     def test_default_pcm_kit_and_ids_are_stable_and_unique(self) -> None:
-        self.assertEqual(DEFAULT_DRUM_KIT_ID, "pcm-old-parlour")
-        self.assertEqual(len(DRUM_KITS), 9)
+        self.assertEqual(DEFAULT_DRUM_KIT_ID, "pcm-vsco")
+        self.assertEqual(len(DRUM_KITS), 15)
         self.assertEqual(len({kit.kit_id for kit in DRUM_KITS}), len(DRUM_KITS))
         with self.assertRaisesRegex(ValueError, "unknown SC drum kit"):
             kit_by_id("unknown")
@@ -50,10 +50,21 @@ class SuperColliderDrumKitTests(unittest.TestCase):
                     self.assertGreater(gain, 0.0)
 
     def test_pcm_programs_and_pads_are_explicit(self) -> None:
+        pcm_kits = [kit for kit in DRUM_KITS if kit.kit_id.startswith("pcm-")]
+        native_kits = [kit for kit in DRUM_KITS if kit.kit_id.startswith("sc-")]
+        self.assertEqual(len(pcm_kits), 10)
+        self.assertEqual(len(native_kits), 5)
         self.assertTrue(
-            all(kit.program_id.startswith("sample.vsco.kit.") for kit in DRUM_KITS)
+            all(
+                program.startswith("sample.vsco.")
+                for kit in pcm_kits
+                for program in kit.sample_programs
+            )
         )
         self.assertTrue(all(kit.role_defaults for kit in DRUM_KITS))
+        program, pad, _gain = resolve_hit("sc-808", "timekeeper_primary")
+        self.assertEqual(program, "sc.sclork.sosHats")
+        self.assertEqual(pad, "sc-808/timekeeper_primary")
 
     def test_general_midi_notes_map_to_musical_roles(self) -> None:
         self.assertEqual(midi_role(36), "low_primary")

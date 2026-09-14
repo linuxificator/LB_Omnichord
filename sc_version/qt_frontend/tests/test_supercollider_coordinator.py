@@ -213,6 +213,7 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                                         tick,
                                         "drumHit",
                                         (
+                                            "rhythm/drums",
                                             "snare",
                                             "sample.vsco.gm-styleperc",
                                             1,

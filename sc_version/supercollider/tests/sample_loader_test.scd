@@ -25,10 +25,23 @@ if(~omniSamplePrograms.size != 75) {
     failed = true;
     ("VSCO_PROGRAM_COUNT_FAILED " ++ ~omniSamplePrograms.size).postln;
 };
-if(~omniSampleAliases.size != 96) {
+if(~omniSampleAliases.size != 105) {
     failed = true;
     ("VSCO_PLAYABLE_PROGRAM_COUNT_FAILED "
         ++ ~omniSampleAliases.size).postln;
+};
+if(~omniNativeDrumPads.size != 105) {
+    failed = true;
+    ("SC_NATIVE_DRUM_PAD_COUNT_FAILED "
+        ++ ~omniNativeDrumPads.size).postln;
+};
+if(
+    (~omniNativeDrumPads["sc-808/timekeeper_primary"]["program_id"]
+        ? ~omniNativeDrumPads["sc-808/timekeeper_primary"][\program_id])
+        .asString != "sc.sclork.sosHats"
+) {
+    failed = true;
+    "SC_NATIVE_DRUM_PROFILE_LOOKUP_FAILED".postln;
 };
 if(~omniSampleProgramName.value("sample.vsco.fluteexpvib").isNil) {
     failed = true;

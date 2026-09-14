@@ -4,64 +4,135 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 from types import MappingProxyType
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
 class DrumKit:
     kit_id: str
     label: str
-    program_id: str
+    engine: str
+    pad_programs: tuple[tuple[str, str], ...]
     role_defaults: tuple[tuple[str, str], ...]
     gain: float = 1.0
 
-    def pad_for(self, role: str) -> str:
+    def pad_for(self, selector: str) -> str:
+        requested = str(selector)
+        programs = dict(self.pad_programs)
+        if requested in programs or "*" in programs:
+            return requested
         try:
-            return dict(self.role_defaults)[str(role)]
+            return dict(self.role_defaults)[requested]
         except KeyError as exc:
             raise ValueError(
-                f"drum kit {self.kit_id!r} has no pad for role {role!r}"
+                f"drum kit {self.kit_id!r} has no pad for {requested!r}"
             ) from exc
 
+    def program_for(self, pad_id: str) -> str:
+        programs = dict(self.pad_programs)
+        if str(pad_id) in programs:
+            return programs[str(pad_id)]
+        try:
+            return programs["*"]
+        except KeyError as exc:
+            raise ValueError(
+                f"drum kit {self.kit_id!r} has no program for pad {pad_id!r}"
+            ) from exc
 
-def _load_kits() -> tuple[DrumKit, ...]:
-    path = (
-        Path(__file__).resolve().parent.parent
-        / "music"
-        / "sc_expansion"
-        / "sc_pcm_drumkits_v1.json"
-    )
+    @property
+    def sample_programs(self) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                {
+                    program
+                    for _pad, program in self.pad_programs
+                    if program.startswith("sample.")
+                }
+            )
+        )
+
+
+def _catalog(name: str) -> dict[str, Any]:
+    path = Path(__file__).resolve().parent.parent / "music" / "sc_expansion" / name
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or raw.get("schema_version") != 1:
-        raise ValueError("unsupported SC PCM drum-kit catalogue")
+        raise ValueError(f"unsupported SC drum-kit catalogue {name!r}")
+    return raw
+
+
+def _role_defaults(row: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    value = row.get("role_defaults")
+    if not isinstance(value, dict) or not value:
+        raise ValueError(f"drum kit {row.get('kit_id')!r} has no role defaults")
+    return tuple(sorted((str(role), str(pad)) for role, pad in value.items()))
+
+
+def _load_native_kits() -> tuple[DrumKit, ...]:
+    raw = _catalog("sc_native_drumkits_v1.json")
     kits: list[DrumKit] = []
     for row in raw.get("kits", ()):
-        if not isinstance(row, dict):
-            raise ValueError("SC PCM drum kit must be an object")
-        role_defaults = row.get("role_defaults")
-        if not isinstance(role_defaults, dict) or not role_defaults:
-            raise ValueError(f"drum kit {row.get('kit_id')!r} has no role defaults")
+        if not isinstance(row, dict) or not isinstance(row.get("pads"), dict):
+            raise ValueError("SC native drum kit must contain pads")
+        pads = row["pads"]
         kits.append(
             DrumKit(
                 kit_id=str(row["kit_id"]),
                 label=str(row["label"]),
-                program_id=str(row["program_id"]),
-                role_defaults=tuple(
+                engine="native",
+                pad_programs=tuple(
                     sorted(
-                        (str(role), str(pad))
-                        for role, pad in role_defaults.items()
+                        (str(pad), str(profile["program_id"]))
+                        for pad, profile in pads.items()
+                        if isinstance(profile, dict)
                     )
                 ),
-                gain=10.0 ** (float(row.get("kit_gain_db", 0.0)) / 20.0),
+                role_defaults=_role_defaults(row),
+                gain=float(row.get("existing_linear_gain", 1.0))
+                * (10.0 ** (float(row.get("kit_gain_db", 0.0)) / 20.0)),
             )
         )
-    if len(kits) != 9 or len({kit.kit_id for kit in kits}) != len(kits):
-        raise ValueError("SC PCM catalogue must contain nine unique kits")
+    if len(kits) != 5:
+        raise ValueError("SC native catalogue must contain five kits")
     return tuple(kits)
 
 
-DRUM_KITS = _load_kits()
+def _load_pcm_kits() -> tuple[DrumKit, ...]:
+    raw = _catalog("sc_pcm_drumkits_v1.json")
+    kits: list[DrumKit] = []
+    for row in raw.get("kits", ()):
+        if not isinstance(row, dict) or not isinstance(row.get("pads"), dict):
+            raise ValueError("SC PCM drum kit must contain pads")
+        program = str(row["program_id"])
+        kits.append(
+            DrumKit(
+                kit_id=str(row["kit_id"]),
+                label=str(row["label"]),
+                engine="sample",
+                pad_programs=tuple(
+                    sorted((str(pad), program) for pad in row["pads"])
+                ),
+                role_defaults=_role_defaults(row),
+                gain=10.0 ** (float(row.get("kit_gain_db", 0.0)) / 20.0),
+            )
+        )
+    if len(kits) != 9:
+        raise ValueError("SC PCM catalogue must contain nine kits")
+    return tuple(kits)
+
+
+_LEGACY_PCM_KIT = DrumKit(
+    kit_id="pcm-vsco",
+    label="VSCO PCM",
+    engine="sample",
+    pad_programs=(("*", "sample.vsco.gm-styleperc"),),
+    role_defaults=(("*", "*"),),
+)
+
+DRUM_KITS = (_LEGACY_PCM_KIT, *_load_native_kits(), *_load_pcm_kits())
+if len(DRUM_KITS) != 15 or len({kit.kit_id for kit in DRUM_KITS}) != 15:
+    raise ValueError("SC edition requires fifteen unique drum kits")
 _BY_ID = MappingProxyType({kit.kit_id: kit for kit in DRUM_KITS})
-DEFAULT_DRUM_KIT_ID = DRUM_KITS[0].kit_id
+DEFAULT_DRUM_KIT_ID = _LEGACY_PCM_KIT.kit_id
 
 
 def kit_by_id(kit_id: str) -> DrumKit:
@@ -94,6 +165,8 @@ def midi_role(note: int) -> str:
     return "electronic_detail"
 
 
-def resolve_hit(kit_id: str, role: str) -> tuple[str, str, float]:
+def resolve_hit(kit_id: str, selector: str) -> tuple[str, str, float]:
     kit = kit_by_id(kit_id)
-    return kit.program_id, kit.pad_for(str(role)), kit.gain
+    pad = kit.pad_for(str(selector))
+    profile_id = f"{kit.kit_id}/{pad}" if kit.engine == "native" else pad
+    return kit.program_for(pad), profile_id, kit.gain

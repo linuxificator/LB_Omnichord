@@ -24,7 +24,14 @@ SOURCE_FILES = (
     "bass_riffs_revised.json",
     "bass_voice_capabilities.json",
     "preset_index.json",
+    "sc_drumkit_profiles.json",
 )
+PRESET_FILES = tuple(f"default_presets/p{index}.json" for index in range(1, 19))
+PROGRAM_CANONICALIZATION = {
+    "sample.vsco.contrabasssusnv": "sample.vsco.contrabass-ks",
+    "sample.vsco.contrabasspizz": "sample.vsco.contrabass-ks.art.e6-pizzicato",
+    "sample.vsco.flutesusnv": "sample.vsco.flute-ks",
+}
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -223,9 +230,35 @@ def _compact_bass(data: Path) -> dict[str, Any]:
     return result
 
 
-def build(bundle: Path, destination: Path) -> None:
+def _canonical_program(program_id: object) -> str:
+    value = str(program_id)
+    return PROGRAM_CANONICALIZATION.get(value, value)
+
+
+def _compact_preset_index(data: Path) -> dict[str, Any]:
+    source = _read(data / "preset_index.json")
+    for row in source["presets"]:
+        for role in ("chord", "strum", "bass"):
+            row[role] = _canonical_program(row[role])
+    return source
+
+
+def _canonical_preset(data: Path) -> dict[str, Any]:
+    snapshot = _read(data)
+    synths = snapshot["synths"]
+    for role in ("chord", "strum", "bass"):
+        synths[role]["selected"] = _canonical_program(synths[role]["selected"])
+    return snapshot
+
+
+def build(
+    bundle: Path,
+    destination: Path,
+    preset_destination: Path | None = None,
+) -> None:
     data = bundle / "data"
-    missing = [name for name in SOURCE_FILES if not (data / name).is_file()]
+    source_names = (*SOURCE_FILES, *PRESET_FILES)
+    missing = [name for name in source_names if not (data / name).is_file()]
     if missing:
         raise FileNotFoundError(f"music bundle is missing {', '.join(missing)}")
     outputs = {
@@ -233,15 +266,25 @@ def build(bundle: Path, destination: Path) -> None:
         "sc_kit_grooves_v1.json": _compact_grooves(data),
         "omnichord_bass_riffs_v2.json": _compact_bass(data),
         "bass_voice_capabilities_v1.json": _read(data / "bass_voice_capabilities.json"),
-        "sc_factory_presets_v1.json": _read(data / "preset_index.json"),
+        "sc_factory_presets_v1.json": _compact_preset_index(data),
+        "sc_native_drumkits_v1.json": _read(data / "sc_drumkit_profiles.json"),
     }
     for name, value in outputs.items():
         _write(destination / name, value)
+    if preset_destination is None:
+        preset_destination = destination.parents[1] / "instruments" / "default_presets"
+    preset_outputs: dict[str, str] = {}
+    for relative_name in PRESET_FILES:
+        source = data / relative_name
+        output = preset_destination / Path(relative_name).name
+        _write(output, _canonical_preset(source))
+        preset_outputs[output.name] = _digest(output)
     manifest = {
         "schema_version": 1,
         "source_bundle": "LB_SC_Music_Expansion",
-        "sources": {name: _digest(data / name) for name in SOURCE_FILES},
+        "sources": {name: _digest(data / name) for name in source_names},
         "outputs": {name: _digest(destination / name) for name in sorted(outputs)},
+        "preset_outputs": preset_outputs,
     }
     _write(destination / "manifest.json", manifest)
 
@@ -250,8 +293,13 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("bundle", type=Path)
     parser.add_argument("destination", type=Path)
+    parser.add_argument("--preset-destination", type=Path)
     args = parser.parse_args()
-    build(args.bundle.resolve(), args.destination.resolve())
+    build(
+        args.bundle.resolve(),
+        args.destination.resolve(),
+        None if args.preset_destination is None else args.preset_destination.resolve(),
+    )
     return 0
 
 

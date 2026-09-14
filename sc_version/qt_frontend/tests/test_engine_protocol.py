@@ -103,7 +103,16 @@ class SequenceEventContractTests(unittest.TestCase):
             ("voiceSet", ("voice", "frequency_hz", 73.4)),
             (
                 "drumHit",
-                ("low_primary/kick", "sample.vsco.kit.old-parlour", 1, "kick", 36, 0.8, 0),
+                (
+                    "rhythm/drums",
+                    "low_primary/kick",
+                    "sample.vsco.kit.old-parlour",
+                    1,
+                    "kick",
+                    36,
+                    0.8,
+                    0,
+                ),
             ),
         )
         for kind, atoms in fixtures:
@@ -123,7 +132,16 @@ class SequenceEventContractTests(unittest.TestCase):
                 0,
                 0,
                 "drumHit",
-                ("low_primary/kick", "sample.vsco.kit.old-parlour", 1, "kick", 36, 0.8, 11),
+                (
+                    "rhythm/drums",
+                    "low_primary/kick",
+                    "sample.vsco.kit.old-parlour",
+                    1,
+                    "kick",
+                    36,
+                    0.8,
+                    11,
+                ),
             )
         with self.assertRaisesRegex(ProtocolValidationError, "velocity"):
             SequenceEvent(0, 0, "noteOff", ("voice", 1.1))

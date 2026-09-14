@@ -57,10 +57,10 @@ class SoundBalanceFeatureTests(unittest.TestCase):
         self.assertEqual(len(plan), 125)
         self.assertEqual({entry["note"] for entry in plan[0]["notes"]}, {40, 60, 84})
 
-    def test_factory_bass_volumes_retain_the_original_curated_values(self) -> None:
+    def test_sc_factory_bass_volumes_match_reviewed_expansion_values(self) -> None:
         expected = (
-            0.34, 0.34, 0.42, 0.36, 0.40, 0.46, 0.99, 0.56, 0.62,
-            0.58, 0.64, 0.65, 0.68, 0.72, 0.70, 0.76, 0.80, 0.84,
+            0.38, 0.38, 0.38, 0.38, 0.38, 0.38, 0.38, 0.38, 0.38,
+            0.43, 0.43, 0.43, 0.43, 0.43, 0.43, 0.43, 0.43, 0.43,
         )
         actual = tuple(
             float(
