@@ -162,6 +162,12 @@ def action_cycle(
         drum_kit_index = rhythm % len(DRUM_KITS)
         yield Action("setDrumKitIndex", (drum_kit_index,), 0.12)
         yield Action("setMidiDrumKitIndex", (drum_kit_index,), 0.12)
+        # The dedicated percussion row receives on MIDI channel 10. This
+        # proves that every selected MIDI kit is not merely visible but can
+        # prepare and play through the public physical-input path.
+        drum_note = (36, 38, 42, 46, 49)[rhythm % 5]
+        yield Action("injectMidiNote", (10, drum_note, 112, True), 0.08)
+        yield Action("injectMidiNote", (10, drum_note, 0, False), 0.04)
         yield Action("pressChord", (rhythm % 6, rhythm % 12), 0.10)
         yield Action("strumStart", (0.08 + (rhythm % 4) * 0.2,))
         yield Action("strumMove", (0.88 - (rhythm % 4) * 0.18,))

@@ -58,6 +58,18 @@ class SuperColliderEnduranceTests(unittest.TestCase):
             },
             set(range(15)),
         )
+        percussion_attacks = [
+            action
+            for action in actions
+            if action.name == "injectMidiNote"
+            and action.args[0] == 10
+            and action.args[3] is True
+        ]
+        self.assertEqual(len(percussion_attacks), 18)
+        self.assertEqual(
+            {action.args[1] for action in percussion_attacks},
+            {36, 38, 42, 46, 49},
+        )
 
     def test_audio_analyzer_reports_level_clipping_and_silence(self) -> None:
         rate = 8_000
