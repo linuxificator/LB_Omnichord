@@ -1,11 +1,13 @@
-1) Is voice stealing bij de strum nog nodig met supercollider? Zo niet, zorg er dan voro dat dat niet gebeurd.
+1) Is voice stealing bij de strum nog nodig met supercollider? Zo niet, zorg er dan voor dat dat niet gebeurd.
 2) De knoppeN in de balken bij PCM zijn allemaal oranje, ze moeten de kleur van de balk zijn, zoals de originele knoppen en sliders
 3) Heeft galm bij supercollider nog andere parameters? We laat de galm parameters volgen wat supercollider aanbied, geen amy compatibiliteit nodig
 4) Eerder aangegeven dat er als er maar een instrument sample in de sample bank is er dan geen keuze knop hoeft te zijn: nuancering, als er er meerdere speelwijzen zijn dan moet de knop er wel zijn, zodat de speelwijzen alsnog op de ondersten rij in de balk komt. Allen is die ene knop in de bovenste rij dan eentje die alleen een naam weergeeft maar niet iets doet.
 5) Maak een inventarisatie van verschillende drum kits, en voeg een roller toe aan het gele gedeelte waarbij deze drumkits gekozen kunnen worden. Neem daar synth drums, de standaard supercollider drums en de PCM drumkits in mee. Deze drumkit keuze roller heeft dezelfde opmaak als die van het ritme keuze en staat er direct rechts naast. De start/stop knop van het ritme schuift dan naar rechts en de tempo en fill density sliders worden minder breed. Dezelfde drumkit roller moet ook in de onderste paarse synth in het midi scherm de instrument keuze roller van nu vervangen. De drumkits mogen alleen in de gele balk in het omni scherm en in de paarse balk in het midi scherm staan, niet tussen de instrument keuzes in andere balken.
 6) de synths in het midi scherm moeten ook dezelfde instrumenten , sliders en SYN/PCM knoppen hebben als in het omni scherm
 7) De sequencer heeft een kleine "hickup" als er gewisseld wordt van riff, APG/LDR of arpeggio/chord activity, dat mag niet, de beat moet altijd eenduidig doorgaan.
-8) Na enige tijd werkte de start ritme knop niet meer met de volgende foutmeldingen:
+8) maak een volledige balans test, ook van drumkits, pas waar nodig volume balans aan.
+9) doe een controle op "hoofdinstrument in de roller keuze" en lijst van speelwijzen en types instrumenten, ik zie bijvoorbeeld nog steeds verschillende piano's in de roller keuze, terwijl ik daar een piano verwacht met dan rechts keuze knoppen en daaronder sustain pedaal aan/uit Sommige instrumenten hebben een langere naam maar zijn nog steeds piano, dus exacte naam vergelijking alleen is niet voldoende. Controleer ook nog een keer of de volledige set uit de sample bank gebruikt wordt, hij staat ook lokaal uitgepakt in: /home/jeroen/sample_lib/VSCO-2-CE-1.1.0
+9) Na enige tijd werkte de start ritme knop niet meer met de volgende foutmeldingen:
 Traceback (most recent call last):
   File "/home/jeroen/omnichord/LB_Omnichord/sc_version/qt_frontend/code/performance_qml_adapter.py", line 102, in setRhythmIndex
     self._controller.setRhythmIndex(index)
