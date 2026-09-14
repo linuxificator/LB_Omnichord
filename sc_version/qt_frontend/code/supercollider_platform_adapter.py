@@ -191,7 +191,10 @@ class SuperColliderSupervisor:
         command = [*prefix, str(self.executables.sclang)]
         language_config = self._language_config()
         if language_config is not None:
-            command.extend(("-l", str(language_config)))
+            # A relocated runtime may still remember its build prefix.  SC's
+            # standalone mode excludes that default and all host extensions;
+            # the private configuration then admits exactly one class tree.
+            command.extend(("-a", "-l", str(language_config)))
         command.extend(("-D", str(bootstrap)))
         return command, env
 
