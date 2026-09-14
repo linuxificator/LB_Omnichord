@@ -66,6 +66,19 @@ def stop_process(process: subprocess.Popen[str]) -> tuple[str, str]:
         return process.communicate(timeout=2)
 
 
+def wait_for_graceful_exit(
+    process: subprocess.Popen[str],
+    *,
+    timeout: float = 2.0,
+) -> tuple[str, str]:
+    """Let an owned peer consume its shutdown packet before signalling it."""
+
+    try:
+        return process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return stop_process(process)
+
+
 class SuperColliderFrontendProcessTests(unittest.TestCase):
     def test_manual_chord_crosses_real_frontend_and_separate_engine_processes(
         self,
@@ -232,7 +245,11 @@ class SuperColliderFrontendProcessTests(unittest.TestCase):
                     self.assertTrue(changed.get("ok"), changed)
             finally:
                 app_stdout, app_stderr = stop_process(application)
-                engine_stdout, engine_stderr = stop_process(engine)
+                # Closing the frontend sends the engine a typed shutdown UDP
+                # packet. Let the separate process consume it before falling
+                # back to signal-based cleanup; otherwise fast macOS runners
+                # can race a valid shutdown and report SIGTERM as a failure.
+                engine_stdout, engine_stderr = wait_for_graceful_exit(engine)
 
             self.assertEqual(application.returncode, 0, app_stdout + app_stderr)
             self.assertEqual(engine.returncode, 0, engine_stdout + engine_stderr)
