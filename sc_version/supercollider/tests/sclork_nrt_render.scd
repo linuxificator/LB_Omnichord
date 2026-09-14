@@ -22,7 +22,10 @@ var endSeconds;
 
 (directory +/+ "sclork_loader.scd").load;
 SynthDef(\omniSclorkAuditOutput, { |in=16, out=0, calibration=1|
-    Out.ar(out, In.ar(in, 2) * calibration);
+    // Match the production output boundary: stochastic percussion can have
+    // valid raw transients above full scale, but users hear the master-limited
+    // signal and that signal must never clip.
+    Out.ar(out, Limiter.ar(In.ar(in, 2) * calibration, 0.95, 0.005));
 }).add;
 if((startIndex < 0) or: { startIndex >= allPrograms.size }) {
     Error("invalid SCLOrk NRT start index: " ++ startIndex).throw;

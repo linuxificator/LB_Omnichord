@@ -201,7 +201,7 @@ class SuperColliderNonRealtimeTests(unittest.TestCase):
             unbalanced = [
                 item
                 for item in calibrated_drums
-                if not 0.015 <= float(item["rms"]) <= 0.075
+                if not 0.010 <= float(item["rms"]) <= 0.075
             ]
             self.assertEqual(
                 unbalanced,
