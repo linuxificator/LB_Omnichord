@@ -38,7 +38,9 @@ SC basic, SC 808, SC Electro, SC Oto 309 and SC SOS.
 ## SCLOrk measurement and gain staging
 
 `tools/build_sclork_playback_profile.py` consumes raw 32-bit-float NRT reports
-at MIDI notes 45, 69 and 81 (A2, A4 and A5). For each eligible definition it
+at MIDI notes 45, 69 and 81 (A2, A4 and A5). MIDI 107 is a separate ceiling
+report: it constrains stability and peak gain across the public strum range
+without treating an extreme register as a loudness target. For each eligible definition it
 uses the median RMS and worst peak to choose one fixed gain, bounded by:
 
 - target RMS `0.05`;
@@ -58,6 +60,13 @@ voices it rejects non-finite, silent, inaudibly quiet or full-scale-clipped
 output. The complete suite was additionally run with each of 110, 440 and
 880 Hz fixed across the catalogue.
 
+A live all-feature pass exposed three upstream filter graphs that become
+non-finite at the strum's MIDI-107 boundary (`acidOto3091`, `acidOto3092` and
+`combs`) and an unstable `tubularBell` low-pass cutoff. Small owned adapters
+preserve their source topology and controls while bounding filter cutoffs to
+45% of the actual sample rate. The exact upper-register set is now an NRT
+regression test. `doubleBass` also receives a ceiling-constrained playback gain.
+
 Selected drum programs are rendered with their production default frequency,
 not the fixed pitched-register probes. Their checked-in gains must keep a
 single hit between RMS 0.015 and 0.075 with peak below 0.85. The profile builder
@@ -71,6 +80,18 @@ also has to release naturally and on explicit note-off. Each live record now
 tracks whether its source node is alive before requesting a free. This makes
 cleanup idempotent and prevents delayed `/n_end` notifications from producing
 the repeated `FAILURE IN SERVER /n_free Node ... not found` messages.
+
+Sample regions may naturally reach the end of their files before a UI release,
+program change or retune arrives. Each region node now records its `/n_end`
+state; later operations visit only live nodes. This prevents harmless user
+actions from becoming `/n_set Node ... not found` server failures while the
+lightweight musical handle remains available for owner-scoped release layers.
+
+All dry bus strips and both room returns meet on one private master bus. A
+single 5 ms look-ahead limiter at 0.95 protects the physical output from hard
+digital clipping under valid polyphonic combinations. Role gains, velocity,
+calibration and room balance remain independent upstream controls; the limiter
+is a final safety boundary rather than another user-visible volume mechanism.
 
 The program configured as a role's default is prepared on first startup even
 when its name equals the initial Python state. Previously that equality caused

@@ -125,6 +125,24 @@ class SclorkPlaybackProfileTests(unittest.TestCase):
                     for argument in ("--report", value)
                 ),
             ]
+            ceiling = root / "107.json"
+            ceiling.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "programs": [
+                            {
+                                "program_id": item["program_id"],
+                                "rms": 0.5,
+                                "peak": 0.5,
+                            }
+                            for item in self.catalog
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            arguments.extend(("--ceiling-report", f"107={ceiling}"))
             previous = sys.argv
             try:
                 sys.argv = [*arguments, "--output", str(first)]
@@ -134,6 +152,12 @@ class SclorkPlaybackProfileTests(unittest.TestCase):
             finally:
                 sys.argv = previous
             self.assertEqual(first.read_bytes(), second.read_bytes())
+            built = json.loads(first.read_text(encoding="utf-8"))
+            self.assertEqual(built["method"]["ceiling_midi_notes"], [107])
+            self.assertLessEqual(
+                max(item["gain"] for item in built["programs"].values()),
+                1.3,
+            )
 
 
 if __name__ == "__main__":

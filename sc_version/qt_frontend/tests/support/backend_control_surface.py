@@ -53,6 +53,21 @@ class BackendControlSurface:
     def cycleMidiChordInputChannel(self) -> None:
         self._backend.midiPlayer.cycleChordInputChannel()
 
+    def setMidiDrumKitIndex(self, index: int) -> None:
+        self._backend.midiPlayer.setDrumKitIndex(index)
+
+    def toggleMidiSynthKind(self, row: int) -> None:
+        self._backend.midiPlayer.toggleSynthKind(row)
+
+    def setMidiSynthBrowserIndex(self, row: int, index: int) -> None:
+        self._backend.midiPlayer.setSynthBrowserIndex(row, index)
+
+    def selectMidiSampleChoice(self, row: int, synth_index: int) -> None:
+        self._backend.midiPlayer.selectSampleChoice(row, synth_index)
+
+    def toggleMidiSustain(self, row: int) -> None:
+        self._backend.midiPlayer.toggleSustain(row)
+
     def requestAmyDiagnostics(self, kind: str = "load") -> None:
         """Queue one bounded firmware diagnostic request on the real sink.
 

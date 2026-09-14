@@ -1,7 +1,10 @@
 /* Build every owned core SynthDef without opening an audio server. */
 (
 var directory = thisProcess.nowExecutingPath.dirname.dirname;
-var names = [\omniVoice, \omniDrum, \omniVoiceOutput, \omniBusStrip, \omniRoom];
+var names = [
+    \omniVoice, \omniDrum, \omniVoiceOutput, \omniBusStrip,
+    \omniRoom, \omniMasterOutput
+];
 var failed = false;
 
 (directory +/+ "core_synthdefs.scd").load;

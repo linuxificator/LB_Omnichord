@@ -461,6 +461,12 @@ regions.do { |record|
         * (2 ** (tuneCents.asFloat / 1200))
 };
 
+~omniForEachLiveSampleNode = { |record, function|
+    record[\sampleNodes].do { |sampleNode|
+        if(sampleNode[\alive]) { function.value(sampleNode) };
+    };
+};
+
 SynthDef(\omniSampleMono, {
     |out=0, buffer=0, rate=1, velocity=0.7, gain=1, gainDb=0,
      attack=0.001, release=0.2, gate=1, pan=0, pitchBendBus=0|
@@ -561,13 +567,17 @@ SynthDef(\omniSampleStereo, {
                     \pitchBendBus, ~omniBendBus.index
                 ]
             );
+            var sampleNode;
             ~omniSampleVoiceRefs[sampleId] =
                 (~omniSampleVoiceRefs[sampleId] ? 0) + 1;
             ~omniTouchSample.value(sampleId);
-            sampleNodes.add((
-                node: node, sampleId: sampleId, center: center, tune: tune
-            ));
+            sampleNode = (
+                node: node, sampleId: sampleId, center: center, tune: tune,
+                alive: true
+            );
+            sampleNodes.add(sampleNode);
             node.onFree {
+                sampleNode[\alive] = false;
                 ~omniSampleVoiceRefs[sampleId] = (
                     (~omniSampleVoiceRefs[sampleId] ? 0) - 1
                 ).max(0);
@@ -594,14 +604,14 @@ SynthDef(\omniSampleStereo, {
 };
 
 ~omniRetuneSampleHandle = { |record, frequencyHz|
-    record[\sampleNodes].do { |sampleNode|
+    ~omniForEachLiveSampleNode.value(record, { |sampleNode|
         sampleNode[\node].set(
             \rate,
             ~omniSamplePlaybackRate.value(
                 frequencyHz, sampleNode[\center], sampleNode[\tune]
             )
         );
-    };
+    });
 };
 
 ("LB_OMNICHORD_VSCO_INDEX_LOADED programs=" ++ programs.size

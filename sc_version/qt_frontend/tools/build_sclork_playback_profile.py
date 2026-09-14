@@ -20,6 +20,16 @@ def parse_args() -> argparse.Namespace:
         metavar="MIDI_NOTE=PATH",
         help="fixed-pitch NRT report (repeat for each audit note)",
     )
+    parser.add_argument(
+        "--ceiling-report",
+        action="append",
+        default=[],
+        metavar="MIDI_NOTE=PATH",
+        help=(
+            "register-boundary NRT report used for stability and peak limiting, "
+            "but not for the median loudness target"
+        ),
+    )
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--target-rms", type=float, default=0.05)
     parser.add_argument("--peak-ceiling", type=float, default=0.65)
@@ -41,13 +51,25 @@ def main() -> int:
     args = parse_args()
     catalog = json.loads(args.catalog.read_text(encoding="utf-8"))["programs"]
     reports: dict[int, dict[str, dict[str, object]]] = {}
-    for value in args.report:
-        note_text, separator, path_text = value.partition("=")
-        if not separator:
-            raise ValueError(f"invalid --report {value!r}; expected MIDI_NOTE=PATH")
-        note = int(note_text)
-        entries = json.loads(Path(path_text).read_text(encoding="utf-8"))["programs"]
-        reports[note] = {str(item["program_id"]): item for item in entries}
+    ceiling_reports: dict[int, dict[str, dict[str, object]]] = {}
+
+    def load_reports(
+        values: list[str], target: dict[int, dict[str, dict[str, object]]]
+    ) -> None:
+        for value in values:
+            note_text, separator, path_text = value.partition("=")
+            if not separator:
+                raise ValueError(
+                    f"invalid report {value!r}; expected MIDI_NOTE=PATH"
+                )
+            note = int(note_text)
+            entries = json.loads(Path(path_text).read_text(encoding="utf-8"))[
+                "programs"
+            ]
+            target[note] = {str(item["program_id"]): item for item in entries}
+
+    load_reports(args.report, reports)
+    load_reports(args.ceiling_report, ceiling_reports)
     if len(reports) < 2:
         raise ValueError("at least two fixed-pitch reports are required")
 
@@ -70,8 +92,16 @@ def main() -> int:
         ):
             continue
         measurements = [report[program_id] for report in reports.values()]
+        boundary_measurements = [
+            report[program_id]
+            for report in ceiling_reports.values()
+            if program_id in report
+        ]
         rms = median(float(item["rms"]) for item in measurements)
-        peak = max(float(item["peak"]) for item in measurements)
+        peak = max(
+            float(item["peak"])
+            for item in (*measurements, *boundary_measurements)
+        )
         if (
             not math.isfinite(rms)
             or rms <= 0
@@ -94,6 +124,7 @@ def main() -> int:
         "schema_revision": 1,
         "method": {
             "midi_notes": sorted(reports),
+            "ceiling_midi_notes": sorted(ceiling_reports),
             "target_rms": args.target_rms,
             "peak_ceiling": args.peak_ceiling,
             "max_gain": args.max_gain,

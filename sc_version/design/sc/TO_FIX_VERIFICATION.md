@@ -32,6 +32,25 @@ the authority.
    profile as pitched SCLOrk programs. No second hidden volume mechanism was
    introduced.
 
+## Defects found by live qualification
+
+The first external PipeWire capture found a sustained full-scale failure when
+the highest strum note selected an upstream filter graph outside its numeric
+range. Four minimal routing adapters now bound those filters by sample rate,
+and the playback builder has a distinct MIDI-107 ceiling report. A targeted NRT
+test reproduces the exact register rather than relying on mid-register renders.
+
+The next pass found brief hard clipping only when several individually valid
+parts summed. Dry strips and room returns now cross one private master limiter;
+the test asserts there is exactly one final bounded stage. This preserves all
+upstream mix controls and prevents the sound device from doing uncontrolled
+integer clipping.
+
+Rapid PCM program replacement then exposed `/n_set Node ... not found`: a
+sample could naturally end before its owner handle was released. Region nodes
+carry an explicit live flag updated by `/n_end`, and release/retune iterates
+only live regions. The sample-loader test freezes that rule.
+
 ## Coverage and balance boundary
 
 The compiler still audits all 109 pinned SCLOrk definitions. The pitched
@@ -53,8 +72,8 @@ filename.
   catalogue separation and reproducible playback-profile membership.
 - `sc-sequencer` checks phase-preserving replacement and unchanged note/gate
   lifetimes in a separate real `sclang` process.
-- `sc-audio` renders all 109 SCLOrk definitions and enforces the drum-kit
-  balance window.
+- `sc-audio` renders all 109 SCLOrk definitions, enforces the drum-kit balance
+  window and renders the exact repaired programs at MIDI 107.
 - Screenshot-state tests drive public controller methods, not private QML
   state. A production bootstrap with real `sclang`, `scsynth` and Qt captured
   representative OMNI and MIDI PCM families, playing styles, Piano sustain and
@@ -64,3 +83,10 @@ The automated evidence establishes bounded signal production and behavioral
 ownership. It does not replace a long subjective performance test across
 polyphony, transitions and sample-cache pressure; that remains a release
 qualification activity.
+
+`tests/endurance/sc_endurance.py` is the repeatable live qualification driver.
+It keeps the test driver, Qt graph, SC runtime and PipeWire recorder in separate
+processes, drives only public controller actions, records action/progress logs,
+and rejects server errors, prolonged silence, dropouts and hard clipping. Four
+cycles rotate through the complete synth and PCM catalogues for every OMNI role
+and every pitched MIDI row; zero cycles means it continues until interrupted.

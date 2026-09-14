@@ -85,9 +85,9 @@ thisProcess.openUDPPort(languagePort);
             if(~omniReleaseSampleLifetime.notNil) {
                 ~omniReleaseSampleLifetime.value(record);
             };
-            record[\sampleNodes].do { |sampleNode|
+            ~omniForEachLiveSampleNode.value(record, { |sampleNode|
                 sampleNode[\node].set(\gate, 0)
-            };
+            });
         } {
         if(record[\outputNode].notNil) {
             record[\outputNode].set(\gate, 0);
@@ -274,15 +274,17 @@ s.waitForBoot({
     ~omniSourceGroup = Group.head(s);
     ~omniMixGroup = Group.after(~omniSourceGroup);
     ~omniFxGroup = Group.after(~omniMixGroup);
+    ~omniOutputGroup = Group.after(~omniFxGroup);
     ~omniBendBus = Bus.control(s, 1);
     ~omniBendBus.set(1.0);
     ~omniLogicalBuses = Array.fill(11, { Bus.audio(s, 2) });
     ~omniRoomBuses = Array.fill(2, { Bus.audio(s, 2) });
+    ~omniMasterBus = Bus.audio(s, 2);
     ~omniBusStrips = Array.fill(11, { |logical|
         var roomIndex = if(logical <= 3) { 0 } { 1 };
         Synth.tail(~omniMixGroup, \omniBusStrip, [
             \in, ~omniLogicalBuses[logical].index,
-            \out, 0,
+            \out, ~omniMasterBus.index,
             \roomOut, ~omniRoomBuses[roomIndex].index,
             \gain, 1,
             \roomSend, if((logical == 0) or: { logical == 10 }) { 0 } { 1 }
@@ -291,10 +293,14 @@ s.waitForBoot({
     ~omniRooms = Array.fill(2, { |roomIndex|
         Synth.tail(~omniFxGroup, \omniRoom, [
             \in, ~omniRoomBuses[roomIndex].index,
-            \out, 0,
+            \out, ~omniMasterBus.index,
             \level, 0
         ])
     });
+    ~omniMasterOutput = Synth.tail(~omniOutputGroup, \omniMasterOutput, [
+        \in, ~omniMasterBus.index,
+        \out, 0
+    ]);
 
     ~omniSpawnVoice = {
         |owner, handle, program, revision, logicalKey, frequency,

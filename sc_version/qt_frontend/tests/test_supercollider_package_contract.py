@@ -112,6 +112,18 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         boot = bootstrap.index("s.waitForBoot")
         self.assertLess(assignment, boot)
 
+    def test_all_mix_and_room_outputs_cross_one_bounded_master_stage(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        core = (SC_ROOT / "core_synthdefs.scd").read_text(encoding="utf-8")
+        self.assertIn("~omniMasterBus = Bus.audio(s, 2)", bootstrap)
+        self.assertGreaterEqual(
+            bootstrap.count("\\out, ~omniMasterBus.index"),
+            2,
+        )
+        self.assertIn("Group.after(~omniFxGroup)", bootstrap)
+        self.assertIn("Synth.tail(~omniOutputGroup, \\omniMasterOutput", bootstrap)
+        self.assertIn("Limiter.ar(signal, ceiling.clip(0.1, 1), 0.005)", core)
+
 
 if __name__ == "__main__":
     unittest.main()

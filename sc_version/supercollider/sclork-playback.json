@@ -6,6 +6,9 @@
       69,
       81
     ],
+    "ceiling_midi_notes": [
+      107
+    ],
     "target_rms": 0.05,
     "peak_ceiling": 0.65,
     "max_gain": 16.0,
@@ -88,7 +91,7 @@
       "gain": 5.26947
     },
     "sc.sclork.doubleBass": {
-      "gain": 3.258987
+      "gain": 1.9
     },
     "sc.sclork.everythingRhodes": {
       "gain": 0.003854

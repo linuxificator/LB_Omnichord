@@ -76,4 +76,9 @@ SynthDef(\omniRoom, {
     );
     Out.ar(out, wet * level.max(0) * master.clip(0, 1));
 }).add;
+
+SynthDef(\omniMasterOutput, { |in=0, out=0, ceiling=0.95|
+    var signal = LeakDC.ar(In.ar(in, 2));
+    Out.ar(out, Limiter.ar(signal, ceiling.clip(0.1, 1), 0.005));
+}).add;
 )

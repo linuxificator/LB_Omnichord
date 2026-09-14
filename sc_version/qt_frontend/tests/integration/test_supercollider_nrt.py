@@ -25,6 +25,68 @@ BATCH_SIZE = 12
     "SuperCollider is unavailable",
 )
 class SuperColliderNonRealtimeTests(unittest.TestCase):
+    def test_strum_ceiling_is_finite_for_repaired_source_definitions(self) -> None:
+        regression_programs = {
+            "sc.sclork.acidOto3091",
+            "sc.sclork.acidOto3092",
+            "sc.sclork.combs",
+            "sc.sclork.doubleBass",
+            "sc.sclork.tubularBell",
+        }
+        catalog = json.loads(
+            (SC_ROOT / "sclork-programs.json").read_text(encoding="utf-8")
+        )["programs"]
+        indexes = [
+            index
+            for index, program in enumerate(catalog)
+            if program["program_id"] in regression_programs
+        ]
+        self.assertEqual(len(indexes), len(regression_programs))
+        start_index = min(indexes)
+        count = max(indexes) - start_index + 1
+        with tempfile.TemporaryDirectory(prefix="lb-sclork-register-") as temporary:
+            output = Path(temporary) / "strum-ceiling.wav"
+            environment = dict(os.environ)
+            environment.update(
+                {
+                    "QT_QPA_PLATFORM": "offscreen",
+                    "OMNICHORD_SC_NRT_OUTPUT": str(output),
+                    "OMNICHORD_SC_NRT_START": str(start_index),
+                    "OMNICHORD_SC_NRT_COUNT": str(count),
+                    # MIDI 107, the public strum's upper inclusive boundary.
+                    "OMNICHORD_SC_NRT_FREQUENCY": "3951.066410",
+                }
+            )
+            completed = subprocess.run(
+                ["sclang", "-D", str(SC_ROOT / "tests" / "sclork_nrt_render.scd")],
+                cwd=SC_ROOT,
+                env=environment,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=45,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout)
+            frames, sample_rate = soundfile.read(
+                output,
+                dtype="float64",
+                always_2d=True,
+            )
+        self.assertEqual(sample_rate, SAMPLE_RATE)
+        segment_frames = round(SEGMENT_SECONDS * SAMPLE_RATE)
+        for catalog_index in indexes:
+            relative = catalog_index - start_index
+            segment = frames[
+                relative * segment_frames : (relative + 1) * segment_frames
+            ]
+            rms = math.sqrt(float(numpy.mean(numpy.square(segment))))
+            peak = float(numpy.max(numpy.abs(segment)))
+            with self.subTest(program=catalog[catalog_index]["program_id"]):
+                self.assertTrue(math.isfinite(rms))
+                self.assertTrue(math.isfinite(peak))
+                self.assertLess(peak, 1.0)
+
     def test_all_sclork_programs_render_bounded_finite_audio(self) -> None:
         artifact_root = Path(
             os.environ.get("OMNICHORD_TEST_ARTIFACT_DIR", ROOT / "test-artifacts")

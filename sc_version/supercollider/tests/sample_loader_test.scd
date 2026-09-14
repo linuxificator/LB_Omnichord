@@ -119,6 +119,21 @@ if((~omniSamplePlaybackRate.value(440, 69, 100) - (2 ** (1 / 12))).abs
     failed = true;
     "VSCO_SFZ_TUNE_RATE_FAILED".postln;
 };
+{
+    var visited = List.new;
+    var record = (sampleNodes: [
+        (id: "alive-a", alive: true),
+        (id: "ended", alive: false),
+        (id: "alive-b", alive: true)
+    ]);
+    ~omniForEachLiveSampleNode.value(record, { |sampleNode|
+        visited.add(sampleNode[\id])
+    });
+    if(visited.asArray != ["alive-a", "alive-b"]) {
+        failed = true;
+        "VSCO_ENDED_SAMPLE_NODE_REUSED_FAILED".postln;
+    };
+}.value;
 triggerBase = ~omniSampleRegions["sample.vsco.fluteexpvib"][0];
 attackRegion = triggerBase.copy;
 releaseRegion = triggerBase.copy;
