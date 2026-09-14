@@ -19,6 +19,7 @@ var files = [
     "tests/core_synthdefs_test.scd",
     "tests/coordinator_service.scd",
     "tests/sample_loader_test.scd",
+    "tests/sample_nrt_render.scd",
     "tests/sequencer_boundary_test.scd",
     "tests/sclork_loader_test.scd",
     "tests/sclork_compile_audit.scd",

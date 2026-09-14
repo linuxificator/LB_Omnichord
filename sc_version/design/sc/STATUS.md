@@ -53,6 +53,9 @@ Target currently exercised: Linux x86_64
 - Sequential round-robin state advances only for admitted notes and is scoped
   by musical owner, program, key, articulation and velocity layer. OMNI drums
   and a MIDI row therefore cannot disturb each other's sample sequence.
+- Deterministic non-realtime tests render the production mono and stereo
+  sample SynthDefs from synthetic fixtures, including gated release, without
+  taking over the workstation's live audio session.
 - Compiling and rendering every SCLOrk definition proves loadability and basic
   signal production, not musical calibration across registers, dynamics and
   long performances. Some definitions clip under the generic audit stimulus
