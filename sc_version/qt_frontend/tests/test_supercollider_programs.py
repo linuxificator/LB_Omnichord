@@ -70,6 +70,25 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
             ["attack_ms", "decay_ms", "sustain", "release_ms"],
         )
         self.assertIn("portamento_ms", {control.key for control in warsaw.controls})
+        acid = [item for item in synths if item.key.startswith("sc.omni.acid")]
+        self.assertEqual(len(acid), 4)
+        self.assertTrue(all(item.supports_riff_articulation for item in acid))
+        for synth in (item for item in synths if item.kind == "synth"):
+            with self.subTest(program=synth.key):
+                self.assertLessEqual(
+                    sum(control.group == "extra" for control in synth.controls),
+                    4,
+                )
+                lower_keys = [
+                    control.key for control in synth.controls
+                    if control.group == "common"
+                ]
+                adsr = [
+                    key for key in (
+                        "attack_ms", "decay_ms", "sustain", "release_ms"
+                    ) if key in lower_keys
+                ]
+                self.assertEqual(lower_keys[:len(adsr)], adsr)
 
     def test_vsco_browser_covers_all_pitched_sources_in_musical_groups(self) -> None:
         choices = load_vsco_browser(SC_ROOT / "vsco-manifest.json")

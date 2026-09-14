@@ -617,6 +617,12 @@ class StaticContractTests(unittest.TestCase):
         self.assertIn('text: "RST"', mode_reset)
         self.assertIn('root.mode === "sample" ? "PCM" : "SYN"', mode_reset)
 
+        synth_section = (ROOT / "gui" / "SynthSection.qml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("sampleChoiceColumns(root.role)", synth_section)
+        self.assertIn("synthSupportsRiffArticulation(root.role)", synth_section)
+
     def test_chord_gate_and_grouped_row_roll_controls_are_present(self) -> None:
         qml = (ROOT / "gui" / "Main.qml").read_text(encoding="utf-8")
         self.assertIn("text: performanceBackend.chordGateButtonText", qml)
