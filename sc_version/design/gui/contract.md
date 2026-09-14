@@ -2,8 +2,8 @@
 
 Status: authoritative GUI structure contract
 Owner: Qt/QML user interface
-Applies to: active `amysynth_version` implementation
-Last verified: 2026-09-05
+Applies to: shared Qt surface; SC-specific overrides are explicit below
+Last verified: 2026-09-14
 
 ## Screens
 
@@ -219,4 +219,10 @@ height.
 
 ## UI state versus audio state
 
-UI changes must first update application state and then generate AMY wire commands. The GUI never directly manipulates AMY internals.
+UI changes first update application state and then use the edition's typed
+transport boundary. The GUI never directly manipulates AMY or SuperCollider
+internals.
+
+In the SuperCollider edition, bass, strum and chord use the two-button
+`SYN`/`PCM` plus `RST` stack and the compact family/variant/articulation layout
+defined in [`../sc/INSTRUMENT_BROWSER.md`](../sc/INSTRUMENT_BROWSER.md).

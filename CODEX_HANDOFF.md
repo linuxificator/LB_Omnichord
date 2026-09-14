@@ -18,6 +18,11 @@ Updated: 2026-09-14
   engine exercised every admitted SCLOrk voice, VSCO range fallback and all
   percussion roles without `/n_free` or buffer-allocation failures. See
   `sc_version/design/sc/PLAYBACK_QUALIFICATION.md`.
+- The SC instrument UI now separates 80 qualified synth programs from a compact
+  PCM browser with 22 VSCO families and 66 canonical choices. SynthDef scalar
+  defaults drive a reviewed parameter surface; ADSR is lower-left, PCM
+  variants/articulations use two aligned button rows, and engine prefixes are
+  hidden. See `sc_version/design/sc/INSTRUMENT_BROWSER.md`.
 - The prior complete local matrix passed at commit `515d8bc`, including all 109
   SCLOrk non-realtime renders and the native sample-player render. GitHub run
   `34794953001` passed the independent SC test/package workflow with pinned

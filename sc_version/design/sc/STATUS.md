@@ -27,7 +27,8 @@ Target currently exercised: Linux x86_64
   messages carry that exact revision too; they no longer fall back to revision
   1 and lose the selected program's prepared controls.
 - The four native acid voices support the current conservative TB-303
-  articulation contract.
+  articulation contract, implement the visible ADSR controls and advertise
+  riff articulation support with the bass-row orange indicator.
 - All 109 pinned SCLOrkSynths definitions compile and remain in the auditable
   source inventory. The pitched browser admits 76 measured definitions; 31
   raw drum definitions remain available to the dedicated drum path and two
@@ -35,11 +36,16 @@ Target currently exercised: Linux x86_64
   The automated float NRT audit exercises the browser voices at MIDI A2, A4
   and A5 with bounded per-program output calibration.
 - The generated VSCO manifest contains all 75 source mappings and 3,163 sample
-  regions. Their complete keyswitch articulation set is exposed as 96 stable,
-  directly selectable program identities. The dedicated percussion identity
-  is kept out of the pitched browser, leaving 95 visible VSCO articulations, so
-  playable notes are never stolen for frontend keyswitches. Startup requires
-  that percussion program to load before the engine announces readiness.
+  regions. The PCM browser groups them into 22 instrument families and 66
+  canonical pitched variant/articulation choices. Equivalent standalone and
+  key-switch views are merged without dropping recorded instruments. The
+  dedicated percussion identity remains drum-only, so playable notes are
+  never stolen for frontend key-switches. Startup requires that percussion
+  program to load before the engine announces readiness.
+- OMNI bass, strum and chord selection is partitioned into `SYN` and `PCM`
+  views. Synth controls come from checked-in source defaults and a reviewed
+  alias/range vocabulary; engine names and ineffective native parameters are
+  not exposed as UI promises. See [`INSTRUMENT_BROWSER.md`](INSTRUMENT_BROWSER.md).
 - Legacy AMY patch keys are accepted only as preset-migration aliases. They do
   not appear in the SC instrument browser and all outgoing program selections
   use canonical `sc.*` or `sample.*` identities.

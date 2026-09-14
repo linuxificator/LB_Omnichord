@@ -44,6 +44,8 @@ For every SuperCollider edition task, first read:
 7. [`sc/STATUS.md`](sc/STATUS.md)
 8. [`sc/PLAYBACK_QUALIFICATION.md`](sc/PLAYBACK_QUALIFICATION.md) when changing
    instruments, samples, drums, gain staging or voice lifetimes
+9. [`sc/INSTRUMENT_BROWSER.md`](sc/INSTRUMENT_BROWSER.md) when changing
+   instrument selection, sample grouping or program controls
 
 Then read the category README and owning contracts for every subsystem being
 changed. If `../../CODEX_HANDOFF.md` exists, read it for operational state; it

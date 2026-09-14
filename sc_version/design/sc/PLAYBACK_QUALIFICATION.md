@@ -21,8 +21,10 @@ boundary:
   unstable or non-finite output at ordinary musical pitches;
 - the remaining 76 SCLOrk definitions are admitted through the checked-in
   playback profile;
-- four owned acid voices and 95 VSCO articulation programs complete the 175
-  visible choices.
+- four owned acid voices and 66 canonical VSCO pitched choices complete the
+  146 program identities behind the compact `SYN`/`PCM` browser. The PCM
+  roller itself stays at 22 families; variant and articulation buttons expose
+  every non-duplicate recorded choice.
 
 This separation keeps upstream material inspectable without presenting every
 compilable graph as a safe musical instrument.
