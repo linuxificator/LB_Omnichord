@@ -12,7 +12,7 @@ var blockSize = ("OMNICHORD_SC_BLOCK_SIZE".getenv ? "64").asInteger;
 var maxNodes = ("OMNICHORD_SC_MAX_NODES".getenv ? "4096").asInteger;
 var maxBuffers = ("OMNICHORD_SC_MAX_BUFFERS".getenv ? "8192").asInteger;
 var memKiB = ("OMNICHORD_SC_MEM_KIB".getenv ? "262144").asInteger;
-var protocolVersion = 1;
+var protocolVersion = 2;
 var validateOnly = ("OMNICHORD_SC_VALIDATE_ONLY".getenv ? "0").asInteger == 1;
 var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 
@@ -517,7 +517,7 @@ s.waitForBoot({
 
     ~omniSpawnDrum = {
         |owner, role, requestedProgram, revision, padId, note, velocity,
-         logicalBus|
+         logicalBus, maxDurationOverride=0|
         var nativePad = ~omniNativeDrumPads[padId.asString];
         ~omniDrumOrdinal = ~omniDrumOrdinal + 1;
         if(nativePad.notNil) {
@@ -537,9 +537,13 @@ s.waitForBoot({
             var nativeVelocity = velocity * (
                 valueAt.value(nativePad, "gain_db").asFloat.dbamp
             );
-            var maxDuration = (
-                valueAt.value(nativePad, "max_duration_ms").asFloat / 1000
-            ).max(0.005);
+            var defaultMaxDuration =
+                valueAt.value(nativePad, "max_duration_ms").asFloat / 1000;
+            var maxDuration = if(maxDurationOverride.asFloat > 0) {
+                defaultMaxDuration.min(maxDurationOverride.asFloat / 1000)
+            } {
+                defaultMaxDuration
+            }.max(0.005);
             if(nativeProgram != requestedProgram.asString) {
                 ("LB_OMNICHORD_SC_DRUM_PROFILE_MISMATCH pad=" ++ padId
                     ++ " requested=" ++ requestedProgram
@@ -586,7 +590,8 @@ s.waitForBoot({
                 revision,
                 padId,
                 velocity,
-                logicalBus
+                logicalBus,
+                maxDurationOverride
             );
         } {
         if(requestedProgram.asString.beginsWith("sample.") and: {

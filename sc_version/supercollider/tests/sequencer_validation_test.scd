@@ -38,9 +38,15 @@ if(~omniEventValidationError.value(
 };
 if(~omniEventValidationError.value(
     "drumHit", ["rhythm/drums", "low_primary/kick", "program", 1,
-        "kick", 36, 0.8, 0]
+        "kick", 36, 0.8, 0, 0]
 ).notNil) {
     Error("valid drum payload was rejected").throw;
+};
+if(~omniEventValidationError.value(
+    "drumHit", ["rhythm/drums", "low_primary/kick", "program", 1,
+        "kick", 36, 0.8, 0, -1]
+).asString != "invalid-drum-max-duration") {
+    Error("negative drum duration cap was accepted").throw;
 };
 
 "LB_OMNICHORD_SC_SEQUENCER_VALIDATION_OK".postln;

@@ -26,8 +26,10 @@ var directory = thisProcess.nowExecutingPath.dirname.dirname;
         velocity, logicalBus, extraArgs]
 };
 ~omniSpawnDrum = {
-    |owner, role, program, revision, pad, note, velocity, logicalBus|
-    [owner, role, program, revision, pad, note, velocity, logicalBus]
+    |owner, role, program, revision, pad, note, velocity, logicalBus,
+     maxDuration|
+    [owner, role, program, revision, pad, note, velocity, logicalBus,
+        maxDuration]
 };
 ~omniTraceSequenceEvent = {
     |logicalTick, executionId, definitionId, revision, eventOrdinal,
@@ -48,7 +50,7 @@ OSCdef(\omniTestHello, { |message, time, address|
         ~omniReplyAddress,
         '/omni/v1/ready',
         "coordinator-test",
-        1,
+        2,
         "test-catalog",
         "ready"
     );

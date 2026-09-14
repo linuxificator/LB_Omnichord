@@ -15,6 +15,7 @@ class ScDrumEvent:
     slot: str
     velocity: int
     semantic_roles: frozenset[str]
+    max_duration_ms: int
 
     @property
     def gate_key(self) -> str:
@@ -125,9 +126,9 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
         events: list[ScDrumEvent] = []
         previous = -1
         for atom in sequence:
-            if not isinstance(atom, list) or len(atom) != 5:
+            if not isinstance(atom, list) or len(atom) != 6:
                 raise ValueError(f"event sequence {sequence_index} has invalid atoms")
-            tick, role_index, velocity, slot_index, semantic_index = map(int, atom)
+            tick, role_index, velocity, slot_index, semantic_index, max_duration = map(int, atom)
             if tick < previous or tick < 0:
                 raise ValueError(f"event sequence {sequence_index} is not ordered")
             if tick % 2:
@@ -136,6 +137,8 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
                 )
             if not 1 <= velocity <= 127:
                 raise ValueError(f"event sequence {sequence_index} has invalid velocity")
+            if max_duration < 0:
+                raise ValueError(f"event sequence {sequence_index} has invalid duration cap")
             try:
                 role = str(roles[role_index])
                 slot = str(slots[slot_index])
@@ -152,7 +155,9 @@ def load_sc_music_catalog(path: Path) -> ScMusicCatalog:
                 raise ValueError("SC drum event references an unknown semantic role") from exc
             if not semantic_roles or role not in semantic_roles:
                 raise ValueError("SC drum event primary role must be semantic")
-            events.append(ScDrumEvent(tick, role, slot, velocity, semantic_roles))
+            events.append(
+                ScDrumEvent(tick, role, slot, velocity, semantic_roles, max_duration)
+            )
             previous = tick
         decoded.append(tuple(events))
 

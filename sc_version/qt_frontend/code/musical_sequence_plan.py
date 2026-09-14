@@ -412,6 +412,7 @@ def _drum_atoms(
         int(sound.note),
         float(level),
         int(logical_bus),
+        0,
     )
 
 
@@ -424,6 +425,7 @@ def _sc_drum_atoms(
     velocity: int,
     logical_bus: int,
     gain: float,
+    max_duration_ms: int,
     program_resolver: Callable[[str, str], tuple[str, str, float]],
 ) -> tuple[str | int | float, ...]:
     program, resolved_pad, kit_gain = program_resolver(kit, slot)
@@ -440,6 +442,7 @@ def _sc_drum_atoms(
         0,
         level,
         int(logical_bus),
+        max(0, int(max_duration_ms)),
     )
 
 
@@ -483,6 +486,7 @@ def _compile_sc_drum_lane(
                     velocity=event.velocity,
                     logical_bus=logical_bus,
                     gain=1.0,
+                    max_duration_ms=event.max_duration_ms,
                     program_resolver=program_resolver,
                 ),
             )
@@ -664,6 +668,7 @@ def _compile_sc_fill_window(
                     velocity=hit.velocity,
                     logical_bus=logical_bus,
                     gain=gain,
+                    max_duration_ms=hit.max_duration_ms,
                     program_resolver=program_resolver,
                 ),
             )

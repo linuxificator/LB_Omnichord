@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 2
+CURRENT_CONFIG_REVISION = 3
 
 
 class SuperColliderConfigError(ValueError):
@@ -88,9 +88,9 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
             f"{revision}; expected {CURRENT_CONFIG_REVISION}"
         )
     protocol_version = _integer(raw, "protocol_version", "$")
-    if protocol_version != 1:
+    if protocol_version != 2:
         raise SuperColliderConfigError(
-            f"$.protocol_version: unsupported version {protocol_version}; expected 1"
+            f"$.protocol_version: unsupported version {protocol_version}; expected 2"
         )
 
     language = _mapping(raw, "language")

@@ -5,7 +5,7 @@ import math
 from typing import Literal
 
 
-PROTOCOL_VERSION = 1
+PROTOCOL_VERSION = 2
 PPQ = 48
 EventKind = Literal[
     "launch",
@@ -59,7 +59,7 @@ def _atoms(kind: EventKind, values: tuple[str | int | float, ...]) -> None:
         "noteOn": 11,
         "noteOff": 2,
         "voiceSet": 3,
-        "drumHit": 8,
+        "drumHit": 9,
     }[kind]
     if len(values) != expected:
         raise ProtocolValidationError(
@@ -132,6 +132,9 @@ def _atoms(kind: EventKind, values: tuple[str | int | float, ...]) -> None:
         logical_bus = _integer("logical bus", values[7])
         if not 0 <= logical_bus <= 10:
             raise ProtocolValidationError("logical bus must be in 0..10")
+        duration = _number("drum max duration", values[8])
+        if not 0 <= duration <= 600_000:
+            raise ProtocolValidationError("drum max duration must be in 0..600000 ms")
 
 
 @dataclass(frozen=True, slots=True)

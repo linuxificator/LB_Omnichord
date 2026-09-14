@@ -628,7 +628,8 @@ SynthDef(\omniDrumSampleStereo, {
 }).add;
 
 ~omniSpawnDrumSample = {
-    |owner, handle, program, revision, padId, velocity, logicalBus|
+    |owner, handle, program, revision, padId, velocity, logicalBus,
+     maxDurationOverride=0|
     var selection;
     if(~omniSampleReady.value(program, revision).not) {
         false
@@ -668,8 +669,12 @@ SynthDef(\omniDrumSampleStereo, {
                     \gainDb, jsonAt.value(pad, "gain_db").asFloat
                         + jsonAt.value(kit, "kit_gain_db").asFloat,
                     \playbackRate, jsonAt.value(pad, "playback_rate").asFloat,
-                    \maxDuration,
-                        jsonAt.value(pad, "max_duration_ms").asFloat / 1000,
+                    \maxDuration, if(maxDurationOverride.asFloat > 0) {
+                        (jsonAt.value(pad, "max_duration_ms").asFloat / 1000)
+                            .min(maxDurationOverride.asFloat / 1000)
+                    } {
+                        jsonAt.value(pad, "max_duration_ms").asFloat / 1000
+                    },
                     \fadeOut, jsonAt.value(pad, "fade_out_ms").asFloat / 1000,
                     \highpass, jsonAt.value(pad, "highpass_hz").asFloat,
                     \lowpass, jsonAt.value(pad, "lowpass_hz").asFloat,

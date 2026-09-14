@@ -94,7 +94,8 @@ class SampleRepositoryTests(unittest.TestCase):
                 install_samples=False,
             )
             persisted = json.loads(target.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 2)
+            self.assertEqual(persisted["config_revision"], 3)
+            self.assertEqual(persisted["protocol_version"], 2)
             self.assertEqual(persisted["samples"]["vsco_root"], "~/VSCO-2-CE")
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
             self.assertEqual(config.samples.repository, DEFAULT_REPOSITORY)
@@ -133,11 +134,12 @@ class SampleRepositoryTests(unittest.TestCase):
                 "/media/samples/VSCO-2-CE", target.read_text(encoding="utf-8")
             )
 
-    def test_revision_two_missing_buffer_capacity_is_migrated(self) -> None:
+    def test_revision_two_protocol_and_missing_buffer_capacity_are_migrated(self) -> None:
         data = json.loads(
             (FRONTEND / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
         data["config_revision"] = 2
+        data["protocol_version"] = 1
         data["server"].pop("max_buffers")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -159,7 +161,8 @@ class SampleRepositoryTests(unittest.TestCase):
             )
 
             persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 2)
+            self.assertEqual(persisted["config_revision"], 3)
+            self.assertEqual(persisted["protocol_version"], 2)
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
             self.assertEqual(config.server.max_buffers, 8192)
 

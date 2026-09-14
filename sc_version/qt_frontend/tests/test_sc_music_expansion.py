@@ -223,6 +223,37 @@ class ScMusicExpansionTests(unittest.TestCase):
         self.assertEqual(max(counts), 57)
         self.assertTrue(all(count <= 64 for count in counts))
 
+    def test_reviewed_short_drum_caps_survive_catalogue_and_protocol_compilation(self) -> None:
+        catalog_caps = {
+            event.max_duration_ms
+            for kit in DRUM_KITS
+            for rhythm_id in self.rhythm_ids
+            for level in self.catalog.arrangement(kit.kit_id, rhythm_id).levels
+            for event in level
+        }
+        self.assertEqual(catalog_caps, {0, 140, 180})
+        compiled_caps = {
+            int(event.atoms[8])
+            for kit in ("pcm-tight-studio", "sc-basic")
+            for definition in compile_drum_lane(
+                config={
+                    "id": "punk",
+                    "percussion_activity": 5,
+                    "fill_order": [0, 1, 2, 3, 4],
+                    "fill_density_bars": 2,
+                },
+                catalog=self.catalog,
+                kit=kit,
+                logical_bus=1,
+                generation=1,
+                program_resolver=lambda _kit, slot: ("test", slot, 1.0),
+            ).definitions
+            for event in definition.events
+            if event.kind == "drumHit"
+        }
+        self.assertIn(140, compiled_caps)
+        self.assertIn(180, compiled_caps)
+
     def test_explicit_pad_identity_is_not_encoded_as_a_gm_note(self) -> None:
         for kit in (item for item in DRUM_KITS if item.engine == "sample"):
             program, pad, _gain = resolve_hit(kit.kit_id, "backbeat_primary")

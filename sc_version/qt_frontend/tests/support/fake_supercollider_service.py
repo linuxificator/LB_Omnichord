@@ -7,12 +7,19 @@ import argparse
 import json
 from pathlib import Path
 import signal
+import sys
 import threading
 from typing import Any
 
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
+
+
+CODE_DIR = Path(__file__).resolve().parents[2] / "code"
+sys.path.insert(0, str(CODE_DIR))
+
+from engine_protocol import PROTOCOL_VERSION  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -54,7 +61,7 @@ class FakeSuperColliderService:
             self._reply_port = int(arguments[2])
             self._send(
                 "/omni/v1/ready",
-                ["fake-engine", 1, "fake-catalog", "ready"],
+                ["fake-engine", PROTOCOL_VERSION, "fake-catalog", "ready"],
             )
         elif address == "/omni/v1/tx/commit":
             self._send(

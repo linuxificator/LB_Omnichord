@@ -16,7 +16,7 @@ from pythonosc.udp_client import SimpleUDPClient
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
-from engine_protocol import NoteOff, NoteOn  # noqa: E402
+from engine_protocol import NoteOff, NoteOn, PROTOCOL_VERSION  # noqa: E402
 from resolved_config import resolve_amy_config_data  # noqa: E402
 from supercollider_client import SuperColliderClient  # noqa: E402
 
@@ -49,7 +49,7 @@ class _FakeSuperCollider:
             try:
                 client.send_message(
                     "/omni/v1/ready",
-                    ["fake-engine", 1, "fake-catalog", "ready"],
+                    ["fake-engine", PROTOCOL_VERSION, "fake-catalog", "ready"],
                 )
             finally:
                 client._sock.close()
@@ -105,8 +105,8 @@ class SuperColliderClientTests(unittest.TestCase):
         self.config_path.write_text(
             json.dumps(
                 {
-                    "config_revision": 2,
-                    "protocol_version": 1,
+                    "config_revision": 3,
+                    "protocol_version": 2,
                     "language": {
                         "host": "127.0.0.1",
                         "port": self.fake.port,

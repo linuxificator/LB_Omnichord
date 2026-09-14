@@ -57,8 +57,8 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                 config_path.write_text(
                     json.dumps(
                         {
-                            "config_revision": 2,
-                            "protocol_version": 1,
+                            "config_revision": 3,
+                            "protocol_version": 2,
                             "language": {
                                 "host": "127.0.0.1",
                                 "port": port,
@@ -220,6 +220,7 @@ class SuperColliderCoordinatorProcessTests(unittest.TestCase):
                                             "snare",
                                             38,
                                             0.8,
+                                            0,
                                             0,
                                         ),
                                     )

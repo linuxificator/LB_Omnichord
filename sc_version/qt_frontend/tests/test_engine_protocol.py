@@ -112,6 +112,7 @@ class SequenceEventContractTests(unittest.TestCase):
                     36,
                     0.8,
                     0,
+                    0,
                 ),
             ),
         )
@@ -141,6 +142,24 @@ class SequenceEventContractTests(unittest.TestCase):
                     36,
                     0.8,
                     11,
+                    0,
+                ),
+            )
+        with self.assertRaisesRegex(ProtocolValidationError, "duration"):
+            SequenceEvent(
+                0,
+                0,
+                "drumHit",
+                (
+                    "rhythm/drums",
+                    "low_primary/kick",
+                    "sample.vsco.kit.old-parlour",
+                    1,
+                    "kick",
+                    36,
+                    0.8,
+                    0,
+                    -1,
                 ),
             )
         with self.assertRaisesRegex(ProtocolValidationError, "velocity"):

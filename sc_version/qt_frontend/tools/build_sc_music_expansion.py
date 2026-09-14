@@ -161,7 +161,7 @@ class _EventPool:
         self.semantic_role_sets: list[list[int]] = []
         self._semantic_indexes: dict[tuple[int, ...], int] = {}
         self.sequences: list[list[list[int]]] = []
-        self._indexes: dict[tuple[tuple[int, int, int, int, int], ...], int] = {}
+        self._indexes: dict[tuple[tuple[int, int, int, int, int, int], ...], int] = {}
 
     def _semantic_index(self, event: dict[str, Any]) -> int:
         roles = tuple(
@@ -188,6 +188,7 @@ class _EventPool:
                 int(event["velocity"]),
                 self._slot_index[str(event["slot"])],
                 self._semantic_index(event),
+                int(event.get("max_duration_ms", 0)),
             )
             for event in events
         )

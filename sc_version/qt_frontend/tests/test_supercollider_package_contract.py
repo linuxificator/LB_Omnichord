@@ -83,8 +83,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(config["config_revision"], 2)
-        self.assertEqual(config["protocol_version"], 1)
+        self.assertEqual(config["config_revision"], 3)
+        self.assertEqual(config["protocol_version"], 2)
 
     def test_frozen_entry_uses_sc_supervision_and_contains_no_amy_service(self) -> None:
         entry = (ROOT / "packaging" / "sc_appimage_entry.py").read_text(

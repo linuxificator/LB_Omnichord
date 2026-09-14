@@ -27,7 +27,7 @@
         "noteOn" -> 11,
         "noteOff" -> 2,
         "voiceSet" -> 3,
-        "drumHit" -> 8
+        "drumHit" -> 9
     ];
     var count = expected[action];
     var error = nil;
@@ -90,6 +90,9 @@
         if(atoms[7].isNumber.not or: {
             atoms[7].asInteger < 0 or: { atoms[7].asInteger > 10 }
         }) { error = "invalid-logical-bus" };
+        if(atoms[8].isNumber.not or: {
+            atoms[8].asFloat < 0 or: { atoms[8].asFloat > 600000 }
+        }) { error = "invalid-drum-max-duration" };
     };
     error
 };
@@ -346,7 +349,7 @@
         if(suppressed.not) {
             ~omniSpawnDrum.value(
                 atoms[0], atoms[1], atoms[2], atoms[3], atoms[4],
-                atoms[5], atoms[6], atoms[7]
+                atoms[5], atoms[6], atoms[7], atoms[8]
             );
         };
     };

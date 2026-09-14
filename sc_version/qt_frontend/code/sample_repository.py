@@ -108,7 +108,11 @@ def _migrate_config(
     if not isinstance(data, dict):
         raise SampleRepositoryError("SuperCollider config must contain an object")
     revision = data.get("config_revision")
-    if revision not in (1, CURRENT_CONFIG_REVISION):
+    if (
+        isinstance(revision, bool)
+        or not isinstance(revision, int)
+        or not 1 <= revision <= CURRENT_CONFIG_REVISION
+    ):
         raise SampleRepositoryError(
             f"unsupported SuperCollider config revision {revision!r}"
         )
@@ -125,14 +129,16 @@ def _migrate_config(
         if "repository" not in samples:
             samples["repository"] = DEFAULT_REPOSITORY
             changed = True
-        migrated["config_revision"] = CURRENT_CONFIG_REVISION
-        changed = True
-
     server = migrated.get("server")
     if not isinstance(server, dict):
         raise SampleRepositoryError("SuperCollider config server object is missing")
     if "max_buffers" not in server:
         server["max_buffers"] = default_max_buffers
+        changed = True
+
+    if revision < CURRENT_CONFIG_REVISION:
+        migrated["protocol_version"] = 2
+        migrated["config_revision"] = CURRENT_CONFIG_REVISION
         changed = True
 
     return migrated, changed

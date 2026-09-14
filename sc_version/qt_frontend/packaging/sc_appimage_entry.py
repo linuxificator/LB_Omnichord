@@ -65,10 +65,13 @@ def verify_config_migrations(root: Path) -> None:
     shipped_path = root / "config" / "supercollider.json"
     shipped = json.loads(shipped_path.read_text(encoding="utf-8"))
     expected_buffers = shipped["server"]["max_buffers"]
-    for revision in (1, 2):
+    for revision in (1, 2, 3):
         legacy = json.loads(json.dumps(shipped))
         legacy["config_revision"] = revision
-        legacy["server"].pop("max_buffers")
+        if revision < 3:
+            legacy["protocol_version"] = 1
+        if revision < 2:
+            legacy["server"].pop("max_buffers")
         if revision == 1:
             legacy["samples"].pop("repository")
             legacy["samples"]["vsco_root"] = LEGACY_SAMPLE_ROOT
@@ -85,7 +88,9 @@ def verify_config_migrations(root: Path) -> None:
             persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
             if (
                 persisted["config_revision"] != shipped["config_revision"]
+                or persisted["protocol_version"] != shipped["protocol_version"]
                 or persisted["server"]["max_buffers"] != expected_buffers
+                or migrated.protocol_version != shipped["protocol_version"]
                 or migrated.server.max_buffers != expected_buffers
             ):
                 raise RuntimeError(
