@@ -109,13 +109,17 @@ class SuperColliderPackageContractTests(unittest.TestCase):
     def test_natural_voice_lifetime_guards_server_node_updates(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
         self.assertIn("record[\\sourceAlive] ? true", bootstrap)
-        self.assertIn("record[\\outputAlive] ? true", bootstrap)
         self.assertIn("record[\\releaseRequested] = true", bootstrap)
         self.assertIn("record[\\releaseRequested].not", bootstrap)
         self.assertIn("record[\\outputAlive] = false", bootstrap)
         self.assertIn("var voiceGroup = Group.tail(~omniSourceGroup)", bootstrap)
         self.assertIn("voiceGroup: voiceGroup", bootstrap)
         self.assertIn("voiceGroup.free", bootstrap)
+        self.assertIn("record[\\voiceGroup].set(\\gate, 0)", bootstrap)
+        self.assertIn("voiceGroup.set(\\gate, 0)", bootstrap)
+        self.assertIn("record[\\voiceGroup].set(\\outputGain, value)", bootstrap)
+        self.assertNotIn("record[\\outputNode].set(", bootstrap)
+        self.assertNotIn("outputNode.set(", bootstrap)
         self.assertNotIn("sourceNode.free", bootstrap)
 
     def test_sample_release_and_retune_use_stable_control_buses(self) -> None:

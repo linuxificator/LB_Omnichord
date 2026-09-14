@@ -67,6 +67,15 @@ output wrapper. Cleanup frees that group instead of addressing a source node
 which may already have ended, while explicit alive/release state prevents late
 parameter or gate messages. The package contract freezes this ownership rule.
 
+A longer continuation then found the matching `/n_set` side of that race: an
+alive flag is necessarily delayed because `/n_end` travels from server to
+language, so it cannot make a later command to an ephemeral child node atomic.
+Native voice gate, frequency, gain, accent and brightness changes now address
+the persistent owned group instead. The wrapper's gain control is deliberately
+named `outputGain`, preventing a group update from also multiplying any source
+SynthDef's own `gain`. The group remains valid until wrapper cleanup, so a
+naturally ended source is harmless without imposing timing or polling on Qt.
+
 ## Coverage and balance boundary
 
 The compiler still audits all 109 pinned SCLOrk definitions. The pitched
@@ -136,3 +145,8 @@ the same real process topology averaged 0.05% CPU for `sclang`, 0.75% for
 during startup and aggressive catalogue cycling is therefore not an idle
 `sclang` busy loop. The endurance runner's `--startup-idle-seconds` option
 makes this boundary repeatable.
+
+The first unbounded continuation subsequently stopped after 154.7 seconds on
+one native-child `/n_set` race. This was a useful failure, not accepted release
+evidence; the persistent-group control change above is its regression fix and
+the clean-runtime counter is restarted after validation.

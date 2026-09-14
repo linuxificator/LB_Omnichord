@@ -59,8 +59,8 @@ Target currently exercised: Linux x86_64
   Upper-register filter adapters keep four pinned source definitions finite at
   the full strum boundary. Sample voices map stable lifetime control buses, so
   later release or retune never targets a naturally ended region node. Native
-  SCLOrk voices use owned node groups, so wrapper cleanup cannot race a
-  naturally ended source into a duplicate server free.
+  SCLOrk voices use owned node groups for both control and cleanup, so neither
+  `/n_set` nor `/n_free` can race a naturally ended source child.
 - Legacy AMY patch keys are accepted only as preset-migration aliases. They do
   not appear in the SC instrument browser and all outgoing program selections
   use canonical `sc.*` or `sample.*` identities.

@@ -48,10 +48,10 @@ thisProcess.openUDPPort(languagePort);
     ~omniVoices.values.do { |record|
         if(record[\nativeName].notNil and: {
             record[\baseFrequency].notNil and: {
-                record[\sourceAlive] ? true
+                record[\voiceGroup].notNil
             }
         }) {
-            record[\sourceNode].set(
+            record[\voiceGroup].set(
                 \freq,
                 record[\baseFrequency] * ratio
             );
@@ -91,14 +91,10 @@ thisProcess.openUDPPort(languagePort);
         } {
         if(record[\outputNode].notNil) {
             record[\releaseRequested] = true;
-            if(record[\outputAlive] ? true) {
-                record[\outputNode].set(\gate, 0)
-            };
-            if((record[\releaseMode] == \gated) and: {
-                record[\sourceAlive] ? true
-            }) {
-                record[\sourceNode].set(\gate, 0);
-            };
+            // The owned group outlives both child synths. Addressing it avoids
+            // an /n_end versus /n_set race when a native source ends between
+            // the language-side alive check and server command execution.
+            record[\voiceGroup].set(\gate, 0);
         } {
             if(record[\sourceAlive] ? true) {
                 record[\sourceNode].set(\gate, 0)
@@ -127,25 +123,44 @@ thisProcess.openUDPPort(languagePort);
             if(record[\sample] == true) {
                 ~omniRetuneSampleHandle.value(record, value);
             } {
-                if(record[\sourceAlive] ? true) {
-                    record[\sourceNode].set(
+                if(record[\voiceGroup].notNil) {
+                    record[\voiceGroup].set(
                         \freq,
                         value * (2 ** ~omniPitchBendOctaves)
                     );
+                } {
+                    if(record[\sourceAlive] ? true) {
+                        record[\sourceNode].set(
+                            \freq,
+                            value * (2 ** ~omniPitchBendOctaves)
+                        );
+                    };
                 };
             };
             };
         };
-        if(name == "accent" and: { record[\sourceAlive] ? true }) {
-            record[\sourceNode].set(\t_accent, 1)
+        if(name == "accent" and: { record[\voiceGroup].notNil }) {
+            record[\voiceGroup].set(\t_accent, 1)
+        } {
+            if(name == "accent" and: { record[\sourceAlive] ? true }) {
+                record[\sourceNode].set(\t_accent, 1)
+            };
         };
         if(name == "gain") {
-            if(record[\outputAlive] ? (record[\sourceAlive] ? true)) {
-                (record[\outputNode] ? record[\sourceNode]).set(\gain, value)
+            if(record[\voiceGroup].notNil) {
+                record[\voiceGroup].set(\outputGain, value)
+            } {
+                if(record[\sourceAlive] ? true) {
+                    record[\sourceNode].set(\gain, value)
+                }
             }
         };
-        if(name == "brightness" and: { record[\sourceAlive] ? true }) {
-            record[\sourceNode].set(\brightness, value)
+        if(name == "brightness" and: { record[\voiceGroup].notNil }) {
+            record[\voiceGroup].set(\brightness, value)
+        } {
+            if(name == "brightness" and: { record[\sourceAlive] ? true }) {
+                record[\sourceNode].set(\brightness, value)
+            };
         };
     };
 };
@@ -445,7 +460,7 @@ s.waitForBoot({
                     }
                 }) {
                     record[\releaseRequested] = true;
-                    outputNode.set(\gate, 0);
+                    voiceGroup.set(\gate, 0);
                 };
             };
         } {
