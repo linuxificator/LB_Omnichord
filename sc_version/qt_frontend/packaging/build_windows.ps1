@@ -50,5 +50,6 @@ Get-FileHash $zip -Algorithm SHA256 | ForEach-Object {
 } | Set-Content -Encoding ascii "$zip.sha256"
 python (Join-Path $frontend "packaging\package_audit.py") `
     --platform Windows-x86_64 --tree $packageRoot --package $zip `
+    --forbidden-runtime-exempt-prefix "sc-runtime" `
     --max-package-bytes 600000000 --output "$zip.package-audit.json"
 Write-Output $zip

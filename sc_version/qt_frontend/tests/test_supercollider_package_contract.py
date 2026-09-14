@@ -121,6 +121,12 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             '--forbidden-runtime-exempt-prefix "Contents/Resources/sc-runtime"',
             macos_builder,
         )
+        windows_builder = (ROOT / "packaging" / "build_windows.ps1").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            '--forbidden-runtime-exempt-prefix "sc-runtime"', windows_builder
+        )
 
     def test_macos_frozen_entry_finds_runtime_in_contents_resources(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
