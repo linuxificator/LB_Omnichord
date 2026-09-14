@@ -151,7 +151,7 @@ class MidiEngine:
         self.client.configure_part(
             "midi/drums",
             "sample.gm.percussion",
-            1,
+            self.client.allocate_program_revision(),
             self.drum_bus,
             {},
         )
@@ -188,7 +188,7 @@ class MidiEngine:
         bus = self.row_buses[row]
         self.silence_row(row)
         self._programs[row] = str(key)
-        self._program_revisions[row] += 1
+        self._program_revisions[row] = self.client.allocate_program_revision()
         self.client.configure_part(
             self._row_owner(row),
             str(key),

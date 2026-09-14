@@ -236,6 +236,13 @@ class SuperColliderClient:
             self._transaction_id += 1
             return self._transaction_id
 
+    def allocate_program_revision(self) -> int:
+        """Return a session-wide revision, unique across every musical part."""
+
+        with self._message_lock:
+            self._program_counter += 1
+            return self._program_counter
+
     @staticmethod
     def _transaction_records(
         plan: LanePlan,
@@ -534,10 +541,13 @@ class SuperColliderClient:
             parameters = {}
         if name == self._selected_program[role] and parameters == self._program_params[role]:
             return
-        self._program_counter += 1
-        revision = self._program_counter
+        revision = self.allocate_program_revision()
         logical_bus = self._role_bus("chord" if role == "chord" else role)
-        owners = ("omni/manual", "omni/automatic") if role == "chord" else (f"omni/{role}",)
+        owners = {
+            "chord": ("omni/manual", "rhythm/chords"),
+            "strum": ("omni/strum",),
+            "bass": ("rhythm/bass",),
+        }[role]
         sample_program = name.startswith("sample.")
         if sample_program:
             superseded = [
@@ -754,7 +764,7 @@ class SuperColliderClient:
         elif address == a["bass_running"]:
             self.bass_running = bool(int(value))
             if not self.bass_running:
-                self.release_owner("omni/bass")
+                self.release_owner("rhythm/bass")
             self._publish_bass_lane()
         elif address == a["rhythm_config"]:
             payload = json.loads(str(value))

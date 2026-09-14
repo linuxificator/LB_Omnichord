@@ -66,6 +66,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
     ),
     "sc-compiler": (
         SC_ROOT / "syntax_check.scd",
+        SC_ROOT / "tests" / "program_registry_test.scd",
         SC_ROOT / "tests" / "core_synthdefs_test.scd",
         SC_ROOT / "tests" / "sclork_compile_audit.scd",
         SC_ROOT / "tests" / "sclork_loader_test.scd",

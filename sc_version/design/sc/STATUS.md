@@ -17,6 +17,10 @@ Target currently exercised: Linux x86_64
   quantization, note releases, gates and snapshot lifetimes.
 - Session reset, panic, exact voice handles and global pitch bend are wired
   through the SC runtime.
+- Prepared program parameters are keyed by musical owner as well as stable
+  program identity and session-wide revision. Selecting the same instrument
+  on independent MIDI, manual, bass or automatic-chord parts therefore cannot
+  leak one part's controls into another.
 - The four native acid voices support the current conservative TB-303
   articulation contract.
 - All 109 pinned SCLOrkSynths definitions compile and participate in the

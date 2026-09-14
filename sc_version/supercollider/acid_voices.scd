@@ -102,9 +102,9 @@
     )
 };
 
-~omniAcidArgs = { |program, revision|
+~omniAcidArgs = { |owner, program, revision|
     var args = List.new;
-    ~omniPreparedArgs.value(program, revision).pairsDo { |name, rawValue|
+    ~omniPreparedArgs.value(owner, program, revision).pairsDo { |name, rawValue|
         var target = switch(name.asString,
             "filter_hz", { \cutoffHz },
             "resonance", { \resonanceNormalized },

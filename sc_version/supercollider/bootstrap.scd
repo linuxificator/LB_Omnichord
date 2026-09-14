@@ -21,7 +21,6 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 ~omniEngineSession = ("sc-" ++ UniqueID.next.asString);
 ~omniVoices = Dictionary.new;
 ~omniGestures = Dictionary.new;
-~omniPrograms = Dictionary.new;
 ~omniBusLevels = Array.fill(11, 1.0);
 ~omniRoomLevels = [0.0, 0.0];
 ~omniClock = TempoClock.new(108 / 60);
@@ -34,6 +33,7 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 
 thisProcess.openUDPPort(languagePort);
 (scriptDirectory +/+ "protocol_runtime.scd").load;
+(scriptDirectory +/+ "program_registry.scd").load;
 
 ~omniReply = { |address, path ... args|
     NetAddr(address.ip, address.port).sendMsg(path, *args);
@@ -74,32 +74,6 @@ thisProcess.openUDPPort(languagePort);
     if(~omniResetSampleSession.notNil) { ~omniResetSampleSession.value };
     ~omniPrograms.clear;
     ~omniSetPitchBend.value(0.0);
-};
-
-~omniProgramKey = { |program, revision|
-    program.asString ++ "@" ++ revision.asInteger.asString
-};
-
-~omniPreparedArgs = { |program, revision|
-    var record = ~omniPrograms[~omniProgramKey.value(program, revision)];
-    var args = List.new;
-    if(record.notNil) {
-        record[\values].keysValuesDo { |name, value|
-            args.add(name.asSymbol);
-            args.add(value);
-        };
-    };
-    args.asArray
-};
-
-~omniGenericArgs = { |program, revision|
-    var args = List.new;
-    ~omniPreparedArgs.value(program, revision).pairsDo { |name, value|
-        if([\gain, \attack, \release, \brightness].includes(name)) {
-            args.add(name); args.add(value);
-        };
-    };
-    args.asArray
 };
 
 ~omniReleaseHandle = { |handle|
@@ -218,7 +192,7 @@ OSCdef(\omniProgramPrepare, { |message|
         var program = message[4].asString;
         var revision = message[5].asInteger;
         var logicalBus = message[6].asInteger.clip(0, 10);
-        var key = ~omniProgramKey.value(program, revision);
+        var key = ~omniProgramKey.value(owner, program, revision);
         if(~omniPrograms[key].isNil) {
             ~omniPrograms[key] = (
                 owner: owner,
@@ -236,7 +210,7 @@ OSCdef(\omniProgramPrepare, { |message|
 
 OSCdef(\omniProgramValue, { |message|
     if(~omniCommandValid.value(message)) {
-        var key = ~omniProgramKey.value(message[4], message[5]);
+        var key = ~omniProgramKey.value(message[3], message[4], message[5]);
         var record = ~omniPrograms[key];
         if(record.notNil) {
             record[\values][message[6].asString] = message[7].asFloat;
@@ -248,7 +222,7 @@ OSCdef(\omniProgramRelease, { |message|
     if(~omniCommandValid.value(message)) {
         var program = message[3].asString;
         var revision = message[4].asInteger;
-        ~omniPrograms.removeAt(~omniProgramKey.value(program, revision));
+        ~omniReleaseProgram.value(program, revision);
         if(~omniReleaseSampleProgram.notNil) {
             ~omniReleaseSampleProgram.value(program, revision);
         };
@@ -317,7 +291,7 @@ s.waitForBoot({
         var nativeName = ~omniSclorkProgramName.value(program);
         var acidName = ~omniAcidProgramName.value(program);
         var sampleName = ~omniSampleProgramName.value(program);
-        var preparedArgs = ~omniPreparedArgs.value(program, revision)
+        var preparedArgs = ~omniPreparedArgs.value(owner, program, revision)
             ++ (extraArgs ? []);
         var accentValue = 0;
         extraArgs.pairsDo { |name, value|
@@ -339,7 +313,7 @@ s.waitForBoot({
                     \velocity, velocity,
                     \pitchBendBus, ~omniBendBus.index,
                     \t_accent, accentValue
-                ] ++ ~omniAcidArgs.value(program, revision));
+                ] ++ ~omniAcidArgs.value(owner, program, revision));
             var record = (
                 sourceNode: sourceNode,
                 outputNode: nil,
@@ -423,7 +397,7 @@ s.waitForBoot({
                 \freq, frequency,
                 \velocity, velocity,
                 \bendBus, ~omniBendBus.index
-                ] ++ ~omniGenericArgs.value(program, revision));
+                ] ++ ~omniGenericArgs.value(owner, program, revision));
             var record = (
                 sourceNode: sourceNode,
                 outputNode: nil,

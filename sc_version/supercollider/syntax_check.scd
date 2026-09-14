@@ -4,6 +4,7 @@ var directory = thisProcess.nowExecutingPath.dirname;
 var files = [
     "sequencer.scd",
     "bootstrap.scd",
+    "program_registry.scd",
     "sclork_loader.scd",
     "acid_voices.scd",
     "sample_loader.scd",
@@ -17,6 +18,7 @@ var files = [
     "adapters/waveguideFlute.scd",
     "tests/acid_voice_test.scd",
     "tests/core_synthdefs_test.scd",
+    "tests/program_registry_test.scd",
     "tests/coordinator_service.scd",
     "tests/sample_loader_test.scd",
     "tests/sample_nrt_render.scd",

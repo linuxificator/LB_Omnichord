@@ -60,6 +60,11 @@ class _Client:
             source_path=ROOT / "config" / "amy_config.json",
             source_kind="external",
         )
+        self._program_revision = 0
+
+    def allocate_program_revision(self) -> int:
+        self._program_revision += 1
+        return self._program_revision
 
     @staticmethod
     def note_to_frequency(note: float) -> float:
@@ -841,7 +846,7 @@ class MidiEngineTests(unittest.TestCase):
             [
                 (
                     "configure",
-                    ("midi/row/0", "dx7_215", 1, 4, {"algorithm": 7.0}),
+                    ("midi/row/0", "dx7_215", 2, 4, {"algorithm": 7.0}),
                 ),
                 (
                     "bus_level",
@@ -924,7 +929,7 @@ class MidiEngineTests(unittest.TestCase):
         client.events.clear()
         engine.configure_row(2, "dx7_215", {}, 0.5)
         self.assertIn(
-            ("configure", ("midi/row/2", "dx7_215", 1, 6, {})),
+            ("configure", ("midi/row/2", "dx7_215", 2, 6, {})),
             client.events,
         )
 

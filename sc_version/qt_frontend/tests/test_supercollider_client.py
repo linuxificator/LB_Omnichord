@@ -193,6 +193,40 @@ class SuperColliderClientTests(unittest.TestCase):
         self.assertEqual(bends[0][0], client.session)
         self.assertAlmostEqual(float(bends[0][2]), -0.125)
 
+    def test_program_revisions_and_parameters_are_part_scoped(self) -> None:
+        client = SuperColliderClient(
+            config=None,
+            addresses={},
+            resolved_config=self.resolved,
+            runtime_config_path=self.config_path,
+            asset_root=ROOT,
+        )
+
+        client._set_program(
+            "chord", {"name": "sc.omni.acid303", "params": ["gain", 0.3]}
+        )
+        chord_revision = client._program_revision["chord"]
+        client._set_program(
+            "bass", {"name": "sc.omni.acid303", "params": ["gain", 0.8]}
+        )
+        bass_revision = client._program_revision["bass"]
+        client.close()
+
+        self.assertNotEqual(chord_revision, bass_revision)
+        prepares = [
+            arguments
+            for address, arguments in self.fake.messages
+            if address == "/omni/v1/program/prepare"
+        ]
+        self.assertEqual(
+            [(item[2], item[3], item[4]) for item in prepares],
+            [
+                ("omni/manual", "sc.omni.acid303", chord_revision),
+                ("rhythm/chords", "sc.omni.acid303", chord_revision),
+                ("rhythm/bass", "sc.omni.acid303", bass_revision),
+            ],
+        )
+
     def test_lane_transaction_is_indexed_and_acknowledged(self) -> None:
         from engine_protocol import SequenceDefinition, SequenceEvent
         from musical_sequence_plan import LanePlan
