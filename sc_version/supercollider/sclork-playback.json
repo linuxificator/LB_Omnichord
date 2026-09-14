@@ -1,0 +1,333 @@
+{
+  "schema_revision": 1,
+  "method": {
+    "midi_notes": [
+      45,
+      69,
+      81
+    ],
+    "ceiling_midi_notes": [
+      107
+    ],
+    "target_rms": 0.05,
+    "peak_ceiling": 0.65,
+    "max_gain": 16.0,
+    "max_raw_peak": 64.0,
+    "drum_programs": [
+      "sc.sclork.clapElectro",
+      "sc.sclork.clapGray",
+      "sc.sclork.clapOto309",
+      "sc.sclork.cymbal808",
+      "sc.sclork.cymbalicMCLD",
+      "sc.sclork.hihat1",
+      "sc.sclork.hihatElectro",
+      "sc.sclork.kick808",
+      "sc.sclork.kick_electro",
+      "sc.sclork.kick_oto309",
+      "sc.sclork.oneclapThor",
+      "sc.sclork.snare909",
+      "sc.sclork.snareElectro",
+      "sc.sclork.snareOto309",
+      "sc.sclork.sosHats",
+      "sc.sclork.sosKick",
+      "sc.sclork.sosSnare",
+      "sc.sclork.sosTom",
+      "sc.sclork.squareDrum"
+    ]
+  },
+  "programs": {
+    "sc.sclork.FMRhodes1": {
+      "gain": 8.10252
+    },
+    "sc.sclork.FMRhodes2": {
+      "gain": 12.168055
+    },
+    "sc.sclork.abstractDrum": {
+      "gain": 1.661922
+    },
+    "sc.sclork.acidOto3091": {
+      "gain": 2.242234
+    },
+    "sc.sclork.acidOto3092": {
+      "gain": 4.975714
+    },
+    "sc.sclork.apadMH": {
+      "gain": 0.580945
+    },
+    "sc.sclork.arpoctave": {
+      "gain": 1.188875
+    },
+    "sc.sclork.bassWarsaw": {
+      "gain": 0.553539
+    },
+    "sc.sclork.beating": {
+      "gain": 1.739895
+    },
+    "sc.sclork.blip1": {
+      "gain": 4.749272
+    },
+    "sc.sclork.chaoscillator": {
+      "gain": 1.194489
+    },
+    "sc.sclork.cheapPiano1": {
+      "gain": 1.57048
+    },
+    "sc.sclork.combs": {
+      "gain": 2.108098
+    },
+    "sc.sclork.crossoverDistortion": {
+      "gain": 0.233653
+    },
+    "sc.sclork.cs80leadMH": {
+      "gain": 0.748423
+    },
+    "sc.sclork.decimator": {
+      "gain": 1.2699
+    },
+    "sc.sclork.defaultB": {
+      "gain": 2.79605
+    },
+    "sc.sclork.distortedGuitar": {
+      "gain": 5.26947
+    },
+    "sc.sclork.doubleBass": {
+      "gain": 1.9
+    },
+    "sc.sclork.everythingRhodes": {
+      "gain": 0.003854
+    },
+    "sc.sclork.feedbackPad1": {
+      "gain": 0.680916
+    },
+    "sc.sclork.feedbackPad2": {
+      "gain": 6.388682
+    },
+    "sc.sclork.feedbackPad3": {
+      "gain": 16.0
+    },
+    "sc.sclork.fmBass": {
+      "gain": 1.761484
+    },
+    "sc.sclork.frameDrum": {
+      "gain": 0.919228
+    },
+    "sc.sclork.glockenspiel": {
+      "gain": 16.0
+    },
+    "sc.sclork.harpsichord1": {
+      "gain": 5.232961
+    },
+    "sc.sclork.harpsichord2": {
+      "gain": 8.542832
+    },
+    "sc.sclork.ikedaBass": {
+      "gain": 0.202785
+    },
+    "sc.sclork.kalimba": {
+      "gain": 2.23424
+    },
+    "sc.sclork.ksBass": {
+      "gain": 0.287356
+    },
+    "sc.sclork.laserbeam": {
+      "gain": 2.923351
+    },
+    "sc.sclork.line": {
+      "gain": 5.09484
+    },
+    "sc.sclork.marimba1": {
+      "gain": 1.960982
+    },
+    "sc.sclork.midSideSaw": {
+      "gain": 0.198099
+    },
+    "sc.sclork.modalElectricGuitar": {
+      "gain": 10.033029
+    },
+    "sc.sclork.modalMarimba": {
+      "gain": 1.210233
+    },
+    "sc.sclork.moogBass": {
+      "gain": 2.172599
+    },
+    "sc.sclork.moreHarmonics": {
+      "gain": 0.104739
+    },
+    "sc.sclork.musicBox": {
+      "gain": 1.609188
+    },
+    "sc.sclork.noisy": {
+      "gain": 1.603074
+    },
+    "sc.sclork.organDonor": {
+      "gain": 6.105281
+    },
+    "sc.sclork.organReed": {
+      "gain": 10.324563
+    },
+    "sc.sclork.organTonewheel0": {
+      "gain": 0.564382
+    },
+    "sc.sclork.organTonewheel1": {
+      "gain": 0.564262
+    },
+    "sc.sclork.organTonewheel2": {
+      "gain": 0.658447
+    },
+    "sc.sclork.organTonewheel3": {
+      "gain": 0.60604
+    },
+    "sc.sclork.organTonewheel4": {
+      "gain": 0.921237
+    },
+    "sc.sclork.phazer": {
+      "gain": 0.213255
+    },
+    "sc.sclork.ping_mh": {
+      "gain": 0.622528
+    },
+    "sc.sclork.pluck": {
+      "gain": 5.145483
+    },
+    "sc.sclork.pmCrotales": {
+      "gain": 2.692867
+    },
+    "sc.sclork.prayerBell": {
+      "gain": 0.100672
+    },
+    "sc.sclork.prophet5pwmStrings": {
+      "gain": 0.295314
+    },
+    "sc.sclork.pulseRisset": {
+      "gain": 16.0
+    },
+    "sc.sclork.rissetBell": {
+      "gain": 1.184466
+    },
+    "sc.sclork.rubberBand": {
+      "gain": 0.263715
+    },
+    "sc.sclork.saturatingWavefolder": {
+      "gain": 0.099663
+    },
+    "sc.sclork.sawSynth": {
+      "gain": 2.038945
+    },
+    "sc.sclork.sillyVoice": {
+      "gain": 6.701003
+    },
+    "sc.sclork.sosBell": {
+      "gain": 1.138317
+    },
+    "sc.sclork.sputter": {
+      "gain": 4.485544
+    },
+    "sc.sclork.steelDrum": {
+      "gain": 5.397598
+    },
+    "sc.sclork.strings": {
+      "gain": 0.272057
+    },
+    "sc.sclork.subBass1": {
+      "gain": 2.111121
+    },
+    "sc.sclork.subBass2": {
+      "gain": 1.128642
+    },
+    "sc.sclork.superSaw": {
+      "gain": 2.254746
+    },
+    "sc.sclork.triangleWaveBells": {
+      "gain": 0.376193
+    },
+    "sc.sclork.trig_demo": {
+      "gain": 1.021759
+    },
+    "sc.sclork.tubularBell": {
+      "gain": 0.248354
+    },
+    "sc.sclork.vintageSine": {
+      "gain": 4.028684
+    },
+    "sc.sclork.violin": {
+      "gain": 0.221805
+    },
+    "sc.sclork.waveguideFlute": {
+      "gain": 0.067059
+    },
+    "sc.sclork.werkit": {
+      "gain": 7.050466
+    },
+    "sc.sclork.werkit2": {
+      "gain": 7.617365
+    },
+    "sc.sclork.clapElectro": {
+      "gain": 3.06
+    },
+    "sc.sclork.clapGray": {
+      "gain": 11.96
+    },
+    "sc.sclork.clapOto309": {
+      "gain": 10.84
+    },
+    "sc.sclork.cymbal808": {
+      "gain": 16.0
+    },
+    "sc.sclork.cymbalicMCLD": {
+      "gain": 0.533
+    },
+    "sc.sclork.hihat1": {
+      "gain": 1.408
+    },
+    "sc.sclork.hihatElectro": {
+      "gain": 3.12
+    },
+    "sc.sclork.kick808": {
+      "gain": 0.267
+    },
+    "sc.sclork.kick_electro": {
+      "gain": 2.53
+    },
+    "sc.sclork.kick_oto309": {
+      "gain": 2.818
+    },
+    "sc.sclork.oneclapThor": {
+      "gain": 2.12
+    },
+    "sc.sclork.snare909": {
+      "gain": 1.386
+    },
+    "sc.sclork.snareElectro": {
+      "gain": 3.715
+    },
+    "sc.sclork.snareOto309": {
+      "gain": 3.038
+    },
+    "sc.sclork.sosHats": {
+      "gain": 0.36
+    },
+    "sc.sclork.sosKick": {
+      "gain": 0.384
+    },
+    "sc.sclork.sosSnare": {
+      "gain": 1.404
+    },
+    "sc.sclork.sosTom": {
+      "gain": 0.207
+    },
+    "sc.sclork.squareDrum": {
+      "gain": 0.92
+    },
+    "sc.sclork.xylophone": {
+      "gain": 8.715053
+    }
+  },
+  "excluded": {
+    "sc.sclork.metalPlate": {
+      "reason": "non-finite or unstable raw output in the fixed-pitch audit"
+    },
+    "sc.sclork.noQuarter": {
+      "reason": "non-finite or unstable raw output in the fixed-pitch audit"
+    }
+  }
+}

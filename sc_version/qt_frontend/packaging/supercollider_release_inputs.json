@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "supercollider": {
+    "version": "3.14.1",
+    "commit": "426edf6d8742e1cc3bd85b51ca0c4e595d37a903",
+    "source_url": "https://github.com/supercollider/supercollider/releases/download/Version-3.14.1/SuperCollider-3.14.1-Source.tar.bz2",
+    "source_sha256": "ee640c68777ae697682066ce5c4a8b7e56c5b223e76c79c13b5be5387ee55bb2",
+    "license": "GPL-3.0-or-later"
+  },
+  "sclork_synths": {
+    "commit": "6730c745971aa45c95d9b4cddfb4d5ca342774b3",
+    "definition_count": 109,
+    "license": "GPL-3.0-or-later"
+  },
+  "sample_assets": {
+    "bundled": false,
+    "repository": "https://github.com/linuxificator/VSCO-2-CE.git",
+    "vsco_2_ce_license": "CC0-1.0",
+    "manifest": "../../supercollider/vsco-manifest.json",
+    "source_catalog": "../../supercollider/sample-bank-sources.json"
+  },
+  "supported_packages": [
+    "Linux-x86_64",
+    "RaspberryPi-aarch64",
+    "macOS-arm64",
+    "Windows-x86_64"
+  ],
+  "unsupported_engine_targets": ["Android", "ESP32-P4"]
+}

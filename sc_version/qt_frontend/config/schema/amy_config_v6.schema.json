@@ -1,0 +1,259 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://linuxificator.github.io/lb-omnichord/schema/amy_config_v6.schema.json",
+  "title": "LB Omnichord AMY configuration revision 6",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config_revision",
+    "serial",
+    "synth_ids",
+    "voices",
+    "midi_player",
+    "midi_input",
+    "default_synths",
+    "synth_programs",
+    "instrument_levels",
+    "drums",
+    "rhythm",
+    "performance",
+    "amy_max_oscs",
+    "amy_max_patterns",
+    "amy_max_pattern_tags",
+    "amy_max_pattern_instances",
+    "amy_max_buses",
+    "debug",
+    "patch_compatibility",
+    "buses"
+  ],
+  "properties": {
+    "config_revision": {"type": "integer", "const": 6},
+    "serial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["port", "baud", "write_timeout"],
+      "properties": {
+        "port": {"type": "string", "minLength": 1},
+        "baud": {"type": "integer", "minimum": 1200},
+        "write_timeout": {"type": "number", "exclusiveMinimum": 0, "maximum": 30}
+      }
+    },
+    "synth_ids": {
+      "$ref": "#/definitions/role_integer_map"
+    },
+    "voices": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["drums", "bass", "strum", "manual_chord", "rhythm_chord"],
+      "properties": {
+        "drums": {"type": "integer", "minimum": 1},
+        "bass": {"type": "integer", "minimum": 1},
+        "strum": {"type": "integer", "minimum": 1},
+        "manual_chord": {"type": "integer", "minimum": 1},
+        "rhythm_chord": {"type": "integer", "minimum": 1}
+      }
+    },
+    "midi_player": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["synth_ids", "drum_synth_id", "voices_per_synth", "drum_voices"],
+      "properties": {
+        "synth_ids": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {"type": "integer", "minimum": 0}
+        },
+        "drum_synth_id": {"type": "integer", "minimum": 0},
+        "voices_per_synth": {"type": "integer", "minimum": 1},
+        "drum_voices": {"type": "integer", "minimum": 1}
+      }
+    },
+    "midi_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "tech_profile", "device_glob", "alsa_raw_globs", "oss_midi_globs"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "tech_profile": {"type": "string", "minLength": 1},
+        "device_glob": {"type": "string", "minLength": 1},
+        "alsa_raw_globs": {"$ref": "#/definitions/nonempty_string_array"},
+        "oss_midi_globs": {"$ref": "#/definitions/nonempty_string_array"}
+      }
+    },
+    "osc_input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "dependencies": {
+        "listen_address": ["listen_port"],
+        "listen_port": ["listen_address"]
+      },
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "listen_address": {"type": "string", "minLength": 1},
+        "listen_port": {"type": "integer", "minimum": 1, "maximum": 65535}
+      }
+    },
+    "default_synths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chord", "strum", "bass"],
+      "properties": {
+        "chord": {"type": "string", "minLength": 1},
+        "strum": {"type": "string", "minLength": 1},
+        "bass": {"type": "string", "minLength": 1}
+      }
+    },
+    "synth_programs": {
+      "type": "object",
+      "additionalProperties": {"type": "object"}
+    },
+    "synth_patches": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "instrument_levels": {
+      "type": "object",
+      "additionalProperties": {"type": "number", "minimum": 0, "maximum": 1}
+    },
+    "drums": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kit", "velocity_gain", "sample_map"],
+      "properties": {
+        "kit": {"enum": ["tiny", "gamma9001", "general_midi"]},
+        "velocity_gain": {"type": "number", "exclusiveMinimum": 0, "maximum": 20},
+        "sample_map": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["preset", "note"],
+            "properties": {
+              "preset": {"type": "integer", "minimum": 0},
+              "note": {"type": "integer", "minimum": 0, "maximum": 127}
+            }
+          }
+        }
+      }
+    },
+    "rhythm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "chord_gate_beats",
+        "bass_gate_beats",
+        "max_rhythm_chord_notes",
+        "sequencer_reset_guard_ms",
+        "max_sequencer_tags",
+        "tag_ranges",
+        "pattern_ranges"
+      ],
+      "properties": {
+        "chord_gate_beats": {"type": "number", "exclusiveMinimum": 0, "maximum": 8},
+        "bass_gate_beats": {"type": "number", "exclusiveMinimum": 0, "maximum": 8},
+        "max_rhythm_chord_notes": {"type": "integer", "minimum": 1, "maximum": 7},
+        "sequencer_reset_guard_ms": {"type": "number", "minimum": 0, "maximum": 1000},
+        "max_sequencer_tags": {"type": "integer", "minimum": 1},
+        "tag_ranges": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["drums", "bass", "chords"],
+          "properties": {
+            "drums": {"$ref": "#/definitions/tag_range"},
+            "bass": {"$ref": "#/definitions/tag_range"},
+            "chords": {"$ref": "#/definitions/tag_range"}
+          }
+        },
+        "pattern_ranges": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fills", "chords", "drum_bases"],
+          "properties": {
+            "fills": {"$ref": "#/definitions/tag_range"},
+            "chords": {"$ref": "#/definitions/tag_range"},
+            "drum_bases": {"$ref": "#/definitions/tag_range"}
+          }
+        }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strum_gate_ms", "one_shot_chord_gate_ms", "strum_tail_ms", "synth_alloc_guard_ms"],
+      "properties": {
+        "strum_gate_ms": {"type": "number", "minimum": 0, "maximum": 60000},
+        "one_shot_chord_gate_ms": {"type": "number", "minimum": 0, "maximum": 60000},
+        "strum_tail_ms": {"type": "number", "minimum": 0, "maximum": 60000},
+        "synth_alloc_guard_ms": {"type": "number", "minimum": 0, "maximum": 1000}
+      }
+    },
+    "amy_max_oscs": {"type": "integer", "minimum": 1},
+    "amy_max_patterns": {"type": "integer", "minimum": 1},
+    "amy_max_pattern_tags": {"type": "integer", "minimum": 1},
+    "amy_max_pattern_instances": {"type": "integer", "minimum": 1},
+    "amy_max_buses": {"type": "integer", "minimum": 1},
+    "debug": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["log_amy_commands", "amy_command_log", "log_logical_events"],
+      "properties": {
+        "log_amy_commands": {"type": "boolean"},
+        "amy_command_log": {"type": "string", "minLength": 1},
+        "log_logical_events": {"type": "boolean"}
+      }
+    },
+    "patch_compatibility": {
+      "type": "object",
+      "additionalProperties": {"type": "object"}
+    },
+    "buses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["drums", "bass", "strum", "chord", "midi_rows", "midi_drums"],
+      "properties": {
+        "drums": {"type": "integer", "minimum": 0},
+        "bass": {"type": "integer", "minimum": 0},
+        "strum": {"type": "integer", "minimum": 0},
+        "chord": {"type": "integer", "minimum": 0},
+        "midi_rows": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {"type": "integer", "minimum": 0}
+        },
+        "midi_drums": {"type": "integer", "minimum": 0}
+      }
+    }
+  },
+  "definitions": {
+    "nonempty_string_array": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "role_integer_map": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["drums", "bass", "strum", "manual_chord", "rhythm_chord"],
+      "properties": {
+        "drums": {"type": "integer", "minimum": 0},
+        "bass": {"type": "integer", "minimum": 0},
+        "strum": {"type": "integer", "minimum": 0},
+        "manual_chord": {"type": "integer", "minimum": 0},
+        "rhythm_chord": {"type": "integer", "minimum": 0}
+      }
+    },
+    "tag_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "count"],
+      "properties": {
+        "start": {"type": "integer", "minimum": 0},
+        "count": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

@@ -1,0 +1,1545 @@
+{
+  "compiler_version": 5,
+  "complete": true,
+  "mapping_count": 75,
+  "opcodes": [
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 12,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "BassoonSus.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "BassoonVib.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 298,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 564,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 842,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1122,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1401,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "CelloEnsSusVib-Quiet.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "CelloEnsSusVib.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "CelloEnsTrem.sfz"
+        },
+        {
+          "line": 12,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 360,
+          "source_file": "Clarinet-KS.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 111,
+      "opcode": "ampeg_attack"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 18,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 18,
+          "source_file": "BassoonSus.sfz"
+        },
+        {
+          "line": 18,
+          "source_file": "BassoonVib.sfz"
+        },
+        {
+          "line": 14,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 300,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 566,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 844,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1124,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1403,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 18,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 18,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 18,
+          "source_file": "CelloEnsSusVib-Quiet.sfz"
+        },
+        {
+          "line": 18,
+          "source_file": "CelloEnsSusVib.sfz"
+        },
+        {
+          "line": 18,
+          "source_file": "CelloEnsTrem.sfz"
+        },
+        {
+          "line": 14,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 362,
+          "source_file": "Clarinet-KS.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 111,
+      "opcode": "ampeg_dynamic"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 15,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 15,
+          "source_file": "BassoonSus.sfz"
+        },
+        {
+          "line": 15,
+          "source_file": "BassoonVib.sfz"
+        },
+        {
+          "line": 13,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 299,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 565,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 843,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1123,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1402,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 15,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 15,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 15,
+          "source_file": "CelloEnsSusVib-Quiet.sfz"
+        },
+        {
+          "line": 15,
+          "source_file": "CelloEnsSusVib.sfz"
+        },
+        {
+          "line": 15,
+          "source_file": "CelloEnsTrem.sfz"
+        },
+        {
+          "line": 13,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 361,
+          "source_file": "Clarinet-KS.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 197,
+      "opcode": "ampeg_release"
+    },
+    {
+      "classification": "compile-time-metadata",
+      "locations": [
+        {
+          "line": 4,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "BassoonSus.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "BassoonVib.sfz"
+        },
+        {
+          "line": 2,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 288,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 554,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1112,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "CelloEnsSusVib-Quiet.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "CelloEnsSusVib.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "CelloEnsTrem.sfz"
+        },
+        {
+          "line": 2,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 351,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "ClarinetStac.sfz"
+        },
+        {
+          "line": 4,
+          "source_file": "ClarinetSus.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 96,
+      "opcode": "default_path"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 36,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 281,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 571,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 849,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1129,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1408,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 39,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 317,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 39,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 317,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 18,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 365,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 700,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 36,
+          "source_file": "ClarinetStac.sfz"
+        },
+        {
+          "line": 371,
+          "source_file": "ClarinetStac.sfz"
+        },
+        {
+          "line": 39,
+          "source_file": "ClarinetSus.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 96,
+      "opcode": "group_label"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 46,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 56,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 66,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 76,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 86,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 96,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 106,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 116,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 126,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 136,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 146,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 156,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 166,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 176,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 186,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 196,
+          "source_file": "BassoonStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 3163,
+      "opcode": "hikey"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 33,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 278,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 364,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 699,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "ClarinetStac.sfz"
+        },
+        {
+          "line": 368,
+          "source_file": "ClarinetStac.sfz"
+        },
+        {
+          "line": 779,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1006,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1236,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1452,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "ContrabassPizz.sfz"
+        },
+        {
+          "line": 248,
+          "source_file": "ContrabassPizz.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "ContrabassSpic.sfz"
+        },
+        {
+          "line": 258,
+          "source_file": "ContrabassSpic.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "FHornStac.sfz"
+        },
+        {
+          "line": 328,
+          "source_file": "FHornStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 40,
+      "opcode": "hirand"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 49,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 59,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 69,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 79,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 89,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 99,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 109,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 119,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 129,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 139,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 149,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 159,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 169,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 179,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 189,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 199,
+          "source_file": "BassoonStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 3163,
+      "opcode": "hivel"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 45,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 55,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 65,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 75,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 85,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 95,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 105,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 115,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 125,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 135,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 145,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 155,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 165,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 175,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 185,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 195,
+          "source_file": "BassoonStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 3163,
+      "opcode": "lokey"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 33,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 278,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 364,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 699,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "ClarinetStac.sfz"
+        },
+        {
+          "line": 368,
+          "source_file": "ClarinetStac.sfz"
+        },
+        {
+          "line": 779,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1006,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1236,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1452,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "ContrabassPizz.sfz"
+        },
+        {
+          "line": 248,
+          "source_file": "ContrabassPizz.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "ContrabassSpic.sfz"
+        },
+        {
+          "line": 258,
+          "source_file": "ContrabassSpic.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "FHornStac.sfz"
+        },
+        {
+          "line": 328,
+          "source_file": "FHornStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 40,
+      "opcode": "lorand"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 48,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 58,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 68,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 78,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 88,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 98,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 108,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 118,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 128,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 138,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 148,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 158,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 168,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 178,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 188,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 198,
+          "source_file": "BassoonStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 3163,
+      "opcode": "lovel"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 47,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 57,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 67,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 77,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 87,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 97,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 107,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 117,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 127,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 137,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 147,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 157,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 167,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 177,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 187,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 197,
+          "source_file": "BassoonStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 3163,
+      "opcode": "pitch_keycenter"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 44,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 54,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 64,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 74,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 84,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 94,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 104,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 114,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 124,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 134,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 144,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 154,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 164,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 174,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 184,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 194,
+          "source_file": "BassoonStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 3163,
+      "opcode": "sample"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 569,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 847,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1127,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1406,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 311,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 311,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 16,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "ClarinetSus.sfz"
+        },
+        {
+          "line": 597,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "ContrabassTrem.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "GM-StylePerc.sfz"
+        },
+        {
+          "line": 1210,
+          "source_file": "GM-StylePerc.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "OrganQuiet.sfz"
+        },
+        {
+          "line": 33,
+          "source_file": "OrganQuietPedal.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 46,
+      "opcode": "seq_length"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 570,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 848,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1128,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1407,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 36,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 314,
+          "source_file": "CelloEnsPizz.sfz"
+        },
+        {
+          "line": 36,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 314,
+          "source_file": "CelloEnsSpic.sfz"
+        },
+        {
+          "line": 17,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 36,
+          "source_file": "ClarinetSus.sfz"
+        },
+        {
+          "line": 598,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 36,
+          "source_file": "ContrabassTrem.sfz"
+        },
+        {
+          "line": 36,
+          "source_file": "GM-StylePerc.sfz"
+        },
+        {
+          "line": 1213,
+          "source_file": "GM-StylePerc.sfz"
+        },
+        {
+          "line": 36,
+          "source_file": "OrganQuiet.sfz"
+        },
+        {
+          "line": 36,
+          "source_file": "OrganQuietPedal.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 46,
+      "opcode": "seq_position"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 6,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 292,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 558,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 836,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1116,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1395,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 6,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 6,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 305,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 586,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 767,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 995,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1225,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1441,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 6,
+          "source_file": "Flute-KS.sfz"
+        },
+        {
+          "line": 6,
+          "source_file": "SViolin-KS.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 33,
+      "opcode": "sw_default"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 8,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 294,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 560,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 838,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1118,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1397,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 8,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 356,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 690,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 8,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 307,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 588,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 769,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 997,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1227,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1443,
+          "source_file": "Contrabass-KS.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 44,
+      "opcode": "sw_hikey"
+    },
+    {
+      "classification": "compile-time-metadata",
+      "locations": [
+        {
+          "line": 10,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 296,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 562,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 840,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1120,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1399,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 10,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 358,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 692,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 10,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 309,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 590,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 771,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 999,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1229,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1445,
+          "source_file": "Contrabass-KS.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 44,
+      "opcode": "sw_label"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 9,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 295,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 561,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 839,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1119,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1398,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 9,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 357,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 691,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 9,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 308,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 589,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 770,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 998,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1228,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1444,
+          "source_file": "Contrabass-KS.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 44,
+      "opcode": "sw_last"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 7,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 293,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 559,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 837,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1117,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 1396,
+          "source_file": "CelloEns-KS.sfz"
+        },
+        {
+          "line": 7,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 355,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 689,
+          "source_file": "Clarinet-KS.sfz"
+        },
+        {
+          "line": 7,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 306,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 587,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 768,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 996,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1226,
+          "source_file": "Contrabass-KS.sfz"
+        },
+        {
+          "line": 1442,
+          "source_file": "Contrabass-KS.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 44,
+      "opcode": "sw_lokey"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 205,
+          "source_file": "OboeSusVib.sfz"
+        },
+        {
+          "line": 60,
+          "source_file": "SViolin-KS.sfz"
+        },
+        {
+          "line": 75,
+          "source_file": "SViolinVib-Quiet.sfz"
+        },
+        {
+          "line": 75,
+          "source_file": "SViolinVib.sfz"
+        }
+      ],
+      "locations_truncated": false,
+      "occurrence_count": 4,
+      "opcode": "tune"
+    },
+    {
+      "classification": "implemented-runtime",
+      "locations": [
+        {
+          "line": 23,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 50,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 60,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 70,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 80,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 90,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 100,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 110,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 120,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 130,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 140,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 150,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 160,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 170,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 180,
+          "source_file": "BassoonStac.sfz"
+        },
+        {
+          "line": 190,
+          "source_file": "BassoonStac.sfz"
+        }
+      ],
+      "locations_truncated": true,
+      "occurrence_count": 3272,
+      "opcode": "volume"
+    }
+  ],
+  "schema_revision": 1,
+  "unsupported_opcodes": []
+}

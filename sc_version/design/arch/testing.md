@@ -1,0 +1,87 @@
+# SuperCollider edition testing
+
+Status: authoritative test and package validation contract
+
+Owner: frontend and SC engine
+
+Applies to: `sc_version`
+
+Last verified: 2026-09-14
+
+`qt_frontend/tests/run_tests.py` is the single local and CI runner. Every test
+runs as an isolated script and writes an atomic machine-readable report.
+Coverage is navigational branch coverage and does not use an arbitrary global
+percentage as a quality substitute.
+
+## SuperCollider suites
+
+| Suite | Evidence |
+| --- | --- |
+| `quality` | compile/JSON/Markdown guards, QML warning ratchet, Ruff and strict-new-module mypy |
+| `sc-frontend` | typed protocol, pure plan compiler, client, config, program catalogue, runtime ownership and separate frontend/fake-engine process |
+| `sc-compiler` | syntax/core definitions and all pinned SCLOrk source/adapters compile |
+| `sc-sequencer` | receiver validation, immutable snapshots, root/finite lifetime, gate overlap, aligned replacement coalescing, same-beat ordering, external-versus-nested boundary rules, tempo-domain releases, stale-wake rejection and a real separate `sclang` transaction process |
+| `sc-audio` | acid definitions and NRT render audit of every SCLOrk program |
+| `sc-banks` | SFZ compiler, complete VSCO manifest shape, loader, owner-scoped RR, semantically reviewed VSCO percussion mapping and deterministic NRT mono/stereo sample playback |
+| `sc-packaged` | independent workflow/runtime/package/release contract |
+| `platform-input-linux` | a separate controller process drives the real SC frontend through Linux MIDI input and a separate fake engine |
+
+The generic portable MIDI/OSC and discovery process suites remain applicable
+because they test frontend boundaries rather than AMY. The visual and
+catalogue unit contracts remain applicable unchanged.
+
+## Process separation
+
+Integration senders and receivers are not embedded in production modules.
+MIDI/OSC sender, frontend and fake or real engine use distinct processes and
+normal production protocols. A unit test may directly exercise one narrow
+object, but a package/process claim requires the real process boundary.
+
+`test_supercollider_frontend_process.py` waits for the fake engine to bind
+before launching the frontend, then verifies health before sending actions.
+Premature process exit includes captured child output in the failure so CI
+reports the actual missing library or startup fault rather than a later
+connection-refused symptom.
+
+## Legacy characterization
+
+The copied `frontend`, `serial`, `presets`, `native-controls` and
+`native-rhythm` suites preserve the established AMY behavior baseline during
+migration. Their harness explicitly launches the original
+`amysynth_version` frontend as a frozen oracle. Passing them does not mean SC
+uses AMY, and they are not part of the independent SC package gate.
+
+The `unit` suite intentionally continues to discover all top-level tests. It
+is useful for a full local regression run where the pinned AMY test dependency
+is installed. The SC GitHub workflow uses the bounded `sc-frontend` suite so
+the package build has no AMY runtime dependency.
+
+## Audio evidence
+
+Compiler success is necessary but does not prove a useful instrument. NRT
+tests render without taking a desktop audio device. The SCLOrk audit measures
+three fixed registers with 32-bit float output, regenerates a bounded playback
+profile and verifies that every browser-admitted voice remains finite,
+non-silent and below full scale at each register. This is deterministic
+qualification evidence, not a substitute for subjective timbre review, tail
+behavior, long live runs or physical latency/load acceptance. Those limitations
+remain explicit in `../sc/STATUS.md` and the procedure is recorded in
+`../sc/PLAYBACK_QUALIFICATION.md`.
+
+## GitHub workflow
+
+`.github/workflows/supercollider-release.yml` tests the same portable frontend,
+protocol, process-boundary and runtime-layout contracts on Linux x86_64,
+Raspberry Pi aarch64, macOS arm64 and Windows x86_64. The complete SC language,
+sequencer and NRT audio suites run on both Linux architectures; macOS and
+Windows additionally verify the official engine executables without repeatedly
+recompiling the SC class library in each test process. Release jobs construct
+two AppImages, a DMG and a ZIP and verify each bundled runtime without opening
+audio. The VSCO bank is identified
+as an external asset rather than falsely listed as package content. Linux
+runtime caches are keyed by architecture, version and build inputs.
+
+An ordinary push or merge never publishes an SC release. Manual dispatch with
+`release=true` builds and publishes the complete four-package set under an
+independent `R<UTC timestamp>-SC` tag. AMY and Sonic Pi are archived editions
+and have no active release workflow.

@@ -1,0 +1,15 @@
+{
+  "schema_revision": 1,
+  "supercollider": {
+    "release_authority": "3.14.1",
+    "minimum_source_compatibility": "3.13.0"
+  },
+  "sclork_synths": {
+    "repository": "https://github.com/SCLOrkHub/SCLOrkSynths.git",
+    "commit": "6730c745971aa45c95d9b4cddfb4d5ca342774b3",
+    "license": "GPL-3.0-or-later",
+    "definition_count": 109,
+    "definition_manifest_sha256": "9c801c371c9814df98a0bf8b9486e886c153e7fe25291ecf432d3de5931e2e26",
+    "license_sha256": "12ac5047f2af0522f06798b1589ffc4599bc29c91f954d7874e0320634e777c0"
+  }
+}

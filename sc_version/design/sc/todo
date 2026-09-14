@@ -1,0 +1,6 @@
+# Completed SC instrument-browser work
+
+The eight instrument catalogue, `SYN`/`PCM`, parameter, articulation and
+sample-browser tasks requested on 2026-09-14 are implemented. The resulting
+authoritative contract and evidence are in `INSTRUMENT_BROWSER.md`; current
+open migration scope remains in `STATUS.md`.

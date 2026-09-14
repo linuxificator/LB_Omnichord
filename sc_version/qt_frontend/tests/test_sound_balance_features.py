@@ -1,0 +1,568 @@
+from __future__ import annotations
+
+import json
+import stat
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "code"))
+
+import app_core  # noqa: E402
+import performance_backend  # noqa: E402
+from config_migrations import CURRENT_CONFIG_REVISION  # noqa: E402
+from midi_control import MidiControlState  # noqa: E402
+from midi_input import (  # noqa: E402
+    MidiByteStreamParser,
+    MidiByteStreamState,
+    MidiInputEvent,
+    OrderedMidiInputEmitter,
+)
+import user_data  # noqa: E402
+import instrument_balance  # noqa: E402
+from rhythm_command_plan import BASS_ACTIVITY_VELOCITY_GAIN  # noqa: E402
+
+
+class SoundBalanceFeatureTests(unittest.TestCase):
+    @staticmethod
+    def _strum_backend(
+        suffix: str,
+        intervals: tuple[int, ...],
+        *,
+        root: int = 0,
+        ladder: bool = False,
+    ) -> app_core.InstrumentBackend:
+        backend = app_core.InstrumentBackend.__new__(
+            app_core.InstrumentBackend
+        )
+        backend._active_row = 0
+        backend._active_root_semitone = root
+        backend._row_chord_indexes = [0]
+        backend._strum_ladder_mode = ladder
+        backend._chords = (
+            app_core.ChordType(
+                suffix,
+                suffix,
+                intervals,
+                (intervals,),
+            ),
+        )
+        return backend
+
+    def test_balance_plan_covers_every_omni_instrument_and_register(self) -> None:
+        plan = instrument_balance.build_plan()
+        self.assertEqual(len(plan), 125)
+        self.assertEqual({entry["note"] for entry in plan[0]["notes"]}, {40, 60, 84})
+
+    def test_factory_bass_volumes_retain_the_original_curated_values(self) -> None:
+        expected = (
+            0.34, 0.34, 0.42, 0.36, 0.40, 0.46, 0.99, 0.56, 0.62,
+            0.58, 0.64, 0.65, 0.68, 0.72, 0.70, 0.76, 0.80, 0.84,
+        )
+        actual = tuple(
+            float(
+                json.loads(
+                    (
+                        ROOT
+                        / "instruments"
+                        / "default_presets"
+                        / f"p{number}.json"
+                    ).read_text(encoding="utf-8")
+                )["volumes"]["bass"]
+            )
+            for number in range(1, 19)
+        )
+        for preset, (value, wanted) in enumerate(zip(actual, expected), start=1):
+            self.assertAlmostEqual(value, wanted, places=9, msg=f"P{preset}")
+
+    def test_activity_and_riff_catalogues_share_a_note_strength_reference(self) -> None:
+        rhythms = json.loads(
+            (ROOT / "music" / "rhythms.json").read_text(encoding="utf-8")
+        )["rhythms"]
+        riffs = json.loads(
+            (ROOT / "music" / "omnichord_bass_riffs.json").read_text(
+                encoding="utf-8"
+            )
+        )["riffs"]
+        activity = [
+            min(1.0, float(event["amp"]) * BASS_ACTIVITY_VELOCITY_GAIN)
+            for rhythm in rhythms
+            for level in rhythm["bass_levels"]
+            for event in level
+        ]
+        riff = [
+            float(event["velocity"]) / 127.0
+            for definition in riffs
+            for event in definition["timing"]["events"]
+        ]
+        self.assertAlmostEqual(
+            sum(activity) / len(activity),
+            sum(riff) / len(riff),
+            delta=0.01,
+        )
+
+    def test_activity_catalogue_retains_only_explicit_tb303_accents(self) -> None:
+        rhythms = json.loads(
+            (ROOT / "music" / "rhythms.json").read_text(encoding="utf-8")
+        )["rhythms"]
+        events = [
+            event
+            for rhythm in rhythms
+            for level in rhythm["bass_levels"]
+            for event in level
+        ]
+        accents = [event for event in events if event.get("accent") is True]
+        self.assertEqual(len(accents), 395)
+        self.assertTrue(all(event.get("accent") in (None, True) for event in events))
+        self.assertTrue(all("slide_to_next" not in event for event in events))
+
+    def test_balance_report_validator_rejects_silence_and_clipping(self) -> None:
+        report = {
+            f"synth_{index}": {
+                str(note): {
+                    "peak_dbfs": -20.0,
+                    "clipped_samples": 0,
+                }
+                for note in instrument_balance.NOTES
+            }
+            for index in range(125)
+        }
+        self.assertEqual(instrument_balance.validate_render_report(report), [])
+        report["synth_0"]["40"]["peak_dbfs"] = -90.0
+        report["synth_1"]["60"]["clipped_samples"] = 2
+        issues = instrument_balance.validate_render_report(report)
+        self.assertTrue(any("effectively silent" in issue for issue in issues))
+        self.assertTrue(any("clipped samples" in issue for issue in issues))
+
+    def test_old_user_layout_migrates_without_overwriting(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old_midi = root / "midi"
+            old_midi.mkdir()
+            (root / "p1.json").write_text('{"old": 1}', encoding="utf-8")
+            (old_midi / "m1.json").write_text('{"midi": 1}', encoding="utf-8")
+            original = (user_data.USER_ROOT, user_data.OMNI_PRESET_DIR,
+                        user_data.MIDI_PRESET_DIR, user_data.USER_CONFIG_DIR)
+            try:
+                user_data.USER_ROOT = root
+                user_data.OMNI_PRESET_DIR = root / "omni_presets"
+                user_data.MIDI_PRESET_DIR = root / "midi_presets"
+                user_data.USER_CONFIG_DIR = root / "config"
+                user_data.migrate_user_layout()
+                self.assertTrue((root / "omni_presets" / "p1.json").is_file())
+                self.assertTrue((root / "midi_presets" / "m1.json").is_file())
+            finally:
+                (user_data.USER_ROOT, user_data.OMNI_PRESET_DIR,
+                 user_data.MIDI_PRESET_DIR, user_data.USER_CONFIG_DIR) = original
+
+    def test_user_config_is_seeded_once_and_then_wins(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shipped = root / "shipped"
+            shipped.mkdir()
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
+            (shipped / "amy_config.json").write_text(
+                json.dumps(shipped_config),
+                encoding="utf-8",
+            )
+            original = user_data.USER_CONFIG_DIR
+            try:
+                user_data.USER_CONFIG_DIR = root / "user"
+                selected = user_data.ensure_user_configs(shipped)
+                target = selected / "amy_config.json"
+                self.assertEqual(
+                    json.loads(target.read_text())["serial"]["baud"],
+                    1_000_000,
+                )
+                self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
+                edited = json.loads(target.read_text(encoding="utf-8"))
+                edited["serial"]["baud"] = 230_400
+                target.write_text(json.dumps(edited), encoding="utf-8")
+                user_data.ensure_user_configs(shipped)
+                self.assertEqual(
+                    json.loads(target.read_text())["serial"]["baud"],
+                    230_400,
+                )
+            finally:
+                user_data.USER_CONFIG_DIR = original
+
+    def test_old_arpeggio_voice_default_is_migrated_without_losing_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shipped = root / "shipped"
+            shipped.mkdir()
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
+            (shipped / "amy_config.json").write_text(
+                json.dumps(shipped_config), encoding="utf-8"
+            )
+            original = user_data.USER_CONFIG_DIR
+            try:
+                user_data.USER_CONFIG_DIR = root / "user"
+                user_data.USER_CONFIG_DIR.mkdir()
+                target = user_data.USER_CONFIG_DIR / "amy_config.json"
+                legacy = json.loads(json.dumps(shipped_config))
+                legacy.pop("config_revision")
+                legacy["serial"]["baud"] = 230_400
+                legacy["voices"]["rhythm_chord"] = 4
+                legacy["midi_input"]["tech_profile"] = "linux"
+                target.write_text(json.dumps(legacy), encoding="utf-8")
+
+                user_data.ensure_user_configs(shipped)
+                migrated = json.loads(target.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    migrated["config_revision"], CURRENT_CONFIG_REVISION
+                )
+                self.assertEqual(migrated["voices"]["rhythm_chord"], 7)
+                self.assertEqual(migrated["serial"]["baud"], 230_400)
+                self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")
+                previous = json.loads(
+                    target.with_suffix(".json.previous").read_text(encoding="utf-8")
+                )
+                self.assertEqual(previous, legacy)
+
+                # The revision makes the migration idempotent: later edits
+                # are authoritative and are never repeatedly rewritten.
+                migrated["voices"]["rhythm_chord"] = 8
+                target.write_text(json.dumps(migrated), encoding="utf-8")
+                user_data.ensure_user_configs(shipped)
+                self.assertEqual(
+                    json.loads(target.read_text())["voices"]["rhythm_chord"],
+                    8,
+                )
+            finally:
+                user_data.USER_CONFIG_DIR = original
+
+    def test_revision_two_user_config_gains_pattern_capacities_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            shipped = root / "shipped"
+            shipped.mkdir()
+            shipped_config = json.loads(
+                (ROOT / "config" / "amy_config.json").read_text(encoding="utf-8")
+            )
+            (shipped / "amy_config.json").write_text(
+                json.dumps(shipped_config), encoding="utf-8"
+            )
+            original = user_data.USER_CONFIG_DIR
+            try:
+                user_data.USER_CONFIG_DIR = root / "user"
+                user_data.USER_CONFIG_DIR.mkdir()
+                target = user_data.USER_CONFIG_DIR / "amy_config.json"
+                legacy = json.loads(json.dumps(shipped_config))
+                legacy["config_revision"] = 2
+                legacy["serial"]["baud"] = 230_400
+                legacy["rhythm"].pop("sequence_ranges")
+                legacy["rhythm"]["max_sequencer_tags"] = 256
+                for key in (
+                    "amy_max_sequencer_tags",
+                    "amy_max_sequence_events",
+                    "amy_max_sequence_executions",
+                ):
+                    legacy.pop(key)
+                legacy["midi_input"].pop("tech_profile")
+                legacy["midi_input"].pop("alsa_raw_globs")
+                legacy["midi_input"].pop("oss_midi_globs")
+                legacy["drums"].pop("kit")
+                target.write_text(json.dumps(legacy), encoding="utf-8")
+
+                user_data.ensure_user_configs(shipped)
+
+                migrated = json.loads(target.read_text(encoding="utf-8"))
+                self.assertEqual(
+                    migrated["config_revision"], CURRENT_CONFIG_REVISION
+                )
+                self.assertEqual(migrated["amy_max_sequencer_tags"], 1280)
+                self.assertEqual(migrated["amy_max_sequence_events"], 64)
+                self.assertEqual(migrated["amy_max_sequence_executions"], 40)
+                self.assertEqual(migrated["midi_input"]["tech_profile"], "auto")
+                self.assertEqual(
+                    migrated["midi_input"]["alsa_raw_globs"],
+                    [legacy["midi_input"]["device_glob"]],
+                )
+                self.assertEqual(
+                    migrated["midi_input"]["oss_midi_globs"],
+                    ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"],
+                )
+                self.assertEqual(migrated["drums"]["kit"], "gamma9001")
+                self.assertEqual(migrated["serial"]["baud"], 230_400)
+                self.assertEqual(
+                    json.loads(
+                        target.with_suffix(".json.previous").read_text(
+                            encoding="utf-8"
+                        )
+                    ),
+                    legacy,
+                )
+            finally:
+                user_data.USER_CONFIG_DIR = original
+
+    def test_midi_running_status_parses_control_changes(self) -> None:
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(OrderedMidiInputEmitter(events.append), "test")
+        parser.feed(bytes([0xB2, 7, 10, 74, 99]), MidiByteStreamState())
+        self.assertEqual(
+            [(event.channel, event.data, event.value) for event in events],
+            [(3, 7, 10), (3, 74, 99)],
+        )
+        self.assertTrue(all(event.kind == "control" for event in events))
+
+    def test_midi_channel_status_without_cc_data_adds_no_indicator(self) -> None:
+        events: list[MidiInputEvent] = []
+        parser = MidiByteStreamParser(OrderedMidiInputEmitter(events.append), "test")
+        parser.feed(bytes([0xB0, 0xB1, 0xB2]), MidiByteStreamState())
+        self.assertEqual(events, [])
+
+    def test_midi_indicators_fill_capacity_before_lru_replacement(self) -> None:
+        state = MidiControlState(capacity=17)
+        for controller in range(17):
+            state.observe(1, controller, controller)
+            state.observe(1, controller, controller + 1)
+        self.assertEqual(len(state.controls), 17)
+        self.assertTrue(all(item["replaced"] == 0 for item in state.controls))
+
+        state.observe(2, 99, 64)
+        self.assertEqual(len(state.controls), 17)
+        state.observe(2, 99, 65)
+        self.assertEqual(len(state.controls), 17)
+        self.assertEqual(state.controls[0]["channel"], 2)
+        self.assertEqual(state.controls[0]["controller"], 99)
+        self.assertGreater(state.controls[0]["replaced"], 0)
+
+    def test_midi_cc_snapshot_needs_a_value_change_before_indicator(self) -> None:
+        state = MidiControlState(capacity=4)
+
+        state.observe(1, 7, 80)
+        state.observe(1, 10, 64)
+        state.observe(2, 7, 80)
+        state.observe(2, 10, 64)
+        self.assertEqual(state.controls, [])
+
+        state.observe(2, 7, 81)
+        self.assertEqual(
+            [(item["channel"], item["controller"]) for item in state.controls],
+            [(2, 7)],
+        )
+
+    def test_midi_lru_replaces_exactly_the_oldest_changed_control(self) -> None:
+        state = MidiControlState(capacity=3)
+
+        for controller in (10, 11, 12):
+            state.observe(1, controller, 0)
+            state.observe(1, controller, 1)
+        state.observe(1, 10, 2)
+        state.observe(1, 13, 0)
+        state.observe(1, 13, 1)
+
+        keys = {
+            (item["channel"], item["controller"])
+            for item in state.controls
+        }
+        self.assertEqual(keys, {(1, 10), (1, 12), (1, 13)})
+
+    def test_ladder_mode_uses_expected_consonant_scale_families(self) -> None:
+        backend = self._strum_backend("5", (0, 7), ladder=True)
+        self.assertEqual(
+            {note % 12 for note in backend._ladder_notes()},
+            {0, 2, 4, 7, 9},
+        )
+
+    def test_all_bass_activities_use_the_selected_apg_or_ldr_pitch_pool(self) -> None:
+        chords = app_core.load_chords(ROOT / "music" / "chords.csv")
+        backend = performance_backend.InstrumentBackend.__new__(
+            performance_backend.InstrumentBackend
+        )
+        backend._active_row = 0
+        backend._row_chord_indexes = [0]
+        backend._chords = chords
+
+        for chord_index, chord in enumerate(chords):
+            backend._row_chord_indexes[0] = chord_index
+            for root in range(12):
+                backend._active_root_semitone = root
+                for ladder in (False, True):
+                    backend._strum_ladder_mode = ladder
+                    expected_intervals = (
+                        app_core.ladder_pattern(chord.suffix)[0]
+                        if ladder
+                        else chord.intervals
+                    )
+                    expected_pitch_classes = {
+                        (root + interval) % 12 for interval in expected_intervals
+                    }
+                    for shift in range(
+                        -performance_backend.BASS_VOICING_LIMIT,
+                        performance_backend.BASS_VOICING_LIMIT + 1,
+                    ):
+                        backend._bass_voicing_shift = shift
+                        notes = backend._current_bass_notes()
+                        self.assertEqual(
+                            {note % 12 for note in notes},
+                            expected_pitch_classes,
+                            f"{chord.suffix}/root={root}/ladder={ladder}/shift={shift}",
+                        )
+                        self.assertEqual(
+                            len(notes),
+                            len(expected_pitch_classes),
+                            chord.suffix,
+                        )
+
+        backend._row_chord_indexes[0] = 0  # C major
+        backend._active_root_semitone = 0
+        backend._bass_voicing_shift = 0
+        backend._strum_ladder_mode = False
+        self.assertEqual(backend._current_bass_notes(), [36, 40, 43])
+        backend._strum_ladder_mode = True
+        self.assertEqual(backend._current_bass_notes(), [36, 38, 40, 43, 45])
+
+    def test_every_chord_has_an_audited_ladder_with_all_chord_tones(self) -> None:
+        chords = app_core.load_chords(ROOT / "music" / "chords.csv")
+        expected_intervals = {
+            "major": (0, 2, 4, 7, 9),
+            "minor": (0, 3, 5, 7, 10),
+            "diminished": (0, 2, 3, 5, 6, 8, 9, 11),
+            "augmented": (0, 2, 4, 6, 8, 10),
+            "sus2": (0, 2, 5, 7, 9),
+            "sus4": (0, 2, 5, 7, 9),
+            "5": (0, 2, 4, 7, 9),
+            "major6": (0, 2, 4, 7, 9),
+            "minor6": (0, 2, 3, 7, 9),
+            "6_9": (0, 2, 4, 7, 9),
+            "add9": (0, 2, 4, 7, 9),
+            "minor_add9": (0, 2, 3, 5, 7, 10),
+            "dominant7": (0, 2, 4, 7, 9, 10),
+            "major7": (0, 2, 4, 7, 9, 11),
+            "minor7": (0, 3, 5, 7, 10),
+            "minor_major7": (0, 2, 3, 7, 9, 11),
+            "minor7_flat5": (0, 2, 3, 5, 6, 8, 10),
+            "diminished7": (0, 2, 3, 5, 6, 8, 9, 11),
+            "augmented7": (0, 2, 4, 8, 10),
+            "augmented_major7": (0, 2, 4, 6, 8, 9, 11),
+            "7_sus4": (0, 2, 5, 7, 9, 10),
+            "dominant9": (0, 2, 4, 7, 9, 10),
+            "major9": (0, 2, 4, 7, 9, 11),
+            "minor9": (0, 2, 3, 5, 7, 10),
+            "dominant11": (0, 2, 4, 5, 7, 9, 10),
+            "major11": (0, 2, 4, 5, 7, 9, 11),
+            "minor11": (0, 2, 3, 5, 7, 10),
+            "dominant13": (0, 2, 4, 5, 7, 9, 10),
+            "major13": (0, 2, 4, 5, 7, 9, 11),
+            "minor13": (0, 2, 3, 5, 7, 9, 10),
+            "dominant7_flat5": (0, 2, 4, 6, 10),
+            "dominant7_sharp5": (0, 2, 4, 8, 10),
+            "dominant7_flat9": (0, 1, 4, 7, 10),
+            "dominant7_sharp9": (0, 3, 4, 7, 10),
+            "dominant7_sharp11": (0, 2, 4, 6, 7, 9, 10),
+            "dominant7_flat13": (0, 2, 4, 7, 8, 10),
+        }
+
+        self.assertEqual(
+            set(expected_intervals),
+            {chord.suffix for chord in chords},
+        )
+        self.assertEqual(
+            set(app_core.CHORD_LADDER_PATTERNS),
+            set(expected_intervals),
+        )
+        for chord in chords:
+            ladder_intervals, degree_offsets = app_core.ladder_pattern(
+                chord.suffix
+            )
+            self.assertEqual(
+                ladder_intervals,
+                expected_intervals[chord.suffix],
+                chord.suffix,
+            )
+            self.assertEqual(
+                len(ladder_intervals),
+                len(degree_offsets),
+                chord.suffix,
+            )
+            self.assertTrue(
+                {interval % 12 for interval in chord.intervals}
+                <= {interval % 12 for interval in ladder_intervals},
+                chord.suffix,
+            )
+
+    def test_minor_major7_ladder_uses_melodic_minor_colours_without_flat7(self) -> None:
+        g_minor_major7 = self._strum_backend(
+            "minor_major7",
+            (0, 3, 7, 11),
+            root=7,
+            ladder=True,
+        )
+        self.assertEqual(
+            g_minor_major7._strum_note_names(),
+            ["G", "A", "B♭", "D", "E", "F♯"],
+        )
+        self.assertNotIn("F", g_minor_major7._strum_note_names())
+
+    def test_ladder_lookup_rejects_unaudited_new_chord_types(self) -> None:
+        with self.assertRaisesRegex(ValueError, "No audited LDR pattern"):
+            app_core.ladder_pattern("future_chord")
+
+    def test_apg_note_guide_uses_musical_chord_spelling(self) -> None:
+        major = self._strum_backend("major", (0, 4, 7))
+        minor = self._strum_backend("minor", (0, 3, 7))
+        sharp_dominant = self._strum_backend(
+            "dominant7",
+            (0, 4, 7, 10),
+            root=6,
+        )
+
+        self.assertEqual(major._strum_note_names(), ["C", "E", "G"])
+        self.assertEqual(minor._strum_note_names(), ["C", "E♭", "G"])
+        self.assertEqual(
+            sharp_dominant._strum_note_names(),
+            ["F♯", "A♯", "C♯", "E"],
+        )
+
+    def test_ldr_note_guide_keeps_scale_accidentals_consistent(self) -> None:
+        d_major = self._strum_backend(
+            "major",
+            (0, 4, 7),
+            root=2,
+            ladder=True,
+        )
+        eb_minor = self._strum_backend(
+            "minor",
+            (0, 3, 7),
+            root=3,
+            ladder=True,
+        )
+
+        self.assertEqual(
+            d_major._strum_note_names(),
+            ["D", "E", "F♯", "A", "B"],
+        )
+        self.assertEqual(
+            eb_minor._strum_note_names(),
+            ["E♭", "G♭", "A♭", "B♭", "D♭"],
+        )
+
+    def test_octatonic_note_guide_uses_its_musical_mixed_spelling(self) -> None:
+        diminished = self._strum_backend(
+            "diminished",
+            (0, 3, 6),
+            ladder=True,
+        )
+        self.assertEqual(
+            diminished._strum_note_names(),
+            ["C", "D", "E♭", "F", "G♭", "A♭", "A", "B"],
+        )
+
+    def test_note_guide_is_empty_without_an_active_chord(self) -> None:
+        backend = self._strum_backend("major", (0, 4, 7))
+        backend._active_row = -1
+        backend._active_root_semitone = -1
+        self.assertEqual(backend._strum_note_names(), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

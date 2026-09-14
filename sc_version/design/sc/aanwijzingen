@@ -1,0 +1,9 @@
+maak in deze directory een supercollider versie, zelfde architectuur waarbij supercollider los draait, headless, en enkel bestuurd wordt door de omnichord.
+laat de amy versie verder met rust, uitgangspunt is de sc_version directory, uiteraard geen esp32 en ook nog geen extra performance maatregelen voor pi, begin met de linux versie op dit systeem 
+maak op github een aparte build voor dit systeem, en en zorg er voor dat een merge naar main niet meer automatisch een release maakt. Vanaf nu moet er dus juist een extra flag meegegeven worden die zeg "release", hou  wel dezelfde release naamgevingen aan, maar dan de SC version.
+SC  version en AMY vesion kunnen dus onafhankelijk van elkaar gebouwd en getest worden en hebben hun eigen release.
+De huidige sc_version directory is initieel een kopie van de amy version.
+Werk in de branch version/supercollider
+De sample lib staat ook in ~/sample_lib/VSCO-2-CE-1.1.0/ lokaal uitgepakt
+Hou je aan de bestaande archtitectuur en code richtlijnen, de omnichord mag ook bij de supercollider sequencer niet zelf dingen moeten timen, geef het aan als dat niet kan, ga het niet toch implementeren.
+In de README krijgen de amy versie en de supercollider versie een eiegen screenshot.

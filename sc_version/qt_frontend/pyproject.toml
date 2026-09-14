@@ -1,0 +1,21 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["build", "dist", "test-artifacts", "deployment"]
+
+[tool.ruff.lint]
+# Keep the gate focused on correctness-critical rules; formatting remains a
+# separate review concern rather than a repository-wide churn source.
+select = ["E9", "F"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["code"]
+mypy_path = "code"
+check_untyped_defs = true
+show_error_codes = true
+show_error_context = false
+pretty = false
+color_output = false
+error_summary = false
+warn_unused_configs = true

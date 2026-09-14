@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "program_id": "sample.vsco.gm-styleperc",
+  "role_keys": {
+    "backbeat_primary": 38,
+    "backbeat_soft": 37,
+    "dry_click": 75,
+    "electronic_detail": 67,
+    "ghost_detail": 37,
+    "hand_accent": 63,
+    "hand_high": 61,
+    "hand_low": 65,
+    "low_primary": 36,
+    "low_secondary": 35,
+    "section_accent": 49,
+    "sustain_bell": 79,
+    "sustain_primary": 51,
+    "texture_shaker": 82,
+    "timekeeper_foot": 75,
+    "timekeeper_open": 51,
+    "timekeeper_primary": 54,
+    "timeline_primary": 56,
+    "tonal_high": 76,
+    "tonal_low": 77,
+    "tonal_mid": 61
+  }
+}

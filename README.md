@@ -47,3 +47,16 @@ the MIDI sources being moved or pressed.
 
 The original Sonic Pi implementation is retained as
 [historical code](./rpi_sonic_pi_version) and is no longer the active version.
+
+## SuperCollider edition
+
+An independent Linux x86_64 SuperCollider edition is under active development.
+It keeps the Qt instrument but runs sequencing and audio in separately
+supervised headless `sclang` and `scsynth` processes through a typed OSC
+boundary. It has its own tests, package workflow and explicitly requested
+`-SC` releases; it does not replace or alter the supported AMY edition.
+
+![LB Omnichord SuperCollider edition](./sc_version/qt_frontend/screenshots/omni-R20260913T004923.png)
+
+See [the SuperCollider edition overview](./sc_version/README.md) for its
+current Linux-only scope and known gaps.

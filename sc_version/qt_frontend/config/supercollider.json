@@ -1,0 +1,23 @@
+{
+  "config_revision": 2,
+  "protocol_version": 1,
+  "language": {
+    "host": "127.0.0.1",
+    "port": 57140,
+    "startup_timeout_seconds": 30.0,
+    "message_payload_bytes": 1000
+  },
+  "server": {
+    "sample_rate": 48000,
+    "block_size": 64,
+    "latency_seconds": 0.02,
+    "max_nodes": 4096,
+    "max_buffers": 8192,
+    "realtime_memory_kib": 262144
+  },
+  "samples": {
+    "vsco_root": "~/VSCO-2-CE",
+    "repository": "https://github.com/linuxificator/VSCO-2-CE.git",
+    "ram_budget_mib": 4096
+  }
+}

@@ -1,22 +1,44 @@
 # Current work handoff
 
-Updated: 2026-09-09
+Updated: 2026-09-14
 
-- Active branch: `bass_refresh`, based on `main` at `8fef088`.
-- The ranked, C-normalized bass catalogue is implemented without TB-303
-  behavior. APG/LDR pitch-pool selection, fixed riff ranks and running-pattern
-  continuity are covered by unit, integration and sequencer-capacity tests.
-- The reported MIDI regressions are repaired: complete GM percussion mapping,
-  endpoint-only CC pushbutton detection, clock-only traffic suppression and
-  factory channels `2,3,4,5,6,10` with chord input on channel 1.
-- AMY `5e3cd57` fixes disabled shared-reverb returns leaking a second dry path.
-  The full local `tests/run_tests.py --suite all` matrix passed on this branch.
-- Rejected P4 prototypes are preserved on the non-production branch
-  `diagnostics/esp32p4-rejected-prototypes`; never merge it into production.
-- Released baseline: LB `R20260907T231243` (`c191e65`). The active development
-  pin is AMY `releases/amy_omnichord_R20260909T140940` (`5e3cd57`).
-- The complete release matrix passed. The Pi AppImage was physically accepted
-  on a 2 GiB Pi 4 with bundled AMY and with serial ESP32-P4.
+- Active branch: `version/supercollider`, based on `main` at `955cbbf`.
+- The AMY implementation under `amysynth_version` is intentionally unchanged.
+- The Linux x86_64 SuperCollider vertical slice lives under `sc_version` and
+  uses separate Qt, headless `sclang` and `scsynth` processes. The frontend
+  sends typed OSC actions and immutable plans; SC owns musical timing and note
+  lifetimes.
+- Pinned inputs are SuperCollider 3.14.1 and SCLOrkSynths commit
+  `6730c745971aa45c95d9b4cddfb4d5ca342774b3`. VSCO 2 CE is a separate local
+  CC0 bank at `~/sample_lib/VSCO-2-CE-1.1.0` by default.
+- The current working tree separates the 109-definition SCLOrk source inventory
+  from its 76 measured pitched-browser voices, removes AMY patch names from the
+  SC catalogue, calibrates three fixed registers with float NRT renders, and
+  keeps raw drums plus two unstable definitions out of that browser. The live
+  engine exercised every admitted SCLOrk voice, VSCO range fallback and all
+  percussion roles without `/n_free` or buffer-allocation failures. See
+  `sc_version/design/sc/PLAYBACK_QUALIFICATION.md`.
+- The SC instrument UI now separates 80 qualified synth programs from a compact
+  PCM browser with 22 VSCO families and 66 canonical choices. SynthDef scalar
+  defaults drive a reviewed parameter surface; ADSR is lower-left, PCM
+  variants/articulations use two aligned button rows, and engine prefixes are
+  hidden. See `sc_version/design/sc/INSTRUMENT_BROWSER.md`.
+- The prior complete local matrix passed at commit `515d8bc`, including all 109
+  SCLOrk non-realtime renders and the native sample-player render. GitHub run
+  `34794953001` passed the independent SC test/package workflow with pinned
+  SuperCollider 3.14.1 and produced the verified `package-SC-Linux-x86_64`
+  artifact. Publishing is
+  manual through `release=true`; AMY publication is independently explicit.
+- VSCO release layers now remain correctly owned across sustain and two-phase
+  program changes. Manual strum and MIDI preview gestures carry the exact
+  prepared program revision. A pinned Salamander opcode audit records 69
+  distinct opcodes and the 49 semantics still blocking an honest import.
+- The implementation is not a full migration claim. Additional banks,
+  advanced SFZ behavior, comprehensive program calibration/load evidence and
+  non-Linux SC targets remain open.
 
-Resume through `amysynth_version/design/README.md`. It routes to the current
-contracts and open work; Git history is the archive for removed handovers.
+Resume through `sc_version/design/README.md`, then
+`sc_version/design/sc/STATUS.md`. The original detailed requirements remain in
+`sc_version/design/sc/CODEX_HANDOVER_SUPERCOLLIDER_MIGRATION.md`; current code,
+configuration and executable tests take precedence where implementation has
+made a choice explicit.

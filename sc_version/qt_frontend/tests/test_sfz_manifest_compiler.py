@@ -1,0 +1,301 @@
+from __future__ import annotations
+
+from pathlib import Path
+import struct
+import sys
+import tempfile
+import unittest
+import wave
+
+import soundfile
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "code"))
+
+from sfz_manifest_compiler import (  # noqa: E402
+    _audio_record,
+    _midi_note,
+    _region_record,
+    audit_sfz_opcodes,
+    compile_vsco_manifest,
+    parse_sfz,
+    preprocess_sfz,
+)
+
+
+class SfzManifestCompilerTests(unittest.TestCase):
+    @staticmethod
+    def _append_smpl_loop(
+        path: Path,
+        *,
+        root_key: int,
+        start: int,
+        end_inclusive: int,
+    ) -> None:
+        payload = struct.pack(
+            "<9I6I",
+            0,
+            0,
+            0,
+            root_key,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            start,
+            end_inclusive,
+            0,
+            0,
+        )
+        chunk = b"smpl" + struct.pack("<I", len(payload)) + payload
+        source = path.read_bytes()
+        path.write_bytes(
+            source[:4]
+            + struct.pack("<I", len(source) - 8 + len(chunk))
+            + source[8:]
+            + chunk
+        )
+
+    def test_note_names_follow_sfz_middle_c_convention(self) -> None:
+        self.assertEqual(_midi_note("c4", -1), 60)
+        self.assertEqual(_midi_note("d#2", -1), 39)
+        self.assertEqual(_midi_note("Bb0", -1), 22)
+
+    def test_scopes_and_multiple_opcodes_are_resolved(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "fixture.sfz"
+            path.write_text(
+                """
+<control> default_path=Samples\\
+<global> ampeg_release=0.7
+<group> sw_last=c2 sw_label=Sustain
+<region> sample=one.wav lokey=60 hikey=62 pitch_keycenter=61 lovel=0 hivel=63
+<region> sample=two.wav lovel=64 hivel=127
+""".strip()
+                + "\n",
+                encoding="utf-8",
+            )
+            regions = parse_sfz(path)
+            self.assertEqual(len(regions), 2)
+            self.assertEqual(regions[0].values["default_path"], "Samples\\")
+            self.assertEqual(regions[1].values["ampeg_release"], "0.7")
+            self.assertEqual(regions[1].values["sw_label"], "Sustain")
+
+    def test_unrecognized_opcode_is_a_build_error(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "fixture.sfz"
+            path.write_text("<region> sample=one.wav mystery=1\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unsupported opcode mystery"):
+                parse_sfz(path)
+
+    def test_release_trigger_is_normalized_without_becoming_an_attack(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "fixture.sfz"
+            path.write_text(
+                "<region> sample=release.wav key=60 trigger=release_key\n",
+                encoding="utf-8",
+            )
+            regions = parse_sfz(path)
+            record = _region_record(
+                Path(temporary), regions[0], "sample.fixture", 0, "file-1"
+            )
+
+        self.assertEqual(record["trigger"], "release_key")
+
+    def test_inline_includes_and_macros_expand_with_source_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            data = root / "Data"
+            data.mkdir()
+            (data / "velocity.inc").write_text(
+                "#define $VEL 96\n#define $SAMPLE tone.wav\n",
+                encoding="utf-8",
+            )
+            regions = data / "regions.inc"
+            regions.write_text(
+                "<region> sample=$SAMPLE key=60 hivel=$VEL\n",
+                encoding="utf-8",
+            )
+            mapping = root / "program.sfz"
+            mapping.write_text(
+                '<group> #include "Data/velocity.inc" lovel=1 '
+                '#include "Data/regions.inc"\n',
+                encoding="utf-8",
+            )
+
+            parsed = parse_sfz(mapping, root=root)
+
+        self.assertEqual(len(parsed), 1)
+        self.assertEqual(parsed[0].source, regions)
+        self.assertEqual(parsed[0].values["sample"], "tone.wav")
+        self.assertEqual(parsed[0].values["lovel"], "1")
+        self.assertEqual(parsed[0].values["hivel"], "96")
+
+    def test_include_cycle_and_undefined_macro_are_explicit_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = root / "first.sfz"
+            second = root / "second.inc"
+            first.write_text('#include "second.inc"\n', encoding="utf-8")
+            second.write_text('#include "first.sfz"\n', encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "include cycle"):
+                preprocess_sfz(first, root=root)
+
+            first.write_text(
+                "<region> sample=$MISSING.wav key=60\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(ValueError, "undefined SFZ macro"):
+                preprocess_sfz(first, root=root)
+
+    def test_opcode_audit_reports_unsupported_behavior_without_accepting_it(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            include = root / "regions.inc"
+            include.write_text(
+                "<region> sample=one.wav key=60 cutoff=1200\n",
+                encoding="utf-8",
+            )
+            mapping = root / "program.sfz"
+            mapping.write_text(
+                '#include "regions.inc"\n',
+                encoding="utf-8",
+            )
+
+            report = audit_sfz_opcodes(
+                (mapping,),
+                root=root,
+                bank_id="fixture-bank",
+                source_pin="a" * 40,
+            )
+
+        self.assertFalse(report["complete"])
+        self.assertEqual(report["bank_id"], "fixture-bank")
+        self.assertEqual(report["source_pin"], "a" * 40)
+        self.assertEqual(report["unsupported_opcodes"], ["cutoff"])
+        records = {item["opcode"]: item for item in report["opcodes"]}
+        self.assertEqual(records["key"]["classification"], "implemented-runtime")
+        self.assertEqual(records["sample"]["occurrence_count"], 1)
+        self.assertEqual(
+            records["cutoff"]["locations"],
+            [{"source_file": "regions.inc", "line": 1}],
+        )
+
+    def test_complete_vsco_shape_with_synthetic_bank(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            samples = root / "Samples"
+            samples.mkdir()
+            sample_path = samples / "one.wav"
+            with wave.open(str(sample_path), "wb") as output:
+                output.setnchannels(1)
+                output.setsampwidth(2)
+                output.setframerate(48000)
+                output.writeframes(struct.pack("<16h", *range(16)))
+            mapping = (
+                "<control> default_path=Samples\\\n"
+                "<region> sample=one.wav lokey=60 hikey=60 pitch_keycenter=60\n"
+            )
+            for index in range(75):
+                (root / f"Program-{index:02}.sfz").write_text(
+                    mapping,
+                    encoding="utf-8",
+                )
+            manifest = compile_vsco_manifest(root)
+            self.assertEqual(len(manifest["programs"]), 75)
+            self.assertEqual(len(manifest["regions"]), 75)
+            self.assertEqual(len(manifest["files"]), 1)
+            self.assertEqual(manifest["files"][0]["decoded_bytes"], 64)
+            self.assertEqual(manifest["coverage"][0]["disposition"], "mapped-region")
+
+    def test_embedded_wav_loop_is_inventoried_but_not_silently_activated(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sample_path = root / "looped.wav"
+            with wave.open(str(sample_path), "wb") as output:
+                output.setnchannels(1)
+                output.setsampwidth(2)
+                output.setframerate(48000)
+                output.writeframes(struct.pack("<16h", *range(16)))
+            self._append_smpl_loop(
+                sample_path,
+                root_key=64,
+                start=0,
+                end_inclusive=15,
+            )
+            mapping = (
+                "<region> sample=looped.wav lokey=64 hikey=64 "
+                "pitch_keycenter=64\n"
+            )
+            for index in range(75):
+                (root / f"Program-{index:02}.sfz").write_text(
+                    mapping,
+                    encoding="utf-8",
+                )
+
+            manifest = compile_vsco_manifest(root)
+
+        sample = manifest["files"][0]
+        self.assertEqual(sample["embedded_root_key"], 64)
+        self.assertEqual(
+            sample["embedded_loops"],
+            [
+                {
+                    "mode": "forward",
+                    "start_frame": 0,
+                    "end_frame_exclusive": 16,
+                    "fraction": 0,
+                    "play_count": 0,
+                    "playback_disposition": "ignored-whole-file-loop",
+                }
+            ],
+        )
+        self.assertEqual(manifest["regions"][0]["loop"], {"mode": "none"})
+
+    def test_lossless_flac_metadata_and_canonical_pcm_hash_are_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            wav_path = root / "same.wav"
+            flac_path = root / "same.flac"
+            samples = struct.pack("<16h", *range(-8, 8))
+            with wave.open(str(wav_path), "wb") as output:
+                output.setnchannels(1)
+                output.setsampwidth(2)
+                output.setframerate(44100)
+                output.writeframes(samples)
+            soundfile.write(
+                flac_path,
+                [value / 32768 for value in range(-8, 8)],
+                44100,
+                subtype="PCM_16",
+            )
+
+            wav_record = _audio_record(root, wav_path, bank_id="fixture-bank")
+            flac_record = _audio_record(root, flac_path, bank_id="fixture-bank")
+
+        self.assertEqual(flac_record["frames"], 16)
+        self.assertEqual(flac_record["sample_rate"], 44100)
+        self.assertEqual(flac_record["channels"], 1)
+        self.assertEqual(flac_record["original_bit_depth"], 16)
+        self.assertEqual(flac_record["decoded_bytes"], 64)
+        self.assertEqual(
+            flac_record["pcm_hash_encoding"],
+            "signed-int32-left-aligned-little-endian",
+        )
+        self.assertEqual(wav_record["pcm_sha256"], flac_record["pcm_sha256"])
+        self.assertTrue(flac_record["id"].startswith("fixture-bank-file-"))
+
+    def test_float_audio_is_rejected_instead_of_misreporting_bit_depth(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "float.wav"
+            soundfile.write(path, [0.0, 0.25], 48000, subtype="FLOAT")
+            with self.assertRaisesRegex(ValueError, "unsupported sample encoding FLOAT"):
+                _audio_record(root, path)
+
+
+if __name__ == "__main__":
+    unittest.main()

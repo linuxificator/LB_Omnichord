@@ -1,0 +1,491 @@
+{
+  "version": 1,
+  "factory_name": "Experimental Floor",
+  "chord_rows": [
+    {
+      "chord": "diminished7",
+      "octave": "O3",
+      "inversion": 0
+    },
+    {
+      "chord": "augmented_major7",
+      "octave": "O4",
+      "inversion": 0
+    },
+    {
+      "chord": "dominant7_sharp11",
+      "octave": "O4",
+      "inversion": 0
+    },
+    {
+      "chord": "dominant7_flat13",
+      "octave": "O5",
+      "inversion": 0
+    }
+  ],
+  "synths": {
+    "chord": {
+      "selected": "dx7_246",
+      "parameters": {}
+    },
+    "strum": {
+      "selected": "dx7_213",
+      "parameters": {}
+    },
+    "bass": {
+      "selected": "dx7_190",
+      "parameters": {}
+    }
+  },
+  "volumes": {
+    "chord": 0.72,
+    "strum": 0.74,
+    "bass": 0.84,
+    "percussion": 0.88
+  },
+  "transport": {
+    "rhythm_running": false,
+    "bass_running": true
+  },
+  "rhythm": {
+    "selected": "breakbeat",
+    "settings": {
+      "pop_8": {
+        "tempo": 108.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "pop_16": {
+        "tempo": 112.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "slow_ballad": {
+        "tempo": 66.0,
+        "percussion_activity": 1,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "six_eight_ballad": {
+        "tempo": 72.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "rock": {
+        "tempo": 118.0,
+        "percussion_activity": 2,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "shuffle": {
+        "tempo": 112.0,
+        "percussion_activity": 2,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "punk": {
+        "tempo": 176.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "metal": {
+        "tempo": 150.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "country_train": {
+        "tempo": 132.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "country_waltz": {
+        "tempo": 92.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "waltz": {
+        "tempo": 96.0,
+        "percussion_activity": 1,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "polka": {
+        "tempo": 126.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "march": {
+        "tempo": 116.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "straight_blues": {
+        "tempo": 100.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "twelve_eight_blues": {
+        "tempo": 72.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "jazz_swing": {
+        "tempo": 144.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "jazz_waltz": {
+        "tempo": 138.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "jazz_shuffle": {
+        "tempo": 118.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "funk": {
+        "tempo": 102.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "jazz_funk": {
+        "tempo": 108.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "soul": {
+        "tempo": 92.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "soul_shuffle": {
+        "tempo": 94.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "gospel_6_8": {
+        "tempo": 82.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "rnb": {
+        "tempo": 78.0,
+        "percussion_activity": 1,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "disco": {
+        "tempo": 120.0,
+        "percussion_activity": 3,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "house": {
+        "tempo": 124.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "techno": {
+        "tempo": 132.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "trance": {
+        "tempo": 138.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "garage_2step": {
+        "tempo": 132.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "breakbeat": {
+        "tempo": 154.0,
+        "percussion_activity": 4,
+        "chord_activity": 4,
+        "bass_activity": 4
+      },
+      "drum_and_bass": {
+        "tempo": 174.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "dubstep": {
+        "tempo": 140.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "hip_hop": {
+        "tempo": 86.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "boom_bap": {
+        "tempo": 92.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "trap": {
+        "tempo": 140.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "bossa": {
+        "tempo": 132.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "samba": {
+        "tempo": 148.0,
+        "percussion_activity": 3,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "salsa": {
+        "tempo": 110.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "cha_cha": {
+        "tempo": 118.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "mambo": {
+        "tempo": 176.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "merengue": {
+        "tempo": 130.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "cumbia": {
+        "tempo": 92.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "bolero": {
+        "tempo": 76.0,
+        "percussion_activity": 1,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "tango": {
+        "tempo": 120.0,
+        "percussion_activity": 1,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "son_clave_3_2": {
+        "tempo": 100.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "rumba_clave_3_2": {
+        "tempo": 104.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "afro_cuban_6_8": {
+        "tempo": 110.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "reggae": {
+        "tempo": 78.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "calypso_soca": {
+        "tempo": 126.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "five_four": {
+        "tempo": 108.0,
+        "percussion_activity": 2,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "seven_eight": {
+        "tempo": 126.0,
+        "percussion_activity": 2,
+        "chord_activity": 1,
+        "bass_activity": 1
+      },
+      "seven_four_funk": {
+        "tempo": 112.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "nine_eight": {
+        "tempo": 118.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      },
+      "eleven_eight": {
+        "tempo": 116.0,
+        "percussion_activity": 2,
+        "chord_activity": 2,
+        "bass_activity": 2
+      }
+    }
+  },
+  "tuning": {
+    "mode": "JV",
+    "reference_hz": 440
+  },
+  "midi_control_bindings": [
+    {
+      "channel": 1,
+      "source_type": "pitch_bend",
+      "activate_on_input": true,
+      "target": {
+        "kind": "pitch_bend"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 1,
+      "activate_on_input": true,
+      "target": {
+        "kind": "strum_position"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 21,
+      "activate_on_input": true,
+      "target": {
+        "kind": "volume",
+        "role": "percussion"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 22,
+      "activate_on_input": true,
+      "target": {
+        "kind": "volume",
+        "role": "bass"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 23,
+      "activate_on_input": true,
+      "target": {
+        "kind": "volume",
+        "role": "strum"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 24,
+      "activate_on_input": true,
+      "target": {
+        "kind": "volume",
+        "role": "chord"
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 25,
+      "activate_on_input": true,
+      "target": {
+        "kind": "chord_type",
+        "row": 0
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 26,
+      "activate_on_input": true,
+      "target": {
+        "kind": "chord_type",
+        "row": 1
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 27,
+      "activate_on_input": true,
+      "target": {
+        "kind": "chord_type",
+        "row": 2
+      }
+    },
+    {
+      "channel": 1,
+      "controller": 28,
+      "activate_on_input": true,
+      "target": {
+        "kind": "chord_type",
+        "row": 3
+      }
+    },
+    {
+      "channel": 16,
+      "controller": 115,
+      "activate_on_input": true,
+      "target": {
+        "kind": "button",
+        "action": "rhythm_toggle"
+      }
+    },
+    {
+      "channel": 16,
+      "controller": 117,
+      "activate_on_input": true,
+      "target": {
+        "kind": "button",
+        "action": "chord_gate"
+      }
+    }
+  ]
+}

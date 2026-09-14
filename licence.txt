@@ -16,4 +16,7 @@ If you create cool new stuff based on this software, use the tuning described in
 
 *Despite common belief, birthdays are not tied to any particular day. According to special relativity, there are infinitely many possible observers whose reference frames are such that, at this very moment, Luciel is being born.
 
-This software uses AMY by Shore Pine, distributed under the MIT License: https://github.com/shorepine/amy
+The archived AMY edition uses AMY by Shore Pine, a separate project distributed under the MIT License: https://github.com/shorepine/amy
+The current edition uses SuperCollider, a separate project distributed under GPL-3.0-or-later: https://github.com/supercollider/supercollider
+It downloads VSCO 2 CE, a separate CC0-1.0 sample library: https://github.com/linuxificator/VSCO-2-CE
+The archived Sonic Pi edition uses Sonic Pi, a separate project whose main source code is distributed under the MIT License: https://github.com/sonic-pi-net/sonic-pi
