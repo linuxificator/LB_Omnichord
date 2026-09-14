@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 from typing import Mapping
 
@@ -31,21 +32,37 @@ def locate_supercollider_runtime(
 
     if runtime_root is not None:
         root = Path(runtime_root).expanduser().resolve()
-        sclang = root / "bin" / "sclang"
-        scsynth = root / "bin" / "scsynth"
-        class_library = root / "share" / "SuperCollider" / "SCClassLibrary"
-        plugins = root / "lib" / "SuperCollider" / "plugins"
-        missing = [
-            str(path)
-            for path in (sclang, scsynth, class_library, plugins)
-            if not path.exists()
-        ]
-        if missing:
-            raise SuperColliderProcessError(
-                "bundled SuperCollider runtime is incomplete: "
-                + ", ".join(missing)
-            )
-        return SuperColliderExecutables(sclang, scsynth, class_library, plugins)
+        layouts = (
+            # Linux installation prefix.
+            (
+                root / "bin" / "sclang",
+                root / "bin" / "scsynth",
+                root / "share" / "SuperCollider" / "SCClassLibrary",
+                root / "lib" / "SuperCollider" / "plugins",
+            ),
+            # Official macOS application bundle.
+            (
+                root / "Contents" / "MacOS" / "sclang",
+                root / "Contents" / "Resources" / "scsynth",
+                root / "Contents" / "Resources" / "SCClassLibrary",
+                root / "Contents" / "Resources" / "plugins",
+            ),
+            # Official portable Windows archive.
+            (
+                root / "sclang.exe",
+                root / "scsynth.exe",
+                root / "SCClassLibrary",
+                root / "plugins",
+            ),
+        )
+        for sclang, scsynth, class_library, plugins in layouts:
+            if all(path.exists() for path in (sclang, scsynth, class_library, plugins)):
+                return SuperColliderExecutables(
+                    sclang, scsynth, class_library, plugins
+                )
+        raise SuperColliderProcessError(
+            f"bundled SuperCollider runtime is incomplete or has an unsupported layout: {root}"
+        )
 
     sclang_name = shutil.which("sclang")
     scsynth_name = shutil.which("scsynth")
@@ -144,7 +161,7 @@ class SuperColliderSupervisor:
         if self.executables.plugins is not None:
             env["OMNICHORD_SC_PLUGIN_PATH"] = str(self.executables.plugins)
         runtime_library = self.executables.sclang.parent.parent / "lib"
-        if self.executables.class_library is not None:
+        if self.executables.class_library is not None and sys.platform.startswith("linux"):
             env["LD_LIBRARY_PATH"] = os.pathsep.join(
                 part
                 for part in (

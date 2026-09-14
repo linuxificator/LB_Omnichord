@@ -88,13 +88,15 @@ sound-bank semantics that are not yet complete.
 settings. `packaging/supercollider_release_inputs.json` and
 `supercollider/source-lock.json` own pinned external source identities. The SC
 package excludes AMY modules and contains the frontend, engine sources and a
-pinned headless SC 3.14.1 runtime. VSCO recordings remain a separately
-installed CC0 asset bank.
+pinned SC 3.14.1 runtime. VSCO recordings remain a separately licensed CC0
+asset bank. On first launch the bundled Dulwich client installs the verified
+fork at a user-configured location (default `~/VSCO-2-CE`) without requiring a
+system Git executable.
 
-The independent SC workflow currently builds Linux x86_64 only. Ordinary
-pushes test and upload an artifact. Publication requires manual
-`release=true`; tags end in `-SC`. The AMY workflow follows the same explicit
-release rule but otherwise remains independent.
+The independent SC workflow tests Linux x86_64, Raspberry Pi aarch64, macOS
+arm64 and Windows x86_64. Ordinary pushes only test. Package construction and
+publication both require manual `release=true`; tags end in `-SC`. The AMY and
+Sonic Pi trees are archived and are not release targets.
 
 ## Test boundary
 

@@ -26,9 +26,7 @@ Requirements:
 - Python dependencies from `requirements.txt`;
 - `sclang` and `scsynth` (3.13 is source-compatible; packages pin 3.14.1);
 - the Linux distribution's PipeWire JACK compatibility tools when applicable;
-- VSCO 2 Community Edition unpacked at
-  `~/sample_lib/VSCO-2-CE-1.1.0`, or a different path configured in
-  `config/supercollider.json`.
+- enough free storage for the external VSCO 2 Community Edition repository.
 
 All 75 VSCO source mappings are catalogued. The PCM browser groups them into
 22 instrument families and 66 canonical pitched variant/articulation choices;
@@ -43,6 +41,13 @@ Run:
 
 `OMNICHORD_SC_CONFIG` may point to another validated SC configuration. Engine
 host addresses remain loopback-only in the current trust model.
+
+The first source or packaged launch clones
+`https://github.com/linuxificator/VSCO-2-CE` to `~/VSCO-2-CE` with the bundled
+Dulwich client. It records the location in
+`~/.omnichord/config/supercollider.json`. A user may change that path, but the
+application verifies the clone's Git origin before using it. It never assumes
+that a system `git` executable is installed.
 
 ## Test suites
 
@@ -72,15 +77,18 @@ can be refreshed without starting an audio engine:
 python capture_screenshots.py
 ```
 
-## Linux package and release
+## Packages and release
 
-The SC workflow builds pinned headless SuperCollider 3.14.1 and a package named
-`LB_Omnichord.SC.R<timestamp>.Linux-x86_64.AppImage`. It verifies the bundled
-runtime without opening an audio device and publishes only when the manually
-dispatched workflow receives `release=true`. Ordinary pushes and merges run
-tests and upload artifacts but do not create releases.
+The SC workflow tests Linux x86_64, Raspberry Pi aarch64, macOS arm64 and
+Windows x86_64. Release packages contain the Qt application, SuperCollider
+3.14.1 language/server runtime and class/plugin trees. They communicate through
+the native loopback OSC protocol described above; no substitute IPC layer is
+introduced.
 
-The current package is Linux x86_64 only and requires the host's normal audio
-session integration (`pw-jack` on PipeWire). The VSCO sample library is not
-embedded. See [third-party notices](./THIRD_PARTY_NOTICES.md) and
+Publishing occurs only when the manually dispatched workflow receives
+`release=true`. An ordinary push or merge performs platform tests and creates
+no release. Linux packages use the host's normal audio-session integration
+(`pw-jack` on PipeWire); Raspberry Pi receives no scheduler, CPU-isolation or
+other machine-policy changes. The external VSCO sample library is deliberately
+not embedded. See [third-party notices](./THIRD_PARTY_NOTICES.md) and
 [current implementation status](../design/sc/STATUS.md).

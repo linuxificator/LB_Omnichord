@@ -71,7 +71,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(config["config_revision"], 1)
+        self.assertEqual(config["config_revision"], 2)
         self.assertEqual(config["protocol_version"], 1)
 
     def test_frozen_entry_uses_sc_supervision_and_contains_no_amy_service(self) -> None:
@@ -84,18 +84,26 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertNotIn("--amy-service", entry)
 
     def test_sc_build_is_independent_and_release_is_explicit(self) -> None:
-        workflow = (ROOT.parents[1] / ".github" / "workflows" / "supercollider-linux.yml")
+        workflow = (
+            ROOT.parents[1] / ".github" / "workflows" / "supercollider-release.yml"
+        )
         text = workflow.read_text(encoding="utf-8")
         builder = (ROOT / "packaging" / "build_sc_appimage.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn("branches: [main, version/supercollider]", text)
-        self.assertIn("description: Publish this tested SuperCollider Linux build", text)
+        self.assertIn("branches: [main, release/supercollider-multiplatform]", text)
+        self.assertIn("Build and publish all tested SuperCollider packages", text)
         self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.release", text)
         self.assertIn("build_supercollider_runtime.sh", text)
-        self.assertIn("supercollider_release_evidence.py", text)
-        self.assertIn("release-manifest-sc.json", text)
-        self.assertIn("*.spdx.json", text)
+        for platform in (
+            "Linux-x86_64",
+            "RaspberryPi-aarch64",
+            "macOS-arm64",
+            "Windows-x86_64",
+        ):
+            self.assertIn(platform, text)
+        self.assertNotIn("Android-arm64.apk", text)
+        self.assertNotIn("ESP32P4.zip", text)
         self.assertIn("--exclude-module c_amy", builder)
         self.assertIn("--add-data \"$sc_dir:supercollider\"", builder)
 

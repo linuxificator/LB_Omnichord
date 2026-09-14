@@ -22,7 +22,7 @@
   "supported_packages": [
     "Linux-x86_64",
     "RaspberryPi-aarch64",
-    "macOS-universal",
+    "macOS-arm64",
     "Windows-x86_64"
   ],
   "unsupported_engine_targets": ["Android", "ESP32-P4"]

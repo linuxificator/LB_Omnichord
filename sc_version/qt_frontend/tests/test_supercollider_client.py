@@ -79,7 +79,7 @@ class SuperColliderClientTests(unittest.TestCase):
         self.config_path.write_text(
             json.dumps(
                 {
-                    "config_revision": 1,
+                    "config_revision": 2,
                     "protocol_version": 1,
                     "language": {
                         "host": "127.0.0.1",
@@ -97,6 +97,7 @@ class SuperColliderClientTests(unittest.TestCase):
                     },
                     "samples": {
                         "vsco_root": "/not-used-by-client",
+                        "repository": "https://github.com/linuxificator/VSCO-2-CE.git",
                         "ram_budget_mib": 4096,
                     },
                 }

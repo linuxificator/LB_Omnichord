@@ -6,9 +6,10 @@ AMY edition, while moving synthesis, sample playback, voice ownership, mixing
 and musical timing into a separately supervised headless `sclang`/`scsynth`
 runtime.
 
-The current supported target is Linux x86_64. Raspberry Pi, macOS, Windows,
-Android and ESP32-P4 remain targets of the AMY edition; this directory does
-not claim SuperCollider support for them yet.
+The packaged targets are Linux x86_64, Raspberry Pi aarch64, macOS arm64 and
+Windows x86_64. Android is not yet a SuperCollider-edition target. The former
+AMY and Sonic Pi editions are retained as source archives, not released
+products.
 
 ![SuperCollider edition OMNI screen](./qt_frontend/screenshots/omni-R20260913T004923.png)
 
@@ -28,9 +29,8 @@ owns one SC process group and shuts it down with the frontend.
 
 ## Run from source on Linux
 
-Install Python dependencies and SuperCollider, install the distribution's
-PipeWire JACK compatibility package when PipeWire is active, and unpack VSCO
-2 Community Edition at `~/sample_lib/VSCO-2-CE-1.1.0`. Then run:
+Install Python dependencies and SuperCollider and install the distribution's
+PipeWire JACK compatibility package when PipeWire is active. Then run:
 
 ```bash
 cd sc_version/qt_frontend
@@ -42,8 +42,11 @@ when `pw-jack` is unavailable, because raw JACK can take ownership of the
 audio device. Override that safety check only for a deliberately configured
 JACK system.
 
-Configuration is read from `qt_frontend/config/supercollider.json`. The VSCO
-root may use `~`; the application validates the configuration and waits for
+On first launch the bundled Dulwich Git client installs the verified
+`linuxificator/VSCO-2-CE` sample repository at `~/VSCO-2-CE`. No system Git
+installation is required. The location is stored in
+`~/.omnichord/config/supercollider.json`; a configured alternative is accepted
+only when its Git origin identifies that repository. The application waits for
 the dedicated VSCO percussion sample program before reporting the engine ready.
 
 ## Tests and packages
@@ -59,11 +62,10 @@ python tests/run_tests.py --suite sc-audio
 python tests/run_tests.py --suite sc-banks
 ```
 
-GitHub builds the Linux package independently in
-`supercollider-linux.yml`. A push tests and uploads a short-lived artifact;
-publishing a release requires a manual workflow run with `release=true` and
-uses an `R<UTC timestamp>-SC` tag. The VSCO recordings are not bundled and
-must be installed separately under their own CC0 license.
+The `supercollider-release.yml` workflow tests the four supported platforms on
+ordinary pushes. It builds and publishes packages only when manually dispatched
+with `release=true`, using an `R<UTC timestamp>-SC` tag. The VSCO recordings are
+not bundled; first launch obtains them under their separate CC0 license.
 
 See [the SC design status](./design/sc/STATUS.md),
 [the design index](./design/README.md), and

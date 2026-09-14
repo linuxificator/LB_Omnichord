@@ -9,6 +9,8 @@ output_dir="${OMNICHORD_SC_APPIMAGE_OUTPUT_DIR:-$frontend_dir/dist}"
 release_stamp="${OMNICHORD_RELEASE_STAMP:?set OMNICHORD_RELEASE_STAMP to RYYYYMMDDHHMMSS}"
 appimage_tool="${APPIMAGETOOL:-appimagetool}"
 runtime_file="${APPIMAGE_RUNTIME_FILE:-}"
+appimage_arch="${OMNICHORD_SC_APPIMAGE_ARCH:-x86_64}"
+platform_name="${OMNICHORD_SC_APPIMAGE_PLATFORM:-Linux-x86_64}"
 
 case "$release_stamp" in
     R[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
@@ -25,7 +27,7 @@ done
 app_dir="$build_root/AppDir"
 pyinstaller_dist="$build_root/pyinstaller-dist"
 pyinstaller_work="$build_root/pyinstaller-work"
-output="$output_dir/LB_Omnichord.SC.${release_stamp}.Linux-x86_64.AppImage"
+output="$output_dir/LB_Omnichord.SC.${release_stamp}.${platform_name}.AppImage"
 qml_evidence="$output.qml-imports.json"
 package_audit="$output.package-audit.json"
 
@@ -52,6 +54,8 @@ python -m PyInstaller \
     --hidden-import ifaddr \
     --copy-metadata zeroconf \
     --copy-metadata ifaddr \
+    --copy-metadata dulwich \
+    --copy-metadata urllib3 \
     --exclude-module amy \
     --exclude-module c_amy \
     --exclude-module amy_transport \
@@ -89,12 +93,12 @@ runtime_args=()
 if [[ -n "$runtime_file" ]]; then
     runtime_args=(--runtime-file "$runtime_file")
 fi
-ARCH=x86_64 "$appimage_tool" "${runtime_args[@]}" "$app_dir" "$output"
+ARCH="$appimage_arch" "$appimage_tool" "${runtime_args[@]}" "$app_dir" "$output"
 chmod +x "$output"
 python "$frontend_dir/packaging/package_audit.py" \
-    --platform Linux-x86_64 \
+    --platform "$platform_name" \
     --tree "$app_dir" \
     --package "$output" \
-    --max-package-bytes 180000000 \
+    --max-package-bytes 240000000 \
     --output "$package_audit"
 printf '%s\n' "$output"

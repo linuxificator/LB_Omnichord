@@ -8,3 +8,7 @@ If you are using it or performing with it, I would like to know!
 Leave a comment at: https://hackaday.io/project/206368-lb-omnichord
 
 If you create new cool stuff based on this software, or use the tuning described in the README.md or got inspired by any of the techniques used, please refer to "Luciel's Birthday Omnichord" as the source and include this license.
+
+This edition uses SuperCollider, a separate project distributed under GPL-3.0-or-later: https://github.com/supercollider/supercollider
+It downloads VSCO 2 CE, a separate CC0-1.0 sample library: https://github.com/linuxificator/VSCO-2-CE
+The archived Sonic Pi edition uses Sonic Pi, a separate project whose main source code is distributed under the MIT License: https://github.com/sonic-pi-net/sonic-pi

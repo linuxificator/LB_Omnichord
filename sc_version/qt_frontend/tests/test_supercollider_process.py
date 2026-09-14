@@ -86,6 +86,35 @@ class SuperColliderProcessTests(unittest.TestCase):
             ):
                 locate_supercollider_runtime(Path(directory))
 
+    def test_official_macos_bundle_layout_is_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "SuperCollider.app"
+            paths = (
+                root / "Contents" / "MacOS" / "sclang",
+                root / "Contents" / "Resources" / "scsynth",
+                root / "Contents" / "Resources" / "SCClassLibrary",
+                root / "Contents" / "Resources" / "plugins",
+            )
+            for path in paths[:2]:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            for path in paths[2:]:
+                path.mkdir(parents=True)
+            runtime = locate_supercollider_runtime(root)
+            self.assertEqual(runtime.sclang, paths[0])
+            self.assertEqual(runtime.scsynth, paths[1])
+
+    def test_official_windows_archive_layout_is_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("sclang.exe", "scsynth.exe"):
+                (root / name).touch()
+            (root / "SCClassLibrary").mkdir()
+            (root / "plugins").mkdir()
+            runtime = locate_supercollider_runtime(root)
+            self.assertEqual(runtime.sclang, root / "sclang.exe")
+            self.assertEqual(runtime.scsynth, root / "scsynth.exe")
+
     def test_supervisor_uses_exact_server_plugins_and_private_class_path(
         self,
     ) -> None:

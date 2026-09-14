@@ -4,7 +4,10 @@ Status: implementation status, not a completion claim
 
 Last verified: 2026-09-14
 
-Target currently exercised: Linux x86_64
+Locally exercised target: Linux x86_64
+
+Packaged targets: Linux x86_64, Raspberry Pi aarch64, macOS arm64 and Windows
+x86_64
 
 ## Working vertical slice
 
@@ -85,10 +88,14 @@ Target currently exercised: Linux x86_64
   overlapping half-open gates, same-boundary replacement coalescing,
   external-versus-nested timing boundaries, tempo-domain releases, stale
   callbacks and every 1--4 note/beat direction of a seven-note arpeggio.
-- A separate GitHub workflow builds pinned headless SuperCollider 3.14.1 and a
-  Linux x86_64 AppImage. Publication requires an explicit `release=true`
-  manual dispatch and uses an independent `-SC` release tag. Its artifact
-  carries a checksum, exact release manifest and SPDX 2.3 evidence.
+- A single GitHub workflow tests all four packaged platforms. Publication and
+  package construction require an explicit `release=true` manual dispatch and
+  use an independent `-SC` release tag. Linux and Raspberry Pi receive
+  AppImages, macOS a DMG and Windows a ZIP. Each contains the official or pinned
+  SuperCollider 3.14.1 runtime and no AMY runtime.
+- First launch uses bundled Dulwich rather than a system Git executable to
+  install `linuxificator/VSCO-2-CE` at `~/VSCO-2-CE`. The user config stores an
+  alternate location, but startup verifies its Git origin before admitting it.
 - The bounded sample-source catalogue records all eleven pinned Git banks and
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see
@@ -155,17 +162,18 @@ Target currently exercised: Linux x86_64
 - Linux source behavior was exercised locally with SuperCollider 3.13.0. The
   pinned 3.14.1 compiler, engine, frontend and package workflow passed on
   commit `fc3b26e` in GitHub run `34790456369`.
-- Raspberry Pi, macOS, Windows, Android and ESP32-P4 are not SuperCollider
-  edition targets. Their existing AMY artifacts remain separate and supported
-  according to the AMY documentation.
+- Physical acceptance on Raspberry Pi, macOS and Windows remains outstanding;
+  their CI jobs exercise the same engine/protocol contracts and verify their
+  packaged runtime layouts. Android and ESP32-P4 are not SuperCollider-edition
+  targets.
 
 ## Distribution boundary
 
-The AppImage bundles the Qt frontend and a pinned headless SC runtime. It does
-not bundle the VSCO recordings and relies on the Linux distribution's normal
-JACK/PipeWire session integration. This is deliberate: sample licensing and
-audio-session ownership remain visible rather than hidden in a nominally
-self-contained executable.
+Each application package bundles the Qt frontend and SuperCollider runtime. It
+does not bundle the VSCO recordings. Linux retains the operating system's
+normal JACK/PipeWire integration, and Raspberry Pi receives no realtime or CPU
+isolation policy. Sample licensing, audio-session ownership and machine policy
+therefore remain explicit.
 
 Current code and executable tests take precedence over the original migration
 handover where implementation details have evolved. The handover remains the

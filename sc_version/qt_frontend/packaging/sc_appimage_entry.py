@@ -31,9 +31,24 @@ def packaged_runtime_root() -> Path:
     if configured:
         return Path(configured).expanduser()
     executable = Path(sys.executable).resolve().parent
-    candidates = (executable / "sc-runtime", executable.parent / "sc-runtime")
+    candidates = (
+        executable.parent.parent / "Resources" / "sc-runtime" / "SuperCollider.app",
+        executable / "sc-runtime" / "SuperCollider.app",
+        executable.parent / "sc-runtime" / "SuperCollider.app",
+        executable / "sc-runtime",
+        executable.parent / "sc-runtime",
+    )
+    from supercollider_platform_adapter import (
+        SuperColliderProcessError,
+        locate_supercollider_runtime,
+    )
+
     for candidate in candidates:
-        if (candidate / "bin" / "sclang").is_file():
+        try:
+            locate_supercollider_runtime(candidate)
+        except SuperColliderProcessError:
+            continue
+        else:
             return candidate
     raise RuntimeError("packaged SuperCollider runtime is unavailable")
 
