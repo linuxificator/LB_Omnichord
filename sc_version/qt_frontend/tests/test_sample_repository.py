@@ -93,7 +93,10 @@ class SampleRepositoryTests(unittest.TestCase):
             self.assertEqual(persisted["config_revision"], 2)
             self.assertEqual(persisted["samples"]["vsco_root"], "~/VSCO-2-CE")
             self.assertEqual(config.samples.repository, DEFAULT_REPOSITORY)
-            self.assertEqual(target, user_root / "config" / "supercollider.json")
+            self.assertEqual(
+                target,
+                (user_root / "config" / "supercollider.json").resolve(),
+            )
 
     def test_revision_one_custom_location_is_preserved(self) -> None:
         data = json.loads(
