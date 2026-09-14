@@ -41,8 +41,11 @@ Target currently exercised: Linux x86_64
 - The migration handover's additional large instrument banks are not imported.
 - VSCO import preserves its declared key/velocity/random/round-robin regions,
   gain, tuning, attack/release and named keyswitch articulations. It does not
-  yet claim sample-header sustain/loop metadata or the advanced release,
-  sustain and microphone behavior needed by the additional planned banks.
+  silently turn the six whole-file RIFF sampler loops into sustain loops: they
+  are inventoried with an explicit ignored disposition. No reviewed partial
+  loop exists in this bank. The importer does not yet claim the advanced
+  release, sustain and microphone behavior needed by the additional planned
+  banks.
 - Compiling and rendering every SCLOrk definition proves loadability and basic
   signal production, not musical calibration across registers, dynamics and
   long performances. Some definitions clip under the generic audit stimulus

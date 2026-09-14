@@ -7,7 +7,7 @@
     "source_pin": "6dd651d55dde97fd4028699be9d4481f26917891",
     "source_verification": "expected-pin; local extracted tree inventoried by hashes"
   },
-  "compiler_version": 1,
+  "compiler_version": 2,
   "coverage": [
     {
       "disposition": "mapped-region",
@@ -22707,6 +22707,17 @@
     {
       "channels": 2,
       "decoded_bytes": 2038720,
+      "embedded_loops": [
+        {
+          "end_frame_exclusive": 254840,
+          "fraction": 0,
+          "mode": "forward",
+          "play_count": 0,
+          "playback_disposition": "ignored-whole-file-loop",
+          "start_frame": 0
+        }
+      ],
+      "embedded_root_key": 0,
       "frames": 254840,
       "id": "vsco-file-051f2fa1760b137a",
       "original_bit_depth": 16,
@@ -22718,6 +22729,17 @@
     {
       "channels": 2,
       "decoded_bytes": 1974088,
+      "embedded_loops": [
+        {
+          "end_frame_exclusive": 246761,
+          "fraction": 0,
+          "mode": "forward",
+          "play_count": 0,
+          "playback_disposition": "ignored-whole-file-loop",
+          "start_frame": 0
+        }
+      ],
+      "embedded_root_key": 0,
       "frames": 246761,
       "id": "vsco-file-58ff20533a8156dc",
       "original_bit_depth": 16,
@@ -22773,6 +22795,17 @@
     {
       "channels": 2,
       "decoded_bytes": 1004312,
+      "embedded_loops": [
+        {
+          "end_frame_exclusive": 125539,
+          "fraction": 0,
+          "mode": "forward",
+          "play_count": 0,
+          "playback_disposition": "ignored-whole-file-loop",
+          "start_frame": 0
+        }
+      ],
+      "embedded_root_key": 0,
       "frames": 125539,
       "id": "vsco-file-0b8bd576f70a7839",
       "original_bit_depth": 16,
@@ -22784,6 +22817,17 @@
     {
       "channels": 2,
       "decoded_bytes": 1088752,
+      "embedded_loops": [
+        {
+          "end_frame_exclusive": 136094,
+          "fraction": 0,
+          "mode": "forward",
+          "play_count": 0,
+          "playback_disposition": "ignored-whole-file-loop",
+          "start_frame": 0
+        }
+      ],
+      "embedded_root_key": 0,
       "frames": 136094,
       "id": "vsco-file-bef2b1f0efa608eb",
       "original_bit_depth": 16,
@@ -23136,6 +23180,17 @@
     {
       "channels": 2,
       "decoded_bytes": 1246128,
+      "embedded_loops": [
+        {
+          "end_frame_exclusive": 155766,
+          "fraction": 0,
+          "mode": "forward",
+          "play_count": 0,
+          "playback_disposition": "ignored-whole-file-loop",
+          "start_frame": 0
+        }
+      ],
+      "embedded_root_key": 0,
       "frames": 155766,
       "id": "vsco-file-e8bf633a98d73ace",
       "original_bit_depth": 16,
@@ -23202,6 +23257,17 @@
     {
       "channels": 2,
       "decoded_bytes": 595376,
+      "embedded_loops": [
+        {
+          "end_frame_exclusive": 74422,
+          "fraction": 0,
+          "mode": "forward",
+          "play_count": 0,
+          "playback_disposition": "ignored-whole-file-loop",
+          "start_frame": 0
+        }
+      ],
+      "embedded_root_key": 0,
       "frames": 74422,
       "id": "vsco-file-8df345df835c9b2c",
       "original_bit_depth": 16,

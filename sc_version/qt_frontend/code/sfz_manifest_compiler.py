@@ -5,11 +5,12 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import re
+import struct
 import wave
 from typing import Any
 
 
-COMPILER_VERSION = 1
+COMPILER_VERSION = 2
 VSCO_SOURCE_PIN = "6dd651d55dde97fd4028699be9d4481f26917891"
 _HEADER = re.compile(r"<([A-Za-z]+)>")
 _OPCODE = re.compile(r"(?<!\S)([A-Za-z][A-Za-z0-9_]*)=")
@@ -188,8 +189,9 @@ def _audio_record(root: Path, path: Path) -> dict[str, Any]:
         frames = source.getnframes()
         while chunk := source.readframes(65536):
             pcm_digest.update(chunk)
+    embedded_root_key, embedded_loops = _wav_sampler_metadata(path, frames)
     relative = path.relative_to(root).as_posix()
-    return {
+    record: dict[str, Any] = {
         "id": "vsco-file-" + hashlib.sha256(relative.encode()).hexdigest()[:16],
         "relative_path": relative,
         "sha256": digest.hexdigest(),
@@ -200,6 +202,69 @@ def _audio_record(root: Path, path: Path) -> dict[str, Any]:
         "original_bit_depth": sample_width * 8,
         "decoded_bytes": frames * channels * 4,
     }
+    if embedded_root_key is not None:
+        record["embedded_root_key"] = embedded_root_key
+    if embedded_loops:
+        record["embedded_loops"] = embedded_loops
+    return record
+
+
+def _wav_sampler_metadata(
+    path: Path,
+    frame_count: int,
+) -> tuple[int | None, list[dict[str, int | str]]]:
+    """Read standard RIFF `smpl` metadata without trusting it as playback policy."""
+
+    with path.open("rb") as source:
+        header = source.read(12)
+        if len(header) != 12 or header[:4] not in (b"RIFF", b"RIFX"):
+            return None, []
+        byte_order = "<" if header[:4] == b"RIFF" else ">"
+        while chunk_header := source.read(8):
+            if len(chunk_header) != 8:
+                raise ValueError(f"{path}: truncated RIFF chunk header")
+            chunk_id = chunk_header[:4]
+            chunk_size = struct.unpack(f"{byte_order}I", chunk_header[4:])[0]
+            if chunk_id != b"smpl":
+                source.seek(chunk_size + (chunk_size & 1), 1)
+                continue
+            payload = source.read(chunk_size)
+            if len(payload) != chunk_size or chunk_size < 36:
+                raise ValueError(f"{path}: truncated RIFF smpl chunk")
+            unity_note = struct.unpack_from(f"{byte_order}I", payload, 12)[0]
+            loop_count = struct.unpack_from(f"{byte_order}I", payload, 28)[0]
+            required = 36 + loop_count * 24
+            if required > len(payload):
+                raise ValueError(f"{path}: RIFF smpl loop table is truncated")
+            loops: list[dict[str, int | str]] = []
+            loop_modes = {0: "forward", 1: "alternating", 2: "backward"}
+            for index in range(loop_count):
+                offset = 36 + index * 24
+                _cue, loop_type, start, inclusive_end, fraction, play_count = (
+                    struct.unpack_from(f"{byte_order}6I", payload, offset)
+                )
+                end_exclusive = inclusive_end + 1
+                if start >= end_exclusive or end_exclusive > frame_count:
+                    raise ValueError(
+                        f"{path}: embedded loop {index} lies outside audio frames"
+                    )
+                whole_file = start == 0 and end_exclusive == frame_count
+                loops.append(
+                    {
+                        "mode": loop_modes.get(loop_type, f"unknown-{loop_type}"),
+                        "start_frame": start,
+                        "end_frame_exclusive": end_exclusive,
+                        "fraction": fraction,
+                        "play_count": play_count,
+                        "playback_disposition": (
+                            "ignored-whole-file-loop"
+                            if whole_file
+                            else "requires-reviewed-loop-policy"
+                        ),
+                    }
+                )
+            return (int(unity_note) if unity_note <= 127 else None), loops
+    return None, []
 
 
 def _region_record(

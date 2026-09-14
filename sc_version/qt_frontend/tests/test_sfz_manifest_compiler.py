@@ -19,6 +19,41 @@ from sfz_manifest_compiler import (  # noqa: E402
 
 
 class SfzManifestCompilerTests(unittest.TestCase):
+    @staticmethod
+    def _append_smpl_loop(
+        path: Path,
+        *,
+        root_key: int,
+        start: int,
+        end_inclusive: int,
+    ) -> None:
+        payload = struct.pack(
+            "<9I6I",
+            0,
+            0,
+            0,
+            root_key,
+            0,
+            0,
+            0,
+            1,
+            0,
+            1,
+            0,
+            start,
+            end_inclusive,
+            0,
+            0,
+        )
+        chunk = b"smpl" + struct.pack("<I", len(payload)) + payload
+        source = path.read_bytes()
+        path.write_bytes(
+            source[:4]
+            + struct.pack("<I", len(source) - 8 + len(chunk))
+            + source[8:]
+            + chunk
+        )
+
     def test_note_names_follow_sfz_middle_c_convention(self) -> None:
         self.assertEqual(_midi_note("c4", -1), 60)
         self.assertEqual(_midi_note("d#2", -1), 39)
@@ -77,6 +112,50 @@ class SfzManifestCompilerTests(unittest.TestCase):
             self.assertEqual(len(manifest["files"]), 1)
             self.assertEqual(manifest["files"][0]["decoded_bytes"], 64)
             self.assertEqual(manifest["coverage"][0]["disposition"], "mapped-region")
+
+    def test_embedded_wav_loop_is_inventoried_but_not_silently_activated(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            sample_path = root / "looped.wav"
+            with wave.open(str(sample_path), "wb") as output:
+                output.setnchannels(1)
+                output.setsampwidth(2)
+                output.setframerate(48000)
+                output.writeframes(struct.pack("<16h", *range(16)))
+            self._append_smpl_loop(
+                sample_path,
+                root_key=64,
+                start=0,
+                end_inclusive=15,
+            )
+            mapping = (
+                "<region> sample=looped.wav lokey=64 hikey=64 "
+                "pitch_keycenter=64\n"
+            )
+            for index in range(75):
+                (root / f"Program-{index:02}.sfz").write_text(
+                    mapping,
+                    encoding="utf-8",
+                )
+
+            manifest = compile_vsco_manifest(root)
+
+        sample = manifest["files"][0]
+        self.assertEqual(sample["embedded_root_key"], 64)
+        self.assertEqual(
+            sample["embedded_loops"],
+            [
+                {
+                    "mode": "forward",
+                    "start_frame": 0,
+                    "end_frame_exclusive": 16,
+                    "fraction": 0,
+                    "play_count": 0,
+                    "playback_disposition": "ignored-whole-file-loop",
+                }
+            ],
+        )
+        self.assertEqual(manifest["regions"][0]["loop"], {"mode": "none"})
 
 
 if __name__ == "__main__":

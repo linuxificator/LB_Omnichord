@@ -51,6 +51,20 @@ class VscoManifestTests(unittest.TestCase):
         self.assertEqual(dispositions.count("mapped-region"), 2034)
         self.assertEqual(dispositions.count("unmapped-source-audio"), 1134)
 
+    def test_embedded_sampler_metadata_is_accounted_without_looping_whole_files(self) -> None:
+        looped = [item for item in self.manifest["files"] if item.get("embedded_loops")]
+        self.assertEqual(len(looped), 6)
+        for sample in looped:
+            self.assertIsInstance(sample.get("embedded_root_key"), int)
+            self.assertTrue(
+                all(
+                    loop["playback_disposition"] == "ignored-whole-file-loop"
+                    and loop["start_frame"] == 0
+                    and loop["end_frame_exclusive"] == sample["frames"]
+                    for loop in sample["embedded_loops"]
+                )
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
