@@ -11,7 +11,7 @@ import uuid
 
 from pythonosc.dispatcher import Dispatcher
 from pythonosc.osc_message_builder import OscMessageBuilder
-from pythonosc.osc_server import BlockingOSCUDPServer
+from pythonosc.osc_server import ThreadingOSCUDPServer
 from pythonosc.udp_client import SimpleUDPClient
 
 from config_loader import ResolvedAmyConfig
@@ -79,9 +79,10 @@ class SuperColliderClient:
         dispatcher.map("/omni/v1/ack", self._accept_ack)
         dispatcher.map("/omni/v1/program/status", self._accept_program_status)
         language = self.runtime_config.language
-        # Replies are tiny and ordered. A single receive loop avoids creating a
-        # fresh OS thread for every acknowledgement during long performances.
-        self._reply_server = BlockingOSCUDPServer((language.host, 0), dispatcher)
+        # Program-ready callbacks can synchronously publish a replacement lane
+        # and wait for its acknowledgement. They therefore need an independent
+        # reply handler while that callback is active.
+        self._reply_server = ThreadingOSCUDPServer((language.host, 0), dispatcher)
         self.reply_port = int(self._reply_server.server_address[1])
         self._reply_thread = threading.Thread(
             target=self._reply_server.serve_forever,

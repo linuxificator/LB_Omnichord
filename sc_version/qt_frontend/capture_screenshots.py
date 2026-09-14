@@ -4,30 +4,26 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
-import pty
-import select
+import socket
 import subprocess
 import sys
 import tempfile
-import threading
+import time
 from pathlib import Path
 
 
 FRONTEND_DIR = Path(__file__).resolve().parent
 DEFAULT_OUTPUT = FRONTEND_DIR / "screenshots"
+FAKE_SC = FRONTEND_DIR / "tests" / "support" / "fake_supercollider_service.py"
+SC_CONFIG = FRONTEND_DIR / "config" / "supercollider.json"
 
 
-def drain_serial_output(master_fd: int, stop: threading.Event) -> None:
-    """Consume the frontend's pseudo-serial output until capture is done."""
-
-    while not stop.is_set():
-        try:
-            readable, _, _ = select.select([master_fd], [], [], 0.05)
-            if readable and not os.read(master_fd, 65536):
-                return
-        except (OSError, ValueError):
-            return
+def free_udp_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -46,22 +42,39 @@ def main() -> int:
     output = args.output.expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
 
-    master_fd, slave_fd = pty.openpty()
-    serial_port = os.ttyname(slave_fd)
-    stop_drain = threading.Event()
-    drain_thread = threading.Thread(
-        target=drain_serial_output,
-        args=(master_fd, stop_drain),
-        name="screenshot-serial-drain",
-        daemon=True,
-    )
-    drain_thread.start()
-    try:
-        with tempfile.TemporaryDirectory(prefix="lb-omnichord-screenshots-") as home:
+    with tempfile.TemporaryDirectory(prefix="lb-omnichord-screenshots-") as home:
+        temporary = Path(home)
+        port = free_udp_port()
+        runtime = json.loads(SC_CONFIG.read_text(encoding="utf-8"))
+        runtime["language"]["port"] = port
+        runtime_path = temporary / "supercollider.json"
+        runtime_path.write_text(json.dumps(runtime), encoding="utf-8")
+        engine_ready = temporary / "engine.ready"
+        engine = subprocess.Popen(
+            [
+                sys.executable,
+                str(FAKE_SC),
+                "--port",
+                str(port),
+                "--log",
+                str(temporary / "engine.jsonl"),
+                "--ready-file",
+                str(engine_ready),
+            ]
+        )
+        try:
+            deadline = time.monotonic() + 3.0
+            while not engine_ready.exists() and time.monotonic() < deadline:
+                if engine.poll() is not None:
+                    return engine.returncode or 1
+                time.sleep(0.01)
+            if not engine_ready.exists():
+                return 1
             env = os.environ.copy()
             env.update(
                 {
                     "HOME": home,
+                    "OMNICHORD_SC_CONFIG": str(runtime_path),
                     "QT_QPA_PLATFORM": "offscreen",
                     "QT_QUICK_BACKEND": "software",
                     "QSG_INFO": "0",
@@ -70,18 +83,19 @@ def main() -> int:
             command = [
                 sys.executable,
                 str(FRONTEND_DIR / "code" / "main.py"),
-                "--serial-port",
-                serial_port,
                 "--windowed",
                 "--capture-screenshots-dir",
                 str(output),
             ]
             return subprocess.run(command, env=env, check=False).returncode
-    finally:
-        stop_drain.set()
-        drain_thread.join(timeout=1.0)
-        os.close(master_fd)
-        os.close(slave_fd)
+        finally:
+            if engine.poll() is None:
+                engine.terminate()
+            try:
+                engine.wait(timeout=3.0)
+            except subprocess.TimeoutExpired:
+                engine.kill()
+                engine.wait(timeout=1.0)
 
 
 if __name__ == "__main__":

@@ -71,7 +71,8 @@ Inherited AMY wire tests explicitly launch the frozen AMY frontend as a
 behavioral oracle; they do not describe the SC production architecture.
 
 Reference UI captures live in `screenshots/`. A deterministic offscreen pair
-can be refreshed without starting an audio engine:
+can be refreshed through a separately launched protocol-faithful test engine;
+neither AMY nor an audio device is involved:
 
 ```bash
 python capture_screenshots.py

@@ -17,6 +17,7 @@ from urllib.request import ProxyHandler, Request, build_opener
 ROOT = Path(__file__).resolve().parents[1]
 HEADLESS_APP = ROOT / "tests" / "integration" / "headless_app.py"
 FAKE_SC = ROOT / "tests" / "support" / "fake_supercollider_service.py"
+SCREENSHOT_HELPER = ROOT / "capture_screenshots.py"
 
 
 def free_port(socket_type: int) -> int:
@@ -80,6 +81,24 @@ def wait_for_graceful_exit(
 
 
 class SuperColliderFrontendProcessTests(unittest.TestCase):
+    def test_public_screenshot_helper_uses_the_sc_process_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                [sys.executable, str(SCREENSHOT_HELPER), "--output", directory],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for name in ("omni.png", "midi.png"):
+                frame = Path(directory) / name
+                self.assertTrue(frame.is_file(), result.stdout + result.stderr)
+                self.assertGreater(frame.stat().st_size, 100_000)
+                self.assertTrue(frame.read_bytes().startswith(b"\x89PNG\r\n\x1a\n"))
+
     def test_manual_chord_crosses_real_frontend_and_separate_engine_processes(
         self,
     ) -> None:
