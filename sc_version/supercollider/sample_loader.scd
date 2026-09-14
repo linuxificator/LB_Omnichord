@@ -280,7 +280,8 @@ regions.do { |record|
     state.notNil and: { state[\status] == \ready }
 };
 
-~omniSelectSampleRegions = { |program, logicalKey, velocity, owner="default"|
+~omniSelectSampleRegions = {
+    |program, logicalKey, velocity, owner="default", trigger="attack"|
     var alias = ~omniSampleAliases[program.asString];
     var sourceProgramId = alias[\sourceProgramId];
     var articulation = alias[\articulation];
@@ -292,6 +293,7 @@ regions.do { |record|
         and: { midiVelocity >= jsonAt.value(region, "velocity_lo").asInteger }
         and: { midiVelocity <= jsonAt.value(region, "velocity_hi").asInteger }
         and: { jsonAt.value(region, "articulation_id").asString == articulation }
+        and: { jsonAt.value(region, "trigger").asString == trigger.asString }
         and: { random >= jsonAt.value(region, "random_lo").asFloat }
         and: { random < jsonAt.value(region, "random_hi").asFloat }
     };
@@ -314,6 +316,67 @@ regions.do { |record|
         };
     };
     selected
+};
+
+~omniSpawnSampleRelease = { |record, trigger, releaseVelocity|
+    var selectionVelocity = if(releaseVelocity > 0) {
+        releaseVelocity
+    } {
+        record[\velocity]
+    };
+    var selected = ~omniSelectSampleRegions.value(
+        record[\program],
+        record[\logicalKey],
+        selectionVelocity,
+        record[\owner] ++ "/" ++ trigger.asString,
+        trigger
+    );
+    selected.do { |region|
+        var sampleId = jsonAt.value(region, "sample_id").asString;
+        var file = ~omniSampleFiles[sampleId];
+        var buffer = ~omniSampleBuffers[sampleId];
+        var channels = jsonAt.value(file, "channels").asInteger;
+        var center = jsonAt.value(region, "key_center").asFloat;
+        var tune = jsonAt.value(region, "tune_cents").asFloat;
+        var envelope = jsonAt.value(region, "envelope");
+        var node = Synth.tail(
+            ~omniSourceGroup,
+            if(channels == 1) { \omniSampleMono } { \omniSampleStereo },
+            [
+                \out, ~omniLogicalBuses[record[\logicalBus]].index,
+                \buffer, buffer.bufnum,
+                \rate, ~omniSamplePlaybackRate.value(
+                    record[\frequencyHz], center, tune
+                ),
+                \velocity, record[\velocity]
+                    * (0.5 + (selectionVelocity * 0.5)),
+                \gainDb, jsonAt.value(region, "gain_db").asFloat,
+                \attack, jsonAt.value(envelope, "attack_sec").asFloat,
+                \release, jsonAt.value(envelope, "release_sec").asFloat,
+                \pitchBendBus, ~omniBendBus.index
+            ]
+        );
+        ~omniSampleVoiceRefs[sampleId] =
+            (~omniSampleVoiceRefs[sampleId] ? 0) + 1;
+        ~omniTouchSample.value(sampleId);
+        node.onFree {
+            ~omniSampleVoiceRefs[sampleId] = (
+                (~omniSampleVoiceRefs[sampleId] ? 0) - 1
+            ).max(0);
+        };
+    };
+};
+
+~omniPhysicalRelease = { |record, releaseVelocity|
+    if(record[\sample] == true) {
+        ~omniSpawnSampleRelease.value(record, "release_key", releaseVelocity);
+    };
+};
+
+~omniFinalRelease = { |record, releaseVelocity|
+    if(record[\sample] == true) {
+        ~omniSpawnSampleRelease.value(record, "release", releaseVelocity);
+    };
 };
 
 ~omniSamplePlaybackRate = { |frequencyHz, keyCenter, tuneCents|
@@ -380,6 +443,10 @@ SynthDef(\omniSampleStereo, {
             owner: owner.asString,
             logicalKey: logicalKey.asInteger,
             program: program.asString,
+            logicalBus: logicalBus.clip(0, 10),
+            frequencyHz: frequencyHz.asFloat,
+            velocity: velocity.asFloat.clip(0, 1),
+            physicalReleased: false,
             sampleNodes: sampleNodes
         );
         ~omniVoices[handle] = record;

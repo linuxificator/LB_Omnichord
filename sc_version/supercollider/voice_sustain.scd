@@ -3,14 +3,30 @@
 ~omniSustainOwners = Dictionary.new;
 ~omniSustainPending = Dictionary.new;
 
-~omniRequestRelease = { |handle|
+~omniFinalizeRelease = { |handle, releaseVelocity=0|
     var record = ~omniVoices[handle.asString];
+    if(record.notNil and: { ~omniFinalRelease.notNil }) {
+        ~omniFinalRelease.value(record, releaseVelocity.asFloat.clip(0, 1));
+    };
+    ~omniReleaseHandle.value(handle);
+};
+
+~omniRequestRelease = { |handle, releaseVelocity=0|
+    var record = ~omniVoices[handle.asString];
+    if(record.notNil and: { record[\physicalReleased] != true }) {
+        record[\physicalReleased] = true;
+        if(~omniPhysicalRelease.notNil) {
+            ~omniPhysicalRelease.value(
+                record, releaseVelocity.asFloat.clip(0, 1)
+            );
+        };
+    };
     if(record.notNil and: {
         ~omniSustainOwners[record[\owner].asString] == true
     }) {
-        ~omniSustainPending[handle.asString] = true;
+        ~omniSustainPending[handle.asString] = releaseVelocity.asFloat.clip(0, 1);
     } {
-        ~omniReleaseHandle.value(handle);
+        ~omniFinalizeRelease.value(handle, releaseVelocity);
     };
 };
 
@@ -24,7 +40,11 @@
             record.notNil and: { record[\owner] == ownerName }
         }.asArray;
         ~omniSustainOwners.removeAt(ownerName);
-        handles.do(~omniReleaseHandle);
+        handles.do { |handle|
+            ~omniFinalizeRelease.value(
+                handle, ~omniSustainPending[handle] ? 0
+            );
+        };
     };
 };
 )

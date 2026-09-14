@@ -6,6 +6,9 @@ var selection;
 var rrA1;
 var rrA2;
 var rrB1;
+var triggerBase;
+var attackRegion;
+var releaseRegion;
 
 (directory +/+ "sample_loader.scd").load;
 if(~omniSampleBudgetBytes < 4294967296) {
@@ -92,6 +95,39 @@ if((~omniSamplePlaybackRate.value(440, 69, 100) - (2 ** (1 / 12))).abs
     > 0.000001) {
     failed = true;
     "VSCO_SFZ_TUNE_RATE_FAILED".postln;
+};
+triggerBase = ~omniSampleRegions["sample.vsco.fluteexpvib"][0];
+attackRegion = triggerBase.copy;
+releaseRegion = triggerBase.copy;
+attackRegion["trigger"] = "attack";
+releaseRegion["trigger"] = "release";
+~omniSampleAliases["sample.trigger-test"] = (
+    sourceProgramId: "sample.trigger-source",
+    articulation: (
+        triggerBase["articulation_id"] ? triggerBase[\articulation_id]
+    ).asString
+);
+~omniSampleRegions["sample.trigger-source"] = List[
+    attackRegion, releaseRegion
+];
+if(~omniSelectSampleRegions.value(
+    "sample.trigger-test",
+    (triggerBase["key_lo"] ? triggerBase[\key_lo]).asInteger,
+    0.5,
+    "trigger-test"
+).size != 1) {
+    failed = true;
+    "VSCO_ATTACK_TRIGGER_FILTER_FAILED".postln;
+};
+if(~omniSelectSampleRegions.value(
+    "sample.trigger-test",
+    (triggerBase["key_lo"] ? triggerBase[\key_lo]).asInteger,
+    0.5,
+    "trigger-test",
+    "release"
+).size != 1) {
+    failed = true;
+    "VSCO_RELEASE_TRIGGER_FILTER_FAILED".postln;
 };
 if(~omniEvictSampleBytes.value(0).not) {
     failed = true;

@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "code"))
 from sfz_manifest_compiler import (  # noqa: E402
     _audio_record,
     _midi_note,
+    _region_record,
     audit_sfz_opcodes,
     compile_vsco_manifest,
     parse_sfz,
@@ -90,6 +91,20 @@ class SfzManifestCompilerTests(unittest.TestCase):
             path.write_text("<region> sample=one.wav mystery=1\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "unsupported opcode mystery"):
                 parse_sfz(path)
+
+    def test_release_trigger_is_normalized_without_becoming_an_attack(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "fixture.sfz"
+            path.write_text(
+                "<region> sample=release.wav key=60 trigger=release_key\n",
+                encoding="utf-8",
+            )
+            regions = parse_sfz(path)
+            record = _region_record(
+                Path(temporary), regions[0], "sample.fixture", 0, "file-1"
+            )
+
+        self.assertEqual(record["trigger"], "release_key")
 
     def test_inline_includes_and_macros_expand_with_source_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -487,7 +487,10 @@ OSCdef(\omniNoteOn, { |message|
 
 OSCdef(\omniNoteOff, { |message|
     if(~omniCommandValid.value(message)) {
-        ~omniRequestRelease.value(message[4].asString);
+        ~omniRequestRelease.value(
+            message[4].asString,
+            message[5].asFloat
+        );
     };
 }, '/omni/v1/note/off', recvPort: languagePort);
 

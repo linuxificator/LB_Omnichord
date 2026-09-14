@@ -13,7 +13,7 @@ from typing import Any
 import soundfile  # type: ignore[import-untyped]
 
 
-COMPILER_VERSION = 4
+COMPILER_VERSION = 5
 VSCO_SOURCE_PIN = "6dd651d55dde97fd4028699be9d4481f26917891"
 _HEADER = re.compile(r"<([A-Za-z]+)>")
 _OPCODE = re.compile(r"(?<!\S)([A-Za-z][A-Za-z0-9_]*)=")
@@ -45,6 +45,7 @@ _KNOWN_OPCODES = {
     "sw_last",
     "sw_lokey",
     "tune",
+    "trigger",
     "volume",
 }
 _OPCODE_CLASSIFICATION = {
@@ -495,6 +496,11 @@ def _region_record(
     file_id: str,
 ) -> dict[str, Any]:
     values = source.values
+    trigger = values.get("trigger", "attack").casefold()
+    if trigger not in ("attack", "release", "release_key"):
+        raise ValueError(
+            f"{source.source}:{source.line}: unsupported trigger mode {trigger}"
+        )
     key_center = _midi_note(
         values.get("pitch_keycenter", values.get("key")), 60
     )
@@ -514,7 +520,7 @@ def _region_record(
         "velocity_lo": int(_number(values.get("lovel"), 0)),
         "velocity_hi": int(_number(values.get("hivel"), 127)),
         "gain_db": _number(values.get("volume"), 0.0),
-        "trigger": "attack",
+        "trigger": trigger,
         "rr_group": values.get("group_label"),
         "rr_position": (
             int(values["seq_position"]) if "seq_position" in values else None

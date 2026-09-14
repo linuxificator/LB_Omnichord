@@ -84,6 +84,11 @@ Target currently exercised: Linux x86_64
 - Reconfiguring a MIDI row releases its voices first and then releases its
   superseded program revision, so the sample cache can reclaim recordings
   without affecting another row's owner-scoped program state.
+- SFZ `trigger=release_key` and `trigger=release` regions are normalized as
+  release layers rather than attacks. Physical key-up and final sustain-aware
+  release are separate SC-owned hooks, preserve release velocity, and spawn
+  only the matching release-layer kind. The additional banks' duration curves,
+  pedal noises and source-specific release-gain opcodes remain incomplete.
 - Deterministic non-realtime tests render the production mono and stereo
   sample SynthDefs from synthetic fixtures, including gated release, without
   taking over the workstation's live audio session.

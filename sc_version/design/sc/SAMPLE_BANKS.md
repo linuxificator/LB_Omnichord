@@ -56,6 +56,13 @@ across different containers without reducing source precision. Unsupported
 floating-point or compressed lossy encodings fail rather than acquiring a
 misleading `original_bit_depth` value.
 
+The normalized trigger field now distinguishes attack, physical-key release
+(`release_key`) and sustain-aware final release (`release`). The SC selector
+never admits release recordings into an attack, and the owner-scoped sustain
+state passes release velocity to the matching layer. This is the generic
+lifetime foundation; it is not yet an implementation claim for bank-specific
+`rt_decay`, pedal-noise, choke or CC-curve behavior.
+
 A source-tree metadata audit at the pinned commits found 183 VCSL mappings, 1
 Salamander mapping, 71 Black and Green, 64 Black and Blue, 39 Meatbass, 6 Emily
 Guitar, 48 Bear Sax, 13 WereSax, 419 Virtuosity Drums and 152 Swirly Drums
