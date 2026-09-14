@@ -537,13 +537,10 @@ s.waitForBoot({
             var nativeVelocity = velocity * (
                 valueAt.value(nativePad, "gain_db").asFloat.dbamp
             );
-            var defaultMaxDuration =
-                valueAt.value(nativePad, "max_duration_ms").asFloat / 1000;
-            var maxDuration = if(maxDurationOverride.asFloat > 0) {
-                defaultMaxDuration.min(maxDurationOverride.asFloat / 1000)
-            } {
-                defaultMaxDuration
-            }.max(0.005);
+            var maxDuration = ~omniDrumDurationSeconds.value(
+                valueAt.value(nativePad, "max_duration_ms"),
+                maxDurationOverride
+            );
             if(nativeProgram != requestedProgram.asString) {
                 ("LB_OMNICHORD_SC_DRUM_PROFILE_MISMATCH pad=" ++ padId
                     ++ " requested=" ++ requestedProgram

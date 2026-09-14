@@ -77,6 +77,17 @@ if(~omniSelectDrumSample.value(
     failed = true;
     "SC_PCM_UNKNOWN_PAD_FAILED".postln;
 };
+if((~omniDrumDurationSeconds.value(900, 140) - 0.14).abs > 0.000001
+    or: {
+        (~omniDrumDurationSeconds.value(100, 140) - 0.1).abs > 0.000001
+    }
+    or: {
+        (~omniDrumDurationSeconds.value(900, 0) - 0.9).abs > 0.000001
+    }
+) {
+    failed = true;
+    "SC_PCM_DRUM_DURATION_CAP_FAILED".postln;
+};
 if(
     (~omniNativeDrumPads["sc-808/timekeeper_primary"]["program_id"]
         ? ~omniNativeDrumPads["sc-808/timekeeper_primary"][\program_id])

@@ -218,6 +218,14 @@ jsonAt.value(nativeDrumCatalog, "kits").do { |kit|
     if(~omniDrumKits[programId.asString].notNil) { value } { nil }
 };
 
+~omniDrumDurationSeconds = { |profileDurationMs, eventCapMs=0|
+    var duration = profileDurationMs.asFloat / 1000;
+    if(eventCapMs.asFloat > 0) {
+        duration = duration.min(eventCapMs.asFloat / 1000);
+    };
+    duration.max(0.005)
+};
+
 ~omniSampleProgramName = { |program|
     var text = program.asString;
     if(text.beginsWith("sample.vsco.") and: {
@@ -669,12 +677,10 @@ SynthDef(\omniDrumSampleStereo, {
                     \gainDb, jsonAt.value(pad, "gain_db").asFloat
                         + jsonAt.value(kit, "kit_gain_db").asFloat,
                     \playbackRate, jsonAt.value(pad, "playback_rate").asFloat,
-                    \maxDuration, if(maxDurationOverride.asFloat > 0) {
-                        (jsonAt.value(pad, "max_duration_ms").asFloat / 1000)
-                            .min(maxDurationOverride.asFloat / 1000)
-                    } {
-                        jsonAt.value(pad, "max_duration_ms").asFloat / 1000
-                    },
+                    \maxDuration, ~omniDrumDurationSeconds.value(
+                        jsonAt.value(pad, "max_duration_ms"),
+                        maxDurationOverride
+                    ),
                     \fadeOut, jsonAt.value(pad, "fade_out_ms").asFloat / 1000,
                     \highpass, jsonAt.value(pad, "highpass_hz").asFloat,
                     \lowpass, jsonAt.value(pad, "lowpass_hz").asFloat,
