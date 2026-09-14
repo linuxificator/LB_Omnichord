@@ -41,6 +41,7 @@ for module_path in (CODE, SUPPORT):
     sys.path.insert(0, str(module_path))
 
 from catalog_extensions import load_synth_catalog  # noqa: E402
+from sc_drum_kits import DRUM_KITS  # noqa: E402
 from supercollider_config import load_supercollider_config  # noqa: E402
 from supercollider_platform_adapter import pipewire_jack_prefix  # noqa: E402
 
@@ -158,7 +159,9 @@ def action_cycle(
         yield Action("setChordArpeggioRate", (float(1 + rhythm % 4),))
         yield Action("setBassRiffSelector", (float(1 + rhythm % 5),))
         yield Action("setBassVoicingShift", (float((rhythm % 7) - 3),))
-        yield Action("setDrumKitIndex", (rhythm % 6,), 0.12)
+        drum_kit_index = rhythm % len(DRUM_KITS)
+        yield Action("setDrumKitIndex", (drum_kit_index,), 0.12)
+        yield Action("setMidiDrumKitIndex", (drum_kit_index,), 0.12)
         yield Action("pressChord", (rhythm % 6, rhythm % 12), 0.10)
         yield Action("strumStart", (0.08 + (rhythm % 4) * 0.2,))
         yield Action("strumMove", (0.88 - (rhythm % 4) * 0.18,))
@@ -208,7 +211,6 @@ def action_cycle(
         yield Action("injectMidiNote", (row, 48 + row, 64, False), 0.08)
         yield Action("injectMidiControl", (row, 64, 0), 0.10)
         yield Action("toggleMidiSustain", (row,))
-        yield Action("setMidiDrumKitIndex", (row % 6,))
         yield Action("injectMidiButton", (row, 70 + row, 100), 0.04)
         yield Action("injectMidiButton", (row, 70 + row, 0), 0.06)
 

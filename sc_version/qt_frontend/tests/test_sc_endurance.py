@@ -46,6 +46,18 @@ class SuperColliderEnduranceTests(unittest.TestCase):
             {action.args[0] for action in actions if action.name == "setRhythmIndex"},
             set(range(18)),
         )
+        self.assertEqual(
+            {action.args[0] for action in actions if action.name == "setDrumKitIndex"},
+            set(range(15)),
+        )
+        self.assertEqual(
+            {
+                action.args[0]
+                for action in actions
+                if action.name == "setMidiDrumKitIndex"
+            },
+            set(range(15)),
+        )
 
     def test_audio_analyzer_reports_level_clipping_and_silence(self) -> None:
         rate = 8_000
