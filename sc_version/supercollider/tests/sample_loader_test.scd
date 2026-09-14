@@ -251,6 +251,35 @@ if(~omniEvictSampleBytes.value(0).not) {
     failed = true;
     "VSCO_ZERO_PRESSURE_EVICTION_FAILED".postln;
 };
+// Releasing a selected sample program must defer buffer-accounting release
+// while an immutable root or finite execution still refers to that revision.
+{
+    var stateKey = "sample.test-lifetime@91";
+    var sampleId = "sample-lifetime-fixture";
+    ~omniSampleStates[stateKey] = (
+        status: \ready,
+        detail: "ready",
+        sampleIds: [sampleId],
+        cancelled: false,
+        releaseRequested: false
+    );
+    ~omniSampleProgramRefs[sampleId] = 1;
+    ~omniRetainSequencePrograms.value([stateKey]);
+    ~omniReleaseSampleProgram.value("sample.test-lifetime", 91);
+    if(~omniSampleStates[stateKey].isNil or: {
+        ~omniSampleProgramRefs[sampleId] != 1
+    }) {
+        failed = true;
+        "VSCO_SEQUENCE_PROGRAM_EARLY_RELEASE_FAILED".postln;
+    };
+    ~omniReleaseSequencePrograms.value([stateKey]);
+    if(~omniSampleStates[stateKey].notNil or: {
+        ~omniSampleProgramRefs[sampleId] != 0
+    }) {
+        failed = true;
+        "VSCO_SEQUENCE_PROGRAM_FINAL_RELEASE_FAILED".postln;
+    };
+}.value;
 // Admission must not evict a buffer required by the program currently being
 // prepared.  This is also the guard that makes shared-buffer preparation
 // atomic before asynchronous scsynth reads complete.

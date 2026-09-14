@@ -246,12 +246,22 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("var voiceGroup = Group.tail(~omniSourceGroup)", bootstrap)
         self.assertIn("voiceGroup: voiceGroup", bootstrap)
         self.assertIn("voiceGroup.free", bootstrap)
-        self.assertIn("record[\\voiceGroup].set(\\gate, 0)", bootstrap)
-        self.assertIn("voiceGroup.set(\\gate, 0)", bootstrap)
+        self.assertIn("var outputGateBus = Bus.control(s, 1)", bootstrap)
+        self.assertIn("outputNode.map(\\gateControl, outputGateBus)", bootstrap)
+        self.assertIn("record[\\outputGateBus].set(0)", bootstrap)
+        self.assertIn("outputGateBus.set(0)", bootstrap)
+        self.assertIn("outputGateBus.free", bootstrap)
         self.assertIn("record[\\voiceGroup].set(\\outputGain, value)", bootstrap)
         self.assertNotIn("record[\\outputNode].set(", bootstrap)
         self.assertNotIn("outputNode.set(", bootstrap)
         self.assertNotIn("sourceNode.free", bootstrap)
+
+    def test_pcm_drum_chokes_use_stable_control_buses(self) -> None:
+        samples = (SC_ROOT / "sample_loader.scd").read_text(encoding="utf-8")
+        self.assertIn("var gateBus = Bus.control(s, 1)", samples)
+        self.assertIn("node.map(\\chokeControl, gateBus)", samples)
+        self.assertIn("~omniDrumChokes[chokeKey][\\gateBus].set(0)", samples)
+        self.assertNotIn("~omniDrumChokes[chokeKey].set(", samples)
 
     def test_sample_release_and_retune_use_stable_control_buses(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")

@@ -103,6 +103,28 @@ when its name equals the initial Python state. Previously that equality caused
 the first configuration to be skipped, which could make initial chord, strum
 or bass attacks target an unprepared revision.
 
+### Immutable sequencer program lifetime
+
+A program selection and an already-published sequencer execution have
+different lifetimes. Changing a PCM chord program immediately publishes a new
+immutable lane definition, but the previous root or a finite phrase may still
+have events carrying the old `program@revision`. Each SC execution therefore
+retains the exact sample revisions referenced by its definition. A root also
+inherits the revisions used by the finite definitions it can launch. Releasing
+the frontend selection only marks that revision for release; its buffers are
+reclaimed after the final root or finite execution has ended.
+
+This ownership stays entirely inside SuperCollider. Python still publishes
+immutable musical plans and does not inspect beat phase, infer remaining
+events or retain sample buffers. A pure-SC regression proves independent root
+and finite ownership, including replacement while a child phrase is running.
+
+Native output wrappers and chokeable PCM drums also use stable control buses
+for their release gates. The buses outlive the nodes they control, so natural
+sample or SynthDef completion cannot race a later `/n_set` addressed to an
+already-freed node. Existing owner-scoped note and release behavior is
+unchanged.
+
 ## Samples and percussion
 
 The pitched VSCO manifest has 3,163 regions and the PCM drum expansion adds 262
@@ -136,6 +158,13 @@ suites pass. A real local production bootstrap was also driven through all 76
 admitted SCLOrk programs, every percussion role and VSCO notes below, inside
 and above a recorded range; shutdown contained no server failure, duplicate
 free or buffer exhaustion.
+
+A focused real-process regression keeps automatic arpeggios and rhythm active
+while switching repeatedly among PCM chord programs. A ten-cycle run selected
+ordinary Flute 120 times among 370 public frontend actions. Its continuous
+recorded-audio windows completed without server failure, clipping,
+missing-node or buffer-lifetime error. This directly exercises the rapid-switch
+symptom while keeping the process boundary identical to a normal local run.
 
 This is technical qualification, not a claim that every timbre is equally
 useful in every musical role. Subjective review of polyphonic balance, tails,

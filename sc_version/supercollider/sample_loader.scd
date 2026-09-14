@@ -47,6 +47,7 @@ nativeDrumCatalog = if(PathName(packagedNativeDrumCatalog).isFile) {
 ~omniSampleBufferBytes = 0;
 ~omniSampleRoundRobin = Dictionary.new;
 ~omniSampleProgramRefs = Dictionary.new;
+~omniSampleSequenceRefs = Dictionary.new;
 ~omniSampleVoiceRefs = Dictionary.new;
 ~omniSampleLastUsed = Dictionary.new;
 ~omniSampleUseOrdinal = 0;
@@ -107,10 +108,11 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
     };
 };
 
-~omniReleaseSampleProgram = { |program, revision|
-    var stateKey = program.asString ++ "@" ++ revision.asInteger;
+~omniFinalizeReleasedSampleProgram = { |stateKey|
     var state = ~omniSampleStates[stateKey];
-    if(state.notNil) {
+    if(state.notNil and: { state[\releaseRequested] == true } and: {
+        (~omniSampleSequenceRefs[stateKey] ? 0) <= 0
+    }) {
         if(state[\status] == \loading) {
             state[\cancelled] = true;
         } {
@@ -127,8 +129,46 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
     };
 };
 
+~omniReleaseSampleProgram = { |program, revision|
+    var stateKey = program.asString ++ "@" ++ revision.asInteger;
+    var state = ~omniSampleStates[stateKey];
+    if(state.notNil) {
+        // A lane replacement may leave immutable finite executions using the
+        // previous revision.  Selection release drops the frontend's claim,
+        // but the buffers stay admitted until those SC-owned executions end.
+        state[\releaseRequested] = true;
+        ~omniFinalizeReleasedSampleProgram.value(stateKey);
+    };
+};
+
+~omniRetainSequencePrograms = { |stateKeys|
+    stateKeys.do { |stateKey|
+        if(~omniSampleStates[stateKey.asString].notNil) {
+            ~omniSampleSequenceRefs[stateKey.asString] =
+                (~omniSampleSequenceRefs[stateKey.asString] ? 0) + 1;
+        };
+    };
+};
+
+~omniReleaseSequencePrograms = { |stateKeys|
+    stateKeys.do { |stateKey|
+        var key = stateKey.asString;
+        var count = ((~omniSampleSequenceRefs[key] ? 0) - 1).max(0);
+        if(count <= 0) {
+            ~omniSampleSequenceRefs.removeAt(key);
+        } {
+            ~omniSampleSequenceRefs[key] = count;
+        };
+        ~omniFinalizeReleasedSampleProgram.value(key);
+    };
+};
+
 ~omniResetSampleSession = {
     var keep = ~omniDrumSampleProgram ++ "@1";
+    // Session reset follows sequencer panic, so no immutable execution can
+    // still own a sample revision.  Drop any defensive counters left by an
+    // interrupted client before releasing its program selections.
+    ~omniSampleSequenceRefs.clear;
     ~omniSampleStates.keys.asArray.do { |stateKey|
         if(stateKey != keep) {
             var fields = stateKey.split($@);
@@ -138,7 +178,7 @@ jsonAt.value(drumMap, "role_keys").keysValuesDo { |role, key|
         };
     };
     ~omniSampleRoundRobin.clear;
-    ~omniDrumChokes.values.do { |node| node.set(\gate, 0) };
+    ~omniDrumChokes.values.do { |record| record[\gateBus].set(0) };
     ~omniDrumChokes.clear;
     ~omniNativeDrumChokes.values.do { |handle|
         ~omniReleaseHandle.value(handle)
@@ -311,7 +351,8 @@ jsonAt.value(nativeDrumCatalog, "kits").do { |kit|
                     status: \loading,
                     detail: "loading",
                     sampleIds: sampleIds,
-                    cancelled: false
+                    cancelled: false,
+                    releaseRequested: false
                 );
                 ~omniSampleStates[stateKey] = state;
                 sampleIds.do { |sampleId|
@@ -353,6 +394,7 @@ jsonAt.value(nativeDrumCatalog, "kits").do { |kit|
                         ~omniSampleStatusReply.value(
                             programId, revision, "ready", "ready"
                         );
+                        ~omniFinalizeReleasedSampleProgram.value(stateKey);
                     };
                     nil
                 }).play(AppClock);
@@ -592,7 +634,7 @@ jsonAt.value(nativeDrumCatalog, "kits").do { |kit|
 SynthDef(\omniDrumSampleMono, {
     |out=0, buffer=0, velocity=0.7, gainDb=0, playbackRate=1,
      maxDuration=1, fadeOut=0.02, highpass=0, lowpass=0,
-     pan=0, gate=1|
+     pan=0, gate=1, chokeControl=1|
     var fade = fadeOut.max(0.001).min(maxDuration.max(0.002) * 0.5);
     var duration = maxDuration.max(fade + 0.001);
     var playback = PlayBuf.ar(
@@ -607,7 +649,10 @@ SynthDef(\omniDrumSampleMono, {
         Env([1, 1, 0], [duration - fade, fade]),
         doneAction: Done.freeSelf
     );
-    var choke = EnvGen.kr(Env.asr(0.001, 1, fade), gate, doneAction: Done.freeSelf);
+    var choke = EnvGen.kr(
+        Env.asr(0.001, 1, fade), gate * chokeControl,
+        doneAction: Done.freeSelf
+    );
     Out.ar(out, Pan2.ar(filtered, pan) * lifetime * choke
         * velocity.clip(0, 1) * gainDb.dbamp);
 }).add;
@@ -615,7 +660,7 @@ SynthDef(\omniDrumSampleMono, {
 SynthDef(\omniDrumSampleStereo, {
     |out=0, buffer=0, velocity=0.7, gainDb=0, playbackRate=1,
      maxDuration=1, fadeOut=0.02, highpass=0, lowpass=0,
-     pan=0, gate=1|
+     pan=0, gate=1, chokeControl=1|
     var fade = fadeOut.max(0.001).min(maxDuration.max(0.002) * 0.5);
     var duration = maxDuration.max(fade + 0.001);
     var playback = PlayBuf.ar(
@@ -630,7 +675,10 @@ SynthDef(\omniDrumSampleStereo, {
         Env([1, 1, 0], [duration - fade, fade]),
         doneAction: Done.freeSelf
     );
-    var choke = EnvGen.kr(Env.asr(0.001, 1, fade), gate, doneAction: Done.freeSelf);
+    var choke = EnvGen.kr(
+        Env.asr(0.001, 1, fade), gate * chokeControl,
+        doneAction: Done.freeSelf
+    );
     Out.ar(out, Balance2.ar(filtered[0], filtered[1], pan) * lifetime * choke
         * velocity.clip(0, 1) * gainDb.dbamp);
 }).add;
@@ -660,8 +708,9 @@ SynthDef(\omniDrumSampleStereo, {
                     ++ chokeGroupValue.asString
             };
             var node;
+            var gateBus = if(chokeKey.isNil) { nil } { Bus.control(s, 1) };
             if(chokeKey.notNil and: { ~omniDrumChokes[chokeKey].notNil }) {
-                ~omniDrumChokes[chokeKey].set(\gate, 0);
+                ~omniDrumChokes[chokeKey][\gateBus].set(0);
             };
             node = Synth.tail(
                 ~omniSourceGroup,
@@ -687,15 +736,26 @@ SynthDef(\omniDrumSampleStereo, {
                     \pan, jsonAt.value(pad, "pan").asFloat
                 ]
             );
+            if(gateBus.notNil) {
+                gateBus.set(1);
+                node.map(\chokeControl, gateBus);
+            };
             ~omniSampleVoiceRefs[sampleId] =
                 (~omniSampleVoiceRefs[sampleId] ? 0) + 1;
             ~omniTouchSample.value(sampleId);
-            if(chokeKey.notNil) { ~omniDrumChokes[chokeKey] = node };
+            if(chokeKey.notNil) {
+                ~omniDrumChokes[chokeKey] = (node: node, gateBus: gateBus)
+            };
             node.onFree {
                 ~omniSampleVoiceRefs[sampleId] = (
                     (~omniSampleVoiceRefs[sampleId] ? 0) - 1
                 ).max(0);
-                if(chokeKey.notNil and: { ~omniDrumChokes[chokeKey] === node }) {
+                if(gateBus.notNil) { gateBus.free };
+                if(chokeKey.notNil and: {
+                    ~omniDrumChokes[chokeKey].notNil and: {
+                        ~omniDrumChokes[chokeKey][\node] === node
+                    }
+                }) {
                     ~omniDrumChokes.removeAt(chokeKey);
                 };
             };

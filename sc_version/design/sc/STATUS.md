@@ -163,6 +163,15 @@ x86_64
 - Reconfiguring a MIDI row releases its voices first and then releases its
   superseded program revision, so the sample cache can reclaim recordings
   without affecting another row's owner-scoped program state.
+- Immutable root and finite sequencer executions retain every exact PCM
+  `program@revision` carried by their events. A frontend selection may be
+  released immediately after lane replacement, but its decoded buffers remain
+  admitted until the final SC-owned execution ends. Roots inherit the sample
+  revisions of finite children they can launch, so a boundary replacement
+  cannot create a use-after-release window.
+- Natural source/sample completion and later release or drum-choke requests no
+  longer race on node identifiers. Stable control buses own those gates and
+  are freed only from the corresponding node completion callback.
 - SFZ `trigger=release_key` and `trigger=release` regions are normalized as
   release layers rather than attacks. Physical key-up and final sustain-aware
   release are separate SC-owned hooks, preserve release velocity, and spawn

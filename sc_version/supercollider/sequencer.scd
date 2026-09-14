@@ -159,6 +159,26 @@
     ~omniWakeBeat = nil;
 };
 
+~omniRetainExecutionPrograms = { |execution|
+    var keys = execution[\definition][\programKeys] ? [];
+    execution[\programKeys] = keys;
+    if(~omniRetainSequencePrograms.notNil) {
+        ~omniRetainSequencePrograms.value(keys);
+    };
+};
+
+~omniRemoveExecution = { |executionId|
+    var execution = ~omniExecutions.removeAt(executionId);
+    if(execution.notNil and: { ~omniReleaseSequencePrograms.notNil }) {
+        ~omniReleaseSequencePrograms.value(execution[\programKeys] ? []);
+    };
+    execution
+};
+
+~omniClearExecutions = {
+    ~omniExecutions.keys.asArray.do(~omniRemoveExecution);
+};
+
 ~omniRemoveRootExecutions = { |lane, definitionId|
     var remove = List.new;
     ~omniExecutions.keysValuesDo { |executionId, execution|
@@ -170,7 +190,7 @@
             }
         }) { remove.add(executionId) };
     };
-    remove.do { |executionId| ~omniExecutions.removeAt(executionId) };
+    remove.do(~omniRemoveExecution);
 };
 
 ~omniStopLane = { |lane|
@@ -210,6 +230,7 @@
             nextIndex: 0,
             creationOrdinal: ~omniExecutionOrdinal
         );
+        ~omniRetainExecutionPrograms.value(~omniExecutions[executionId]);
     };
     executionId
 };
@@ -240,6 +261,7 @@
             nextIndex: nextIndex,
             creationOrdinal: ~omniExecutionOrdinal
         );
+        ~omniRetainExecutionPrograms.value(~omniExecutions[executionId]);
     };
     executionId
 };
@@ -268,6 +290,7 @@
                 nextIndex: 0,
                 creationOrdinal: ~omniExecutionOrdinal
             );
+            ~omniRetainExecutionPrograms.value(~omniExecutions[executionId]);
         };
     };
 };
@@ -371,7 +394,7 @@
                 execution[\baseBeat] = execution[\baseBeat]
                     + (execution[\definition][\period] / 48);
             } {
-                ~omniExecutions.removeAt(execution[\id]);
+                ~omniRemoveExecution.value(execution[\id]);
             };
         };
     };
@@ -638,6 +661,42 @@
             };
         };
     };
+    if(rejected.isNil) {
+        // Pin sample revisions for the lifetime of every immutable execution.
+        // Roots inherit their direct finite children's keys because a release
+        // request can otherwise arrive between a root launch and lane swap.
+        definitions.values.do { |definition|
+            var keys = Set.new;
+            definition[\events].do { |event|
+                var atoms = event[\atoms];
+                if(event[\action] == "noteOn" and: {
+                    atoms[2].asString.beginsWith("sample.")
+                }) {
+                    keys.add(atoms[2].asString ++ "@" ++ atoms[3].asInteger);
+                };
+                if(event[\action] == "drumHit" and: {
+                    atoms[2].asString.beginsWith("sample.")
+                }) {
+                    keys.add(atoms[2].asString ++ "@" ++ atoms[3].asInteger);
+                };
+            };
+            definition[\programKeys] = keys.asArray;
+        };
+        definitions.values.select { |definition|
+            definition[\kind] == "root"
+        }.do { |definition|
+            var keys = definition[\programKeys].as(Set);
+            definition[\events].do { |event|
+                if(event[\action] == "launch") {
+                    var child = definitions[event[\atoms][0].asString];
+                    if(child.notNil) {
+                        child[\programKeys].do { |key| keys.add(key) };
+                    };
+                };
+            };
+            definition[\programKeys] = keys.asArray;
+        };
+    };
     if(rejected.notNil) {
         ~omniStoreTransactionResult.value(
             transactionId, "rejected", transaction[\generation],
@@ -843,7 +902,7 @@ OSCdef(\omniTransport, { |message|
             ~omniTransportEpoch = ~omniTransportEpoch + 1;
             ~omniClock.clear;
             ~omniClock.beats = 0;
-            ~omniExecutions.clear;
+            ~omniClearExecutions.value;
             ~omniGates.clear;
             ~omniInvalidateWake.value;
             ~omniTransportRunning = true;
@@ -856,7 +915,7 @@ OSCdef(\omniTransport, { |message|
         if(action == "stop") {
             ~omniTransportEpoch = ~omniTransportEpoch + 1;
             ~omniClock.clear;
-            ~omniExecutions.clear;
+            ~omniClearExecutions.value;
             ~omniGates.clear;
             ~omniInvalidateWake.value;
             ~omniTransportRunning = false;
@@ -868,7 +927,7 @@ OSCdef(\omniTransport, { |message|
         if(action == "panic") {
             ~omniTransportEpoch = ~omniTransportEpoch + 1;
             ~omniClock.clear;
-            ~omniExecutions.clear;
+            ~omniClearExecutions.value;
             ~omniGates.clear;
             ~omniInvalidateWake.value;
             ~omniTransportRunning = false;

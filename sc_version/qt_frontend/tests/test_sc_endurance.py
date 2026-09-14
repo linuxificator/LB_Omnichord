@@ -13,15 +13,44 @@ ROOT = Path(__file__).resolve().parents[1]
 ENDURANCE = ROOT / "tests" / "endurance"
 sys.path.insert(0, str(ENDURANCE))
 
-from sc_endurance import action_cycle, analyze_wave  # noqa: E402
+from sc_endurance import action_cycle, analyze_wave, pcm_chord_switch_cycle  # noqa: E402
 
 
 class _Synth:
-    def __init__(self, kind: str) -> None:
+    def __init__(self, kind: str, key: str = "fixture") -> None:
         self.kind = kind
+        self.key = key
 
 
 class SuperColliderEnduranceTests(unittest.TestCase):
+    def test_pcm_chord_switch_scenario_repeats_flute_during_arpeggio(self) -> None:
+        keys = (
+            "sample.vsco.uprightpiano",
+            "sample.vsco.flute-ks",
+            "sample.vsco.marimba",
+            "sample.vsco.flute-ks.art.c-2-sustain-vibrato",
+        )
+        synths = [_Synth("sample", key) for key in keys]
+        actions = list(pcm_chord_switch_cycle(synths))
+        flute_index = keys.index("sample.vsco.flute-ks")
+        selected = [
+            int(action.args[0])
+            for action in actions
+            if action.name == "setChordSynthIndex"
+        ]
+        self.assertGreaterEqual(selected.count(flute_index), 12)
+        arpeggio = next(
+            index
+            for index, action in enumerate(actions)
+            if action.name == "ensureChordArpeggioRunning"
+        )
+        first_switch = next(
+            index
+            for index, action in enumerate(actions)
+            if action.name == "setChordSynthIndex"
+        )
+        self.assertLess(arpeggio, first_switch)
+
     def test_cycle_covers_timing_audio_catalogue_and_external_controls(self) -> None:
         actions = list(
             action_cycle(

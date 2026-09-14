@@ -110,6 +110,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
         SC_ROOT / "tests" / "protocol_runtime_test.scd",
         SC_ROOT / "tests" / "sequencer_validation_test.scd",
         SC_ROOT / "tests" / "sequencer_snapshot_test.scd",
+        SC_ROOT / "tests" / "sequencer_program_lifetime_test.scd",
         SC_ROOT / "tests" / "sequencer_lifecycle_test.scd",
         SC_ROOT / "tests" / "sequencer_boundary_test.scd",
         TESTS / "test_supercollider_coordinator.py",

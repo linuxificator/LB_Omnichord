@@ -90,10 +90,10 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
         } {
         if(record[\outputNode].notNil) {
             record[\releaseRequested] = true;
-            // The owned group outlives both child synths. Addressing it avoids
-            // an /n_end versus /n_set race when a native source ends between
-            // the language-side alive check and server command execution.
-            record[\voiceGroup].set(\gate, 0);
+            // The control bus outlives the output synth until its /n_end has
+            // been observed.  Unlike /n_set on a node that may just have
+            // ended, this cannot race the server's node lifetime.
+            record[\outputGateBus].set(0);
         } {
             if(record[\sourceAlive] ? true) {
                 record[\sourceNode].set(\gate, 0)
@@ -202,7 +202,9 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
     ~omniSustainOwners.clear;
     ~omniSustainPending.clear;
     ~omniGestures.clear;
-    if(~omniExecutions.notNil) { ~omniExecutions.clear };
+    if(~omniClearExecutions.notNil) { ~omniClearExecutions.value } {
+        if(~omniExecutions.notNil) { ~omniExecutions.clear };
+    };
 };
 
 OSCdef(\omniHello, { |message, time, address|
@@ -412,6 +414,7 @@ s.waitForBoot({
             var voiceBus = Bus.audio(s, 2);
             var voiceGroup = Group.tail(~omniSourceGroup);
             var outputRelease = 0.22;
+            var outputGateBus = Bus.control(s, 1);
             var sourceNode;
             var outputNode;
             var record;
@@ -440,11 +443,14 @@ s.waitForBoot({
                 \calibration, ~omniSclorkPlaybackGain.value(program),
                 \release, outputRelease.max(0.005)
             ]);
+            outputGateBus.set(1);
+            outputNode.map(\gateControl, outputGateBus);
             record = (
                 sourceNode: sourceNode,
                 outputNode: outputNode,
                 voiceGroup: voiceGroup,
                 voiceBus: voiceBus,
+                outputGateBus: outputGateBus,
                 nativeName: nativeName,
                 baseFrequency: frequency,
                 releaseMode: if(~omniSynthHasControl.value(nativeName, \gate)) {
@@ -471,6 +477,7 @@ s.waitForBoot({
                     // container avoids racing /n_end with a second /n_free.
                     voiceGroup.free;
                     voiceBus.free;
+                    outputGateBus.free;
                     if(~omniVoices[handle] === record) {
                         ~omniVoices.removeAt(handle);
                     };
@@ -484,7 +491,7 @@ s.waitForBoot({
                     }
                 }) {
                     record[\releaseRequested] = true;
-                    voiceGroup.set(\gate, 0);
+                    outputGateBus.set(0);
                 };
             };
         } {

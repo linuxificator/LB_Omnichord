@@ -2,7 +2,8 @@
 
 Updated: 2026-09-14
 
-- Active branch: `version/supercollider`, based on `main` at `955cbbf`.
+- Active branch: `feature/sc-music-expansion`; current implementation and
+  qualification status are maintained under `sc_version/design/sc/`.
 - The AMY implementation under `amysynth_version` is intentionally unchanged.
 - The Linux x86_64 SuperCollider vertical slice lives under `sc_version` and
   uses separate Qt, headless `sclang` and `scsynth` processes. The frontend
@@ -33,6 +34,11 @@ Updated: 2026-09-14
   program changes. Manual strum and MIDI preview gestures carry the exact
   prepared program revision. A pinned Salamander opcode audit records 69
   distinct opcodes and the 49 semantics still blocking an honest import.
+- Immutable sequencer executions retain exact PCM program revisions across
+  live instrument changes. Native output and PCM choke release use stable
+  control buses, eliminating natural-end versus `/n_set` node races. The
+  focused real-process regression is recorded in
+  `sc_version/design/sc/PLAYBACK_QUALIFICATION.md`.
 - The implementation is not a full migration claim. Additional banks,
   advanced SFZ behavior, comprehensive program calibration/load evidence and
   non-Linux SC targets remain open.

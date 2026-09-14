@@ -235,6 +235,34 @@ def action_cycle(
     yield Action("ensureChordArpeggioRunning", (True,), 0.2)
 
 
+def pcm_chord_switch_cycle(synths: list[Any]) -> Iterator[Action]:
+    """Stress prepared PCM revision handover while arpeggios keep running."""
+
+    keys = (
+        "sample.vsco.uprightpiano",
+        "sample.vsco.flute-ks",
+        "sample.vsco.marimba",
+        "sample.vsco.flute-ks.art.c-2-sustain-vibrato",
+        "sample.vsco.flute-ks",
+    )
+    indexes = {synth.key: index for index, synth in enumerate(synths)}
+    missing = [key for key in keys if key not in indexes]
+    if missing:
+        raise RuntimeError(f"PCM chord-switch fixtures missing from catalogue: {missing}")
+    yield Action("setMasterVolume", (0.36,))
+    yield Action("setChordVolume", (0.46,))
+    yield Action("ensureRhythmRunning", (True,), 0.2)
+    yield Action("pressChord", (0, 0), 0.08)
+    yield Action("releaseChord", (0, 0), 0.08)
+    yield Action("ensureChordArpeggioRunning", (True,), 0.2)
+    for _round in range(6):
+        for key in keys:
+            yield Action("setChordSynthIndex", (indexes[key],), 0.12)
+    # Let the final prepared revision cross a complete arpeggio phrase and
+    # allow delayed /n_end notifications to surface in the engine log.
+    yield Action("setChordArpeggioRate", (4.0,), 2.0)
+
+
 class ApiClient:
     def __init__(self, port: int) -> None:
         self.port = port
@@ -394,6 +422,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="load and capture the real production QML scene offscreen",
     )
+    parser.add_argument(
+        "--scenario",
+        choices=("broad", "pcm-chord-switch"),
+        default="broad",
+        help="run broad coverage or focused PCM chord-instrument handover",
+    )
     return parser.parse_args()
 
 
@@ -497,11 +531,16 @@ def main() -> int:
         completed_cycles = 0
         action_count = 0
         while args.cycles == 0 or completed_cycles < args.cycles:
-            for action in action_cycle(
-                cycle,
-                synths,
-                artifact_dir if args.gui else None,
-            ):
+            actions = (
+                pcm_chord_switch_cycle(synths)
+                if args.scenario == "pcm-chord-switch"
+                else action_cycle(
+                    cycle,
+                    synths,
+                    artifact_dir if args.gui else None,
+                )
+            )
+            for action in actions:
                 for process, label in ((sc_process, "SuperCollider"), (frontend_process, "frontend")):
                     if process.poll() is not None:
                         raise RuntimeError(f"{label} exited with {process.returncode}")
