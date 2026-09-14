@@ -697,6 +697,12 @@ This loop reader is custom SynthDef work using SC primitives; it is not an alrea
 
 Each pitched part has independent sustain state. Physical note release while pedal is down records key-up but retains appropriate sounding layers. For SFZ `release_key`, trigger at physical key-up; for `release`, follow the mapped sustain-aware release behavior. Pedal-up releases deferred voices and triggers pedal-up noise once per actual transition. Same-pitch repetitions remain separate handles until the program's deliberate self-masking rule/choke policy acts.
 
+Implementation note (2026-09-14): the generic owner-scoped CC64 lifetime path
+is now implemented for pitched MIDI rows and tested in both Python routing and
+the production SC state machine. Bank-specific `release`, `release_key` and
+pedal-noise layer selection still belongs to the incomplete additional-bank
+normalization work and must not be inferred from this generic sustain support.
+
 Store note age and velocity for release-layer scaling; do not play a full loud hammer/release sample after an inaudible gated note. Choke groups are scoped to part/program/exclusive group. A closed hi-hat may choke that part's open hat; it must not choke another MIDI row or undo unrelated fill gates.
 
 Voice stealing is a documented overload policy: first completed/released quiet voices, then oldest release tail, then oldest sustained voice only when the part's hard limit is reached. Apply a short fade to stolen layers, cancel only their handle-specific later releases, and increment a diagnostic counter. Never use the oldest server node across all parts indiscriminately. Reserve capacity for note-off/control processing; memory/CPU exhaustion must not create stuck notes.

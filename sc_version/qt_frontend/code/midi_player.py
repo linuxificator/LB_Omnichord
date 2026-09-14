@@ -48,6 +48,7 @@ MIDI_LAST_PRESET_FILE = "last_preset.json"
 MIDI_PREVIEW_LOW = app_core.STRUM_LOW_MIDI
 MIDI_PREVIEW_HIGH = app_core.STRUM_HIGH_MIDI
 MIDI_REVERB_MAX = app_core.REVERB_LEVEL_MAX
+MIDI_SUSTAIN_CONTROLLER = 64
 
 PREVIEW_DRUM_NOTES = (36, 38, 42, 46, 41, 45, 48, 51)
 
@@ -116,6 +117,7 @@ class MidiEngine:
         self._configured_rows: set[int] = set()
         self._drum_configured = False
         self._active_notes: dict[tuple[int, int, int], str] = {}
+        self._sustain_rows: set[int] = set()
         self._programs = ["builtin.safe"] * MIDI_ROW_COUNT
         self._program_revisions = [0] * MIDI_ROW_COUNT
         self._row_levels = [1.0] * MIDI_ROW_COUNT
@@ -175,8 +177,21 @@ class MidiEngine:
             return
         self.client.release_owner(self._row_owner(row))
         self.client.release_owner(self._preview_owner(row))
+        self._sustain_rows.discard(row)
         for key in [key for key in self._active_notes if key[0] == row]:
             self._active_notes.pop(key, None)
+
+    def set_sustain(self, row: int, enabled: bool) -> None:
+        if row not in self._configured_rows:
+            return
+        active = row in self._sustain_rows
+        if bool(enabled) == active:
+            return
+        if enabled:
+            self._sustain_rows.add(row)
+        else:
+            self._sustain_rows.discard(row)
+        self.client.set_owner_sustain(self._row_owner(row), bool(enabled))
 
     def configure_row(
         self,
@@ -331,11 +346,13 @@ class MidiEngine:
         if self._drum_configured:
             self.client.release_owner("midi/drums")
         self._active_notes.clear()
+        self._sustain_rows.clear()
 
     def rebuild(self) -> None:
         self._configured_rows.clear()
         self._drum_configured = False
         self._active_notes.clear()
+        self._sustain_rows.clear()
         self.configure_drum_synth()
 
 
@@ -704,6 +721,10 @@ class MidiPlayerBackend(QObject):
 
     @Slot(int, int, int)
     def process_midi_control(self, channel: int, controller: int, value: int) -> None:
+        if int(controller) == MIDI_SUSTAIN_CONTROLLER:
+            for row, row_channel in enumerate(self.channels):
+                if int(row_channel) == int(channel) and not self._is_drum(row):
+                    self.engine.set_sustain(row, int(value) >= 64)
         control_key = self._midi_control_state.key(channel, controller)
         with self._midi_control_lock:
             was_blue = control_key in self._midi_control_state.blue_since

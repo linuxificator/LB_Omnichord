@@ -427,6 +427,17 @@ class SuperColliderClient:
             [self.session, self._next_message_id(), str(owner)],
         )
 
+    def set_owner_sustain(self, owner: str, enabled: bool) -> None:
+        self._send_raw(
+            "/omni/v1/owner/sustain",
+            [
+                self.session,
+                self._next_message_id(),
+                str(owner),
+                int(bool(enabled)),
+            ],
+        )
+
     def configure_part(
         self,
         owner: str,

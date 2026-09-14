@@ -18,6 +18,7 @@ from midi_player import (  # noqa: E402
     LEGACY_FACTORY_MIDI_CHANNELS,
     MIDI_PRESET_COUNT,
     MIDI_ROW_COUNT,
+    MIDI_SUSTAIN_CONTROLLER,
     MidiEngine,
     MidiPlayerBackend,
     _migrated_factory_channel_defaults,
@@ -109,6 +110,9 @@ class _Client:
     def release_owner(self, owner: str) -> None:
         self.events.append(("release_owner", owner))
 
+    def set_owner_sustain(self, owner: str, enabled: bool) -> None:
+        self.events.append(("sustain", (owner, enabled)))
+
     def release_program(self, program_id: str, revision: int) -> None:
         self.events.append(("release_program", (program_id, revision)))
 
@@ -119,6 +123,64 @@ class _Client:
         self.events.append(("drum_hit", event))
 
 class MidiEngineTests(unittest.TestCase):
+    def test_sustain_is_owner_scoped_idempotent_and_released_by_row_silence(self) -> None:
+        client = _Client()
+        engine = MidiEngine(client)
+        engine.configure_row(0, "juno_000", {}, 0.5)
+        client.events.clear()
+
+        engine.set_sustain(0, True)
+        engine.set_sustain(0, True)
+        engine.set_sustain(0, False)
+        engine.set_sustain(0, False)
+
+        self.assertEqual(
+            [event for event in client.events if event[0] == "sustain"],
+            [
+                ("sustain", ("midi/row/0", True)),
+                ("sustain", ("midi/row/0", False)),
+            ],
+        )
+
+        engine.set_sustain(0, True)
+        engine.silence_row(0)
+        engine.set_sustain(0, False)
+        self.assertNotIn(0, engine._sustain_rows)
+
+    def test_standard_sustain_controller_constant_is_cc64(self) -> None:
+        self.assertEqual(MIDI_SUSTAIN_CONTROLLER, 64)
+
+    def test_cc64_reaches_every_pitched_row_on_its_channel(self) -> None:
+        calls: list[tuple[int, bool]] = []
+
+        class ControlState:
+            blue_since: dict[object, object] = {}
+            bindings: dict[object, object] = {}
+
+            @staticmethod
+            def key(channel: int, controller: int) -> tuple[int, int]:
+                return channel, controller
+
+            @staticmethod
+            def observe(*_args: object, **_kwargs: object) -> tuple[bool, None, None]:
+                return False, None, None
+
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.channels = [2, 2, 3, 4, 5, 10]
+        backend.engine = type(
+            "Engine",
+            (),
+            {"set_sustain": lambda _self, row, enabled: calls.append((row, enabled))},
+        )()
+        backend._is_drum = lambda row: row == 5
+        backend._midi_control_state = ControlState()
+        backend._midi_control_lock = threading.Lock()
+
+        backend.process_midi_control(2, MIDI_SUSTAIN_CONTROLLER, 127)
+        backend.process_midi_control(10, MIDI_SUSTAIN_CONTROLLER, 127)
+
+        self.assertEqual(calls, [(0, True), (1, True)])
+
     def test_external_strum_position_crosses_each_new_note_once(self) -> None:
         backend = app_core.InstrumentBackend.__new__(app_core.InstrumentBackend)
         backend._external_strum_last_index = None

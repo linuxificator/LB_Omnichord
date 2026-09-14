@@ -16,7 +16,10 @@ Target currently exercised: Linux x86_64
 - Python compiles immutable musical plans; one SC `TempoClock` owns execution,
   quantization, note releases, gates and snapshot lifetimes.
 - Session reset, panic, exact voice handles and global pitch bend are wired
-  through the SC runtime.
+  through the SC runtime. Standard MIDI sustain (CC64) is owner-scoped per
+  pitched MIDI row: key releases are held inside SC and pedal-up releases only
+  that row's deferred handles. It remains visible to the existing controller-
+  learn path without transferring note-lifetime timing into Qt.
 - Prepared program parameters are keyed by musical owner as well as stable
   program identity and session-wide revision. Selecting the same instrument
   on independent MIDI, manual, bass or automatic-chord parts therefore cannot

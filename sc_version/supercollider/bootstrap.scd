@@ -78,6 +78,7 @@ thisProcess.openUDPPort(languagePort);
 
 ~omniReleaseHandle = { |handle|
     var record = ~omniVoices.removeAt(handle.asString);
+    ~omniSustainPending.removeAt(handle.asString);
     if(record.notNil) {
         if(record[\sample] == true) {
             record[\sampleNodes].do { |sampleNode|
@@ -95,6 +96,8 @@ thisProcess.openUDPPort(languagePort);
         };
     };
 };
+
+(scriptDirectory +/+ "voice_sustain.scd").load;
 
 ~omniSetHandle = { |handle, parameter, value|
     var record = ~omniVoices[handle.asString];
@@ -133,12 +136,15 @@ thisProcess.openUDPPort(languagePort);
     ~omniVoices.keysValuesDo { |handle, record|
         if(record[\owner] == owner.asString) { handles.add(handle) };
     };
+    ~omniSustainOwners.removeAt(owner.asString);
     handles.do(~omniReleaseHandle);
 };
 
 ~omniPanic = {
     var handles = ~omniVoices.keys.asArray;
     handles.do(~omniReleaseHandle);
+    ~omniSustainOwners.clear;
+    ~omniSustainPending.clear;
     ~omniGestures.clear;
     if(~omniExecutions.notNil) { ~omniExecutions.clear };
 };
@@ -481,7 +487,7 @@ OSCdef(\omniNoteOn, { |message|
 
 OSCdef(\omniNoteOff, { |message|
     if(~omniCommandValid.value(message)) {
-        ~omniReleaseHandle.value(message[4].asString);
+        ~omniRequestRelease.value(message[4].asString);
     };
 }, '/omni/v1/note/off', recvPort: languagePort);
 
@@ -500,6 +506,15 @@ OSCdef(\omniOwnerRelease, { |message|
         ~omniReleaseOwner.value(message[3].asString);
     };
 }, '/omni/v1/owner/release', recvPort: languagePort);
+
+OSCdef(\omniOwnerSustain, { |message|
+    if(~omniCommandValid.value(message)) {
+        ~omniSetOwnerSustain.value(
+            message[3].asString,
+            message[4].asInteger != 0
+        );
+    };
+}, '/omni/v1/owner/sustain', recvPort: languagePort);
 
 OSCdef(\omniGestureNote, { |message|
     if(~omniCommandValid.value(message)) {

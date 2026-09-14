@@ -142,12 +142,15 @@ class SuperColliderClientTests(unittest.TestCase):
             )
         )
         client.note_off(NoteOff(owner="test", handle="test/60"))
+        client.set_owner_sustain("test", True)
+        client.set_owner_sustain("test", False)
         client.close()
 
         addresses = [address for address, _ in self.fake.messages]
         self.assertIn("/omni/v1/hello", addresses)
         self.assertIn("/omni/v1/note/on", addresses)
         self.assertIn("/omni/v1/note/off", addresses)
+        self.assertIn("/omni/v1/owner/sustain", addresses)
         self.assertIn("/omni/v1/panic", addresses)
         self.assertIn("/omni/v1/shutdown", addresses)
 
