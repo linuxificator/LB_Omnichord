@@ -289,9 +289,10 @@ class SampleRepositoryTests(unittest.TestCase):
                 )
 
             persisted = json.loads(target.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["samples"]["vsco_root"], str(selected))
-            self.assertEqual(config.samples.vsco_root, selected)
-            self.assertEqual(ensure.call_args.args[0], selected)
+            resolved = selected.resolve()
+            self.assertEqual(persisted["samples"]["vsco_root"], str(resolved))
+            self.assertEqual(config.samples.vsco_root, resolved)
+            self.assertEqual(ensure.call_args.args[0], resolved)
 
     def test_cancelled_first_install_downloads_nothing_and_leaves_no_config(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -331,9 +332,10 @@ class SampleRepositoryTests(unittest.TestCase):
                 )
 
             persisted = json.loads(persisted_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["samples"]["vsco_root"], str(selected))
-            self.assertEqual(config.samples.vsco_root, selected)
-            self.assertEqual(ensure.call_args.args[0], selected)
+            resolved = selected.resolve()
+            self.assertEqual(persisted["samples"]["vsco_root"], str(resolved))
+            self.assertEqual(config.samples.vsco_root, resolved)
+            self.assertEqual(ensure.call_args.args[0], resolved)
 
     def test_existing_non_repository_is_rejected_clearly(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
