@@ -26,7 +26,7 @@ def run(arguments: Sequence[str] | None = None) -> int:
         engine_root=frontend_root.parent / "supercollider",
         config=config,
     ):
-        return frontend_main.main(arguments, asset_root=frontend_root)
+        return int(frontend_main.main(arguments, asset_root=frontend_root))
 
 
 def main() -> int:

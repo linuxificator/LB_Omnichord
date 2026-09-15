@@ -11,10 +11,16 @@ import subprocess
 import sys
 import tempfile
 import threading
-from typing import Mapping
+from types import FrameType
+from typing import Callable, Mapping, TypeAlias
 
 from supercollider_config import SuperColliderRuntimeConfig
 from supercollider_linux_realtime import configure_owned_supernova_realtime
+
+
+SignalHandler: TypeAlias = (
+    Callable[[int, FrameType | None], object] | int | signal.Handlers | None
+)
 
 
 class SuperColliderProcessError(RuntimeError):
@@ -163,7 +169,7 @@ class SuperColliderSupervisor:
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self.process: subprocess.Popen[bytes] | None = None
         self._realtime_setup_thread: threading.Thread | None = None
-        self._previous_signal_handlers: dict[int, object] = {}
+        self._previous_signal_handlers: dict[int, SignalHandler] = {}
         self._stopping = False
 
     def _language_config(self) -> Path | None:
@@ -261,13 +267,16 @@ class SuperColliderSupervisor:
         language = self.config.language
         require_available_language_port(language.host, language.port)
         command, env = self._launch_context(with_audio_wrapper=True)
+        creation_flags = (
+            int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+            if os.name == "nt"
+            else 0
+        )
         self.process = subprocess.Popen(
             command,
             env=env,
             start_new_session=os.name != "nt",
-            creationflags=(
-                subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
-            ),
+            creationflags=creation_flags,
         )
         if isinstance(self.process.pid, int):
             self._realtime_setup_thread = threading.Thread(
@@ -328,7 +337,7 @@ class SuperColliderSupervisor:
         except ProcessLookupError:
             pass
 
-    def _handle_termination(self, signum: int, _frame: object) -> None:
+    def _handle_termination(self, signum: int, _frame: FrameType | None) -> None:
         if self._stopping:
             return
         # Qt may defer or absorb an exception raised while its native event
