@@ -6,11 +6,12 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QCoreApplication, QUrl
+from PySide6.QtCore import QCoreApplication, QObject, QPoint, QPointF, Qt, QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
+from PySide6.QtTest import QTest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -61,6 +62,54 @@ class GuiControlSurface(BackendControlSurface):
             "height": image.height(),
             "sampled_colours": len(colours),
         }
+
+    def strumPointerPath(self, normalized_positions: list[float], delay_ms: int) -> None:
+        """Drive the production strum item through Qt's real mouse path."""
+
+        if not normalized_positions:
+            raise ValueError("strum pointer path must contain positions")
+        pad = self._window.findChild(QObject, "strumPad")
+        if pad is None:
+            raise RuntimeError("production strum pad was not found")
+
+        def window_point(position: float) -> QPoint:
+            y = max(0.0, min(1.0, float(position))) * float(pad.height())
+            point = pad.mapToScene(QPointF(float(pad.width()) / 2.0, y))
+            return QPoint(round(point.x()), round(point.y()))
+
+        points = [window_point(position) for position in normalized_positions]
+        QTest.mousePress(
+            self._window, Qt.LeftButton, Qt.NoModifier, points[0]
+        )
+        for point in points[1:]:
+            QTest.mouseMove(self._window, point)
+            QTest.qWait(max(0, int(delay_ms)))
+        QTest.mouseRelease(
+            self._window, Qt.LeftButton, Qt.NoModifier, points[-1]
+        )
+
+    def strumContinuousSweeps(
+        self,
+        sweep_count: int,
+        points_per_sweep: int,
+        delay_ms: int,
+    ) -> None:
+        """Keep one real pointer grab while repeatedly crossing the strum."""
+
+        sweep_count = max(1, int(sweep_count))
+        points_per_sweep = max(2, int(points_per_sweep))
+        down = [
+            0.96 - (index * 0.92 / (points_per_sweep - 1))
+            for index in range(points_per_sweep)
+        ]
+        up = list(reversed(down))
+        path: list[float] = []
+        for sweep in range(sweep_count):
+            segment = down if sweep % 2 == 0 else up
+            if path and path[-1] == segment[0]:
+                segment = segment[1:]
+            path.extend(segment)
+        self.strumPointerPath(path, delay_ms)
 
 
 def load_qml(
@@ -131,7 +180,11 @@ def main() -> int:
         print("TEST_QML_READY=1", file=sys.stderr, flush=True)
     else:
         surface = BackendControlSurface(backend)
-    test_server = TestControlServer(surface, port)
+    test_server = TestControlServer(
+        surface,
+        port,
+        request_timeout_seconds=120.0 if with_qml else 5.0,
+    )
     print(f"TEST_API_PORT={test_server.port}", file=sys.stderr, flush=True)
 
     backend.send_initial_state()

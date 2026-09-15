@@ -18,6 +18,7 @@ from sc_endurance import (  # noqa: E402
     action_cycle,
     analyze_wave,
     pcm_chord_switch_cycle,
+    strum_pressure_cycle,
     startup_bass_riff_cycle,
     vsco_drum_role_cycle,
 )
@@ -32,6 +33,18 @@ class _Synth:
 class SuperColliderEnduranceTests(unittest.TestCase):
     def test_server_node_creation_exceptions_are_fatal(self) -> None:
         self.assertIn("exception in /s_new", FATAL_LOG_TEXT)
+        self.assertIn("failed to get an audio bus allocated", FATAL_LOG_TEXT)
+        self.assertIn("Message 'index' not understood", FATAL_LOG_TEXT)
+
+    def test_strum_pressure_is_one_minute_long_held_qml_gesture(self) -> None:
+        actions = list(strum_pressure_cycle(through_qml=True))
+        pressure = [
+            action for action in actions
+            if action.name == "strumContinuousSweeps"
+        ]
+        self.assertEqual(len(pressure), 1)
+        self.assertEqual(pressure[0].args, (200, 37, 8))
+        self.assertFalse(any(action.name == "strumPointerPath" for action in actions))
 
     def test_audio_monitor_targets_supernova_pipewire_outputs(self) -> None:
         source = (ENDURANCE / "sc_endurance.py").read_text(encoding="utf-8")

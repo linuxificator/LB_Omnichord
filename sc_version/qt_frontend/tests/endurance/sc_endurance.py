@@ -59,6 +59,8 @@ FATAL_LOG_TEXT = (
     "Exception:",
     "SynthDef not found",
     "buffer overflow",
+    "failed to get an audio bus allocated",
+    "Message 'index' not understood",
     "exception in /s_new",
 )
 
@@ -298,6 +300,53 @@ def startup_bass_riff_cycle() -> Iterator[Action]:
     yield Action("releaseChord", (0, 5), 0.3)
 
 
+def strum_pressure_cycle(*, through_qml: bool = False) -> Iterator[Action]:
+    """Hold the busiest accompaniment while increasing strum pressure."""
+
+    # Trance Lift combines a comparatively expensive native strum voice,
+    # supersaw accompaniment, acid bass and native percussion. It is a useful
+    # upper-load production preset rather than a synthetic oscillator fixture.
+    yield Action("selectPreset", (14,), 0.4)
+    yield Action("setMasterVolume", (0.36,))
+    yield Action("setChordVolume", (0.42,))
+    yield Action("setStrumVolume", (0.38,))
+    yield Action("setBassVolume", (0.40,))
+    yield Action("setPercussionVolume", (0.42,))
+    yield Action("setRhythmBusyness", (5.0,), 0.08)
+    yield Action("setRhythmChordActivity", (5.0,), 0.08)
+    yield Action("setRhythmBassActivity", (5.0,), 0.08)
+    yield Action("setRhythmFillDensity", (1.0,), 0.08)
+    yield Action("ensureRhythmRunning", (True,), 0.2)
+    yield Action("ensureBassRunning", (True,), 0.2)
+    yield Action("ensureChordArpeggioRunning", (True,), 0.2)
+    yield Action("pressChord", (0, 0), 2.0)
+
+    # Move across successive physical positions instead of jumping directly
+    # between endpoints. This matches a real pointer trajectory: chord tones
+    # are attacked across the duration of each sweep rather than in one burst.
+    down = [0.96 - (index * 0.92 / 36) for index in range(37)]
+    up = list(reversed(down))
+    sweep_count = 200
+    if through_qml:
+        # One press crosses the full surface for nearly a minute. Releasing
+        # between shorter batches failed to model the reported performance
+        # problem and artificially allowed all strum voices to drain.
+        yield Action(
+            "strumContinuousSweeps",
+            (sweep_count, len(down), 8),
+            0.02,
+        )
+    else:
+        yield Action("strumStart", (down[0],), 0.008)
+        for sweep in range(sweep_count):
+            path = down if sweep % 2 == 0 else up
+            for position in path[1:]:
+                yield Action("strumMove", (position,), 0.008)
+        yield Action("strumEnd", dwell=0.1)
+    yield Action("strumTap", (0.50,), 1.0)
+    yield Action("releaseChord", (0, 0), 1.0)
+
+
 class ApiClient:
     def __init__(self, port: int) -> None:
         self.port = port
@@ -320,7 +369,9 @@ class ApiClient:
             method="POST",
         )
         try:
-            with urlopen(request, timeout=8) as reply:
+            # A production-QML pointer path deliberately holds the GUI event
+            # loop while QTest delivers several seconds of real motion.
+            with urlopen(request, timeout=125) as reply:
                 result = json.loads(reply.read())
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
@@ -458,12 +509,19 @@ def parse_args() -> argparse.Namespace:
         help="load and capture the real production QML scene offscreen",
     )
     parser.add_argument(
+        "--gui-platform",
+        choices=("offscreen", "native"),
+        default="offscreen",
+        help="use deterministic offscreen QML or the current desktop compositor",
+    )
+    parser.add_argument(
         "--scenario",
         choices=(
             "broad",
             "pcm-chord-switch",
             "vsco-drum-roles",
             "startup-bass-riff",
+            "strum-pressure",
         ),
         default="broad",
         help="run broad coverage or one focused playback regression",
@@ -497,6 +555,9 @@ def main() -> int:
             "OMNICHORD_SC_BLOCK_SIZE": str(config.server.block_size),
             "OMNICHORD_SC_MAX_NODES": str(config.server.max_nodes),
             "OMNICHORD_SC_MAX_BUFFERS": str(config.server.max_buffers),
+            "OMNICHORD_SC_MAX_GESTURE_VOICES": str(
+                config.server.gesture_voice_limit
+            ),
             "OMNICHORD_SC_MEM_KIB": str(config.server.realtime_memory_kib),
             "OMNICHORD_SC_VSCO_ROOT": str(config.samples.vsco_root),
             "OMNICHORD_SC_SAMPLE_RAM_MIB": str(config.samples.ram_budget_mib),
@@ -533,14 +594,15 @@ def main() -> int:
             }
         )
         if args.gui:
-            frontend_environment.update(
-                {
-                    "OMNICHORD_TEST_LOAD_QML": "1",
-                    "QT_QPA_PLATFORM": "offscreen",
-                    "QT_QUICK_BACKEND": "software",
-                    "QSG_INFO": "0",
-                }
-            )
+            frontend_environment["OMNICHORD_TEST_LOAD_QML"] = "1"
+            if args.gui_platform == "offscreen":
+                frontend_environment.update(
+                    {
+                        "QT_QPA_PLATFORM": "offscreen",
+                        "QT_QUICK_BACKEND": "software",
+                        "QSG_INFO": "0",
+                    }
+                )
         frontend_process = subprocess.Popen(
             [sys.executable, str(HEADLESS_APP), "--debug-file", str(debug_log)],
             cwd=ROOT, env=frontend_environment, stdout=frontend_stream,
@@ -583,6 +645,8 @@ def main() -> int:
                 actions = vsco_drum_role_cycle()
             elif args.scenario == "startup-bass-riff":
                 actions = startup_bass_riff_cycle()
+            elif args.scenario == "strum-pressure":
+                actions = strum_pressure_cycle(through_qml=args.gui)
             else:
                 actions = action_cycle(
                     cycle,

@@ -242,6 +242,7 @@ def _migrate_config(
     data: object,
     *,
     default_max_buffers: int,
+    default_gesture_voice_limit: int,
     default_sample_commit: str,
 ) -> tuple[dict[str, object], bool]:
     if not isinstance(data, dict):
@@ -273,6 +274,9 @@ def _migrate_config(
         raise SampleRepositoryError("SuperCollider config server object is missing")
     if "max_buffers" not in server:
         server["max_buffers"] = default_max_buffers
+        changed = True
+    if "gesture_voice_limit" not in server:
+        server["gesture_voice_limit"] = default_gesture_voice_limit
         changed = True
 
     samples = migrated.get("samples")
@@ -309,6 +313,7 @@ def prepare_user_runtime_config(
     migrated, changed = _migrate_config(
         store.read(),
         default_max_buffers=shipped.server.max_buffers,
+        default_gesture_voice_limit=shipped.server.gesture_voice_limit,
         default_sample_commit=shipped.samples.commit,
     )
     if changed:

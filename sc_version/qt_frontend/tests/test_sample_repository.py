@@ -184,7 +184,7 @@ class SampleRepositoryTests(unittest.TestCase):
             persisted = json.loads(target.read_text(encoding="utf-8"))
             self.assertIs(type(persisted["server"]["max_buffers"]), int)
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
-            self.assertEqual(persisted["config_revision"], 4)
+            self.assertEqual(persisted["config_revision"], 5)
             self.assertEqual(persisted["protocol_version"], 2)
 
     def test_existing_non_repository_is_rejected_clearly(self) -> None:
@@ -254,6 +254,7 @@ class SampleRepositoryTests(unittest.TestCase):
         old["samples"].pop("repository")
         old["samples"].pop("commit")
         old["server"].pop("max_buffers")
+        old["server"].pop("gesture_voice_limit")
         old["samples"]["vsco_root"] = "~/sample_lib/VSCO-2-CE-1.1.0"
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -269,11 +270,12 @@ class SampleRepositoryTests(unittest.TestCase):
                 install_samples=False,
             )
             persisted = json.loads(target.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 4)
+            self.assertEqual(persisted["config_revision"], 5)
             self.assertEqual(persisted["protocol_version"], 2)
             self.assertEqual(persisted["samples"]["commit"], DEFAULT_SAMPLE_COMMIT)
             self.assertEqual(persisted["samples"]["vsco_root"], "~/VSCO-2-CE")
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
+            self.assertEqual(persisted["server"]["gesture_voice_limit"], 24)
             self.assertEqual(config.samples.repository, DEFAULT_REPOSITORY)
             self.assertEqual(
                 target,
@@ -288,6 +290,7 @@ class SampleRepositoryTests(unittest.TestCase):
         data["samples"].pop("repository")
         data["samples"].pop("commit")
         data["server"].pop("max_buffers")
+        data["server"].pop("gesture_voice_limit")
         data["samples"]["vsco_root"] = "/media/samples/VSCO-2-CE"
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -319,6 +322,7 @@ class SampleRepositoryTests(unittest.TestCase):
         data["protocol_version"] = 1
         data["samples"].pop("commit")
         data["server"].pop("max_buffers")
+        data["server"].pop("gesture_voice_limit")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             shipped = root / "shipped.json"
@@ -339,11 +343,41 @@ class SampleRepositoryTests(unittest.TestCase):
             )
 
             persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 4)
+            self.assertEqual(persisted["config_revision"], 5)
             self.assertEqual(persisted["protocol_version"], 2)
             self.assertEqual(persisted["samples"]["commit"], DEFAULT_SAMPLE_COMMIT)
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
+            self.assertEqual(persisted["server"]["gesture_voice_limit"], 24)
             self.assertEqual(config.server.max_buffers, 8192)
+            self.assertEqual(config.server.gesture_voice_limit, 24)
+
+    def test_revision_four_gains_the_shipped_gesture_boundary(self) -> None:
+        shipped_data = json.loads(
+            (FRONTEND / "config" / "supercollider.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        existing_data = json.loads(json.dumps(shipped_data))
+        existing_data["config_revision"] = 4
+        existing_data["server"].pop("gesture_voice_limit")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            shipped = root / "shipped.json"
+            shipped.write_text(json.dumps(shipped_data), encoding="utf-8")
+            target = root / "user" / "config" / "supercollider.json"
+            target.parent.mkdir(parents=True)
+            target.write_text(json.dumps(existing_data), encoding="utf-8")
+
+            migrated_path, config = prepare_user_runtime_config(
+                shipped,
+                user_root=root / "user",
+                install_samples=False,
+            )
+
+            persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["config_revision"], 5)
+            self.assertEqual(persisted["server"]["gesture_voice_limit"], 24)
+            self.assertEqual(config.server.gesture_voice_limit, 24)
 
 
 if __name__ == "__main__":

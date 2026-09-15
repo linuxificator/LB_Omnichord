@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 4
+CURRENT_CONFIG_REVISION = 5
 
 
 class SuperColliderConfigError(ValueError):
@@ -30,6 +30,7 @@ class SuperColliderServerConfig:
     latency_seconds: float
     max_nodes: int
     max_buffers: int
+    gesture_voice_limit: int
     realtime_memory_kib: int
 
 
@@ -150,6 +151,13 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
         raise SuperColliderConfigError(
             "$.server.max_buffers: expected 1024..1000000"
         )
+    gesture_voice_limit = _integer(
+        server, "gesture_voice_limit", "$.server"
+    )
+    if not 1 <= gesture_voice_limit <= 256:
+        raise SuperColliderConfigError(
+            "$.server.gesture_voice_limit: expected 1..256"
+        )
     realtime_memory = _integer(
         server, "realtime_memory_kib", "$.server"
     )
@@ -195,6 +203,7 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
             latency_seconds=latency,
             max_nodes=max_nodes,
             max_buffers=max_buffers,
+            gesture_voice_limit=gesture_voice_limit,
             realtime_memory_kib=realtime_memory,
         ),
         samples=SuperColliderSampleConfig(
@@ -220,6 +229,7 @@ def _cli() -> int:
             "server.block_size",
             "server.max_nodes",
             "server.max_buffers",
+            "server.gesture_voice_limit",
             "server.realtime_memory_kib",
             "samples.vsco_root",
             "samples.repository",

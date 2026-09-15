@@ -121,8 +121,9 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(config["config_revision"], 4)
+        self.assertEqual(config["config_revision"], 5)
         self.assertEqual(config["protocol_version"], 2)
+        self.assertEqual(config["server"]["gesture_voice_limit"], 24)
         self.assertEqual(
             config["samples"]["commit"],
             "440300901dfe9275fd84e0b7763af1f8443ae62e",
@@ -304,6 +305,21 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertNotIn("record[\\outputNode].set(", bootstrap)
         self.assertNotIn("outputNode.set(", bootstrap)
         self.assertNotIn("sourceNode.free", bootstrap)
+
+    def test_gesture_voices_are_bounded_inside_the_engine(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        config = json.loads(
+            (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(config["server"]["gesture_voice_limit"], 24)
+        self.assertIn("OMNICHORD_SC_MAX_GESTURE_VOICES", bootstrap)
+        self.assertIn("handles: List.new", bootstrap)
+        self.assertIn(
+            "state[\\handles].size >= maxGestureVoices",
+            bootstrap,
+        )
+        self.assertIn("state[\\handles].removeAt(0)", bootstrap)
+        self.assertIn("gestureStealRelease", bootstrap)
 
     def test_supernova_graph_parallelizes_only_independent_stages(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")

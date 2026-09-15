@@ -6,6 +6,8 @@ import "PointerNormalization.js" as PointerNormalization
 Item {
     id: root
 
+    objectName: "strumPad"
+
     required property var controller
     property var midiControlRouter: null
     property var midiTarget: ({

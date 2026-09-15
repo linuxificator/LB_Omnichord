@@ -226,6 +226,10 @@ class SuperColliderProcessTests(unittest.TestCase):
                     str(plugins.resolve()),
                 )
                 self.assertEqual(
+                    environment["OMNICHORD_SC_MAX_GESTURE_VOICES"],
+                    "24",
+                )
+                self.assertEqual(
                     command[-2:], ["-D", str((engine / "bootstrap.scd").resolve())]
                 )
                 supervisor.stop()

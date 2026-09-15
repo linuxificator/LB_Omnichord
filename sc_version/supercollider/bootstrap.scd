@@ -12,6 +12,9 @@ var blockSize = ("OMNICHORD_SC_BLOCK_SIZE".getenv ? "64").asInteger;
 var maxNodes = ("OMNICHORD_SC_MAX_NODES".getenv ? "4096").asInteger;
 var maxBuffers = ("OMNICHORD_SC_MAX_BUFFERS".getenv ? "8192").asInteger;
 var memKiB = ("OMNICHORD_SC_MEM_KIB".getenv ? "262144").asInteger;
+var maxGestureVoices = ("OMNICHORD_SC_MAX_GESTURE_VOICES".getenv ? "24")
+    .asInteger.clip(1, 256);
+var gestureStealRelease = ((blockSize / sampleRate) * 4).max(0.005);
 var protocolVersion = 2;
 var validateOnly = ("OMNICHORD_SC_VALIDATE_ONLY".getenv ? "0").asInteger == 1;
 var scriptDirectory = thisProcess.nowExecutingPath.dirname;
@@ -78,7 +81,7 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
     ~omniSetPitchBend.value(0.0);
 };
 
-~omniReleaseHandle = { |handle|
+~omniReleaseHandle = { |handle, forcedRelease|
     var record = ~omniVoices.removeAt(handle.asString);
     ~omniSustainPending.removeAt(handle.asString);
     if(record.notNil) {
@@ -90,6 +93,14 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
         } {
         if(record[\outputNode].notNil) {
             record[\releaseRequested] = true;
+            if(forcedRelease.notNil) {
+                // The owned group remains valid until the output boundary
+                // ends, unlike an individual native source or output node.
+                record[\voiceGroup].set(
+                    \release,
+                    forcedRelease.asFloat.max(0.005)
+                );
+            };
             // The control bus outlives the output synth until its /n_end has
             // been observed.  Unlike /n_set on a node that may just have
             // ended, this cannot race the server's node lifetime.
@@ -720,7 +731,13 @@ OSCdef(\omniGestureNote, { |message|
         var logicalBus = message[9].asInteger.clip(0, 10);
         var tailSeconds = message[10].asFloat.max(0.01);
         var programRevision = message[11].asInteger.max(1);
-        var state = ~omniGestures[owner] ? (handles: Set.new);
+        var state = ~omniGestures[owner] ? (handles: List.new);
+        while { state[\handles].size >= maxGestureVoices } {
+            ~omniReleaseHandle.value(
+                state[\handles].removeAt(0),
+                gestureStealRelease
+            );
+        };
         ~omniSpawnVoice.value(
             owner, handle, program, programRevision, logicalKey, frequency,
             velocity, logicalBus, []
