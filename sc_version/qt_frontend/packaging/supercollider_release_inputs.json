@@ -7,6 +7,12 @@
     "source_sha256": "ee640c68777ae697682066ce5c4a8b7e56c5b223e76c79c13b5be5387ee55bb2",
     "license": "GPL-3.0-or-later"
   },
+  "windows_asio_sdk": {
+    "source_url": "https://www.steinberg.net/asiosdk",
+    "source_sha256": "d5ebf0c20dd2c5f43771fd0c1418f4b361bf52434ee670097cfa6b3a335e2eca",
+    "license_path": "LICENSES/LICENSE_GPLv3.txt",
+    "license": "GPL-3.0-only"
+  },
   "sclork_synths": {
     "commit": "6730c745971aa45c95d9b4cddfb4d5ca342774b3",
     "definition_count": 109,

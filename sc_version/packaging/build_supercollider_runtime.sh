@@ -8,14 +8,46 @@ build_root="${OMNICHORD_SC_BUILD_ROOT:-$PWD/build/supercollider-${sc_version}}"
 install_prefix="${OMNICHORD_SC_INSTALL_PREFIX:-$build_root/install}"
 archive="${OMNICHORD_SC_SOURCE_ARCHIVE:-$build_root/SuperCollider-${sc_version}-Source.tar.bz2}"
 source_root="$build_root/SuperCollider-${sc_version}-Source"
+host_system="$(uname -s)"
+
+verify_sha256() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        echo "$source_sha256  $archive" | sha256sum --check --strict
+    else
+        actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
+        [[ "$actual" == "$source_sha256" ]] || {
+            echo "SuperCollider source checksum mismatch" >&2
+            exit 2
+        }
+    fi
+}
+
+build_jobs="${OMNICHORD_BUILD_JOBS:-}"
+if [[ -z "$build_jobs" ]]; then
+    if command -v nproc >/dev/null 2>&1; then
+        build_jobs="$(nproc)"
+    else
+        build_jobs="$(sysctl -n hw.ncpu)"
+    fi
+fi
 
 mkdir -p "$build_root"
 if [[ ! -f "$archive" ]]; then
     curl -L --fail --silent --show-error "$source_url" -o "$archive"
 fi
-echo "$source_sha256  $archive" | sha256sum --check --strict
+verify_sha256
 if [[ ! -f "$source_root/CMakeLists.txt" ]]; then
     tar -xjf "$archive" -C "$build_root"
+fi
+
+platform_flags=()
+if [[ "$host_system" == "Darwin" ]]; then
+    platform_flags+=(
+        -DCMAKE_OSX_ARCHITECTURES=arm64
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+        -DAUDIOAPI=portaudio
+        -DSYSTEM_PORTAUDIO=ON
+    )
 fi
 
 cmake -S "$source_root" -B "$build_root/cmake" --fresh -G Ninja \
@@ -32,11 +64,42 @@ cmake -S "$source_root" -B "$build_root/cmake" --fresh -G Ninja \
     -DINSTALL_HELP=OFF \
     -DENABLE_TESTSUITE=OFF \
     -DNO_AVAHI=ON \
-    -DNATIVE=OFF
-cmake --build "$build_root/cmake" --parallel "${OMNICHORD_BUILD_JOBS:-$(nproc)}"
+    -DNATIVE=OFF \
+    "${platform_flags[@]}"
+cmake --build "$build_root/cmake" --parallel "$build_jobs"
 cmake --install "$build_root/cmake"
 
-"$install_prefix/bin/sclang" -v | grep -F "$sc_version"
-"$install_prefix/bin/scsynth" -v | grep -F "$sc_version"
-"$install_prefix/bin/supernova" -v | grep -F "$sc_version"
-printf '%s\n' "$install_prefix"
+if [[ "$host_system" == "Darwin" ]]; then
+    runtime_root="$install_prefix/SuperCollider/SuperCollider.app"
+    resources="$runtime_root/Contents/Resources"
+    mkdir -p "$resources/SCClassLibrary"
+    rsync -a \
+        --exclude='GUI/' \
+        --exclude='Ableton/' \
+        "$source_root/SCClassLibrary/" "$resources/SCClassLibrary/"
+    executables=(
+        "$runtime_root/Contents/MacOS/sclang"
+        "$resources/scsynth"
+        "$resources/supernova"
+    )
+    [[ -d "$resources/plugins" ]] || {
+        echo "SuperCollider plugins are missing from macOS runtime" >&2
+        exit 2
+    }
+    if find "$runtime_root" -iname '*QtWebEngine*' -print -quit | grep -q .; then
+        echo "QtWebEngine is forbidden in the headless macOS runtime" >&2
+        exit 2
+    fi
+else
+    runtime_root="$install_prefix"
+    executables=(
+        "$runtime_root/bin/sclang"
+        "$runtime_root/bin/scsynth"
+        "$runtime_root/bin/supernova"
+    )
+fi
+
+for executable in "${executables[@]}"; do
+    "$executable" -v | grep -F "$sc_version"
+done
+printf '%s\n' "$runtime_root"

@@ -259,8 +259,19 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         runtime_builder = (
             ROOT.parent / "packaging" / "build_supercollider_runtime.sh"
         ).read_text(encoding="utf-8")
+        windows_runtime_builder = (
+            ROOT.parent / "packaging" / "build_supercollider_runtime.ps1"
+        ).read_text(encoding="utf-8")
         self.assertIn("-DSUPERNOVA=ON", runtime_builder)
-        self.assertIn('"$install_prefix/bin/supernova" -v', runtime_builder)
+        self.assertIn("-DSC_QT=OFF", runtime_builder)
+        self.assertIn("-DSC_IDE=OFF", runtime_builder)
+        self.assertIn('"$runtime_root/bin/supernova"', runtime_builder)
+        self.assertIn('"$resources/supernova"', runtime_builder)
+        self.assertIn("QtWebEngine is forbidden", runtime_builder)
+        self.assertIn('"-DSC_QT=OFF"', windows_runtime_builder)
+        self.assertIn('"-DSC_IDE=OFF"', windows_runtime_builder)
+        self.assertIn('"-DPA_USE_ASIO=ON"', windows_runtime_builder)
+        self.assertIn("ASIO SDK checksum mismatch", windows_runtime_builder)
         self.assertGreaterEqual(text.count("supernova -v"), 3)
         for platform in (
             "Linux-x86_64",
@@ -278,14 +289,13 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         macos_builder = (ROOT / "packaging" / "build_macos_dmg.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            '--forbidden-runtime-exempt-prefix "Contents/Resources/sc-runtime"',
-            macos_builder,
-        )
         self.assertIn('Contents/Resources/supernova', macos_builder)
         self.assertIn('shasum -a 256', macos_builder)
         self.assertIn('"$(basename "$output").sha256"', macos_builder)
+        self.assertNotIn("forbidden-runtime-exempt-prefix", macos_builder)
+        self.assertNotIn("max-package-bytes", macos_builder)
         self.assertIn('test -f "dist/$package.sha256"', text)
+        self.assertIn("inputs.build_packages || inputs.release", text)
         self.assertIn(
             "RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}", text
         )
@@ -294,10 +304,9 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         windows_builder = (ROOT / "packaging" / "build_windows.ps1").read_text(
             encoding="utf-8"
         )
-        self.assertIn(
-            '--forbidden-runtime-exempt-prefix "sc-runtime"', windows_builder
-        )
         self.assertIn('"supernova.exe"', windows_builder)
+        self.assertNotIn("forbidden-runtime-exempt-prefix", windows_builder)
+        self.assertNotIn("max-package-bytes", windows_builder)
 
     def test_macos_frozen_entry_finds_runtime_in_contents_resources(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
