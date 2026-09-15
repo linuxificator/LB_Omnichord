@@ -19,7 +19,9 @@ sys.path.insert(0, str(FRONTEND / "code"))
 
 from sample_repository import (  # noqa: E402
     DEFAULT_REPOSITORY,
+    DEFAULT_SAMPLE_BRANCH,
     DEFAULT_SAMPLE_COMMIT,
+    SAMPLE_RECEIPT_NAME,
     SampleRepositoryError,
     ensure_sample_repository,
     prepare_user_runtime_config,
@@ -61,10 +63,12 @@ class SampleRepositoryTests(unittest.TestCase):
                     {
                         "files": [
                             {
+                                "id": "fixture",
                                 "relative_path": "Keys/fixture.wav",
                                 "sha256": hashlib.sha256(b"sample audio").hexdigest(),
                             }
-                        ]
+                        ],
+                        "regions": [{"sample_id": "fixture"}],
                     }
                 ),
                 encoding="utf-8",
@@ -76,6 +80,19 @@ class SampleRepositoryTests(unittest.TestCase):
                 samples.resolve(),
             )
             self.assertTrue(cache.is_file())
+            receipt = json.loads(
+                (samples / SAMPLE_RECEIPT_NAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(receipt["file_count"], 1)
+            self.assertEqual(
+                receipt["files"],
+                [
+                    {
+                        "relative_path": "Keys/fixture.wav",
+                        "sha256": hashlib.sha256(b"sample audio").hexdigest(),
+                    }
+                ],
+            )
             with patch("sample_repository.hashlib.file_digest") as digest:
                 self.assertEqual(
                     validate_sample_tree(samples, manifest, cache_path=cache),
@@ -96,10 +113,12 @@ class SampleRepositoryTests(unittest.TestCase):
                     {
                         "files": [
                             {
+                                "id": "fixture",
                                 "relative_path": "fixture.wav",
                                 "sha256": hashlib.sha256(b"expected audio").hexdigest(),
                             }
-                        ]
+                        ],
+                        "regions": [{"sample_id": "fixture"}],
                     }
                 ),
                 encoding="utf-8",
@@ -109,6 +128,131 @@ class SampleRepositoryTests(unittest.TestCase):
                 SampleRepositoryError, "content differs from the supported set"
             ):
                 validate_sample_tree(samples, manifest)
+
+    def test_unreferenced_source_audio_is_not_required_or_receipted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            samples = root / "runtime-subset"
+            samples.mkdir()
+            (samples / "used.wav").write_bytes(b"used")
+            manifest = root / "vsco-manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "id": "used",
+                                "relative_path": "used.wav",
+                                "sha256": hashlib.sha256(b"used").hexdigest(),
+                            },
+                            {
+                                "id": "unmapped",
+                                "relative_path": "not-downloaded.wav",
+                                "sha256": hashlib.sha256(b"unused").hexdigest(),
+                            },
+                        ],
+                        "regions": [{"sample_id": "used"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            validate_sample_tree(samples, manifest)
+
+            receipt = json.loads(
+                (samples / SAMPLE_RECEIPT_NAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(receipt["file_count"], 1)
+            self.assertEqual(
+                [record["relative_path"] for record in receipt["files"]],
+                ["used.wav"],
+            )
+
+    def test_direct_pcm_drum_reference_is_part_of_runtime_subset(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            samples = root / "samples"
+            samples.mkdir()
+            (samples / "melodic.wav").write_bytes(b"melodic")
+            (samples / "drum.wav").write_bytes(b"drum")
+            manifest = root / "vsco-manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "id": "melodic",
+                                "relative_path": "melodic.wav",
+                                "sha256": hashlib.sha256(b"melodic").hexdigest(),
+                            },
+                            {
+                                "id": "drum",
+                                "relative_path": "drum.wav",
+                                "sha256": hashlib.sha256(b"drum").hexdigest(),
+                            },
+                        ],
+                        "regions": [{"sample_id": "melodic"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            drums = root / "drums.json"
+            drums.write_text(
+                json.dumps({"sample_files": [{"source_sample_id": "drum"}]}),
+                encoding="utf-8",
+            )
+
+            validate_sample_tree(
+                samples,
+                manifest,
+                direct_reference_catalogue=drums,
+            )
+
+            receipt = json.loads(
+                (samples / SAMPLE_RECEIPT_NAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                {record["relative_path"] for record in receipt["files"]},
+                {"melodic.wav", "drum.wav"},
+            )
+
+    def test_changed_receipt_forces_content_revalidation_and_repair(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            samples = root / "samples"
+            samples.mkdir()
+            (samples / "fixture.wav").write_bytes(b"sample")
+            manifest = root / "vsco-manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "id": "fixture",
+                                "relative_path": "fixture.wav",
+                                "sha256": hashlib.sha256(b"sample").hexdigest(),
+                            }
+                        ],
+                        "regions": [{"sample_id": "fixture"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            cache = root / "cache.json"
+            validate_sample_tree(samples, manifest, cache_path=cache)
+            receipt_path = samples / SAMPLE_RECEIPT_NAME
+            receipt_path.write_text("{}\n", encoding="utf-8")
+
+            with patch(
+                "sample_repository.hashlib.file_digest",
+                wraps=hashlib.file_digest,
+            ) as digest:
+                validate_sample_tree(samples, manifest, cache_path=cache)
+                digest.assert_called_once()
+            self.assertEqual(
+                json.loads(receipt_path.read_text(encoding="utf-8"))["file_count"],
+                1,
+            )
 
     def test_runtime_preparation_accepts_an_ordinary_sample_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -135,13 +279,22 @@ class SampleRepositoryTests(unittest.TestCase):
                     {
                         "files": [
                             {
+                                "id": "fixture",
                                 "relative_path": "fixture.wav",
                                 "sha256": hashlib.sha256(b"sample audio").hexdigest(),
                             }
-                        ]
+                        ],
+                        "regions": [{"sample_id": "fixture"}],
                     }
                 ),
                 encoding="utf-8",
+            )
+            drum_catalogue = (
+                frontend / "music" / "sc_expansion" / "sc_pcm_drumkits_v1.json"
+            )
+            drum_catalogue.parent.mkdir(parents=True)
+            drum_catalogue.write_text(
+                json.dumps({"sample_files": []}), encoding="utf-8"
             )
 
             target, runtime = prepare_user_runtime_config(
@@ -155,6 +308,7 @@ class SampleRepositoryTests(unittest.TestCase):
             self.assertTrue(
                 (root / "empty-user-root" / "cache" / "vsco-validation.json").is_file()
             )
+            self.assertTrue((samples / SAMPLE_RECEIPT_NAME).is_file())
 
     def test_cli_seeds_a_valid_config_in_a_completely_empty_home(self) -> None:
         """Cover the exact first source-run boundary used by run_local.sh."""
@@ -184,7 +338,7 @@ class SampleRepositoryTests(unittest.TestCase):
             persisted = json.loads(target.read_text(encoding="utf-8"))
             self.assertIs(type(persisted["server"]["max_buffers"]), int)
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
-            self.assertEqual(persisted["config_revision"], 6)
+            self.assertEqual(persisted["config_revision"], 7)
             self.assertEqual(persisted["protocol_version"], 2)
 
     def test_existing_non_repository_is_rejected_clearly(self) -> None:
@@ -223,26 +377,54 @@ class SampleRepositoryTests(unittest.TestCase):
 
     def test_missing_repository_is_cloned_to_final_path_atomically(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            destination = Path(temporary) / "VSCO-2-CE"
+            root = Path(temporary)
+            destination = root / "VSCO-2-CE"
+            manifest = root / "vsco-manifest.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "files": [
+                            {
+                                "id": "fixture",
+                                "relative_path": "fixture.wav",
+                                "sha256": hashlib.sha256(b"sample").hexdigest(),
+                            }
+                        ],
+                        "regions": [{"sample_id": "fixture"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
 
-            def fake_clone(url: str, target: str, **_arguments: object) -> None:
+            def fake_clone(url: str, target: str, **arguments: object) -> None:
                 self.assertEqual(url, DEFAULT_REPOSITORY)
+                self.assertEqual(arguments["depth"], 1)
+                self.assertEqual(arguments["branch"], DEFAULT_SAMPLE_BRANCH)
                 make_clone(Path(target), url)
                 commit_clone(Path(target))
 
             with (
                 patch("sample_repository.porcelain.clone", side_effect=fake_clone),
-                patch("sample_repository.porcelain.reset"),
                 patch(
                     "sample_repository.repository_commit",
                     return_value=DEFAULT_SAMPLE_COMMIT,
                 ),
             ):
                 result = ensure_sample_repository(
-                    destination, DEFAULT_REPOSITORY, DEFAULT_SAMPLE_COMMIT
+                    destination,
+                    DEFAULT_REPOSITORY,
+                    DEFAULT_SAMPLE_BRANCH,
+                    DEFAULT_SAMPLE_COMMIT,
+                    content_manifest=manifest,
+                    validation_cache=root / "cache.json",
                 )
             self.assertEqual(result, destination.resolve())
             self.assertEqual((destination / "fixture.wav").read_bytes(), b"sample")
+            receipt = json.loads(
+                (destination / SAMPLE_RECEIPT_NAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(receipt["branch"], DEFAULT_SAMPLE_BRANCH)
+            self.assertEqual(receipt["commit"], DEFAULT_SAMPLE_COMMIT)
             self.assertFalse(any(destination.parent.glob(".VSCO-2-CE.clone-*")))
 
     def test_user_config_is_seeded_and_revision_one_default_is_migrated(self) -> None:
@@ -253,6 +435,7 @@ class SampleRepositoryTests(unittest.TestCase):
         old["config_revision"] = 1
         old["samples"].pop("repository")
         old["samples"].pop("commit")
+        old["samples"].pop("branch")
         old["server"].pop("max_buffers")
         old["server"].pop("gesture_voice_limit")
         old["samples"]["vsco_root"] = "~/sample_lib/VSCO-2-CE-1.1.0"
@@ -270,9 +453,10 @@ class SampleRepositoryTests(unittest.TestCase):
                 install_samples=False,
             )
             persisted = json.loads(target.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 6)
+            self.assertEqual(persisted["config_revision"], 7)
             self.assertEqual(persisted["protocol_version"], 2)
             self.assertEqual(persisted["samples"]["commit"], DEFAULT_SAMPLE_COMMIT)
+            self.assertEqual(persisted["samples"]["branch"], DEFAULT_SAMPLE_BRANCH)
             self.assertEqual(persisted["samples"]["vsco_root"], "~/VSCO-2-CE")
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
             self.assertEqual(persisted["server"]["gesture_voice_limit"], 64)
@@ -289,6 +473,7 @@ class SampleRepositoryTests(unittest.TestCase):
         data["config_revision"] = 1
         data["samples"].pop("repository")
         data["samples"].pop("commit")
+        data["samples"].pop("branch")
         data["server"].pop("max_buffers")
         data["server"].pop("gesture_voice_limit")
         data["samples"]["vsco_root"] = "/media/samples/VSCO-2-CE"
@@ -321,6 +506,7 @@ class SampleRepositoryTests(unittest.TestCase):
         data["config_revision"] = 2
         data["protocol_version"] = 1
         data["samples"].pop("commit")
+        data["samples"].pop("branch")
         data["server"].pop("max_buffers")
         data["server"].pop("gesture_voice_limit")
         with tempfile.TemporaryDirectory() as temporary:
@@ -343,9 +529,10 @@ class SampleRepositoryTests(unittest.TestCase):
             )
 
             persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 6)
+            self.assertEqual(persisted["config_revision"], 7)
             self.assertEqual(persisted["protocol_version"], 2)
             self.assertEqual(persisted["samples"]["commit"], DEFAULT_SAMPLE_COMMIT)
+            self.assertEqual(persisted["samples"]["branch"], DEFAULT_SAMPLE_BRANCH)
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
             self.assertEqual(persisted["server"]["gesture_voice_limit"], 64)
             self.assertEqual(config.server.max_buffers, 8192)
@@ -359,6 +546,7 @@ class SampleRepositoryTests(unittest.TestCase):
         )
         existing_data = json.loads(json.dumps(shipped_data))
         existing_data["config_revision"] = 4
+        existing_data["samples"].pop("branch")
         existing_data["server"].pop("gesture_voice_limit")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -375,7 +563,7 @@ class SampleRepositoryTests(unittest.TestCase):
             )
 
             persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 6)
+            self.assertEqual(persisted["config_revision"], 7)
             self.assertEqual(persisted["server"]["gesture_voice_limit"], 64)
             self.assertEqual(config.server.gesture_voice_limit, 64)
 
@@ -387,6 +575,7 @@ class SampleRepositoryTests(unittest.TestCase):
         )
         existing_data = json.loads(json.dumps(shipped_data))
         existing_data["config_revision"] = 5
+        existing_data["samples"].pop("branch")
         existing_data["server"]["gesture_voice_limit"] = 24
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -403,7 +592,7 @@ class SampleRepositoryTests(unittest.TestCase):
             )
 
             persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 6)
+            self.assertEqual(persisted["config_revision"], 7)
             self.assertEqual(persisted["server"]["gesture_voice_limit"], 64)
             self.assertEqual(config.server.gesture_voice_limit, 64)
 
@@ -415,6 +604,7 @@ class SampleRepositoryTests(unittest.TestCase):
         )
         existing_data = json.loads(json.dumps(shipped_data))
         existing_data["config_revision"] = 5
+        existing_data["samples"].pop("branch")
         existing_data["server"]["gesture_voice_limit"] = 48
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -431,9 +621,42 @@ class SampleRepositoryTests(unittest.TestCase):
             )
 
             persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
-            self.assertEqual(persisted["config_revision"], 6)
+            self.assertEqual(persisted["config_revision"], 7)
             self.assertEqual(persisted["server"]["gesture_voice_limit"], 48)
             self.assertEqual(config.server.gesture_voice_limit, 48)
+
+    def test_revision_six_source_pin_moves_to_shallow_runtime_branch(self) -> None:
+        shipped_data = json.loads(
+            (FRONTEND / "config" / "supercollider.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        existing_data = json.loads(json.dumps(shipped_data))
+        existing_data["config_revision"] = 6
+        existing_data["samples"].pop("branch")
+        existing_data["samples"]["commit"] = (
+            "440300901dfe9275fd84e0b7763af1f8443ae62e"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            shipped = root / "shipped.json"
+            shipped.write_text(json.dumps(shipped_data), encoding="utf-8")
+            target = root / "user" / "config" / "supercollider.json"
+            target.parent.mkdir(parents=True)
+            target.write_text(json.dumps(existing_data), encoding="utf-8")
+
+            migrated_path, config = prepare_user_runtime_config(
+                shipped,
+                user_root=root / "user",
+                install_samples=False,
+            )
+
+            persisted = json.loads(migrated_path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["config_revision"], 7)
+            self.assertEqual(persisted["samples"]["branch"], DEFAULT_SAMPLE_BRANCH)
+            self.assertEqual(persisted["samples"]["commit"], DEFAULT_SAMPLE_COMMIT)
+            self.assertEqual(config.samples.branch, DEFAULT_SAMPLE_BRANCH)
+            self.assertEqual(config.samples.commit, DEFAULT_SAMPLE_COMMIT)
 
 
 if __name__ == "__main__":

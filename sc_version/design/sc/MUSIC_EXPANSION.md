@@ -59,13 +59,15 @@ group, fade time and duration cap are data, not frontend conditionals. Event
 duration caps are optional: zero means the sample profile owns its full
 duration, otherwise the shorter of profile duration and event cap is used.
 
-The external VSCO sample source is acquired from commit
-`440300901dfe9275fd84e0b7763af1f8443ae62e` of the configured repository. A
-new installation checks out that commit. Runtime admission does not require
-Git metadata: an existing checkout or ordinary copy is accepted only when all
-3,168 required audio files match the checked-in content manifest. This makes
-every PCM alias and byte measurement reproducible across source runs and
-packages without rejecting a byte-identical copied sample tree.
+The external VSCO sample source is acquired from the shallow runtime branch at
+commit `78b95e70efe4349eeb03855f7f7654cb81c8c62f` of the configured repository.
+Its 2,166 audio files are the exact union of playable SFZ-region references
+and direct PCM-drum references. Runtime admission does not require Git
+metadata: an existing checkout or ordinary copy is accepted only when every
+required file matches the checked-in manifests. The installation receipt
+records the full selected path/hash list. This makes every PCM alias and byte
+measurement reproducible across source runs and packages without downloading
+unreachable source recordings or rejecting a byte-identical copied tree.
 
 ## Rhythm and fill behavior
 
@@ -114,7 +116,7 @@ remain user-owned and are not overwritten. The factory-bank revision controls
 only the shipped defaults.
 
 Older SuperCollider runtime configurations are migrated additively to current
-configuration revision 6 and protocol revision 2. Older bass-riff documents
+configuration revision 7 and protocol revision 2. Older bass-riff documents
 without expansion articulation still load with neutral links. The legacy PCM
 kit and prior native kit identities remain available.
 

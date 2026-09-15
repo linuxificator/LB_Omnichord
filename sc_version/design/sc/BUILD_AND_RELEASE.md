@@ -57,13 +57,20 @@ loopback. Linux uses the normal host JACK/PipeWire audio-session boundary; no
 package starts a competing raw JACK server.
 
 VSCO 2 CE recordings are separate CC0 assets and are not embedded. First
-launch uses the bundled Dulwich implementation to clone the verified
-`linuxificator/VSCO-2-CE` repository to `~/VSCO-2-CE`. The selected location is
-stored in `~/.omnichord/config/supercollider.json`. An existing checkout or
-ordinary copy is accepted when all required audio files match the bundled
-content manifest. A cached path, manifest and file-inventory identity avoids
-rehashing unchanged recordings on every launch. No system Git executable is
-required.
+launch uses the bundled Dulwich implementation to shallow-clone the pinned
+`lb-omnichord-runtime-v1` branch of `linuxificator/VSCO-2-CE` to the location
+selected in `~/.omnichord/config/supercollider.json` (default
+`~/VSCO-2-CE`). This branch contains only source audio reachable from a
+playable SFZ region or the direct PCM-drum catalogue, plus the source licence
+and readmes. An existing checkout or ordinary copy is accepted when all those
+required audio files match the bundled manifests.
+
+Successful validation atomically writes `lb-omnichord-samples.json` inside
+the sample directory. It records the exact repository branch and commit,
+selection-manifest digest and complete relative-path/SHA-256 list. Every
+startup checks this receipt and a stat-based inventory; unchanged recordings
+do not need to be rehashed, while a missing or changed receipt forces full
+content validation and receipt repair. No system Git executable is required.
 
 The Raspberry Pi package does not install scheduler policy, isolate CPUs or
 change machine configuration.

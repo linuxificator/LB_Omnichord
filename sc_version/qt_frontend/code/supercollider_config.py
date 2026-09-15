@@ -5,10 +5,11 @@ from dataclasses import dataclass
 import ipaddress
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 6
+CURRENT_CONFIG_REVISION = 7
 
 
 class SuperColliderConfigError(ValueError):
@@ -38,6 +39,7 @@ class SuperColliderServerConfig:
 class SuperColliderSampleConfig:
     vsco_root: Path
     repository: str
+    branch: str
     commit: str
     ram_budget_mib: int
 
@@ -173,6 +175,18 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
     repository = samples.get("repository")
     if not isinstance(repository, str) or not repository.strip():
         raise SuperColliderConfigError("$.samples.repository: expected URL string")
+    branch = samples.get("branch")
+    if (
+        not isinstance(branch, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]{0,127}", branch) is None
+        or ".." in branch
+        or "//" in branch
+        or "@{" in branch
+        or branch.endswith(("/", ".", ".lock"))
+    ):
+        raise SuperColliderConfigError(
+            "$.samples.branch: expected a safe explicit Git branch name"
+        )
     commit = samples.get("commit")
     if (
         not isinstance(commit, str)
@@ -209,6 +223,7 @@ def load_supercollider_config(path: Path) -> SuperColliderRuntimeConfig:
         samples=SuperColliderSampleConfig(
             vsco_root=Path(vsco_root).expanduser(),
             repository=repository,
+            branch=branch,
             commit=commit,
             ram_budget_mib=ram_budget,
         ),
@@ -233,6 +248,7 @@ def _cli() -> int:
             "server.realtime_memory_kib",
             "samples.vsco_root",
             "samples.repository",
+            "samples.branch",
             "samples.commit",
             "samples.ram_budget_mib",
         ),

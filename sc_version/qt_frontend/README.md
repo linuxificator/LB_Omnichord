@@ -15,9 +15,10 @@ audio graph.
 `config/frontend.json` owns input and frontend policy.
 `config/supercollider.json` owns the SC runtime and sample configuration. The
 first launch creates private editable copies under `~/.omnichord/config` and
-installs the pinned VSCO 2 CE sample tree when required. An ordinary copied
-sample directory is valid when every manifest file matches; Git metadata is not
-required at runtime.
+installs the pinned, shallow VSCO 2 CE runtime subset at the configured location
+when required. An ordinary copied sample directory is valid when every
+reachable manifest file matches; Git metadata is not required at runtime. Its
+installation receipt lists every admitted relative path and hash.
 
 ## Run and test
 

@@ -78,9 +78,10 @@ def verify_config_migrations(root: Path) -> None:
             or fresh.server.max_buffers != expected_buffers
         ):
             raise RuntimeError("packaged fresh-user config seeding failed")
-    for revision in (1, 2, 3, 4):
+    for revision in range(1, shipped["config_revision"]):
         legacy = json.loads(json.dumps(shipped))
         legacy["config_revision"] = revision
+        legacy["samples"].pop("branch")
         if revision < 3:
             legacy["protocol_version"] = 1
         if revision < 4:
@@ -105,8 +106,10 @@ def verify_config_migrations(root: Path) -> None:
                 persisted["config_revision"] != shipped["config_revision"]
                 or persisted["protocol_version"] != shipped["protocol_version"]
                 or persisted["samples"]["commit"] != shipped["samples"]["commit"]
+                or persisted["samples"]["branch"] != shipped["samples"]["branch"]
                 or persisted["server"]["max_buffers"] != expected_buffers
                 or migrated.samples.commit != shipped["samples"]["commit"]
+                or migrated.samples.branch != shipped["samples"]["branch"]
                 or migrated.protocol_version != shipped["protocol_version"]
                 or migrated.server.max_buffers != expected_buffers
             ):

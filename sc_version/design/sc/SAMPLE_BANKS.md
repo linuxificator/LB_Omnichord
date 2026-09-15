@@ -28,10 +28,14 @@ the installed asset set rather than committing tens of thousands of file
 records to the application repository. Release evidence hashes the bounded
 source catalogue and the normalized runtime manifest.
 
-The current playable bank is VSCO 2 CE. Its normalized manifest covers all 75
-source SFZ mappings, all 3,168 audio files and all 3,163 mapped regions. The
-remaining 1,134 source recordings are visible as `unmapped-source-audio`; that
-is evidence of incomplete curation, not permission to silently omit them. The
+The current playable bank is VSCO 2 CE. Its normalized source manifest covers
+all 75 source SFZ mappings, all 3,168 audio files and all 3,163 mapped regions.
+Runtime reachability is narrower and explicit: 2,034 unique files are used by
+those regions and another 132 are used directly by the PCM-drum catalogue.
+The pinned runtime branch therefore contains 2,166 WAV files and omits the
+remaining 1,002 recordings, which have no executable reference. This is a
+derived packaging selection, not a claim that the omitted source recordings
+were deleted from or unsupported by the full source inventory. The
 checked-in [`vsco-opcode-coverage.json`](../../supercollider/vsco-opcode-coverage.json)
 accounts for every preprocessed opcode in all 75 mappings and currently has no
 unsupported entry. The audit records exact occurrence counts and a bounded set
@@ -40,6 +44,14 @@ of every region. The
 other selected banks and Iowa inventory remain migration backlog and must not
 be represented as installed or playable until their own generated asset locks,
 normalized manifests and audio acceptance evidence exist.
+
+The runtime branch is `lb-omnichord-runtime-v1` at commit
+`78b95e70efe4349eeb03855f7f7654cb81c8c62f`, derived from source commit
+`440300901dfe9275fd84e0b7763af1f8443ae62e`. Installations are shallow clones;
+the source history and unreachable recordings are not transferred. An atomic
+`lb-omnichord-samples.json` receipt beside the samples lists all 2,166 selected
+paths and hashes. Startup validates that receipt and the file inventory before
+the engine can load a buffer.
 
 The checked-in
 [`salamander-opcode-coverage.json`](../../supercollider/salamander-opcode-coverage.json)

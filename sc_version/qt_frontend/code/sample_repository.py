@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 import hashlib
 import json
 from pathlib import Path
+from pathlib import PurePosixPath
 import shutil
 import sys
 import tempfile
@@ -22,9 +24,12 @@ from supercollider_config import (
 
 
 DEFAULT_REPOSITORY = "https://github.com/linuxificator/VSCO-2-CE.git"
-DEFAULT_SAMPLE_COMMIT = "440300901dfe9275fd84e0b7763af1f8443ae62e"
+DEFAULT_SAMPLE_BRANCH = "lb-omnichord-runtime-v1"
+DEFAULT_SAMPLE_COMMIT = "78b95e70efe4349eeb03855f7f7654cb81c8c62f"
+LEGACY_SAMPLE_COMMIT = "440300901dfe9275fd84e0b7763af1f8443ae62e"
 DEFAULT_SAMPLE_ROOT = "~/VSCO-2-CE"
 LEGACY_SAMPLE_ROOT = "~/sample_lib/VSCO-2-CE-1.1.0"
+SAMPLE_RECEIPT_NAME = "lb-omnichord-samples.json"
 
 
 class SampleRepositoryError(RuntimeError):
@@ -45,8 +50,107 @@ def _sample_manifest_for_config(shipped_config: Path) -> Path:
     )
 
 
+def _drum_catalogue_for_config(shipped_config: Path) -> Path:
+    source = shipped_config.expanduser().resolve()
+    candidate = source.parents[1] / "music" / "sc_expansion" / "sc_pcm_drumkits_v1.json"
+    if candidate.is_file():
+        return candidate
+    raise SampleRepositoryError(
+        f"could not locate the PCM drum catalogue beside {source}"
+    )
+
+
+def _runtime_sample_records(
+    manifest: object,
+    direct_sample_ids: set[str] | None = None,
+) -> list[dict[str, object]]:
+    """Select the source files reachable from the shipped playable regions."""
+
+    if not isinstance(manifest, dict):
+        raise SampleRepositoryError("VSCO content manifest must contain an object")
+    raw_files = manifest.get("files")
+    raw_regions = manifest.get("regions")
+    if not isinstance(raw_files, list) or not isinstance(raw_regions, list):
+        raise SampleRepositoryError(
+            "VSCO content manifest must contain files and regions arrays"
+        )
+
+    files_by_id: dict[str, dict[str, object]] = {}
+    ordered_files: list[dict[str, object]] = []
+    for raw_record in raw_files:
+        if not isinstance(raw_record, dict):
+            raise SampleRepositoryError("VSCO manifest contains an invalid file record")
+        sample_id = raw_record.get("id")
+        relative = raw_record.get("relative_path")
+        expected_hash = raw_record.get("sha256")
+        if (
+            not isinstance(sample_id, str)
+            or not sample_id
+            or not isinstance(relative, str)
+            or not isinstance(expected_hash, str)
+        ):
+            raise SampleRepositoryError("VSCO manifest file identity is incomplete")
+        relative_path = PurePosixPath(relative)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise SampleRepositoryError(
+                f"VSCO manifest contains an unsafe sample path: {relative!r}"
+            )
+        if sample_id in files_by_id:
+            raise SampleRepositoryError(
+                f"VSCO manifest contains duplicate sample id {sample_id!r}"
+            )
+        files_by_id[sample_id] = raw_record
+        ordered_files.append(raw_record)
+
+    used_ids: set[str] = set(direct_sample_ids or ())
+    unknown_direct = used_ids.difference(files_by_id)
+    if unknown_direct:
+        raise SampleRepositoryError(
+            "PCM catalogue refers to unknown VSCO sample id "
+            f"{min(unknown_direct)!r}"
+        )
+    for raw_region in raw_regions:
+        if not isinstance(raw_region, dict):
+            raise SampleRepositoryError("VSCO manifest contains an invalid region record")
+        sample_id = raw_region.get("sample_id")
+        if not isinstance(sample_id, str) or not sample_id:
+            raise SampleRepositoryError("VSCO manifest region has no sample identity")
+        if sample_id not in files_by_id:
+            raise SampleRepositoryError(
+                f"VSCO manifest region refers to unknown sample id {sample_id!r}"
+            )
+        used_ids.add(sample_id)
+    if not used_ids:
+        raise SampleRepositoryError("VSCO content manifest has no playable samples")
+    return [record for record in ordered_files if record["id"] in used_ids]
+
+
+def _direct_drum_sample_ids(path: Path | None) -> tuple[set[str], bytes]:
+    if path is None:
+        return set(), b""
+    try:
+        encoded = path.read_bytes()
+        catalogue = json.loads(encoded)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SampleRepositoryError(
+            f"could not read PCM drum catalogue {path}: {exc}"
+        ) from exc
+    records = catalogue.get("sample_files") if isinstance(catalogue, dict) else None
+    if not isinstance(records, list):
+        raise SampleRepositoryError("PCM drum catalogue has no sample_files array")
+    sample_ids: set[str] = set()
+    for record in records:
+        sample_id = record.get("source_sample_id") if isinstance(record, dict) else None
+        if not isinstance(sample_id, str) or not sample_id:
+            raise SampleRepositoryError(
+                "PCM drum catalogue contains an incomplete source sample identity"
+            )
+        sample_ids.add(sample_id)
+    return sample_ids, encoded
+
+
 def _sample_inventory(
-    root: Path, records: list[object]
+    root: Path, records: Sequence[object]
 ) -> tuple[str, list[tuple[Path, str]]]:
     inventory = hashlib.sha256()
     files: list[tuple[Path, str]] = []
@@ -80,13 +184,44 @@ def _sample_inventory(
     return inventory.hexdigest(), files
 
 
+def _sample_receipt(
+    records: list[dict[str, object]],
+    *,
+    manifest_hash: str,
+    repository_url: str | None,
+    branch: str | None,
+    commit: str | None,
+) -> dict[str, object]:
+    return {
+        "schema_revision": 1,
+        "bank_id": "vsco-2-ce",
+        "selection": "files referenced by playable regions or the PCM drum catalogue",
+        "repository": repository_url,
+        "branch": branch,
+        "commit": commit,
+        "content_manifest_sha256": manifest_hash,
+        "file_count": len(records),
+        "files": [
+            {
+                "relative_path": record["relative_path"],
+                "sha256": record["sha256"],
+            }
+            for record in records
+        ],
+    }
+
+
 def validate_sample_tree(
     path: Path,
     manifest_path: Path,
     *,
     cache_path: Path | None = None,
+    repository_url: str | None = None,
+    branch: str | None = None,
+    commit: str | None = None,
+    direct_reference_catalogue: Path | None = None,
 ) -> Path:
-    """Validate either a clone or an ordinary copy by its audio contents."""
+    """Validate the playable subset and maintain its installation receipt."""
 
     resolved = path.expanduser().resolve()
     try:
@@ -96,21 +231,34 @@ def validate_sample_tree(
         raise SampleRepositoryError(
             f"could not read VSCO content manifest {manifest_path}: {exc}"
         ) from exc
-    if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
-        raise SampleRepositoryError("VSCO content manifest has no files array")
-
-    manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
-    inventory_hash, files = _sample_inventory(resolved, manifest["files"])
+    direct_sample_ids, catalogue_bytes = _direct_drum_sample_ids(
+        direct_reference_catalogue
+    )
+    records = _runtime_sample_records(manifest, direct_sample_ids)
+    manifest_hash = hashlib.sha256(
+        manifest_bytes + b"\0" + catalogue_bytes
+    ).hexdigest()
+    inventory_hash, files = _sample_inventory(resolved, records)
+    receipt_path = resolved / SAMPLE_RECEIPT_NAME
+    expected_receipt = _sample_receipt(
+        records,
+        manifest_hash=manifest_hash,
+        repository_url=repository_url,
+        branch=branch,
+        commit=commit,
+    )
     expected_cache = {
         "schema_revision": 1,
-        "sample_root": str(resolved),
         "manifest_sha256": manifest_hash,
         "inventory_sha256": inventory_hash,
         "file_count": len(files),
     }
     if cache_path is not None:
         try:
-            if JsonStore(cache_path).read() == expected_cache:
+            if (
+                JsonStore(cache_path).read() == expected_cache
+                and JsonStore(receipt_path).read() == expected_receipt
+            ):
                 return resolved
         except (FileNotFoundError, OSError):
             pass
@@ -127,6 +275,7 @@ def validate_sample_tree(
             )
     if cache_path is not None:
         JsonStore(cache_path).write(expected_cache)
+    JsonStore(receipt_path, mode=0o644).write(expected_receipt)
     return resolved
 
 
@@ -194,9 +343,11 @@ def validate_sample_repository(
 def ensure_sample_repository(
     path: Path,
     repository_url: str,
+    branch: str = DEFAULT_SAMPLE_BRANCH,
     expected_commit: str = DEFAULT_SAMPLE_COMMIT,
     *,
     content_manifest: Path | None = None,
+    direct_reference_catalogue: Path | None = None,
     validation_cache: Path | None = None,
 ) -> Path:
     destination = path.expanduser().resolve()
@@ -206,6 +357,10 @@ def ensure_sample_repository(
                 destination,
                 content_manifest,
                 cache_path=validation_cache,
+                repository_url=repository_url,
+                branch=branch,
+                commit=expected_commit,
+                direct_reference_catalogue=direct_reference_catalogue,
             )
         return validate_sample_repository(
             destination, repository_url, expected_commit
@@ -217,17 +372,30 @@ def ensure_sample_repository(
     )
     checkout = temporary_root / "repository"
     print(
-        f"Installing VSCO 2 CE samples in {destination}; this is a large "
-        "one-time download.",
+        f"Installing the LB Omnichord VSCO 2 CE sample subset in {destination}; "
+        "this is a one-time download.",
         file=sys.stderr,
         flush=True,
     )
     try:
-        porcelain.clone(repository_url, str(checkout), checkout=True)
-        porcelain.reset(checkout, "hard", expected_commit)
+        porcelain.clone(
+            repository_url,
+            str(checkout),
+            checkout=True,
+            depth=1,
+            branch=branch,
+        )
         validate_sample_repository(checkout, repository_url, expected_commit)
         if content_manifest is not None:
-            validate_sample_tree(checkout, content_manifest)
+            validate_sample_tree(
+                checkout,
+                content_manifest,
+                cache_path=validation_cache,
+                repository_url=repository_url,
+                branch=branch,
+                commit=expected_commit,
+                direct_reference_catalogue=direct_reference_catalogue,
+            )
         checkout.replace(destination)
     except BaseException as exc:
         raise SampleRepositoryError(
@@ -243,6 +411,7 @@ def _migrate_config(
     *,
     default_max_buffers: int,
     default_gesture_voice_limit: int,
+    default_sample_branch: str,
     default_sample_commit: str,
 ) -> tuple[dict[str, object], bool]:
     if not isinstance(data, dict):
@@ -291,6 +460,11 @@ def _migrate_config(
     if "commit" not in samples:
         samples["commit"] = default_sample_commit
         changed = True
+    if "branch" not in samples:
+        samples["branch"] = default_sample_branch
+        changed = True
+        if samples.get("commit") == LEGACY_SAMPLE_COMMIT:
+            samples["commit"] = default_sample_commit
 
     if revision < CURRENT_CONFIG_REVISION:
         migrated["protocol_version"] = 2
@@ -320,6 +494,7 @@ def prepare_user_runtime_config(
         store.read(),
         default_max_buffers=shipped.server.max_buffers,
         default_gesture_voice_limit=shipped.server.gesture_voice_limit,
+        default_sample_branch=shipped.samples.branch,
         default_sample_commit=shipped.samples.commit,
     )
     if changed:
@@ -329,8 +504,10 @@ def prepare_user_runtime_config(
         ensure_sample_repository(
             config.samples.vsco_root,
             config.samples.repository,
+            config.samples.branch,
             config.samples.commit,
             content_manifest=_sample_manifest_for_config(shipped_config),
+            direct_reference_catalogue=_drum_catalogue_for_config(shipped_config),
             validation_cache=root / "cache" / "vsco-validation.json",
         )
     return target, config
