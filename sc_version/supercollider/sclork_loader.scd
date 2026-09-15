@@ -83,12 +83,12 @@ PathName(adapterRoot).files
     preparedArgs.pairsDo { |key, rawValue|
         var candidates = mappings[key.asString] ? [key.asSymbol];
         var target = ~omniFirstSynthControl.value(name, candidates);
-        var value = rawValue;
-        if(["attack_ms", "decay_ms", "release_ms", "portamento_ms"]
-            .includesEqual(key.asString)) {
-            value = rawValue / 1000;
-        };
         if(target.notNil) {
+            var value = rawValue.asFloat;
+            if(["attack_ms", "decay_ms", "release_ms", "portamento_ms"]
+                .includesEqual(key.asString)) {
+                value = value / 1000;
+            };
             args.add(target); args.add(value);
         };
     };

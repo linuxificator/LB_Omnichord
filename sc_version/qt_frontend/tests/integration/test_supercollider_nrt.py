@@ -61,6 +61,8 @@ class SuperColliderNonRealtimeTests(unittest.TestCase):
             )
         self.assertEqual(sample_rate, SAMPLE_RATE)
         self.assertEqual(frames.shape[1], 2)
+        self.assertTrue(numpy.isfinite(frames).all())
+        self.assertLessEqual(float(numpy.max(numpy.abs(frames))), 0.951)
         self.assertGreater(
             math.sqrt(float(numpy.mean(numpy.square(frames)))),
             0.01,

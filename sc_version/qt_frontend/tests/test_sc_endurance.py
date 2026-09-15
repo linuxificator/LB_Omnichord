@@ -14,6 +14,7 @@ ENDURANCE = ROOT / "tests" / "endurance"
 sys.path.insert(0, str(ENDURANCE))
 
 from sc_endurance import (  # noqa: E402
+    FATAL_LOG_TEXT,
     action_cycle,
     analyze_wave,
     pcm_chord_switch_cycle,
@@ -29,6 +30,15 @@ class _Synth:
 
 
 class SuperColliderEnduranceTests(unittest.TestCase):
+    def test_server_node_creation_exceptions_are_fatal(self) -> None:
+        self.assertIn("exception in /s_new", FATAL_LOG_TEXT)
+
+    def test_audio_monitor_targets_supernova_pipewire_outputs(self) -> None:
+        source = (ENDURANCE / "sc_endurance.py").read_text(encoding="utf-8")
+        self.assertIn('"supernova:output_1"', source)
+        self.assertIn('"supernova:output_2"', source)
+        self.assertNotIn('"SuperCollider:out_1"', source)
+
     def test_startup_bass_riff_scenario_needs_no_transport_restart(self) -> None:
         actions = list(startup_bass_riff_cycle())
         names = [action.name for action in actions]

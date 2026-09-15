@@ -59,6 +59,7 @@ FATAL_LOG_TEXT = (
     "Exception:",
     "SynthDef not found",
     "buffer overflow",
+    "exception in /s_new",
 )
 
 
@@ -385,8 +386,8 @@ class AudioMonitor(threading.Thread):
 
             wait_for(recorder_ready, 5, "PipeWire recorder ports")
             for source, target in (
-                ("SuperCollider:out_1", "pw-record:input_FL"),
-                ("SuperCollider:out_2", "pw-record:input_FR"),
+                ("supernova:output_1", "pw-record:input_FL"),
+                ("supernova:output_2", "pw-record:input_FR"),
             ):
                 linked = subprocess.run(
                     ["pw-link", source, target], text=True, capture_output=True

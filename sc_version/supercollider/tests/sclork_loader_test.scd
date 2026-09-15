@@ -61,6 +61,16 @@ if(~omniSclorkArgs.value(\everythingRhodes, 0, 440, []).includesEqual(\amp)) {
         "SCLORK_LOADER_FILTER_RQ_FAILED".postln;
     };
 }.value;
+{
+    var controls = ~omniSclorkArgs.value(
+        \sosHats, 0, 440, ["bodyRel", "0.06"]
+    );
+    var bodyRel = controls[controls.indexOf(\bodyRel) + 1];
+    if((bodyRel.class != Float) or: { (bodyRel - 0.06).abs > 0.000001 }) {
+        failed = true;
+        "SCLORK_LOADER_NUMERIC_CONTROL_COERCION_FAILED".postln;
+    };
+}.value;
 if((~omniSclorkPlaybackGain.value("sc.sclork.everythingRhodes") - 0.003854).abs
     > 0.000001) {
     failed = true;

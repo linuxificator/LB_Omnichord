@@ -47,6 +47,14 @@ clock, quantization, event ordering, note lifetime and exact release handles.
 The bus layout, two room effects, master limiter, protocol and UI remain
 unchanged.
 
+Supernova correctly interprets string-valued Synth controls as audio/control
+bus mappings and is stricter than the former server when such a value is not a
+valid mapping. The SCLOrk adapter therefore normalizes every admitted scalar
+control to a float before creating a node. Native third-party voices also cross
+a `Sanitize` boundary before reaching shared buses. This prevents one unstable
+or non-finite source from poisoning a room effect and every other instrument;
+it does not alter finite source audio.
+
 Parallel execution provides headroom when several independent synths and
 effects run together. It does not prove that every possible load is free from
 audio underruns, nor does it hide an invalid graph or excessive single-node
@@ -62,8 +70,14 @@ Executable contracts verify that:
 - the supervisor selects its exact bundled executable;
 - source, mix and effect stages are parallel groups;
 - the master and dependent per-voice chains remain serial;
+- SCLOrk controls crossing the server boundary are numeric and non-finite
+  third-party output is contained before shared effects;
 - an incomplete runtime is rejected before application launch.
 
 The SC compiler and audio suites remain authoritative for graph syntax and
 signal behavior. Platform workflow tests validate the executable in each
 pinned SuperCollider 3.14.1 runtime.
+
+The separate-process live endurance driver selects Supernova explicitly and
+records its native PipeWire outputs. Server node-creation exceptions are fatal
+test results rather than ignored console text.

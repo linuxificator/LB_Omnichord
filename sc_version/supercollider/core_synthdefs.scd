@@ -47,7 +47,10 @@ SynthDef(\omniDrum, { |out=0, note=36, velocity=0.7, gain=1|
 SynthDef(\omniVoiceOutput, {
     |in=0, out=0, velocity=0.7, outputGain=1, calibration=1,
      pan=0, gate=1, gateControl=1, release=0.22|
-    var input = In.ar(in, 2);
+    // Third-party definitions are untrusted DSP boundaries. Different server
+    // worker scheduling and random streams must not let one non-finite voice
+    // poison the shared buses for every other instrument.
+    var input = Sanitize.ar(In.ar(in, 2));
     var envelope = EnvGen.kr(
         Env.asr(0.003, 1, release.max(0.005)),
         gate * gateControl,

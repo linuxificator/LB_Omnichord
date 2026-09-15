@@ -53,6 +53,12 @@ Updated: 2026-09-15
   passed all four platform test jobs. The active performance branch selects
   Supernova for production audio and gives independent graph stages explicit
   parallel groups without changing the musical-time or voice-owner contracts.
+- The current Supernova implementation passed the complete local matrix and a
+  97.6-second separate-process broad live endurance cycle. That qualification
+  exposed and fixed two server-compatibility boundaries: scalar SCLOrk controls
+  are now always numeric, and non-finite third-party voice output is sanitized
+  before it can poison shared buses and room effects. The live recorder follows
+  Supernova's actual PipeWire ports and treats `/s_new` exceptions as fatal.
 
 Resume through `sc_version/design/README.md`, then
 `sc_version/design/sc/STATUS.md`. The original detailed requirements remain in

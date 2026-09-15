@@ -315,6 +315,10 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("~omniOutputGroup = Group.after(~omniFxGroup)", bootstrap)
         self.assertIn("var voiceGroup = Group.tail(~omniSourceGroup)", bootstrap)
 
+    def test_native_voice_adapter_contains_non_finite_source_output(self) -> None:
+        core = (SC_ROOT / "core_synthdefs.scd").read_text(encoding="utf-8")
+        self.assertIn("var input = Sanitize.ar(In.ar(in, 2))", core)
+
     def test_pcm_drum_chokes_use_stable_control_buses(self) -> None:
         samples = (SC_ROOT / "sample_loader.scd").read_text(encoding="utf-8")
         self.assertIn("var gateBus = Bus.control(s, 1)", samples)
