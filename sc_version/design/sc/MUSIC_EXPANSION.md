@@ -141,5 +141,5 @@ ran simultaneous rhythm, bass and arpeggio playback. A subsequent four-cycle
 pass exercised 3,306 actions and the complete SYN/PCM catalogue. Its twelve
 independently captured PipeWire windows remained non-silent, reported no
 clipped samples and had no gap longer than 0.60 seconds. The owned `sclang`,
-`scsynth` and frontend processes shut down cleanly with no server failure or
+Supernova and frontend processes shut down cleanly with no server failure or
 buffer exhaustion.

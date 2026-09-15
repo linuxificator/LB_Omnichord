@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive the real SC edition indefinitely through its public Qt surface.
 
-The driver, frontend, sclang/scsynth and PipeWire recorder are separate
+The driver, frontend, sclang/Supernova and PipeWire recorder are separate
 processes. No synthetic-input endpoint is added to production code. With
 ``--gui`` the frontend also loads and continuously captures the production QML
 scene through Qt's offscreen platform. Use Ctrl-C for a clean stop; a zero

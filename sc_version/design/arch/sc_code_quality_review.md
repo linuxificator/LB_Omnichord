@@ -52,7 +52,7 @@ longer carries the old product as a hidden alternative.
 ## Architecture verification
 
 - Qt/Python owns interaction and immutable plan construction; `sclang` owns
-  musical timing and voice lifetime; `scsynth` owns audio resources.
+  musical timing and voice lifetime; Supernova owns audio resources.
 - Production communicates through the typed versioned OSC protocol. UI code
   does not own engine node IDs or a musical clock.
 - `code/main.py` is the only composition root and injects one client.
