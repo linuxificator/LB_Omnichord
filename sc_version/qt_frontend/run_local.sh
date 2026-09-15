@@ -54,6 +54,11 @@ if ! command -v scsynth >/dev/null 2>&1; then
     echo "SuperCollider audio server (scsynth) is not installed." >&2
     exit 1
 fi
+if ! command -v supernova >/dev/null 2>&1; then
+    echo "SuperCollider multicore audio server (supernova) is not installed." >&2
+    exit 1
+fi
+supernova_path="$(command -v supernova)"
 
 # Ubuntu's SuperCollider server links to JACK.  On a PipeWire desktop it must
 # use PipeWire's JACK compatibility shim.  Without it libjack may launch a raw
@@ -76,6 +81,7 @@ export OMNICHORD_SC_MAX_BUFFERS
 export OMNICHORD_SC_MEM_KIB
 export OMNICHORD_SC_VSCO_ROOT
 export OMNICHORD_SC_SAMPLE_RAM_MIB
+export OMNICHORD_SC_SYNTH_PROGRAM
 OMNICHORD_SC_PORT="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" language.port)"
 OMNICHORD_SC_SAMPLE_RATE="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.sample_rate)"
 OMNICHORD_SC_BLOCK_SIZE="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.block_size)"
@@ -84,9 +90,10 @@ OMNICHORD_SC_MAX_BUFFERS="$("$venv_python" "$frontend_dir/code/supercollider_con
 OMNICHORD_SC_MEM_KIB="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.realtime_memory_kib)"
 OMNICHORD_SC_VSCO_ROOT="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" samples.vsco_root)"
 OMNICHORD_SC_SAMPLE_RAM_MIB="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" samples.ram_budget_mib)"
+OMNICHORD_SC_SYNTH_PROGRAM="exec $(printf '%q' "$supernova_path")"
 
 # A dedicated process group gives this source supervisor exact ownership of
-# both sclang and the scsynth child it boots. It never kills another user's
+# both sclang and the supernova child it boots. It never kills another user's
 # unrelated SuperCollider process by executable name.
 setsid "${sc_launcher[@]}" sclang -D "$sc_dir/bootstrap.scd" &
 sc_process_group=$!

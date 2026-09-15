@@ -10,7 +10,7 @@ $runtimeRoot = if ($env:OMNICHORD_SC_RUNTIME_ROOT) { $env:OMNICHORD_SC_RUNTIME_R
 $zip = Join-Path $dist "LB_Omnichord.SC.$stamp.Windows-x86_64.zip"
 
 if ($stamp -notmatch '^R[0-9]{14}$') { throw "Invalid OMNICHORD_RELEASE_STAMP: $stamp" }
-@("sclang.exe", "scsynth.exe", "SCClassLibrary", "plugins") | ForEach-Object {
+@("sclang.exe", "scsynth.exe", "supernova.exe", "SCClassLibrary", "plugins") | ForEach-Object {
     if (-not (Test-Path (Join-Path $runtimeRoot $_))) { throw "Missing SC runtime input: $_" }
 }
 

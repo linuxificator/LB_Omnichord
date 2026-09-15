@@ -330,9 +330,11 @@ s.waitForBoot({
 
     s.sync;
 
-    ~omniSourceGroup = Group.head(s);
-    ~omniMixGroup = Group.after(~omniSourceGroup);
-    ~omniFxGroup = Group.after(~omniMixGroup);
+    // Supernova evaluates children of each parallel group concurrently while
+    // preserving the dependency order between these four graph stages.
+    ~omniSourceGroup = ParGroup.head(s);
+    ~omniMixGroup = ParGroup.after(~omniSourceGroup);
+    ~omniFxGroup = ParGroup.after(~omniMixGroup);
     ~omniOutputGroup = Group.after(~omniFxGroup);
     ~omniBendBus = Bus.control(s, 1);
     ~omniBendBus.set(1.0);

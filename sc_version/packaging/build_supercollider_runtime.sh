@@ -27,7 +27,7 @@ cmake -S "$source_root" -B "$build_root/cmake" --fresh -G Ninja \
     -DNO_X11=ON \
     -DSC_HIDAPI=OFF \
     -DSC_ABLETON_LINK=OFF \
-    -DSUPERNOVA=OFF \
+    -DSUPERNOVA=ON \
     -DSCLANG_SERVER=OFF \
     -DINSTALL_HELP=OFF \
     -DENABLE_TESTSUITE=OFF \
@@ -38,4 +38,5 @@ cmake --install "$build_root/cmake"
 
 "$install_prefix/bin/sclang" -v | grep -F "$sc_version"
 "$install_prefix/bin/scsynth" -v | grep -F "$sc_version"
+"$install_prefix/bin/supernova" -v | grep -F "$sc_version"
 printf '%s\n' "$install_prefix"

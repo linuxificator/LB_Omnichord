@@ -22,6 +22,7 @@ class SuperColliderProcessError(RuntimeError):
 class SuperColliderExecutables:
     sclang: Path
     scsynth: Path
+    supernova: Path
     class_library: Path | None
     plugins: Path | None
 
@@ -38,6 +39,7 @@ def locate_supercollider_runtime(
             (
                 root / "bin" / "sclang",
                 root / "bin" / "scsynth",
+                root / "bin" / "supernova",
                 root / "share" / "SuperCollider" / "SCClassLibrary",
                 root / "lib" / "SuperCollider" / "plugins",
             ),
@@ -45,6 +47,7 @@ def locate_supercollider_runtime(
             (
                 root / "Contents" / "MacOS" / "sclang",
                 root / "Contents" / "Resources" / "scsynth",
+                root / "Contents" / "Resources" / "supernova",
                 root / "Contents" / "Resources" / "SCClassLibrary",
                 root / "Contents" / "Resources" / "plugins",
             ),
@@ -52,14 +55,18 @@ def locate_supercollider_runtime(
             (
                 root / "sclang.exe",
                 root / "scsynth.exe",
+                root / "supernova.exe",
                 root / "SCClassLibrary",
                 root / "plugins",
             ),
         )
-        for sclang, scsynth, class_library, plugins in layouts:
-            if all(path.exists() for path in (sclang, scsynth, class_library, plugins)):
+        for sclang, scsynth, supernova, class_library, plugins in layouts:
+            if all(
+                path.exists()
+                for path in (sclang, scsynth, supernova, class_library, plugins)
+            ):
                 return SuperColliderExecutables(
-                    sclang, scsynth, class_library, plugins
+                    sclang, scsynth, supernova, class_library, plugins
                 )
         raise SuperColliderProcessError(
             f"bundled SuperCollider runtime is incomplete or has an unsupported layout: {root}"
@@ -67,13 +74,15 @@ def locate_supercollider_runtime(
 
     sclang_name = shutil.which("sclang")
     scsynth_name = shutil.which("scsynth")
-    if not sclang_name or not scsynth_name:
+    supernova_name = shutil.which("supernova")
+    if not sclang_name or not scsynth_name or not supernova_name:
         raise SuperColliderProcessError(
-            "SuperCollider sclang and scsynth are required"
+            "SuperCollider sclang, scsynth and supernova are required"
         )
     return SuperColliderExecutables(
         Path(sclang_name).resolve(),
         Path(scsynth_name).resolve(),
+        Path(supernova_name).resolve(),
         None,
         None,
     )
@@ -121,7 +130,7 @@ def server_program_command(path: Path, *, platform: str | None = None) -> str:
 
 
 class SuperColliderSupervisor:
-    """Own exactly one headless sclang process group and its scsynth child."""
+    """Own exactly one headless sclang process group and its supernova child."""
 
     def __init__(
         self,
@@ -171,7 +180,7 @@ class SuperColliderSupervisor:
                 "OMNICHORD_SC_VSCO_ROOT": str(samples.vsco_root),
                 "OMNICHORD_SC_SAMPLE_RAM_MIB": str(samples.ram_budget_mib),
                 "OMNICHORD_SC_SYNTH_PROGRAM": server_program_command(
-                    self.executables.scsynth
+                    self.executables.supernova
                 ),
             }
         )

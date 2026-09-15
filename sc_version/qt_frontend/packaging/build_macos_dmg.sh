@@ -15,6 +15,7 @@ esac
 for required in \
     "$runtime_app/Contents/MacOS/sclang" \
     "$runtime_app/Contents/Resources/scsynth" \
+    "$runtime_app/Contents/Resources/supernova" \
     "$runtime_app/Contents/Resources/SCClassLibrary" \
     "$runtime_app/Contents/Resources/plugins"; do
     [[ -e "$required" ]] || { echo "Missing SC runtime input: $required" >&2; exit 2; }

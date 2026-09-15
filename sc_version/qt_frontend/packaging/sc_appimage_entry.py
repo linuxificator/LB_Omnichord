@@ -150,7 +150,11 @@ def verify_package(root: Path, runtime: Path) -> int:
         )
         if part
     )
-    for executable in (executables.sclang, executables.scsynth):
+    for executable in (
+        executables.sclang,
+        executables.scsynth,
+        executables.supernova,
+    ):
         result = subprocess.run(
             [str(executable), "-v"],
             env=environment,
@@ -171,7 +175,7 @@ def verify_package(root: Path, runtime: Path) -> int:
         runtime_root=runtime,
     ).validate_bootstrap()
     print(
-        "LB_OMNICHORD_SC_PACKAGE_OK "
+        "LB_OMNICHORD_SC_PACKAGE_OK server=supernova "
         f"root={root} runtime={runtime} config_migrations=1,2 "
         "frontend_config=loaded catalogue=loaded bootstrap=validated"
     )
