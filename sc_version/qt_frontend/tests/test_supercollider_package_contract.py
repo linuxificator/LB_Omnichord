@@ -279,7 +279,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn('"-DPA_USE_ASIO=ON"', windows_runtime_builder)
         self.assertIn("ASIO SDK checksum mismatch", windows_runtime_builder)
         self.assertIn("fixup_supercollider_windows.cmake", windows_runtime_builder)
-        self.assertIn("ASIO-SDK-GPLv3.txt", windows_runtime_builder)
+        self.assertIn('"LICENSE.txt"', windows_runtime_builder)
+        self.assertIn("ASIO-SDK-LICENSE.txt", windows_runtime_builder)
         windows_fixup = (
             ROOT.parent / "packaging" / "fixup_supercollider_windows.cmake"
         ).read_text(encoding="utf-8")

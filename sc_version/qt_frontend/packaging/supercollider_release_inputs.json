@@ -10,7 +10,7 @@
   "windows_asio_sdk": {
     "source_url": "https://www.steinberg.net/asiosdk",
     "source_sha256": "d5ebf0c20dd2c5f43771fd0c1418f4b361bf52434ee670097cfa6b3a335e2eca",
-    "license_path": "LICENSES/LICENSE_GPLv3.txt",
+    "license_path": "LICENSE.txt",
     "license": "GPL-3.0-only"
   },
   "sclork_synths": {

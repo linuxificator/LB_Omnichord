@@ -153,6 +153,8 @@ jobs:
             ${{ env.LOCALAPPDATA }}\vcpkg\archives
             ${{ env.VCPKG_INSTALLATION_ROOT }}\downloads
           key: sc-vcpkg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
+          restore-keys: |
+            sc-vcpkg-${{ runner.os }}-${{ runner.arch }}-
           save-always: true
       - name: Restore pinned headless SuperCollider runtime
         id: runtime

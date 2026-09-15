@@ -89,8 +89,8 @@ cmake "-DRUNTIME_ROOT=$RuntimeRoot" "-DDEPENDENCY_DIRS=$VcpkgBin" `
     -P (Join-Path $ScriptRoot "fixup_supercollider_windows.cmake")
 $LicenseRoot = Join-Path $RuntimeRoot "licenses"
 New-Item -ItemType Directory -Force -Path $LicenseRoot | Out-Null
-Copy-Item (Join-Path $ExtractedAsio "LICENSES\LICENSE_GPLv3.txt") `
-    (Join-Path $LicenseRoot "ASIO-SDK-GPLv3.txt")
+Copy-Item (Join-Path $ExtractedAsio "LICENSE.txt") `
+    (Join-Path $LicenseRoot "ASIO-SDK-LICENSE.txt")
 if (Get-ChildItem $RuntimeRoot -Recurse -File | Where-Object {
     $_.Name -match '^Qt(5|6)|WebEngine|scide'
 }) {
