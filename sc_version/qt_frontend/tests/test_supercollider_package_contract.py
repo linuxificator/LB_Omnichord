@@ -281,6 +281,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("fixup_supercollider_windows.cmake", windows_runtime_builder)
         self.assertIn('"LICENSE.txt"', windows_runtime_builder)
         self.assertIn("ASIO-SDK-LICENSE.txt", windows_runtime_builder)
+        self.assertIn('"SCClassLibrary\\scide_scqt"', windows_runtime_builder)
+        self.assertIn("$ForbiddenNative.FullName", windows_runtime_builder)
         windows_fixup = (
             ROOT.parent / "packaging" / "fixup_supercollider_windows.cmake"
         ).read_text(encoding="utf-8")

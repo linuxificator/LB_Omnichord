@@ -82,6 +82,7 @@ if [[ "$host_system" == "Darwin" ]]; then
     rsync -a \
         --exclude='GUI/' \
         --exclude='Ableton/' \
+        --exclude='scide_scqt/' \
         "$source_root/SCClassLibrary/" "$resources/SCClassLibrary/"
     executables=(
         "$runtime_root/Contents/MacOS/sclang"

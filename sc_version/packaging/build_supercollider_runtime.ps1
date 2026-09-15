@@ -85,16 +85,30 @@ $RuntimeRoot = Join-Path $InstallPrefix "SuperCollider"
             throw "Windows headless runtime is missing $_"
         }
     }
+# These language-side classes only support the disabled Qt IDE/GUI and Ableton
+# integration. Keep the Windows class library equivalent to the minimal macOS
+# source copy rather than shipping dead frontend code.
+@(
+    "SCClassLibrary\Common\GUI",
+    "SCClassLibrary\External\Ableton",
+    "SCClassLibrary\scide_scqt"
+) | ForEach-Object {
+    Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `
+        (Join-Path $RuntimeRoot $_)
+}
 cmake "-DRUNTIME_ROOT=$RuntimeRoot" "-DDEPENDENCY_DIRS=$VcpkgBin" `
     -P (Join-Path $ScriptRoot "fixup_supercollider_windows.cmake")
 $LicenseRoot = Join-Path $RuntimeRoot "licenses"
 New-Item -ItemType Directory -Force -Path $LicenseRoot | Out-Null
 Copy-Item (Join-Path $ExtractedAsio "LICENSE.txt") `
     (Join-Path $LicenseRoot "ASIO-SDK-LICENSE.txt")
-if (Get-ChildItem $RuntimeRoot -Recurse -File | Where-Object {
-    $_.Name -match '^Qt(5|6)|WebEngine|scide'
-}) {
-    throw "Qt or the SuperCollider IDE leaked into the Windows headless runtime"
+$ForbiddenNative = @(Get-ChildItem $RuntimeRoot -Recurse -File | Where-Object {
+    $_.Extension -in @(".dll", ".exe", ".scx") -and
+        $_.Name -match '^(Qt(5|6)|scide)|WebEngine'
+})
+if ($ForbiddenNative.Count -gt 0) {
+    $Paths = ($ForbiddenNative.FullName -join ", ")
+    throw "Qt or the SuperCollider IDE leaked into the Windows headless runtime: $Paths"
 }
 @("sclang.exe", "scsynth.exe", "supernova.exe") | ForEach-Object {
     $Output = & (Join-Path $RuntimeRoot $_) -v 2>&1 | Out-String
