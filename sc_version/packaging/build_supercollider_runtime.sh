@@ -46,7 +46,7 @@ if [[ "$host_system" == "Darwin" ]]; then
         -DCMAKE_OSX_ARCHITECTURES=arm64
         -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
         -DAUDIOAPI=portaudio
-        -DSYSTEM_PORTAUDIO=ON
+        -DSYSTEM_PORTAUDIO=OFF
     )
 fi
 

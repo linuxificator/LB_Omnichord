@@ -110,7 +110,7 @@ jobs:
           key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.sh', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
       - name: Install native build dependencies
         if: steps.runtime.outputs.cache-hit != 'true'
-        run: brew install cmake ninja libsndfile readline fftw portaudio
+        run: brew install cmake ninja libsndfile readline fftw
       - name: Build pinned headless runtime
         if: steps.runtime.outputs.cache-hit != 'true'
         env:
@@ -280,7 +280,7 @@ jobs:
           key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.sh', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
       - name: Install native build dependencies
         if: steps.runtime.outputs.cache-hit != 'true'
-        run: brew install cmake ninja libsndfile readline fftw portaudio
+        run: brew install cmake ninja libsndfile readline fftw
       - name: Build pinned headless runtime
         if: steps.runtime.outputs.cache-hit != 'true'
         env:
