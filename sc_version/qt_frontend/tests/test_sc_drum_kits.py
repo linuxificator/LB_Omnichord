@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +17,7 @@ from sc_music_catalog import load_sc_music_catalog  # noqa: E402
 from sc_drum_kits import (  # noqa: E402
     DEFAULT_DRUM_KIT_ID,
     DRUM_KITS,
+    _catalog,
     kit_by_id,
     midi_role,
     resolve_hit,
@@ -21,6 +25,16 @@ from sc_drum_kits import (  # noqa: E402
 
 
 class SuperColliderDrumKitTests(unittest.TestCase):
+    def test_catalogue_resolves_from_frozen_asset_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            packaged = Path(directory)
+            target = packaged / "music" / "sc_expansion"
+            target.mkdir(parents=True)
+            source = ROOT / "music" / "sc_expansion" / "sc_native_drumkits_v1.json"
+            shutil.copy2(source, target / source.name)
+            with patch.object(sys, "_MEIPASS", str(packaged), create=True):
+                self.assertEqual(_catalog(source.name)["schema_version"], 1)
+
     def test_default_pcm_kit_and_ids_are_stable_and_unique(self) -> None:
         self.assertEqual(DEFAULT_DRUM_KIT_ID, "pcm-vsco")
         self.assertEqual(len(DRUM_KITS), 15)

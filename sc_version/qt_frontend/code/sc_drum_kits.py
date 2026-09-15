@@ -6,6 +6,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any
 
+from runtime_paths import production_frontend_asset_root
+
 
 @dataclass(frozen=True, slots=True)
 class DrumKit:
@@ -53,7 +55,8 @@ class DrumKit:
 
 
 def _catalog(name: str) -> dict[str, Any]:
-    path = Path(__file__).resolve().parent.parent / "music" / "sc_expansion" / name
+    root = production_frontend_asset_root(Path(__file__).resolve().parent)
+    path = root / "music" / "sc_expansion" / name
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict) or raw.get("schema_version") != 1:
         raise ValueError(f"unsupported SC drum-kit catalogue {name!r}")

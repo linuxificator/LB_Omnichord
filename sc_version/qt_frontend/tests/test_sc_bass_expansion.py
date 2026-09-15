@@ -4,8 +4,11 @@ import json
 import hashlib
 from dataclasses import asdict
 from pathlib import Path
+import shutil
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,7 +16,7 @@ sys.path.insert(0, str(ROOT / "code"))
 
 from app_core import load_chords, load_rhythm_catalog  # noqa: E402
 from bass_riffs import load_bass_riff_catalog  # noqa: E402
-from bass_voice_capabilities import CAPABILITIES, capability_for  # noqa: E402
+from bass_voice_capabilities import CAPABILITIES, _load, capability_for  # noqa: E402
 from musical_sequence_plan import compile_bass_lane  # noqa: E402
 from sc_bass_articulation import load_sc_bass_articulation  # noqa: E402
 from sc_music_catalog import load_sc_music_catalog  # noqa: E402
@@ -132,6 +135,21 @@ class ScBassExpansionTests(unittest.TestCase):
         self.assertTrue(capability_for("sc.sclork.bassWarsaw").supports("tie"))
         self.assertFalse(capability_for("sc.sclork.fmBass").supports("tie"))
         self.assertFalse(capability_for("unknown").supports("legato_glide"))
+
+    def test_capabilities_resolve_from_frozen_asset_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            packaged = Path(directory)
+            target = packaged / "music" / "sc_expansion"
+            target.mkdir(parents=True)
+            source = (
+                ROOT
+                / "music"
+                / "sc_expansion"
+                / "bass_voice_capabilities_v1.json"
+            )
+            shutil.copy2(source, target / source.name)
+            with patch.object(sys, "_MEIPASS", str(packaged), create=True):
+                self.assertIn("sc.omni.acid303", _load())
 
     @staticmethod
     def _plan(
