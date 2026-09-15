@@ -27,7 +27,6 @@ python -m PyInstaller --noconfirm --clean --windowed --onedir `
     --additional-hooks-dir (Join-Path $frontend "packaging\pyinstaller_hooks") `
     --collect-all zeroconf --hidden-import ifaddr `
     --copy-metadata zeroconf --copy-metadata ifaddr `
-    --copy-metadata dulwich --copy-metadata urllib3 `
     --add-data "$(Join-Path $frontend 'licence.txt');." `
     --add-data "$(Join-Path $frontend 'THIRD_PARTY_NOTICES.md');." `
     --add-data "$(Join-Path $frontend 'config');config" `

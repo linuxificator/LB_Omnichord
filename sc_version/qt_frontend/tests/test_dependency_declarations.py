@@ -147,6 +147,22 @@ class DependencyDeclarationTests(unittest.TestCase):
         self.assertNotIn("packaging/release_inputs.py", release)
         self.assertNotIn("AMY_RELEASE_BRANCH:", release)
 
+    def test_package_metadata_matches_the_runtime_dependencies(self) -> None:
+        packaging_scripts = (
+            FRONTEND / "packaging" / "build_sc_appimage.sh",
+            FRONTEND / "packaging" / "build_macos_dmg.sh",
+            FRONTEND / "packaging" / "build_windows.ps1",
+        )
+        for script in packaging_scripts:
+            copied = set(
+                re.findall(
+                    r"--copy-metadata\s+([A-Za-z0-9_.-]+)",
+                    script.read_text(encoding="utf-8"),
+                )
+            )
+            with self.subTest(script=script.name):
+                self.assertEqual(copied, {"ifaddr", "zeroconf"})
+
 
 if __name__ == "__main__":
     unittest.main()
