@@ -9,9 +9,11 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 from typing import Mapping
 
 from supercollider_config import SuperColliderRuntimeConfig
+from supercollider_linux_realtime import configure_owned_supernova_realtime
 
 
 class SuperColliderProcessError(RuntimeError):
@@ -144,6 +146,7 @@ class SuperColliderSupervisor:
         self.executables = locate_supercollider_runtime(runtime_root)
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self.process: subprocess.Popen[bytes] | None = None
+        self._realtime_setup_thread: threading.Thread | None = None
 
     def _language_config(self) -> Path | None:
         class_library = self.executables.class_library
@@ -239,6 +242,23 @@ class SuperColliderSupervisor:
             raise SuperColliderProcessError("SuperCollider is already started")
         command, env = self._launch_context(with_audio_wrapper=True)
         self.process = subprocess.Popen(command, env=env, start_new_session=True)
+        if isinstance(self.process.pid, int):
+            self._realtime_setup_thread = threading.Thread(
+                target=self._configure_realtime,
+                args=(self.process.pid, env),
+                name="supernova-realtime-setup",
+                daemon=True,
+            )
+            self._realtime_setup_thread.start()
+
+    def _configure_realtime(self, session_leader: int, env: Mapping[str, str]) -> None:
+        realtime = configure_owned_supernova_realtime(
+            session_leader,
+            self.executables.supernova,
+            environment=env,
+        )
+        stream = sys.stdout if realtime.successful else sys.stderr
+        print(realtime.summary(), file=stream, flush=True)
 
     def stop(self, timeout: float = 4.0) -> None:
         process = self.process
@@ -256,6 +276,7 @@ class SuperColliderSupervisor:
                 except ProcessLookupError:
                     pass
                 process.wait(timeout=2.0)
+        self._realtime_setup_thread = None
         if self._temporary is not None:
             self._temporary.cleanup()
             self._temporary = None

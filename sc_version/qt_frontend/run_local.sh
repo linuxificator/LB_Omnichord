@@ -99,8 +99,12 @@ OMNICHORD_SC_SYNTH_PROGRAM="exec $(printf '%q' "$supernova_path")"
 # unrelated SuperCollider process by executable name.
 setsid "${sc_launcher[@]}" sclang -D "$sc_dir/bootstrap.scd" &
 sc_process_group=$!
+realtime_setup_pid=""
 
 cleanup() {
+    if [[ -n "$realtime_setup_pid" ]]; then
+        kill -TERM "$realtime_setup_pid" 2>/dev/null || true
+    fi
     kill -TERM -- "-$sc_process_group" 2>/dev/null || true
     wait "$sc_process_group" 2>/dev/null || true
 }
@@ -111,5 +115,13 @@ kill -0 "$sc_process_group" 2>/dev/null || {
     wait "$sc_process_group"
     exit 1
 }
+
+# PipeWire promotes the JACK callback through RealtimeKit. Supernova's own
+# parallel DSP helpers also need that same priority; configure this exact,
+# owned process group once as the audio graph becomes active. This setup
+# process exits immediately after verification; it is not a runtime watcher.
+"$venv_python" "$frontend_dir/code/supercollider_linux_realtime.py" \
+    "$sc_process_group" "$supernova_path" &
+realtime_setup_pid=$!
 
 "$venv_python" "$frontend_dir/code/main.py" "$@"

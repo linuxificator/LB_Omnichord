@@ -81,7 +81,17 @@ dropout. The deliberately bunched test injector can still create short-lived
 releasing nodes, but it no longer exhausts buses or leaves the graph enlarged.
 This synthetic pressure is not the steady physical-input load.
 
-The local desktop could not grant realtime priority to Supernova, but its
-PipeWire error counter remained unchanged after graph activation during the
-successful pressure run. Realtime scheduling remains a host configuration
-concern and is not substituted by increasing audio latency here.
+A separate screen-edge reproduction exposed a different boundary: Qt keeps
+one mouse grab after a press and continues reporting coordinates beyond an
+item or window edge. The strum normalizes those coordinates, clamps them to the
+nearest note and suppresses repeated movement at the same note index. Crossing
+the top edge therefore does not intentionally send a new voice or transfer
+musical ownership.
+
+The local PipeWire session did reveal that only one of sixteen Supernova DSP
+threads had realtime priority while the remaining parallel workers used normal
+desktop scheduling. The Linux launcher now completes that pool through the
+system RealtimeKit service before normal interaction. This fixes a scheduling
+deadline boundary without changing gesture interpretation, voice count, SC
+latency or musical timing. See `SUPERNOVA.md` for the exact ownership and
+platform contract.

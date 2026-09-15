@@ -73,7 +73,10 @@ class GuiControlSurface(BackendControlSurface):
             raise RuntimeError("production strum pad was not found")
 
         def window_point(position: float) -> QPoint:
-            y = max(0.0, min(1.0, float(position))) * float(pad.height())
+            # Deliberately retain out-of-bounds positions. Qt's implicit mouse
+            # grab is expected to keep delivering them after a press inside
+            # the item; clamping here would hide top-edge regressions.
+            y = float(position) * float(pad.height())
             point = pad.mapToScene(QPointF(float(pad.width()) / 2.0, y))
             return QPoint(round(point.x()), round(point.y()))
 
@@ -100,6 +103,29 @@ class GuiControlSurface(BackendControlSurface):
         points_per_sweep = max(2, int(points_per_sweep))
         down = [
             0.96 - (index * 0.92 / (points_per_sweep - 1))
+            for index in range(points_per_sweep)
+        ]
+        up = list(reversed(down))
+        path: list[float] = []
+        for sweep in range(sweep_count):
+            segment = down if sweep % 2 == 0 else up
+            if path and path[-1] == segment[0]:
+                segment = segment[1:]
+            path.extend(segment)
+        self.strumPointerPath(path, delay_ms)
+
+    def strumOutsideTopSweeps(
+        self,
+        sweep_count: int,
+        points_per_sweep: int,
+        delay_ms: int,
+    ) -> None:
+        """Keep one press while crossing past the strum's upper boundary."""
+
+        sweep_count = max(1, int(sweep_count))
+        points_per_sweep = max(2, int(points_per_sweep))
+        down = [
+            0.96 - (index * 1.16 / (points_per_sweep - 1))
             for index in range(points_per_sweep)
         ]
         up = list(reversed(down))

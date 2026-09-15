@@ -69,6 +69,14 @@ Updated: 2026-09-15
   160-second held-pointer regression completed without SC errors, clipping or
   long silence; the preceding instrumented run also added no PipeWire errors. See
   `sc_version/design/sc/STRUM_PRESSURE.md`.
+- A second, screen-edge-specific reproduction showed no extra semantic strum
+  attack from out-of-bounds coordinates, but exposed incomplete Linux
+  scheduling: one Supernova DSP thread was `SCHED_RR 20` and fifteen helpers
+  were `SCHED_OTHER`. The source and packaged Linux launchers now perform one
+  bounded, exact-owned-session RealtimeKit setup and verify the complete DSP
+  pool. There is no persistent/name-based watcher and no change to Qt gesture
+  or musical behavior. The focused QML top-edge and Linux realtime adapter
+  regressions are in the normal test tree.
 
 Resume through `sc_version/design/README.md`, then
 `sc_version/design/sc/STATUS.md`. The original detailed requirements remain in

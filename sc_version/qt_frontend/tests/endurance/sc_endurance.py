@@ -48,6 +48,9 @@ from supercollider_platform_adapter import (  # noqa: E402
     pipewire_jack_prefix,
     server_program_command,
 )
+from supercollider_linux_realtime import (  # noqa: E402
+    configure_owned_supernova_realtime,
+)
 
 
 FATAL_LOG_TEXT = (
@@ -396,6 +399,31 @@ def strum_click_cycle(*, through_qml: bool = False) -> Iterator[Action]:
         yield Action("strumEnd", dwell=0.5)
 
 
+def strum_top_edge_cycle(*, through_qml: bool = False) -> Iterator[Action]:
+    """Reproduce P15 full accompaniment while crossing above the window."""
+
+    yield Action("selectPreset", (14,), 0.4)
+    yield Action("setRhythmChordActivity", (4.0,), 0.08)
+    yield Action("setRhythmBassActivity", (4.0,), 0.08)
+    yield Action("setChordArpeggioRate", (2.0,), 0.08)
+    yield Action("ensureRhythmRunning", (True,), 0.2)
+    yield Action("ensureBassRunning", (True,), 0.2)
+    yield Action("ensureChordArpeggioRunning", (True,), 0.2)
+    yield Action("pressChord", (0, 0), 0.08)
+    yield Action("releaseChord", (0, 0), 1.0)
+    if through_qml:
+        yield Action("strumOutsideTopSweeps", (60, 45, 8), 0.5)
+    else:
+        down = [0.96 - (index * 1.16 / 44) for index in range(45)]
+        up = list(reversed(down))
+        yield Action("strumStart", (down[0],), 0.008)
+        for sweep in range(60):
+            path = down if sweep % 2 == 0 else up
+            for position in path[1:]:
+                yield Action("strumMove", (position,), 0.008)
+        yield Action("strumEnd", dwell=0.5)
+
+
 class ApiClient:
     def __init__(self, port: int) -> None:
         self.port = port
@@ -595,6 +623,7 @@ def parse_args() -> argparse.Namespace:
             "startup-bass-riff",
             "strum-pressure",
             "strum-click",
+            "strum-top-edge",
         ),
         default="broad",
         help="run broad coverage or one focused playback regression",
@@ -656,6 +685,16 @@ def main() -> int:
             command, cwd=SC_ROOT, env=environment, stdout=sc_stream,
             stderr=subprocess.STDOUT, start_new_session=True,
         )
+        realtime = configure_owned_supernova_realtime(
+            sc_process.pid,
+            runtime.supernova,
+            environment=environment,
+        )
+        (artifact_dir / "supernova-realtime.json").write_text(
+            json.dumps(asdict(realtime), indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(realtime.summary(), flush=True)
         wait_for(
             lambda: "LB_OMNICHORD_SC_READY" in sc_log.read_text(encoding="utf-8", errors="replace"),
             45,
@@ -732,6 +771,8 @@ def main() -> int:
                 actions = strum_pressure_cycle(through_qml=args.gui)
             elif args.scenario == "strum-click":
                 actions = strum_click_cycle(through_qml=args.gui)
+            elif args.scenario == "strum-top-edge":
+                actions = strum_top_edge_cycle(through_qml=args.gui)
             else:
                 actions = action_cycle(
                     cycle,

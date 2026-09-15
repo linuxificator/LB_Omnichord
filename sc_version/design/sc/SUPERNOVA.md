@@ -18,6 +18,29 @@ does not duplicate that operating-system and SuperCollider policy in its JSON
 configuration. A configurable worker override should be added only after a
 measured platform needs one.
 
+## Linux realtime startup
+
+Process separation does not by itself imply realtime scheduling. Under the
+PipeWire JACK bridge, the audio callback can receive realtime priority through
+RealtimeKit while Supernova's independently created DSP helpers remain normal
+`SCHED_OTHER` threads when the login session has an `RLIMIT_RTPRIO` of zero.
+The audio graph then has low average CPU use but can still miss a deadline when
+a desktop compositor briefly schedules work ahead of any one helper.
+
+The Linux launcher therefore performs one bounded startup action after it has
+created its private process session. It resolves the exact Supernova executable
+inside that owned session, enumerates only its `DSP Thread *` tasks through
+`/proc`, asks the existing system RealtimeKit service for its configured maximum
+priority, applies that policy to the pool and verifies the result. It then
+exits; it is neither a persistent process watcher nor a process-name search.
+If the host already granted Supernova realtime access, no RealtimeKit call is
+made. Other platforms retain SuperCollider's native scheduling policy.
+
+Failure to obtain host realtime service is reported explicitly but does not
+silently select another engine or prevent startup. Linux package qualification
+keeps this a host capability boundary because a build container need not have
+an active audio session.
+
 ## Graph structure
 
 Parallelism is explicit and limited to nodes that do not depend on one
@@ -81,3 +104,9 @@ pinned SuperCollider 3.14.1 runtime.
 The separate-process live endurance driver selects Supernova explicitly and
 records its native PipeWire outputs. Server node-creation exceptions are fatal
 test results rather than ignored console text.
+
+The same driver records the one-shot realtime setup result and has a focused
+top-edge scenario. The QML regression keeps one held mouse grab while crossing
+outside the top of the production strum surface. It verifies that the pointer
+path is clamped without creating a second gesture; PipeWire's error counter is
+the authority for distinguishing an audio deadline miss from a musical click.

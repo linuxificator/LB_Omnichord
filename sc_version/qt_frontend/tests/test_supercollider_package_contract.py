@@ -93,6 +93,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("pipewire-jack", launcher)
         self.assertIn('command -v supernova', launcher)
         self.assertIn('OMNICHORD_SC_SYNTH_PROGRAM="exec ', launcher)
+        self.assertIn("supercollider_linux_realtime.py", launcher)
+        self.assertIn("it is not a runtime watcher", launcher)
 
     def test_endurance_driver_uses_the_production_audio_server(self) -> None:
         endurance = (

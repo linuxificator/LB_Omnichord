@@ -122,6 +122,11 @@ x86_64
   effects use ordered `ParGroup` stages; each dependent voice chain and the
   final master stage remains serial. Source builds enable Supernova, every
   package requires it, and source launch refuses to fall back to `scsynth`.
+- Linux launch completes Supernova's parallel DSP pool with the standard
+  RealtimeKit service when the JACK callback is realtime but helpers are not.
+  Discovery is restricted to the exact executable in the launcher's private
+  process session and ends after startup verification; it never watches or
+  modifies unrelated processes. See [`SUPERNOVA.md`](SUPERNOVA.md).
 - The bounded sample-source catalogue records all eleven pinned Git banks and
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see
