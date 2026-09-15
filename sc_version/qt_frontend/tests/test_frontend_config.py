@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from functools import partial
 import json
 from pathlib import Path
 import sys
@@ -18,6 +19,7 @@ from frontend_config import (  # noqa: E402
     load_frontend_config,
     resolve_frontend_config,
 )
+import frontend_config  # noqa: E402
 import user_data  # noqa: E402
 
 
@@ -144,6 +146,41 @@ class FrontendConfigTests(unittest.TestCase):
             self.assertEqual(loaded["performance"], {"strum_tail_ms": 600})
             self.assertNotIn("amy_max_oscs", loaded)
             self.assertNotIn("tag_ranges", loaded["rhythm"])
+
+    def test_packaged_first_start_uses_the_explicit_asset_schema(self) -> None:
+        """A copied user config must not derive schema location from __file__."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            packaged_config = root / "package" / "_internal" / "config"
+            packaged_config.mkdir(parents=True)
+            for source in (ROOT / "config").glob("*.json"):
+                (packaged_config / source.name).write_bytes(source.read_bytes())
+            schema_dir = packaged_config / "schema"
+            schema_dir.mkdir()
+            schema = schema_dir / "frontend_v1.schema.json"
+            schema.write_bytes(
+                (ROOT / "config" / "schema" / schema.name).read_bytes()
+            )
+            user_config = root / "home" / ".omnichord" / "config"
+            loader = partial(frontend_config.load_frontend_config, schema_path=schema)
+
+            # Model a frozen module beside the executable. There is no schema
+            # at the source-layout fallback path used by an unfrozen module.
+            with patch.object(
+                frontend_config,
+                "__file__",
+                str(root / "package" / "frontend_config.py"),
+            ):
+                result = user_data.ensure_user_configs(
+                    packaged_config,
+                    user_config_dir=user_config,
+                    frontend_config_loader=loader,
+                )
+                resolved = loader(result / "frontend.json")
+
+            self.assertEqual(resolved.source_path, (result / "frontend.json").resolve())
+            self.assertEqual(resolved.source_kind, "user")
 
 
 if __name__ == "__main__":

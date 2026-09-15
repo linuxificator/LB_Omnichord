@@ -105,11 +105,18 @@ def _json_path(parts: list[object]) -> str:
     return path
 
 
-def _schema_path(source_path: Path) -> Path:
+def _schema_path(
+    source_path: Path,
+    explicit_schema_path: Path | None = None,
+) -> Path:
     name = "frontend_v1.schema.json"
     candidates = (
-        source_path.parent / "schema" / name,
-        Path(__file__).resolve().parent.parent / "config" / "schema" / name,
+        (Path(explicit_schema_path),)
+        if explicit_schema_path is not None
+        else (
+            source_path.parent / "schema" / name,
+            Path(__file__).resolve().parent.parent / "config" / "schema" / name,
+        )
     )
     for candidate in candidates:
         if candidate.is_file():
@@ -128,7 +135,11 @@ def _compiled_schema(path: Path) -> SchemaValidator:
     )
 
 
-def _validate_schema(data: JsonObject, source_path: Path) -> None:
+def _validate_schema(
+    data: JsonObject,
+    source_path: Path,
+    schema_path: Path | None = None,
+) -> None:
     revision = data.get("config_revision")
     if revision != CURRENT_FRONTEND_CONFIG_REVISION:
         raise FrontendConfigError(
@@ -141,7 +152,7 @@ def _validate_schema(data: JsonObject, source_path: Path) -> None:
             ]
         )
     try:
-        _compiled_schema(_schema_path(source_path))(data)
+        _compiled_schema(_schema_path(source_path, schema_path))(data)
     except fastjsonschema.JsonSchemaException as exc:
         raw_path = cast(list[object], getattr(exc, "path", []))
         rule = str(getattr(exc, "rule", ""))
@@ -174,11 +185,12 @@ def resolve_frontend_config(
     *,
     source_path: Path,
     source_kind: ConfigSourceKind | None = None,
+    schema_path: Path | None = None,
 ) -> FrontendConfig:
     if not isinstance(loaded, dict):
         raise FrontendConfigError([ConfigIssue("$", "must contain a JSON object")])
     data = cast(JsonObject, loaded)
-    _validate_schema(data, source_path)
+    _validate_schema(data, source_path, schema_path)
 
     midi_input = cast(dict[str, Any], data["midi_input"])
     profile = str(midi_input["tech_profile"]).strip().casefold()
@@ -264,6 +276,7 @@ def load_frontend_config(
     path: Path,
     *,
     source_kind: ConfigSourceKind | None = None,
+    schema_path: Path | None = None,
 ) -> FrontendConfig:
     source_path = Path(path).expanduser()
     if not source_path.is_file():
@@ -274,4 +287,9 @@ def load_frontend_config(
         raise FrontendConfigError(
             [ConfigIssue("$", f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}")]
         ) from exc
-    return resolve_frontend_config(loaded, source_path=source_path, source_kind=source_kind)
+    return resolve_frontend_config(
+        loaded,
+        source_path=source_path,
+        source_kind=source_kind,
+        schema_path=schema_path,
+    )

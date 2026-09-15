@@ -116,18 +116,36 @@ def verify_config_migrations(root: Path) -> None:
 
 
 def verify_application_assets(root: Path) -> None:
-    """Load the frozen production catalogue without starting Qt or audio."""
+    """Exercise a clean frontend start without starting Qt or audio."""
 
-    from frontend_config import load_frontend_config
+    from application_composition import load_application_resources
     import main
+    from user_data import ensure_user_configs
 
-    load_frontend_config(root / "config" / "frontend.json", source_kind="shipped")
     dependencies = main.production_dependencies(asset_root=root)
-    synths, chord, strum, bass = dependencies.load_synth_catalog(
-        dependencies.paths.instruments / "supercollider-legacy-map.json"
-    )
-    if not synths or min(chord, strum, bass) < 0:
-        raise RuntimeError("packaged SuperCollider instrument catalogue is invalid")
+    with tempfile.TemporaryDirectory() as directory:
+        user_config_dir = ensure_user_configs(
+            dependencies.paths.config,
+            user_config_dir=Path(directory) / ".omnichord" / "config",
+            frontend_config_loader=dependencies.load_frontend_config,
+        )
+        frontend_config = dependencies.load_frontend_config(
+            user_config_dir / "frontend.json"
+        )
+        resources = load_application_resources(
+            dependencies,
+            user_config_dir=user_config_dir,
+        )
+        if frontend_config.source_path != (
+            user_config_dir / "frontend.json"
+        ).resolve():
+            raise RuntimeError("packaged fresh-user frontend config was not selected")
+        if not resources.synths or min(
+            resources.default_chord_synth_index,
+            resources.default_strum_synth_index,
+            resources.default_bass_synth_index,
+        ) < 0:
+            raise RuntimeError("packaged SuperCollider instrument catalogue is invalid")
 
 
 def verify_package(root: Path, runtime: Path) -> int:
@@ -177,7 +195,7 @@ def verify_package(root: Path, runtime: Path) -> int:
     print(
         "LB_OMNICHORD_SC_PACKAGE_OK server=supernova "
         f"root={root} runtime={runtime} config_migrations=1,2 "
-        "frontend_config=loaded catalogue=loaded bootstrap=validated"
+        "frontend_first_run=validated catalogue=loaded bootstrap=validated"
     )
     return 0
 

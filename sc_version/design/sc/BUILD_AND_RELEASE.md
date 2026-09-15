@@ -34,6 +34,8 @@ The frozen package self-check seeds a completely empty user directory and
 migrates every supported configuration revision. This guards clean first
 launch and the upgrade path on Linux, Raspberry Pi, macOS and Windows,
 including configuration fields added within an already published revision. It
+validates the copied frontend config against the immutable schema at its real
+packaged asset path; validating only the shipped config is insufficient. It
 then constructs the production
 dependency graph and loads the packaged instrument catalogue, catching layout
 differences between source trees and PyInstaller's `_internal` asset root.

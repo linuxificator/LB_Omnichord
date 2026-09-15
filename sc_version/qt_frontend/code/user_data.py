@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from pathlib import Path
 
-from frontend_config import load_frontend_config
+from frontend_config import FrontendConfig, load_frontend_config
 from json_store import JsonStore
 
 
@@ -13,10 +14,14 @@ MIDI_PRESET_DIR = USER_ROOT / "midi_presets"
 USER_CONFIG_DIR = USER_ROOT / "config"
 
 
-def _legacy_frontend_config(shipped: dict[str, object]) -> dict[str, object]:
+def _legacy_frontend_config(
+    shipped: dict[str, object],
+    *,
+    user_config_dir: Path,
+) -> dict[str, object]:
     """Import engine-neutral settings from the preceding edition's config."""
 
-    legacy_path = USER_CONFIG_DIR / "amy_config.json"
+    legacy_path = user_config_dir / "amy_config.json"
     legacy = JsonStore(legacy_path).read() if legacy_path.is_file() else None
     result = copy.deepcopy(shipped)
     if not isinstance(legacy, dict):
@@ -78,16 +83,26 @@ def migrate_user_layout() -> None:
             pass
 
 
-def ensure_user_configs(shipped_config_dir: Path) -> Path:
+def ensure_user_configs(
+    shipped_config_dir: Path,
+    *,
+    user_config_dir: Path | None = None,
+    frontend_config_loader: Callable[[Path], FrontendConfig] | None = None,
+) -> Path:
     """Seed editable startup configs and return their authoritative directory."""
-    USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    destination = USER_CONFIG_DIR if user_config_dir is None else Path(user_config_dir)
+    loader = frontend_config_loader or load_frontend_config
+    destination.mkdir(parents=True, exist_ok=True)
     for source in Path(shipped_config_dir).glob("*.json"):
-        target = USER_CONFIG_DIR / source.name
+        target = destination / source.name
         if not target.exists():
             shipped = JsonStore(source).read()
             if source.name == "frontend.json" and isinstance(shipped, dict):
-                shipped = _legacy_frontend_config(shipped)
+                shipped = _legacy_frontend_config(
+                    shipped,
+                    user_config_dir=destination,
+                )
             JsonStore(target).write(shipped)
         if source.name == "frontend.json":
-            load_frontend_config(target, source_kind="user")
-    return USER_CONFIG_DIR
+            loader(target)
+    return destination
