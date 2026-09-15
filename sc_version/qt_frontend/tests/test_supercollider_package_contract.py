@@ -94,6 +94,13 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn('command -v supernova', launcher)
         self.assertIn('OMNICHORD_SC_SYNTH_PROGRAM="exec ', launcher)
 
+    def test_endurance_driver_uses_the_production_audio_server(self) -> None:
+        endurance = (
+            ROOT / "tests" / "endurance" / "sc_endurance.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"OMNICHORD_SC_SYNTH_PROGRAM"', endurance)
+        self.assertIn("runtime.supernova", endurance)
+
     def test_runtime_inventory_is_complete_and_versioned(self) -> None:
         required = {
             "bootstrap.scd",

@@ -43,7 +43,11 @@ for module_path in (CODE, SUPPORT):
 from catalog_extensions import load_synth_catalog  # noqa: E402
 from sc_drum_kits import DRUM_KITS  # noqa: E402
 from supercollider_config import load_supercollider_config  # noqa: E402
-from supercollider_platform_adapter import pipewire_jack_prefix  # noqa: E402
+from supercollider_platform_adapter import (  # noqa: E402
+    locate_supercollider_runtime,
+    pipewire_jack_prefix,
+    server_program_command,
+)
 
 
 FATAL_LOG_TEXT = (
@@ -476,6 +480,7 @@ def main() -> int:
     debug_log = artifact_dir / "frontend-debug.jsonl"
     action_log = artifact_dir / "actions.jsonl"
     config = load_supercollider_config(SC_CONFIG)
+    runtime = locate_supercollider_runtime()
     synths, _chord, _strum, _bass = load_synth_catalog(
         ROOT / "instruments" / "supercollider-legacy-map.json"
     )
@@ -494,6 +499,9 @@ def main() -> int:
             "OMNICHORD_SC_MEM_KIB": str(config.server.realtime_memory_kib),
             "OMNICHORD_SC_VSCO_ROOT": str(config.samples.vsco_root),
             "OMNICHORD_SC_SAMPLE_RAM_MIB": str(config.samples.ram_budget_mib),
+            "OMNICHORD_SC_SYNTH_PROGRAM": server_program_command(
+                runtime.supernova
+            ),
         }
     )
     sc_stream = sc_log.open("w", encoding="utf-8")
