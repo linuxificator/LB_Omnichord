@@ -19,6 +19,7 @@
     "commit": "78b95e70efe4349eeb03855f7f7654cb81c8c62f",
     "vsco_2_ce_license": "CC0-1.0",
     "manifest": "../../supercollider/vsco-manifest.json",
+    "required_samples": "../../supercollider/required-samples.json",
     "source_catalog": "../../supercollider/sample-bank-sources.json"
   },
   "supported_packages": [

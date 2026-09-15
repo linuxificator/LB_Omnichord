@@ -64,10 +64,10 @@ commit `78b95e70efe4349eeb03855f7f7654cb81c8c62f` of the configured repository.
 Its 2,166 audio files are the exact union of playable SFZ-region references
 and direct PCM-drum references. Runtime admission does not require Git
 metadata: an existing checkout or ordinary copy is accepted only when every
-required file matches the checked-in manifests. The installation receipt
-records the full selected path/hash list. This makes every PCM alias and byte
-measurement reproducible across source runs and packages without downloading
-unreachable source recordings or rejecting a byte-identical copied tree.
+required path exists. The installation receipt records the full selected path
+list and is compared as JSON content rather than serialized bytes. No hashes
+are calculated during startup. This makes every PCM alias reproducible across
+source runs and packages without downloading unreachable source recordings.
 
 ## Rhythm and fill behavior
 

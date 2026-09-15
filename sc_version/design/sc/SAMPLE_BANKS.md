@@ -50,8 +50,10 @@ The runtime branch is `lb-omnichord-runtime-v1` at commit
 `440300901dfe9275fd84e0b7763af1f8443ae62e`. Installations are shallow clones;
 the source history and unreachable recordings are not transferred. An atomic
 `lb-omnichord-samples.json` receipt beside the samples lists all 2,166 selected
-paths and hashes. Startup validates that receipt and the file inventory before
-the engine can load a buffer.
+paths. Startup compares its parsed content with the checked-in required-sample
+list and checks the file inventory before the engine can load a buffer. It does
+not calculate recording hashes at startup; the pinned Git commit establishes
+the contents of a downloaded collection.
 
 The checked-in
 [`salamander-opcode-coverage.json`](../../supercollider/salamander-opcode-coverage.json)

@@ -14,6 +14,57 @@ import tempfile
 ASSET_DIRECTORIES = ("config", "gui", "instruments", "music", "supercollider")
 
 
+def _extract_sample_root_argument(arguments: list[str]) -> tuple[list[str], Path | None]:
+    forwarded: list[str] = []
+    sample_root: Path | None = None
+    iterator = iter(arguments)
+    for argument in iterator:
+        if argument != "--sample-root":
+            forwarded.append(argument)
+            continue
+        if sample_root is not None:
+            raise RuntimeError("--sample-root may be supplied only once")
+        try:
+            value = next(iterator)
+        except StopIteration as exc:
+            raise RuntimeError("--sample-root requires a path") from exc
+        sample_root = Path(value)
+    return forwarded, sample_root
+
+
+def _select_packaged_sample_root(default_root: Path) -> Path | None:
+    result = subprocess.run(
+        [sys.executable, "--choose-sample-root", str(default_root)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode == 3:
+        return None
+    if result.returncode != 0:
+        raise RuntimeError(
+            "could not open the sample-location chooser: "
+            f"{result.stderr.strip()}"
+        )
+    selected = result.stdout.strip()
+    if not selected:
+        raise RuntimeError("sample-location chooser returned no path")
+    return Path(selected)
+
+
+def _run_sample_location_chooser(arguments: list[str]) -> int:
+    if len(arguments) != 1:
+        print("internal sample-location chooser requires one path", file=sys.stderr)
+        return 2
+    from sample_location_dialog import choose_sample_root
+
+    selected = choose_sample_root(Path(arguments[0]))
+    if selected is None:
+        return 3
+    print(selected)
+    return 0
+
+
 def packaged_asset_root() -> Path:
     packaged = getattr(sys, "_MEIPASS", None)
     candidates: list[Path] = []
@@ -204,6 +255,8 @@ def verify_package(root: Path, runtime: Path) -> int:
 
 
 def main_entry() -> int:
+    if len(sys.argv) >= 2 and sys.argv[1] == "--choose-sample-root":
+        return _run_sample_location_chooser(sys.argv[2:])
     root = packaged_asset_root()
     runtime = packaged_runtime_root()
     if sys.argv[1:] == ["--verify-package"]:
@@ -212,8 +265,13 @@ def main_entry() -> int:
     from sample_repository import prepare_user_runtime_config
     from supercollider_platform_adapter import SuperColliderSupervisor
 
+    forwarded_args, explicit_sample_root = _extract_sample_root_argument(sys.argv[1:])
     config_path, config = prepare_user_runtime_config(
-        root / "config" / "supercollider.json"
+        root / "config" / "supercollider.json",
+        sample_root_override=explicit_sample_root,
+        sample_root_selector=(
+            None if explicit_sample_root is not None else _select_packaged_sample_root
+        ),
     )
     os.environ["OMNICHORD_SC_CONFIG"] = str(config_path)
     with SuperColliderSupervisor(
@@ -221,7 +279,7 @@ def main_entry() -> int:
         config=config,
         runtime_root=runtime,
     ):
-        return int(main.main(sys.argv[1:], asset_root=root))
+        return int(main.main(forwarded_args, asset_root=root))
 
 
 if __name__ == "__main__":

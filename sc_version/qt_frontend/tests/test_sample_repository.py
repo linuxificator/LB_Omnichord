@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -28,6 +27,7 @@ from sample_repository import (  # noqa: E402
     validate_sample_tree,
     validate_sample_repository,
 )
+from sample_location_dialog import choose_sample_root  # noqa: E402
 
 
 def make_clone(path: Path, origin: str = DEFAULT_REPOSITORY) -> None:
@@ -49,210 +49,168 @@ def commit_clone(path: Path) -> str:
     ).decode("ascii")
 
 
+def write_required_samples(
+    path: Path,
+    files: list[str],
+    *,
+    repository: str = DEFAULT_REPOSITORY,
+    branch: str = DEFAULT_SAMPLE_BRANCH,
+    commit: str = DEFAULT_SAMPLE_COMMIT,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_revision": 1,
+                "bank_id": "vsco-2-ce",
+                "repository": repository,
+                "branch": branch,
+                "commit": commit,
+                "file_count": len(files),
+                "files": files,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class SampleRepositoryTests(unittest.TestCase):
-    def test_plain_sample_copy_is_validated_by_content_and_cached(self) -> None:
+    def test_qt_location_chooser_returns_a_named_library_below_the_parent(self) -> None:
+        existing_application = object()
+        with (
+            patch(
+                "sample_location_dialog.QApplication.instance",
+                return_value=existing_application,
+            ),
+            patch(
+                "sample_location_dialog.QFileDialog.getExistingDirectory",
+                return_value="/media/audio",
+            ),
+        ):
+            selected = choose_sample_root(Path("~/VSCO-2-CE"))
+
+        self.assertEqual(selected, Path("/media/audio/VSCO-2-CE"))
+
+    def test_qt_location_chooser_can_be_cancelled(self) -> None:
+        with (
+            patch(
+                "sample_location_dialog.QApplication.instance",
+                return_value=object(),
+            ),
+            patch(
+                "sample_location_dialog.QFileDialog.getExistingDirectory",
+                return_value="",
+            ),
+        ):
+            self.assertIsNone(choose_sample_root(Path("~/VSCO-2-CE")))
+
+    def test_plain_sample_copy_gets_a_path_only_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             samples = root / "ordinary-copy"
             sample = samples / "Keys" / "fixture.wav"
             sample.parent.mkdir(parents=True)
             sample.write_bytes(b"sample audio")
-            manifest = root / "vsco-manifest.json"
-            manifest.write_text(
-                json.dumps(
-                    {
-                        "files": [
-                            {
-                                "id": "fixture",
-                                "relative_path": "Keys/fixture.wav",
-                                "sha256": hashlib.sha256(b"sample audio").hexdigest(),
-                            }
-                        ],
-                        "regions": [{"sample_id": "fixture"}],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            cache = root / "cache" / "vsco-validation.json"
+            required = root / "required-samples.json"
+            write_required_samples(required, ["Keys/fixture.wav"])
 
             self.assertEqual(
-                validate_sample_tree(samples, manifest, cache_path=cache),
+                validate_sample_tree(samples, required),
                 samples.resolve(),
             )
-            self.assertTrue(cache.is_file())
             receipt = json.loads(
                 (samples / SAMPLE_RECEIPT_NAME).read_text(encoding="utf-8")
             )
             self.assertEqual(receipt["file_count"], 1)
-            self.assertEqual(
-                receipt["files"],
-                [
-                    {
-                        "relative_path": "Keys/fixture.wav",
-                        "sha256": hashlib.sha256(b"sample audio").hexdigest(),
-                    }
-                ],
-            )
-            with patch("sample_repository.hashlib.file_digest") as digest:
-                self.assertEqual(
-                    validate_sample_tree(samples, manifest, cache_path=cache),
-                    samples.resolve(),
-                )
-                digest.assert_not_called()
+            self.assertEqual(receipt["files"], ["Keys/fixture.wav"])
+            self.assertNotIn("sha256", json.dumps(receipt).lower())
 
-    def test_plain_sample_copy_with_changed_content_is_rejected(self) -> None:
+    def test_missing_required_sample_is_rejected_clearly(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             samples = root / "ordinary-copy"
             samples.mkdir()
-            sample = samples / "fixture.wav"
-            sample.write_bytes(b"unexpected audio")
-            manifest = root / "vsco-manifest.json"
-            manifest.write_text(
-                json.dumps(
-                    {
-                        "files": [
-                            {
-                                "id": "fixture",
-                                "relative_path": "fixture.wav",
-                                "sha256": hashlib.sha256(b"expected audio").hexdigest(),
-                            }
-                        ],
-                        "regions": [{"sample_id": "fixture"}],
-                    }
-                ),
-                encoding="utf-8",
-            )
+            required = root / "required-samples.json"
+            write_required_samples(required, ["fixture.wav"])
 
             with self.assertRaisesRegex(
-                SampleRepositoryError, "content differs from the supported set"
+                SampleRepositoryError, "incomplete.*fixture.wav"
             ):
-                validate_sample_tree(samples, manifest)
+                validate_sample_tree(samples, required)
 
-    def test_unreferenced_source_audio_is_not_required_or_receipted(self) -> None:
+    def test_unlisted_source_audio_is_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             samples = root / "runtime-subset"
             samples.mkdir()
             (samples / "used.wav").write_bytes(b"used")
-            manifest = root / "vsco-manifest.json"
-            manifest.write_text(
-                json.dumps(
-                    {
-                        "files": [
-                            {
-                                "id": "used",
-                                "relative_path": "used.wav",
-                                "sha256": hashlib.sha256(b"used").hexdigest(),
-                            },
-                            {
-                                "id": "unmapped",
-                                "relative_path": "not-downloaded.wav",
-                                "sha256": hashlib.sha256(b"unused").hexdigest(),
-                            },
-                        ],
-                        "regions": [{"sample_id": "used"}],
-                    }
-                ),
-                encoding="utf-8",
-            )
+            (samples / "unused.wav").write_bytes(b"unused")
+            required = root / "required-samples.json"
+            write_required_samples(required, ["used.wav"])
 
-            validate_sample_tree(samples, manifest)
+            validate_sample_tree(samples, required)
 
             receipt = json.loads(
                 (samples / SAMPLE_RECEIPT_NAME).read_text(encoding="utf-8")
             )
-            self.assertEqual(receipt["file_count"], 1)
-            self.assertEqual(
-                [record["relative_path"] for record in receipt["files"]],
-                ["used.wav"],
-            )
+            self.assertEqual(receipt["files"], ["used.wav"])
 
-    def test_direct_pcm_drum_reference_is_part_of_runtime_subset(self) -> None:
+    def test_receipt_json_is_compared_semantically(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             samples = root / "samples"
             samples.mkdir()
-            (samples / "melodic.wav").write_bytes(b"melodic")
-            (samples / "drum.wav").write_bytes(b"drum")
-            manifest = root / "vsco-manifest.json"
-            manifest.write_text(
+            (samples / "a.wav").write_bytes(b"a")
+            (samples / "b.wav").write_bytes(b"b")
+            required = root / "required-samples.json"
+            write_required_samples(required, ["a.wav", "b.wav"])
+            receipt_path = samples / SAMPLE_RECEIPT_NAME
+            receipt_path.write_text(
                 json.dumps(
                     {
-                        "files": [
-                            {
-                                "id": "melodic",
-                                "relative_path": "melodic.wav",
-                                "sha256": hashlib.sha256(b"melodic").hexdigest(),
-                            },
-                            {
-                                "id": "drum",
-                                "relative_path": "drum.wav",
-                                "sha256": hashlib.sha256(b"drum").hexdigest(),
-                            },
-                        ],
-                        "regions": [{"sample_id": "melodic"}],
+                        "files": ["b.wav", "a.wav"],
+                        "file_count": 2,
+                        "commit": DEFAULT_SAMPLE_COMMIT,
+                        "branch": DEFAULT_SAMPLE_BRANCH,
+                        "repository": DEFAULT_REPOSITORY,
+                        "bank_id": "vsco-2-ce",
+                        "schema_revision": 1,
                     }
                 ),
                 encoding="utf-8",
             )
-            drums = root / "drums.json"
-            drums.write_text(
-                json.dumps({"sample_files": [{"source_sample_id": "drum"}]}),
-                encoding="utf-8",
-            )
 
-            validate_sample_tree(
-                samples,
-                manifest,
-                direct_reference_catalogue=drums,
-            )
+            before = receipt_path.read_text(encoding="utf-8")
+            with patch("sample_repository.JsonStore.write") as write:
+                validate_sample_tree(samples, required)
+                write.assert_not_called()
+            self.assertEqual(receipt_path.read_text(encoding="utf-8"), before)
 
-            receipt = json.loads(
-                (samples / SAMPLE_RECEIPT_NAME).read_text(encoding="utf-8")
-            )
-            self.assertEqual(
-                {record["relative_path"] for record in receipt["files"]},
-                {"melodic.wav", "drum.wav"},
-            )
-
-    def test_changed_receipt_forces_content_revalidation_and_repair(self) -> None:
+    def test_invalid_old_hash_receipt_is_replaced_by_the_path_list(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             samples = root / "samples"
             samples.mkdir()
             (samples / "fixture.wav").write_bytes(b"sample")
-            manifest = root / "vsco-manifest.json"
-            manifest.write_text(
+            required = root / "required-samples.json"
+            write_required_samples(required, ["fixture.wav"])
+            receipt_path = samples / SAMPLE_RECEIPT_NAME
+            receipt_path.write_text(
                 json.dumps(
                     {
+                        "schema_revision": 1,
                         "files": [
-                            {
-                                "id": "fixture",
-                                "relative_path": "fixture.wav",
-                                "sha256": hashlib.sha256(b"sample").hexdigest(),
-                            }
+                            {"relative_path": "fixture.wav", "sha256": "old"}
                         ],
-                        "regions": [{"sample_id": "fixture"}],
                     }
                 ),
                 encoding="utf-8",
             )
-            cache = root / "cache.json"
-            validate_sample_tree(samples, manifest, cache_path=cache)
-            receipt_path = samples / SAMPLE_RECEIPT_NAME
-            receipt_path.write_text("{}\n", encoding="utf-8")
 
-            with patch(
-                "sample_repository.hashlib.file_digest",
-                wraps=hashlib.file_digest,
-            ) as digest:
-                validate_sample_tree(samples, manifest, cache_path=cache)
-                digest.assert_called_once()
-            self.assertEqual(
-                json.loads(receipt_path.read_text(encoding="utf-8"))["file_count"],
-                1,
-            )
+            validate_sample_tree(samples, required)
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["files"], ["fixture.wav"])
+            self.assertNotIn("sha256", json.dumps(receipt).lower())
 
     def test_runtime_preparation_accepts_an_ordinary_sample_copy(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -272,30 +230,8 @@ class SampleRepositoryTests(unittest.TestCase):
             config["samples"]["vsco_root"] = str(samples)
             shipped.write_text(json.dumps(config), encoding="utf-8")
 
-            manifest = root / "sc_version" / "supercollider" / "vsco-manifest.json"
-            manifest.parent.mkdir(parents=True)
-            manifest.write_text(
-                json.dumps(
-                    {
-                        "files": [
-                            {
-                                "id": "fixture",
-                                "relative_path": "fixture.wav",
-                                "sha256": hashlib.sha256(b"sample audio").hexdigest(),
-                            }
-                        ],
-                        "regions": [{"sample_id": "fixture"}],
-                    }
-                ),
-                encoding="utf-8",
-            )
-            drum_catalogue = (
-                frontend / "music" / "sc_expansion" / "sc_pcm_drumkits_v1.json"
-            )
-            drum_catalogue.parent.mkdir(parents=True)
-            drum_catalogue.write_text(
-                json.dumps({"sample_files": []}), encoding="utf-8"
-            )
+            required = root / "sc_version" / "supercollider" / "required-samples.json"
+            write_required_samples(required, ["fixture.wav"])
 
             target, runtime = prepare_user_runtime_config(
                 shipped,
@@ -305,9 +241,6 @@ class SampleRepositoryTests(unittest.TestCase):
 
             self.assertEqual(runtime.samples.vsco_root, samples)
             self.assertTrue(target.is_file())
-            self.assertTrue(
-                (root / "empty-user-root" / "cache" / "vsco-validation.json").is_file()
-            )
             self.assertTrue((samples / SAMPLE_RECEIPT_NAME).is_file())
 
     def test_cli_seeds_a_valid_config_in_a_completely_empty_home(self) -> None:
@@ -340,6 +273,67 @@ class SampleRepositoryTests(unittest.TestCase):
             self.assertEqual(persisted["server"]["max_buffers"], 8192)
             self.assertEqual(persisted["config_revision"], 7)
             self.assertEqual(persisted["protocol_version"], 2)
+
+    def test_first_install_persists_the_directory_chosen_by_the_user(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            selected = root / "Samples" / "VSCO-2-CE"
+            with (
+                patch.dict(os.environ, HOME=str(root / "home")),
+                patch("sample_repository.ensure_sample_repository") as ensure,
+            ):
+                target, config = prepare_user_runtime_config(
+                    FRONTEND / "config" / "supercollider.json",
+                    user_root=root / "empty-user-root",
+                    sample_root_selector=lambda _default: selected,
+                )
+
+            persisted = json.loads(target.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["samples"]["vsco_root"], str(selected))
+            self.assertEqual(config.samples.vsco_root, selected)
+            self.assertEqual(ensure.call_args.args[0], selected)
+
+    def test_cancelled_first_install_downloads_nothing_and_leaves_no_config(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            user_root = Path(temporary) / "empty-user-root"
+            with (
+                patch.dict(os.environ, HOME=str(Path(temporary) / "home")),
+                patch("sample_repository.ensure_sample_repository") as ensure,
+                self.assertRaisesRegex(SampleRepositoryError, "was cancelled"),
+            ):
+                prepare_user_runtime_config(
+                    FRONTEND / "config" / "supercollider.json",
+                    user_root=user_root,
+                    sample_root_selector=lambda _default: None,
+                )
+
+            ensure.assert_not_called()
+            self.assertFalse((user_root / "config" / "supercollider.json").exists())
+
+    def test_explicit_sample_root_updates_an_existing_user_choice(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            user_root = root / "user"
+            target = user_root / "config" / "supercollider.json"
+            target.parent.mkdir(parents=True)
+            target.write_text(
+                (FRONTEND / "config" / "supercollider.json").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            selected = root / "external" / "VSCO-2-CE"
+            with patch("sample_repository.ensure_sample_repository") as ensure:
+                persisted_path, config = prepare_user_runtime_config(
+                    FRONTEND / "config" / "supercollider.json",
+                    user_root=user_root,
+                    sample_root_override=selected,
+                )
+
+            persisted = json.loads(persisted_path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["samples"]["vsco_root"], str(selected))
+            self.assertEqual(config.samples.vsco_root, selected)
+            self.assertEqual(ensure.call_args.args[0], selected)
 
     def test_existing_non_repository_is_rejected_clearly(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -379,22 +373,8 @@ class SampleRepositoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             destination = root / "VSCO-2-CE"
-            manifest = root / "vsco-manifest.json"
-            manifest.write_text(
-                json.dumps(
-                    {
-                        "files": [
-                            {
-                                "id": "fixture",
-                                "relative_path": "fixture.wav",
-                                "sha256": hashlib.sha256(b"sample").hexdigest(),
-                            }
-                        ],
-                        "regions": [{"sample_id": "fixture"}],
-                    }
-                ),
-                encoding="utf-8",
-            )
+            required = root / "required-samples.json"
+            write_required_samples(required, ["fixture.wav"])
 
             def fake_clone(url: str, target: str, **arguments: object) -> None:
                 self.assertEqual(url, DEFAULT_REPOSITORY)
@@ -415,8 +395,7 @@ class SampleRepositoryTests(unittest.TestCase):
                     DEFAULT_REPOSITORY,
                     DEFAULT_SAMPLE_BRANCH,
                     DEFAULT_SAMPLE_COMMIT,
-                    content_manifest=manifest,
-                    validation_cache=root / "cache.json",
+                    required_samples=required,
                 )
             self.assertEqual(result, destination.resolve())
             self.assertEqual((destination / "fixture.wav").read_bytes(), b"sample")

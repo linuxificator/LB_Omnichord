@@ -59,18 +59,21 @@ package starts a competing raw JACK server.
 VSCO 2 CE recordings are separate CC0 assets and are not embedded. First
 launch uses the bundled Dulwich implementation to shallow-clone the pinned
 `lb-omnichord-runtime-v1` branch of `linuxificator/VSCO-2-CE` to the location
-selected in `~/.omnichord/config/supercollider.json` (default
-`~/VSCO-2-CE`). This branch contains only source audio reachable from a
+selected through Qt's platform-standard directory chooser and persisted in
+`~/.omnichord/config/supercollider.json`. The chooser selects a parent and the
+library is created below it as `VSCO-2-CE`; `--sample-root` provides an exact,
+non-interactive path. Cancelling creates neither the user SC config nor a
+partial library. This branch contains only source audio reachable from a
 playable SFZ region or the direct PCM-drum catalogue, plus the source licence
 and readmes. An existing checkout or ordinary copy is accepted when all those
-required audio files match the bundled manifests.
+required audio-file paths exist.
 
 Successful validation atomically writes `lb-omnichord-samples.json` inside
-the sample directory. It records the exact repository branch and commit,
-selection-manifest digest and complete relative-path/SHA-256 list. Every
-startup checks this receipt and a stat-based inventory; unchanged recordings
-do not need to be rehashed, while a missing or changed receipt forces full
-content validation and receipt repair. No system Git executable is required.
+the sample directory. It records the exact repository branch and commit plus
+the complete relative-path list. Every startup compares parsed JSON content,
+so neither JSON object order nor file-list order matters, and checks that each
+listed path exists. A missing or different receipt is repaired atomically.
+Startup never hashes the recordings. No system Git executable is required.
 
 The Raspberry Pi package does not install scheduler policy, isolate CPUs or
 change machine configuration.
