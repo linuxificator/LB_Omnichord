@@ -76,20 +76,21 @@ def write_required_samples(
 
 class SampleRepositoryTests(unittest.TestCase):
     def test_qt_location_chooser_returns_a_named_library_below_the_parent(self) -> None:
-        existing_application = object()
-        with (
-            patch(
-                "sample_location_dialog.QApplication.instance",
-                return_value=existing_application,
-            ),
-            patch(
-                "sample_location_dialog.QFileDialog.getExistingDirectory",
-                return_value="/media/audio",
-            ),
-        ):
-            selected = choose_sample_root(Path("~/VSCO-2-CE"))
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary) / "audio"
+            with (
+                patch(
+                    "sample_location_dialog.QApplication.instance",
+                    return_value=object(),
+                ),
+                patch(
+                    "sample_location_dialog.QFileDialog.getExistingDirectory",
+                    return_value=str(parent),
+                ),
+            ):
+                selected = choose_sample_root(Path("~/VSCO-2-CE"))
 
-        self.assertEqual(selected, Path("/media/audio/VSCO-2-CE"))
+            self.assertEqual(selected, parent.resolve() / "VSCO-2-CE")
 
     def test_qt_location_chooser_can_be_cancelled(self) -> None:
         with (
