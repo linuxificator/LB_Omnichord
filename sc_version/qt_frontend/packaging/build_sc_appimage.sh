@@ -55,8 +55,6 @@ python -m PyInstaller \
     --hidden-import ifaddr \
     --copy-metadata zeroconf \
     --copy-metadata ifaddr \
-    --copy-metadata dulwich \
-    --copy-metadata urllib3 \
     --add-data "$frontend_dir/licence.txt:." \
     --add-data "$frontend_dir/THIRD_PARTY_NOTICES.md:." \
     --add-data "$frontend_dir/config:config" \
