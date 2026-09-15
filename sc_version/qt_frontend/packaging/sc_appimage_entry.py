@@ -197,7 +197,7 @@ def verify_package(root: Path, runtime: Path) -> int:
     ).validate_bootstrap()
     print(
         "LB_OMNICHORD_SC_PACKAGE_OK server=supernova "
-        f"root={root} runtime={runtime} config_migrations=1,2 "
+        f"root={root} runtime={runtime} config_migrations=all "
         "frontend_first_run=validated catalogue=loaded bootstrap=validated"
     )
     return 0
