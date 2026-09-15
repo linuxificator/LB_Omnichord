@@ -227,7 +227,7 @@ class SuperColliderProcessTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     environment["OMNICHORD_SC_MAX_GESTURE_VOICES"],
-                    "24",
+                    "64",
                 )
                 self.assertEqual(
                     command[-2:], ["-D", str((engine / "bootstrap.scd").resolve())]

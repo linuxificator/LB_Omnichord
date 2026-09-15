@@ -278,6 +278,12 @@ def _migrate_config(
     if "gesture_voice_limit" not in server:
         server["gesture_voice_limit"] = default_gesture_voice_limit
         changed = True
+    elif revision == 5 and server["gesture_voice_limit"] == 24:
+        # Revision 5 briefly shipped on the development branch with a limit
+        # below the natural overlap of the 450 ms strum tail. Upgrade only
+        # that exact old default; preserve an explicitly chosen other value.
+        server["gesture_voice_limit"] = default_gesture_voice_limit
+        changed = True
 
     samples = migrated.get("samples")
     if not isinstance(samples, dict):

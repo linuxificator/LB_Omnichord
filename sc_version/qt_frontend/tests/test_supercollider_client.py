@@ -106,7 +106,7 @@ class SuperColliderClientTests(unittest.TestCase):
         self.config_path.write_text(
             json.dumps(
                 {
-                    "config_revision": 5,
+                    "config_revision": 6,
                     "protocol_version": 2,
                     "language": {
                         "host": "127.0.0.1",
@@ -120,7 +120,7 @@ class SuperColliderClientTests(unittest.TestCase):
                         "latency_seconds": 0.02,
                         "max_nodes": 4096,
                         "max_buffers": 8192,
-                        "gesture_voice_limit": 24,
+                        "gesture_voice_limit": 64,
                         "realtime_memory_kib": 262144,
                     },
                     "samples": {

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 
-CURRENT_CONFIG_REVISION = 5
+CURRENT_CONFIG_REVISION = 6
 
 
 class SuperColliderConfigError(ValueError):

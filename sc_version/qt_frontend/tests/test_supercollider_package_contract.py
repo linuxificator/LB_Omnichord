@@ -121,9 +121,9 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(config["config_revision"], 5)
+        self.assertEqual(config["config_revision"], 6)
         self.assertEqual(config["protocol_version"], 2)
-        self.assertEqual(config["server"]["gesture_voice_limit"], 24)
+        self.assertEqual(config["server"]["gesture_voice_limit"], 64)
         self.assertEqual(
             config["samples"]["commit"],
             "440300901dfe9275fd84e0b7763af1f8443ae62e",
@@ -296,11 +296,18 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("var voiceGroup = Group.tail(~omniSourceGroup)", bootstrap)
         self.assertIn("voiceGroup: voiceGroup", bootstrap)
         self.assertIn("voiceGroup.free", bootstrap)
-        self.assertIn("var outputGateBus = Bus.control(s, 1)", bootstrap)
-        self.assertIn("outputNode.map(\\gateControl, outputGateBus)", bootstrap)
-        self.assertIn("record[\\outputGateBus].set(0)", bootstrap)
-        self.assertIn("outputGateBus.set(0)", bootstrap)
-        self.assertIn("outputGateBus.free", bootstrap)
+        self.assertIn("var outputControlBus = Bus.control(s, 2)", bootstrap)
+        self.assertIn(
+            "outputNode.map(\\gateControl, outputControlBus.index)",
+            bootstrap,
+        )
+        self.assertIn(
+            "outputNode.map(\\release, outputControlBus.index + 1)",
+            bootstrap,
+        )
+        self.assertIn("record[\\outputControlBus].set(0)", bootstrap)
+        self.assertIn("outputControlBus.set(0)", bootstrap)
+        self.assertIn("outputControlBus.free", bootstrap)
         self.assertIn("record[\\voiceGroup].set(\\outputGain, value)", bootstrap)
         self.assertNotIn("record[\\outputNode].set(", bootstrap)
         self.assertNotIn("outputNode.set(", bootstrap)
@@ -311,7 +318,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(config["server"]["gesture_voice_limit"], 24)
+        self.assertEqual(config["server"]["gesture_voice_limit"], 64)
         self.assertIn("OMNICHORD_SC_MAX_GESTURE_VOICES", bootstrap)
         self.assertIn("handles: List.new", bootstrap)
         self.assertIn(
@@ -320,6 +327,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         )
         self.assertIn("state[\\handles].removeAt(0)", bootstrap)
         self.assertIn("gestureStealRelease", bootstrap)
+        self.assertIn("record[\\outputControlBus].setn([", bootstrap)
+        self.assertIn("forcedRelease.asFloat.max(0.05)", bootstrap)
 
     def test_supernova_graph_parallelizes_only_independent_stages(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")

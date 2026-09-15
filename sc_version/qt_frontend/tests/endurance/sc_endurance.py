@@ -61,6 +61,7 @@ FATAL_LOG_TEXT = (
     "buffer overflow",
     "failed to get an audio bus allocated",
     "Message 'index' not understood",
+    "node not found:",
     "exception in /s_new",
 )
 
@@ -79,6 +80,8 @@ class AudioWindow:
     peak: float
     clipped_fraction: float
     longest_silent_seconds: float
+    largest_sample_step: float
+    sample_step_outlier_ratio: float
 
 
 def free_tcp_port() -> int:
@@ -107,7 +110,12 @@ def analyze_wave(path: Path, *, silence_threshold: int = 2) -> AudioWindow:
     clipped = 0
     silent_run = 0
     longest_silent_run = 0
+    step_histogram = [0] * 65536
+    largest_step = 0
+    previous: tuple[int, int] | None = None
     for left, right in zip(samples[0::2], samples[1::2], strict=True):
+        left = int(left)
+        right = int(right)
         magnitude = max(abs(int(left)), abs(int(right)))
         squared += (int(left) * int(left) + int(right) * int(right)) / 2.0
         peak = max(peak, magnitude)
@@ -118,13 +126,32 @@ def analyze_wave(path: Path, *, silence_threshold: int = 2) -> AudioWindow:
             longest_silent_run = max(longest_silent_run, silent_run)
         else:
             silent_run = 0
+        if previous is not None:
+            step = max(abs(left - previous[0]), abs(right - previous[1]))
+            step_histogram[step] += 1
+            largest_step = max(largest_step, step)
+        previous = (left, right)
     frame_count = len(samples) // 2
+    step_count = max(0, frame_count - 1)
+    # A 99.95th-percentile baseline excludes a single discontinuity and its
+    # return edge even in a short diagnostic capture, while retaining the
+    # repeated noisy attacks that are characteristic of plucked voices.
+    percentile_target = math.ceil(step_count * 0.9995)
+    accumulated = 0
+    percentile_step = 0
+    for step, count in enumerate(step_histogram):
+        accumulated += count
+        if accumulated >= percentile_target:
+            percentile_step = step
+            break
     return AudioWindow(
         duration_seconds=frame_count / float(sample_rate),
         rms=math.sqrt(squared / frame_count) / 32768.0,
         peak=peak / 32768.0,
         clipped_fraction=clipped / frame_count,
         longest_silent_seconds=longest_silent_run / float(sample_rate),
+        largest_sample_step=largest_step / 32768.0,
+        sample_step_outlier_ratio=largest_step / max(1, percentile_step),
     )
 
 
@@ -347,6 +374,28 @@ def strum_pressure_cycle(*, through_qml: bool = False) -> Iterator[Action]:
     yield Action("releaseChord", (0, 0), 1.0)
 
 
+def strum_click_cycle(*, through_qml: bool = False) -> Iterator[Action]:
+    """Reproduce P16 chord-selection followed by uninterrupted strumming."""
+
+    yield Action("selectPreset", (15,), 0.4)
+    yield Action("ensureRhythmRunning", (False,))
+    yield Action("ensureBassRunning", (False,))
+    yield Action("ensureChordArpeggioRunning", (False,))
+    yield Action("pressChord", (0, 0), 0.08)
+    yield Action("releaseChord", (0, 0), 0.4)
+    if through_qml:
+        yield Action("strumContinuousSweeps", (30, 37, 8), 0.5)
+    else:
+        down = [0.96 - (index * 0.92 / 36) for index in range(37)]
+        up = list(reversed(down))
+        yield Action("strumStart", (down[0],), 0.008)
+        for sweep in range(30):
+            path = down if sweep % 2 == 0 else up
+            for position in path[1:]:
+                yield Action("strumMove", (position,), 0.008)
+        yield Action("strumEnd", dwell=0.5)
+
+
 class ApiClient:
     def __init__(self, port: int) -> None:
         self.port = port
@@ -406,10 +455,19 @@ def stop_process(process: subprocess.Popen[Any], timeout: float = 5.0) -> None:
 
 
 class AudioMonitor(threading.Thread):
-    def __init__(self, artifact_dir: Path, chunk_seconds: float) -> None:
+    def __init__(
+        self,
+        artifact_dir: Path,
+        chunk_seconds: float,
+        *,
+        keep_audio: bool = False,
+        reject_step_outliers: bool = False,
+    ) -> None:
         super().__init__(name="sc-endurance-audio", daemon=True)
         self.artifact_dir = artifact_dir
         self.chunk_seconds = chunk_seconds
+        self.keep_audio = keep_audio
+        self.reject_step_outliers = reject_step_outliers
         self.stop_requested = threading.Event()
         self.failure: BaseException | None = None
         self.window_count = 0
@@ -473,7 +531,16 @@ class AudioMonitor(threading.Thread):
                     raise RuntimeError(f"live audio clips persistently: {metrics}")
                 if metrics.longest_silent_seconds > 3.0:
                     raise RuntimeError(f"live audio dropout exceeds 3 s: {metrics}")
-                wave_path.unlink(missing_ok=True)
+                if (
+                    self.reject_step_outliers
+                    and metrics.largest_sample_step > 0.08
+                    and metrics.sample_step_outlier_ratio > 2.0
+                ):
+                    raise RuntimeError(
+                        f"live audio contains an isolated sample-step click: {metrics}"
+                    )
+                if not self.keep_audio:
+                    wave_path.unlink(missing_ok=True)
         except BaseException as exc:
             self.failure = exc
             self.stop_requested.set()
@@ -496,6 +563,11 @@ def parse_args() -> argparse.Namespace:
         help="catalogue rotation cycle used first (diagnostic reproduction)",
     )
     parser.add_argument("--chunk-seconds", type=float, default=60.0)
+    parser.add_argument(
+        "--keep-audio",
+        action="store_true",
+        help="retain captured WAV chunks for diagnostic waveform analysis",
+    )
     parser.add_argument(
         "--startup-idle-seconds",
         type=float,
@@ -522,9 +594,15 @@ def parse_args() -> argparse.Namespace:
             "vsco-drum-roles",
             "startup-bass-riff",
             "strum-pressure",
+            "strum-click",
         ),
         default="broad",
         help="run broad coverage or one focused playback regression",
+    )
+    parser.add_argument(
+        "--gesture-voice-limit",
+        type=int,
+        help="override the configured engine gesture boundary for diagnostics",
     )
     return parser.parse_args()
 
@@ -556,7 +634,7 @@ def main() -> int:
             "OMNICHORD_SC_MAX_NODES": str(config.server.max_nodes),
             "OMNICHORD_SC_MAX_BUFFERS": str(config.server.max_buffers),
             "OMNICHORD_SC_MAX_GESTURE_VOICES": str(
-                config.server.gesture_voice_limit
+                args.gesture_voice_limit or config.server.gesture_voice_limit
             ),
             "OMNICHORD_SC_MEM_KIB": str(config.server.realtime_memory_kib),
             "OMNICHORD_SC_VSCO_ROOT": str(config.samples.vsco_root),
@@ -633,7 +711,12 @@ def main() -> int:
                 flush=True,
             )
 
-        audio_monitor = AudioMonitor(artifact_dir, args.chunk_seconds)
+        audio_monitor = AudioMonitor(
+            artifact_dir,
+            args.chunk_seconds,
+            keep_audio=args.keep_audio,
+            reject_step_outliers=args.scenario == "strum-click",
+        )
         audio_monitor.start()
         cycle = max(0, args.start_cycle)
         completed_cycles = 0
@@ -647,6 +730,8 @@ def main() -> int:
                 actions = startup_bass_riff_cycle()
             elif args.scenario == "strum-pressure":
                 actions = strum_pressure_cycle(through_qml=args.gui)
+            elif args.scenario == "strum-click":
+                actions = strum_click_cycle(through_qml=args.gui)
             else:
                 actions = action_cycle(
                     cycle,
@@ -695,6 +780,20 @@ def main() -> int:
                     indent=2,
                 )
                 target.write("\n")
+        # Drain live ownership while the language and audio server are still
+        # available. Otherwise process shutdown can hide late /n_end cleanup
+        # races behind Supernova's final tree teardown.
+        api.action(Action("panic"))
+        time.sleep(1.0)
+        for path, label in (
+            (sc_log, "SuperCollider"),
+            (frontend_log, "frontend"),
+        ):
+            failure = log_has_failure(path)
+            if failure is not None:
+                raise RuntimeError(f"{label} log contains {failure!r}")
+        if audio_monitor.failure is not None:
+            raise RuntimeError(f"audio monitor failed: {audio_monitor.failure}")
         return 0
     except KeyboardInterrupt:
         return 0
