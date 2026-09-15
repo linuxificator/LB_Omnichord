@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
 import tomllib
 import unittest
 from pathlib import Path
@@ -10,7 +9,6 @@ from pathlib import Path
 
 FRONTEND = Path(__file__).resolve().parents[1]
 ACTIVE = FRONTEND.parent
-CODE = FRONTEND / "code"
 PROFILE = (
     ACTIVE
     / "controller_profiles"
@@ -21,12 +19,6 @@ SYSEX = PROFILE.with_suffix(".syx")
 CHECKSUMS = PROFILE.parent / "SHA256SUMS"
 DEFAULT_BINDINGS = FRONTEND / "instruments" / "default_omni_midi_control_bindings.json"
 OMNI_FACTORY_PRESETS = FRONTEND / "instruments" / "default_presets"
-
-if str(CODE) not in sys.path:
-    sys.path.insert(0, str(CODE))
-
-from gm_percussion import GM_PERCUSSION_NAMES  # noqa: E402
-
 
 EXPECTED_NOTES = (
     49, 42, 44, 46, 50, 48, 51, 57,
@@ -63,7 +55,7 @@ class ControllerProfileTests(unittest.TestCase):
         )
         self.assertEqual(notes, EXPECTED_NOTES)
         self.assertEqual(len(set(notes)), 16)
-        self.assertTrue(all(note in GM_PERCUSSION_NAMES for note in notes))
+        self.assertTrue(all(35 <= note <= 81 for note in notes))
         self.assertEqual(channels, (10,) * 16)
 
     def test_committed_sysex_has_framing_and_reviewed_digest(self) -> None:

@@ -8,7 +8,7 @@ from midi_input import (
     MidiInputTechnologyStatus,
 )
 from midi_platform_profile import current_midi_tech_profile
-from resolved_config import MidiInputConfig
+from frontend_config import MidiInputConfig
 
 
 _UNSUPPORTED_TECHNOLOGIES: dict[str, tuple[str, str, str]] = {
@@ -22,11 +22,6 @@ _UNSUPPORTED_TECHNOLOGIES: dict[str, tuple[str, str, str]] = {
         "WinMM MIDI",
         "native WinMM MIDI bridge is not bundled",
     ),
-    "android": (
-        "android_midi",
-        "Android MIDI",
-        "native Android MIDI bridge is not bundled",
-    ),
 }
 
 
@@ -34,8 +29,6 @@ def _normalized_profile(profile: str) -> str:
     value = str(profile).strip().casefold()
     if value.startswith("win"):
         return "win32"
-    if value.startswith("android"):
-        return "android"
     if value.startswith("darwin"):
         return "darwin"
     if value.startswith("linux"):

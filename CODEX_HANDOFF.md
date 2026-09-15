@@ -1,10 +1,17 @@
 # Current work handoff
 
-Updated: 2026-09-14
+Updated: 2026-09-15
 
-- Active branch: `feature/sc-music-expansion`; current implementation and
-  qualification status are maintained under `sc_version/design/sc/`.
+- Active branch: `rework/sc_code_quality`; current implementation and
+  qualification status are maintained under `sc_version/design/`.
 - The AMY implementation under `amysynth_version` is intentionally unchanged.
+- The preceding SC music work was merged to `main`; GitHub Actions run
+  `34903048200` passed Linux x86_64, Raspberry Pi aarch64, macOS arm64 and
+  Windows x86_64.
+- The quality branch removes the inherited AMY runtime/config/firmware/test
+  copy from `sc_version`, introduces a strict engine-neutral frontend config
+  and leaves one SC production graph. The full local test suite passes. See
+  `sc_version/design/arch/sc_code_quality_review.md`.
 - The Linux x86_64 SuperCollider vertical slice lives under `sc_version` and
   uses separate Qt, headless `sclang` and `scsynth` processes. The frontend
   sends typed OSC actions and immutable plans; SC owns musical timing and note

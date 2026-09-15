@@ -28,19 +28,12 @@ from PySide6.QtQuick import QQuickWindow
 from PySide6.QtQuickControls2 import QQuickStyle
 from application_composition import (
     ApplicationDependencies,
-    ClientSelection,
     CommandClient,
     compose_application_graph,
     load_application_resources,
 )
 from bass_riffs import BassRiffCatalog
 from control_limits import bounded_control_range, clamp_control_value
-from config_loader import ResolvedAmyConfig
-from drum_patterns import (
-    DrumRhythm,
-    FILL_DENSITY_BARS,
-    load_drum_pattern_catalog,
-)
 from external_chord_input import ExternalChordAction, ExternalChordInputState
 from musical_state import (
     ChordSnapshot,
@@ -92,6 +85,7 @@ NOTE_DEFINITIONS = (
     {"label": "B", "semitone": 11, "accidental": False},
     {"label": "F♯", "semitone": 6, "accidental": True},
 )
+FILL_DENSITY_BARS = (8, 7, 6, 5, 4, 3, 2, 1)
 
 NOTE_NAMES_BY_SEMITONE = {item["semitone"]: item["label"] for item in NOTE_DEFINITIONS}
 
@@ -182,7 +176,7 @@ UI_PITCH_BEND_LIMIT_OCTAVES = 1.0 / 12.0
 UI_PITCH_BEND_STEP_OCTAVES = 1.0 / 300.0
 MIDI_PITCH_BEND_RANGE_OCTAVES = 1.0 / 6.0
 # FreeVerb's wet return is normalized.  The SC edition exposes its native
-# wet/room/damping surface and does not inherit AMY's boosted return range.
+# wet/room/damping surface and uses a normalized wet-return range.
 REVERB_LEVEL_MAX = 1.0
 
 PRESET_COUNT = 18
@@ -272,10 +266,6 @@ class RhythmDefinition:
     default_busyness: int
     default_chord_activity: int
     default_bass_activity: int
-    drum_pattern: DrumRhythm
-    # Retained only for backwards-compatible catalogue diagnostics. Runtime
-    # percussion uses drum_pattern's five complete logical-role patterns.
-    percussion_layers: tuple[dict[str, Any], ...]
     chord_levels: tuple[tuple[dict[str, Any], ...], ...]
     bass_levels: tuple[tuple[dict[str, Any], ...], ...]
 
@@ -767,7 +757,6 @@ def load_rhythm_catalog(
     path: Path,
 ) -> tuple[RhythmDefinition, ...]:
     raw = json.loads(path.read_text(encoding="utf-8"))
-    drum_catalog = load_drum_pattern_catalog(path.parent / "drums")
     rhythms: list[RhythmDefinition] = []
 
     for item in raw["rhythms"]:
@@ -785,8 +774,6 @@ def load_rhythm_catalog(
                 default_busyness=int(item["default_busyness"]),
                 default_chord_activity=int(item["default_chord_activity"]),
                 default_bass_activity=int(item["default_bass_activity"]),
-                drum_pattern=drum_catalog.rhythm(str(item["id"])),
-                percussion_layers=tuple(dict(layer) for layer in item["percussion_layers"]),
                 chord_levels=tuple(
                     tuple(dict(event) for event in level) for level in item["chord_levels"]
                 ),
@@ -800,10 +787,6 @@ def load_rhythm_catalog(
         raise ValueError("No rhythm definitions found")
 
     for rhythm in rhythms:
-        if len(rhythm.percussion_layers) != 5:
-            raise ValueError(f"Rhythm {rhythm.key!r} must have five percussion layers")
-        if rhythm.drum_pattern.meter != rhythm.meter:
-            raise ValueError(f"Rhythm {rhythm.key!r} meter differs from drum catalogue")
         if len(rhythm.chord_levels) != 5:
             raise ValueError(f"Rhythm {rhythm.key!r} must have five chord levels")
         if len(rhythm.bass_levels) != 5:
@@ -1078,7 +1061,7 @@ class InstrumentBackend(QObject):
         ]
         self._tempo_nudge_pressed = False
 
-        # Pitch bend is one transient AMY-global performance control. Static
+        # Pitch bend is one transient engine-global performance control. Static
         # tuning reference/mode may be decoupled between OMNI and MIDI, but
         # neither owns a second bend state or bakes bend into note definitions.
         self._pitch_bend_timer = QTimer(self)
@@ -1762,7 +1745,7 @@ class InstrumentBackend(QObject):
         if not runtime.set_control(key, value):
             return
 
-        # UI live edits send the same complete logical state to AMY, but they
+        # UI live edits send the same complete logical state to the engine, but they
         # must not republish the QML control-list model on every mouse move:
         # resetting a Repeater delegate during an active drag drops Qt's mouse
         # grab after the first movement. Instrument switches, preset loads and
@@ -2116,7 +2099,7 @@ class InstrumentBackend(QObject):
         """Move the obsolete identical bootstrap bank out of the active bank.
 
         Early Qt builds created all eighteen user presets from one placeholder
-        snapshot.  Its synth and rhythm identifiers predate the AMY catalog, so
+        snapshot. Its synth and rhythm identifiers predate the SC catalog, so
         retaining that bank makes every preset button appear ineffective.  The
         deliberately narrow signature below avoids replacing user-edited banks.
         """
@@ -2643,9 +2626,8 @@ class InstrumentBackend(QObject):
         self._active_root_midi_override = None
         self._strum_last_index = None
 
-        # Dedicated panic packet silences AMY and forces the serial backend
-        # to rebuild all five synth instances, so Panic is also a recovery
-        # operation after any allocation/transport fault.
+        # The dedicated panic action silences the engine, so Panic is also a
+        # recovery operation after an engine or protocol fault.
         self._client.send_message(
             self._panic_address,
             1,
@@ -2653,7 +2635,7 @@ class InstrumentBackend(QObject):
         self._send_pitch_bend()
 
         # Redundant explicit state messages keep the UI and receiver state
-        # converged after the hard AMY reset/rebuild.
+        # converged after the engine reset/rebuild.
         self._client.send_message(
             self._rhythm_chord_enabled_address,
             0,
@@ -2832,8 +2814,8 @@ class InstrumentBackend(QObject):
             self._rhythm_running = True
             self._send_rhythm_config()
 
-            # Publish the accompaniment gate before starting AMY transport.
-            # The AMY backend is still stopped at this point, so this updates
+            # Publish the accompaniment gate before starting engine transport.
+            # The engine is still stopped at this point, so this updates
             # its state without triggering a second sequencer rebuild.
             self._send_rhythm_chord_enabled()
             self._client.send_message(
@@ -3155,9 +3137,9 @@ class InstrumentBackend(QObject):
                 next_root,
             )
             self._send_chord_state(play_now=False)
-            # The AMY backend intentionally uses one fixed manual-chord
-            # synth.  If an older still-held chord becomes active again after
-            # the newer chord is released, retrigger it on that synth.
+            # The backend intentionally uses one fixed manual-chord owner. If
+            # an older still-held chord becomes active again after the newer
+            # chord is released, retrigger it under that owner.
             self._send_manual_chord(
                 "start",
                 key=(next_row, next_root),
@@ -3837,44 +3819,10 @@ def parse_arguments(
         description=("Qt Quick Omnichord using its configured audio backend")
     )
     parser.add_argument(
-        "--amy-config",
+        "--frontend-config",
         type=Path,
-        default=default_config_path or CONFIG_DIR / "amy_config.json",
-        help="AMY serial/backend JSON configuration file.",
-    )
-    parser.add_argument(
-        "--serial-port",
-        default=None,
-        help="Override serial.port from amy_config.json (for example /dev/serial0).",
-    )
-    parser.add_argument(
-        "--serial-baud",
-        type=int,
-        default=None,
-        help="Override serial.baud from amy_config.json.",
-    )
-    parser.add_argument(
-        "--local-amy",
-        action="store_const",
-        const=str(Path.home() / ".omnichord" / "amy.sock"),
-        dest="amy_socket",
-        help=("Connect to the external AMY service at ~/.omnichord/amy.sock."),
-    )
-    parser.add_argument(
-        "--amy-socket",
-        default=None,
-        help=(
-            "Connect to an external AMY local socket "
-            "(packet or LF-framed stream, depending on the platform)."
-        ),
-    )
-    parser.add_argument(
-        "--amy-local-name",
-        default=None,
-        help=(
-            "Connect to an external AMY service through Qt local IPC "
-            "(a named pipe in the native Windows package)."
-        ),
+        default=default_config_path or CONFIG_DIR / "frontend.json",
+        help="Frontend, MIDI, OSC and logical-routing JSON configuration file.",
     )
     parser.add_argument(
         "--capture-screenshots-dir",
@@ -4085,11 +4033,7 @@ def run_application(
     runtime = dependencies.resolve_package_runtime(
         platform_name=QGuiApplication.platformName(),
         private_files_dir=dependencies.private_files_dir(),
-        amy_socket=args.amy_socket,
-        amy_local_name=args.amy_local_name,
     )
-    args.amy_socket = runtime.amy_socket
-    args.amy_local_name = runtime.amy_local_name
 
     for warning in runtime.startup_warnings:
         print(f"Warning: {warning}", file=sys.stderr, flush=True)
@@ -4097,30 +4041,19 @@ def run_application(
     for diagnostic in dependencies.display_diagnostics(QGuiApplication.platformName()):
         print(diagnostic, file=sys.stderr, flush=True)
 
-    def transport_notice(
-        selection: ClientSelection,
-        resolved: ResolvedAmyConfig,
-    ) -> None:
-        if dependencies.engine_label == "SuperCollider":
-            message = "Audio backend: separate headless sclang/scsynth service"
-        elif selection.kind == "local":
-            message = f"AMY backend: Qt local IPC {selection.endpoint}"
-        elif selection.kind == "socket":
-            message = f"AMY backend: external socket {selection.endpoint}"
-        else:
-            message = (
-                "AMY serial backend: "
-                f"{resolved.transport.serial_port} @ "
-                f"{resolved.transport.serial_baud} baud"
-            )
-        print(message, file=sys.stderr, flush=True)
+    def backend_notice(_config: object) -> None:
+        print(
+            f"Audio backend: separate headless {dependencies.engine_label} service",
+            file=sys.stderr,
+            flush=True,
+        )
 
     graph = compose_application_graph(
         args,
         dependencies,
         resources,
         user_config_dir=user_config_dir,
-        transport_notice=transport_notice,
+        backend_notice=backend_notice,
     )
     audio_client = graph.client
     backend = graph.backend

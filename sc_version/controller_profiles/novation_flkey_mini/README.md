@@ -5,9 +5,9 @@ FLkey Mini (`USB 1235:013b`). It makes all 16 pads send distinct General MIDI
 percussion notes on MIDI channel 10.
 
 LB Omnichord needs no FLkey-specific translation. Leave the final MIDI row on
-its factory `Drum Kit 0` and channel `10`: the existing standard GM percussion
-path resolves these identities to the active AMY/Gamma9001 drum bank. Other
-MIDI controllers that already emit these notes behave identically.
+its factory `Drum Kit 0` and channel `10`: the standard GM percussion path
+resolves these identities to the selected SuperCollider drum kit. Other MIDI
+controllers that already emit these notes behave identically.
 
 The profile changes only the FLkey's pad **Custom Mode**. Its other pad modes
 are unaffected. Enter the configured mode by holding **Shift** and pressing

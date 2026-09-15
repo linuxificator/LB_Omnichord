@@ -2,12 +2,11 @@
 
 Status: authoritative category index
 Owner: Qt/QML presentation
-Last verified: 2026-09-08
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
-- `contract.md` owns screen layout and presentation behavior.
-- `behavior.md` is the compact UI behavior reference.
-- `interaction.md` owns shared mouse/touch/keyboard, slider and visual-cost
-  decisions.
-
-Read `../controls/` for MIDI/OSC learning and `../music/` for musical meaning.
-
+`interaction.md` owns shared mouse/touch/keyboard, slider and visual-cost
+decisions. Current screen behavior is executable in QML and the frontend/QML
+tests; completed migration verification is recorded in
+[`../sc/TO_FIX_VERIFICATION.md`](../sc/TO_FIX_VERIFICATION.md). Engine timing
+and nodes never leak into QML.

@@ -25,16 +25,16 @@ from application_composition import (  # noqa: E402
     compose_application_graph,
     load_application_resources,
 )
-from control_server import TestControlServer  # noqa: E402
 from backend_control_surface import BackendControlSurface  # noqa: E402
+from control_server import TestControlServer  # noqa: E402
 from performance_qml_adapter import PerformanceQmlAdapter  # noqa: E402
 
 
 class GuiControlSurface(BackendControlSurface):
     """Test-only visual probe around the production QML root window."""
 
-    def __init__(self, backend: Any, client: Any, window: QQuickWindow) -> None:
-        super().__init__(backend, client)
+    def __init__(self, backend: Any, window: QQuickWindow) -> None:
+        super().__init__(backend)
         self._window = window
 
     def setGuiScreen(self, midi_screen: bool) -> None:
@@ -120,27 +120,19 @@ def main() -> int:
         resources,
         user_config_dir=omnichord.CONFIG_DIR,
     )
-    amy_client = graph.client
+    client = graph.client
     backend = graph.backend
 
     port = int(os.environ.get("OMNICHORD_TEST_API_PORT", "18765"))
     engine: QQmlApplicationEngine | None = None
     if with_qml:
         engine, window = load_qml(resources, backend, dependencies.paths.gui)
-        surface: BackendControlSurface = GuiControlSurface(
-            backend,
-            amy_client,
-            window,
-        )
+        surface: BackendControlSurface = GuiControlSurface(backend, window)
         print("TEST_QML_READY=1", file=sys.stderr, flush=True)
     else:
-        surface = BackendControlSurface(backend, amy_client)
+        surface = BackendControlSurface(backend)
     test_server = TestControlServer(surface, port)
-    print(
-        f"TEST_API_PORT={test_server.port}",
-        file=sys.stderr,
-        flush=True,
-    )
+    print(f"TEST_API_PORT={test_server.port}", file=sys.stderr, flush=True)
 
     backend.send_initial_state()
     try:
@@ -149,7 +141,7 @@ def main() -> int:
         test_server.close()
         if engine is not None:
             del engine
-        amy_client.close()
+        client.close()
 
 
 if __name__ == "__main__":

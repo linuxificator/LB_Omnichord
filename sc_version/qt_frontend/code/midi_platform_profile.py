@@ -21,7 +21,6 @@ def resolve_midi_tech_profile(
     qpa_profiles = {
         "cocoa": "darwin",
         "windows": "win32",
-        "android": "android",
     }
     if qpa in qpa_profiles:
         return qpa_profiles[qpa]
@@ -30,8 +29,6 @@ def resolve_midi_tech_profile(
         return "darwin"
     if runtime.startswith(("win32", "cygwin", "msys")):
         return "win32"
-    if runtime.startswith("android"):
-        return "android"
     if runtime.startswith("linux"):
         return "linux"
 

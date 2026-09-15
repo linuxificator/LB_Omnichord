@@ -62,24 +62,25 @@ class QualityGuardrailFixtureTests(unittest.TestCase):
     def test_missing_design_route_fixture_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            design = root / "amysynth_version" / "design"
+            frontend = root / "sc_version" / "qt_frontend"
+            design = frontend.parent / "design"
             design.mkdir(parents=True)
             (design / "README.md").write_text(
                 "Read `missing.md`.\n", encoding="utf-8"
             )
             with self.assertRaisesRegex(QualityError, "route target is missing"):
-                check_document_routes(root)
+                check_document_routes(frontend)
 
-    def test_amy_and_platform_import_fixtures_are_rejected(self) -> None:
+    def test_foreign_engine_and_platform_import_fixtures_are_rejected(self) -> None:
         policy = {
-            "amy_import_allowlist": ["service.py"],
+            "forbidden_engine_imports": ["amy", "c_amy"],
             "platform_import_allowlist": {"ctypes": ["midi_adapter.py"]},
             "direct_platform_access_allowlist": [],
         }
         with tempfile.TemporaryDirectory() as directory:
             code = Path(directory)
             (code / "core.py").write_text("import amy\n", encoding="utf-8")
-            with self.assertRaisesRegex(QualityError, "AMY engine import"):
+            with self.assertRaisesRegex(QualityError, "forbidden engine import"):
                 check_import_boundaries(code, policy)
             (code / "core.py").write_text("import ctypes\n", encoding="utf-8")
             with self.assertRaisesRegex(QualityError, "platform import"):

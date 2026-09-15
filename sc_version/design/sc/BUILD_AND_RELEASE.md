@@ -1,6 +1,9 @@
 # SuperCollider build and release
 
 Status: active release contract
+Owner: SuperCollider package and release workflow
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
 The SuperCollider edition is the only actively released LB Omnichord edition.
 The AMY and Sonic Pi trees remain available as historical source archives.

@@ -1,89 +1,48 @@
 # SuperCollider edition design principles
 
 Status: authoritative baseline contract
-
 Owner: application architecture
-
 Applies to: `sc_version`
+Last verified: 2026-09-15
 
-Last verified: 2026-09-14
+## Boundaries and ownership
 
-## Engine boundary
+Qt/Python owns presentation, user interaction, external MIDI/OSC input,
+catalogue choice, presets and pure immutable plan compilation. `sclang` owns
+musical time, quantization, executions, gates, voice handles and timed release.
+`scsynth` owns audio nodes, buffers, buses and effects. Communication crosses a
+typed, versioned OSC protocol over loopback; UI code never manipulates engine
+nodes or schedules musical events.
 
-The Qt process does not synthesize audio, own the musical clock, or import an
-audio-engine implementation. It produces validated immutable plans and typed
-live actions. A versioned OSC adapter transports them to a separately
-supervised headless `sclang` process; `scsynth` is a child of that engine
-process.
+Manual chord, automatic chord, strum, bass, drum and MIDI voices have explicit
+owners. Releases target the original handle. A broad all-notes-off is recovery,
+not normal lifetime management.
 
-```text
-Qt -> application policy -> typed plan/action -> loopback OSC
-   -> sclang coordinator and clock -> scsynth audio graph
-```
+## One active engine
 
-The internal protocol contains musical meaning, not AMY wire strings and not
-raw scsynth node IDs. The UI-facing semantic API remains stable while the
-engine adapter changes.
+The production SC graph imports and packages no AMY runtime, wire transport,
+firmware builder or AMY capacity/configuration model. Compatibility with old
+program selections is data migration through a checked-in alias table, not a
+second engine path. Historical implementation material belongs in Git history
+or the separate edition.
 
-## Explicit ownership
+## Platform independence
 
-Python owns UI state, MIDI/OSC input, catalogue selection, presets and pure
-plan compilation. `sclang` owns sequence phase, quantization, immutable
-definition snapshots, execution state, note handles, musical gates and timed
-releases. `scsynth` owns audio nodes, buffers, buses and effects.
+Portable application and musical logic contain no platform branches.
+Discovery, native input and runtime location live in named adapters selected at
+the composition root. The supported package targets are Linux x86_64,
+Raspberry Pi aarch64, macOS arm64 and Windows x86_64. Android and ESP32 are not
+SC edition targets.
 
-Manual chord, automatic chord, strum, bass, drum and MIDI voices have distinct
-owners even where they share an audio bus. A release addresses the original
-handle; pitch lookup and broad all-notes-off operations are not substitutes.
+## Native mechanisms and simplicity
 
-## No frontend musical timing
+Prefer established Qt, operating-system and SuperCollider mechanisms over
+custom schedulers, mixers, process watchers or gesture interpreters. Add an
+abstraction only when it reduces coupling, makes ownership explicit or
+prevents a demonstrated regression. Do not headbang: repeated repairs to a
+growing custom mechanism are a signal to revisit the premise and use the
+standard mechanism.
 
-Python never polls sequence phase, follows beats or schedules musical note
-events. UI timers may classify gestures and animate presentation. Seconds-
-based performance tails are delegated to the engine once they affect note
-lifetime. Beat-based work stays on one SuperCollider `TempoClock`.
-
-## Behavioral preservation
-
-Screen changes do not change sound. OMNI and MIDI preset ownership remains
-separate. Running preset/rhythm changes preserve the established live state
-and transport continuity. Catalogue data is not rewritten merely to make an
-engine migration easier.
-
-Legacy AMY tests may remain as explicit characterization oracles during the
-migration. They do not authorize importing AMY into the SC production graph or
-shipping AMY in the SC package.
-
-## Platform scope
-
-Platform-specific discovery, process and package behavior lives in named
-adapters. The current supported SC target is Linux x86_64. Do not infer SC
-support for Raspberry Pi, macOS, Windows, Android or ESP32-P4 from the AMY
-edition's support for those targets.
-
-On Linux, use the distribution's audio-session mechanism. A PipeWire desktop
-uses its JACK compatibility wrapper; application code must not secretly start
-a competing raw JACK server.
-
-## Simplicity and native mechanisms
-
-Use native SuperCollider concepts—`TempoClock`, server groups, buses,
-SynthDefs and immutable application records—before inventing parallel clocks,
-mixers or lifetime systems. Add an abstraction only when it reduces coupling,
-makes ownership explicit or prevents a demonstrated regression.
-
-Do not headbang: repeated repairs to a growing custom mechanism are evidence
-to revisit the design and established platform/framework solution, not a
-reason to add another compensating layer.
-
-## Code-quality non-regression
-
-Portable application logic contains no operating-system branches, packaging
-drivers, synthetic inputs or integration-test receivers. External-input and
-process tests use separate processes across production boundaries. Generic
-tests are shared; unavoidable platform capability setup is isolated in a
-named platform adapter.
-
-Current executable tests, validated configuration and typed records outrank
-historical Git prose. Any intentional behavior change needs an executable
-contract and an updated owning design document.
+Current executable tests and validated configuration outrank historical notes.
+Every intentional behavior change needs a focused regression test and an
+update to its owning contract.

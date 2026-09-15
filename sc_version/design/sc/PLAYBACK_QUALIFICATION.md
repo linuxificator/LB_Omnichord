@@ -1,8 +1,9 @@
 # SuperCollider playback qualification
 
 Status: implemented contract and reproducible evidence
-
-Last verified: 2026-09-14 on Linux x86_64 with SuperCollider 3.13.0
+Owner: instrument playback qualification
+Applies to: `sc_version`
+Last verified: 2026-09-15 on Linux x86_64 with SuperCollider 3.13.0
 
 ## Catalogue boundary
 

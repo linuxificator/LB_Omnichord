@@ -1,0 +1,41 @@
+{
+  "config_revision": 1,
+  "midi_input": {
+    "enabled": true,
+    "tech_profile": "auto",
+    "device_glob": "/dev/snd/midiC*D*",
+    "alsa_raw_globs": ["/dev/snd/midiC*D*"],
+    "oss_midi_globs": ["/dev/midi", "/dev/midi[0-9]*", "/dev/amidi[0-9]*"]
+  },
+  "osc_input": {
+    "enabled": true,
+    "listen_address": "0.0.0.0",
+    "listen_port": 8000,
+    "advertise": true,
+    "service_name": "LB Omnichord"
+  },
+  "default_programs": {
+    "chord": "sc.sclork.prophet5pwmStrings",
+    "strum": "sc.sclork.pluck",
+    "bass": "sc.sclork.fmBass"
+  },
+  "midi": {
+    "voices_per_row": 4
+  },
+  "rhythm": {
+    "chord_gate_beats": 0.72,
+    "bass_gate_beats": 0.3,
+    "max_chord_notes": 4
+  },
+  "performance": {
+    "strum_tail_ms": 450
+  },
+  "logical_buses": {
+    "drums": 0,
+    "bass": 1,
+    "strum": 2,
+    "chord": 3,
+    "midi_rows": [4, 5, 6, 7, 8, 9],
+    "midi_drums": 10
+  }
+}

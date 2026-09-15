@@ -28,9 +28,6 @@ python -m PyInstaller --noconfirm --clean --windowed --onedir `
     --collect-all zeroconf --hidden-import ifaddr `
     --copy-metadata zeroconf --copy-metadata ifaddr `
     --copy-metadata dulwich --copy-metadata urllib3 `
-    --exclude-module amy --exclude-module c_amy `
-    --exclude-module amy_transport --exclude-module local_amy_service `
-    --exclude-module program_amy `
     --add-data "$(Join-Path $frontend 'licence.txt');." `
     --add-data "$(Join-Path $frontend 'THIRD_PARTY_NOTICES.md');." `
     --add-data "$(Join-Path $frontend 'config');config" `

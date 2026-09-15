@@ -2,31 +2,16 @@
 
 Status: authoritative category index
 Owner: musical application policy
-Last verified: 2026-09-14
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
-The active SuperCollider music-expansion contract is
-[`../sc/MUSIC_EXPANSION.md`](../sc/MUSIC_EXPANSION.md). It supersedes AMY engine
-details in the older shared documents below while preserving their musical and
-UI behavior contracts.
+The active rhythm, fill, bass, articulation and factory-preset contract is
+[`../sc/MUSIC_EXPANSION.md`](../sc/MUSIC_EXPANSION.md). Instrument admission,
+controls, sample semantics, gain qualification and lifetime evidence are in
+[`../sc/INSTRUMENT_BROWSER.md`](../sc/INSTRUMENT_BROWSER.md),
+[`../sc/SAMPLE_BANKS.md`](../sc/SAMPLE_BANKS.md) and
+[`../sc/PLAYBACK_QUALIFICATION.md`](../sc/PLAYBACK_QUALIFICATION.md).
 
-- `presets.md`: preset ownership and persistence.
-- `rhythm.md`: transport, tempo, fills and activity behavior.
-- `bass_riffs.md`: simple-bass pitch sources and the ranked independent riff
-  catalogue.
-- `bass_handover.md`: phase-preserving harmony publication and AMY-timed,
-  release-safe riff replacement.
-- `tb303.md`: shared TB-303-style instrument, bass-only articulation and
-  AMY-owned timing limits.
-- `midi_percussion.md`: complete GM note resolution and MIDI/sequencer level
-  reference.
-- `midi_pitched_balance.md`: common velocity and output-level reference for
-  every externally played pitched MIDI synth.
-- `sequences.md`: LB ownership versus AMY reusable definitions/executions.
-- `sound_balance.md`: instrument/reverb balance and measurement.
-- `volume_balance_audit.md`: bass/fill measurements, attack policy and reset
-  verification.
-- `tuning.md`: pitch and tuning behavior.
-- `use_cases.md`: executable musical expectations.
-
-Runtime catalogues under `../../qt_frontend/music/` and their schemas and
-provenance are the data authority. Design does not carry duplicate datasets.
+Runtime JSON under `../../qt_frontend/music/sc_expansion/`, factory presets and
+their executable tests are the data authority. The SC tree does not retain the
+old engine's generated drum/riff catalogues as a second musical source.

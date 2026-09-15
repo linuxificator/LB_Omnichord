@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=LB Omnichord
-Comment=Omnichord instrument using the AMY synthesizer
+Comment=Omnichord instrument using SuperCollider
 Exec=LB_Omnichord
 Icon=LB_Omnichord
 Categories=AudioVideo;Audio;Music;

@@ -8,12 +8,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "code"))
 
-from drum_patterns import load_drum_pattern_catalog  # noqa: E402
 from musical_sequence_plan import (  # noqa: E402
     compile_bass_lane,
     compile_chord_lane,
     compile_drum_lane,
 )
+from sc_drum_kits import resolve_hit  # noqa: E402
+from sc_music_catalog import load_sc_music_catalog  # noqa: E402
 
 
 class MusicalSequencePlanTests(unittest.TestCase):
@@ -238,7 +239,9 @@ class MusicalSequencePlanTests(unittest.TestCase):
                     )
 
     def test_drum_timing_uses_floor_conversion_and_fills_are_finite(self) -> None:
-        catalog = load_drum_pattern_catalog(ROOT / "music" / "drums")
+        catalog = load_sc_music_catalog(
+            ROOT / "music" / "sc_expansion" / "sc_kit_grooves_v1.json"
+        )
         config = {
             "id": "funk",
             "percussion_activity": 1,
@@ -248,35 +251,39 @@ class MusicalSequencePlanTests(unittest.TestCase):
         plan = compile_drum_lane(
             config=config,
             catalog=catalog,
-            kit="gamma9001",
+            kit="pcm-vsco",
             logical_bus=0,
             generation=1,
+            program_resolver=resolve_hit,
         )
+        arrangement = catalog.arrangement("pcm-vsco", "funk")
+        gate_key = sorted(event.gate_key for event in arrangement.levels[0])[0]
         activity = next(
             definition
             for definition in plan.definitions
-            if definition.definition_id.startswith("drums/activity/")
+            if definition.definition_id == f"drums/activity/{gate_key}"
         )
-        source_role = activity.definition_id.rsplit("/", 1)[-1]
         source_ticks = [
             event.tick // 2
-            for event in catalog.rhythm("funk").levels[0]
-            if event.role == source_role
+            for event in arrangement.levels[0]
+            if event.gate_key == gate_key
         ]
         self.assertEqual([event.tick for event in activity.events], source_ticks)
         fill = next(
             definition
             for definition in plan.definitions
-            if definition.definition_id.endswith(
-                "/" + catalog.rhythm("funk").fills[4].fill_id
-            )
+            if definition.definition_id
+            == "drums/fill/5/"
+            + str(catalog.fills("pcm-vsco", "funk")[4].allowed_start_beats[0])
         )
         self.assertEqual(fill.kind, "finite")
         self.assertTrue(any(event.kind == "gateBegin" for event in fill.events))
         self.assertTrue(any(event.kind == "drumHit" for event in fill.events))
 
     def test_drum_resolver_applies_program_and_clamps_final_velocity(self) -> None:
-        catalog = load_drum_pattern_catalog(ROOT / "music" / "drums")
+        catalog = load_sc_music_catalog(
+            ROOT / "music" / "sc_expansion" / "sc_kit_grooves_v1.json"
+        )
         plan = compile_drum_lane(
             config={
                 "id": "funk",
@@ -285,10 +292,10 @@ class MusicalSequencePlanTests(unittest.TestCase):
                 "fill_density_bars": 1,
             },
             catalog=catalog,
-            kit="loud-test-kit",
+            kit="pcm-vsco",
             logical_bus=2,
             generation=4,
-            program_resolver=lambda _kit, role: (f"sc.test.{role}", 2.5),
+            program_resolver=lambda _kit, role: (f"sc.test.{role}", role, 2.5),
         )
         hits = [
             event

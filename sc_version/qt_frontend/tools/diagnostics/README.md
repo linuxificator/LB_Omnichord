@@ -9,23 +9,23 @@ applications.
 
 It deliberately uses only the current repository's Python/PySide6/Qt/QML stack
 and a plain Qt Quick `Slider`. It does not import the LB Omnichord backend,
-AMY, MIDI code, custom slider components, scaling layout, presets or release
+MIDI code, custom slider components, scaling layout, presets or release
 packaging.
 
 Run it from the Qt frontend directory with the same environment used for the
 main app:
 
 ```bash
-cd /home/jeroen/omnichord/LB_Omnichord/amysynth_version/qt_frontend
-/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/simple_slider_baseline.py
+cd sc_version/qt_frontend
+../../.venv/bin/python tools/diagnostics/simple_slider_baseline.py
 ```
 
 If no window appears, retry with an explicit platform, matching the same
 diagnostic options supported by the main app:
 
 ```bash
-/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/simple_slider_baseline.py --x11
-/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/simple_slider_baseline.py --wayland
+../../.venv/bin/python tools/diagnostics/simple_slider_baseline.py --x11
+../../.venv/bin/python tools/diagnostics/simple_slider_baseline.py --wayland
 ```
 
 The baseline prints the selected Qt platform and display environment before it
@@ -50,7 +50,7 @@ Interpretation:
 After the plain baseline works, run the custom component baseline:
 
 ```bash
-/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/custom_slider_baseline.py
+../../.venv/bin/python tools/diagnostics/custom_slider_baseline.py
 ```
 
 Use the same mouse-hold-and-drag test. This version uses only
@@ -61,21 +61,20 @@ the full Omnichord layout or one of its surrounding controls.
 If both plain and custom baselines work, run the layout baseline:
 
 ```bash
-/home/jeroen/omnichord/omnichord-env/bin/python tools/diagnostics/layout_slider_baseline.py
+../../.venv/bin/python tools/diagnostics/layout_slider_baseline.py
 ```
 
 This adds the real app's outer shape: a `Flickable` viewport and scaled
-`contentArea`, but still no backend, AMY or MIDI. It has an immediate-echo
+`contentArea`, but still no backend or MIDI. It has an immediate-echo
 slider and a delayed-echo slider. If this fails, the bug is in viewport/layout
 pointer handling. If it works, the remaining suspect is full-app runtime state
 feedback or another surrounding full-app control.
 
-For full-app slider tracing on a desktop machine, use the local AMY launcher:
+For full-app slider tracing on a desktop machine, use the edition launcher:
 
 ```bash
 ./run_local.sh --slider-trace
 ```
 
-Do not run `code/main.py --slider-trace` directly on a desktop unless a serial
-AMY device exists or an AMY socket option is supplied. Direct `code/main.py`
-uses the default Pi serial config (`/dev/serial0`).
+The launcher owns the SuperCollider process group and runtime environment, so
+do not bypass it by starting `code/main.py` directly.

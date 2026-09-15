@@ -512,7 +512,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
 
     @Slot(float)
     def setReverbLevel(self, value: float) -> None:
-        """Expose AMY reverb wet-return gain through 3.0."""
+        """Expose the normalized SuperCollider room wet-return gain."""
         if self._midi_control_blocks({"screen": "omni", "kind": "reverb_level"}):
             return
         clamped = max(0.0, min(REVERB_LEVEL_MAX, float(value)))

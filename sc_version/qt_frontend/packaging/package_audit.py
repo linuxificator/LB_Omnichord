@@ -4,10 +4,8 @@
 from __future__ import annotations
 
 import argparse
-import gzip
 import json
 import re
-import tarfile
 import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -40,25 +38,6 @@ def tree_members(root: Path) -> list[Member]:
     ]
 
 
-def _nested_python_bundle_members(
-    archive: zipfile.ZipFile, info: zipfile.ZipInfo
-) -> list[Member]:
-    members: list[Member] = []
-    with archive.open(info) as raw, gzip.GzipFile(fileobj=raw) as uncompressed:
-        with tarfile.open(fileobj=uncompressed, mode="r|") as bundle:
-            for item in bundle:
-                if item.isfile() or item.issym():
-                    members.append(
-                        Member(
-                            item.name,
-                            item.size,
-                            None,
-                            "android-python-bundle",
-                        )
-                    )
-    return members
-
-
 def zip_members(path: Path) -> list[Member]:
     members: list[Member] = []
     with zipfile.ZipFile(path) as archive:
@@ -73,8 +52,6 @@ def zip_members(path: Path) -> list[Member]:
                     "zip",
                 )
             )
-            if info.filename.endswith("/libpybundle.so"):
-                members.extend(_nested_python_bundle_members(archive, info))
     return members
 
 
@@ -85,7 +62,7 @@ def content_members(package: Path | None, tree: Path | None) -> list[Member]:
     if package is not None and zipfile.is_zipfile(package):
         members.extend(zip_members(package))
     if not members:
-        raise ValueError("audit needs a package ZIP/APK or an extracted package tree")
+        raise ValueError("audit needs a package ZIP or an extracted package tree")
     return members
 
 

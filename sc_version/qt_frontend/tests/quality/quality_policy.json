@@ -1,34 +1,18 @@
 {
   "schema_version": 1,
   "active_documents": [
-    "amysynth_version/design/arch/principles.md",
-    "amysynth_version/design/arch/architecture.md",
-    "amysynth_version/design/arch/behavior.md",
-    "amysynth_version/design/arch/configuration.md",
-    "amysynth_version/design/arch/testing.md",
-    "amysynth_version/design/arch/test_processes.md",
-    "amysynth_version/design/gui/contract.md",
-    "amysynth_version/design/gui/behavior.md",
-    "amysynth_version/design/controls/midi.md",
-    "amysynth_version/design/controls/midi_control.md",
-    "amysynth_version/design/controls/osc.md",
-    "amysynth_version/design/music/presets.md",
-    "amysynth_version/design/music/sound_balance.md",
-    "amysynth_version/design/music/rhythm.md",
-    "amysynth_version/design/music/sequences.md",
-    "amysynth_version/design/music/tuning.md",
-    "amysynth_version/design/music/use_cases.md",
-    "amysynth_version/design/amy/interface.md",
-    "amysynth_version/design/amy/sequencer.md",
-    "amysynth_version/design/esp32/performance.md",
-    "amysynth_version/design/platform/raspberry_pi/README.md",
-    "amysynth_version/qt_frontend/docs/CONTROL_SAFETY.md",
-    "amysynth_version/qt_frontend/docs/DEPENDENCIES.md",
-    "amysynth_version/qt_frontend/packaging/AMY_RELEASE.md"
+    "sc_version/design/arch/principles.md",
+    "sc_version/design/arch/architecture.md",
+    "sc_version/design/arch/behavior.md",
+    "sc_version/design/arch/testing.md",
+    "sc_version/design/arch/sc_code_quality_review.md",
+    "sc_version/design/sc/STATUS.md",
+    "sc_version/design/sc/PLAYBACK_QUALIFICATION.md",
+    "sc_version/design/sc/INSTRUMENT_BROWSER.md",
+    "sc_version/design/sc/MUSIC_EXPANSION.md",
+    "sc_version/design/sc/BUILD_AND_RELEASE.md"
   ],
-  "amy_import_allowlist": [
-    "local_amy_service.py"
-  ],
+  "forbidden_engine_imports": ["amy", "c_amy"],
   "platform_import_allowlist": {
     "ctypes": [
       "midi_linux.py"

@@ -1,8 +1,9 @@
 # SuperCollider music expansion
 
 Status: authoritative implementation and data contract
-
-Last verified: 2026-09-14
+Owner: SuperCollider musical catalogue
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
 ## Scope and ownership
 

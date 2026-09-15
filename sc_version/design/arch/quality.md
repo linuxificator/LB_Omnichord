@@ -2,28 +2,21 @@
 
 Status: authoritative non-regression contract
 Owner: application architecture
-Applies to: active `amysynth_version`
-Last verified: 2026-09-08
+Applies to: `sc_version`
+Last verified: 2026-09-15
 
-The completed quality work established these boundaries:
+- `code/main.py` is the only production composition root.
+- One typed SC client is injected; production has no alternate engine path.
+- Platform-dependent behavior is selected in named adapters.
+- Musical plans are immutable and Python owns no musical clock.
+- Frontend and engine configuration are strict, versioned and typed.
+- Queues and ownership pools are bounded and failures are visible.
+- MIDI/OSC integration stimulus runs outside production processes.
+- The SC package contains no AMY runtime, transport, firmware, configuration or
+  unused AMY source catalogue.
+- Requirements and direct imports have one checked-in dependency authority.
+- New Python modules pass strict mypy; Ruff and the QML warning ratchet gate CI.
 
-- `code/main.py` is the sole production composition root.
-- The Qt frontend is a wire-only AMY client and never imports or links AMY.
-- Platform-specific behavior lives in imported/injected adapters.
-- AMY command plans and musical state transformations are pure and immutable.
-- Configuration is versioned, schema-validated, migrated and resolved before
-  runtime construction; config values have one authority.
-- MIDI/OSC readers cross a queued Qt boundary. Integration stimulus runs in a
-  separate process and is not packaged as product code.
-- Command, logging and delayed-work queues are bounded and expose failure.
-- Runtime catalogues are validated, immutable and covered by provenance.
-- Release inputs pin an immutable AMY commit and reviewed dependency inputs.
-- Ruff/Pyflakes and mypy are regression gates; production mypy debt is zero.
-- Mouse, touch and keyboard policy stays in shared Qt primitives rather than
-  duplicated platform branches.
-
-Large modules remain candidates for cohesive extraction, but line count alone
-is not permission to split them. Every refactor must preserve QML behavior,
-wire bytes, musical timing, preset migration and process separation, with
-characterization tests added before moving an uncertain boundary.
-
+Large modules may be split only along demonstrated ownership seams. Line count
+alone is not a reason to add indirection. Refactoring preserves QML behavior,
+musical timing, migration and process separation with executable contracts.

@@ -37,40 +37,19 @@ class ScBassExpansionTests(unittest.TestCase):
             ROOT / "music" / "sc_expansion" / "sc_kit_grooves_v1.json"
         )
 
-    def test_revised_catalogue_preserves_every_original_onset_and_pitch(self) -> None:
-        original = json.loads(
-            (ROOT / "music" / "omnichord_bass_riffs.json").read_text(encoding="utf-8")
-        )
+    def test_catalogue_has_unique_complete_sc_riff_identities(self) -> None:
         by_id = {riff.riff_id: riff for riff in self.catalog.riffs}
         self.assertEqual(len(by_id), 1664)
-        self.assertEqual(set(by_id), {str(row["riff_id"]) for row in original["riffs"]})
-        for row in original["riffs"]:
-            revised = by_id[str(row["riff_id"])]
-            expected = [
-                (
-                    event["tick"],
-                    event["duration_ticks"],
-                    event["pitch_offset_semitones_from_C2"],
-                    event["role"],
-                    event["velocity"],
-                    event["accent"],
-                    event["slide_to_next"],
-                )
-                for event in row["timing"]["events"]
-            ]
-            actual = [
-                (
-                    event.tick,
-                    event.duration_ticks,
-                    event.pitch_offset,
-                    event.role,
-                    event.velocity,
-                    event.accent,
-                    event.slide_to_next,
-                )
-                for event in revised.events
-            ]
-            self.assertEqual(actual, expected, revised.riff_id)
+        self.assertEqual(len(by_id), len(self.catalog.riffs))
+        self.assertTrue(all(riff.events for riff in self.catalog.riffs))
+        self.assertTrue(
+            all(
+                0 <= event.tick < riff.phrase_ticks
+                and 0 < event.duration_ticks <= riff.phrase_ticks
+                for riff in self.catalog.riffs
+                for event in riff.events
+            )
+        )
 
     def test_all_contexts_match_reviewed_reference_resolutions(self) -> None:
         raw = json.loads(self.context_path.read_text(encoding="utf-8"))

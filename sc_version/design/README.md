@@ -1,74 +1,41 @@
 # LB Omnichord SuperCollider design index
 
 Status: authoritative documentation index
-
 Owner: SuperCollider edition architecture
-
 Applies to: `sc_version`
-Last verified: 2026-09-14
+Last verified: 2026-09-15
 
-This tree began as a behavior-preserving copy of the AMY design tree. The
-contracts remain authoritative for UI, music, external controls, configuration
-quality and tests. Where an AMY transport or engine detail conflicts with the
-SuperCollider design, the documents in [`sc/`](sc/) and executable SC tests
-supersede it for this edition only. The AMY and Sonic Pi implementations are
-retained as historical source archives and are not active release targets.
-
-## Categories
-
-- [`arch/`](arch/README.md): architecture, configuration, testing, quality,
-  dependencies and open work.
-- [`amy/`](amy/README.md): AMY wire boundary, reusable sequences and upstream
-  maintenance findings.
-- [`esp32/`](esp32/README.md): ESP32-P4 firmware, realtime performance,
-  reverb and release evidence.
-- [`gui/`](gui/README.md): Qt/QML layout, interaction and rendering contracts.
-- [`controls/`](controls/README.md): MIDI, OSC and external-control learning.
-- [`music/`](music/README.md): presets, rhythm, sequences, balance and tuning.
-- [`platform/`](platform/README.md): desktop/mobile packaging and Raspberry Pi.
-- [`quality_todo/`](quality_todo/README.md): bounded, evidence-backed quality
-  work that has been identified but is not yet an active implementation.
-- [`sc/`](sc/): migration requirements, decisions, implementation evidence and
-  current completion status.
+This design tree describes only the active SuperCollider edition. Historical
+AMY implementation notes remain available in Git history and in the separate
+`amysynth_version` tree; they are not runtime or packaging authority here.
 
 ## Required reading
 
-For every SuperCollider edition task, first read:
+Before changing this edition, read:
 
 1. [`../README.md`](../README.md)
 2. [`arch/principles.md`](arch/principles.md)
 3. [`arch/architecture.md`](arch/architecture.md)
 4. [`arch/behavior.md`](arch/behavior.md)
 5. [`arch/testing.md`](arch/testing.md)
-6. [`sc/CODEX_HANDOVER_SUPERCOLLIDER_MIGRATION.md`](sc/CODEX_HANDOVER_SUPERCOLLIDER_MIGRATION.md)
-7. [`sc/STATUS.md`](sc/STATUS.md)
-8. [`sc/PLAYBACK_QUALIFICATION.md`](sc/PLAYBACK_QUALIFICATION.md) when changing
-   instruments, samples, drums, gain staging or voice lifetimes
-9. [`sc/INSTRUMENT_BROWSER.md`](sc/INSTRUMENT_BROWSER.md) when changing
-   instrument selection, sample grouping or program controls
-10. [`sc/TO_FIX_VERIFICATION.md`](sc/TO_FIX_VERIFICATION.md) for the completed
-    SC usability follow-up and its executable evidence
-11. [`sc/BUILD_AND_RELEASE.md`](sc/BUILD_AND_RELEASE.md) for active platform,
-    sample-installation and release workflow contracts
-12. [`sc/MUSIC_EXPANSION.md`](sc/MUSIC_EXPANSION.md) when changing drum kits,
-    rhythms, fills, bass articulation or factory preset defaults
+6. [`sc/STATUS.md`](sc/STATUS.md)
+7. the README for each affected category
 
-Then read the category README and owning contracts for every subsystem being
-changed. If `../../CODEX_HANDOFF.md` exists, read it for operational state; it
-never overrides these contracts or the user's current request.
+Use [`sc/PLAYBACK_QUALIFICATION.md`](sc/PLAYBACK_QUALIFICATION.md) for sound,
+sample or voice-lifetime work, [`sc/INSTRUMENT_BROWSER.md`](sc/INSTRUMENT_BROWSER.md)
+for program selection and controls, [`sc/MUSIC_EXPANSION.md`](sc/MUSIC_EXPANSION.md)
+for rhythm/bass work and [`sc/BUILD_AND_RELEASE.md`](sc/BUILD_AND_RELEASE.md)
+for package changes. `../../CODEX_HANDOFF.md` records operational state but
+does not override these contracts.
 
-## Conflict resolution
+## Categories
 
-When prose and implementation disagree, use this order:
+- [`arch/`](arch/README.md): ownership, configuration, tests and quality.
+- [`gui/`](gui/README.md): Qt interaction and rendering.
+- [`controls/`](controls/README.md): MIDI/OSC input and learning.
+- [`music/`](music/README.md): routes to current musical contracts and data.
+- [`platform/`](platform/README.md): supported packages and native boundaries.
+- [`sc/`](sc/STATUS.md): engine implementation, evidence and release state.
 
-1. current executable tests and machine-readable configuration;
-2. authoritative subsystem contract;
-3. current consolidated analysis;
-4. historical Git content.
-
-Document the discrepancy before changing behavior. SC release pins and
-resource limits come from
-`../qt_frontend/packaging/supercollider_release_inputs.json`,
-`../supercollider/source-lock.json`, and
-`../qt_frontend/config/supercollider.json`; copied AMY release metadata is not
-an authority for the SC package.
+Executable tests and validated machine-readable data outrank stale prose. A
+superseded design is removed from the branch tip; Git keeps the audit trail.

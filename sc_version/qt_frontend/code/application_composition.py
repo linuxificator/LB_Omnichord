@@ -4,18 +4,15 @@ from argparse import Namespace
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Protocol, cast
 
-from config_loader import (
-    ResolvedAmyConfig,
-    apply_transport_overrides,
-)
+from frontend_config import FrontendConfig
 from midi_input import MidiInputPortFactory
 from osc_input import OscInputPortFactory
 from runtime_platform_adapters import RuntimeOverrides
 
 
-TransportNotice = Callable[["ClientSelection", ResolvedAmyConfig], None]
+BackendNotice = Callable[[FrontendConfig], None]
 SynthFallbackNotice = Callable[[str, str, str], None]
 
 
@@ -39,8 +36,6 @@ class RuntimeResolver(Protocol):
         *,
         platform_name: str,
         private_files_dir: Path,
-        amy_socket: str | None,
-        amy_local_name: str | None,
     ) -> RuntimeOverrides: ...
 
 
@@ -67,7 +62,7 @@ class FrontendPaths:
 @dataclass(frozen=True, slots=True)
 class ApplicationDependencies:
     paths: FrontendPaths
-    load_resolved_config: Callable[[Path], ResolvedAmyConfig]
+    load_frontend_config: Callable[[Path], FrontendConfig]
     load_defaults: Callable[[Path], dict[str, Any]]
     load_chords: Callable[[Path], tuple[Any, ...]]
     load_synth_catalog: Callable[[Path], tuple[Sequence[Any], int, int, int]]
@@ -75,16 +70,14 @@ class ApplicationDependencies:
     load_bass_riffs: Callable[..., Any]
     load_title_config: Callable[[Path], dict[str, Any]]
     load_intonation_table: Callable[[Path], Any]
-    serial_client: ClientFactory
-    socket_client: ClientFactory
-    local_client: ClientFactory
+    client_factory: ClientFactory
     midi_input_port: MidiInputPortFactory
     osc_input_port: OscInputPortFactory
     private_files_dir: Callable[[], Path]
     resolve_package_runtime: RuntimeResolver
     display_diagnostics: Callable[[str], tuple[str, ...]]
     backend: BackendFactory
-    engine_label: str = "AMY"
+    engine_label: str = "SuperCollider"
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,15 +97,8 @@ class ApplicationResources:
 
 
 @dataclass(frozen=True, slots=True)
-class ClientSelection:
-    kind: Literal["serial", "socket", "local"]
-    endpoint: str | None
-
-
-@dataclass(frozen=True, slots=True)
 class ApplicationGraph:
-    resolved_config: ResolvedAmyConfig
-    client_selection: ClientSelection
+    frontend_config: FrontendConfig
     client: CommandClient
     backend: Any
     resources: ApplicationResources
@@ -140,12 +126,14 @@ def load_application_resources(
     defaults = dependencies.load_defaults(user_config_dir / "defaults.json")
     chords = dependencies.load_chords(paths.music / "chords.csv")
     synth_list, chord_fallback, strum_fallback, bass_fallback = (
-        dependencies.load_synth_catalog(paths.instruments / "synths.json")
+        dependencies.load_synth_catalog(
+            paths.instruments / "supercollider-legacy-map.json"
+        )
     )
     synths = tuple(synth_list)
     rhythms = dependencies.load_rhythm_catalog(paths.music / "rhythms.json")
     bass_riffs = dependencies.load_bass_riffs(
-        paths.music / "omnichord_bass_riffs.json",
+        paths.music / "sc_expansion" / "omnichord_bass_riffs_v2.json",
         rhythm_ids=(rhythm.key for rhythm in rhythms),
         chord_suffixes=(chord.suffix for chord in chords),
     )
@@ -224,44 +212,15 @@ def address_map(args: Namespace) -> dict[str, str]:
     }
 
 
-def select_client(args: Namespace) -> ClientSelection:
-    if args.amy_socket and args.amy_local_name:
-        raise ValueError("select either --amy-socket or --amy-local-name")
-    if args.amy_local_name:
-        return ClientSelection("local", str(args.amy_local_name))
-    if args.amy_socket:
-        return ClientSelection(
-            "socket",
-            str(Path(args.amy_socket).expanduser()),
-        )
-    return ClientSelection("serial", None)
-
-
 def _create_client(
-    selection: ClientSelection,
     dependencies: ApplicationDependencies,
     *,
-    resolved: ResolvedAmyConfig,
+    config: FrontendConfig,
     addresses: dict[str, str],
 ) -> CommandClient:
-    if selection.kind == "local":
-        return dependencies.local_client(
-            config=None,
-            addresses=addresses,
-            server_name=selection.endpoint,
-            resolved_config=resolved,
-        )
-    if selection.kind == "socket":
-        return dependencies.socket_client(
-            config=None,
-            addresses=addresses,
-            socket_path=selection.endpoint,
-            resolved_config=resolved,
-        )
-    return dependencies.serial_client(
-        config=None,
+    return dependencies.client_factory(
         addresses=addresses,
-        resolved_config=resolved,
+        frontend_config=config,
     )
 
 
@@ -271,27 +230,20 @@ def compose_application_graph(
     resources: ApplicationResources,
     *,
     user_config_dir: Path,
-    transport_notice: TransportNotice | None = None,
+    backend_notice: BackendNotice | None = None,
 ) -> ApplicationGraph:
-    requested = Path(args.amy_config)
+    requested = Path(args.frontend_config)
     config_path = select_config_path(
         requested,
-        shipped_config=dependencies.paths.config / "amy_config.json",
-        user_config=user_config_dir / "amy_config.json",
+        shipped_config=dependencies.paths.config / "frontend.json",
+        user_config=user_config_dir / "frontend.json",
     )
-    resolved = dependencies.load_resolved_config(config_path)
-    resolved = apply_transport_overrides(
-        resolved,
-        serial_port=args.serial_port,
-        serial_baud=args.serial_baud,
-    )
-    selection = select_client(args)
-    if transport_notice is not None:
-        transport_notice(selection, resolved)
+    config = dependencies.load_frontend_config(config_path)
+    if backend_notice is not None:
+        backend_notice(config)
     client = _create_client(
-        selection,
         dependencies,
-        resolved=resolved,
+        config=config,
         addresses=address_map(args),
     )
     backend = dependencies.backend(
@@ -338,8 +290,7 @@ def compose_application_graph(
     # exists, so base construction never dispatches to subclass overrides.
     backend.initialize()
     return ApplicationGraph(
-        resolved_config=resolved,
-        client_selection=selection,
+        frontend_config=config,
         client=client,
         backend=backend,
         resources=resources,

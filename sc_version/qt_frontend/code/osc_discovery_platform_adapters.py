@@ -5,17 +5,10 @@ from collections.abc import Callable
 
 from PySide6.QtGui import QGuiApplication
 
-from osc_discovery import OscServiceAdvertiser, null_osc_service_advertiser
+from osc_discovery import OscServiceAdvertiser
 
 
 OscServiceAdvertiserFactory = Callable[[], OscServiceAdvertiser]
-
-
-def _is_android(runtime_platform: str, qpa_name: str) -> bool:
-    return (
-        str(runtime_platform).casefold().startswith("android")
-        or str(qpa_name).casefold() == "android"
-    )
 
 
 def create_osc_service_advertiser(
@@ -25,8 +18,7 @@ def create_osc_service_advertiser(
 ) -> OscServiceAdvertiser:
     """Select the discovery adapter once at the platform boundary."""
 
-    if _is_android(runtime_platform, qpa_name):
-        return null_osc_service_advertiser()
+    del runtime_platform, qpa_name
 
     from osc_discovery_zeroconf import ZeroconfOscServiceAdvertiser
 
