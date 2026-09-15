@@ -29,3 +29,17 @@ For diagnostic packaging, dispatch with `build_packages=true` and
 `release=false`. It follows the same four-platform test, package self-check,
 content-audit and size-gate path, retains the artifacts for inspection and
 cannot publish a release.
+
+## Headless desktop runtime evidence
+
+Diagnostic run `35035347234` built and tested all four targets from commit
+`230bf5a`. Its complete-package audits reported no forbidden runtime content:
+
+| Package | Full IDE runtime release | Headless runtime candidate | Reduction |
+| --- | ---: | ---: | ---: |
+| macOS arm64 DMG | 296,968,460 bytes | 51,786,964 bytes | 82.6% |
+| Windows x86_64 ZIP | 203,302,533 bytes | 61,772,572 bytes | 69.6% |
+
+The comparison baseline is published release `R20260915T180639-SC`. The
+candidate figures are the package files themselves, not GitHub's outer
+artifact archives. Both are well below the enforced 145,000,000-byte budgets.
