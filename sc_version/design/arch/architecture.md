@@ -12,8 +12,8 @@ one validated frontend configuration, constructs one `SuperColliderClient` and
 injects that semantic client into the application backend. There is no runtime
 transport selector and no serial, socket or in-process synth fallback.
 
-The launcher or frozen entry supervises one headless `sclang` process group;
-`sclang` owns the Supernova audio server:
+Source and frozen entry points use the same Python supervisor for one headless
+`sclang` process group; `sclang` owns the Supernova audio server:
 
 ```text
 launcher / frozen entry
@@ -22,8 +22,12 @@ launcher / frozen entry
     └── Supernova multicore audio server
 ```
 
-Shutdown targets only the owned process group and never searches by executable
-name.
+Startup first verifies that the configured language UDP endpoint is available;
+the SC bootstrap repeats that check before it installs any OSC handler, closing
+the unavoidable check-to-bind race. A collision therefore fails before the UI
+can connect to a stale coordinator. Normal application exit and termination
+signals both stop the complete owned process group with a bounded graceful
+then forced fallback. Shutdown never searches by executable name.
 
 ## Protocol and execution
 

@@ -37,6 +37,17 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
 
 (scriptDirectory +/+ "protocol_runtime.scd").load;
 (scriptDirectory +/+ "program_registry.scd").load;
+(scriptDirectory +/+ "sequencer.scd").load;
+
+if(validateOnly) {
+    "LB_OMNICHORD_SC_SYNTAX_OK".postln;
+    0.exit;
+};
+
+if(thisProcess.openUDPPort(languagePort).not) {
+    ("LB_OMNICHORD_SC_PORT_IN_USE " ++ languagePort).postln;
+    1.exit;
+};
 
 ~omniReply = { |address, path ... args|
     NetAddr(address.ip, address.port).sendMsg(path, *args);
@@ -304,18 +315,10 @@ OSCdef(\omniProgramRelease, { |message|
     };
 }, '/omni/v1/program/release', recvPort: languagePort);
 
-(scriptDirectory +/+ "sequencer.scd").load;
-
 if("OMNICHORD_SC_SYNTH_PROGRAM".getenv.notNil) {
     Server.program = "OMNICHORD_SC_SYNTH_PROGRAM".getenv;
 };
 
-if(validateOnly) {
-    "LB_OMNICHORD_SC_SYNTAX_OK".postln;
-    0.exit;
-};
-
-thisProcess.openUDPPort(languagePort);
 s = Server.local;
 s.options.sampleRate = sampleRate;
 s.options.blockSize = blockSize;

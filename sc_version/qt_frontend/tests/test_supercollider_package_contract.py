@@ -99,13 +99,18 @@ class SuperColliderPackageContractTests(unittest.TestCase):
 
     def test_source_launcher_owns_one_headless_engine_process_group(self) -> None:
         launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
-        self.assertIn('setsid "${sc_launcher[@]}" sclang -D', launcher)
-        self.assertIn('trap cleanup EXIT INT TERM HUP', launcher)
-        self.assertIn("pipewire-jack", launcher)
-        self.assertIn('command -v supernova', launcher)
-        self.assertIn('OMNICHORD_SC_SYNTH_PROGRAM="exec ', launcher)
-        self.assertIn("supercollider_linux_realtime.py", launcher)
-        self.assertIn("it is not a runtime watcher", launcher)
+        source_entry = (ROOT / "code" / "supercollider_source_entry.py").read_text(
+            encoding="utf-8"
+        )
+        adapter = (ROOT / "code" / "supercollider_platform_adapter.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('exec "$venv_python"', launcher)
+        self.assertIn("supercollider_source_entry.py", launcher)
+        self.assertIn("SuperColliderSupervisor", source_entry)
+        self.assertIn("require_available_language_port", adapter)
+        self.assertIn("start_new_session=os.name !=", adapter)
+        self.assertIn("configure_owned_supernova_realtime", adapter)
 
     def test_endurance_driver_uses_the_production_audio_server(self) -> None:
         endurance = (
@@ -371,7 +376,9 @@ class SuperColliderPackageContractTests(unittest.TestCase):
 
     def test_gesture_voices_are_bounded_inside_the_engine(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
-        launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
+        adapter = (ROOT / "code" / "supercollider_platform_adapter.py").read_text(
+            encoding="utf-8"
+        )
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
@@ -386,8 +393,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("gestureStealRelease", bootstrap)
         self.assertIn("record[\\outputControlBus].setn([", bootstrap)
         self.assertIn("forcedRelease.asFloat.max(0.05)", bootstrap)
-        self.assertIn("server.gesture_voice_limit", launcher)
-        self.assertIn("export OMNICHORD_SC_MAX_GESTURE_VOICES", launcher)
+        self.assertIn("server.gesture_voice_limit", adapter)
+        self.assertIn('"OMNICHORD_SC_MAX_GESTURE_VOICES"', adapter)
 
     def test_supernova_graph_parallelizes_only_independent_stages(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")

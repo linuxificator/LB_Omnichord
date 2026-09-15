@@ -28,13 +28,22 @@ The audio graph then has low average CPU use but can still miss a deadline when
 a desktop compositor briefly schedules work ahead of any one helper.
 
 The Linux launcher therefore performs one bounded startup action after it has
-created its private process session. It resolves the exact Supernova executable
+created its private process session. Source and packaged launchers share this
+same Python supervisor rather than duplicating shell lifecycle code. It resolves
+the exact Supernova executable
 inside that owned session, enumerates only its `DSP Thread *` tasks through
 `/proc`, asks the existing system RealtimeKit service for its configured maximum
 priority, applies that policy to the pool and verifies the result. It then
 exits; it is neither a persistent process watcher nor a process-name search.
 If the host already granted Supernova realtime access, no RealtimeKit call is
 made. Other platforms retain SuperCollider's native scheduling policy.
+
+The supervisor also owns restart safety. It rejects an occupied coordinator
+port before launch, while the SC bootstrap treats a bind race as fatal before
+creating OSC handlers or an audio server. Application close and OS termination
+signals synchronously stop the exact private process tree. A quick restart can
+therefore either start cleanly or report that the previous instance is still
+finishing; it cannot silently talk to an older coordinator.
 
 Failure to obtain host realtime service is reported explicitly but does not
 silently select another engine or prevent startup. Linux package qualification

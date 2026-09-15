@@ -263,7 +263,9 @@ def main_entry() -> int:
         return verify_package(root, runtime)
     import main
     from sample_repository import prepare_user_runtime_config
+    from supercollider_client import SuperColliderUnavailable
     from supercollider_platform_adapter import SuperColliderSupervisor
+    from supercollider_platform_adapter import SuperColliderProcessError
 
     forwarded_args, explicit_sample_root = _extract_sample_root_argument(sys.argv[1:])
     config_path, config = prepare_user_runtime_config(
@@ -274,12 +276,16 @@ def main_entry() -> int:
         ),
     )
     os.environ["OMNICHORD_SC_CONFIG"] = str(config_path)
-    with SuperColliderSupervisor(
-        engine_root=root / "supercollider",
-        config=config,
-        runtime_root=runtime,
-    ):
-        return int(main.main(forwarded_args, asset_root=root))
+    try:
+        with SuperColliderSupervisor(
+            engine_root=root / "supercollider",
+            config=config,
+            runtime_root=runtime,
+        ):
+            return int(main.main(forwarded_args, asset_root=root))
+    except (SuperColliderProcessError, SuperColliderUnavailable) as exc:
+        print(f"Cannot start LB Omnichord: {exc}", file=sys.stderr, flush=True)
+        return 1
 
 
 if __name__ == "__main__":

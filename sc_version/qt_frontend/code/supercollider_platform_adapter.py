@@ -6,6 +6,7 @@ from pathlib import Path
 import shlex
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -18,6 +19,21 @@ from supercollider_linux_realtime import configure_owned_supernova_realtime
 
 class SuperColliderProcessError(RuntimeError):
     """Raised before the UI starts when its owned SC runtime is unusable."""
+
+
+def require_available_language_port(host: str, port: int) -> None:
+    """Fail before engine launch when another process owns the OSC endpoint."""
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            if os.name == "nt" and hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            probe.bind((host, port))
+    except OSError as exc:
+        raise SuperColliderProcessError(
+            f"SuperCollider OSC port {host}:{port} is already in use; "
+            "close the previous LB Omnichord instance and retry"
+        ) from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +163,8 @@ class SuperColliderSupervisor:
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self.process: subprocess.Popen[bytes] | None = None
         self._realtime_setup_thread: threading.Thread | None = None
+        self._previous_signal_handlers: dict[int, object] = {}
+        self._stopping = False
 
     def _language_config(self) -> Path | None:
         class_library = self.executables.class_library
@@ -240,8 +258,17 @@ class SuperColliderSupervisor:
     def start(self) -> None:
         if self.process is not None:
             raise SuperColliderProcessError("SuperCollider is already started")
+        language = self.config.language
+        require_available_language_port(language.host, language.port)
         command, env = self._launch_context(with_audio_wrapper=True)
-        self.process = subprocess.Popen(command, env=env, start_new_session=True)
+        self.process = subprocess.Popen(
+            command,
+            env=env,
+            start_new_session=os.name != "nt",
+            creationflags=(
+                subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
+            ),
+        )
         if isinstance(self.process.pid, int):
             self._realtime_setup_thread = threading.Thread(
                 target=self._configure_realtime,
@@ -261,32 +288,88 @@ class SuperColliderSupervisor:
         print(realtime.summary(), file=stream, flush=True)
 
     def stop(self, timeout: float = 4.0) -> None:
+        if self._stopping:
+            return
+        self._stopping = True
         process = self.process
         self.process = None
-        if process is not None and process.poll() is None:
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            try:
-                process.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
+        try:
+            if process is not None and process.poll() is None:
+                self._signal_process_tree(process, force=False)
                 try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                process.wait(timeout=2.0)
-        self._realtime_setup_thread = None
-        if self._temporary is not None:
-            self._temporary.cleanup()
-            self._temporary = None
+                    process.wait(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    self._signal_process_tree(process, force=True)
+                    process.wait(timeout=2.0)
+            self._realtime_setup_thread = None
+            if self._temporary is not None:
+                self._temporary.cleanup()
+                self._temporary = None
+        finally:
+            self._stopping = False
+
+    @staticmethod
+    def _signal_process_tree(
+        process: subprocess.Popen[bytes], *, force: bool
+    ) -> None:
+        if os.name == "nt":
+            command = ["taskkill", "/PID", str(process.pid), "/T"]
+            if force:
+                command.append("/F")
+            subprocess.run(
+                command,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            return
+        try:
+            os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+
+    def _handle_termination(self, signum: int, _frame: object) -> None:
+        if self._stopping:
+            return
+        # Qt may defer or absorb an exception raised while its native event
+        # loop is active.  Tear down the exact process tree here as well as in
+        # __exit__, so an operating-system termination signal can never orphan
+        # the private sclang/Supernova runtime.
+        self.stop()
+        raise SystemExit(128 + signum)
+
+    def _install_signal_handlers(self) -> None:
+        if threading.current_thread() is not threading.main_thread():
+            return
+        for name in ("SIGTERM", "SIGHUP", "SIGQUIT"):
+            signum = getattr(signal, name, None)
+            if signum is None:
+                continue
+            previous = signal.getsignal(signum)
+            if previous is signal.SIG_IGN:
+                continue
+            signal.signal(signum, self._handle_termination)
+            self._previous_signal_handlers[int(signum)] = previous
+
+    def _restore_signal_handlers(self) -> None:
+        for signum, previous in self._previous_signal_handlers.items():
+            signal.signal(signum, previous)
+        self._previous_signal_handlers.clear()
 
     def __enter__(self) -> SuperColliderSupervisor:
         self.start()
+        try:
+            self._install_signal_handlers()
+        except BaseException:
+            self.stop()
+            raise
         return self
 
     def __exit__(self, *_exc: object) -> None:
-        self.stop()
+        try:
+            self.stop()
+        finally:
+            self._restore_signal_handlers()
 
 
 def json_string(value: str) -> str:

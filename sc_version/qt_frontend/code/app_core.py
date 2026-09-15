@@ -4196,13 +4196,16 @@ def run_application(
     # Make teardown order explicit. QML must be destroyed while the Python
     # backend QObject is still alive; otherwise its context property becomes
     # null and dozens of bindings log TypeErrors during application shutdown.
-    exit_code = app.exec()
+    try:
+        exit_code = app.exec()
+    finally:
+        # Destroy the QML engine/root objects first. This cleanup also runs
+        # when the process supervisor translates an OS termination signal
+        # into SystemExit while Qt owns the native event loop.
+        del engine
 
-    # Destroy the QML engine/root objects first.
-    del engine
-
-    # QML can no longer generate performance messages, so close the selected
-    # engine protocol before releasing the backend object that owns it.
-    audio_client.close()
+        # QML can no longer generate performance messages, so close the
+        # selected engine protocol before releasing its backend owner.
+        audio_client.close()
 
     return exit_code
