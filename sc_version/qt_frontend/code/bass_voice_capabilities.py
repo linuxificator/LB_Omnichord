@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from types import MappingProxyType
 
+from runtime_paths import production_frontend_asset_root
+
 
 @dataclass(frozen=True, slots=True)
 class BassVoiceCapability:
@@ -27,8 +29,9 @@ class BassVoiceCapability:
 
 
 def _load() -> MappingProxyType[str, BassVoiceCapability]:
+    root = production_frontend_asset_root(Path(__file__).resolve().parent)
     path = (
-        Path(__file__).resolve().parent.parent
+        root
         / "music"
         / "sc_expansion"
         / "bass_voice_capabilities_v1.json"
