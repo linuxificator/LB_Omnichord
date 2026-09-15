@@ -69,6 +69,13 @@ list and is compared as JSON content rather than serialized bytes. No hashes
 are calculated during startup. This makes every PCM alias reproducible across
 source runs and packages without downloading unreachable source recordings.
 
+The generated compact drum catalogue retains the source kit-calibration
+records rather than treating them as build-only metadata. A source-level test
+qualifies every kit against one common reference groove and every pad against
+the same peak window. This evidence is independent of preset role volumes:
+presets remain musical choices, while kit calibration makes those choices
+comparable.
+
 ## Rhythm and fill behavior
 
 Each arrangement retains its authored period, event timing, role, pad,

@@ -144,6 +144,7 @@ def _compact_kit_catalogue(bundle: Path) -> dict[str, Any]:
                 "program_id": item["program_id"],
                 "profile": item["profile"],
                 "kit_gain_db": item["kit_gain_db"],
+                "kit_calibration": item["kit_calibration"],
                 "pads": item["pads"],
                 "role_defaults": item["role_defaults"],
             }

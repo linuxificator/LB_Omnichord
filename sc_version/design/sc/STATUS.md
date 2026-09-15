@@ -33,7 +33,10 @@ x86_64
   1 and lose the selected program's prepared controls.
 - The four native acid voices support the current conservative TB-303
   articulation contract, implement the visible ADSR controls and advertise
-  riff articulation support with the bass-row orange indicator.
+  riff articulation support with the bass-row orange indicator. Three-register
+  NRT calibration now places each voice at the same median-RMS reference as the
+  measured SCLOrk catalogue; the formerly hot Acid Oto source no longer masks
+  otherwise balanced percussion.
 - All 109 pinned SCLOrkSynths definitions compile and remain in the auditable
   source inventory. The pitched browser admits 76 measured definitions; 31
   raw drum definitions remain available to the dedicated drum path, nineteen
@@ -55,6 +58,9 @@ x86_64
 - The five pitched MIDI rows now use that same `SYN`/`PCM` catalogue and
   parameter surface. Both percussion locations expose fifteen explicit drum
   kits: the legacy PCM kit, five native SC kits and nine expanded PCM kits.
+  The compact runtime data preserves per-kit calibration, and tests require a
+  common reference-groove target plus bounded pad peaks for every PCM kit and
+  explicit measured gains for every selected native drum program.
   Reverb controls name the native SC model (`WET`, `ROOM`, `DAMP`) and no
   longer promise AMY-only ranges or terminology.
 - Manual strum has no frontend voice-stealing limit: every accepted attack has

@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -15,6 +16,8 @@ import soundfile
 
 ROOT = Path(__file__).resolve().parents[2]
 SC_ROOT = ROOT.parent / "supercollider"
+sys.path.insert(0, str(ROOT / "tests"))
+from audio_metrics import audio_metrics  # noqa: E402
 SEGMENT_SECONDS = 0.75
 SAMPLE_RATE = 48_000
 BATCH_SIZE = 12
@@ -25,6 +28,49 @@ BATCH_SIZE = 12
     "SuperCollider is unavailable",
 )
 class SuperColliderNonRealtimeTests(unittest.TestCase):
+    def test_owned_acid_voices_match_the_instrument_balance_reference(self) -> None:
+        names = ("acid303", "acidOto", "acidMoog", "acidWarsaw")
+        frequencies = (55, 110, 220)
+        segment_seconds = 0.8
+        with tempfile.TemporaryDirectory(prefix="lb-acid-balance-") as temporary:
+            output = Path(temporary) / "acid-balance.wav"
+            environment = dict(os.environ)
+            environment["OMNICHORD_SC_ACID_BALANCE_OUTPUT"] = str(output)
+            completed = subprocess.run(
+                ["sclang", "-D", str(SC_ROOT / "tests" / "acid_balance_nrt.scd")],
+                cwd=SC_ROOT,
+                env=environment,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=20,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout)
+            self.assertIn("LB_OMNICHORD_ACID_BALANCE_NRT_OK", completed.stdout)
+            self.assertNotIn("FAILURE IN SERVER", completed.stdout)
+            frames, sample_rate = soundfile.read(
+                output, dtype="float64", always_2d=True
+            )
+
+        measurements: dict[str, list[float]] = {name: [] for name in names}
+        for index, (name, frequency) in enumerate(
+            (name, frequency) for name in names for frequency in frequencies
+        ):
+            start = round((0.05 + index * segment_seconds) * sample_rate)
+            end = round((0.05 + index * segment_seconds + 0.70) * sample_rate)
+            metrics = audio_metrics(frames[start:end], sample_rate)
+            rms = 10.0 ** (float(metrics["rms_dbfs"]) / 20.0)
+            measurements[name].append(rms)
+            with self.subTest(program=name, frequency=frequency):
+                self.assertEqual(int(metrics["clipped_samples"]), 0)
+                self.assertLessEqual(float(metrics["peak_dbfs"]), -3.7)
+        for name, values in measurements.items():
+            with self.subTest(program=name):
+                median = sorted(values)[1]
+                self.assertGreaterEqual(median, 0.049)
+                self.assertLessEqual(median, 0.051)
+
     @unittest.skipUnless(shutil.which("supernova"), "Supernova is unavailable")
     def test_supernova_renders_ordered_parallel_graph(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lb-supernova-nrt-") as temporary:

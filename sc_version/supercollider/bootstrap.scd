@@ -403,6 +403,7 @@ s.waitForBoot({
                     \out, ~omniLogicalBuses[logicalBus.clip(0, 10)].index,
                     \freqTargetHz, frequency,
                     \velocity, velocity,
+                    \calibrationGain, ~omniAcidPlaybackGain.value(program),
                     \pitchBendBus, ~omniBendBus.index,
                     \t_accent, accentValue
                 ] ++ ~omniAcidArgs.value(owner, program, revision));
