@@ -57,8 +57,11 @@ x86_64
   kits: the legacy PCM kit, five native SC kits and nine expanded PCM kits.
   Reverb controls name the native SC model (`WET`, `ROOM`, `DAMP`) and no
   longer promise AMY-only ranges or terminology.
-- Manual strum no longer has a frontend voice-stealing limit: every attack has
-  an exact independent handle and SC owns its release. Root sequence changes
+- Manual strum has no frontend voice-stealing limit: every accepted attack has
+  an exact independent handle and SC owns its release. The engine admits 24
+  live handles per gesture owner and releases the oldest with a short fade only
+  under saturation, preventing GUI event bursts from exhausting native voice
+  buses. See [`STRUM_PRESSURE.md`](STRUM_PRESSURE.md). Root sequence changes
   are scheduled at the current transport phase, so riff, arpeggio, leader and
   activity changes do not restart the beat clock.
 - The complete mix crosses one private master stage with a 0.95 safety limiter.
@@ -101,8 +104,9 @@ x86_64
   alternate location. Startup admits a checkout or ordinary copy based on all
   required audio hashes in the bundled manifest; Git metadata is not a runtime
   dependency. An unchanged validated inventory uses a user-local cache.
-- SuperCollider configuration revision 4 and protocol revision 2 include the
-  explicit sample commit and per-event drum duration cap. Every frozen package
+- SuperCollider configuration revision 5 and protocol revision 2 include the
+  explicit sample commit, per-event drum duration cap and per-owner gesture
+  voice boundary. Every frozen package
   self-check exercises additive migration from all earlier revisions before an
   audio process is opened.
 - Frozen package verification resolves both source and PyInstaller asset

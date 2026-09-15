@@ -29,6 +29,8 @@ for package changes. `../../CODEX_HANDOFF.md` records operational state but
 does not override these contracts.
 Read [`sc/SUPERNOVA.md`](sc/SUPERNOVA.md) for audio-server selection,
 parallel graph ordering and its performance boundary.
+Read [`sc/STRUM_PRESSURE.md`](sc/STRUM_PRESSURE.md) for the bounded native
+gesture lifetime and its continuous-pointer regression evidence.
 
 ## Categories
 
