@@ -6,9 +6,13 @@ components in addition to the components recorded in the release SBOM.
 ## SuperCollider 3.14.1
 
 SuperCollider is distributed under the GNU General Public License, version 3
-or later. The SC Linux edition includes a pinned, headless build. Corresponding
-source is available from
+or later. Every desktop package includes a pinned, headless build from the
+same upstream source release. Corresponding source is available from
 <https://github.com/supercollider/supercollider/releases/tag/Version-3.14.1>.
+
+The Windows build enables SuperCollider's PortAudio ASIO backend using the
+checksum-pinned Steinberg ASIO SDK under its GNU GPL version 3 option. The SDK
+and its licence are available from <https://www.steinberg.net/asiosdk>.
 
 ## SCLOrkSynths
 

@@ -107,7 +107,7 @@ jobs:
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ${{ runner.temp }}/supercollider-runtime
-          key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.sh', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
+          key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.sh', 'sc_version/packaging/fixup_supercollider_macos.cmake', 'sc_version/packaging/headless-macos-Info.plist', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
       - name: Install native build dependencies
         if: steps.runtime.outputs.cache-hit != 'true'
         run: brew install cmake ninja libsndfile readline fftw
@@ -151,7 +151,7 @@ jobs:
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ${{ runner.temp }}/supercollider-runtime
-          key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.ps1', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
+          key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.ps1', 'sc_version/packaging/fixup_supercollider_windows.cmake', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
       - name: Build pinned headless runtime
         if: steps.runtime.outputs.cache-hit != 'true'
         shell: pwsh
@@ -277,7 +277,7 @@ jobs:
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ${{ runner.temp }}/supercollider-runtime
-          key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.sh', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
+          key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.sh', 'sc_version/packaging/fixup_supercollider_macos.cmake', 'sc_version/packaging/headless-macos-Info.plist', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
       - name: Install native build dependencies
         if: steps.runtime.outputs.cache-hit != 'true'
         run: brew install cmake ninja libsndfile readline fftw
@@ -319,7 +319,7 @@ jobs:
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ${{ runner.temp }}/supercollider-runtime
-          key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.ps1', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
+          key: sc-headless-${{ runner.os }}-${{ runner.arch }}-3.14.1-${{ hashFiles('sc_version/packaging/build_supercollider_runtime.ps1', 'sc_version/packaging/fixup_supercollider_windows.cmake', 'sc_version/qt_frontend/packaging/supercollider_release_inputs.json') }}
       - name: Build pinned headless runtime
         if: steps.runtime.outputs.cache-hit != 'true'
         shell: pwsh

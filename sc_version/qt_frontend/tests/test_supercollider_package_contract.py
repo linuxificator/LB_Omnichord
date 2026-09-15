@@ -268,10 +268,31 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn('"$runtime_root/bin/supernova"', runtime_builder)
         self.assertIn('"$resources/supernova"', runtime_builder)
         self.assertIn("QtWebEngine is forbidden", runtime_builder)
+        self.assertIn("fixup_supercollider_macos.cmake", runtime_builder)
+        macos_fixup = (
+            ROOT.parent / "packaging" / "fixup_supercollider_macos.cmake"
+        ).read_text(encoding="utf-8")
+        self.assertIn("fixup_bundle", macos_fixup)
+        self.assertIn("verify_app", macos_fixup)
         self.assertIn('"-DSC_QT=OFF"', windows_runtime_builder)
         self.assertIn('"-DSC_IDE=OFF"', windows_runtime_builder)
         self.assertIn('"-DPA_USE_ASIO=ON"', windows_runtime_builder)
         self.assertIn("ASIO SDK checksum mismatch", windows_runtime_builder)
+        self.assertIn("fixup_supercollider_windows.cmake", windows_runtime_builder)
+        self.assertIn("ASIO-SDK-GPLv3.txt", windows_runtime_builder)
+        windows_fixup = (
+            ROOT.parent / "packaging" / "fixup_supercollider_windows.cmake"
+        ).read_text(encoding="utf-8")
+        self.assertIn("fixup_bundle", windows_fixup)
+        self.assertIn("verify_app", windows_fixup)
+        release_inputs = json.loads(
+            (ROOT / "packaging" / "supercollider_release_inputs.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        asio = release_inputs["windows_asio_sdk"]
+        self.assertIn(asio["source_url"], windows_runtime_builder)
+        self.assertIn(asio["source_sha256"], windows_runtime_builder)
         self.assertGreaterEqual(text.count("supernova -v"), 3)
         for platform in (
             "Linux-x86_64",

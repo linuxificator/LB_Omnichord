@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 sc_version=3.14.1
 source_sha256=ee640c68777ae697682066ce5c4a8b7e56c5b223e76c79c13b5be5387ee55bb2
 source_url="https://github.com/supercollider/supercollider/releases/download/Version-${sc_version}/SuperCollider-${sc_version}-Source.tar.bz2"
@@ -72,6 +73,7 @@ cmake --install "$build_root/cmake"
 if [[ "$host_system" == "Darwin" ]]; then
     runtime_root="$install_prefix/SuperCollider/SuperCollider.app"
     resources="$runtime_root/Contents/Resources"
+    cp "$script_dir/headless-macos-Info.plist" "$runtime_root/Contents/Info.plist"
     mkdir -p "$resources/SCClassLibrary"
     rsync -a \
         --exclude='GUI/' \
@@ -90,6 +92,12 @@ if [[ "$host_system" == "Darwin" ]]; then
         echo "QtWebEngine is forbidden in the headless macOS runtime" >&2
         exit 2
     fi
+    brew_prefix="$(brew --prefix)"
+    cmake \
+        -DRUNTIME_APP="$runtime_root" \
+        -DDEPENDENCY_DIRS="$brew_prefix/lib;$(brew --prefix libsndfile)/lib;$(brew --prefix readline)/lib" \
+        -P "$script_dir/fixup_supercollider_macos.cmake"
+    codesign --force --deep --sign - "$runtime_root"
 else
     runtime_root="$install_prefix"
     executables=(

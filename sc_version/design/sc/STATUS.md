@@ -103,8 +103,11 @@ x86_64
 - A single GitHub workflow tests all four packaged platforms. Publication and
   package construction require an explicit `release=true` manual dispatch and
   use an independent `-SC` release tag. Linux and Raspberry Pi receive
-  AppImages, macOS a DMG and Windows a ZIP. Each contains the official or pinned
-  SuperCollider 3.14.1 runtime and no AMY runtime.
+  AppImages, macOS a DMG and Windows a ZIP. Each contains the same
+  checksum-pinned, source-built headless SuperCollider 3.14.1 runtime and no
+  AMY runtime. The IDE, SC Qt bindings, help browser and QtWebEngine are not
+  part of any package; diagnostic package builds enforce the whole-package
+  size budget without an engine-runtime exemption.
 - First launch streams the commit-pinned GitHub tree snapshot of the
   `linuxificator/VSCO-2-CE` runtime branch at the first-run location chosen
   through Qt (or the exact `--sample-root` path).

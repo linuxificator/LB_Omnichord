@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 $PSNativeCommandUseErrorActionPreference = $true
 
+$ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ScVersion = "3.14.1"
 $SourceSha256 = "ee640c68777ae697682066ce5c4a8b7e56c5b223e76c79c13b5be5387ee55bb2"
 $SourceUrl = "https://github.com/supercollider/supercollider/releases/download/Version-$ScVersion/SuperCollider-$ScVersion-Source.tar.bz2"
@@ -56,7 +57,6 @@ if (-not (Test-Path $ExtractedAsio)) {
 
 $CmakeRoot = Join-Path $BuildRoot "cmake"
 cmake -S $SourceRoot -B $CmakeRoot --fresh `
-    -G "Visual Studio 17 2022" -A x64 `
     "-DCMAKE_BUILD_TYPE=Release" `
     "-DCMAKE_INSTALL_PREFIX=$InstallPrefix" `
     "-DCMAKE_TOOLCHAIN_FILE=$(Join-Path $VcpkgRoot 'scripts\buildsystems\vcpkg.cmake')" `
@@ -82,6 +82,13 @@ $RuntimeRoot = Join-Path $InstallPrefix "SuperCollider"
             throw "Windows headless runtime is missing $_"
         }
     }
+$VcpkgBin = Join-Path $VcpkgRoot "installed\$Triplet\bin"
+cmake "-DRUNTIME_ROOT=$RuntimeRoot" "-DDEPENDENCY_DIRS=$VcpkgBin" `
+    -P (Join-Path $ScriptRoot "fixup_supercollider_windows.cmake")
+$LicenseRoot = Join-Path $RuntimeRoot "licenses"
+New-Item -ItemType Directory -Force -Path $LicenseRoot | Out-Null
+Copy-Item (Join-Path $ExtractedAsio "LICENSES\LICENSE_GPLv3.txt") `
+    (Join-Path $LicenseRoot "ASIO-SDK-GPLv3.txt")
 if (Get-ChildItem $RuntimeRoot -Recurse -File | Where-Object {
     $_.Name -match '^Qt(5|6)|WebEngine|scide'
 }) {

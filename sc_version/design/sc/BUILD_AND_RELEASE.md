@@ -3,7 +3,7 @@
 Status: active release contract
 Owner: SuperCollider package and release workflow
 Applies to: `sc_version`
-Last verified: 2026-09-15
+Last verified: 2026-09-16
 
 The SuperCollider edition is the only actively released LB Omnichord edition.
 The AMY and Sonic Pi trees remain available as historical source archives.
@@ -48,6 +48,19 @@ non-realtime tooling but is not the production audio server.
 Packaged `sclang` runs in its native standalone mode with one explicit private
 class-library tree. A remembered build prefix or a user's SC extensions can
 therefore neither duplicate nor alter the released engine.
+
+All four engine runtimes are compiled headlessly from the same pinned upstream
+source release. The desktop packages contain `sclang`, `scsynth`, `supernova`,
+the class library and plugins, but not the SuperCollider IDE, its Qt bindings,
+help browser or QtWebEngine. macOS bundles and rewrites its non-system dylib
+closure with CMake's platform-standard `BundleUtilities`; Homebrew remains a
+build dependency and is not a runtime assumption. Windows builds the bundled
+PortAudio backend with the checksum-pinned ASIO SDK under its GPLv3 terms.
+
+Before publishing, use `build_packages=true` with `release=false` when a
+packaging change needs downloadable evidence. This executes the release path
+without creating a GitHub release. The macOS and Windows package budgets are
+145,000,000 bytes each, and their embedded SC runtime has no audit exemption.
 
 ## Runtime and samples
 
