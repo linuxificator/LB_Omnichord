@@ -72,4 +72,8 @@ python "$frontend_dir/packaging/package_audit.py" \
     --platform macOS-arm64 --tree "$app_bundle" --package "$output" \
     --forbidden-runtime-exempt-prefix "Contents/Resources/sc-runtime" \
     --max-package-bytes 600000000 --output "$package_audit"
+(
+    cd "$output_dir"
+    shasum -a 256 "$(basename "$output")" > "$(basename "$output").sha256"
+)
 printf '%s\n' "$output"

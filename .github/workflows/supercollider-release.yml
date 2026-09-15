@@ -316,5 +316,14 @@ jobs:
           RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
         run: |
           mapfile -t assets < <(find dist -maxdepth 1 -type f -print | sort)
-          test "${#assets[@]}" -ge 8
+          for package in \
+            "LB_Omnichord.SC.${RELEASE_TAG%-SC}.Linux-x86_64.AppImage" \
+            "LB_Omnichord.SC.${RELEASE_TAG%-SC}.RaspberryPi-aarch64.AppImage" \
+            "LB_Omnichord.SC.${RELEASE_TAG%-SC}.macOS-arm64.dmg" \
+            "LB_Omnichord.SC.${RELEASE_TAG%-SC}.Windows-x86_64.zip"; do
+            test -f "dist/$package"
+            test -f "dist/$package.sha256"
+            test -f "dist/$package.package-audit.json"
+            test -f "dist/$package.qml-imports.json"
+          done
           gh release create "$RELEASE_TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$RELEASE_TAG" --notes 'LB Omnichord SuperCollider edition for Linux x86_64, Raspberry Pi aarch64, macOS arm64 and Windows x86_64. The verified VSCO 2 CE sample repository is installed on first launch. Android is not part of this release.'
