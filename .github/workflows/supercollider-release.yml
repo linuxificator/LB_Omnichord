@@ -313,14 +313,15 @@ jobs:
       - name: Publish complete SuperCollider release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
           RELEASE_TAG: ${{ needs.release-metadata.outputs.tag }}
         run: |
           mapfile -t assets < <(find dist -maxdepth 1 -type f -print | sort)
           for package in \
-            "LB_Omnichord.SC.${RELEASE_TAG%-SC}.Linux-x86_64.AppImage" \
-            "LB_Omnichord.SC.${RELEASE_TAG%-SC}.RaspberryPi-aarch64.AppImage" \
-            "LB_Omnichord.SC.${RELEASE_TAG%-SC}.macOS-arm64.dmg" \
-            "LB_Omnichord.SC.${RELEASE_TAG%-SC}.Windows-x86_64.zip"; do
+            "LB_Omnichord.SC.${RELEASE_STAMP}.Linux-x86_64.AppImage" \
+            "LB_Omnichord.SC.${RELEASE_STAMP}.RaspberryPi-aarch64.AppImage" \
+            "LB_Omnichord.SC.${RELEASE_STAMP}.macOS-arm64.dmg" \
+            "LB_Omnichord.SC.${RELEASE_STAMP}.Windows-x86_64.zip"; do
             test -f "dist/$package"
             test -f "dist/$package.sha256"
             test -f "dist/$package.package-audit.json"

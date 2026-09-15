@@ -286,6 +286,11 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn('shasum -a 256', macos_builder)
         self.assertIn('"$(basename "$output").sha256"', macos_builder)
         self.assertIn('test -f "dist/$package.sha256"', text)
+        self.assertIn(
+            "RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}", text
+        )
+        self.assertIn("LB_Omnichord.SC.${RELEASE_STAMP}", text)
+        self.assertNotIn("LB_Omnichord.SC.${RELEASE_TAG%-SC}", text)
         windows_builder = (ROOT / "packaging" / "build_windows.ps1").read_text(
             encoding="utf-8"
         )
