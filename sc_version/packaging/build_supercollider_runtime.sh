@@ -43,9 +43,13 @@ fi
 
 platform_flags=()
 if [[ "$host_system" == "Darwin" ]]; then
+    # The Qt IDE normally links Foundation transitively. A Qt-free sclang still
+    # uses SC's Objective-C filesystem helpers, so declare that native framework
+    # directly instead of retaining Qt solely for an incidental link edge.
     platform_flags+=(
         -DCMAKE_OSX_ARCHITECTURES=arm64
         -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+        "-DCMAKE_EXE_LINKER_FLAGS=-framework Foundation"
         -DAUDIOAPI=portaudio
         -DSYSTEM_PORTAUDIO=OFF
     )

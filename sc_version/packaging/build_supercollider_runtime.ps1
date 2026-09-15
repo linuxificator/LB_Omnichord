@@ -25,6 +25,7 @@ if (-not $VcpkgRoot) {
     throw "VCPKG_INSTALLATION_ROOT is required for the Windows runtime build"
 }
 $Triplet = "x64-windows-release"
+$VcpkgBin = Join-Path $VcpkgRoot "installed\$Triplet\bin"
 
 New-Item -ItemType Directory -Force -Path $BuildRoot | Out-Null
 if (-not (Test-Path $Archive)) {
@@ -53,7 +54,7 @@ if (-not (Test-Path $ExtractedAsio)) {
 }
 
 & (Join-Path $VcpkgRoot "vcpkg.exe") install `
-    "libsndfile:$Triplet" "fftw3:$Triplet" "readline:$Triplet"
+    "libsndfile[core]:$Triplet" "fftw3:$Triplet"
 
 $CmakeRoot = Join-Path $BuildRoot "cmake"
 cmake -S $SourceRoot -B $CmakeRoot --fresh `
@@ -61,6 +62,8 @@ cmake -S $SourceRoot -B $CmakeRoot --fresh `
     "-DCMAKE_INSTALL_PREFIX=$InstallPrefix" `
     "-DCMAKE_TOOLCHAIN_FILE=$(Join-Path $VcpkgRoot 'scripts\buildsystems\vcpkg.cmake')" `
     "-DVCPKG_TARGET_TRIPLET=$Triplet" `
+    "-DFFTW3F_LIBRARY_DIR=$VcpkgBin" `
+    "-DSNDFILE_LIBRARY_DIR=$VcpkgBin" `
     "-DSC_QT=OFF" `
     "-DSC_IDE=OFF" `
     "-DNO_X11=ON" `
@@ -82,7 +85,6 @@ $RuntimeRoot = Join-Path $InstallPrefix "SuperCollider"
             throw "Windows headless runtime is missing $_"
         }
     }
-$VcpkgBin = Join-Path $VcpkgRoot "installed\$Triplet\bin"
 cmake "-DRUNTIME_ROOT=$RuntimeRoot" "-DDEPENDENCY_DIRS=$VcpkgBin" `
     -P (Join-Path $ScriptRoot "fixup_supercollider_windows.cmake")
 $LicenseRoot = Join-Path $RuntimeRoot "licenses"
