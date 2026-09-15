@@ -27,6 +27,8 @@ for program selection and controls, [`sc/MUSIC_EXPANSION.md`](sc/MUSIC_EXPANSION
 for rhythm/bass work and [`sc/BUILD_AND_RELEASE.md`](sc/BUILD_AND_RELEASE.md)
 for package changes. `../../CODEX_HANDOFF.md` records operational state but
 does not override these contracts.
+Read [`sc/SUPERNOVA.md`](sc/SUPERNOVA.md) for audio-server selection,
+parallel graph ordering and its performance boundary.
 
 ## Categories
 

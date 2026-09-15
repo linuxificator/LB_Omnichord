@@ -54,7 +54,7 @@ class SuperColliderProcessTests(unittest.TestCase):
             self.assertEqual(run.call_args.args[0][0], "/usr/bin/systemctl")
 
     def test_server_program_command_is_shell_safe_on_each_platform(self) -> None:
-        path = Path("/tmp/SC Runtime/bin/scsynth")
+        path = Path("/tmp/SC Runtime/bin/supernova")
         self.assertEqual(
             server_program_command(path, platform="linux"),
             f"exec {shlex.quote(str(path.resolve()))}",
@@ -93,6 +93,7 @@ class SuperColliderProcessTests(unittest.TestCase):
             for path in (
                 root / "bin" / "sclang",
                 root / "bin" / "scsynth",
+                root / "bin" / "supernova",
             ):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.touch()
@@ -105,6 +106,9 @@ class SuperColliderProcessTests(unittest.TestCase):
 
             self.assertEqual(runtime.sclang, (root / "bin" / "sclang").resolve())
             self.assertEqual(runtime.scsynth, (root / "bin" / "scsynth").resolve())
+            self.assertEqual(
+                runtime.supernova, (root / "bin" / "supernova").resolve()
+            )
             self.assertEqual(
                 runtime.class_library,
                 (root / "share" / "SuperCollider" / "SCClassLibrary").resolve(),
@@ -123,28 +127,46 @@ class SuperColliderProcessTests(unittest.TestCase):
             paths = (
                 root / "Contents" / "MacOS" / "sclang",
                 root / "Contents" / "Resources" / "scsynth",
+                root / "Contents" / "Resources" / "supernova",
                 root / "Contents" / "Resources" / "SCClassLibrary",
                 root / "Contents" / "Resources" / "plugins",
             )
-            for path in paths[:2]:
+            for path in paths[:3]:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.touch()
-            for path in paths[2:]:
+            for path in paths[3:]:
                 path.mkdir(parents=True)
             runtime = locate_supercollider_runtime(root)
             self.assertEqual(runtime.sclang, paths[0].resolve())
             self.assertEqual(runtime.scsynth, paths[1].resolve())
+            self.assertEqual(runtime.supernova, paths[2].resolve())
 
     def test_official_windows_archive_layout_is_supported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ("sclang.exe", "scsynth.exe"):
+            for name in ("sclang.exe", "scsynth.exe", "supernova.exe"):
                 (root / name).touch()
             (root / "SCClassLibrary").mkdir()
             (root / "plugins").mkdir()
             runtime = locate_supercollider_runtime(root)
             self.assertEqual(runtime.sclang, (root / "sclang.exe").resolve())
             self.assertEqual(runtime.scsynth, (root / "scsynth.exe").resolve())
+            self.assertEqual(runtime.supernova, (root / "supernova.exe").resolve())
+
+    def test_runtime_without_supernova_is_rejected_before_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for path in (root / "bin" / "sclang", root / "bin" / "scsynth"):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            (root / "share" / "SuperCollider" / "SCClassLibrary").mkdir(
+                parents=True
+            )
+            (root / "lib" / "SuperCollider" / "plugins").mkdir(parents=True)
+            with self.assertRaisesRegex(
+                SuperColliderProcessError, "runtime is incomplete"
+            ):
+                locate_supercollider_runtime(root)
 
     def test_supervisor_uses_exact_server_plugins_and_private_class_path(
         self,
@@ -158,6 +180,7 @@ class SuperColliderProcessTests(unittest.TestCase):
             for path in (
                 runtime / "bin" / "sclang",
                 runtime / "bin" / "scsynth",
+                runtime / "bin" / "supernova",
             ):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.touch()
@@ -196,7 +219,7 @@ class SuperColliderProcessTests(unittest.TestCase):
                 )
                 self.assertEqual(
                     environment["OMNICHORD_SC_SYNTH_PROGRAM"],
-                    server_program_command(runtime / "bin" / "scsynth"),
+                    server_program_command(runtime / "bin" / "supernova"),
                 )
                 self.assertEqual(
                     environment["OMNICHORD_SC_PLUGIN_PATH"],

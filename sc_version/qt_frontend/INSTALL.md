@@ -2,7 +2,7 @@
 
 ## Linux and Raspberry Pi source checkout
 
-Install Python 3, SuperCollider (`sclang` and `scsynth`) and the distribution's
+Install Python 3, SuperCollider (`sclang`, `scsynth` and `supernova`) and the distribution's
 PipeWire JACK compatibility package when the desktop uses PipeWire. From this
 directory run:
 

@@ -91,6 +91,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn('setsid "${sc_launcher[@]}" sclang -D', launcher)
         self.assertIn('trap cleanup EXIT INT TERM HUP', launcher)
         self.assertIn("pipewire-jack", launcher)
+        self.assertIn('command -v supernova', launcher)
+        self.assertIn('OMNICHORD_SC_SYNTH_PROGRAM="exec ', launcher)
 
     def test_runtime_inventory_is_complete_and_versioned(self) -> None:
         required = {
@@ -108,6 +110,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             "source-lock.json",
         }
         self.assertTrue(required.issubset({path.name for path in SC_ROOT.iterdir()}))
+        self.assertTrue((SC_ROOT / "tests" / "supernova_graph_nrt.scd").is_file())
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
@@ -184,6 +187,12 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("Build and publish all tested SuperCollider packages", text)
         self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.release", text)
         self.assertIn("build_supercollider_runtime.sh", text)
+        runtime_builder = (
+            ROOT.parent / "packaging" / "build_supercollider_runtime.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("-DSUPERNOVA=ON", runtime_builder)
+        self.assertIn('"$install_prefix/bin/supernova" -v', runtime_builder)
+        self.assertGreaterEqual(text.count("supernova -v"), 3)
         for platform in (
             "Linux-x86_64",
             "RaspberryPi-aarch64",
@@ -196,6 +205,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertNotIn("--exclude-module amy", builder)
         self.assertNotIn("--exclude-module c_amy", builder)
         self.assertIn("--add-data \"$sc_dir:supercollider\"", builder)
+        self.assertIn('"$runtime_prefix/bin/supernova"', builder)
         macos_builder = (ROOT / "packaging" / "build_macos_dmg.sh").read_text(
             encoding="utf-8"
         )
@@ -203,12 +213,14 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             '--forbidden-runtime-exempt-prefix "Contents/Resources/sc-runtime"',
             macos_builder,
         )
+        self.assertIn('Contents/Resources/supernova', macos_builder)
         windows_builder = (ROOT / "packaging" / "build_windows.ps1").read_text(
             encoding="utf-8"
         )
         self.assertIn(
             '--forbidden-runtime-exempt-prefix "sc-runtime"', windows_builder
         )
+        self.assertIn('"supernova.exe"', windows_builder)
 
     def test_macos_frozen_entry_finds_runtime_in_contents_resources(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -226,6 +238,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             for path in (
                 runtime / "Contents" / "MacOS" / "sclang",
                 runtime / "Contents" / "Resources" / "scsynth",
+                runtime / "Contents" / "Resources" / "supernova",
             ):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.touch()
@@ -284,6 +297,16 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertNotIn("record[\\outputNode].set(", bootstrap)
         self.assertNotIn("outputNode.set(", bootstrap)
         self.assertNotIn("sourceNode.free", bootstrap)
+
+    def test_supernova_graph_parallelizes_only_independent_stages(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        self.assertIn("~omniSourceGroup = ParGroup.head(s)", bootstrap)
+        self.assertIn(
+            "~omniMixGroup = ParGroup.after(~omniSourceGroup)", bootstrap
+        )
+        self.assertIn("~omniFxGroup = ParGroup.after(~omniMixGroup)", bootstrap)
+        self.assertIn("~omniOutputGroup = Group.after(~omniFxGroup)", bootstrap)
+        self.assertIn("var voiceGroup = Group.tail(~omniSourceGroup)", bootstrap)
 
     def test_pcm_drum_chokes_use_stable_control_buses(self) -> None:
         samples = (SC_ROOT / "sample_loader.scd").read_text(encoding="utf-8")

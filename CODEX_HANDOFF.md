@@ -2,7 +2,7 @@
 
 Updated: 2026-09-15
 
-- Active branch: `rework/sc_code_quality`; current implementation and
+- Active branch: `performance/supernova`; current implementation and
   qualification status are maintained under `sc_version/design/`.
 - The AMY implementation under `amysynth_version` is intentionally unchanged.
 - The preceding SC music work was merged to `main`; GitHub Actions run
@@ -13,7 +13,7 @@ Updated: 2026-09-15
   and leaves one SC production graph. The full local test suite passes. See
   `sc_version/design/arch/sc_code_quality_review.md`.
 - The Linux x86_64 SuperCollider vertical slice lives under `sc_version` and
-  uses separate Qt, headless `sclang` and `scsynth` processes. The frontend
+  uses separate Qt, headless `sclang` and Supernova processes. The frontend
   sends typed OSC actions and immutable plans; SC owns musical timing and note
   lifetimes.
 - Pinned inputs are SuperCollider 3.14.1 and SCLOrkSynths commit
@@ -49,6 +49,10 @@ Updated: 2026-09-15
 - The implementation is not a full migration claim. Additional banks,
   advanced SFZ behavior, comprehensive program calibration/load evidence and
   non-Linux SC targets remain open.
+- `rework/sc_code_quality` was merged to `main`; GitHub run `34953089772`
+  passed all four platform test jobs. The active performance branch selects
+  Supernova for production audio and gives independent graph stages explicit
+  parallel groups without changing the musical-time or voice-owner contracts.
 
 Resume through `sc_version/design/README.md`, then
 `sc_version/design/sc/STATUS.md`. The original detailed requirements remain in

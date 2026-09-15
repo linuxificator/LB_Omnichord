@@ -13,13 +13,13 @@ injects that semantic client into the application backend. There is no runtime
 transport selector and no serial, socket or in-process synth fallback.
 
 The launcher or frozen entry supervises one headless `sclang` process group;
-`sclang` owns `scsynth`:
+`sclang` owns the Supernova audio server:
 
 ```text
 launcher / frozen entry
 ├── Qt/Python frontend
 └── sclang coordinator
-    └── scsynth audio server
+    └── Supernova multicore audio server
 ```
 
 Shutdown targets only the owned process group and never searches by executable
@@ -42,10 +42,14 @@ polls phase or follows beats.
 ## Audio and program graph
 
 Logical role IDs are not raw SC buses. Sources feed channel strips, sends, two
-room effects and a master limiter. Voice owners remain distinct even when they
-share a mix bus. Native SCLOrk programs, four acid programs and manifest-driven
-VSCO sample programs use stable IDs. Sample preparation is off the audio path,
-reference-counted and bounded; failure leaves the prior program intact.
+room effects and a master limiter. Supernova runs the independent source nodes,
+channel strips and room effects in three ordered parallel groups. The master
+output follows those groups. A dependent source/output pair for one voice stays
+in an ordinary serial group, so multicore execution cannot reverse its signal
+flow. Voice owners remain distinct even when they share a mix bus. Native
+SCLOrk programs, four acid programs and manifest-driven VSCO sample programs
+use stable IDs. Sample preparation is off the audio path, reference-counted
+and bounded; failure leaves the prior program intact.
 
 ## Configuration and packaging
 

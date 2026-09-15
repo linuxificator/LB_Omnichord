@@ -70,7 +70,7 @@ x86_64
 - Legacy AMY patch keys are accepted only as preset-migration aliases. They do
   not appear in the SC instrument browser and all outgoing program selections
   use canonical `sc.*` or `sample.*` identities.
-- `scsynth` starts with 8,192 buffer identifiers. This is intentionally above
+- Supernova starts with 8,192 buffer identifiers. This is intentionally above
   the 3,163-region VSCO inventory, while decoded sample RAM remains governed by
   the separate bounded cache.
 - A sample request outside an articulation's recorded key range selects the
@@ -109,11 +109,15 @@ x86_64
   layouts through the production catalogue loader; a package cannot pass by
   checking directory names while its instrument metadata is unreachable.
 - Frozen package verification executes the packaged bootstrap with the pinned
-  SC class library before publication. The scsynth executable is configured
+  SC class library before publication. The Supernova executable is configured
   on `Server.program`, the API owned by SC 3.14, and host `systemctl` probes
   are isolated from the package's private dynamic-library search path.
   Bundled `sclang` uses SC's standalone mode and one explicit class tree, so
   neither its former build prefix nor host extensions enter the engine.
+- The production server is Supernova. Independent sources, bus strips and room
+  effects use ordered `ParGroup` stages; each dependent voice chain and the
+  final master stage remains serial. Source builds enable Supernova, every
+  package requires it, and source launch refuses to fall back to `scsynth`.
 - The bounded sample-source catalogue records all eleven pinned Git banks and
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see

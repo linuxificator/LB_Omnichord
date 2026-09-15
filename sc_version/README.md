@@ -3,7 +3,7 @@
 This directory contains the independent SuperCollider implementation of LB
 Omnichord. It keeps the same Qt Quick instrument and musical catalogues as the
 AMY edition, while moving synthesis, sample playback, voice ownership, mixing
-and musical timing into a separately supervised headless `sclang`/`scsynth`
+and musical timing into a separately supervised headless `sclang`/`supernova`
 runtime.
 
 The packaged targets are Linux x86_64, Raspberry Pi aarch64, macOS arm64 and
@@ -19,13 +19,15 @@ The production boundary is a typed, versioned OSC protocol over loopback:
 
 ```text
 Qt UI and policy -> immutable typed plans -> SuperCollider client
-                 -> headless sclang coordinator -> scsynth audio graph
+                 -> headless sclang coordinator -> Supernova audio graph
 ```
 
 Python owns user interaction, catalogues and immutable plan compilation.
 SuperCollider owns the clock, sequencing, note lifetimes and audio. The UI
 does not schedule musical events and does not import or run AMY. The launcher
 owns one SC process group and shuts it down with the frontend.
+Independent source, mix and effect nodes run in parallel groups; ordering is
+retained between those stages and within each dependent voice chain.
 
 ## Run from source on Linux
 
