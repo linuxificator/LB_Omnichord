@@ -62,10 +62,12 @@ Updated: 2026-09-15
 - Continuous production-QML strumming now has a reproduced engine-resource
   regression and an engine-owned fix. A queued pointer burst previously grew
   to 1,007 synths, exhausted private audio buses and corrupted subsequent
-  spawns. SuperCollider now admits 24 live voices per gesture owner and fades
-  only the oldest saturated voice over at least four control blocks. The exact
-  two-cycle, 161-second held-pointer regression completed without SC errors,
-  clipping, long silence or additional PipeWire errors. See
+  spawns. The initial 24-voice/5-ms boundary itself caused an audible P16
+  discontinuity and has been superseded. SuperCollider now admits 64 live
+  voices per gesture owner and fades only the oldest saturated voice over at
+  least 50 ms through a race-free control bus. The exact two-cycle,
+  160-second held-pointer regression completed without SC errors, clipping or
+  long silence; the preceding instrumented run also added no PipeWire errors. See
   `sc_version/design/sc/STRUM_PRESSURE.md`.
 
 Resume through `sc_version/design/README.md`, then

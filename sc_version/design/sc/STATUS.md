@@ -58,7 +58,7 @@ x86_64
   Reverb controls name the native SC model (`WET`, `ROOM`, `DAMP`) and no
   longer promise AMY-only ranges or terminology.
 - Manual strum has no frontend voice-stealing limit: every accepted attack has
-  an exact independent handle and SC owns its release. The engine admits 24
+  an exact independent handle and SC owns its release. The engine admits 64
   live handles per gesture owner and releases the oldest with a short fade only
   under saturation, preventing GUI event bursts from exhausting native voice
   buses. See [`STRUM_PRESSURE.md`](STRUM_PRESSURE.md). Root sequence changes
@@ -104,7 +104,7 @@ x86_64
   alternate location. Startup admits a checkout or ordinary copy based on all
   required audio hashes in the bundled manifest; Git metadata is not a runtime
   dependency. An unchanged validated inventory uses a user-local cache.
-- SuperCollider configuration revision 5 and protocol revision 2 include the
+- SuperCollider configuration revision 6 and protocol revision 2 include the
   explicit sample commit, per-event drum duration cap and per-owner gesture
   voice boundary. Every frozen package
   self-check exercises additive migration from all earlier revisions before an

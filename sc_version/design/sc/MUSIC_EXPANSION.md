@@ -114,7 +114,7 @@ remain user-owned and are not overwritten. The factory-bank revision controls
 only the shipped defaults.
 
 Older SuperCollider runtime configurations are migrated additively to current
-configuration revision 5 and protocol revision 2. Older bass-riff documents
+configuration revision 6 and protocol revision 2. Older bass-riff documents
 without expansion articulation still load with neutral links. The legacy PCM
 kit and prior native kit identities remain available.
 
