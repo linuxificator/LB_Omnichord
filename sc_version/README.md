@@ -45,12 +45,13 @@ audio device. Override that safety check only for a deliberately configured
 JACK system.
 
 On first launch a standard Qt directory chooser asks for the parent of the
-sample library. The bundled Dulwich Git client then shallow-clones the pinned
+sample library. The application streams the pinned GitHub tree snapshot of the
 `linuxificator/VSCO-2-CE` runtime branch there, and records the exact location
 in `~/.omnichord/config/supercollider.json`. A script may instead pass
-`--sample-root /exact/library/path`. It downloads
-only the 2,166 recordings reachable from playable mappings; no system Git or
-repository history is required. An existing ordinary copy is also supported.
+`--sample-root /exact/library/path`. It extracts only the 2,166 recordings
+reachable from playable mappings. It creates no clone or `.git` directory, so
+the incompressible WAV data is not duplicated in a Git object store. An
+existing ordinary copy is also supported.
 The application compares the checked-in required-path JSON semantically with
 the receipt beside the library and checks that every listed file exists; it
 does not hash recordings during startup. The pinned Git commit establishes

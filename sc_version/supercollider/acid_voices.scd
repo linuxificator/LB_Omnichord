@@ -3,6 +3,7 @@
 ~omniBuildAcidVoice = { |name, model|
     SynthDef(name, {
         |out=0, freqTargetHz=110, gate=1, velocity=0.7, gain=1,
+         calibrationGain=1,
          waveform=0, cutoffHz=400, resonanceNormalized=0.35,
          envOctaves=2, filterDecaySeconds=0.25,
          slideSeconds=0.060, slideEnabled=0,
@@ -86,7 +87,7 @@
         filtered = LeakDC.ar((filtered * (1.2 + (model * 0.18))).tanh);
         Out.ar(
             out,
-            (filtered * amplitude * velocity.clip(0, 1) * gain
+            (filtered * amplitude * velocity.clip(0, 1) * gain * calibrationGain
                 * (1 + (0.08 * attackTransient))
                 * (1 + (0.5 * accentAmount.clip(0, 1) * accentEnvelope))) ! 2
         );
@@ -105,6 +106,20 @@
         "sc.omni.acidMoog", { \omniAcidMoog },
         "sc.omni.acidWarsaw", { \omniAcidWarsaw },
         { nil }
+    )
+};
+
+// The SCLOrk browser already calibrates every admitted source to 0.05 RMS.
+// These owned voices use the same fixed-source boundary. Values are the
+// median correction measured at 55, 110 and 220 Hz with velocity 0.7; role
+// volume, event velocity and user parameters remain independent downstream.
+~omniAcidPlaybackGain = { |program|
+    switch(program.asString,
+        "sc.omni.acid303", { 0.246928 },
+        "sc.omni.acidOto", { 0.127327 },
+        "sc.omni.acidMoog", { 0.551023 },
+        "sc.omni.acidWarsaw", { 0.122087 },
+        { 1.0 }
     )
 };
 

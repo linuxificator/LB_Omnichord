@@ -3,7 +3,7 @@
 var directory = thisProcess.nowExecutingPath.dirname.dirname;
 var names = [\omniAcid303, \omniAcidOto, \omniAcidMoog, \omniAcidWarsaw];
 var required = [
-    \out, \freqTargetHz, \gate, \velocity, \gain, \waveform,
+    \out, \freqTargetHz, \gate, \velocity, \gain, \calibrationGain, \waveform,
     \cutoffHz, \resonanceNormalized, \envOctaves, \filterDecaySeconds,
     \slideSeconds, \slideEnabled, \t_attack, \t_filter, \t_accent,
     \accentAmount, \pitchBendBus
@@ -30,6 +30,10 @@ names.do { |name|
 if(~omniAcidProgramName.value("sc.omni.acidMoog") != \omniAcidMoog) {
     failed = true;
     "ACID_PROGRAM_MAP_FAILED".postln;
+};
+if((~omniAcidPlaybackGain.value("sc.omni.acidOto") - 0.127327).abs > 0.000001) {
+    failed = true;
+    "ACID_PLAYBACK_GAIN_FAILED".postln;
 };
 if(failed) { 1.exit } {
     "ACID_VOICE_TEST_OK".postln;

@@ -14,6 +14,7 @@ SC_ROOT = ROOT.parent / "supercollider"
 sys.path.insert(0, str(ROOT / "code"))
 
 from sc_music_catalog import load_sc_music_catalog  # noqa: E402
+from supercollider_programs import load_sclork_playback_profile  # noqa: E402
 from sc_drum_kits import (  # noqa: E402
     DEFAULT_DRUM_KIT_ID,
     DRUM_KITS,
@@ -79,6 +80,43 @@ class SuperColliderDrumKitTests(unittest.TestCase):
         program, pad, _gain = resolve_hit("sc-808", "timekeeper_primary")
         self.assertEqual(program, "sc.sclork.sosHats")
         self.assertEqual(pad, "sc-808/timekeeper_primary")
+
+    def test_every_drum_kit_has_an_objective_source_balance_reference(self) -> None:
+        pcm = json.loads(
+            (ROOT / "music" / "sc_expansion" / "sc_pcm_drumkits_v1.json")
+            .read_text(encoding="utf-8")
+        )["kits"]
+        for kit in pcm:
+            calibration = kit["kit_calibration"]
+            with self.subTest(kit=kit["kit_id"]):
+                self.assertEqual(calibration["target_rms_dbfs"], -28)
+                self.assertEqual(
+                    calibration["common_groove"],
+                    "pop_8 level 3, 120 BPM, 2 bars",
+                )
+                self.assertLessEqual(abs(float(kit["kit_gain_db"])), 6.0)
+                for pad in kit["pads"].values():
+                    self.assertIn("calibration", pad)
+                    self.assertLessEqual(
+                        float(pad["calibration"]["max_peak_dbfs_at_velocity_127"]),
+                        -6.0,
+                    )
+
+        gains, _excluded = load_sclork_playback_profile(
+            SC_ROOT / "sclork-playback.json"
+        )
+        native = json.loads(
+            (ROOT / "music" / "sc_expansion" / "sc_native_drumkits_v1.json")
+            .read_text(encoding="utf-8")
+        )["kits"]
+        for kit in native:
+            for pad in kit["pads"].values():
+                program = pad["program_id"]
+                with self.subTest(kit=kit["kit_id"], program=program):
+                    if program == "sc.omni.drum":
+                        self.assertIsInstance(pad["gain_db"], (int, float))
+                    else:
+                        self.assertIn(program, gains)
 
     def test_legacy_catalogue_slots_resolve_to_vsco_semantic_roles(self) -> None:
         expected = {

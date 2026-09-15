@@ -15,10 +15,12 @@ requirements, prepares the user configuration and starts exactly one owned
 headless SC process group. It refuses to start a competing raw JACK server on a
 PipeWire desktop.
 
-On first launch the bundled Dulwich client obtains the pinned VSCO 2 CE sample
-repository. Its default location is `~/VSCO-2-CE`; edit
+On first launch the application streams the pinned VSCO 2 CE runtime snapshot
+from GitHub. Its default location is `~/VSCO-2-CE`; edit
 `~/.omnichord/config/supercollider.json` to use another checkout or ordinary
-copy. All required files are verified against the bundled content manifest.
+copy. Only the required files are extracted and neither Git history nor a
+`.git` directory is retained. All required files are verified against the
+bundled content manifest.
 
 ## Packaged application
 

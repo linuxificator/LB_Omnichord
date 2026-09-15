@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shlex
+import signal
 import subprocess
 import sys
 import tempfile
@@ -19,11 +20,24 @@ from supercollider_platform_adapter import (  # noqa: E402
     SuperColliderSupervisor,
     locate_supercollider_runtime,
     pipewire_jack_prefix,
+    require_available_language_port,
     server_program_command,
 )
 
 
 class SuperColliderProcessTests(unittest.TestCase):
+    def test_occupied_language_port_is_rejected_before_engine_launch(self) -> None:
+        import socket
+
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as listener:
+            listener.bind(("127.0.0.1", 0))
+            port = int(listener.getsockname()[1])
+            with self.assertRaisesRegex(
+                SuperColliderProcessError,
+                rf"127\.0\.0\.1:{port} is already in use",
+            ):
+                require_available_language_port("127.0.0.1", port)
+
     def test_pipewire_uses_distribution_jack_wrapper(self) -> None:
         active = Mock(returncode=0)
         with (
@@ -202,6 +216,9 @@ class SuperColliderProcessTests(unittest.TestCase):
                     "supercollider_platform_adapter.subprocess.Popen",
                     return_value=process,
                 ) as popen,
+                patch(
+                    "supercollider_platform_adapter.require_available_language_port"
+                ),
             ):
                 supervisor = SuperColliderSupervisor(
                     engine_root=engine,
@@ -233,6 +250,30 @@ class SuperColliderProcessTests(unittest.TestCase):
                     command[-2:], ["-D", str((engine / "bootstrap.scd").resolve())]
                 )
                 supervisor.stop()
+
+    def test_termination_signal_unwinds_and_stops_the_owned_group(self) -> None:
+        config = load_supercollider_config(ROOT / "config" / "supercollider.json")
+        supervisor = object.__new__(SuperColliderSupervisor)
+        supervisor.config = config
+        process = Mock()
+        process.pid = 4242
+        process.poll.return_value = None
+        process.wait.return_value = 0
+        supervisor.process = process
+        supervisor._temporary = None
+        supervisor._realtime_setup_thread = None
+        supervisor._previous_signal_handlers = {}
+        supervisor._stopping = False
+
+        with (
+            patch.object(supervisor, "start"),
+            patch.object(supervisor, "_signal_process_tree") as terminate,
+            self.assertRaises(SystemExit),
+        ):
+            with supervisor:
+                supervisor._handle_termination(int(signal.SIGTERM), None)
+
+        terminate.assert_called_once_with(process, force=False)
 
 
 if __name__ == "__main__":

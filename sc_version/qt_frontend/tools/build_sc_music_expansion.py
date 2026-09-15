@@ -28,6 +28,9 @@ SOURCE_FILES = (
     "sc_drumkit_profiles.json",
 )
 PRESET_FILES = tuple(f"default_presets/p{index}.json" for index in range(1, 19))
+DEFAULT_REQUIRED_SAMPLES = (
+    Path(__file__).resolve().parents[2] / "supercollider" / "required-samples.json"
+)
 PROGRAM_CANONICALIZATION = {
     "sample.vsco.contrabasssusnv": "sample.vsco.contrabass-ks",
     "sample.vsco.contrabasspizz": "sample.vsco.contrabass-ks.art.e6-pizzicato",
@@ -80,7 +83,10 @@ def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _compact_kit_catalogue(bundle: Path) -> dict[str, Any]:
+def _compact_kit_catalogue(
+    bundle: Path,
+    runtime_samples: dict[str, Any],
+) -> dict[str, Any]:
     data = bundle / "data"
     kits = _read(data / "pcm_drumkits.json")
     sample_sets = _read(data / "pcm_sample_sets.json")
@@ -94,6 +100,12 @@ def _compact_kit_catalogue(bundle: Path) -> dict[str, Any]:
     }
     if set(measured) != selected:
         raise ValueError("PCM drum measurements do not match selected samples")
+    runtime_repository = str(runtime_samples.get("repository", "")).removesuffix(
+        ".git"
+    )
+    source_repository = str(sample_sets.get("repository", "")).removesuffix(".git")
+    if runtime_repository.casefold() != source_repository.casefold():
+        raise ValueError("runtime and source sample repositories do not match")
 
     def alias(sample_id: object) -> str:
         return f"sc-drum-{sample_id}"
@@ -102,7 +114,7 @@ def _compact_kit_catalogue(bundle: Path) -> dict[str, Any]:
         "schema_version": 1,
         "source_commit": kits["source_commit"],
         "sample_repository": sample_sets["repository"],
-        "sample_commit": sample_sets["commit"],
+        "sample_commit": runtime_samples["commit"],
         "sample_files": [
             {
                 "id": alias(sample_id),
@@ -144,6 +156,7 @@ def _compact_kit_catalogue(bundle: Path) -> dict[str, Any]:
                 "program_id": item["program_id"],
                 "profile": item["profile"],
                 "kit_gain_db": item["kit_gain_db"],
+                "kit_calibration": item["kit_calibration"],
                 "pads": item["pads"],
                 "role_defaults": item["role_defaults"],
             }
@@ -438,6 +451,7 @@ def build(
     bundle: Path,
     destination: Path,
     preset_destination: Path | None = None,
+    required_samples: Path = DEFAULT_REQUIRED_SAMPLES,
 ) -> None:
     data = bundle / "data"
     evidence = bundle / "evidence"
@@ -445,8 +459,11 @@ def build(
     missing = [name for name in source_names if not (data / name).is_file()]
     if missing:
         raise FileNotFoundError(f"music bundle is missing {', '.join(missing)}")
+    runtime_samples = _read(required_samples)
     outputs = {
-        "sc_pcm_drumkits_v1.json": _compact_kit_catalogue(bundle),
+        "sc_pcm_drumkits_v1.json": _compact_kit_catalogue(
+            bundle, runtime_samples
+        ),
         "sc_kit_grooves_v1.json": _compact_grooves(data),
         "omnichord_bass_riffs_v2.json": _compact_bass(data),
         "sc_bass_contexts_v1.json": _compact_bass_contexts(data),
@@ -470,6 +487,7 @@ def build(
     manifest = {
         "schema_version": 1,
         "source_bundle": "LB_SC_Music_Expansion",
+        "runtime_sample_selection": _digest(required_samples),
         "sources": {name: _digest(data / name) for name in source_names},
         "evidence_sources": {
             "sample_measurements.json": _digest(
@@ -500,11 +518,17 @@ def main() -> int:
     parser.add_argument("bundle", type=Path)
     parser.add_argument("destination", type=Path)
     parser.add_argument("--preset-destination", type=Path)
+    parser.add_argument(
+        "--required-samples",
+        type=Path,
+        default=DEFAULT_REQUIRED_SAMPLES,
+    )
     args = parser.parse_args()
     build(
         args.bundle.resolve(),
         args.destination.resolve(),
         None if args.preset_destination is None else args.preset_destination.resolve(),
+        args.required_samples.resolve(),
     )
     return 0
 

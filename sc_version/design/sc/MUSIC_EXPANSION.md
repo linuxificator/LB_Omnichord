@@ -59,7 +59,7 @@ group, fade time and duration cap are data, not frontend conditionals. Event
 duration caps are optional: zero means the sample profile owns its full
 duration, otherwise the shorter of profile duration and event cap is used.
 
-The external VSCO sample source is acquired from the shallow runtime branch at
+The external VSCO sample source is acquired from the pinned runtime snapshot at
 commit `78b95e70efe4349eeb03855f7f7654cb81c8c62f` of the configured repository.
 Its 2,166 audio files are the exact union of playable SFZ-region references
 and direct PCM-drum references. Runtime admission does not require Git
@@ -68,6 +68,13 @@ required path exists. The installation receipt records the full selected path
 list and is compared as JSON content rather than serialized bytes. No hashes
 are calculated during startup. This makes every PCM alias reproducible across
 source runs and packages without downloading unreachable source recordings.
+
+The generated compact drum catalogue retains the source kit-calibration
+records rather than treating them as build-only metadata. A source-level test
+qualifies every kit against one common reference groove and every pad against
+the same peak window. This evidence is independent of preset role volumes:
+presets remain musical choices, while kit calibration makes those choices
+comparable.
 
 ## Rhythm and fill behavior
 

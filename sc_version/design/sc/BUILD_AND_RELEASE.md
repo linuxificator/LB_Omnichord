@@ -57,7 +57,7 @@ loopback. Linux uses the normal host JACK/PipeWire audio-session boundary; no
 package starts a competing raw JACK server.
 
 VSCO 2 CE recordings are separate CC0 assets and are not embedded. First
-launch uses the bundled Dulwich implementation to shallow-clone the pinned
+launch streams the commit-pinned GitHub tree snapshot of the
 `lb-omnichord-runtime-v1` branch of `linuxificator/VSCO-2-CE` to the location
 selected through Qt's platform-standard directory chooser and persisted in
 `~/.omnichord/config/supercollider.json`. The chooser selects a parent and the
@@ -65,8 +65,9 @@ library is created below it as `VSCO-2-CE`; `--sample-root` provides an exact,
 non-interactive path. Cancelling creates neither the user SC config nor a
 partial library. This branch contains only source audio reachable from a
 playable SFZ region or the direct PCM-drum catalogue, plus the source licence
-and readmes. An existing checkout or ordinary copy is accepted when all those
-required audio-file paths exist.
+and readmes. The installer extracts only the required 2,166 regular files and
+retains neither the streamed archive nor Git metadata. An existing checkout or
+ordinary copy is accepted when all those required audio-file paths exist.
 
 Successful validation atomically writes `lb-omnichord-samples.json` inside
 the sample directory. It records the exact repository branch and commit plus

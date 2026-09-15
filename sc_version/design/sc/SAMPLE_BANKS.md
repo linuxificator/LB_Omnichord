@@ -47,8 +47,12 @@ normalized manifests and audio acceptance evidence exist.
 
 The runtime branch is `lb-omnichord-runtime-v1` at commit
 `78b95e70efe4349eeb03855f7f7654cb81c8c62f`, derived from source commit
-`440300901dfe9275fd84e0b7763af1f8443ae62e`. Installations are shallow clones;
-the source history and unreachable recordings are not transferred. An atomic
+`440300901dfe9275fd84e0b7763af1f8443ae62e`. Installation streams the pinned
+GitHub tree archive and extracts only required regular files. It retains no
+archive, Git history or `.git` object store; this matters because storing the
+largely incompressible WAVs in both the working tree and a shallow clone's pack
+roughly doubled a runtime installation. Unreachable recordings are not
+transferred. An atomic
 `lb-omnichord-samples.json` receipt beside the samples lists all 2,166 selected
 paths. Startup compares its parsed content with the checked-in required-sample
 list and checks the file inventory before the engine can load a buffer. It does

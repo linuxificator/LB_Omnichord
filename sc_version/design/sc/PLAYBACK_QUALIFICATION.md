@@ -58,6 +58,14 @@ gain. It therefore does not rewrite upstream definitions or interfere with UI
 volume control. Runtime loading rejects overlapping include/exclude entries,
 non-finite gains, non-positive gains and gains beyond the recorded bound.
 
+The four owned acid voices use the same `0.05` median-RMS reference, measured
+at MIDI notes 33, 45 and 57. Their fixed playback gains are applied through a
+hidden SynthDef control, before the ordinary role and live mixer gains. This
+keeps preset balance independent from implementation loudness. In particular,
+the raw Acid Oto voice was about 18 dB above the shared reference; that made a
+balanced PCM drum kit appear abnormally quiet in preset 18 even though the kit
+itself already met its target.
+
 The `sc-audio` suite renders every source definition. For browser-admitted
 voices it rejects non-finite, silent, inaudibly quiet or full-scale-clipped
 output. The complete suite was additionally run with each of 110, 440 and
@@ -133,6 +141,14 @@ verified sample identities, so Supernova receives 8,192 buffer-number slots
 before boot. Buffer identifiers and decoded sample memory are separate
 resources: the existing byte-budgeted cache still owns admission and eviction.
 
+The compact runtime catalogue preserves every PCM kit's generated calibration.
+All nine expanded kits are qualified with the same two-bar `pop8`, activity-3,
+120-BPM reference groove and target `-28 dBFS` RMS; individual pads are also
+checked over a fixed 120 ms window with a `-6 dBFS` peak ceiling. Native kits
+must likewise provide an explicit measured gain for every selected program.
+These source-level checks deliberately exclude preset volumes, so a later
+preset edit cannot hide a kit or instrument imbalance.
+
 VSCO instruments do not all cover the full keyboard. If a requested note lies
 outside a program's recorded range, selection uses its nearest valid region
 while playback rate still targets the requested note. The same rule applies to
@@ -174,6 +190,12 @@ suites pass. A real local production bootstrap was also driven through all 76
 admitted SCLOrk programs, every percussion role and VSCO notes below, inside
 and above a recorded range; shutdown contained no server failure, duplicate
 free or buffer exhaustion.
+
+The same NRT boundary renders every owned acid voice at three bass registers
+and verifies its median RMS against the shared instrument reference, with
+finite-output, peak and server-failure gates. Drum catalogue tests verify that
+every selectable PCM and native kit carries the corresponding independent
+calibration contract.
 
 A focused real-process regression keeps automatic arpeggios and rhythm active
 while switching repeatedly among PCM chord programs. A ten-cycle run selected
