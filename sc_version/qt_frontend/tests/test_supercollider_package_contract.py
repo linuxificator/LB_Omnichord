@@ -315,6 +315,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
 
     def test_gesture_voices_are_bounded_inside_the_engine(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
@@ -329,6 +330,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("gestureStealRelease", bootstrap)
         self.assertIn("record[\\outputControlBus].setn([", bootstrap)
         self.assertIn("forcedRelease.asFloat.max(0.05)", bootstrap)
+        self.assertIn("server.gesture_voice_limit", launcher)
+        self.assertIn("export OMNICHORD_SC_MAX_GESTURE_VOICES", launcher)
 
     def test_supernova_graph_parallelizes_only_independent_stages(self) -> None:
         bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")

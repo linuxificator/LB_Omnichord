@@ -78,6 +78,7 @@ export OMNICHORD_SC_SAMPLE_RATE
 export OMNICHORD_SC_BLOCK_SIZE
 export OMNICHORD_SC_MAX_NODES
 export OMNICHORD_SC_MAX_BUFFERS
+export OMNICHORD_SC_MAX_GESTURE_VOICES
 export OMNICHORD_SC_MEM_KIB
 export OMNICHORD_SC_VSCO_ROOT
 export OMNICHORD_SC_SAMPLE_RAM_MIB
@@ -87,6 +88,7 @@ OMNICHORD_SC_SAMPLE_RATE="$("$venv_python" "$frontend_dir/code/supercollider_con
 OMNICHORD_SC_BLOCK_SIZE="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.block_size)"
 OMNICHORD_SC_MAX_NODES="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.max_nodes)"
 OMNICHORD_SC_MAX_BUFFERS="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.max_buffers)"
+OMNICHORD_SC_MAX_GESTURE_VOICES="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.gesture_voice_limit)"
 OMNICHORD_SC_MEM_KIB="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" server.realtime_memory_kib)"
 OMNICHORD_SC_VSCO_ROOT="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" samples.vsco_root)"
 OMNICHORD_SC_SAMPLE_RAM_MIB="$("$venv_python" "$frontend_dir/code/supercollider_config.py" "$sc_config" samples.ram_budget_mib)"
