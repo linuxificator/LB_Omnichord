@@ -10,7 +10,7 @@ Last verified: 2026-09-15
 Qt/Python owns presentation, user interaction, external MIDI/OSC input,
 catalogue choice, presets and pure immutable plan compilation. `sclang` owns
 musical time, quantization, executions, gates, voice handles and timed release.
-`scsynth` owns audio nodes, buffers, buses and effects. Communication crosses a
+Supernova owns audio nodes, buffers, buses and effects. Communication crosses a
 typed, versioned OSC protocol over loopback; UI code never manipulates engine
 nodes or schedules musical events.
 

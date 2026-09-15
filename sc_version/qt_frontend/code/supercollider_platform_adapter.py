@@ -9,9 +9,11 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 from typing import Mapping
 
 from supercollider_config import SuperColliderRuntimeConfig
+from supercollider_linux_realtime import configure_owned_supernova_realtime
 
 
 class SuperColliderProcessError(RuntimeError):
@@ -22,6 +24,7 @@ class SuperColliderProcessError(RuntimeError):
 class SuperColliderExecutables:
     sclang: Path
     scsynth: Path
+    supernova: Path
     class_library: Path | None
     plugins: Path | None
 
@@ -38,6 +41,7 @@ def locate_supercollider_runtime(
             (
                 root / "bin" / "sclang",
                 root / "bin" / "scsynth",
+                root / "bin" / "supernova",
                 root / "share" / "SuperCollider" / "SCClassLibrary",
                 root / "lib" / "SuperCollider" / "plugins",
             ),
@@ -45,6 +49,7 @@ def locate_supercollider_runtime(
             (
                 root / "Contents" / "MacOS" / "sclang",
                 root / "Contents" / "Resources" / "scsynth",
+                root / "Contents" / "Resources" / "supernova",
                 root / "Contents" / "Resources" / "SCClassLibrary",
                 root / "Contents" / "Resources" / "plugins",
             ),
@@ -52,14 +57,18 @@ def locate_supercollider_runtime(
             (
                 root / "sclang.exe",
                 root / "scsynth.exe",
+                root / "supernova.exe",
                 root / "SCClassLibrary",
                 root / "plugins",
             ),
         )
-        for sclang, scsynth, class_library, plugins in layouts:
-            if all(path.exists() for path in (sclang, scsynth, class_library, plugins)):
+        for sclang, scsynth, supernova, class_library, plugins in layouts:
+            if all(
+                path.exists()
+                for path in (sclang, scsynth, supernova, class_library, plugins)
+            ):
                 return SuperColliderExecutables(
-                    sclang, scsynth, class_library, plugins
+                    sclang, scsynth, supernova, class_library, plugins
                 )
         raise SuperColliderProcessError(
             f"bundled SuperCollider runtime is incomplete or has an unsupported layout: {root}"
@@ -67,13 +76,15 @@ def locate_supercollider_runtime(
 
     sclang_name = shutil.which("sclang")
     scsynth_name = shutil.which("scsynth")
-    if not sclang_name or not scsynth_name:
+    supernova_name = shutil.which("supernova")
+    if not sclang_name or not scsynth_name or not supernova_name:
         raise SuperColliderProcessError(
-            "SuperCollider sclang and scsynth are required"
+            "SuperCollider sclang, scsynth and supernova are required"
         )
     return SuperColliderExecutables(
         Path(sclang_name).resolve(),
         Path(scsynth_name).resolve(),
+        Path(supernova_name).resolve(),
         None,
         None,
     )
@@ -121,7 +132,7 @@ def server_program_command(path: Path, *, platform: str | None = None) -> str:
 
 
 class SuperColliderSupervisor:
-    """Own exactly one headless sclang process group and its scsynth child."""
+    """Own exactly one headless sclang process group and its supernova child."""
 
     def __init__(
         self,
@@ -135,6 +146,7 @@ class SuperColliderSupervisor:
         self.executables = locate_supercollider_runtime(runtime_root)
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self.process: subprocess.Popen[bytes] | None = None
+        self._realtime_setup_thread: threading.Thread | None = None
 
     def _language_config(self) -> Path | None:
         class_library = self.executables.class_library
@@ -167,11 +179,14 @@ class SuperColliderSupervisor:
                 "OMNICHORD_SC_BLOCK_SIZE": str(server.block_size),
                 "OMNICHORD_SC_MAX_NODES": str(server.max_nodes),
                 "OMNICHORD_SC_MAX_BUFFERS": str(server.max_buffers),
+                "OMNICHORD_SC_MAX_GESTURE_VOICES": str(
+                    server.gesture_voice_limit
+                ),
                 "OMNICHORD_SC_MEM_KIB": str(server.realtime_memory_kib),
                 "OMNICHORD_SC_VSCO_ROOT": str(samples.vsco_root),
                 "OMNICHORD_SC_SAMPLE_RAM_MIB": str(samples.ram_budget_mib),
                 "OMNICHORD_SC_SYNTH_PROGRAM": server_program_command(
-                    self.executables.scsynth
+                    self.executables.supernova
                 ),
             }
         )
@@ -227,6 +242,23 @@ class SuperColliderSupervisor:
             raise SuperColliderProcessError("SuperCollider is already started")
         command, env = self._launch_context(with_audio_wrapper=True)
         self.process = subprocess.Popen(command, env=env, start_new_session=True)
+        if isinstance(self.process.pid, int):
+            self._realtime_setup_thread = threading.Thread(
+                target=self._configure_realtime,
+                args=(self.process.pid, env),
+                name="supernova-realtime-setup",
+                daemon=True,
+            )
+            self._realtime_setup_thread.start()
+
+    def _configure_realtime(self, session_leader: int, env: Mapping[str, str]) -> None:
+        realtime = configure_owned_supernova_realtime(
+            session_leader,
+            self.executables.supernova,
+            environment=env,
+        )
+        stream = sys.stdout if realtime.successful else sys.stderr
+        print(realtime.summary(), file=stream, flush=True)
 
     def stop(self, timeout: float = 4.0) -> None:
         process = self.process
@@ -244,6 +276,7 @@ class SuperColliderSupervisor:
                 except ProcessLookupError:
                     pass
                 process.wait(timeout=2.0)
+        self._realtime_setup_thread = None
         if self._temporary is not None:
             self._temporary.cleanup()
             self._temporary = None

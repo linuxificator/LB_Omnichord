@@ -57,7 +57,11 @@ def dependencies(path: Path) -> tuple[Path, ...]:
 def bundle(prefix: Path) -> tuple[Path, ...]:
     library_dir = prefix / "lib"
     library_dir.mkdir(parents=True, exist_ok=True)
-    roots = [prefix / "bin" / "sclang", prefix / "bin" / "scsynth"]
+    roots = [
+        prefix / "bin" / "sclang",
+        prefix / "bin" / "scsynth",
+        prefix / "bin" / "supernova",
+    ]
     roots.extend((library_dir / "SuperCollider" / "plugins").glob("*.so"))
     queue = deque(path for path in roots if is_elf(path))
     visited: set[Path] = set()

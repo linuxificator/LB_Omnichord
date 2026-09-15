@@ -19,6 +19,7 @@ esac
 for required in \
     "$runtime_prefix/bin/sclang" \
     "$runtime_prefix/bin/scsynth" \
+    "$runtime_prefix/bin/supernova" \
     "$runtime_prefix/share/SuperCollider/SCClassLibrary" \
     "$runtime_prefix/lib/SuperCollider/plugins"; do
     [[ -e "$required" ]] || { echo "Missing SC runtime input: $required" >&2; exit 2; }

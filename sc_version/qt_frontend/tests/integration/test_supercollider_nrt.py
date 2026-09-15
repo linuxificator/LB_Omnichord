@@ -25,6 +25,49 @@ BATCH_SIZE = 12
     "SuperCollider is unavailable",
 )
 class SuperColliderNonRealtimeTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which("supernova"), "Supernova is unavailable")
+    def test_supernova_renders_ordered_parallel_graph(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lb-supernova-nrt-") as temporary:
+            output = Path(temporary) / "parallel.wav"
+            environment = dict(os.environ)
+            environment.update(
+                {
+                    "OMNICHORD_SC_SUPERNOVA_NRT_OUTPUT": str(output),
+                    "OMNICHORD_SC_NRT_PROGRAM": str(
+                        Path(shutil.which("supernova") or "supernova").resolve()
+                    ),
+                }
+            )
+            completed = subprocess.run(
+                [
+                    "sclang",
+                    "-D",
+                    str(SC_ROOT / "tests" / "supernova_graph_nrt.scd"),
+                ],
+                cwd=SC_ROOT,
+                env=environment,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=20,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout)
+            self.assertIn("LB_OMNICHORD_SUPERNOVA_NRT_OK", completed.stdout)
+            frames, sample_rate = soundfile.read(
+                output,
+                dtype="float64",
+                always_2d=True,
+            )
+        self.assertEqual(sample_rate, SAMPLE_RATE)
+        self.assertEqual(frames.shape[1], 2)
+        self.assertTrue(numpy.isfinite(frames).all())
+        self.assertLessEqual(float(numpy.max(numpy.abs(frames))), 0.951)
+        self.assertGreater(
+            math.sqrt(float(numpy.mean(numpy.square(frames)))),
+            0.01,
+        )
+
     def test_strum_ceiling_is_finite_for_repaired_source_definitions(self) -> None:
         regression_programs = {
             "sc.sclork.acidOto3091",

@@ -83,9 +83,16 @@ class TestControlServer:
     uses without constructing a display/QML engine.
     """
 
-    def __init__(self, backend: QObject, port: int = 0) -> None:
+    def __init__(
+        self,
+        backend: QObject,
+        port: int = 0,
+        *,
+        request_timeout_seconds: float = 5.0,
+    ) -> None:
         self._bridge = _Bridge(backend)
         bridge = self._bridge
+        request_timeout = max(0.1, float(request_timeout_seconds))
 
         class Handler(BaseHTTPRequestHandler):
             def _reply(self, status: int, payload: dict[str, Any]) -> None:
@@ -112,7 +119,7 @@ class TestControlServer:
             ) -> None:
                 req = _Request()
                 bridge.requested.emit(operation, name, args, req)
-                if not req.done.wait(timeout=5.0):
+                if not req.done.wait(timeout=request_timeout):
                     self._reply(
                         504,
                         {"ok": False, "error": "Qt request timed out"},

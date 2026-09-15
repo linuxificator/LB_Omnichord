@@ -14,9 +14,13 @@ ENDURANCE = ROOT / "tests" / "endurance"
 sys.path.insert(0, str(ENDURANCE))
 
 from sc_endurance import (  # noqa: E402
+    Action,
+    FATAL_LOG_TEXT,
     action_cycle,
     analyze_wave,
     pcm_chord_switch_cycle,
+    strum_click_cycle,
+    strum_pressure_cycle,
     startup_bass_riff_cycle,
     vsco_drum_role_cycle,
 )
@@ -29,6 +33,47 @@ class _Synth:
 
 
 class SuperColliderEnduranceTests(unittest.TestCase):
+    def test_server_node_creation_exceptions_are_fatal(self) -> None:
+        self.assertIn("exception in /s_new", FATAL_LOG_TEXT)
+        self.assertIn("failed to get an audio bus allocated", FATAL_LOG_TEXT)
+        self.assertIn("Message 'index' not understood", FATAL_LOG_TEXT)
+        self.assertIn("node not found:", FATAL_LOG_TEXT)
+
+    def test_strum_pressure_is_one_minute_long_held_qml_gesture(self) -> None:
+        actions = list(strum_pressure_cycle(through_qml=True))
+        pressure = [
+            action for action in actions
+            if action.name == "strumContinuousSweeps"
+        ]
+        self.assertEqual(len(pressure), 1)
+        self.assertEqual(pressure[0].args, (200, 37, 8))
+        self.assertFalse(any(action.name == "strumPointerPath" for action in actions))
+
+    def test_strum_click_reproduces_p16_without_accompaniment(self) -> None:
+        actions = list(strum_click_cycle(through_qml=True))
+        self.assertEqual(actions[0], Action("selectPreset", (15,), 0.4))
+        for action_name in (
+            "ensureRhythmRunning",
+            "ensureBassRunning",
+            "ensureChordArpeggioRunning",
+        ):
+            matching = [action for action in actions if action.name == action_name]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0].args, (False,))
+        self.assertIn(Action("pressChord", (0, 0), 0.08), actions)
+        self.assertIn(Action("releaseChord", (0, 0), 0.4), actions)
+        pressure = [
+            action for action in actions
+            if action.name == "strumContinuousSweeps"
+        ]
+        self.assertEqual(pressure, [Action("strumContinuousSweeps", (30, 37, 8), 0.5)])
+
+    def test_audio_monitor_targets_supernova_pipewire_outputs(self) -> None:
+        source = (ENDURANCE / "sc_endurance.py").read_text(encoding="utf-8")
+        self.assertIn('"supernova:output_1"', source)
+        self.assertIn('"supernova:output_2"', source)
+        self.assertNotIn('"SuperCollider:out_1"', source)
+
     def test_startup_bass_riff_scenario_needs_no_transport_restart(self) -> None:
         actions = list(startup_bass_riff_cycle())
         names = [action.name for action in actions]
@@ -158,6 +203,27 @@ class SuperColliderEnduranceTests(unittest.TestCase):
         self.assertLess(metrics.peak, 0.2)
         self.assertEqual(metrics.clipped_fraction, 0)
         self.assertLess(metrics.longest_silent_seconds, 0.01)
+        self.assertLess(metrics.largest_sample_step, 0.1)
+        self.assertLess(metrics.sample_step_outlier_ratio, 1.1)
+
+    def test_audio_analyzer_identifies_an_isolated_sample_step(self) -> None:
+        rate = 8_000
+        samples = array("h")
+        for index in range(rate):
+            value = round(1000 * math.sin(2 * math.pi * 220 * index / rate))
+            if index == rate // 2:
+                value = 20_000
+            samples.extend((value, value))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "click.wav"
+            with wave.open(str(path), "wb") as target:
+                target.setnchannels(2)
+                target.setsampwidth(2)
+                target.setframerate(rate)
+                target.writeframes(samples.tobytes())
+            metrics = analyze_wave(path)
+        self.assertGreater(metrics.largest_sample_step, 0.5)
+        self.assertGreater(metrics.sample_step_outlier_ratio, 10)
 
     def test_gui_cycle_captures_both_production_screens(self) -> None:
         actions = list(

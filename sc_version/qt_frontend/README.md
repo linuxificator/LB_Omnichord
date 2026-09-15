@@ -8,8 +8,9 @@ contains no AMY runtime, wire transport, serial selector or firmware path.
 
 `code/main.py` composes the application. `supercollider_client.py` transports
 the typed versioned OSC protocol. A supervised headless `sclang` owns musical
-time and voice lifetime; its `scsynth` child owns audio. Python publishes
-immutable plans and semantic live actions but never follows the beat.
+time and voice lifetime. Python publishes immutable plans and semantic live
+actions but never follows the beat. Its `supernova` child owns the multicore
+audio graph.
 
 `config/frontend.json` owns input and frontend policy.
 `config/supercollider.json` owns the SC runtime and sample configuration. The

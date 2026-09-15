@@ -366,6 +366,68 @@ Window {
         component.deleteLater()
         engine.deleteLater()
 
+    def test_strum_keeps_one_grab_and_clamps_motion_past_top_edge(self) -> None:
+        engine, component, window = self.create_window(
+            b"""
+import QtQuick
+import QtQuick.Window
+import "."
+
+Window {
+    id: window
+    width: 180
+    height: 180
+    visible: true
+    property int startCount: 0
+    property int moveCount: 0
+    property int endCount: 0
+    property real lastMove: -1
+
+    QtObject {
+        id: fakeController
+        function strumStart(value) { window.startCount += 1 }
+        function strumMove(value) {
+            window.moveCount += 1
+            window.lastMove = value
+        }
+        function strumEnd() { window.endCount += 1 }
+    }
+
+    StrumPad {
+        x: 50
+        y: 40
+        width: 80
+        height: 100
+        controller: fakeController
+    }
+}
+""",
+        )
+        QTest.mousePress(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            QPoint(90, 100),
+        )
+        for y in (60, 40, 20, -10, 20, 40, 60):
+            QTest.mouseMove(window, QPoint(90, y), 8)
+        QTest.mouseRelease(
+            window,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier,
+            QPoint(90, 60),
+        )
+        QCoreApplication.processEvents()
+
+        self.assertEqual(int(window.property("startCount")), 1)
+        self.assertGreaterEqual(int(window.property("moveCount")), 7)
+        self.assertEqual(int(window.property("endCount")), 1)
+        self.assertAlmostEqual(float(window.property("lastMove")), 0.2)
+
+        window.deleteLater()
+        component.deleteLater()
+        engine.deleteLater()
+
     def test_strum_learn_touch_is_consumed_but_bound_touch_still_plays(self) -> None:
         engine, component, window = self.create_window(
             b"""

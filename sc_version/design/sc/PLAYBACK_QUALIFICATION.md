@@ -129,7 +129,7 @@ unchanged.
 ## Samples and percussion
 
 The pitched VSCO manifest has 3,163 regions and the PCM drum expansion adds 262
-verified sample identities, so `scsynth` receives 8,192 buffer-number slots
+verified sample identities, so Supernova receives 8,192 buffer-number slots
 before boot. Buffer identifiers and decoded sample memory are separate
 resources: the existing byte-budgeted cache still owns admission and eviction.
 

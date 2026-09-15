@@ -57,8 +57,11 @@ x86_64
   kits: the legacy PCM kit, five native SC kits and nine expanded PCM kits.
   Reverb controls name the native SC model (`WET`, `ROOM`, `DAMP`) and no
   longer promise AMY-only ranges or terminology.
-- Manual strum no longer has a frontend voice-stealing limit: every attack has
-  an exact independent handle and SC owns its release. Root sequence changes
+- Manual strum has no frontend voice-stealing limit: every accepted attack has
+  an exact independent handle and SC owns its release. The engine admits 64
+  live handles per gesture owner and releases the oldest with a short fade only
+  under saturation, preventing GUI event bursts from exhausting native voice
+  buses. See [`STRUM_PRESSURE.md`](STRUM_PRESSURE.md). Root sequence changes
   are scheduled at the current transport phase, so riff, arpeggio, leader and
   activity changes do not restart the beat clock.
 - The complete mix crosses one private master stage with a 0.95 safety limiter.
@@ -70,7 +73,7 @@ x86_64
 - Legacy AMY patch keys are accepted only as preset-migration aliases. They do
   not appear in the SC instrument browser and all outgoing program selections
   use canonical `sc.*` or `sample.*` identities.
-- `scsynth` starts with 8,192 buffer identifiers. This is intentionally above
+- Supernova starts with 8,192 buffer identifiers. This is intentionally above
   the 3,163-region VSCO inventory, while decoded sample RAM remains governed by
   the separate bounded cache.
 - A sample request outside an articulation's recorded key range selects the
@@ -101,19 +104,29 @@ x86_64
   alternate location. Startup admits a checkout or ordinary copy based on all
   required audio hashes in the bundled manifest; Git metadata is not a runtime
   dependency. An unchanged validated inventory uses a user-local cache.
-- SuperCollider configuration revision 4 and protocol revision 2 include the
-  explicit sample commit and per-event drum duration cap. Every frozen package
+- SuperCollider configuration revision 6 and protocol revision 2 include the
+  explicit sample commit, per-event drum duration cap and per-owner gesture
+  voice boundary. Every frozen package
   self-check exercises additive migration from all earlier revisions before an
   audio process is opened.
 - Frozen package verification resolves both source and PyInstaller asset
   layouts through the production catalogue loader; a package cannot pass by
   checking directory names while its instrument metadata is unreachable.
 - Frozen package verification executes the packaged bootstrap with the pinned
-  SC class library before publication. The scsynth executable is configured
+  SC class library before publication. The Supernova executable is configured
   on `Server.program`, the API owned by SC 3.14, and host `systemctl` probes
   are isolated from the package's private dynamic-library search path.
   Bundled `sclang` uses SC's standalone mode and one explicit class tree, so
   neither its former build prefix nor host extensions enter the engine.
+- The production server is Supernova. Independent sources, bus strips and room
+  effects use ordered `ParGroup` stages; each dependent voice chain and the
+  final master stage remains serial. Source builds enable Supernova, every
+  package requires it, and source launch refuses to fall back to `scsynth`.
+- Linux launch completes Supernova's parallel DSP pool with the standard
+  RealtimeKit service when the JACK callback is realtime but helpers are not.
+  Discovery is restricted to the exact executable in the launcher's private
+  process session and ends after startup verification; it never watches or
+  modifies unrelated processes. See [`SUPERNOVA.md`](SUPERNOVA.md).
 - The bounded sample-source catalogue records all eleven pinned Git banks and
   the separate Iowa discovery authority. The local inventory tool rejects LFS
   placeholders and produces per-file asset locks; see

@@ -21,8 +21,9 @@ rhythm, strum-tail and logical-layout settings are imported. Program IDs and
 engine capacity never cross that boundary. Existing frontend config is never
 silently replaced.
 
-`supercollider.json` revision 4 separately owns OSC protocol endpoints, server
-options, buffer limits and sample repository identity/location. Its explicit
+`supercollider.json` revision 6 separately owns OSC protocol endpoints, server
+options, buffer limits, the per-owner gesture voice boundary and sample
+repository identity/location. Its explicit
 migrations are verified from an empty user directory and every supported old
 revision inside the frozen package. Validation completes before Qt input or
 engine processes are created.

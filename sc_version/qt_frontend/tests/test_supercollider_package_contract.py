@@ -91,6 +91,17 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn('setsid "${sc_launcher[@]}" sclang -D', launcher)
         self.assertIn('trap cleanup EXIT INT TERM HUP', launcher)
         self.assertIn("pipewire-jack", launcher)
+        self.assertIn('command -v supernova', launcher)
+        self.assertIn('OMNICHORD_SC_SYNTH_PROGRAM="exec ', launcher)
+        self.assertIn("supercollider_linux_realtime.py", launcher)
+        self.assertIn("it is not a runtime watcher", launcher)
+
+    def test_endurance_driver_uses_the_production_audio_server(self) -> None:
+        endurance = (
+            ROOT / "tests" / "endurance" / "sc_endurance.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn('"OMNICHORD_SC_SYNTH_PROGRAM"', endurance)
+        self.assertIn("runtime.supernova", endurance)
 
     def test_runtime_inventory_is_complete_and_versioned(self) -> None:
         required = {
@@ -108,11 +119,13 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             "source-lock.json",
         }
         self.assertTrue(required.issubset({path.name for path in SC_ROOT.iterdir()}))
+        self.assertTrue((SC_ROOT / "tests" / "supernova_graph_nrt.scd").is_file())
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(config["config_revision"], 4)
+        self.assertEqual(config["config_revision"], 6)
         self.assertEqual(config["protocol_version"], 2)
+        self.assertEqual(config["server"]["gesture_voice_limit"], 64)
         self.assertEqual(
             config["samples"]["commit"],
             "440300901dfe9275fd84e0b7763af1f8443ae62e",
@@ -184,6 +197,12 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("Build and publish all tested SuperCollider packages", text)
         self.assertIn("if: github.event_name == 'workflow_dispatch' && inputs.release", text)
         self.assertIn("build_supercollider_runtime.sh", text)
+        runtime_builder = (
+            ROOT.parent / "packaging" / "build_supercollider_runtime.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("-DSUPERNOVA=ON", runtime_builder)
+        self.assertIn('"$install_prefix/bin/supernova" -v', runtime_builder)
+        self.assertGreaterEqual(text.count("supernova -v"), 3)
         for platform in (
             "Linux-x86_64",
             "RaspberryPi-aarch64",
@@ -196,6 +215,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertNotIn("--exclude-module amy", builder)
         self.assertNotIn("--exclude-module c_amy", builder)
         self.assertIn("--add-data \"$sc_dir:supercollider\"", builder)
+        self.assertIn('"$runtime_prefix/bin/supernova"', builder)
         macos_builder = (ROOT / "packaging" / "build_macos_dmg.sh").read_text(
             encoding="utf-8"
         )
@@ -203,12 +223,14 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             '--forbidden-runtime-exempt-prefix "Contents/Resources/sc-runtime"',
             macos_builder,
         )
+        self.assertIn('Contents/Resources/supernova', macos_builder)
         windows_builder = (ROOT / "packaging" / "build_windows.ps1").read_text(
             encoding="utf-8"
         )
         self.assertIn(
             '--forbidden-runtime-exempt-prefix "sc-runtime"', windows_builder
         )
+        self.assertIn('"supernova.exe"', windows_builder)
 
     def test_macos_frozen_entry_finds_runtime_in_contents_resources(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -226,6 +248,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             for path in (
                 runtime / "Contents" / "MacOS" / "sclang",
                 runtime / "Contents" / "Resources" / "scsynth",
+                runtime / "Contents" / "Resources" / "supernova",
             ):
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.touch()
@@ -275,15 +298,56 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertIn("var voiceGroup = Group.tail(~omniSourceGroup)", bootstrap)
         self.assertIn("voiceGroup: voiceGroup", bootstrap)
         self.assertIn("voiceGroup.free", bootstrap)
-        self.assertIn("var outputGateBus = Bus.control(s, 1)", bootstrap)
-        self.assertIn("outputNode.map(\\gateControl, outputGateBus)", bootstrap)
-        self.assertIn("record[\\outputGateBus].set(0)", bootstrap)
-        self.assertIn("outputGateBus.set(0)", bootstrap)
-        self.assertIn("outputGateBus.free", bootstrap)
+        self.assertIn("var outputControlBus = Bus.control(s, 2)", bootstrap)
+        self.assertIn(
+            "outputNode.map(\\gateControl, outputControlBus.index)",
+            bootstrap,
+        )
+        self.assertIn(
+            "outputNode.map(\\release, outputControlBus.index + 1)",
+            bootstrap,
+        )
+        self.assertIn("record[\\outputControlBus].set(0)", bootstrap)
+        self.assertIn("outputControlBus.set(0)", bootstrap)
+        self.assertIn("outputControlBus.free", bootstrap)
         self.assertIn("record[\\voiceGroup].set(\\outputGain, value)", bootstrap)
         self.assertNotIn("record[\\outputNode].set(", bootstrap)
         self.assertNotIn("outputNode.set(", bootstrap)
         self.assertNotIn("sourceNode.free", bootstrap)
+
+    def test_gesture_voices_are_bounded_inside_the_engine(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        launcher = (ROOT / "run_local.sh").read_text(encoding="utf-8")
+        config = json.loads(
+            (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(config["server"]["gesture_voice_limit"], 64)
+        self.assertIn("OMNICHORD_SC_MAX_GESTURE_VOICES", bootstrap)
+        self.assertIn("handles: List.new", bootstrap)
+        self.assertIn(
+            "state[\\handles].size >= maxGestureVoices",
+            bootstrap,
+        )
+        self.assertIn("state[\\handles].removeAt(0)", bootstrap)
+        self.assertIn("gestureStealRelease", bootstrap)
+        self.assertIn("record[\\outputControlBus].setn([", bootstrap)
+        self.assertIn("forcedRelease.asFloat.max(0.05)", bootstrap)
+        self.assertIn("server.gesture_voice_limit", launcher)
+        self.assertIn("export OMNICHORD_SC_MAX_GESTURE_VOICES", launcher)
+
+    def test_supernova_graph_parallelizes_only_independent_stages(self) -> None:
+        bootstrap = (SC_ROOT / "bootstrap.scd").read_text(encoding="utf-8")
+        self.assertIn("~omniSourceGroup = ParGroup.head(s)", bootstrap)
+        self.assertIn(
+            "~omniMixGroup = ParGroup.after(~omniSourceGroup)", bootstrap
+        )
+        self.assertIn("~omniFxGroup = ParGroup.after(~omniMixGroup)", bootstrap)
+        self.assertIn("~omniOutputGroup = Group.after(~omniFxGroup)", bootstrap)
+        self.assertIn("var voiceGroup = Group.tail(~omniSourceGroup)", bootstrap)
+
+    def test_native_voice_adapter_contains_non_finite_source_output(self) -> None:
+        core = (SC_ROOT / "core_synthdefs.scd").read_text(encoding="utf-8")
+        self.assertIn("var input = Sanitize.ar(In.ar(in, 2))", core)
 
     def test_pcm_drum_chokes_use_stable_control_buses(self) -> None:
         samples = (SC_ROOT / "sample_loader.scd").read_text(encoding="utf-8")

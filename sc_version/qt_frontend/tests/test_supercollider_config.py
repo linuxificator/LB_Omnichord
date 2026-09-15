@@ -20,11 +20,12 @@ class SuperColliderConfigTests(unittest.TestCase):
         config = load_supercollider_config(
             FRONTEND_DIR / "config" / "supercollider.json"
         )
-        self.assertEqual(config.config_revision, 4)
+        self.assertEqual(config.config_revision, 6)
         self.assertEqual(config.protocol_version, 2)
         self.assertEqual(config.language.host, "127.0.0.1")
         self.assertEqual(config.server.sample_rate, 48000)
         self.assertEqual(config.server.max_buffers, 8192)
+        self.assertEqual(config.server.gesture_voice_limit, 64)
         self.assertEqual(
             config.samples.commit,
             "440300901dfe9275fd84e0b7763af1f8443ae62e",
@@ -48,6 +49,19 @@ class SuperColliderConfigTests(unittest.TestCase):
             path = Path(directory) / "supercollider.json"
             path.write_text(json.dumps(data), encoding="utf-8")
             with self.assertRaisesRegex(SuperColliderConfigError, "max_buffers"):
+                load_supercollider_config(path)
+
+    def test_invalid_gesture_voice_limit_is_rejected(self) -> None:
+        source = FRONTEND_DIR / "config" / "supercollider.json"
+        data = json.loads(source.read_text(encoding="utf-8"))
+        data["server"]["gesture_voice_limit"] = 0
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "supercollider.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(
+                SuperColliderConfigError,
+                "gesture_voice_limit",
+            ):
                 load_supercollider_config(path)
 
 

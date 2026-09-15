@@ -2,7 +2,7 @@
 
 Updated: 2026-09-15
 
-- Active branch: `rework/sc_code_quality`; current implementation and
+- Active branch: `performance/supernova`; current implementation and
   qualification status are maintained under `sc_version/design/`.
 - The AMY implementation under `amysynth_version` is intentionally unchanged.
 - The preceding SC music work was merged to `main`; GitHub Actions run
@@ -13,7 +13,7 @@ Updated: 2026-09-15
   and leaves one SC production graph. The full local test suite passes. See
   `sc_version/design/arch/sc_code_quality_review.md`.
 - The Linux x86_64 SuperCollider vertical slice lives under `sc_version` and
-  uses separate Qt, headless `sclang` and `scsynth` processes. The frontend
+  uses separate Qt, headless `sclang` and Supernova processes. The frontend
   sends typed OSC actions and immutable plans; SC owns musical timing and note
   lifetimes.
 - Pinned inputs are SuperCollider 3.14.1 and SCLOrkSynths commit
@@ -49,6 +49,34 @@ Updated: 2026-09-15
 - The implementation is not a full migration claim. Additional banks,
   advanced SFZ behavior, comprehensive program calibration/load evidence and
   non-Linux SC targets remain open.
+- `rework/sc_code_quality` was merged to `main`; GitHub run `34953089772`
+  passed all four platform test jobs. The active performance branch selects
+  Supernova for production audio and gives independent graph stages explicit
+  parallel groups without changing the musical-time or voice-owner contracts.
+- The current Supernova implementation passed the complete local matrix and a
+  97.6-second separate-process broad live endurance cycle. That qualification
+  exposed and fixed two server-compatibility boundaries: scalar SCLOrk controls
+  are now always numeric, and non-finite third-party voice output is sanitized
+  before it can poison shared buses and room effects. The live recorder follows
+  Supernova's actual PipeWire ports and treats `/s_new` exceptions as fatal.
+- Continuous production-QML strumming now has a reproduced engine-resource
+  regression and an engine-owned fix. A queued pointer burst previously grew
+  to 1,007 synths, exhausted private audio buses and corrupted subsequent
+  spawns. The initial 24-voice/5-ms boundary itself caused an audible P16
+  discontinuity and has been superseded. SuperCollider now admits 64 live
+  voices per gesture owner and fades only the oldest saturated voice over at
+  least 50 ms through a race-free control bus. The exact two-cycle,
+  160-second held-pointer regression completed without SC errors, clipping or
+  long silence; the preceding instrumented run also added no PipeWire errors. See
+  `sc_version/design/sc/STRUM_PRESSURE.md`.
+- A second, screen-edge-specific reproduction showed no extra semantic strum
+  attack from out-of-bounds coordinates, but exposed incomplete Linux
+  scheduling: one Supernova DSP thread was `SCHED_RR 20` and fifteen helpers
+  were `SCHED_OTHER`. The source and packaged Linux launchers now perform one
+  bounded, exact-owned-session RealtimeKit setup and verify the complete DSP
+  pool. There is no persistent/name-based watcher and no change to Qt gesture
+  or musical behavior. The focused QML top-edge and Linux realtime adapter
+  regressions are in the normal test tree.
 
 Resume through `sc_version/design/README.md`, then
 `sc_version/design/sc/STATUS.md`. The original detailed requirements remain in

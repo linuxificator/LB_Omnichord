@@ -12,6 +12,9 @@ var blockSize = ("OMNICHORD_SC_BLOCK_SIZE".getenv ? "64").asInteger;
 var maxNodes = ("OMNICHORD_SC_MAX_NODES".getenv ? "4096").asInteger;
 var maxBuffers = ("OMNICHORD_SC_MAX_BUFFERS".getenv ? "8192").asInteger;
 var memKiB = ("OMNICHORD_SC_MEM_KIB".getenv ? "262144").asInteger;
+var maxGestureVoices = ("OMNICHORD_SC_MAX_GESTURE_VOICES".getenv ? "64")
+    .asInteger.clip(1, 256);
+var gestureStealRelease = ((blockSize / sampleRate) * 4).max(0.05);
 var protocolVersion = 2;
 var validateOnly = ("OMNICHORD_SC_VALIDATE_ONLY".getenv ? "0").asInteger == 1;
 var scriptDirectory = thisProcess.nowExecutingPath.dirname;
@@ -78,7 +81,7 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
     ~omniSetPitchBend.value(0.0);
 };
 
-~omniReleaseHandle = { |handle|
+~omniReleaseHandle = { |handle, forcedRelease|
     var record = ~omniVoices.removeAt(handle.asString);
     ~omniSustainPending.removeAt(handle.asString);
     if(record.notNil) {
@@ -90,10 +93,18 @@ var scriptDirectory = thisProcess.nowExecutingPath.dirname;
         } {
         if(record[\outputNode].notNil) {
             record[\releaseRequested] = true;
+            if(forcedRelease.notNil) {
+                // The mapped bus remains valid until output cleanup, unlike
+                // an individual native source or output node.
+                record[\outputControlBus].setn([
+                    0,
+                    forcedRelease.asFloat.max(0.05)
+                ]);
+            };
             // The control bus outlives the output synth until its /n_end has
             // been observed.  Unlike /n_set on a node that may just have
             // ended, this cannot race the server's node lifetime.
-            record[\outputGateBus].set(0);
+            record[\outputControlBus].set(0);
         } {
             if(record[\sourceAlive] ? true) {
                 record[\sourceNode].set(\gate, 0)
@@ -330,9 +341,11 @@ s.waitForBoot({
 
     s.sync;
 
-    ~omniSourceGroup = Group.head(s);
-    ~omniMixGroup = Group.after(~omniSourceGroup);
-    ~omniFxGroup = Group.after(~omniMixGroup);
+    // Supernova evaluates children of each parallel group concurrently while
+    // preserving the dependency order between these four graph stages.
+    ~omniSourceGroup = ParGroup.head(s);
+    ~omniMixGroup = ParGroup.after(~omniSourceGroup);
+    ~omniFxGroup = ParGroup.after(~omniMixGroup);
     ~omniOutputGroup = Group.after(~omniFxGroup);
     ~omniBendBus = Bus.control(s, 1);
     ~omniBendBus.set(1.0);
@@ -414,7 +427,7 @@ s.waitForBoot({
             var voiceBus = Bus.audio(s, 2);
             var voiceGroup = Group.tail(~omniSourceGroup);
             var outputRelease = 0.22;
-            var outputGateBus = Bus.control(s, 1);
+            var outputControlBus = Bus.control(s, 2);
             var sourceNode;
             var outputNode;
             var record;
@@ -443,14 +456,15 @@ s.waitForBoot({
                 \calibration, ~omniSclorkPlaybackGain.value(program),
                 \release, outputRelease.max(0.005)
             ]);
-            outputGateBus.set(1);
-            outputNode.map(\gateControl, outputGateBus);
+            outputControlBus.setn([1, outputRelease.max(0.005)]);
+            outputNode.map(\gateControl, outputControlBus.index);
+            outputNode.map(\release, outputControlBus.index + 1);
             record = (
                 sourceNode: sourceNode,
                 outputNode: outputNode,
                 voiceGroup: voiceGroup,
                 voiceBus: voiceBus,
-                outputGateBus: outputGateBus,
+                outputControlBus: outputControlBus,
                 nativeName: nativeName,
                 baseFrequency: frequency,
                 releaseMode: if(~omniSynthHasControl.value(nativeName, \gate)) {
@@ -477,7 +491,7 @@ s.waitForBoot({
                     // container avoids racing /n_end with a second /n_free.
                     voiceGroup.free;
                     voiceBus.free;
-                    outputGateBus.free;
+                    outputControlBus.free;
                     if(~omniVoices[handle] === record) {
                         ~omniVoices.removeAt(handle);
                     };
@@ -491,7 +505,7 @@ s.waitForBoot({
                     }
                 }) {
                     record[\releaseRequested] = true;
-                    outputGateBus.set(0);
+                    outputControlBus.set(0);
                 };
             };
         } {
@@ -718,7 +732,13 @@ OSCdef(\omniGestureNote, { |message|
         var logicalBus = message[9].asInteger.clip(0, 10);
         var tailSeconds = message[10].asFloat.max(0.01);
         var programRevision = message[11].asInteger.max(1);
-        var state = ~omniGestures[owner] ? (handles: Set.new);
+        var state = ~omniGestures[owner] ? (handles: List.new);
+        while { state[\handles].size >= maxGestureVoices } {
+            ~omniReleaseHandle.value(
+                state[\handles].removeAt(0),
+                gestureStealRelease
+            );
+        };
         ~omniSpawnVoice.value(
             owner, handle, program, programRevision, logicalKey, frequency,
             velocity, logicalBus, []

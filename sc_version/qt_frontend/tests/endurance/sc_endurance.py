@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drive the real SC edition indefinitely through its public Qt surface.
 
-The driver, frontend, sclang/scsynth and PipeWire recorder are separate
+The driver, frontend, sclang/Supernova and PipeWire recorder are separate
 processes. No synthetic-input endpoint is added to production code. With
 ``--gui`` the frontend also loads and continuously captures the production QML
 scene through Qt's offscreen platform. Use Ctrl-C for a clean stop; a zero
@@ -43,7 +43,14 @@ for module_path in (CODE, SUPPORT):
 from catalog_extensions import load_synth_catalog  # noqa: E402
 from sc_drum_kits import DRUM_KITS  # noqa: E402
 from supercollider_config import load_supercollider_config  # noqa: E402
-from supercollider_platform_adapter import pipewire_jack_prefix  # noqa: E402
+from supercollider_platform_adapter import (  # noqa: E402
+    locate_supercollider_runtime,
+    pipewire_jack_prefix,
+    server_program_command,
+)
+from supercollider_linux_realtime import (  # noqa: E402
+    configure_owned_supernova_realtime,
+)
 
 
 FATAL_LOG_TEXT = (
@@ -55,6 +62,10 @@ FATAL_LOG_TEXT = (
     "Exception:",
     "SynthDef not found",
     "buffer overflow",
+    "failed to get an audio bus allocated",
+    "Message 'index' not understood",
+    "node not found:",
+    "exception in /s_new",
 )
 
 
@@ -72,6 +83,8 @@ class AudioWindow:
     peak: float
     clipped_fraction: float
     longest_silent_seconds: float
+    largest_sample_step: float
+    sample_step_outlier_ratio: float
 
 
 def free_tcp_port() -> int:
@@ -100,7 +113,12 @@ def analyze_wave(path: Path, *, silence_threshold: int = 2) -> AudioWindow:
     clipped = 0
     silent_run = 0
     longest_silent_run = 0
+    step_histogram = [0] * 65536
+    largest_step = 0
+    previous: tuple[int, int] | None = None
     for left, right in zip(samples[0::2], samples[1::2], strict=True):
+        left = int(left)
+        right = int(right)
         magnitude = max(abs(int(left)), abs(int(right)))
         squared += (int(left) * int(left) + int(right) * int(right)) / 2.0
         peak = max(peak, magnitude)
@@ -111,13 +129,32 @@ def analyze_wave(path: Path, *, silence_threshold: int = 2) -> AudioWindow:
             longest_silent_run = max(longest_silent_run, silent_run)
         else:
             silent_run = 0
+        if previous is not None:
+            step = max(abs(left - previous[0]), abs(right - previous[1]))
+            step_histogram[step] += 1
+            largest_step = max(largest_step, step)
+        previous = (left, right)
     frame_count = len(samples) // 2
+    step_count = max(0, frame_count - 1)
+    # A 99.95th-percentile baseline excludes a single discontinuity and its
+    # return edge even in a short diagnostic capture, while retaining the
+    # repeated noisy attacks that are characteristic of plucked voices.
+    percentile_target = math.ceil(step_count * 0.9995)
+    accumulated = 0
+    percentile_step = 0
+    for step, count in enumerate(step_histogram):
+        accumulated += count
+        if accumulated >= percentile_target:
+            percentile_step = step
+            break
     return AudioWindow(
         duration_seconds=frame_count / float(sample_rate),
         rms=math.sqrt(squared / frame_count) / 32768.0,
         peak=peak / 32768.0,
         clipped_fraction=clipped / frame_count,
         longest_silent_seconds=longest_silent_run / float(sample_rate),
+        largest_sample_step=largest_step / 32768.0,
+        sample_step_outlier_ratio=largest_step / max(1, percentile_step),
     )
 
 
@@ -293,6 +330,100 @@ def startup_bass_riff_cycle() -> Iterator[Action]:
     yield Action("releaseChord", (0, 5), 0.3)
 
 
+def strum_pressure_cycle(*, through_qml: bool = False) -> Iterator[Action]:
+    """Hold the busiest accompaniment while increasing strum pressure."""
+
+    # Trance Lift combines a comparatively expensive native strum voice,
+    # supersaw accompaniment, acid bass and native percussion. It is a useful
+    # upper-load production preset rather than a synthetic oscillator fixture.
+    yield Action("selectPreset", (14,), 0.4)
+    yield Action("setMasterVolume", (0.36,))
+    yield Action("setChordVolume", (0.42,))
+    yield Action("setStrumVolume", (0.38,))
+    yield Action("setBassVolume", (0.40,))
+    yield Action("setPercussionVolume", (0.42,))
+    yield Action("setRhythmBusyness", (5.0,), 0.08)
+    yield Action("setRhythmChordActivity", (5.0,), 0.08)
+    yield Action("setRhythmBassActivity", (5.0,), 0.08)
+    yield Action("setRhythmFillDensity", (1.0,), 0.08)
+    yield Action("ensureRhythmRunning", (True,), 0.2)
+    yield Action("ensureBassRunning", (True,), 0.2)
+    yield Action("ensureChordArpeggioRunning", (True,), 0.2)
+    yield Action("pressChord", (0, 0), 2.0)
+
+    # Move across successive physical positions instead of jumping directly
+    # between endpoints. This matches a real pointer trajectory: chord tones
+    # are attacked across the duration of each sweep rather than in one burst.
+    down = [0.96 - (index * 0.92 / 36) for index in range(37)]
+    up = list(reversed(down))
+    sweep_count = 200
+    if through_qml:
+        # One press crosses the full surface for nearly a minute. Releasing
+        # between shorter batches failed to model the reported performance
+        # problem and artificially allowed all strum voices to drain.
+        yield Action(
+            "strumContinuousSweeps",
+            (sweep_count, len(down), 8),
+            0.02,
+        )
+    else:
+        yield Action("strumStart", (down[0],), 0.008)
+        for sweep in range(sweep_count):
+            path = down if sweep % 2 == 0 else up
+            for position in path[1:]:
+                yield Action("strumMove", (position,), 0.008)
+        yield Action("strumEnd", dwell=0.1)
+    yield Action("strumTap", (0.50,), 1.0)
+    yield Action("releaseChord", (0, 0), 1.0)
+
+
+def strum_click_cycle(*, through_qml: bool = False) -> Iterator[Action]:
+    """Reproduce P16 chord-selection followed by uninterrupted strumming."""
+
+    yield Action("selectPreset", (15,), 0.4)
+    yield Action("ensureRhythmRunning", (False,))
+    yield Action("ensureBassRunning", (False,))
+    yield Action("ensureChordArpeggioRunning", (False,))
+    yield Action("pressChord", (0, 0), 0.08)
+    yield Action("releaseChord", (0, 0), 0.4)
+    if through_qml:
+        yield Action("strumContinuousSweeps", (30, 37, 8), 0.5)
+    else:
+        down = [0.96 - (index * 0.92 / 36) for index in range(37)]
+        up = list(reversed(down))
+        yield Action("strumStart", (down[0],), 0.008)
+        for sweep in range(30):
+            path = down if sweep % 2 == 0 else up
+            for position in path[1:]:
+                yield Action("strumMove", (position,), 0.008)
+        yield Action("strumEnd", dwell=0.5)
+
+
+def strum_top_edge_cycle(*, through_qml: bool = False) -> Iterator[Action]:
+    """Reproduce P15 full accompaniment while crossing above the window."""
+
+    yield Action("selectPreset", (14,), 0.4)
+    yield Action("setRhythmChordActivity", (4.0,), 0.08)
+    yield Action("setRhythmBassActivity", (4.0,), 0.08)
+    yield Action("setChordArpeggioRate", (2.0,), 0.08)
+    yield Action("ensureRhythmRunning", (True,), 0.2)
+    yield Action("ensureBassRunning", (True,), 0.2)
+    yield Action("ensureChordArpeggioRunning", (True,), 0.2)
+    yield Action("pressChord", (0, 0), 0.08)
+    yield Action("releaseChord", (0, 0), 1.0)
+    if through_qml:
+        yield Action("strumOutsideTopSweeps", (60, 45, 8), 0.5)
+    else:
+        down = [0.96 - (index * 1.16 / 44) for index in range(45)]
+        up = list(reversed(down))
+        yield Action("strumStart", (down[0],), 0.008)
+        for sweep in range(60):
+            path = down if sweep % 2 == 0 else up
+            for position in path[1:]:
+                yield Action("strumMove", (position,), 0.008)
+        yield Action("strumEnd", dwell=0.5)
+
+
 class ApiClient:
     def __init__(self, port: int) -> None:
         self.port = port
@@ -315,7 +446,9 @@ class ApiClient:
             method="POST",
         )
         try:
-            with urlopen(request, timeout=8) as reply:
+            # A production-QML pointer path deliberately holds the GUI event
+            # loop while QTest delivers several seconds of real motion.
+            with urlopen(request, timeout=125) as reply:
                 result = json.loads(reply.read())
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
@@ -350,10 +483,19 @@ def stop_process(process: subprocess.Popen[Any], timeout: float = 5.0) -> None:
 
 
 class AudioMonitor(threading.Thread):
-    def __init__(self, artifact_dir: Path, chunk_seconds: float) -> None:
+    def __init__(
+        self,
+        artifact_dir: Path,
+        chunk_seconds: float,
+        *,
+        keep_audio: bool = False,
+        reject_step_outliers: bool = False,
+    ) -> None:
         super().__init__(name="sc-endurance-audio", daemon=True)
         self.artifact_dir = artifact_dir
         self.chunk_seconds = chunk_seconds
+        self.keep_audio = keep_audio
+        self.reject_step_outliers = reject_step_outliers
         self.stop_requested = threading.Event()
         self.failure: BaseException | None = None
         self.window_count = 0
@@ -381,8 +523,8 @@ class AudioMonitor(threading.Thread):
 
             wait_for(recorder_ready, 5, "PipeWire recorder ports")
             for source, target in (
-                ("SuperCollider:out_1", "pw-record:input_FL"),
-                ("SuperCollider:out_2", "pw-record:input_FR"),
+                ("supernova:output_1", "pw-record:input_FL"),
+                ("supernova:output_2", "pw-record:input_FR"),
             ):
                 linked = subprocess.run(
                     ["pw-link", source, target], text=True, capture_output=True
@@ -417,7 +559,16 @@ class AudioMonitor(threading.Thread):
                     raise RuntimeError(f"live audio clips persistently: {metrics}")
                 if metrics.longest_silent_seconds > 3.0:
                     raise RuntimeError(f"live audio dropout exceeds 3 s: {metrics}")
-                wave_path.unlink(missing_ok=True)
+                if (
+                    self.reject_step_outliers
+                    and metrics.largest_sample_step > 0.08
+                    and metrics.sample_step_outlier_ratio > 2.0
+                ):
+                    raise RuntimeError(
+                        f"live audio contains an isolated sample-step click: {metrics}"
+                    )
+                if not self.keep_audio:
+                    wave_path.unlink(missing_ok=True)
         except BaseException as exc:
             self.failure = exc
             self.stop_requested.set()
@@ -441,6 +592,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--chunk-seconds", type=float, default=60.0)
     parser.add_argument(
+        "--keep-audio",
+        action="store_true",
+        help="retain captured WAV chunks for diagnostic waveform analysis",
+    )
+    parser.add_argument(
         "--startup-idle-seconds",
         type=float,
         default=0.0,
@@ -453,15 +609,29 @@ def parse_args() -> argparse.Namespace:
         help="load and capture the real production QML scene offscreen",
     )
     parser.add_argument(
+        "--gui-platform",
+        choices=("offscreen", "native"),
+        default="offscreen",
+        help="use deterministic offscreen QML or the current desktop compositor",
+    )
+    parser.add_argument(
         "--scenario",
         choices=(
             "broad",
             "pcm-chord-switch",
             "vsco-drum-roles",
             "startup-bass-riff",
+            "strum-pressure",
+            "strum-click",
+            "strum-top-edge",
         ),
         default="broad",
         help="run broad coverage or one focused playback regression",
+    )
+    parser.add_argument(
+        "--gesture-voice-limit",
+        type=int,
+        help="override the configured engine gesture boundary for diagnostics",
     )
     return parser.parse_args()
 
@@ -476,6 +646,7 @@ def main() -> int:
     debug_log = artifact_dir / "frontend-debug.jsonl"
     action_log = artifact_dir / "actions.jsonl"
     config = load_supercollider_config(SC_CONFIG)
+    runtime = locate_supercollider_runtime()
     synths, _chord, _strum, _bass = load_synth_catalog(
         ROOT / "instruments" / "supercollider-legacy-map.json"
     )
@@ -491,9 +662,15 @@ def main() -> int:
             "OMNICHORD_SC_BLOCK_SIZE": str(config.server.block_size),
             "OMNICHORD_SC_MAX_NODES": str(config.server.max_nodes),
             "OMNICHORD_SC_MAX_BUFFERS": str(config.server.max_buffers),
+            "OMNICHORD_SC_MAX_GESTURE_VOICES": str(
+                args.gesture_voice_limit or config.server.gesture_voice_limit
+            ),
             "OMNICHORD_SC_MEM_KIB": str(config.server.realtime_memory_kib),
             "OMNICHORD_SC_VSCO_ROOT": str(config.samples.vsco_root),
             "OMNICHORD_SC_SAMPLE_RAM_MIB": str(config.samples.ram_budget_mib),
+            "OMNICHORD_SC_SYNTH_PROGRAM": server_program_command(
+                runtime.supernova
+            ),
         }
     )
     sc_stream = sc_log.open("w", encoding="utf-8")
@@ -508,6 +685,16 @@ def main() -> int:
             command, cwd=SC_ROOT, env=environment, stdout=sc_stream,
             stderr=subprocess.STDOUT, start_new_session=True,
         )
+        realtime = configure_owned_supernova_realtime(
+            sc_process.pid,
+            runtime.supernova,
+            environment=environment,
+        )
+        (artifact_dir / "supernova-realtime.json").write_text(
+            json.dumps(asdict(realtime), indent=2) + "\n",
+            encoding="utf-8",
+        )
+        print(realtime.summary(), flush=True)
         wait_for(
             lambda: "LB_OMNICHORD_SC_READY" in sc_log.read_text(encoding="utf-8", errors="replace"),
             45,
@@ -524,14 +711,15 @@ def main() -> int:
             }
         )
         if args.gui:
-            frontend_environment.update(
-                {
-                    "OMNICHORD_TEST_LOAD_QML": "1",
-                    "QT_QPA_PLATFORM": "offscreen",
-                    "QT_QUICK_BACKEND": "software",
-                    "QSG_INFO": "0",
-                }
-            )
+            frontend_environment["OMNICHORD_TEST_LOAD_QML"] = "1"
+            if args.gui_platform == "offscreen":
+                frontend_environment.update(
+                    {
+                        "QT_QPA_PLATFORM": "offscreen",
+                        "QT_QUICK_BACKEND": "software",
+                        "QSG_INFO": "0",
+                    }
+                )
         frontend_process = subprocess.Popen(
             [sys.executable, str(HEADLESS_APP), "--debug-file", str(debug_log)],
             cwd=ROOT, env=frontend_environment, stdout=frontend_stream,
@@ -562,7 +750,12 @@ def main() -> int:
                 flush=True,
             )
 
-        audio_monitor = AudioMonitor(artifact_dir, args.chunk_seconds)
+        audio_monitor = AudioMonitor(
+            artifact_dir,
+            args.chunk_seconds,
+            keep_audio=args.keep_audio,
+            reject_step_outliers=args.scenario == "strum-click",
+        )
         audio_monitor.start()
         cycle = max(0, args.start_cycle)
         completed_cycles = 0
@@ -574,6 +767,12 @@ def main() -> int:
                 actions = vsco_drum_role_cycle()
             elif args.scenario == "startup-bass-riff":
                 actions = startup_bass_riff_cycle()
+            elif args.scenario == "strum-pressure":
+                actions = strum_pressure_cycle(through_qml=args.gui)
+            elif args.scenario == "strum-click":
+                actions = strum_click_cycle(through_qml=args.gui)
+            elif args.scenario == "strum-top-edge":
+                actions = strum_top_edge_cycle(through_qml=args.gui)
             else:
                 actions = action_cycle(
                     cycle,
@@ -622,6 +821,20 @@ def main() -> int:
                     indent=2,
                 )
                 target.write("\n")
+        # Drain live ownership while the language and audio server are still
+        # available. Otherwise process shutdown can hide late /n_end cleanup
+        # races behind Supernova's final tree teardown.
+        api.action(Action("panic"))
+        time.sleep(1.0)
+        for path, label in (
+            (sc_log, "SuperCollider"),
+            (frontend_log, "frontend"),
+        ):
+            failure = log_has_failure(path)
+            if failure is not None:
+                raise RuntimeError(f"{label} log contains {failure!r}")
+        if audio_monitor.failure is not None:
+            raise RuntimeError(f"audio monitor failed: {audio_monitor.failure}")
         return 0
     except KeyboardInterrupt:
         return 0
