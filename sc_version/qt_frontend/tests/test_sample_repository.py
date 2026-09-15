@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+import io
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
-
-from dulwich import porcelain
-from dulwich.repo import Repo
 
 
 FRONTEND = Path(__file__).resolve().parents[1]
@@ -22,31 +21,27 @@ from sample_repository import (  # noqa: E402
     DEFAULT_SAMPLE_COMMIT,
     SAMPLE_RECEIPT_NAME,
     SampleRepositoryError,
+    _sample_archive_url,
     ensure_sample_repository,
     prepare_user_runtime_config,
     validate_sample_tree,
-    validate_sample_repository,
 )
 from sample_location_dialog import choose_sample_root  # noqa: E402
 
 
-def make_clone(path: Path, origin: str = DEFAULT_REPOSITORY) -> None:
-    porcelain.init(str(path))
-    config = Repo(str(path)).get_config()
-    config.set((b"remote", b"origin"), b"url", origin.encode())
-    config.write_to_path()
-
-
-def commit_clone(path: Path) -> str:
-    marker = path / "fixture.wav"
-    marker.write_bytes(b"sample")
-    porcelain.add(str(path), paths=[marker.name])
-    return porcelain.commit(
-        str(path),
-        message=b"fixture",
-        author=b"Test <test@example.com>",
-        committer=b"Test <test@example.com>",
-    ).decode("ascii")
+def make_snapshot(
+    files: dict[str, bytes],
+    *,
+    root: str = f"VSCO-2-CE-{DEFAULT_SAMPLE_COMMIT}",
+) -> io.BytesIO:
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode="w:gz") as archive:
+        for relative, payload in files.items():
+            record = tarfile.TarInfo(f"{root}/{relative}")
+            record.size = len(payload)
+            archive.addfile(record, io.BytesIO(payload))
+    stream.seek(0)
+    return stream
 
 
 def write_required_samples(
@@ -338,61 +333,41 @@ class SampleRepositoryTests(unittest.TestCase):
             self.assertEqual(config.samples.vsco_root, resolved)
             self.assertEqual(ensure.call_args.args[0], resolved)
 
-    def test_existing_non_repository_is_rejected_clearly(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            with self.assertRaisesRegex(
-                SampleRepositoryError,
-                "not a readable Git clone",
-            ):
-                validate_sample_repository(Path(temporary), DEFAULT_REPOSITORY)
+    def test_archive_url_accepts_https_and_ssh_repository_identity(self) -> None:
+        expected = (
+            "https://codeload.github.com/linuxificator/vsco-2-ce/tar.gz/"
+            f"{DEFAULT_SAMPLE_COMMIT}"
+        )
+        self.assertEqual(
+            _sample_archive_url(DEFAULT_REPOSITORY, DEFAULT_SAMPLE_COMMIT), expected
+        )
+        self.assertEqual(
+            _sample_archive_url(
+                "git@github.com:linuxificator/VSCO-2-CE.git",
+                DEFAULT_SAMPLE_COMMIT,
+            ),
+            expected,
+        )
+        with self.assertRaisesRegex(SampleRepositoryError, "invalid pinned"):
+            _sample_archive_url(DEFAULT_REPOSITORY, "main")
 
-    def test_origin_identity_accepts_https_and_ssh_but_rejects_other_forks(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            make_clone(root / "https")
-            make_clone(root / "ssh", "git@github.com:linuxificator/VSCO-2-CE.git")
-            make_clone(root / "wrong", "https://github.com/sgossner/VSCO-2-CE.git")
-            https_commit = commit_clone(root / "https")
-            ssh_commit = commit_clone(root / "ssh")
-            commit_clone(root / "wrong")
-            self.assertEqual(
-                validate_sample_repository(
-                    root / "https", DEFAULT_REPOSITORY, https_commit
-                ),
-                (root / "https").resolve(),
-            )
-            self.assertEqual(
-                validate_sample_repository(root / "ssh", DEFAULT_REPOSITORY, ssh_commit),
-                (root / "ssh").resolve(),
-            )
-            with self.assertRaisesRegex(SampleRepositoryError, "wrong Git origin"):
-                validate_sample_repository(root / "wrong", DEFAULT_REPOSITORY)
-            with self.assertRaisesRegex(SampleRepositoryError, "wrong Git commit"):
-                validate_sample_repository(
-                    root / "https", DEFAULT_REPOSITORY, "0" * 40
-                )
-
-    def test_missing_repository_is_cloned_to_final_path_atomically(self) -> None:
+    def test_missing_collection_streams_only_required_files_without_git_metadata(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             destination = root / "VSCO-2-CE"
             required = root / "required-samples.json"
-            write_required_samples(required, ["fixture.wav"])
+            write_required_samples(required, ["Keys/fixture.wav"])
+            snapshot = make_snapshot(
+                {
+                    "Keys/fixture.wav": b"sample",
+                    "unused.wav": b"must not be installed",
+                    ".git/objects/pack/history": b"must not be installed",
+                }
+            )
 
-            def fake_clone(url: str, target: str, **arguments: object) -> None:
-                self.assertEqual(url, DEFAULT_REPOSITORY)
-                self.assertEqual(arguments["depth"], 1)
-                self.assertEqual(arguments["branch"], DEFAULT_SAMPLE_BRANCH)
-                make_clone(Path(target), url)
-                commit_clone(Path(target))
-
-            with (
-                patch("sample_repository.porcelain.clone", side_effect=fake_clone),
-                patch(
-                    "sample_repository.repository_commit",
-                    return_value=DEFAULT_SAMPLE_COMMIT,
-                ),
-            ):
+            with patch("sample_repository.urlopen", return_value=snapshot) as open_url:
                 result = ensure_sample_repository(
                     destination,
                     DEFAULT_REPOSITORY,
@@ -401,13 +376,73 @@ class SampleRepositoryTests(unittest.TestCase):
                     required_samples=required,
                 )
             self.assertEqual(result, destination.resolve())
-            self.assertEqual((destination / "fixture.wav").read_bytes(), b"sample")
+            self.assertEqual(
+                (destination / "Keys" / "fixture.wav").read_bytes(), b"sample"
+            )
+            self.assertFalse((destination / "unused.wav").exists())
+            self.assertFalse((destination / ".git").exists())
             receipt = json.loads(
                 (destination / SAMPLE_RECEIPT_NAME).read_text(encoding="utf-8")
             )
             self.assertEqual(receipt["branch"], DEFAULT_SAMPLE_BRANCH)
             self.assertEqual(receipt["commit"], DEFAULT_SAMPLE_COMMIT)
-            self.assertFalse(any(destination.parent.glob(".VSCO-2-CE.clone-*")))
+            self.assertEqual(open_url.call_count, 1)
+            request = open_url.call_args.args[0]
+            self.assertEqual(
+                request.full_url,
+                _sample_archive_url(DEFAULT_REPOSITORY, DEFAULT_SAMPLE_COMMIT),
+            )
+            self.assertFalse(any(destination.parent.glob(".VSCO-2-CE.install-*")))
+
+    def test_incomplete_snapshot_fails_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            destination = root / "VSCO-2-CE"
+            required = root / "required-samples.json"
+            write_required_samples(required, ["missing.wav"])
+
+            with (
+                patch("sample_repository.urlopen", return_value=make_snapshot({})),
+                self.assertRaisesRegex(
+                    SampleRepositoryError, "snapshot is incomplete"
+                ),
+            ):
+                ensure_sample_repository(
+                    destination,
+                    DEFAULT_REPOSITORY,
+                    DEFAULT_SAMPLE_BRANCH,
+                    DEFAULT_SAMPLE_COMMIT,
+                    required_samples=required,
+                )
+
+            self.assertFalse(destination.exists())
+            self.assertFalse(any(destination.parent.glob(".VSCO-2-CE.install-*")))
+
+    def test_snapshot_with_an_unexpected_root_fails_atomically(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            destination = root / "VSCO-2-CE"
+            required = root / "required-samples.json"
+            write_required_samples(required, ["fixture.wav"])
+            snapshot = make_snapshot(
+                {"fixture.wav": b"sample"}, root="untrusted-snapshot"
+            )
+
+            with (
+                patch("sample_repository.urlopen", return_value=snapshot),
+                self.assertRaisesRegex(
+                    SampleRepositoryError, "unexpected archive root"
+                ),
+            ):
+                ensure_sample_repository(
+                    destination,
+                    DEFAULT_REPOSITORY,
+                    DEFAULT_SAMPLE_BRANCH,
+                    DEFAULT_SAMPLE_COMMIT,
+                    required_samples=required,
+                )
+
+            self.assertFalse(destination.exists())
 
     def test_user_config_is_seeded_and_revision_one_default_is_migrated(self) -> None:
         shipped = json.loads(
@@ -607,7 +642,7 @@ class SampleRepositoryTests(unittest.TestCase):
             self.assertEqual(persisted["server"]["gesture_voice_limit"], 48)
             self.assertEqual(config.server.gesture_voice_limit, 48)
 
-    def test_revision_six_source_pin_moves_to_shallow_runtime_branch(self) -> None:
+    def test_revision_six_source_pin_moves_to_runtime_snapshot(self) -> None:
         shipped_data = json.loads(
             (FRONTEND / "config" / "supercollider.json").read_text(
                 encoding="utf-8"

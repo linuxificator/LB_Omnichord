@@ -16,12 +16,14 @@ audio graph.
 `config/supercollider.json` owns the SC runtime and sample configuration. The
 first launch creates private editable copies under `~/.omnichord/config` and
 uses Qt's standard directory chooser to select the parent of the sample
-library. It then installs the pinned, shallow VSCO 2 CE runtime subset there
-when required. `--sample-root /exact/library/path` provides the equivalent
-non-interactive choice. An ordinary copied sample directory is valid when every
-required path exists; Git metadata is not required at runtime. Its installation
-receipt contains the required path list. Parsed JSON content is compared without
-assuming an object or list order, and startup never hashes the recordings.
+library. It then installs the pinned, curated VSCO 2 CE runtime subset there
+when required by streaming its commit-pinned GitHub snapshot without Git
+history or a `.git` directory. `--sample-root /exact/library/path` provides the
+equivalent non-interactive choice. An ordinary copied sample directory is valid
+when every required path exists; Git metadata is not required at runtime. Its
+installation receipt contains the required path list. Parsed JSON content is
+compared without assuming an object or list order, and startup never hashes the
+recordings.
 
 ## Run and test
 

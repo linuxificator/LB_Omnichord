@@ -8,12 +8,10 @@ from pathlib import Path
 from pathlib import PurePosixPath
 import shutil
 import sys
+import tarfile
 import tempfile
-from urllib.parse import urlsplit
-
-from dulwich import porcelain
-from dulwich.errors import NotGitRepository
-from dulwich.repo import Repo
+from urllib.parse import quote, urlsplit
+from urllib.request import Request, urlopen
 
 from json_store import JsonStore
 from supercollider_config import (
@@ -30,6 +28,7 @@ LEGACY_SAMPLE_COMMIT = "440300901dfe9275fd84e0b7763af1f8443ae62e"
 DEFAULT_SAMPLE_ROOT = "~/VSCO-2-CE"
 LEGACY_SAMPLE_ROOT = "~/sample_lib/VSCO-2-CE-1.1.0"
 SAMPLE_RECEIPT_NAME = "lb-omnichord-samples.json"
+SAMPLE_DOWNLOAD_TIMEOUT_SECONDS = 60.0
 
 
 class SampleRepositoryError(RuntimeError):
@@ -205,45 +204,94 @@ def _repository_identity(value: str) -> tuple[str, str, str]:
     return host.lower(), owner.lower(), name.lower()
 
 
-def repository_origin(path: Path) -> str:
+def _sample_archive_url(repository_url: str, commit: str) -> str:
+    _host, owner, name = _repository_identity(repository_url)
+    invalid_commit = len(commit) != 40 or any(
+        character not in "0123456789abcdefABCDEF" for character in commit
+    )
+    if invalid_commit:
+        raise SampleRepositoryError(f"invalid pinned sample commit: {commit!r}")
+    return (
+        "https://codeload.github.com/"
+        f"{quote(owner, safe='')}/{quote(name, safe='')}/tar.gz/{commit.lower()}"
+    )
+
+
+def _install_sample_snapshot(
+    destination: Path,
+    repository_url: str,
+    expected_commit: str,
+    required: RequiredSampleList,
+) -> None:
+    """Stream only required files from a pinned GitHub tree snapshot.
+
+    A Git clone duplicates every incompressible WAV in its object store. A
+    codeload snapshot has the same pinned tree identity without history; files
+    are copied directly from the response, so neither an archive nor `.git`
+    remains on disk.
+    """
+
+    _host, _owner, repository_name = _repository_identity(repository_url)
+    expected_archive_root = f"{repository_name}-{expected_commit}".casefold()
+    archive_url = _sample_archive_url(repository_url, expected_commit)
+    request = Request(
+        archive_url,
+        headers={
+            "Accept": "application/x-gzip",
+            "User-Agent": "LB-Omnichord-sample-installer/1",
+        },
+    )
+    required_paths = set(required.files)
+    installed: set[str] = set()
     try:
-        config = Repo(str(path)).get_config()
-        value = config.get((b"remote", b"origin"), b"url")
-    except (KeyError, NotGitRepository, OSError, ValueError) as exc:
+        with urlopen(request, timeout=SAMPLE_DOWNLOAD_TIMEOUT_SECONDS) as response:
+            with tarfile.open(fileobj=response, mode="r|gz") as archive:
+                for member in archive:
+                    member_path = PurePosixPath(member.name)
+                    if member_path.is_absolute() or ".." in member_path.parts:
+                        raise SampleRepositoryError(
+                            f"sample snapshot contains unsafe path {member.name!r}"
+                        )
+                    if len(member_path.parts) < 2:
+                        continue
+                    if member_path.parts[0].casefold() != expected_archive_root:
+                        raise SampleRepositoryError(
+                            "sample snapshot has an unexpected archive root: "
+                            f"{member_path.parts[0]!r}"
+                        )
+                    relative = PurePosixPath(*member_path.parts[1:]).as_posix()
+                    if relative not in required_paths:
+                        continue
+                    if relative in installed:
+                        raise SampleRepositoryError(
+                            f"sample snapshot repeats required path {relative!r}"
+                        )
+                    if not member.isfile():
+                        raise SampleRepositoryError(
+                            f"required sample is not a regular file: {relative!r}"
+                        )
+                    source = archive.extractfile(member)
+                    if source is None:
+                        raise SampleRepositoryError(
+                            f"could not read required sample {relative!r}"
+                        )
+                    target = destination / relative
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    with source, target.open("wb") as output:
+                        shutil.copyfileobj(source, output, length=1024 * 1024)
+                    installed.add(relative)
+    except (OSError, tarfile.TarError) as exc:
         raise SampleRepositoryError(
-            f"sample directory is not a readable Git clone: {path}"
+            f"could not download pinned sample snapshot {archive_url}: {exc}"
         ) from exc
-    return bytes(value).decode("utf-8", errors="strict")
 
-
-def repository_commit(path: Path) -> str:
-    try:
-        return bytes(Repo(str(path)).head()).decode("ascii")
-    except (NotGitRepository, OSError, UnicodeDecodeError, ValueError) as exc:
+    missing = sorted(required_paths - installed)
+    if missing:
+        example = missing[0]
         raise SampleRepositoryError(
-            f"sample directory has no readable Git HEAD: {path}"
-        ) from exc
-
-
-def validate_sample_repository(
-    path: Path,
-    expected_url: str,
-    expected_commit: str = DEFAULT_SAMPLE_COMMIT,
-) -> Path:
-    resolved = path.expanduser().resolve()
-    actual_url = repository_origin(resolved)
-    if _repository_identity(actual_url) != _repository_identity(expected_url):
-        raise SampleRepositoryError(
-            "configured sample directory has the wrong Git origin: "
-            f"expected {expected_url}, found {actual_url} in {resolved}"
+            "pinned sample snapshot is incomplete; "
+            f"missing {len(missing)} required file(s), including {example!r}"
         )
-    actual_commit = repository_commit(resolved)
-    if actual_commit != str(expected_commit):
-        raise SampleRepositoryError(
-            "configured sample directory is at the wrong Git commit: "
-            f"expected {expected_commit}, found {actual_commit} in {resolved}"
-        )
-    return resolved
 
 
 def ensure_sample_repository(
@@ -256,50 +304,66 @@ def ensure_sample_repository(
 ) -> Path:
     destination = path.expanduser().resolve()
     if destination.exists():
-        if required_samples is not None:
-            return validate_sample_tree(
-                destination,
-                required_samples,
-                repository_url=repository_url,
-                branch=branch,
-                commit=expected_commit,
+        if required_samples is None:
+            raise SampleRepositoryError(
+                "a required sample list is needed to validate the sample directory"
             )
-        return validate_sample_repository(
-            destination, repository_url, expected_commit
+        return validate_sample_tree(
+            destination,
+            required_samples,
+            repository_url=repository_url,
+            branch=branch,
+            commit=expected_commit,
+        )
+    if required_samples is None:
+        raise SampleRepositoryError(
+            "a required sample list is needed to install the sample directory"
+        )
+
+    required = load_required_sample_list(required_samples)
+    if _repository_identity(required.repository) != _repository_identity(
+        repository_url
+    ):
+        raise SampleRepositoryError(
+            "required sample list repository differs from the runtime config"
+        )
+    if required.branch != branch or required.commit != expected_commit:
+        raise SampleRepositoryError(
+            "required sample list branch or commit differs from the runtime config"
         )
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary_root = Path(
-        tempfile.mkdtemp(prefix=f".{destination.name}.clone-", dir=destination.parent)
+        tempfile.mkdtemp(prefix=f".{destination.name}.install-", dir=destination.parent)
     )
-    checkout = temporary_root / "repository"
+    snapshot = temporary_root / "snapshot"
+    snapshot.mkdir()
     print(
-        f"Installing the LB Omnichord VSCO 2 CE sample subset in {destination}; "
-        "this is a one-time download.",
+        f"Installing {len(required.files)} LB Omnichord VSCO 2 CE samples in "
+        f"{destination}; this is a one-time download without Git history.",
         file=sys.stderr,
         flush=True,
     )
     try:
-        porcelain.clone(
+        _install_sample_snapshot(
+            snapshot,
             repository_url,
-            str(checkout),
-            checkout=True,
-            depth=1,
-            branch=branch,
+            expected_commit,
+            required,
         )
-        validate_sample_repository(checkout, repository_url, expected_commit)
-        if required_samples is not None:
-            validate_sample_tree(
-                checkout,
-                required_samples,
-                repository_url=repository_url,
-                branch=branch,
-                commit=expected_commit,
-            )
-        checkout.replace(destination)
-    except BaseException as exc:
+        validate_sample_tree(
+            snapshot,
+            required_samples,
+            repository_url=repository_url,
+            branch=branch,
+            commit=expected_commit,
+        )
+        snapshot.replace(destination)
+    except SampleRepositoryError:
+        raise
+    except Exception as exc:
         raise SampleRepositoryError(
-            f"could not clone sample repository {repository_url} to {destination}: {exc}"
+            f"could not install sample snapshot {repository_url} in {destination}: {exc}"
         ) from exc
     finally:
         shutil.rmtree(temporary_root, ignore_errors=True)

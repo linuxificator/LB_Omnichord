@@ -19,11 +19,6 @@
       "owner": "runtime",
       "used_by": ["Qt frontend", "tests", "diagnostics"]
     },
-    "dulwich": {
-      "distribution": "dulwich",
-      "owner": "runtime",
-      "used_by": ["verified VSCO sample repository installation"]
-    },
     "fastjsonschema": {
       "distribution": "fastjsonschema",
       "owner": "runtime",
@@ -50,9 +45,7 @@
       "used_by": ["desktop OSC DNS-SD service advertisement"]
     }
   },
-  "transitive_dependencies": {
-    "urllib3": {"distribution": "urllib3", "owner": "portable"}
-  },
+  "transitive_dependencies": {},
   "invoked_python_tools": {
     "PyInstaller": {"distribution": "PyInstaller", "owner": "build"},
     "coverage": {"distribution": "coverage", "owner": "test_quality"},

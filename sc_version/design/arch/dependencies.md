@@ -12,6 +12,7 @@ trade a small local implementation for an obscure dependency.
 
 Requirements files and `qt_frontend/packaging/python_dependency_groups.json`
 are the authority. Current direct runtime dependencies cover PySide6,
-fastjsonschema, python-osc, Zeroconf, Dulwich and urllib3; source audio tools add
-NumPy and SoundFile, and builds add PyInstaller. A new dependency requires a
+fastjsonschema, python-osc and Zeroconf; source audio tools add NumPy and
+SoundFile, and builds add PyInstaller. Commit-pinned sample snapshots use the
+Python standard-library HTTPS and tar readers. A new dependency requires a
 dated assessment, boundary tests, notices and package audit updates.

@@ -59,7 +59,7 @@ group, fade time and duration cap are data, not frontend conditionals. Event
 duration caps are optional: zero means the sample profile owns its full
 duration, otherwise the shorter of profile duration and event cap is used.
 
-The external VSCO sample source is acquired from the shallow runtime branch at
+The external VSCO sample source is acquired from the pinned runtime snapshot at
 commit `78b95e70efe4349eeb03855f7f7654cb81c8c62f` of the configured repository.
 Its 2,166 audio files are the exact union of playable SFZ-region references
 and direct PCM-drum references. Runtime admission does not require Git

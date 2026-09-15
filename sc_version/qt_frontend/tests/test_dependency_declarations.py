@@ -74,13 +74,13 @@ class DependencyDeclarationTests(unittest.TestCase):
         }
         self.assertEqual(
             resolved["portable"],
-            {"fastjsonschema", "python-osc", "dulwich", "urllib3"},
+            {"fastjsonschema", "python-osc"},
         )
         self.assertEqual(
             resolved["runtime"],
             {
                 "pyside6", "fastjsonschema", "python-osc",
-                "zeroconf", "dulwich", "urllib3",
+                "zeroconf",
             },
         )
         self.assertEqual(
@@ -90,8 +90,6 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "fastjsonschema",
                 "python-osc",
                 "zeroconf",
-                "dulwich",
-                "urllib3",
                 "numpy",
                 "soundfile",
             },
@@ -103,8 +101,6 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "fastjsonschema",
                 "python-osc",
                 "zeroconf",
-                "dulwich",
-                "urllib3",
                 "pyinstaller",
             },
         )
@@ -115,8 +111,6 @@ class DependencyDeclarationTests(unittest.TestCase):
                 "fastjsonschema",
                 "python-osc",
                 "zeroconf",
-                "dulwich",
-                "urllib3",
                 "numpy",
                 "ruff",
                 "mypy",

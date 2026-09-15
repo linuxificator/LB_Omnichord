@@ -2,7 +2,7 @@
 
 Updated: 2026-09-15
 
-- Active branch: `fix/sc-runtime-lifecycle`; current implementation and
+- Active branch: `fix/sc-instrument-balance`; current implementation and
   qualification status are maintained under `sc_version/design/`.
 - The AMY implementation under `amysynth_version` is intentionally unchanged.
 - The preceding SC music work was merged to `main`; GitHub Actions run
@@ -84,6 +84,18 @@ Updated: 2026-09-15
   fatal before registering OSC handlers. Two immediate real source launches
   completed and released both UDP ports; an occupied-port launch failed before
   opening Qt or starting another SC process.
+- The four owned acid voices now share the same three-register median-RMS
+  reference as the measured instrument catalogue. This removes the roughly
+  18 dB raw excess of Acid Oto that made preset 18's already-calibrated Gongs
+  and Metal kit seem abnormally quiet. Every PCM kit retains its independent
+  common-groove and pad calibration in the runtime catalogue, and every native
+  drum program must have a measured gain.
+- First-run samples are no longer installed as a shallow Git clone. A shallow
+  clone still stored the largely incompressible 2.2 GiB WAV payload twice: once
+  as files and once in `.git/objects`. Installation now streams the pinned
+  GitHub commit snapshot, extracts only the 2,166 required regular files and
+  retains no archive or Git metadata. The semantic receipt remains the runtime
+  authority; Dulwich and urllib3 were removed from package dependencies.
 
 Resume through `sc_version/design/README.md`, then
 `sc_version/design/sc/STATUS.md`. The original detailed requirements remain in

@@ -105,12 +105,13 @@ x86_64
   use an independent `-SC` release tag. Linux and Raspberry Pi receive
   AppImages, macOS a DMG and Windows a ZIP. Each contains the official or pinned
   SuperCollider 3.14.1 runtime and no AMY runtime.
-- First launch uses bundled Dulwich rather than a system Git executable to
-  shallow-clone the pinned `linuxificator/VSCO-2-CE` runtime branch at the
-  first-run location chosen through Qt (or the exact `--sample-root` path).
+- First launch streams the commit-pinned GitHub tree snapshot of the
+  `linuxificator/VSCO-2-CE` runtime branch at the first-run location chosen
+  through Qt (or the exact `--sample-root` path).
   Its 2,166 WAVs are the union of
   playable SFZ and direct PCM-drum references; 1,002 unreachable source files
-  and Git history are not downloaded. Startup admits a checkout or ordinary
+  and Git history are not downloaded. No archive or `.git` object store remains,
+  preventing the WAV payload from being stored twice. Startup admits a checkout or ordinary
   copy by semantically comparing the required-path JSON with an atomic receipt
   and checking that every listed path exists. JSON ordering is irrelevant and
   no file hashes are calculated at startup; Git metadata is not a runtime
