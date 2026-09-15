@@ -11,7 +11,7 @@ source_root="$build_root/SuperCollider-${sc_version}-Source"
 host_system="$(uname -s)"
 
 verify_sha256() {
-    if command -v sha256sum >/dev/null 2>&1; then
+    if [[ "$host_system" != "Darwin" ]] && command -v sha256sum >/dev/null 2>&1; then
         echo "$source_sha256  $archive" | sha256sum --check --strict
     else
         actual="$(shasum -a 256 "$archive" | awk '{print $1}')"

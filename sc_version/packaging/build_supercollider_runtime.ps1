@@ -47,7 +47,9 @@ $AsioRoot = Join-Path $PortaudioRoot "asiosdk"
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $AsioRoot
 Expand-Archive $AsioArchive $PortaudioRoot -Force
 $ExtractedAsio = Join-Path $PortaudioRoot "ASIOSDK"
-Move-Item $ExtractedAsio $AsioRoot
+if (-not (Test-Path $ExtractedAsio)) {
+    throw "ASIO SDK archive has no ASIOSDK root directory"
+}
 
 & (Join-Path $VcpkgRoot "vcpkg.exe") install `
     "libsndfile:$Triplet" "fftw3:$Triplet" "readline:$Triplet"
