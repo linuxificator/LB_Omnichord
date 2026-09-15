@@ -91,6 +91,7 @@ SUITES: dict[str, tuple[Path, ...]] = {
         TESTS / "test_supercollider_drums.py",
     ),
     "sc-packaged": (
+        TESTS / "test_sample_repository.py",
         TESTS / "test_supercollider_package_contract.py",
     ),
 }

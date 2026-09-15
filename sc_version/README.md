@@ -44,14 +44,18 @@ when `pw-jack` is unavailable, because raw JACK can take ownership of the
 audio device. Override that safety check only for a deliberately configured
 JACK system.
 
-On first launch the bundled Dulwich Git client installs the pinned
-`linuxificator/VSCO-2-CE` sample set at `~/VSCO-2-CE` when it is absent. No
-system Git installation is required. The location is stored in
-`~/.omnichord/config/supercollider.json`. An existing ordinary copy is also
-supported: runtime identity is established from every required audio file in
-the bundled content manifest, not from optional Git metadata. The application
-waits for the dedicated VSCO percussion sample program before reporting the
-engine ready.
+On first launch a standard Qt directory chooser asks for the parent of the
+sample library. The bundled Dulwich Git client then shallow-clones the pinned
+`linuxificator/VSCO-2-CE` runtime branch there, and records the exact location
+in `~/.omnichord/config/supercollider.json`. A script may instead pass
+`--sample-root /exact/library/path`. It downloads
+only the 2,166 recordings reachable from playable mappings; no system Git or
+repository history is required. An existing ordinary copy is also supported.
+The application compares the checked-in required-path JSON semantically with
+the receipt beside the library and checks that every listed file exists; it
+does not hash recordings during startup. The pinned Git commit establishes
+the contents of downloads. The application waits for the
+dedicated VSCO percussion sample program before reporting the engine ready.
 
 ## Tests and packages
 

@@ -5,6 +5,28 @@ frontend_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd -- "$frontend_dir/../.." && pwd)"
 sc_dir="$frontend_dir/../supercollider"
 shipped_sc_config="$frontend_dir/config/supercollider.json"
+frontend_args=()
+sample_args=()
+while (($#)); do
+    case "$1" in
+        --sample-root)
+            (($# >= 2)) || {
+                echo "--sample-root requires a path" >&2
+                exit 2
+            }
+            ((${#sample_args[@]} == 0)) || {
+                echo "--sample-root may be supplied only once" >&2
+                exit 2
+            }
+            sample_args=(--sample-root "$2")
+            shift 2
+            ;;
+        *)
+            frontend_args+=("$1")
+            shift
+            ;;
+    esac
+done
 
 if [[ -n "${OMNICHORD_VENV:-}" ]]; then
     venv_dir="$OMNICHORD_VENV"
@@ -42,7 +64,8 @@ fi
 # preparation as frozen packages. The Python implementation bundles cleanly
 # and never assumes a system Git executable.
 sc_config="$(
-    "$venv_python" "$frontend_dir/code/sample_repository.py" "$shipped_sc_config"
+    "$venv_python" "$frontend_dir/code/sample_repository.py" \
+        "$shipped_sc_config" "${sample_args[@]}"
 )"
 export OMNICHORD_SC_CONFIG="$sc_config"
 
@@ -124,4 +147,4 @@ kill -0 "$sc_process_group" 2>/dev/null || {
     "$sc_process_group" "$supernova_path" &
 realtime_setup_pid=$!
 
-"$venv_python" "$frontend_dir/code/main.py" "$@"
+"$venv_python" "$frontend_dir/code/main.py" "${frontend_args[@]}"

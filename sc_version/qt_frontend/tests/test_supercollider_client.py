@@ -106,7 +106,7 @@ class SuperColliderClientTests(unittest.TestCase):
         self.config_path.write_text(
             json.dumps(
                 {
-                    "config_revision": 6,
+                    "config_revision": 7,
                     "protocol_version": 2,
                     "language": {
                         "host": "127.0.0.1",
@@ -126,7 +126,8 @@ class SuperColliderClientTests(unittest.TestCase):
                     "samples": {
                         "vsco_root": "/not-used-by-client",
                         "repository": "https://github.com/linuxificator/VSCO-2-CE.git",
-                        "commit": "440300901dfe9275fd84e0b7763af1f8443ae62e",
+                        "branch": "lb-omnichord-runtime-v1",
+                        "commit": "78b95e70efe4349eeb03855f7f7654cb81c8c62f",
                         "ram_budget_mib": 4096,
                     },
                 }

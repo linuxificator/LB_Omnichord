@@ -20,7 +20,7 @@ class SuperColliderConfigTests(unittest.TestCase):
         config = load_supercollider_config(
             FRONTEND_DIR / "config" / "supercollider.json"
         )
-        self.assertEqual(config.config_revision, 6)
+        self.assertEqual(config.config_revision, 7)
         self.assertEqual(config.protocol_version, 2)
         self.assertEqual(config.language.host, "127.0.0.1")
         self.assertEqual(config.server.sample_rate, 48000)
@@ -28,8 +28,19 @@ class SuperColliderConfigTests(unittest.TestCase):
         self.assertEqual(config.server.gesture_voice_limit, 64)
         self.assertEqual(
             config.samples.commit,
-            "440300901dfe9275fd84e0b7763af1f8443ae62e",
+            "78b95e70efe4349eeb03855f7f7654cb81c8c62f",
         )
+        self.assertEqual(config.samples.branch, "lb-omnichord-runtime-v1")
+
+    def test_unsafe_sample_branch_is_rejected(self) -> None:
+        source = FRONTEND_DIR / "config" / "supercollider.json"
+        data = json.loads(source.read_text(encoding="utf-8"))
+        data["samples"]["branch"] = "../unexpected"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "supercollider.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(SuperColliderConfigError, "safe explicit"):
+                load_supercollider_config(path)
 
     def test_non_loopback_control_listener_is_rejected(self) -> None:
         source = FRONTEND_DIR / "config" / "supercollider.json"

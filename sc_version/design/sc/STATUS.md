@@ -100,12 +100,17 @@ x86_64
   AppImages, macOS a DMG and Windows a ZIP. Each contains the official or pinned
   SuperCollider 3.14.1 runtime and no AMY runtime.
 - First launch uses bundled Dulwich rather than a system Git executable to
-  install `linuxificator/VSCO-2-CE` at `~/VSCO-2-CE`. The user config stores an
-  alternate location. Startup admits a checkout or ordinary copy based on all
-  required audio hashes in the bundled manifest; Git metadata is not a runtime
-  dependency. An unchanged validated inventory uses a user-local cache.
-- SuperCollider configuration revision 6 and protocol revision 2 include the
-  explicit sample commit, per-event drum duration cap and per-owner gesture
+  shallow-clone the pinned `linuxificator/VSCO-2-CE` runtime branch at the
+  first-run location chosen through Qt (or the exact `--sample-root` path).
+  Its 2,166 WAVs are the union of
+  playable SFZ and direct PCM-drum references; 1,002 unreachable source files
+  and Git history are not downloaded. Startup admits a checkout or ordinary
+  copy by semantically comparing the required-path JSON with an atomic receipt
+  and checking that every listed path exists. JSON ordering is irrelevant and
+  no file hashes are calculated at startup; Git metadata is not a runtime
+  dependency for an ordinary copy.
+- SuperCollider configuration revision 7 and protocol revision 2 include the
+  explicit sample branch and commit, per-event drum duration cap and per-owner gesture
   voice boundary. Every frozen package
   self-check exercises additive migration from all earlier revisions before an
   audio process is opened.

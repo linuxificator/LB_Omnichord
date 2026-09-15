@@ -89,6 +89,10 @@ def production_dependencies(
     """Construct the one production dependency graph without mutating modules."""
 
     paths = FrontendPaths.from_root(asset_root or FRONTEND_DIR)
+    frontend_loader = partial(
+        load_frontend_config,
+        schema_path=paths.config / "schema" / "frontend_v1.schema.json",
+    )
     supercollider_root = resolve_supercollider_asset_root(paths.root)
     runtime_config_path = Path(
         os.environ.get(
@@ -113,7 +117,7 @@ def production_dependencies(
     )
     return ApplicationDependencies(
         paths=paths,
-        load_frontend_config=load_frontend_config,
+        load_frontend_config=frontend_loader,
         load_defaults=app_core.load_defaults,
         load_chords=app_core.load_chords,
         load_synth_catalog=partial(

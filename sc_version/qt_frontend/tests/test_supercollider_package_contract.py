@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "code"))
 sys.path.insert(0, str(ROOT / "packaging"))
 
 from sc_appimage_entry import (  # noqa: E402
+    _extract_sample_root_argument,
     packaged_runtime_root,
     verify_application_assets,
     verify_config_migrations,
@@ -23,6 +24,16 @@ from sc_appimage_entry import (  # noqa: E402
 
 
 class SuperColliderPackageContractTests(unittest.TestCase):
+    def test_packaged_sample_location_option_is_removed_before_qt_start(self) -> None:
+        forwarded, sample_root = _extract_sample_root_argument(
+            ["--windowed", "--sample-root", "/media/audio/VSCO-2-CE"]
+        )
+        self.assertEqual(forwarded, ["--windowed"])
+        self.assertEqual(sample_root, Path("/media/audio/VSCO-2-CE"))
+
+        with self.assertRaisesRegex(RuntimeError, "requires a path"):
+            _extract_sample_root_argument(["--sample-root"])
+
     def test_production_import_graph_cannot_reach_an_amy_runtime(self) -> None:
         code_root = ROOT / "code"
         packaging_root = ROOT / "packaging"
@@ -115,6 +126,7 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             "core_synthdefs.scd",
             "sclork-programs.json",
             "vsco-manifest.json",
+            "required-samples.json",
             "drum-key-map.json",
             "source-lock.json",
         }
@@ -123,12 +135,15 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         config = json.loads(
             (ROOT / "config" / "supercollider.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(config["config_revision"], 6)
+        self.assertEqual(config["config_revision"], 7)
         self.assertEqual(config["protocol_version"], 2)
         self.assertEqual(config["server"]["gesture_voice_limit"], 64)
         self.assertEqual(
             config["samples"]["commit"],
-            "440300901dfe9275fd84e0b7763af1f8443ae62e",
+            "78b95e70efe4349eeb03855f7f7654cb81c8c62f",
+        )
+        self.assertEqual(
+            config["samples"]["branch"], "lb-omnichord-runtime-v1"
         )
         release_inputs = json.loads(
             (ROOT / "packaging" / "supercollider_release_inputs.json").read_text(
@@ -150,12 +165,51 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         )
         self.assertEqual(
             {
+                config["samples"]["branch"],
+                release_inputs["sample_assets"]["branch"],
+            },
+            {"lb-omnichord-runtime-v1"},
+        )
+        self.assertEqual(
+            {
                 config["samples"]["commit"],
                 release_inputs["sample_assets"]["commit"],
                 drum_catalogue["sample_commit"],
             },
-            {"440300901dfe9275fd84e0b7763af1f8443ae62e"},
+            {"78b95e70efe4349eeb03855f7f7654cb81c8c62f"},
         )
+
+    def test_runtime_sample_selection_covers_every_playback_reference(self) -> None:
+        manifest = json.loads(
+            (SC_ROOT / "vsco-manifest.json").read_text(encoding="utf-8")
+        )
+        drums = json.loads(
+            (ROOT / "music" / "sc_expansion" / "sc_pcm_drumkits_v1.json")
+            .read_text(encoding="utf-8")
+        )
+        source_ids = {record["id"] for record in manifest["files"]}
+        melodic_ids = {region["sample_id"] for region in manifest["regions"]}
+        drum_ids = {
+            record["source_sample_id"] for record in drums["sample_files"]
+        }
+        selected_ids = melodic_ids | drum_ids
+        paths_by_id = {
+            record["id"]: record["relative_path"] for record in manifest["files"]
+        }
+        selected_paths = {paths_by_id[sample_id] for sample_id in selected_ids}
+        required = json.loads(
+            (SC_ROOT / "required-samples.json").read_text(encoding="utf-8")
+        )
+
+        self.assertTrue(selected_ids.issubset(source_ids))
+        self.assertEqual(len(melodic_ids), 2034)
+        self.assertEqual(len(drum_ids - melodic_ids), 132)
+        self.assertEqual(len(selected_ids), 2166)
+        self.assertEqual(len(source_ids - selected_ids), 1002)
+        self.assertEqual(required["file_count"], 2166)
+        self.assertEqual(set(required["files"]), selected_paths)
+        self.assertEqual(len(required["files"]), len(set(required["files"])))
+        self.assertTrue(all(isinstance(path, str) for path in required["files"]))
 
     def test_frozen_entry_uses_sc_supervision_and_contains_no_amy_service(self) -> None:
         entry = (ROOT / "packaging" / "sc_appimage_entry.py").read_text(

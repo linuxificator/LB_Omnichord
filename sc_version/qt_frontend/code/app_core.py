@@ -3987,7 +3987,10 @@ def run_application(
     dependencies: ApplicationDependencies,
 ) -> int:
     migrate_user_layout()
-    user_config_dir = ensure_user_configs(dependencies.paths.config)
+    user_config_dir = ensure_user_configs(
+        dependencies.paths.config,
+        frontend_config_loader=dependencies.load_frontend_config,
+    )
 
     # These Qt choices must be made before the first application/window is
     # constructed.

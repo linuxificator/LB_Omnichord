@@ -21,9 +21,15 @@ rhythm, strum-tail and logical-layout settings are imported. Program IDs and
 engine capacity never cross that boundary. Existing frontend config is never
 silently replaced.
 
-`supercollider.json` revision 6 separately owns OSC protocol endpoints, server
-options, buffer limits, the per-owner gesture voice boundary and sample
-repository identity/location. Its explicit
+The immutable frontend schema remains a packaged asset; it is not copied into
+the editable user directory. The composition root binds that exact schema to
+the config loader, so validation of `~/.omnichord/config/frontend.json` never
+depends on the frozen Python module's `__file__` layout. Package acceptance
+must exercise this copied-user-config path from an empty directory.
+
+`supercollider.json` revision 7 separately owns OSC protocol endpoints, server
+options, buffer limits, the per-owner gesture voice boundary and the sample
+repository identity, runtime branch, immutable commit and selected location. Its explicit
 migrations are verified from an empty user directory and every supported old
 revision inside the frozen package. Validation completes before Qt input or
 engine processes are created.

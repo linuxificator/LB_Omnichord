@@ -14,6 +14,57 @@ import tempfile
 ASSET_DIRECTORIES = ("config", "gui", "instruments", "music", "supercollider")
 
 
+def _extract_sample_root_argument(arguments: list[str]) -> tuple[list[str], Path | None]:
+    forwarded: list[str] = []
+    sample_root: Path | None = None
+    iterator = iter(arguments)
+    for argument in iterator:
+        if argument != "--sample-root":
+            forwarded.append(argument)
+            continue
+        if sample_root is not None:
+            raise RuntimeError("--sample-root may be supplied only once")
+        try:
+            value = next(iterator)
+        except StopIteration as exc:
+            raise RuntimeError("--sample-root requires a path") from exc
+        sample_root = Path(value)
+    return forwarded, sample_root
+
+
+def _select_packaged_sample_root(default_root: Path) -> Path | None:
+    result = subprocess.run(
+        [sys.executable, "--choose-sample-root", str(default_root)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode == 3:
+        return None
+    if result.returncode != 0:
+        raise RuntimeError(
+            "could not open the sample-location chooser: "
+            f"{result.stderr.strip()}"
+        )
+    selected = result.stdout.strip()
+    if not selected:
+        raise RuntimeError("sample-location chooser returned no path")
+    return Path(selected)
+
+
+def _run_sample_location_chooser(arguments: list[str]) -> int:
+    if len(arguments) != 1:
+        print("internal sample-location chooser requires one path", file=sys.stderr)
+        return 2
+    from sample_location_dialog import choose_sample_root
+
+    selected = choose_sample_root(Path(arguments[0]))
+    if selected is None:
+        return 3
+    print(selected)
+    return 0
+
+
 def packaged_asset_root() -> Path:
     packaged = getattr(sys, "_MEIPASS", None)
     candidates: list[Path] = []
@@ -78,9 +129,10 @@ def verify_config_migrations(root: Path) -> None:
             or fresh.server.max_buffers != expected_buffers
         ):
             raise RuntimeError("packaged fresh-user config seeding failed")
-    for revision in (1, 2, 3, 4):
+    for revision in range(1, shipped["config_revision"]):
         legacy = json.loads(json.dumps(shipped))
         legacy["config_revision"] = revision
+        legacy["samples"].pop("branch")
         if revision < 3:
             legacy["protocol_version"] = 1
         if revision < 4:
@@ -105,8 +157,10 @@ def verify_config_migrations(root: Path) -> None:
                 persisted["config_revision"] != shipped["config_revision"]
                 or persisted["protocol_version"] != shipped["protocol_version"]
                 or persisted["samples"]["commit"] != shipped["samples"]["commit"]
+                or persisted["samples"]["branch"] != shipped["samples"]["branch"]
                 or persisted["server"]["max_buffers"] != expected_buffers
                 or migrated.samples.commit != shipped["samples"]["commit"]
+                or migrated.samples.branch != shipped["samples"]["branch"]
                 or migrated.protocol_version != shipped["protocol_version"]
                 or migrated.server.max_buffers != expected_buffers
             ):
@@ -116,18 +170,36 @@ def verify_config_migrations(root: Path) -> None:
 
 
 def verify_application_assets(root: Path) -> None:
-    """Load the frozen production catalogue without starting Qt or audio."""
+    """Exercise a clean frontend start without starting Qt or audio."""
 
-    from frontend_config import load_frontend_config
+    from application_composition import load_application_resources
     import main
+    from user_data import ensure_user_configs
 
-    load_frontend_config(root / "config" / "frontend.json", source_kind="shipped")
     dependencies = main.production_dependencies(asset_root=root)
-    synths, chord, strum, bass = dependencies.load_synth_catalog(
-        dependencies.paths.instruments / "supercollider-legacy-map.json"
-    )
-    if not synths or min(chord, strum, bass) < 0:
-        raise RuntimeError("packaged SuperCollider instrument catalogue is invalid")
+    with tempfile.TemporaryDirectory() as directory:
+        user_config_dir = ensure_user_configs(
+            dependencies.paths.config,
+            user_config_dir=Path(directory) / ".omnichord" / "config",
+            frontend_config_loader=dependencies.load_frontend_config,
+        )
+        frontend_config = dependencies.load_frontend_config(
+            user_config_dir / "frontend.json"
+        )
+        resources = load_application_resources(
+            dependencies,
+            user_config_dir=user_config_dir,
+        )
+        if frontend_config.source_path != (
+            user_config_dir / "frontend.json"
+        ).resolve():
+            raise RuntimeError("packaged fresh-user frontend config was not selected")
+        if not resources.synths or min(
+            resources.default_chord_synth_index,
+            resources.default_strum_synth_index,
+            resources.default_bass_synth_index,
+        ) < 0:
+            raise RuntimeError("packaged SuperCollider instrument catalogue is invalid")
 
 
 def verify_package(root: Path, runtime: Path) -> int:
@@ -176,13 +248,15 @@ def verify_package(root: Path, runtime: Path) -> int:
     ).validate_bootstrap()
     print(
         "LB_OMNICHORD_SC_PACKAGE_OK server=supernova "
-        f"root={root} runtime={runtime} config_migrations=1,2 "
-        "frontend_config=loaded catalogue=loaded bootstrap=validated"
+        f"root={root} runtime={runtime} config_migrations=all "
+        "frontend_first_run=validated catalogue=loaded bootstrap=validated"
     )
     return 0
 
 
 def main_entry() -> int:
+    if len(sys.argv) >= 2 and sys.argv[1] == "--choose-sample-root":
+        return _run_sample_location_chooser(sys.argv[2:])
     root = packaged_asset_root()
     runtime = packaged_runtime_root()
     if sys.argv[1:] == ["--verify-package"]:
@@ -191,8 +265,13 @@ def main_entry() -> int:
     from sample_repository import prepare_user_runtime_config
     from supercollider_platform_adapter import SuperColliderSupervisor
 
+    forwarded_args, explicit_sample_root = _extract_sample_root_argument(sys.argv[1:])
     config_path, config = prepare_user_runtime_config(
-        root / "config" / "supercollider.json"
+        root / "config" / "supercollider.json",
+        sample_root_override=explicit_sample_root,
+        sample_root_selector=(
+            None if explicit_sample_root is not None else _select_packaged_sample_root
+        ),
     )
     os.environ["OMNICHORD_SC_CONFIG"] = str(config_path)
     with SuperColliderSupervisor(
@@ -200,7 +279,7 @@ def main_entry() -> int:
         config=config,
         runtime_root=runtime,
     ):
-        return int(main.main(sys.argv[1:], asset_root=root))
+        return int(main.main(forwarded_args, asset_root=root))
 
 
 if __name__ == "__main__":

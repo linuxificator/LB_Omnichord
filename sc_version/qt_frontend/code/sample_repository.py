@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
+from collections.abc import Callable
+from dataclasses import dataclass
 import json
 from pathlib import Path
+from pathlib import PurePosixPath
 import shutil
 import sys
 import tempfile
@@ -22,111 +24,164 @@ from supercollider_config import (
 
 
 DEFAULT_REPOSITORY = "https://github.com/linuxificator/VSCO-2-CE.git"
-DEFAULT_SAMPLE_COMMIT = "440300901dfe9275fd84e0b7763af1f8443ae62e"
+DEFAULT_SAMPLE_BRANCH = "lb-omnichord-runtime-v1"
+DEFAULT_SAMPLE_COMMIT = "78b95e70efe4349eeb03855f7f7654cb81c8c62f"
+LEGACY_SAMPLE_COMMIT = "440300901dfe9275fd84e0b7763af1f8443ae62e"
 DEFAULT_SAMPLE_ROOT = "~/VSCO-2-CE"
 LEGACY_SAMPLE_ROOT = "~/sample_lib/VSCO-2-CE-1.1.0"
+SAMPLE_RECEIPT_NAME = "lb-omnichord-samples.json"
 
 
 class SampleRepositoryError(RuntimeError):
     """Raised before audio startup when the configured sample tree is unsafe."""
 
 
-def _sample_manifest_for_config(shipped_config: Path) -> Path:
+def _required_sample_list_for_config(shipped_config: Path) -> Path:
     source = shipped_config.expanduser().resolve()
     candidates = (
-        source.parents[1] / "supercollider" / "vsco-manifest.json",
-        source.parents[2] / "supercollider" / "vsco-manifest.json",
+        source.parents[1] / "supercollider" / "required-samples.json",
+        source.parents[2] / "supercollider" / "required-samples.json",
     )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
     raise SampleRepositoryError(
-        f"could not locate the VSCO content manifest beside {source}"
+        f"could not locate the required sample list beside {source}"
     )
 
 
-def _sample_inventory(
-    root: Path, records: list[object]
-) -> tuple[str, list[tuple[Path, str]]]:
-    inventory = hashlib.sha256()
-    files: list[tuple[Path, str]] = []
-    for raw_record in records:
-        if not isinstance(raw_record, dict):
-            raise SampleRepositoryError("VSCO manifest contains an invalid file record")
-        relative = raw_record.get("relative_path")
-        expected_hash = raw_record.get("sha256")
-        if not isinstance(relative, str) or not isinstance(expected_hash, str):
-            raise SampleRepositoryError("VSCO manifest file identity is incomplete")
-        path = root / relative
-        try:
-            status = path.stat()
-        except OSError as exc:
+@dataclass(frozen=True, slots=True)
+class RequiredSampleList:
+    bank_id: str
+    repository: str
+    branch: str
+    commit: str
+    files: frozenset[str]
+
+    def as_json(self) -> dict[str, object]:
+        return {
+            "schema_revision": 1,
+            "bank_id": self.bank_id,
+            "repository": self.repository,
+            "branch": self.branch,
+            "commit": self.commit,
+            "file_count": len(self.files),
+            "files": sorted(self.files),
+        }
+
+
+def _required_sample_list(data: object, source: str) -> RequiredSampleList:
+    if not isinstance(data, dict) or data.get("schema_revision") != 1:
+        raise SampleRepositoryError(f"{source} has no supported schema revision")
+    expected_keys = {
+        "schema_revision",
+        "bank_id",
+        "repository",
+        "branch",
+        "commit",
+        "file_count",
+        "files",
+    }
+    if set(data) != expected_keys:
+        raise SampleRepositoryError(f"{source} has unexpected sample-list fields")
+    bank_id = data.get("bank_id")
+    repository = data.get("repository")
+    branch = data.get("branch")
+    commit = data.get("commit")
+    raw_files = data.get("files")
+    if not isinstance(bank_id, str) or not bank_id:
+        raise SampleRepositoryError(f"{source} has incomplete sample identity")
+    if not isinstance(repository, str) or not repository:
+        raise SampleRepositoryError(f"{source} has incomplete sample identity")
+    if not isinstance(branch, str) or not branch:
+        raise SampleRepositoryError(f"{source} has incomplete sample identity")
+    if not isinstance(commit, str) or not commit:
+        raise SampleRepositoryError(f"{source} has incomplete sample identity")
+    if not isinstance(raw_files, list) or not raw_files:
+        raise SampleRepositoryError(f"{source} has no required sample files")
+    files: set[str] = set()
+    for relative in raw_files:
+        if not isinstance(relative, str) or not relative:
+            raise SampleRepositoryError(f"{source} contains an invalid sample path")
+        relative_path = PurePosixPath(relative)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
             raise SampleRepositoryError(
-                f"sample collection is incomplete; missing {relative} in {root}"
-            ) from exc
-        if not path.is_file():
-            raise SampleRepositoryError(
-                f"sample collection is incomplete; {relative} is not a file"
+                f"{source} contains an unsafe sample path: {relative!r}"
             )
-        inventory.update(relative.encode("utf-8"))
-        inventory.update(b"\0")
-        inventory.update(str(status.st_size).encode("ascii"))
-        inventory.update(b"\0")
-        inventory.update(str(status.st_mtime_ns).encode("ascii"))
-        inventory.update(b"\0")
-        inventory.update(str(status.st_ctime_ns).encode("ascii"))
-        inventory.update(b"\n")
-        files.append((path, expected_hash))
-    return inventory.hexdigest(), files
+        if relative in files:
+            raise SampleRepositoryError(
+                f"{source} contains duplicate sample path {relative!r}"
+            )
+        files.add(relative)
+    file_count = data.get("file_count")
+    if file_count != len(files):
+        raise SampleRepositoryError(
+            f"{source} file_count does not match its sample list"
+        )
+    return RequiredSampleList(
+        bank_id=bank_id,
+        repository=repository,
+        branch=branch,
+        commit=commit,
+        files=frozenset(files),
+    )
+
+
+def load_required_sample_list(path: Path) -> RequiredSampleList:
+    try:
+        data = JsonStore(path).read()
+    except (FileNotFoundError, OSError) as exc:
+        raise SampleRepositoryError(
+            f"could not read required sample list {path}: {exc}"
+        ) from exc
+    return _required_sample_list(data, str(path))
 
 
 def validate_sample_tree(
     path: Path,
-    manifest_path: Path,
+    required_samples_path: Path,
     *,
-    cache_path: Path | None = None,
+    repository_url: str | None = None,
+    branch: str | None = None,
+    commit: str | None = None,
 ) -> Path:
-    """Validate either a clone or an ordinary copy by its audio contents."""
+    """Compare semantic sample lists and verify every listed path exists."""
 
     resolved = path.expanduser().resolve()
-    try:
-        manifest_bytes = manifest_path.read_bytes()
-        manifest = json.loads(manifest_bytes)
-    except (OSError, json.JSONDecodeError) as exc:
+    required = load_required_sample_list(required_samples_path)
+    if repository_url is not None and _repository_identity(
+        required.repository
+    ) != _repository_identity(repository_url):
         raise SampleRepositoryError(
-            f"could not read VSCO content manifest {manifest_path}: {exc}"
-        ) from exc
-    if not isinstance(manifest, dict) or not isinstance(manifest.get("files"), list):
-        raise SampleRepositoryError("VSCO content manifest has no files array")
+            "required sample list repository differs from the runtime config"
+        )
+    if branch is not None and required.branch != branch:
+        raise SampleRepositoryError(
+            "required sample list branch differs from the runtime config"
+        )
+    if commit is not None and required.commit != commit:
+        raise SampleRepositoryError(
+            "required sample list commit differs from the runtime config"
+        )
 
-    manifest_hash = hashlib.sha256(manifest_bytes).hexdigest()
-    inventory_hash, files = _sample_inventory(resolved, manifest["files"])
-    expected_cache = {
-        "schema_revision": 1,
-        "sample_root": str(resolved),
-        "manifest_sha256": manifest_hash,
-        "inventory_sha256": inventory_hash,
-        "file_count": len(files),
-    }
-    if cache_path is not None:
-        try:
-            if JsonStore(cache_path).read() == expected_cache:
-                return resolved
-        except (FileNotFoundError, OSError):
-            pass
+    receipt_path = resolved / SAMPLE_RECEIPT_NAME
+    receipt: RequiredSampleList | None = None
+    try:
+        receipt = _required_sample_list(
+            JsonStore(receipt_path).read(), str(receipt_path)
+        )
+    except (FileNotFoundError, OSError, SampleRepositoryError):
+        pass
 
-    for sample, expected_hash in files:
-        try:
-            with sample.open("rb") as handle:
-                actual_hash = hashlib.file_digest(handle, "sha256").hexdigest()
-        except OSError as exc:
-            raise SampleRepositoryError(f"could not read sample file {sample}: {exc}") from exc
-        if actual_hash != expected_hash:
+    for relative in required.files:
+        sample = resolved / relative
+        if not sample.is_file():
             raise SampleRepositoryError(
-                f"sample collection content differs from the supported set: {sample}"
+                "sample collection is incomplete; missing "
+                f"{relative!r} in {resolved}"
             )
-    if cache_path is not None:
-        JsonStore(cache_path).write(expected_cache)
+    if receipt != required:
+        JsonStore(receipt_path, mode=0o644).write(required.as_json())
     return resolved
 
 
@@ -194,18 +249,20 @@ def validate_sample_repository(
 def ensure_sample_repository(
     path: Path,
     repository_url: str,
+    branch: str = DEFAULT_SAMPLE_BRANCH,
     expected_commit: str = DEFAULT_SAMPLE_COMMIT,
     *,
-    content_manifest: Path | None = None,
-    validation_cache: Path | None = None,
+    required_samples: Path | None = None,
 ) -> Path:
     destination = path.expanduser().resolve()
     if destination.exists():
-        if content_manifest is not None:
+        if required_samples is not None:
             return validate_sample_tree(
                 destination,
-                content_manifest,
-                cache_path=validation_cache,
+                required_samples,
+                repository_url=repository_url,
+                branch=branch,
+                commit=expected_commit,
             )
         return validate_sample_repository(
             destination, repository_url, expected_commit
@@ -217,17 +274,28 @@ def ensure_sample_repository(
     )
     checkout = temporary_root / "repository"
     print(
-        f"Installing VSCO 2 CE samples in {destination}; this is a large "
-        "one-time download.",
+        f"Installing the LB Omnichord VSCO 2 CE sample subset in {destination}; "
+        "this is a one-time download.",
         file=sys.stderr,
         flush=True,
     )
     try:
-        porcelain.clone(repository_url, str(checkout), checkout=True)
-        porcelain.reset(checkout, "hard", expected_commit)
+        porcelain.clone(
+            repository_url,
+            str(checkout),
+            checkout=True,
+            depth=1,
+            branch=branch,
+        )
         validate_sample_repository(checkout, repository_url, expected_commit)
-        if content_manifest is not None:
-            validate_sample_tree(checkout, content_manifest)
+        if required_samples is not None:
+            validate_sample_tree(
+                checkout,
+                required_samples,
+                repository_url=repository_url,
+                branch=branch,
+                commit=expected_commit,
+            )
         checkout.replace(destination)
     except BaseException as exc:
         raise SampleRepositoryError(
@@ -243,6 +311,7 @@ def _migrate_config(
     *,
     default_max_buffers: int,
     default_gesture_voice_limit: int,
+    default_sample_branch: str,
     default_sample_commit: str,
 ) -> tuple[dict[str, object], bool]:
     if not isinstance(data, dict):
@@ -291,6 +360,11 @@ def _migrate_config(
     if "commit" not in samples:
         samples["commit"] = default_sample_commit
         changed = True
+    if "branch" not in samples:
+        samples["branch"] = default_sample_branch
+        changed = True
+        if samples.get("commit") == LEGACY_SAMPLE_COMMIT:
+            samples["commit"] = default_sample_commit
 
     if revision < CURRENT_CONFIG_REVISION:
         migrated["protocol_version"] = 2
@@ -305,6 +379,8 @@ def prepare_user_runtime_config(
     *,
     user_root: Path | None = None,
     install_samples: bool = True,
+    sample_root_override: Path | None = None,
+    sample_root_selector: Callable[[Path], Path | None] | None = None,
 ) -> tuple[Path, SuperColliderRuntimeConfig]:
     """Seed/migrate user config and ensure its external sample collection."""
 
@@ -315,11 +391,48 @@ def prepare_user_runtime_config(
     store = JsonStore(target)
     if not target.exists():
         source = JsonStore(shipped_config).read()
+        if sample_root_override is not None:
+            samples = source.get("samples") if isinstance(source, dict) else None
+            if not isinstance(samples, dict):
+                raise SampleRepositoryError(
+                    "shipped SuperCollider config has no samples object"
+                )
+            samples["vsco_root"] = str(sample_root_override.expanduser().resolve())
+        elif install_samples and sample_root_selector is not None:
+            samples = source.get("samples") if isinstance(source, dict) else None
+            if not isinstance(samples, dict):
+                raise SampleRepositoryError(
+                    "shipped SuperCollider config has no samples object"
+                )
+            configured_root = samples.get("vsco_root")
+            if not isinstance(configured_root, str):
+                raise SampleRepositoryError(
+                    "shipped SuperCollider config has no sample location"
+                )
+            default_root = Path(configured_root).expanduser()
+            if not default_root.exists():
+                selected_root = sample_root_selector(default_root)
+                if selected_root is None:
+                    raise SampleRepositoryError(
+                        "sample location selection was cancelled; "
+                        "no samples were downloaded"
+                    )
+                samples["vsco_root"] = str(selected_root.expanduser().resolve())
+        store.write(source)
+    elif sample_root_override is not None:
+        source = store.read()
+        samples = source.get("samples") if isinstance(source, dict) else None
+        if not isinstance(samples, dict):
+            raise SampleRepositoryError(
+                "user SuperCollider config has no samples object"
+            )
+        samples["vsco_root"] = str(sample_root_override.expanduser().resolve())
         store.write(source)
     migrated, changed = _migrate_config(
         store.read(),
         default_max_buffers=shipped.server.max_buffers,
         default_gesture_voice_limit=shipped.server.gesture_voice_limit,
+        default_sample_branch=shipped.samples.branch,
         default_sample_commit=shipped.samples.commit,
     )
     if changed:
@@ -329,9 +442,9 @@ def prepare_user_runtime_config(
         ensure_sample_repository(
             config.samples.vsco_root,
             config.samples.repository,
+            config.samples.branch,
             config.samples.commit,
-            content_manifest=_sample_manifest_for_config(shipped_config),
-            validation_cache=root / "cache" / "vsco-validation.json",
+            required_samples=_required_sample_list_for_config(shipped_config),
         )
     return target, config
 
@@ -342,10 +455,23 @@ def _main() -> int:
     )
     parser.add_argument("shipped_config", type=Path)
     parser.add_argument("--without-samples", action="store_true")
+    parser.add_argument(
+        "--sample-root",
+        type=Path,
+        help="use this exact sample-library path instead of the first-run chooser",
+    )
     args = parser.parse_args()
+    selector: Callable[[Path], Path | None] | None = None
+    if not args.without_samples:
+        if args.sample_root is None:
+            from sample_location_dialog import choose_sample_root
+
+            selector = choose_sample_root
     path, _config = prepare_user_runtime_config(
         args.shipped_config,
         install_samples=not args.without_samples,
+        sample_root_override=args.sample_root,
+        sample_root_selector=selector,
     )
     print(path)
     return 0
