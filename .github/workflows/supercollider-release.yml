@@ -259,6 +259,7 @@ jobs:
           OMNICHORD_SC_APPIMAGE_ARCH: ${{ matrix.arch }}
           OMNICHORD_SC_APPIMAGE_PLATFORM: ${{ matrix.platform }}
           OMNICHORD_RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+          OMNICHORD_RELEASE_NAME: ${{ needs.release-metadata.outputs.tag }}
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: |
           packaging/build_sc_appimage.sh
@@ -306,6 +307,7 @@ jobs:
         working-directory: sc_version/qt_frontend
         env:
           OMNICHORD_RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+          OMNICHORD_RELEASE_NAME: ${{ needs.release-metadata.outputs.tag }}
         run: packaging/build_macos_dmg.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -348,6 +350,7 @@ jobs:
         working-directory: sc_version/qt_frontend
         env:
           OMNICHORD_RELEASE_STAMP: ${{ needs.release-metadata.outputs.stamp }}
+          OMNICHORD_RELEASE_NAME: ${{ needs.release-metadata.outputs.tag }}
         run: ./packaging/build_windows.ps1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

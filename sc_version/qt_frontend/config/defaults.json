@@ -43,7 +43,8 @@
     "bass_riff_selector": 1,
     "chord_arpeggio_enabled": false,
     "chord_arpeggio_rate": 1,
-    "chord_arpeggio_direction": "up"
+    "chord_arpeggio_direction": "up",
+    "chord_tap_audible": true
   },
   "window": {
     "start_fullscreen": false,

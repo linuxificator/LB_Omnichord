@@ -13,7 +13,7 @@ partition and selects the last-used instrument in that partition. It does not
 create a second audio backend: both choices are canonical SuperCollider
 programs and travel through the same typed program-selection protocol.
 
-`SYN` shows the 76 qualified SCLOrk definitions plus four owned acid voices.
+`SYN` shows the 75 qualified SCLOrk definitions plus four owned acid voices.
 Engine prefixes are not user-facing labels. `PCM` shows 22 recorded instrument
 families in the roller. The space to its right shows recorded variants in the
 upper row and articulations or playing styles in the lower row. A family with

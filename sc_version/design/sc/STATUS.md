@@ -38,7 +38,7 @@ x86_64
   measured SCLOrk catalogue; the formerly hot Acid Oto source no longer masks
   otherwise balanced percussion.
 - All 109 pinned SCLOrkSynths definitions compile and remain in the auditable
-  source inventory. The pitched browser admits 76 measured definitions; 31
+  source inventory. The pitched browser admits 75 measured definitions; 31
   raw drum definitions remain available to the dedicated drum path, nineteen
   used drum programs have their own measured playback calibration, and two
   numerically unstable definitions are explicitly excluded from playback.
@@ -85,7 +85,7 @@ x86_64
 - A sample request outside an articulation's recorded key range selects the
   nearest valid source region and then tunes it to the requested note. Strum
   therefore remains complete without inventing missing recordings.
-- Live startup plus attacks/releases across all 76 admitted SCLOrk voices,
+- Live startup plus attacks/releases across all 75 admitted SCLOrk voices,
   percussion roles and out-of-range VSCO notes completed without server
   failures, duplicate `/n_free` requests or buffer-number exhaustion.
 - MIDI and OSC integration tests keep the sender, frontend and engine receiver

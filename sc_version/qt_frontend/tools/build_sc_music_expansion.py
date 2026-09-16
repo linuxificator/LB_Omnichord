@@ -35,6 +35,11 @@ PROGRAM_CANONICALIZATION = {
     "sample.vsco.contrabasssusnv": "sample.vsco.contrabass-ks",
     "sample.vsco.contrabasspizz": "sample.vsco.contrabass-ks.art.e6-pizzicato",
     "sample.vsco.flutesusnv": "sample.vsco.flute-ks",
+    # The 50-mode source keeps every strummed voice alive for about 5.5 s and
+    # can exceed the realtime DSP budget under an ordinary continuous sweep.
+    # Preserve the source bundle as evidence, but compile factory snapshots to
+    # the already-qualified lightweight guitar voice.
+    "sc.sclork.modalElectricGuitar": "sc.sclork.pluck",
 }
 RHYTHM_FAMILIES = {
     rhythm_id: family
@@ -444,6 +449,7 @@ def _canonical_preset(data: Path) -> dict[str, Any]:
     synths = snapshot["synths"]
     for role in ("chord", "strum", "bass"):
         synths[role]["selected"] = _canonical_program(synths[role]["selected"])
+    snapshot.setdefault("rhythm", {})["chord_tap_audible"] = True
     return snapshot
 
 

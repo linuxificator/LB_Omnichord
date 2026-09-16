@@ -59,6 +59,12 @@ fi
 
 "$venv_python" -m pip check
 
+export OMNICHORD_RELEASE_NAME="$(
+    "$venv_python" -c \
+        'from pathlib import Path; import sys; sys.path.insert(0, sys.argv[1]); from release_identity import read_release_name; print(read_release_name(Path(sys.argv[2])))' \
+        "$frontend_dir/code" "$frontend_dir/release_identity.json"
+)"
+
 # Source runs use the same per-user configuration and sample-repository
 # preparation as frozen packages. The Python implementation bundles cleanly
 # and never assumes a system Git executable.

@@ -14,7 +14,8 @@ audio graph.
 
 `config/frontend.json` owns input and frontend policy.
 `config/supercollider.json` owns the SC runtime and sample configuration. The
-first launch creates private editable copies under `~/.omnichord/config` and
+first launch creates private editable copies under
+`~/.omnichord/<release-name>/config` and
 uses Qt's standard directory chooser to select the parent of the sample
 library. It then installs the pinned, curated VSCO 2 CE runtime subset there
 when required by streaming its commit-pinned GitHub snapshot without Git
@@ -24,6 +25,11 @@ when every required path exists; Git metadata is not required at runtime. Its
 installation receipt contains the required path list. Parsed JSON content is
 compared without assuming an object or list order, and startup never hashes the
 recordings.
+
+Configuration, OMNI presets, MIDI presets and optional diagnostic logs are
+release-scoped beneath `~/.omnichord/<release-name>/`. A new release starts
+from its shipped defaults instead of inheriting potentially incompatible state
+from an earlier build. Source runs use the fixed identity `development-SC`.
 
 ## Run and test
 

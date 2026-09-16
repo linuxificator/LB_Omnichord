@@ -7,6 +7,11 @@ import QtQuick.Window
 ApplicationWindow {
     id: window
 
+    // Bind externally supplied context objects once so nested controls use a
+    // qualified, stable owner instead of repeatedly resolving context names.
+    readonly property var performanceControlBackend: performanceBackend
+    readonly property var midiControlBackend: midiBackend
+
     width: 1920
     height: 850
     minimumWidth: 800
@@ -1539,8 +1544,8 @@ ApplicationWindow {
 
             // Moved left and up: aligned with the third chord row and with the
             // left edge of the section backgrounds.
-            Button {
-                id: chordGateButton
+            Item {
+                id: chordControlButtons
 
                 x: 0
                 y:
@@ -1555,56 +1560,110 @@ ApplicationWindow {
                     + 2 * window.rowIndent
                     - window.controlSpacing
                 height: window.rowHeight
-                text: performanceBackend.chordGateButtonText
-                property var midiTarget: ({
-                    "screen": "omni",
-                    "kind": "button",
-                    "action": "chord_gate"
-                })
 
-                readonly property bool selectedState:
-                    performanceBackend.chordGateState === 1
+                Button {
+                    id: chordGateButton
+                    objectName: "accompanimentToggleButton"
+                    anchors.left: parent.left
+                    width: (parent.width - window.controlSpacing) / 2
+                    height: parent.height
+                    text: window.performanceControlBackend.chordGateButtonText
+                    property var midiTarget: ({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_gate"
+                    })
 
-                font.pixelSize: 14
-                font.bold: true
+                    readonly property bool selectedState:
+                        window.performanceControlBackend.chordGateState === 1
 
-                contentItem: Text {
-                    text: chordGateButton.text
-                    color:
-                        chordGateButton.selectedState
-                        ? "#fff9dd"
-                        : "#4c3b08"
-                    font: chordGateButton.font
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
+                    font.pixelSize: 13
+                    font.bold: true
+
+                    contentItem: Text {
+                        text: chordGateButton.text
+                        color:
+                            chordGateButton.selectedState
+                            ? "#fff9dd"
+                            : "#4c3b08"
+                        font: chordGateButton.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    background: Rectangle {
+                        radius: 9
+                        color:
+                            chordGateButton.selectedState
+                            ? "#c79214"
+                            : (
+                                chordGateButton.pressed
+                                ? "#e1ca6a"
+                                : "#f3e5a5"
+                            )
+                        border.color: "#96720f"
+                        border.width:
+                            chordGateButton.selectedState ? 2 : 1
+                    }
+
+                    MidiButtonLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 6
+                        z: 2
+                        midiControlRouter: window.midiControlBackend
+                        midiTarget: chordGateButton.midiTarget
+                    }
+
+                    onClicked: {
+                        if (!window.midiButtonHandled(chordGateButton.midiTarget))
+                            window.performanceControlBackend.toggleChordGate()
+                    }
                 }
 
-                background: Rectangle {
-                    radius: 9
-                    color:
-                        chordGateButton.selectedState
-                        ? "#c79214"
-                        : (
-                            chordGateButton.pressed
-                            ? "#e1ca6a"
-                            : "#f3e5a5"
-                        )
-                    border.color: "#96720f"
-                    border.width:
-                        chordGateButton.selectedState ? 2 : 1
-                }
+                Button {
+                    id: chordTapButton
+                    objectName: "chordTapAudibleButton"
+                    anchors.right: parent.right
+                    width: (parent.width - window.controlSpacing) / 2
+                    height: parent.height
+                    text: window.performanceControlBackend.chordTapButtonText
+                    property var midiTarget: ({
+                        "screen": "omni",
+                        "kind": "button",
+                        "action": "chord_tap_audible"
+                    })
 
-                MidiButtonLed {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    y: 8
-                    z: 2
-                    midiControlRouter: midiBackend
-                    midiTarget: chordGateButton.midiTarget
-                }
+                    font.pixelSize: 13
+                    font.bold: true
 
-                onClicked: {
-                    if (!window.midiButtonHandled(chordGateButton.midiTarget))
-                        performanceBackend.toggleChordGate()
+                    contentItem: Text {
+                        text: chordTapButton.text
+                        color: "#111111"
+                        font: chordTapButton.font
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+
+                    background: Rectangle {
+                        radius: 9
+                        color: chordTapButton.pressed ? "#dddddd" : "#ffffff"
+                        border.color: "#111111"
+                        border.width:
+                            window.performanceControlBackend.chordTapAudible ? 2 : 1
+                    }
+
+                    MidiButtonLed {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 6
+                        z: 2
+                        midiControlRouter: window.midiControlBackend
+                        midiTarget: chordTapButton.midiTarget
+                    }
+
+                    onClicked: {
+                        if (!window.midiButtonHandled(chordTapButton.midiTarget))
+                            window.performanceControlBackend.toggleChordTapAudible()
+                    }
                 }
             }
 

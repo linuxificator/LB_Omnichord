@@ -174,7 +174,9 @@ def _validate_schema(
 
 
 def _source_kind(path: Path) -> ConfigSourceKind:
-    if path.parent.name == "config" and path.parent.parent.name == ".omnichord":
+    if path.parent.name == "config" and any(
+        parent.name == ".omnichord" for parent in path.parents
+    ):
         return "user"
     shipped = Path(__file__).resolve().parent.parent / "config" / "frontend.json"
     return "shipped" if path.resolve() == shipped.resolve() else "external"

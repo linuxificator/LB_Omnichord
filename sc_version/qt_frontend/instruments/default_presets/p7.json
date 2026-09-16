@@ -139,6 +139,7 @@
   "rhythm": {
     "bass_riff_selector": 5,
     "bass_voicing_shift": 1,
+    "chord_tap_audible": true,
     "drum_kit": "sc-sos",
     "selected": "soul",
     "settings": {

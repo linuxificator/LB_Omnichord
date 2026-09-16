@@ -91,7 +91,7 @@ naturally ended source is harmless without imposing timing or polling on Qt.
 ## Coverage and balance boundary
 
 The compiler still audits all 109 pinned SCLOrk definitions. The pitched
-browser exposes 76 qualified SCLOrk programs and four owned acid programs. The
+browser exposes 75 qualified SCLOrk programs and four owned acid programs. The
 drum rollers use nineteen separately qualified SCLOrk drum programs plus the
 basic and VSCO paths. NRT renders require finite audio; every selected synth
 drum hit must have RMS 0.010..0.075 at its real runtime default frequency.

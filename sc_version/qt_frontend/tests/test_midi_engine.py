@@ -439,6 +439,33 @@ class MidiEngineTests(unittest.TestCase):
 
         self.assertEqual(calls, ["chord_gate"])
 
+    def test_chord_tap_audition_button_uses_explicit_performance_action(self) -> None:
+        calls: list[str] = []
+        backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
+        backend.owner = type(
+            "Owner",
+            (),
+            {
+                "toggleChordTapAudible": lambda _self: calls.append(
+                    "chord_tap_audible"
+                )
+            },
+        )()
+        backend._midi_control_lock = threading.Lock()
+        backend._held_midi_button_targets = set()
+        backend._applying_midi_control = 0
+        target = {
+            "id": "omni:button:chord_tap_audible",
+            "screen": "omni",
+            "kind": "button",
+            "action": "chord_tap_audible",
+        }
+
+        backend._apply_button_target(target, True)
+        backend._apply_button_target(target, False)
+
+        self.assertEqual(calls, ["chord_tap_audible"])
+
     def test_preset_binding_loader_accepts_new_source_types(self) -> None:
         backend = MidiPlayerBackend.__new__(MidiPlayerBackend)
         backend._midi_control_state = MidiControlState()

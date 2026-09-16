@@ -131,6 +131,7 @@
     }
   ],
   "rhythm": {
+    "chord_tap_audible": true,
     "drum_kit": "pcm-hand-wood",
     "selected": "reggae",
     "settings": {
@@ -471,7 +472,7 @@
     },
     "strum": {
       "parameters": {},
-      "selected": "sc.sclork.modalElectricGuitar"
+      "selected": "sc.sclork.pluck"
     }
   },
   "transport": {

@@ -141,9 +141,6 @@
     "sc.sclork.midSideSaw": {
       "gain": 0.198099
     },
-    "sc.sclork.modalElectricGuitar": {
-      "gain": 10.033029
-    },
     "sc.sclork.modalMarimba": {
       "gain": 1.210233
     },
@@ -325,6 +322,9 @@
   "excluded": {
     "sc.sclork.metalPlate": {
       "reason": "non-finite or unstable raw output in the fixed-pitch audit"
+    },
+    "sc.sclork.modalElectricGuitar": {
+      "reason": "unbounded realtime cost under polyphonic strumming: each voice keeps 50 modal resonators active for about 5.5 seconds"
     },
     "sc.sclork.noQuarter": {
       "reason": "non-finite or unstable raw output in the fixed-pitch audit"

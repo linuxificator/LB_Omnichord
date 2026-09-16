@@ -131,6 +131,7 @@
     }
   ],
   "rhythm": {
+    "chord_tap_audible": true,
     "drum_kit": "sc-oto309",
     "selected": "garage_2step",
     "settings": {
