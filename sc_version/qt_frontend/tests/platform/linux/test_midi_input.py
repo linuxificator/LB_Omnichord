@@ -33,7 +33,9 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
     def test_real_midi_bytes_reach_a_bound_application_control(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
-            config_dir = temp / ".omnichord" / "config"
+            release_name = "midi-integration-test-SC"
+            release_root = temp / ".omnichord" / release_name
+            config_dir = release_root / "config"
             config_dir.mkdir(parents=True)
             config = json.loads(
                 (ROOT / "config" / "frontend.json").read_text(encoding="utf-8")
@@ -44,7 +46,7 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
             config_dir.joinpath("frontend.json").write_text(
                 json.dumps(config), encoding="utf-8"
             )
-            preset_dir = temp / ".omnichord" / "omni_presets"
+            preset_dir = release_root / "omni_presets"
             preset_dir.mkdir(parents=True)
             preset = json.loads(
                 (
@@ -116,6 +118,7 @@ class LinuxMidiInputIntegrationTests(unittest.TestCase):
                 HOME=str(temp),
                 QT_QPA_PLATFORM="offscreen",
                 QT_QUICK_BACKEND="software",
+                OMNICHORD_RELEASE_NAME=release_name,
                 OMNICHORD_SC_CONFIG=str(sc_config_path),
             )
             process = subprocess.Popen(
