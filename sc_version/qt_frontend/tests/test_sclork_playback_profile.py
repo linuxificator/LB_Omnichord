@@ -47,7 +47,11 @@ class SclorkPlaybackProfileTests(unittest.TestCase):
         self.assertFalse(included & excluded)
         self.assertEqual(
             excluded,
-            {"sc.sclork.metalPlate", "sc.sclork.noQuarter"},
+            {
+                "sc.sclork.metalPlate",
+                "sc.sclork.modalElectricGuitar",
+                "sc.sclork.noQuarter",
+            },
         )
 
     def test_runtime_loader_preserves_gains_and_exclusion_reasons(self) -> None:
@@ -56,6 +60,10 @@ class SclorkPlaybackProfileTests(unittest.TestCase):
         )
         self.assertEqual(gains["sc.sclork.glockenspiel"], 16.0)
         self.assertIn("unstable raw output", exclusions["sc.sclork.metalPlate"])
+        self.assertIn(
+            "50 modal resonators",
+            exclusions["sc.sclork.modalElectricGuitar"],
+        )
 
     def test_runtime_loader_rejects_ambiguous_or_unsafe_profiles(self) -> None:
         examples = (
@@ -152,6 +160,14 @@ class SclorkPlaybackProfileTests(unittest.TestCase):
             self.assertEqual(first.read_bytes(), second.read_bytes())
             built = json.loads(first.read_text(encoding="utf-8"))
             self.assertEqual(built["method"]["ceiling_midi_notes"], [107])
+            self.assertNotIn(
+                "sc.sclork.modalElectricGuitar",
+                built["programs"],
+            )
+            self.assertIn(
+                "sc.sclork.modalElectricGuitar",
+                built["excluded"],
+            )
             self.assertLessEqual(
                 max(item["gain"] for item in built["programs"].values()),
                 1.3,

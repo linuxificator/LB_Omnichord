@@ -54,10 +54,14 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
             "sc.omni.acidMoog",
             "sc.omni.acidWarsaw",
         }
-        self.assertEqual(len(mappings), 125)
+        self.assertEqual(len(mappings), 126)
         self.assertLessEqual(set(mappings.values()), available)
         self.assertEqual(mappings["tb303"], "sc.omni.acid303")
         self.assertEqual(mappings["physical_strings"], "sc.sclork.pluck")
+        self.assertEqual(
+            mappings["sc.sclork.modalElectricGuitar"],
+            "sc.sclork.pluck",
+        )
 
     def test_native_names_have_human_readable_sc_labels(self) -> None:
         self.assertEqual(display_name("organTonewheel1"), "Organ Tonewheel 1")
@@ -66,7 +70,7 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
         synths, *_ = load_synth_catalog(
             ROOT / "instruments" / "supercollider-legacy-map.json"
         )
-        self.assertEqual(sum(item.kind == "synth" for item in synths), 80)
+        self.assertEqual(sum(item.kind == "synth" for item in synths), 79)
         self.assertEqual(sum(item.kind == "sample" for item in synths), 66)
         drum_programs = {
             item.program_id
@@ -77,6 +81,12 @@ class SuperColliderProgramCatalogTests(unittest.TestCase):
         }
         self.assertTrue(drum_programs)
         self.assertTrue(all(item.key not in drum_programs for item in synths))
+        self.assertNotIn(
+            "sc.sclork.modalElectricGuitar",
+            {item.key for item in synths},
+        )
+        pluck = next(item for item in synths if item.key == "sc.sclork.pluck")
+        self.assertIn("sc.sclork.modalElectricGuitar", pluck.aliases)
         self.assertTrue(all(not item.label.startswith(("SC ", "VSCO ")) for item in synths))
         warsaw = next(item for item in synths if item.key == "sc.sclork.bassWarsaw")
         self.assertEqual(

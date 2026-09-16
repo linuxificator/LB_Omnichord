@@ -10,6 +10,14 @@ from pathlib import Path
 from statistics import median
 
 
+REVIEWED_EXCLUSIONS = {
+    "sc.sclork.modalElectricGuitar": (
+        "unbounded realtime cost under polyphonic strumming: each voice keeps "
+        "50 modal resonators active for about 5.5 seconds"
+    ),
+}
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--catalog", type=Path, required=True)
@@ -90,6 +98,11 @@ def main() -> int:
         if not is_requested_drum and (
             not program["pitch_support"] or program["category"] == "drums"
         ):
+            continue
+        if program_id in REVIEWED_EXCLUSIONS:
+            excluded[program_id] = {
+                "reason": REVIEWED_EXCLUSIONS[program_id]
+            }
             continue
         measurements = [report[program_id] for report in reports.values()]
         boundary_measurements = [

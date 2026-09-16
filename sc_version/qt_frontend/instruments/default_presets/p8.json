@@ -471,7 +471,7 @@
     },
     "strum": {
       "parameters": {},
-      "selected": "sc.sclork.modalElectricGuitar"
+      "selected": "sc.sclork.pluck"
     }
   },
   "transport": {

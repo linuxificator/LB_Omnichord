@@ -20,10 +20,17 @@ boundary:
   instrument browser;
 - `metalPlate` and `noQuarter` are excluded because float renders expose
   unstable or non-finite output at ordinary musical pitches;
-- the remaining 76 SCLOrk definitions are admitted through the checked-in
+- `modalElectricGuitar` is finite at isolated fixed pitches, but one voice
+  runs 50 modal resonators for about 5.5 seconds. Ordinary continuous strumming
+  can therefore build thousands of active resonators and overrun the realtime
+  DSP budget. It remains in the pinned source inventory but is not offered as
+  a playable program. Factory presets 4 and 8 use the qualified lightweight
+  `pluck` guitar instead; the legacy-program alias maps an existing saved
+  `modalElectricGuitar` selection to the same replacement;
+- the remaining 75 SCLOrk definitions are admitted through the checked-in
   playback profile;
 - four owned acid voices and 66 canonical VSCO pitched choices complete the
-  146 program identities behind the compact `SYN`/`PCM` browser. The PCM
+  145 program identities behind the compact `SYN`/`PCM` browser. The PCM
   roller itself stays at 22 families; variant and articulation buttons expose
   every non-duplicate recorded choice.
 
@@ -186,7 +193,7 @@ or articulation semantics merely to expose every file.
 ## Evidence and remaining limits
 
 Automated compiler, frontend, sequencer, bank, package and three-register audio
-suites pass. A real local production bootstrap was also driven through all 76
+suites pass. A real local production bootstrap was also driven through all 75
 admitted SCLOrk programs, every percussion role and VSCO notes below, inside
 and above a recorded range; shutdown contained no server failure, duplicate
 free or buffer exhaustion.

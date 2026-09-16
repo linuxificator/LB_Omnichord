@@ -323,6 +323,21 @@ class ScMusicExpansionTests(unittest.TestCase):
                 self.assertEqual(settings["chord_activity"], row["chord_activity"])
                 self.assertEqual(settings["bass_activity"], row["bass_activity"])
 
+    def test_factory_presets_do_not_select_the_realtime_unsafe_modal_guitar(self) -> None:
+        index = json.loads(
+            (CATALOG_ROOT / "sc_factory_presets_v1.json").read_text(
+                encoding="utf-8"
+            )
+        )["presets"]
+        selected = {
+            str(row[role])
+            for row in index
+            for role in ("chord", "strum", "bass")
+        }
+        self.assertNotIn("sc.sclork.modalElectricGuitar", selected)
+        self.assertEqual(index[3]["strum"], "sc.sclork.pluck")
+        self.assertEqual(index[7]["strum"], "sc.sclork.pluck")
+
 
 if __name__ == "__main__":
     unittest.main()
