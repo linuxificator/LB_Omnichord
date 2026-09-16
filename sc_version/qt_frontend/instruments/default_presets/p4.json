@@ -131,6 +131,7 @@
     }
   ],
   "rhythm": {
+    "chord_tap_audible": true,
     "drum_kit": "pcm-old-parlour",
     "selected": "jazz_swing",
     "settings": {

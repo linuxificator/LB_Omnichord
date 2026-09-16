@@ -15,6 +15,7 @@ class PerformanceQmlAdapter(QObject):
     """
 
     chordGateChanged = Signal()
+    chordTapAudibleChanged = Signal()
     bassVoicingChanged = Signal()
     chordArpeggioChanged = Signal()
 
@@ -26,6 +27,7 @@ class PerformanceQmlAdapter(QObject):
     @Slot()
     def _notify_all(self) -> None:
         self.chordGateChanged.emit()
+        self.chordTapAudibleChanged.emit()
         self.bassVoicingChanged.emit()
         self.chordArpeggioChanged.emit()
 
@@ -36,6 +38,14 @@ class PerformanceQmlAdapter(QObject):
     @Property(str, notify=chordGateChanged)
     def chordGateButtonText(self) -> str:
         return str(self._controller.chordGateButtonText)
+
+    @Property(bool, notify=chordTapAudibleChanged)
+    def chordTapAudible(self) -> bool:
+        return bool(self._controller.chordTapAudible)
+
+    @Property(str, notify=chordTapAudibleChanged)
+    def chordTapButtonText(self) -> str:
+        return str(self._controller.chordTapButtonText)
 
     @Property(bool, notify=chordArpeggioChanged)
     def chordArpeggioEnabled(self) -> bool:
@@ -72,6 +82,10 @@ class PerformanceQmlAdapter(QObject):
     @Slot()
     def toggleChordGate(self) -> None:
         self._controller.toggleChordGate()
+
+    @Slot()
+    def toggleChordTapAudible(self) -> None:
+        self._controller.toggleChordTapAudible()
 
     @Slot()
     def toggleChordArpeggio(self) -> None:

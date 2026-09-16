@@ -449,6 +449,7 @@ def _canonical_preset(data: Path) -> dict[str, Any]:
     synths = snapshot["synths"]
     for role in ("chord", "strum", "bass"):
         synths[role]["selected"] = _canonical_program(synths[role]["selected"])
+    snapshot.setdefault("rhythm", {})["chord_tap_audible"] = True
     return snapshot
 
 

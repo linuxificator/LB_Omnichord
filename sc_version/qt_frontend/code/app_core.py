@@ -1080,6 +1080,8 @@ class InstrumentBackend(QObject):
         self._pressed_chords: set[tuple[int, int]] = set()
         self._pressed_chord_order: list[tuple[int, int]] = []
         self._promoted_chords: set[tuple[int, int]] = set()
+        self._sounding_chords: set[tuple[int, int]] = set()
+        self._chord_tap_audible = True
         self._chord_activity_hold_override = False
         self._external_chord_input = ExternalChordInputState()
 
@@ -1133,6 +1135,7 @@ class InstrumentBackend(QObject):
         return {
             "pressed": [list(key) for key in sorted(self._pressed_chords)],
             "promoted": [list(key) for key in sorted(self._promoted_chords)],
+            "sounding": [list(key) for key in sorted(self._sounding_chords)],
             "external": list(external_key) if external_key is not None else None,
             "root_midi_override": self._active_root_midi_override,
             "override": (self._chord_activity_hold_override),
@@ -1836,7 +1839,7 @@ class InstrumentBackend(QObject):
 
     def _refresh_tuning_on_active_notes(self) -> None:
         # Retune every manually held chord in place.
-        for key in sorted(self._pressed_chords):
+        for key in sorted(self._sounding_chords):
             row_index, root_semitone = key
 
             self._send_manual_chord(
@@ -2618,6 +2621,7 @@ class InstrumentBackend(QObject):
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
+        self._sounding_chords.clear()
         self._chord_activity_hold_override = False
         self._external_chord_input.reset()
 
@@ -3113,10 +3117,12 @@ class InstrumentBackend(QObject):
             **self._debug_chord_state(),
         )
 
-        self._send_manual_chord(
-            "stop",
-            key=key,
-        )
+        if key in self._sounding_chords:
+            self._send_manual_chord(
+                "stop",
+                key=key,
+            )
+            self._sounding_chords.discard(key)
 
         self._pressed_chords.discard(key)
         self._promoted_chords.discard(key)
@@ -3140,11 +3146,14 @@ class InstrumentBackend(QObject):
             # The backend intentionally uses one fixed manual-chord owner. If
             # an older still-held chord becomes active again after the newer
             # chord is released, retrigger it under that owner.
-            self._send_manual_chord(
-                "start",
-                key=(next_row, next_root),
-                notes=self._current_notes(),
-            )
+            next_key = (next_row, next_root)
+            if self._chord_tap_audible or next_key in self._promoted_chords:
+                self._send_manual_chord(
+                    "start",
+                    key=next_key,
+                    notes=self._current_notes(),
+                )
+                self._sounding_chords.add(next_key)
 
         self._update_hold_override()
 
@@ -3162,6 +3171,7 @@ class InstrumentBackend(QObject):
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
+        self._sounding_chords.clear()
         self._update_hold_override()
 
     def _apply_external_chord_action(
@@ -3273,11 +3283,13 @@ class InstrumentBackend(QObject):
         )
         self._send_chord_state(play_now=False)
 
-        self._send_manual_chord(
-            "start",
-            key=key,
-            notes=self._current_notes(),
-        )
+        if self._chord_tap_audible:
+            self._send_manual_chord(
+                "start",
+                key=key,
+                notes=self._current_notes(),
+            )
+            self._sounding_chords.add(key)
         self._debug(
             "pressChord_exit",
             row=row_index,
@@ -3295,10 +3307,18 @@ class InstrumentBackend(QObject):
         if key not in self._pressed_chords or key in self._promoted_chords:
             return
 
-        # Qt/QML owns long-press recognition. Promotion performs only the
-        # accompaniment takeover; the active chord and its replacement pitches
-        # were already published on pointer-down.
+        # Qt/QML owns long-press recognition. When tap audition is disabled,
+        # promotion is also the exact point at which a deliberate hold starts
+        # sounding; Python never duplicates Qt's gesture timing.
         self._promoted_chords.add(key)
+        if key not in self._sounding_chords:
+            self._set_active_chord(row_index, root_semitone)
+            self._send_manual_chord(
+                "start",
+                key=key,
+                notes=self._current_notes(),
+            )
+            self._sounding_chords.add(key)
         self._debug(
             "chord_hold_promoted",
             row=row_index,
@@ -3721,7 +3741,7 @@ class InstrumentBackend(QObject):
         if self._active_row >= 0 and self._active_root_semitone >= 0:
             self._send_chord_state(play_now=False)
             active_key = (self._active_row, self._active_root_semitone)
-            if active_key in self._pressed_chords:
+            if active_key in self._sounding_chords:
                 self._send_manual_chord(
                     "update",
                     key=active_key,
@@ -3760,6 +3780,7 @@ class InstrumentBackend(QObject):
         self._pressed_chords.clear()
         self._pressed_chord_order.clear()
         self._promoted_chords.clear()
+        self._sounding_chords.clear()
         self._chord_activity_hold_override = False
         self._external_chord_input.reset()
         self._send_chord_state(play_now=False)

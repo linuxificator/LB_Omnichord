@@ -24,7 +24,9 @@ class FakeController(QObject):
     def __init__(self) -> None:
         super().__init__()
         self.chordGateState = 1
-        self.chordGateButtonText = "CHORD\nON"
+        self.chordGateButtonText = "ACC\nON"
+        self.chordTapAudible = True
+        self.chordTapButtonText = "CRD\nON"
         self.chordArpeggioEnabled = True
         self.chordArpeggioRate = 3
         self.chordArpeggioDescending = True
@@ -56,6 +58,8 @@ class PerformanceQmlAdapterTests(unittest.TestCase):
         for name in (
             "chordGateState",
             "chordGateButtonText",
+            "chordTapAudible",
+            "chordTapButtonText",
             "chordArpeggioEnabled",
             "chordArpeggioRate",
             "chordArpeggioDescending",
@@ -68,6 +72,7 @@ class PerformanceQmlAdapterTests(unittest.TestCase):
             self.assertGreaterEqual(meta.indexOfProperty(name), 0, name)
         for signature in (
             "toggleChordGate()",
+            "toggleChordTapAudible()",
             "toggleChordArpeggio()",
             "setChordArpeggioRate(double)",
             "toggleChordArpeggioDirection()",
@@ -88,7 +93,9 @@ class PerformanceQmlAdapterTests(unittest.TestCase):
 
     def test_properties_and_notify_signals_delegate_to_controller(self) -> None:
         self.assertEqual(self.adapter.chordGateState, 1)
-        self.assertEqual(self.adapter.chordGateButtonText, "CHORD\nON")
+        self.assertEqual(self.adapter.chordGateButtonText, "ACC\nON")
+        self.assertTrue(self.adapter.chordTapAudible)
+        self.assertEqual(self.adapter.chordTapButtonText, "CRD\nON")
         self.assertTrue(self.adapter.chordArpeggioEnabled)
         self.assertEqual(self.adapter.chordArpeggioRate, 3)
         self.assertTrue(self.adapter.chordArpeggioDescending)
@@ -113,6 +120,7 @@ class PerformanceQmlAdapterTests(unittest.TestCase):
 
     def test_actions_delegate_without_duplicating_domain_logic(self) -> None:
         self.adapter.toggleChordGate()
+        self.adapter.toggleChordTapAudible()
         self.adapter.toggleChordArpeggio()
         self.adapter.setChordArpeggioRate(4.0)
         self.adapter.toggleChordArpeggioDirection()
@@ -133,6 +141,7 @@ class PerformanceQmlAdapterTests(unittest.TestCase):
             self.controller.calls,
             [
                 ("toggleChordGate", ()),
+                ("toggleChordTapAudible", ()),
                 ("toggleChordArpeggio", ()),
                 ("setChordArpeggioRate", (4.0,)),
                 ("toggleChordArpeggioDirection", ()),

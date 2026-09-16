@@ -131,6 +131,7 @@
     }
   ],
   "rhythm": {
+    "chord_tap_audible": true,
     "drum_kit": "pcm-son",
     "selected": "cha_cha",
     "settings": {

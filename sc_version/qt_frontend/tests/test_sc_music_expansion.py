@@ -314,6 +314,7 @@ class ScMusicExpansionTests(unittest.TestCase):
                     programs,
                 )
                 rhythm = preset["rhythm"]
+                self.assertIs(rhythm["chord_tap_audible"], True)
                 self.assertEqual(rhythm["selected"], row["rhythm_id"])
                 self.assertEqual(rhythm["drum_kit"], row["kit_id"])
                 self.assertIn(rhythm["drum_kit"], kits)

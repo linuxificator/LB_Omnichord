@@ -131,6 +131,7 @@
     }
   ],
   "rhythm": {
+    "chord_tap_audible": true,
     "drum_kit": "pcm-concert",
     "selected": "waltz",
     "settings": {

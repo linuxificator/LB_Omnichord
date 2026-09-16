@@ -1382,6 +1382,8 @@ class MidiPlayerBackend(QObject):
                 self._apply_midi_setter(self.owner.toggleChordArpeggioDirection)
             elif action == "chord_gate":
                 self._apply_midi_setter(self.owner.toggleChordGate)
+            elif action == "chord_tap_audible":
+                self._apply_midi_setter(self.owner.toggleChordTapAudible)
 
     @Slot(int, int)
     def clickControlIndicator(self, channel: int, controller: int) -> None:

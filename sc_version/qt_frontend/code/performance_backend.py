@@ -42,6 +42,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
     """
 
     chordGateChanged = Signal()
+    chordTapAudibleChanged = Signal()
     bassVoicingChanged = Signal()
     chordArpeggioChanged = Signal()
 
@@ -141,8 +142,16 @@ class InstrumentBackend(app_core.InstrumentBackend):
     @Property(str, notify=chordGateChanged)
     def chordGateButtonText(self) -> str:
         if self._chord_gate_state == CHORD_GATE_ON:
-            return "CHORD\nON"
-        return "CHORD\nOFF"
+            return "ACC\nON"
+        return "ACC\nOFF"
+
+    @Property(bool, notify=chordTapAudibleChanged)
+    def chordTapAudible(self) -> bool:
+        return self._chord_tap_audible
+
+    @Property(str, notify=chordTapAudibleChanged)
+    def chordTapButtonText(self) -> str:
+        return "CRD\nON" if self._chord_tap_audible else "CRD\nOFF"
 
     @Property(bool, notify=chordGateChanged)
     def isOff(self) -> bool:
@@ -417,6 +426,13 @@ class InstrumentBackend(app_core.InstrumentBackend):
             self._send_chord_state(play_now=False)
 
     @Slot()
+    def toggleChordTapAudible(self) -> None:
+        self._chord_tap_audible = not self._chord_tap_audible
+        self.chordTapAudibleChanged.emit()
+        self.performanceChanged.emit()
+        self._emit_state_changed()
+
+    @Slot()
     def turnOff(self) -> None:
         self._set_chord_gate_state(CHORD_GATE_OFF)
         self._strum_last_index = None
@@ -599,6 +615,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
     def _reset_presettable_state_to_defaults(self) -> None:
         super()._reset_presettable_state_to_defaults()
         rhythm = self._defaults.get("rhythm", {})
+        self._chord_tap_audible = bool(rhythm.get("chord_tap_audible", True))
         self._bass_voicing_shift = clamp_bass_voicing_shift(
             rhythm.get("bass_voicing_shift", 0),
             limit=BASS_VOICING_LIMIT,
@@ -626,6 +643,9 @@ class InstrumentBackend(app_core.InstrumentBackend):
         rhythm = data.get("rhythm", {})
         if not isinstance(rhythm, dict):
             rhythm = {}
+        self._chord_tap_audible = bool(
+            rhythm.get("chord_tap_audible", self._chord_tap_audible)
+        )
         self._chord_arpeggio_enabled = bool(
             rhythm.get(
                 "chord_arpeggio_enabled",
@@ -677,12 +697,14 @@ class InstrumentBackend(app_core.InstrumentBackend):
         rhythm["chord_arpeggio_enabled"] = self._chord_arpeggio_enabled
         rhythm["chord_arpeggio_rate"] = self._chord_arpeggio_rate
         rhythm["chord_arpeggio_direction"] = "down" if self._chord_arpeggio_descending else "up"
+        rhythm["chord_tap_audible"] = self._chord_tap_audible
         return snapshot
 
     def _emit_full_preset_state(self) -> None:
         super()._emit_full_preset_state()
         self.bassVoicingChanged.emit()
         self.chordGateChanged.emit()
+        self.chordTapAudibleChanged.emit()
         self.chordArpeggioChanged.emit()
         self.performanceChanged.emit()
 
@@ -692,6 +714,7 @@ class InstrumentBackend(app_core.InstrumentBackend):
         self._bass_riff_context = None
         super().send_initial_state()
         self.chordGateChanged.emit()
+        self.chordTapAudibleChanged.emit()
         self.bassVoicingChanged.emit()
         self.chordArpeggioChanged.emit()
         self.performanceChanged.emit()
@@ -703,5 +726,6 @@ class InstrumentBackend(app_core.InstrumentBackend):
         self._bass_riff_context = None
         super().panic()
         self.chordGateChanged.emit()
+        self.chordTapAudibleChanged.emit()
         self.chordArpeggioChanged.emit()
         self.performanceChanged.emit()

@@ -131,6 +131,7 @@
     }
   ],
   "rhythm": {
+    "chord_tap_audible": true,
     "drum_kit": "sc-electro",
     "selected": "drum_and_bass",
     "settings": {

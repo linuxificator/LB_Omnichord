@@ -132,6 +132,7 @@
   ],
   "rhythm": {
     "bass_riff_selector": 3,
+    "chord_tap_audible": true,
     "drum_kit": "sc-electro",
     "selected": "techno",
     "settings": {
