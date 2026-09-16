@@ -61,7 +61,7 @@ from screenshot_state import (
 )
 from synth_state import SynthState
 from sc_drum_kits import DEFAULT_DRUM_KIT_ID, DRUM_KITS
-from user_data import OMNI_PRESET_DIR, ensure_user_configs, migrate_user_layout
+from user_data import OMNI_PRESET_DIR, ensure_user_configs
 
 
 CODE_DIR = Path(__file__).resolve().parent
@@ -3965,7 +3965,7 @@ def parse_arguments(
         "--debug",
         action="store_true",
         help=(
-            "Log detailed chord-touch and backend state transitions to ~/.omnichord/debug-*.jsonl"
+            "Log detailed chord-touch and backend state transitions in the active release directory"
         ),
     )
     parser.add_argument(
@@ -3986,7 +3986,6 @@ def run_application(
     args: argparse.Namespace,
     dependencies: ApplicationDependencies,
 ) -> int:
-    migrate_user_layout()
     user_config_dir = ensure_user_configs(
         dependencies.paths.config,
         frontend_config_loader=dependencies.load_frontend_config,

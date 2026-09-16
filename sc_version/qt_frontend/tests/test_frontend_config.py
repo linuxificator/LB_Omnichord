@@ -101,51 +101,30 @@ class FrontendConfigTests(unittest.TestCase):
             "$.osc_input.listen_address",
         )
 
-    def test_first_start_imports_only_relevant_legacy_user_settings(self) -> None:
+    def test_new_release_seeds_defaults_without_importing_an_older_release(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             user_root = Path(directory) / ".omnichord"
-            config_dir = user_root / "config"
-            config_dir.mkdir(parents=True)
-            legacy = {
-                "midi_input": copy.deepcopy(self.shipped["midi_input"]),
-                "osc_input": copy.deepcopy(self.shipped["osc_input"]),
-                "default_synths": {
-                    "chord": "juno_004",
-                    "strum": "juno_028",
-                    "bass": "dx7_143",
-                },
-                "midi_player": {"voices_per_synth": 7},
-                "rhythm": {
-                    "chord_gate_beats": 0.8,
-                    "bass_gate_beats": 0.4,
-                    "max_rhythm_chord_notes": 5,
-                    "tag_ranges": {"not": "imported"},
-                },
-                "performance": {"strum_tail_ms": 600, "synth_alloc_guard_ms": 99},
-                "buses": copy.deepcopy(self.shipped["logical_buses"]),
-                "amy_max_oscs": 999,
-            }
-            (config_dir / "amy_config.json").write_text(
-                json.dumps(legacy), encoding="utf-8"
+            old_config_dir = user_root / "R20260901T120000-SC" / "config"
+            old_config_dir.mkdir(parents=True)
+            old_frontend = copy.deepcopy(self.shipped)
+            old_frontend["midi"]["voices_per_row"] = 7
+            (old_config_dir / "frontend.json").write_text(
+                json.dumps(old_frontend), encoding="utf-8"
             )
+            release_root = user_root / "R20260916T120000-SC"
+            config_dir = release_root / "config"
             with patch.multiple(
                 user_data,
-                USER_ROOT=user_root,
+                USER_ROOT=release_root,
                 USER_CONFIG_DIR=config_dir,
-                OMNI_PRESET_DIR=user_root / "omni_presets",
-                MIDI_PRESET_DIR=user_root / "midi_presets",
+                OMNI_PRESET_DIR=release_root / "omni_presets",
+                MIDI_PRESET_DIR=release_root / "midi_presets",
             ):
                 result = user_data.ensure_user_configs(ROOT / "config")
 
             loaded = json.loads((result / "frontend.json").read_text(encoding="utf-8"))
-            self.assertEqual(
-                loaded["default_programs"], self.shipped["default_programs"]
-            )
-            self.assertEqual(loaded["midi"]["voices_per_row"], 7)
-            self.assertEqual(loaded["rhythm"]["max_chord_notes"], 5)
-            self.assertEqual(loaded["performance"], {"strum_tail_ms": 600})
-            self.assertNotIn("amy_max_oscs", loaded)
-            self.assertNotIn("tag_ranges", loaded["rhythm"])
+            self.assertEqual(loaded, self.shipped)
+            self.assertEqual(old_frontend["midi"]["voices_per_row"], 7)
 
     def test_packaged_first_start_uses_the_explicit_asset_schema(self) -> None:
         """A copied user config must not derive schema location from __file__."""
@@ -162,7 +141,9 @@ class FrontendConfigTests(unittest.TestCase):
             schema.write_bytes(
                 (ROOT / "config" / "schema" / schema.name).read_bytes()
             )
-            user_config = root / "home" / ".omnichord" / "config"
+            user_config = (
+                root / "home" / ".omnichord" / "R20260916T120000-SC" / "config"
+            )
             loader = partial(frontend_config.load_frontend_config, schema_path=schema)
 
             # Model a frozen module beside the executable. There is no schema

@@ -7,6 +7,7 @@ runtime_app="${OMNICHORD_SC_RUNTIME_APP:?set OMNICHORD_SC_RUNTIME_APP to SuperCo
 build_root="${OMNICHORD_DMG_BUILD_DIR:-$frontend_dir/build/macos-sc}"
 output_dir="${OMNICHORD_DMG_OUTPUT_DIR:-$frontend_dir/dist}"
 release_stamp="${OMNICHORD_RELEASE_STAMP:?set OMNICHORD_RELEASE_STAMP to RYYYYMMDDHHMMSS}"
+release_name="${OMNICHORD_RELEASE_NAME:?set OMNICHORD_RELEASE_NAME to the release tag}"
 
 case "$release_stamp" in
     R[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]) ;;
@@ -27,11 +28,14 @@ app_bundle="$pyinstaller_dist/LB_Omnichord_SC.app"
 output="$output_dir/LB_Omnichord.SC.${release_stamp}.macOS-arm64.dmg"
 qml_evidence="$output.qml-imports.json"
 package_audit="$output.package-audit.json"
+release_identity="$build_root/release_identity.json"
 
 rm -rf "$build_root"
 mkdir -p "$output_dir"
 python "$frontend_dir/packaging/qt_runtime_policy.py" \
     --qml-root "$frontend_dir/gui" --output "$qml_evidence"
+python "$frontend_dir/code/release_identity.py" \
+    --write "$release_identity" "$release_name"
 
 python -m PyInstaller \
     --noconfirm --clean --windowed \
@@ -54,6 +58,7 @@ python -m PyInstaller \
     --add-data "$frontend_dir/instruments:instruments" \
     --add-data "$frontend_dir/music:music" \
     --add-data "$sc_dir:supercollider" \
+    --add-data "$release_identity:." \
     "$frontend_dir/packaging/sc_appimage_entry.py"
 
 mkdir -p "$app_bundle/Contents/Resources/sc-runtime"

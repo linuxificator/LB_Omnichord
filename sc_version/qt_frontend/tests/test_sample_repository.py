@@ -262,7 +262,13 @@ class SampleRepositoryTests(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            target = home / ".omnichord" / "config" / "supercollider.json"
+            target = (
+                home
+                / ".omnichord"
+                / "development-SC"
+                / "config"
+                / "supercollider.json"
+            )
             self.assertEqual(Path(result.stdout.strip()).resolve(), target.resolve())
             persisted = json.loads(target.read_text(encoding="utf-8"))
             self.assertIs(type(persisted["server"]["max_buffers"]), int)

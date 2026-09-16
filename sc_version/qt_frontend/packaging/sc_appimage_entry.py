@@ -174,13 +174,14 @@ def verify_application_assets(root: Path) -> None:
 
     from application_composition import load_application_resources
     import main
+    from release_identity import release_user_root
     from user_data import ensure_user_configs
 
     dependencies = main.production_dependencies(asset_root=root)
     with tempfile.TemporaryDirectory() as directory:
         user_config_dir = ensure_user_configs(
             dependencies.paths.config,
-            user_config_dir=Path(directory) / ".omnichord" / "config",
+            user_config_dir=release_user_root(home=Path(directory)) / "config",
             frontend_config_loader=dependencies.load_frontend_config,
         )
         frontend_config = dependencies.load_frontend_config(
@@ -258,6 +259,9 @@ def main_entry() -> int:
     if len(sys.argv) >= 2 and sys.argv[1] == "--choose-sample-root":
         return _run_sample_location_chooser(sys.argv[2:])
     root = packaged_asset_root()
+    from release_identity import configure_release_environment
+
+    configure_release_environment(root / "release_identity.json")
     runtime = packaged_runtime_root()
     if sys.argv[1:] == ["--verify-package"]:
         return verify_package(root, runtime)

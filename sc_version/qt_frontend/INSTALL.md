@@ -16,11 +16,11 @@ headless SC process group. It refuses to start a competing raw JACK server on a
 PipeWire desktop.
 
 On first launch the application streams the pinned VSCO 2 CE runtime snapshot
-from GitHub. Its default location is `~/VSCO-2-CE`; edit
-`~/.omnichord/config/supercollider.json` to use another checkout or ordinary
-copy. Only the required files are extracted and neither Git history nor a
-`.git` directory is retained. All required files are verified against the
-bundled content manifest.
+from GitHub. Its default location is `~/VSCO-2-CE`; edit the active release's
+`~/.omnichord/<release-name>/config/supercollider.json` to use another
+checkout or ordinary copy. Only the required files are extracted and neither
+Git history nor a `.git` directory is retained. All required files are
+verified against the bundled content manifest.
 
 ## Packaged application
 
@@ -35,11 +35,16 @@ catalogue loading and the SC bootstrap without opening an audio device.
 
 ## Configuration
 
-- `~/.omnichord/config/frontend.json`: MIDI/OSC input and frontend policy.
-- `~/.omnichord/config/supercollider.json`: SC process/server/sample policy.
-- `~/.omnichord/omni_presets/`: OMNI presets.
-- `~/.omnichord/midi_presets/`: MIDI presets.
+- `~/.omnichord/<release-name>/config/frontend.json`: MIDI/OSC input and frontend policy.
+- `~/.omnichord/<release-name>/config/supercollider.json`: SC process/server/sample policy.
+- `~/.omnichord/<release-name>/omni_presets/`: OMNI presets.
+- `~/.omnichord/<release-name>/midi_presets/`: MIDI presets.
+
+Every packaged release embeds its own immutable release name and starts with
+fresh defaults in a separate directory. It deliberately does not import an
+older release's configuration or presets. Source checkouts use
+`development-SC`, so local development also remains separate from releases.
 
 Invalid or future configuration is rejected with a JSON path. Delete only the
-specific user config you intentionally want reseeded; the application does not
-silently overwrite existing settings.
+specific active-release user config you intentionally want reseeded; the
+application does not silently overwrite existing settings.

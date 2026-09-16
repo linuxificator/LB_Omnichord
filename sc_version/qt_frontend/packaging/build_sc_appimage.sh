@@ -7,6 +7,7 @@ runtime_prefix="${OMNICHORD_SC_RUNTIME_PREFIX:?set OMNICHORD_SC_RUNTIME_PREFIX}"
 build_root="${OMNICHORD_SC_APPIMAGE_BUILD_DIR:-$frontend_dir/build/sc-appimage}"
 output_dir="${OMNICHORD_SC_APPIMAGE_OUTPUT_DIR:-$frontend_dir/dist}"
 release_stamp="${OMNICHORD_RELEASE_STAMP:?set OMNICHORD_RELEASE_STAMP to RYYYYMMDDHHMMSS}"
+release_name="${OMNICHORD_RELEASE_NAME:?set OMNICHORD_RELEASE_NAME to the release tag}"
 appimage_tool="${APPIMAGETOOL:-appimagetool}"
 runtime_file="${APPIMAGE_RUNTIME_FILE:-}"
 appimage_arch="${OMNICHORD_SC_APPIMAGE_ARCH:-x86_64}"
@@ -31,6 +32,7 @@ pyinstaller_work="$build_root/pyinstaller-work"
 output="$output_dir/LB_Omnichord.SC.${release_stamp}.${platform_name}.AppImage"
 qml_evidence="$output.qml-imports.json"
 package_audit="$output.package-audit.json"
+release_identity="$build_root/release_identity.json"
 
 mkdir -p \
     "$app_dir/usr/lib/LB_Omnichord" \
@@ -40,6 +42,8 @@ mkdir -p \
 python "$frontend_dir/packaging/qt_runtime_policy.py" \
     --qml-root "$frontend_dir/gui" \
     --output "$qml_evidence"
+python "$frontend_dir/code/release_identity.py" \
+    --write "$release_identity" "$release_name"
 
 python -m PyInstaller \
     --noconfirm \
@@ -62,6 +66,7 @@ python -m PyInstaller \
     --add-data "$frontend_dir/instruments:instruments" \
     --add-data "$frontend_dir/music:music" \
     --add-data "$sc_dir:supercollider" \
+    --add-data "$release_identity:." \
     "$frontend_dir/packaging/sc_appimage_entry.py"
 
 cp -a "$pyinstaller_dist/LB_Omnichord_SC/." "$app_dir/usr/lib/LB_Omnichord/"

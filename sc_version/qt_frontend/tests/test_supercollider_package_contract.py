@@ -309,6 +309,8 @@ class SuperColliderPackageContractTests(unittest.TestCase):
         self.assertNotIn("--exclude-module amy", builder)
         self.assertNotIn("--exclude-module c_amy", builder)
         self.assertIn("--add-data \"$sc_dir:supercollider\"", builder)
+        self.assertIn('OMNICHORD_RELEASE_NAME', builder)
+        self.assertIn('--add-data "$release_identity:."', builder)
         self.assertIn('"$runtime_prefix/bin/supernova"', builder)
         macos_builder = (ROOT / "packaging" / "build_macos_dmg.sh").read_text(
             encoding="utf-8"
@@ -329,8 +331,34 @@ class SuperColliderPackageContractTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('"supernova.exe"', windows_builder)
+        self.assertIn("OMNICHORD_RELEASE_NAME", windows_builder)
+        self.assertIn('$releaseIdentity;.', windows_builder)
         self.assertNotIn("forbidden-runtime-exempt-prefix", windows_builder)
         self.assertNotIn("max-package-bytes", windows_builder)
+
+        macos_builder = (ROOT / "packaging" / "build_macos_dmg.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("OMNICHORD_RELEASE_NAME", macos_builder)
+        self.assertIn('--add-data "$release_identity:."', macos_builder)
+
+        self.assertGreaterEqual(text.count("OMNICHORD_RELEASE_NAME:"), 3)
+
+    def test_source_and_frozen_launchers_select_release_before_user_imports(self) -> None:
+        source = (ROOT / "run_local.sh").read_text(encoding="utf-8")
+        frozen = (ROOT / "packaging" / "sc_appimage_entry.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("release_identity.json", source)
+        self.assertLess(
+            source.index("OMNICHORD_RELEASE_NAME"),
+            source.index("sample_repository.py"),
+        )
+        self.assertIn("configure_release_environment", frozen)
+        self.assertLess(
+            frozen.index("configure_release_environment"),
+            frozen.index("from sample_repository import prepare_user_runtime_config"),
+        )
 
     def test_macos_frozen_entry_finds_runtime_in_contents_resources(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

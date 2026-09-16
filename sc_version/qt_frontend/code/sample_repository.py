@@ -14,6 +14,7 @@ from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 from json_store import JsonStore
+from release_identity import release_user_root
 from supercollider_config import (
     CURRENT_CONFIG_REVISION,
     SuperColliderRuntimeConfig,
@@ -448,7 +449,7 @@ def prepare_user_runtime_config(
 ) -> tuple[Path, SuperColliderRuntimeConfig]:
     """Seed/migrate user config and ensure its external sample collection."""
 
-    root = (user_root or (Path.home() / ".omnichord")).expanduser().resolve()
+    root = (user_root or release_user_root()).expanduser().resolve()
     target = root / "config" / "supercollider.json"
     target.parent.mkdir(parents=True, exist_ok=True)
     shipped = load_supercollider_config(shipped_config)
